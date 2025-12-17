@@ -15,6 +15,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+google = [
+  "google-cloud-speech",
+  "google-genai",
+  "grpcio",
+]
+alibaba = [
+  "dashscope",
+  "websockets",
+]
 keyring = ["keyring>=25.0"]
 dev = [
   "pytest>=9.0",
