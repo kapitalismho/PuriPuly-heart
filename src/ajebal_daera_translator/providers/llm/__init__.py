@@ -1,2 +1,1 @@
-__all__ = ["gemini"]
-
+__all__ = ["gemini", "qwen"]
