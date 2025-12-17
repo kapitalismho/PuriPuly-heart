@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+keyring = ["keyring>=25.0"]
 dev = [
   "pytest>=9.0",
   "pytest-asyncio>=1.3",
