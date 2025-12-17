@@ -72,11 +72,22 @@ class LLMSettings:
 
 @dataclass(slots=True)
 class OSCSettings:
+    host: str = "127.0.0.1"
+    port: int = 9000
+    chatbox_address: str = "/chatbox/input"
+    chatbox_send: bool = True
+    chatbox_clear: bool = False
     chatbox_max_chars: int = 144
     cooldown_s: float = 1.5
     ttl_s: float = 7.0
 
     def validate(self) -> None:
+        if not self.host:
+            raise ValueError("host must be non-empty")
+        if not (0 < self.port <= 65535):
+            raise ValueError("port must be in 1..65535")
+        if not self.chatbox_address or not self.chatbox_address.startswith("/"):
+            raise ValueError("chatbox_address must start with '/'")
         if self.chatbox_max_chars <= 0:
             raise ValueError("chatbox_max_chars must be > 0")
         if self.cooldown_s <= 0:
@@ -158,6 +169,11 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
         },
         "llm": {"concurrency_limit": settings.llm.concurrency_limit},
         "osc": {
+            "host": settings.osc.host,
+            "port": settings.osc.port,
+            "chatbox_address": settings.osc.chatbox_address,
+            "chatbox_send": settings.osc.chatbox_send,
+            "chatbox_clear": settings.osc.chatbox_clear,
             "chatbox_max_chars": settings.osc.chatbox_max_chars,
             "cooldown_s": settings.osc.cooldown_s,
             "ttl_s": settings.osc.ttl_s,
@@ -192,6 +208,11 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
         ),
         llm=LLMSettings(concurrency_limit=int(data.get("llm", {}).get("concurrency_limit", 1))),
         osc=OSCSettings(
+            host=str(data.get("osc", {}).get("host", "127.0.0.1")),
+            port=int(data.get("osc", {}).get("port", 9000)),
+            chatbox_address=str(data.get("osc", {}).get("chatbox_address", "/chatbox/input")),
+            chatbox_send=bool(data.get("osc", {}).get("chatbox_send", True)),
+            chatbox_clear=bool(data.get("osc", {}).get("chatbox_clear", False)),
             chatbox_max_chars=int(data.get("osc", {}).get("chatbox_max_chars", 144)),
             cooldown_s=float(data.get("osc", {}).get("cooldown_s", 1.5)),
             ttl_s=float(data.get("osc", {}).get("ttl_s", 7.0)),
@@ -217,4 +238,3 @@ def save_settings(path: Path, settings: AppSettings) -> None:
     settings.validate()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(to_dict(settings), ensure_ascii=False, indent=2), encoding="utf-8")
-
