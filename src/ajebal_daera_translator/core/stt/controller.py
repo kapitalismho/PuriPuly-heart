@@ -64,12 +64,12 @@ class ManagedSTTProvider:
 
         if self._consumer_task:
             self._consumer_task.cancel()
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._consumer_task
             self._consumer_task = None
 
         if self._active_session:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._active_session.close()
             self._active_session = None
 
