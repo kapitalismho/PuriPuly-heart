@@ -21,6 +21,7 @@ dependencies = [
   "dashscope",
   "websockets",
   "keyring>=25.0",
+  "flet>=0.25.0",
 ]
 
 [project.optional-dependencies]

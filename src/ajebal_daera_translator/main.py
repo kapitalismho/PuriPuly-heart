@@ -42,6 +42,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Translate STT final results using configured LLM provider",
     )
 
+    sub.add_parser("run-gui", help="Run the Graphical User Interface (Flet)")
+
     return parser
 
 
@@ -53,6 +55,14 @@ def main(argv: list[str] | None = None) -> int:
         from . import __version__
 
         print(__version__)
+        return 0
+
+    if args.command == "run-gui":
+        import flet as ft
+        from ajebal_daera_translator.ui.app import main_gui
+        
+        # Run Flet app
+        ft.app(target=main_gui)
         return 0
 
     settings = _load_settings_or_default(args.config)
