@@ -25,7 +25,7 @@ class SecretsBackend(str, Enum):
 @dataclass(slots=True)
 class LanguageSettings:
     source_language: str = "ko-KR"
-    target_language: str = "en"
+    target_language: str = "en-US"
 
     def validate(self) -> None:
         if not self.source_language:
@@ -39,6 +39,8 @@ class AudioSettings:
     internal_sample_rate_hz: int = 16000
     internal_channels: int = 1
     ring_buffer_ms: int = 500
+    input_host_api: str = ""
+    input_device: str = ""
 
     def validate(self) -> None:
         if self.internal_sample_rate_hz not in (8000, 16000):
@@ -47,18 +49,25 @@ class AudioSettings:
             raise ValueError("internal_channels must be 1 (mono)")
         if self.ring_buffer_ms <= 0:
             raise ValueError("ring_buffer_ms must be > 0")
+        if self.input_host_api is None:
+            raise ValueError("input_host_api must be a string")
+        if self.input_device is None:
+            raise ValueError("input_device must be a string")
 
 
 @dataclass(slots=True)
 class STTSettings:
     reset_deadline_s: float = 90.0
     drain_timeout_s: float = 2.0
+    vad_speech_threshold: float = 0.5
 
     def validate(self) -> None:
         if self.reset_deadline_s <= 0:
             raise ValueError("reset_deadline_s must be > 0")
         if self.drain_timeout_s <= 0:
             raise ValueError("drain_timeout_s must be > 0")
+        if not (0.0 <= self.vad_speech_threshold <= 1.0):
+            raise ValueError("vad_speech_threshold must be in 0.0..1.0")
 
 
 @dataclass(slots=True)
@@ -188,10 +197,13 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
             "internal_sample_rate_hz": settings.audio.internal_sample_rate_hz,
             "internal_channels": settings.audio.internal_channels,
             "ring_buffer_ms": settings.audio.ring_buffer_ms,
+            "input_host_api": settings.audio.input_host_api,
+            "input_device": settings.audio.input_device,
         },
         "stt": {
             "reset_deadline_s": settings.stt.reset_deadline_s,
             "drain_timeout_s": settings.stt.drain_timeout_s,
+            "vad_speech_threshold": settings.stt.vad_speech_threshold,
         },
         "google_speech": {
             "recognizer": settings.google_speech.recognizer,
@@ -222,6 +234,13 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
 
 
 def from_dict(data: dict[str, Any]) -> AppSettings:
+    audio_data = data.get("audio") or {}
+    stt_data = data.get("stt") or {}
+
+    input_host_api_raw = audio_data.get("input_host_api")
+    input_device_raw = audio_data.get("input_device")
+    vad_threshold_raw = stt_data.get("vad_speech_threshold")
+
     settings = AppSettings(
         provider=ProviderSettings(
             stt=STTProviderName(data.get("provider", {}).get("stt", STTProviderName.GOOGLE.value)),
@@ -229,16 +248,19 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
         ),
         languages=LanguageSettings(
             source_language=data.get("languages", {}).get("source_language", "ko-KR"),
-            target_language=data.get("languages", {}).get("target_language", "en"),
+            target_language=data.get("languages", {}).get("target_language", "en-US"),
         ),
         audio=AudioSettings(
-            internal_sample_rate_hz=int(data.get("audio", {}).get("internal_sample_rate_hz", 16000)),
-            internal_channels=int(data.get("audio", {}).get("internal_channels", 1)),
-            ring_buffer_ms=int(data.get("audio", {}).get("ring_buffer_ms", 500)),
+            internal_sample_rate_hz=int(audio_data.get("internal_sample_rate_hz", 16000)),
+            internal_channels=int(audio_data.get("internal_channels", 1)),
+            ring_buffer_ms=int(audio_data.get("ring_buffer_ms", 500)),
+            input_host_api=str(input_host_api_raw) if input_host_api_raw is not None else "",
+            input_device=str(input_device_raw) if input_device_raw is not None else "",
         ),
         stt=STTSettings(
-            reset_deadline_s=float(data.get("stt", {}).get("reset_deadline_s", 90.0)),
-            drain_timeout_s=float(data.get("stt", {}).get("drain_timeout_s", 2.0)),
+            reset_deadline_s=float(stt_data.get("reset_deadline_s", 90.0)),
+            drain_timeout_s=float(stt_data.get("drain_timeout_s", 2.0)),
+            vad_speech_threshold=float(vad_threshold_raw) if vad_threshold_raw is not None else 0.5,
         ),
         google_speech=GoogleSpeechSettings(
             recognizer=str(data.get("google_speech", {}).get("recognizer", "")),

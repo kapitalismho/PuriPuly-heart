@@ -73,3 +73,4 @@ class UIEvent:
     type: UIEventType
     utterance_id: UUID | None = None
     payload: object | None = None
+    source: str | None = None

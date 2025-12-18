@@ -11,7 +11,7 @@ import numpy as np
 from ajebal_daera_translator.app.wiring import create_llm_provider, create_secret_store, create_stt_backend
 from ajebal_daera_translator.config.settings import AppSettings
 from ajebal_daera_translator.core.audio.format import normalize_audio_f32
-from ajebal_daera_translator.core.audio.source import AudioSource, SoundDeviceAudioSource
+from ajebal_daera_translator.core.audio.source import AudioSource, SoundDeviceAudioSource, resolve_sounddevice_input_device
 from ajebal_daera_translator.core.clock import SystemClock
 from ajebal_daera_translator.core.orchestrator.hub import ClientHub
 from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue
@@ -75,11 +75,20 @@ class HeadlessMicRunner:
             engine=SileroVadOnnx(model_path=self.vad_model_path),
             sample_rate_hz=self.settings.audio.internal_sample_rate_hz,
             ring_buffer_ms=self.settings.audio.ring_buffer_ms,
+            speech_threshold=self.settings.stt.vad_speech_threshold,
         )
+
+        device_idx = None
+        with contextlib.suppress(Exception):
+            device_idx = resolve_sounddevice_input_device(
+                host_api=self.settings.audio.input_host_api,
+                device=self.settings.audio.input_device,
+            )
 
         source: AudioSource = SoundDeviceAudioSource(
             sample_rate_hz=self.settings.audio.internal_sample_rate_hz,
             channels=self.settings.audio.internal_channels,
+            device=device_idx,
         )
 
         await hub.start(auto_flush_osc=True)

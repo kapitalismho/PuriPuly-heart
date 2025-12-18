@@ -5,6 +5,13 @@ from ajebal_daera_translator.ui.theme import COLOR_SURFACE, COLOR_ON_BACKGROUND,
 from ajebal_daera_translator.ui.components.bento_card import BentoCard
 
 class DashboardView(ft.Column):
+    LANG_LABEL_TO_CODE = {
+        "Korean": "ko-KR",
+        "English": "en-US",
+        "Japanese": "ja-JP",
+    }
+    LANG_CODE_TO_LABEL = {v: k for k, v in LANG_LABEL_TO_CODE.items()}
+
     def __init__(self):
         super().__init__(expand=True, spacing=15) # increased spacing for grid gaps
         # State placeholders
@@ -13,20 +20,11 @@ class DashboardView(ft.Column):
         self.last_sent_text = "Ready to translate..."
         self.history_items = []
         self.on_send_message = None # Callback function assigned by App
+        self.on_toggle_translation = None
+        self.on_toggle_stt = None
+        self.on_language_change = None
         
         self._build_ui()
-
-
-    def did_mount(self):
-        # Load persisted state
-        try:
-            stored_source = self.page.client_storage.get("source_lang")
-            stored_target = self.page.client_storage.get("target_lang")
-            if stored_source: self.source_lang.value = stored_source
-            if stored_target: self.target_lang.value = stored_target
-            self.update()
-        except Exception:
-            pass # Storage might not be available
 
     def _build_ui(self):
         # 1. Status Card (Left Top)
@@ -55,7 +53,7 @@ class DashboardView(ft.Column):
          # 2. Language Control Section (Left Bottom)
         self.source_lang = ft.Dropdown(
             label="Source", 
-            options=[ft.dropdown.Option("Korean"), ft.dropdown.Option("English")], 
+            options=[ft.dropdown.Option("Korean"), ft.dropdown.Option("English"), ft.dropdown.Option("Japanese")],
             value="Korean", 
             expand=True, 
             text_size=15, 
@@ -66,12 +64,12 @@ class DashboardView(ft.Column):
             color=colors.WHITE,
             border_color=colors.GREY_700,
             focused_bgcolor=colors.GREY_700,
-            on_change=self._on_lang_save 
+            on_change=self._on_lang_change,
         )
         
         self.target_lang = ft.Dropdown(
             label="Target", 
-            options=[ft.dropdown.Option("English"), ft.dropdown.Option("Japanese")], 
+            options=[ft.dropdown.Option("English"), ft.dropdown.Option("Japanese"), ft.dropdown.Option("Korean")],
             value="English", 
             expand=True, 
             text_size=15, 
@@ -82,7 +80,7 @@ class DashboardView(ft.Column):
             color=colors.WHITE,
             border_color=colors.GREY_700,
             focused_bgcolor=colors.GREY_700,
-            on_change=self._on_lang_save
+            on_change=self._on_lang_change,
         )
         
         # Segmented Control for Presets
@@ -277,7 +275,7 @@ class DashboardView(ft.Column):
         self.target_lang.value = preset['tgt']
         
         # Save
-        self._on_lang_save(None) 
+        self._on_lang_change(None)
         
         # Update Visuals
         self._update_preset_visuals()
@@ -298,15 +296,16 @@ class DashboardView(ft.Column):
             # Flet often needs parent update or page update if deep property change.
             # safe to just update main view in event handler.
 
-    def _on_lang_save(self, e):
-        # Persist selection
-        if self.page:
-            self.page.client_storage.set("source_lang", self.source_lang.value)
-            self.page.client_storage.set("target_lang", self.target_lang.value)
-        # Also update visuals when manually changed (e maps to dropdown change event)
+    def _on_lang_change(self, e):
+        # Update visuals when manually changed
         if e is not None:
-             self._update_preset_visuals()
-             self.update()
+            self._update_preset_visuals()
+            self.update()
+
+        if self.on_language_change:
+            source_code = self.LANG_LABEL_TO_CODE.get(self.source_lang.value, "ko-KR")
+            target_code = self.LANG_LABEL_TO_CODE.get(self.target_lang.value, "en-US")
+            self.on_language_change(source_code, target_code)
         
     def _build_power_tile(self, label, icon_name, is_active, on_click):
         icon_color = colors.WHITE if is_active else colors.GREY_500
@@ -335,11 +334,15 @@ class DashboardView(ft.Column):
         self._update_tile_visuals(self.tile_translation, self.is_translation_on, is_stt=False)
         self.is_power_on = self.is_translation_on # Sync main power flag relative to Translation
         self.update()
+        if self.on_toggle_translation:
+            self.on_toggle_translation(self.is_translation_on)
 
     def _toggle_stt(self, e):
         self.is_stt_on = not self.is_stt_on
         self._update_tile_visuals(self.tile_stt, self.is_stt_on, is_stt=True)
         self.update()
+        if self.on_toggle_stt:
+            self.on_toggle_stt(self.is_stt_on)
 
     def _update_tile_visuals(self, tile, is_active, is_stt=False):
         # Determine colors
@@ -375,23 +378,27 @@ class DashboardView(ft.Column):
         if self.on_send_message:
             self.on_send_message("You", text)
 
-    def add_history(self, source: str, text: str):
-        self.history_list.controls.append(
-            ft.Container(
-                content=ft.Column([
-                    ft.Text(source, size=10, color=COLOR_PRIMARY),
-                    ft.Text(text, size=14, color=COLOR_ON_BACKGROUND),
-                ], spacing=2),
-                bgcolor=colors.with_opacity(0.05, colors.WHITE),
-                padding=12,
-                border_radius=8,
-            )
-        )
-        self.update()
-
     def set_status(self, connected: bool):
         self.is_connected = connected
         self.status_indicator.color = COLOR_SUCCESS if connected else COLOR_ERROR
         self.status_text.value = "Connected" if connected else "Disconnected"
         self.status_text.color = COLOR_SUCCESS if connected else colors.GREY_400
+        self.update()
+
+    def set_languages_from_codes(self, source_code: str, target_code: str) -> None:
+        src_label = self.LANG_CODE_TO_LABEL.get(source_code, "Korean")
+        tgt_label = self.LANG_CODE_TO_LABEL.get(target_code, "English")
+        self.source_lang.value = src_label
+        self.target_lang.value = tgt_label
+        self._update_preset_visuals()
+        self.update()
+
+    def set_translation_enabled(self, enabled: bool) -> None:
+        self.is_translation_on = bool(enabled)
+        self._update_tile_visuals(self.tile_translation, self.is_translation_on, is_stt=False)
+        self.update()
+
+    def set_stt_enabled(self, enabled: bool) -> None:
+        self.is_stt_on = bool(enabled)
+        self._update_tile_visuals(self.tile_stt, self.is_stt_on, is_stt=True)
         self.update()

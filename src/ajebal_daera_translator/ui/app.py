@@ -7,17 +7,25 @@ from ajebal_daera_translator.ui.views.dashboard import DashboardView
 from ajebal_daera_translator.ui.views.settings import SettingsView
 from ajebal_daera_translator.ui.views.logs import LogsView
 from ajebal_daera_translator.ui.views.history import HistoryView  # Import HistoryView
+from ajebal_daera_translator.ui.controller import GuiController
 
 logger = logging.getLogger(__name__)
 
 class TranslatorApp:
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, *, config_path):
         self.page = page
+        self.controller = GuiController(page=page, app=self, config_path=config_path)
         self._setup_page()
         self._build_layout()
         
         # Link Dashboard submit to App's history handler
-        self.view_dashboard.on_send_message = self.add_history_entry
+        self.view_dashboard.on_send_message = self._on_manual_submit
+        self.view_dashboard.on_toggle_translation = self._on_translation_toggle
+        self.view_dashboard.on_toggle_stt = self._on_stt_toggle
+        self.view_dashboard.on_language_change = self._on_language_change
+
+        self.view_settings.on_settings_changed = self._on_settings_changed
+        self.view_settings.on_providers_changed = self._on_providers_changed
 
     def _setup_page(self):
         self.page.title = "A-Jebal-Daera Translator"
@@ -75,8 +83,30 @@ class TranslatorApp:
         
         # Also update Dashboard's hero text if needed (it does it locally, but good to know)
 
+    def _on_manual_submit(self, _source: str, text: str) -> None:
+        # UI already wrote to hero/history; pipeline should run asynchronously.
+        self.page.run_task(self.controller.submit_text(text))
 
-async def main_gui(page: ft.Page):
-    app = TranslatorApp(page)
-    # Ensure asyncio loop runs smoothly if needed
-    # page.run_task(task) could be used here for event bridge later
+    def _on_translation_toggle(self, enabled: bool) -> None:
+        self.page.run_task(self.controller.set_translation_enabled(enabled))
+
+    def _on_stt_toggle(self, enabled: bool) -> None:
+        self.page.run_task(self.controller.set_stt_enabled(enabled))
+
+    def _on_language_change(self, source_code: str, target_code: str) -> None:
+        if self.controller.settings is None:
+            return
+        settings = self.controller.settings
+        settings.languages.source_language = source_code
+        settings.languages.target_language = target_code
+        self.page.run_task(self.controller.apply_settings(settings))
+
+    def _on_settings_changed(self, settings) -> None:
+        self.page.run_task(self.controller.apply_settings(settings))
+
+    def _on_providers_changed(self) -> None:
+        self.page.run_task(self.controller.apply_providers())
+
+async def main_gui(page: ft.Page, *, config_path):
+    app = TranslatorApp(page, config_path=config_path)
+    await app.controller.start()

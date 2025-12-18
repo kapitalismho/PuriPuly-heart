@@ -7,6 +7,7 @@ from pathlib import Path
 from ajebal_daera_translator.app.headless_mic import HeadlessMicRunner
 from ajebal_daera_translator.app.headless_stdin import HeadlessStdinRunner
 from ajebal_daera_translator.app.wiring import create_llm_provider, create_secret_store
+from ajebal_daera_translator.config.paths import default_settings_path
 from ajebal_daera_translator.config.settings import AppSettings, load_settings
 from ajebal_daera_translator.core.osc.udp_sender import VrchatOscUdpSender
 
@@ -18,8 +19,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("settings.json"),
-        help="Path to settings JSON (default: ./settings.json)",
+        default=default_settings_path(),
+        help="Path to settings JSON (default: user config dir)",
     )
 
     sub = parser.add_subparsers(dest="command")
@@ -61,8 +62,12 @@ def main(argv: list[str] | None = None) -> int:
         import flet as ft
         from ajebal_daera_translator.ui.app import main_gui
         
-        # Run Flet app
-        ft.app(target=main_gui)
+        config_path = args.config
+
+        async def _target(page: ft.Page):
+            return await main_gui(page, config_path=config_path)
+
+        ft.app(target=_target)
         return 0
 
     settings = _load_settings_or_default(args.config)

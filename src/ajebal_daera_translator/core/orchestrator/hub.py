@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import UUID
+from uuid import uuid4
 
 from ajebal_daera_translator.core.clock import Clock, SystemClock
 from ajebal_daera_translator.core.llm.provider import LLMProvider
@@ -37,11 +38,13 @@ class ClientHub:
     target_language: str = "en"
     system_prompt: str = ""
     fallback_transcript_only: bool = False
+    translation_enabled: bool = True
 
     ui_events: asyncio.Queue[UIEvent] = field(default_factory=asyncio.Queue)
 
     _utterances: dict[UUID, UtteranceBundle] = field(default_factory=dict)
     _translation_tasks: dict[UUID, asyncio.Task[None]] = field(default_factory=dict)
+    _utterance_sources: dict[UUID, str] = field(default_factory=dict)
     _stt_task: asyncio.Task[None] | None = None
     _osc_flush_task: asyncio.Task[None] | None = None
     _running: bool = False
@@ -79,6 +82,29 @@ class ClientHub:
     async def handle_vad_event(self, event: VadEvent) -> None:
         await self.stt.handle_vad_event(event)
 
+    async def submit_text(self, text: str, *, source: str = "You") -> UUID:
+        text = text.strip()
+        if not text:
+            raise ValueError("text must be non-empty")
+
+        utterance_id = uuid4()
+        self._remember_source(utterance_id, source)
+
+        transcript = Transcript(
+            utterance_id=utterance_id,
+            text=text,
+            is_final=True,
+            created_at=self.clock.now(),
+        )
+        await self._handle_transcript(transcript, is_final=True, source=source)
+
+        if self.llm is None or not self.translation_enabled:
+            await self._enqueue_osc(utterance_id, transcript_text=text, translation_text=None)
+        else:
+            await self._ensure_translation(transcript)
+
+        return utterance_id
+
     def get_or_create_bundle(self, utterance_id: UUID) -> UtteranceBundle:
         bundle = self._utterances.get(utterance_id)
         if bundle is None:
@@ -99,16 +125,16 @@ class ClientHub:
             return
 
         if isinstance(event, STTErrorEvent):
-            await self.ui_events.put(UIEvent(type=UIEventType.ERROR, payload=event.message))
+            await self.ui_events.put(UIEvent(type=UIEventType.ERROR, payload=event.message, source="Mic"))
             return
 
         if isinstance(event, STTPartialEvent):
-            await self._handle_transcript(event.transcript, is_final=False)
+            await self._handle_transcript(event.transcript, is_final=False, source="Mic")
             return
 
         if isinstance(event, STTFinalEvent):
-            await self._handle_transcript(event.transcript, is_final=True)
-            if self.llm is None:
+            await self._handle_transcript(event.transcript, is_final=True, source="Mic")
+            if self.llm is None or not self.translation_enabled:
                 await self._enqueue_osc(
                     event.transcript.utterance_id,
                     transcript_text=event.transcript.text,
@@ -118,16 +144,26 @@ class ClientHub:
                 await self._ensure_translation(event.transcript)
             return
 
-    async def _handle_transcript(self, transcript: Transcript, *, is_final: bool) -> None:
+    async def _handle_transcript(self, transcript: Transcript, *, is_final: bool, source: str | None) -> None:
         bundle = self.get_or_create_bundle(transcript.utterance_id)
         bundle.with_transcript(transcript)
+        self._remember_source(transcript.utterance_id, source)
         await self.ui_events.put(
             UIEvent(
                 type=UIEventType.TRANSCRIPT_FINAL if is_final else UIEventType.TRANSCRIPT_PARTIAL,
                 utterance_id=transcript.utterance_id,
                 payload=transcript,
+                source=source,
             )
         )
+
+    def _remember_source(self, utterance_id: UUID, source: str | None) -> None:
+        if not source:
+            return
+        self._utterance_sources[utterance_id] = source
+
+    def _get_source(self, utterance_id: UUID) -> str | None:
+        return self._utterance_sources.get(utterance_id)
 
     async def _ensure_translation(self, transcript: Transcript) -> None:
         if self.llm is None:
@@ -153,7 +189,14 @@ class ClientHub:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            await self.ui_events.put(UIEvent(type=UIEventType.ERROR, utterance_id=utterance_id, payload=str(exc)))
+            await self.ui_events.put(
+                UIEvent(
+                    type=UIEventType.ERROR,
+                    utterance_id=utterance_id,
+                    payload=str(exc),
+                    source=self._get_source(utterance_id),
+                )
+            )
             if self.fallback_transcript_only:
                 await self._enqueue_osc(utterance_id, transcript_text=text, translation_text=None)
             return
@@ -161,7 +204,12 @@ class ClientHub:
         bundle = self.get_or_create_bundle(utterance_id)
         bundle.with_translation(translation)
         await self.ui_events.put(
-            UIEvent(type=UIEventType.TRANSLATION_DONE, utterance_id=utterance_id, payload=translation)
+            UIEvent(
+                type=UIEventType.TRANSLATION_DONE,
+                utterance_id=utterance_id,
+                payload=translation,
+                source=self._get_source(utterance_id),
+            )
         )
         await self._enqueue_osc(utterance_id, transcript_text=text, translation_text=translation.text)
 
@@ -173,7 +221,14 @@ class ClientHub:
 
         msg = OSCMessage(utterance_id=utterance_id, text=merged, created_at=self.clock.now())
         self.osc.enqueue(msg)
-        await self.ui_events.put(UIEvent(type=UIEventType.OSC_SENT, utterance_id=utterance_id, payload=msg))
+        await self.ui_events.put(
+            UIEvent(
+                type=UIEventType.OSC_SENT,
+                utterance_id=utterance_id,
+                payload=msg,
+                source=self._get_source(utterance_id),
+            )
+        )
 
     async def _run_osc_flush_loop(self) -> None:
         try:

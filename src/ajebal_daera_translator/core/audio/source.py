@@ -94,4 +94,49 @@ class SoundDeviceAudioSource(AudioSource):
             await self._queue.wait_closed()
 
 
+def resolve_sounddevice_input_device(*, host_api: str = "", device: str = "") -> int | None:
+    host_api = (host_api or "").strip()
+    device = (device or "").strip()
+    if not host_api and not device:
+        return None
+
+    import sounddevice as sd  # type: ignore
+
+    hostapis = sd.query_hostapis()
+    devices = sd.query_devices()
+
+    hostapi_index: int | None = None
+    if host_api:
+        for idx, item in enumerate(hostapis):
+            name = str(item.get("name", "") or "")
+            if name.lower() == host_api.lower():
+                hostapi_index = idx
+                break
+
+    if device:
+        with contextlib.suppress(ValueError):
+            idx = int(device)
+            if 0 <= idx < len(devices) and int(devices[idx].get("max_input_channels", 0) or 0) > 0:
+                if hostapi_index is None or int(devices[idx].get("hostapi", -1) or -1) == hostapi_index:
+                    return idx
+
+    if hostapi_index is not None and not device:
+        default_input = hostapis[hostapi_index].get("default_input_device")
+        if isinstance(default_input, int) and default_input >= 0:
+            return default_input
+
+    for idx, info in enumerate(devices):
+        if int(info.get("max_input_channels", 0) or 0) <= 0:
+            continue
+        if hostapi_index is not None and int(info.get("hostapi", -1) or -1) != hostapi_index:
+            continue
+        if device:
+            name = str(info.get("name", "") or "")
+            if name.lower() != device.lower():
+                continue
+        return idx
+
+    return None
+
+
 import contextlib  # keep main logic compact
