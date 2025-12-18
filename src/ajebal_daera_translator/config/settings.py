@@ -62,6 +62,28 @@ class STTSettings:
 
 
 @dataclass(slots=True)
+class GoogleSpeechSettings:
+    recognizer: str = ""
+    endpoint: str = ""
+
+    def validate(self) -> None:
+        if self.endpoint and not self.endpoint.strip():
+            raise ValueError("endpoint must be non-empty when set")
+
+
+@dataclass(slots=True)
+class AlibabaSTTSettings:
+    model: str = "paraformer-realtime-v2"
+    endpoint: str = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
+
+    def validate(self) -> None:
+        if not self.model:
+            raise ValueError("model must be non-empty")
+        if not self.endpoint:
+            raise ValueError("endpoint must be non-empty")
+
+
+@dataclass(slots=True)
 class LLMSettings:
     concurrency_limit: int = 1
 
@@ -126,6 +148,8 @@ class AppSettings:
     languages: LanguageSettings = field(default_factory=LanguageSettings)
     audio: AudioSettings = field(default_factory=AudioSettings)
     stt: STTSettings = field(default_factory=STTSettings)
+    google_speech: GoogleSpeechSettings = field(default_factory=GoogleSpeechSettings)
+    alibaba_stt: AlibabaSTTSettings = field(default_factory=AlibabaSTTSettings)
     llm: LLMSettings = field(default_factory=LLMSettings)
     osc: OSCSettings = field(default_factory=OSCSettings)
     secrets: SecretsSettings = field(default_factory=SecretsSettings)
@@ -136,6 +160,8 @@ class AppSettings:
         self.languages.validate()
         self.audio.validate()
         self.stt.validate()
+        self.google_speech.validate()
+        self.alibaba_stt.validate()
         self.llm.validate()
         self.osc.validate()
         self.secrets.validate()
@@ -166,6 +192,14 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
         "stt": {
             "reset_deadline_s": settings.stt.reset_deadline_s,
             "drain_timeout_s": settings.stt.drain_timeout_s,
+        },
+        "google_speech": {
+            "recognizer": settings.google_speech.recognizer,
+            "endpoint": settings.google_speech.endpoint,
+        },
+        "alibaba_stt": {
+            "model": settings.alibaba_stt.model,
+            "endpoint": settings.alibaba_stt.endpoint,
         },
         "llm": {"concurrency_limit": settings.llm.concurrency_limit},
         "osc": {
@@ -205,6 +239,16 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
         stt=STTSettings(
             reset_deadline_s=float(data.get("stt", {}).get("reset_deadline_s", 90.0)),
             drain_timeout_s=float(data.get("stt", {}).get("drain_timeout_s", 2.0)),
+        ),
+        google_speech=GoogleSpeechSettings(
+            recognizer=str(data.get("google_speech", {}).get("recognizer", "")),
+            endpoint=str(data.get("google_speech", {}).get("endpoint", "")),
+        ),
+        alibaba_stt=AlibabaSTTSettings(
+            model=str(data.get("alibaba_stt", {}).get("model", "paraformer-realtime-v2")),
+            endpoint=str(
+                data.get("alibaba_stt", {}).get("endpoint", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference")
+            ),
         ),
         llm=LLMSettings(concurrency_limit=int(data.get("llm", {}).get("concurrency_limit", 1))),
         osc=OSCSettings(

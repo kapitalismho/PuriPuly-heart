@@ -57,13 +57,8 @@ class GoogleGenaiGeminiClient:
         source_language: str,
         target_language: str,
     ) -> str:
-        try:
-            from google import genai  # type: ignore
-            from google.genai import types  # type: ignore
-        except ModuleNotFoundError as exc:
-            raise ModuleNotFoundError(
-                "google-genai is required for GeminiLLMProvider; install with `pip install google-genai`"
-            ) from exc
+        from google import genai  # type: ignore
+        from google.genai import types  # type: ignore
 
         prompt = f"Source language: {source_language}\nTarget language: {target_language}\n\n{text}"
 

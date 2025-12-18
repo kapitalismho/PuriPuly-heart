@@ -29,7 +29,7 @@ class STTProvider(Protocol):
 @dataclass(slots=True)
 class ClientHub:
     stt: STTProvider
-    llm: LLMProvider
+    llm: LLMProvider | None
     osc: SmartOscQueue
     clock: Clock = SystemClock()
 
@@ -108,7 +108,14 @@ class ClientHub:
 
         if isinstance(event, STTFinalEvent):
             await self._handle_transcript(event.transcript, is_final=True)
-            await self._ensure_translation(event.transcript)
+            if self.llm is None:
+                await self._enqueue_osc(
+                    event.transcript.utterance_id,
+                    transcript_text=event.transcript.text,
+                    translation_text=None,
+                )
+            else:
+                await self._ensure_translation(event.transcript)
             return
 
     async def _handle_transcript(self, transcript: Transcript, *, is_final: bool) -> None:
@@ -123,6 +130,8 @@ class ClientHub:
         )
 
     async def _ensure_translation(self, transcript: Transcript) -> None:
+        if self.llm is None:
+            return
         utterance_id = transcript.utterance_id
         if utterance_id in self._translation_tasks:
             return
@@ -131,6 +140,8 @@ class ClientHub:
         task.add_done_callback(lambda _t: self._translation_tasks.pop(utterance_id, None))
 
     async def _translate_and_enqueue(self, utterance_id: UUID, text: str) -> None:
+        if self.llm is None:
+            return
         try:
             translation = await self.llm.translate(
                 utterance_id=utterance_id,
@@ -171,4 +182,3 @@ class ClientHub:
                 await asyncio.sleep(0.05)
         except asyncio.CancelledError:
             raise
-

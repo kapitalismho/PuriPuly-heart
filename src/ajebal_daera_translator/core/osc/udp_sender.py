@@ -3,8 +3,8 @@ from __future__ import annotations
 import socket
 from dataclasses import dataclass, field
 
-from ajebal_daera_translator.core.osc.encoding import encode_message
 from ajebal_daera_translator.core.osc.sender import OscSender
+from pythonosc.osc_message_builder import OscMessageBuilder
 
 
 @dataclass(slots=True)
@@ -15,6 +15,7 @@ class VrchatOscUdpSender(OscSender):
     chatbox_send: bool = True
     chatbox_clear: bool = False
     _sock: socket.socket = field(init=False, repr=False)
+    _OscMessageBuilder: object = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if not self.host:
@@ -25,14 +26,15 @@ class VrchatOscUdpSender(OscSender):
             raise ValueError("chatbox_address must start with '/'")
 
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._OscMessageBuilder = OscMessageBuilder
 
     def close(self) -> None:
         self._sock.close()
 
     def send_chatbox(self, text: str) -> None:
-        packet = encode_message(
-            self.chatbox_address,
-            [text, self.chatbox_send, self.chatbox_clear],
-        )
+        builder = self._OscMessageBuilder(address=self.chatbox_address)
+        builder.add_arg(text)
+        builder.add_arg(self.chatbox_send)
+        builder.add_arg(self.chatbox_clear)
+        packet = builder.build().dgram
         self._sock.sendto(packet, (self.host, self.port))
-

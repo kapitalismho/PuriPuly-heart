@@ -57,12 +57,7 @@ class DashScopeQwenClient:
         source_language: str,
         target_language: str,
     ) -> str:
-        try:
-            import dashscope  # type: ignore
-        except ModuleNotFoundError as exc:
-            raise ModuleNotFoundError(
-                "dashscope is required for QwenLLMProvider; install with `pip install dashscope`"
-            ) from exc
+        import dashscope  # type: ignore
 
         prompt = f"Source language: {source_language}\nTarget language: {target_language}\n\n{text}"
 
@@ -87,4 +82,3 @@ class DashScopeQwenClient:
             return str(content).strip()
 
         return await asyncio.to_thread(_call)
-

@@ -4,7 +4,9 @@ import asyncio
 import argparse
 from pathlib import Path
 
+from ajebal_daera_translator.app.headless_mic import HeadlessMicRunner
 from ajebal_daera_translator.app.headless_stdin import HeadlessStdinRunner
+from ajebal_daera_translator.app.wiring import create_llm_provider, create_secret_store
 from ajebal_daera_translator.config.settings import AppSettings, load_settings
 from ajebal_daera_translator.core.osc.udp_sender import VrchatOscUdpSender
 
@@ -30,6 +32,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--use-llm",
         action="store_true",
         help="Translate each line using configured LLM provider (requires provider setup)",
+    )
+
+    mic = sub.add_parser("run-mic", help="Capture microphone audio (VAD→STT→LLM→OSC)")
+    mic.add_argument("--vad-model", type=Path, required=True, help="Path to Silero VAD ONNX model file")
+    mic.add_argument(
+        "--use-llm",
+        action="store_true",
+        help="Translate STT final results using configured LLM provider",
     )
 
     return parser
@@ -62,10 +72,25 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "run-stdin":
+        llm = None
         if args.use_llm:
-            print("Error: LLM wiring for headless runner is implemented in later phases.", flush=True)
-            return 2
-        runner = HeadlessStdinRunner(settings=settings, llm=None)
+            try:
+                secrets = create_secret_store(settings.secrets, config_path=args.config)
+                llm = create_llm_provider(settings, secrets=secrets)
+            except Exception as exc:
+                print(f"Error: failed to initialize LLM provider: {exc}", flush=True)
+                return 2
+
+        runner = HeadlessStdinRunner(settings=settings, llm=llm)
+        return asyncio.run(runner.run())
+
+    if args.command == "run-mic":
+        runner = HeadlessMicRunner(
+            settings=settings,
+            config_path=args.config,
+            vad_model_path=args.vad_model,
+            use_llm=args.use_llm,
+        )
         return asyncio.run(runner.run())
 
     parser.print_help()

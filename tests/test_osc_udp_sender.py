@@ -27,7 +27,6 @@ def test_encode_message_chatbox_input():
 
     assert offset == len(packet)
 
-
 def test_vrchat_udp_sender_sends_packet():
     server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server.bind(("127.0.0.1", 0))
@@ -53,4 +52,3 @@ def test_vrchat_udp_sender_sends_packet():
     assert text == "hello"
 
     assert offset == len(packet)
-

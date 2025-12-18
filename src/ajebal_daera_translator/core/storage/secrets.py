@@ -39,12 +39,8 @@ class KeyringSecretStore:
     service_name: str = "ajebal-daera-translator"
 
     def _keyring(self):
-        try:
-            import keyring  # type: ignore
-        except ModuleNotFoundError as exc:
-            raise ModuleNotFoundError(
-                "keyring is required for KeyringSecretStore; install with `pip install keyring`"
-            ) from exc
+        import keyring  # type: ignore
+
         return keyring
 
     def get(self, key: str) -> str | None:
@@ -132,4 +128,3 @@ def _atomic_write_json(path: Path, data: object) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp.replace(path)
-
