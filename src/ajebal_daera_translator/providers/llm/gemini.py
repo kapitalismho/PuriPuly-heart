@@ -22,7 +22,7 @@ class GeminiClient(Protocol):
 @dataclass(slots=True)
 class GeminiLLMProvider:
     api_key: str
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-3-flash-preview"
     client: GeminiClient | None = None
 
     async def translate(
@@ -72,11 +72,13 @@ class GoogleGenaiGeminiClient:
             response = client.models.generate_content(
                 model=self.model,
                 contents=prompt,
-                config=types.GenerateContentConfig(system_instruction=system_prompt),
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+                ),
             )
             if getattr(response, "text", None):
                 return str(response.text).strip()
             raise RuntimeError("Gemini response did not contain text")
 
         return await asyncio.to_thread(_call)
-

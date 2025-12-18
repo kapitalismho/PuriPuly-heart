@@ -17,7 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 google = [
   "google-cloud-speech",
-  "google-genai",
+  "google-genai>=1.56.0",
   "grpcio",
 ]
 alibaba = [
