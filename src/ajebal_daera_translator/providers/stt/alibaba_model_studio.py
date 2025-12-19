@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import queue
+import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
 
@@ -68,37 +71,36 @@ class _DashScopeRealtimeSession(STTBackendSession):
     max_retries: int
     retry_backoff_s: float
 
-    _control_q: asyncio.Queue[bytes | object] = field(init=False, repr=False)
-    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(init=False, repr=False)
-    _loop: asyncio.AbstractEventLoop | None = field(init=False, default=None, repr=False)
+    _control_q: queue.Queue[bytes | object] = field(init=False, repr=False)
+    _events: queue.Queue[STTBackendTranscriptEvent | BaseException | None] = field(init=False, repr=False)
     _recognition: Any | None = field(init=False, default=None, repr=False)
-    _worker: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _thread: threading.Thread | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
-        self._control_q = asyncio.Queue()
-        self._events = asyncio.Queue()
+        self._control_q = queue.Queue()
+        self._events = queue.Queue()
 
     async def start(self) -> None:
-        self._loop = asyncio.get_running_loop()
-        self._worker = asyncio.create_task(self._run())
+        self._thread = threading.Thread(target=self._thread_main, name="dashscope-asr", daemon=True)
+        self._thread.start()
 
     async def send_audio(self, pcm16le: bytes) -> None:
         if self._stopped:
             return
-        await self._control_q.put(pcm16le)
+        self._control_q.put_nowait(pcm16le)
 
     async def stop(self) -> None:
         if self._stopped:
             return
         self._stopped = True
-        await self._control_q.put(_STOP)
+        self._control_q.put_nowait(_STOP)
 
     async def close(self) -> None:
         await self.stop()
-        if self._worker is not None:
-            await asyncio.gather(self._worker, return_exceptions=True)
-            self._worker = None
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
 
         if self._recognition is not None:
             with contextlib.suppress(Exception):
@@ -107,60 +109,62 @@ class _DashScopeRealtimeSession(STTBackendSession):
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         while True:
-            item = await self._events.get()
+            try:
+                item = self._events.get_nowait()
+            except queue.Empty:
+                await asyncio.sleep(0.01)
+                continue
             if item is None:
                 return
             if isinstance(item, BaseException):
                 raise item
             yield item
 
-    async def _run(self) -> None:
-        assert self._loop is not None
-
+    def _thread_main(self) -> None:
         retries = 0
         try:
             while True:
-                message = await self._control_q.get()
+                message = self._control_q.get()
                 if message is _STOP:
                     break
                 if message is _RECONNECT:
-                    await self._restart_with_backoff(retries=retries)
+                    self._restart_with_backoff(retries=retries)
                     retries = min(retries + 1, self.max_retries)
                     continue
 
                 audio = message
                 retries = 0
-                await self._ensure_started()
+                self._ensure_started()
 
                 while True:
                     try:
-                        await asyncio.to_thread(self._recognition.send_audio_frame, audio)  # type: ignore[union-attr]
+                        self._recognition.send_audio_frame(audio)  # type: ignore[union-attr]
                         break
                     except Exception:
                         retries += 1
                         if retries > self.max_retries:
                             raise
-                        await self._restart_with_backoff(retries=retries)
-                        await self._ensure_started()
+                        self._restart_with_backoff(retries=retries)
+                        self._ensure_started()
         except BaseException as exc:
-            await self._events.put(exc)
+            self._events.put(exc)
         finally:
             if self._recognition is not None:
                 with contextlib.suppress(Exception):
                     self._recognition.stop()
                 self._recognition = None
-            await self._events.put(None)
+            self._events.put(None)
 
-    async def _restart_with_backoff(self, *, retries: int) -> None:
+    def _restart_with_backoff(self, *, retries: int) -> None:
         if self._recognition is not None:
             with contextlib.suppress(Exception):
                 self._recognition.stop()
         self._recognition = None
 
         delay = self.retry_backoff_s * max(retries, 1)
-        await asyncio.sleep(delay)
+        time.sleep(delay)
 
-    async def _ensure_started(self) -> None:
+    def _ensure_started(self) -> None:
         if self._recognition is not None:
             return
 
@@ -189,11 +193,11 @@ class _DashScopeRealtimeSession(STTBackendSession):
                 with contextlib.suppress(Exception):
                     is_final = bool(session.RecognitionResult.is_sentence_end(sentence))
                 event = STTBackendTranscriptEvent(text=str(text).strip(), is_final=is_final)
-                session._loop.call_soon_threadsafe(session._events.put_nowait, event)  # type: ignore[union-attr]
+                session._events.put(event)
 
             def on_error(self, message):  # type: ignore[no-untyped-def]
                 # Transient errors should trigger reconnect attempts; only raise when retries are exhausted.
-                session._loop.call_soon_threadsafe(session._control_q.put_nowait, _RECONNECT)  # type: ignore[union-attr]
+                session._control_q.put_nowait(_RECONNECT)
 
             def on_close(self) -> None:
                 return

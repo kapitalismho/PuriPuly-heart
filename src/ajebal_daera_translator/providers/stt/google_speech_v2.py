@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import queue
+import threading
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Iterable, Protocol
 
@@ -55,32 +56,19 @@ class _GoogleSpeechV2Session(STTBackendSession):
     language_codes: tuple[str, ...]
 
     _req_q: queue.Queue[object | None] = field(init=False, repr=False)
-    _event_q: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(init=False, repr=False)
-    _task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _event_q: queue.Queue[STTBackendTranscriptEvent | BaseException | None] = field(init=False, repr=False)
+    _thread: threading.Thread | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
         self._req_q = queue.Queue()
-        self._event_q = asyncio.Queue()
+        self._event_q = queue.Queue()
 
     async def start(self) -> None:
         initial = self._build_initial_request()
         self._req_q.put(initial)
-
-        loop = asyncio.get_running_loop()
-
-        def _run() -> None:
-            try:
-                responses = self.client.streaming_recognize(requests=_request_iter(self._req_q))
-                for response in responses:
-                    for event in _extract_transcript_events(response):
-                        loop.call_soon_threadsafe(self._event_q.put_nowait, event)
-            except BaseException as exc:
-                loop.call_soon_threadsafe(self._event_q.put_nowait, exc)
-            finally:
-                loop.call_soon_threadsafe(self._event_q.put_nowait, None)
-
-        self._task = asyncio.create_task(asyncio.to_thread(_run))
+        self._thread = threading.Thread(target=self._thread_main, name="google-speech-v2", daemon=True)
+        self._thread.start()
 
     async def send_audio(self, pcm16le: bytes) -> None:
         if self._stopped:
@@ -96,19 +84,34 @@ class _GoogleSpeechV2Session(STTBackendSession):
 
     async def close(self) -> None:
         await self.stop()
-        if self._task is None:
+        if self._thread is None:
             return
-        await asyncio.gather(self._task, return_exceptions=True)
-        self._task = None
+        self._thread.join()
+        self._thread = None
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         while True:
-            item = await self._event_q.get()
+            try:
+                item = self._event_q.get_nowait()
+            except queue.Empty:
+                await asyncio.sleep(0.01)
+                continue
             if item is None:
                 return
             if isinstance(item, BaseException):
                 raise item
             yield item
+
+    def _thread_main(self) -> None:
+        try:
+            responses = self.client.streaming_recognize(requests=_request_iter(self._req_q))
+            for response in responses:
+                for event in _extract_transcript_events(response):
+                    self._event_q.put(event)
+        except BaseException as exc:
+            self._event_q.put(exc)
+        finally:
+            self._event_q.put(None)
 
     def _build_initial_request(self) -> object:
         # Build a minimal explicit decoding config (mono PCM16LE @ sample_rate_hz).
