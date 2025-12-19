@@ -43,6 +43,9 @@ class QwenLLMProvider:
         )
         return Translation(utterance_id=utterance_id, text=translated)
 
+    async def close(self) -> None:
+        pass
+
 
 @dataclass(slots=True)
 class DashScopeQwenClient:

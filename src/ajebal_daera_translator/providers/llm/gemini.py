@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import asyncio
-from dataclasses import dataclass
-from typing import Protocol
+from dataclasses import dataclass, field
+from typing import Any, Protocol
 from uuid import UUID
 
 from ajebal_daera_translator.domain.models import Translation
@@ -18,12 +17,22 @@ class GeminiClient(Protocol):
         target_language: str,
     ) -> str: ...
 
+    async def close(self) -> None: ...
+
 
 @dataclass(slots=True)
 class GeminiLLMProvider:
     api_key: str
     model: str = "gemini-3-flash-preview"
     client: GeminiClient | None = None
+    _internal_client: GeminiClient | None = field(init=False, default=None, repr=False)
+
+    def _get_client(self) -> GeminiClient:
+        if self.client is not None:
+            return self.client
+        if self._internal_client is None:
+            self._internal_client = GoogleGenaiGeminiClient(api_key=self.api_key, model=self.model)
+        return self._internal_client
 
     async def translate(
         self,
@@ -34,7 +43,7 @@ class GeminiLLMProvider:
         source_language: str,
         target_language: str,
     ) -> Translation:
-        client = self.client or GoogleGenaiGeminiClient(api_key=self.api_key, model=self.model)
+        client = self._get_client()
         translated = await client.translate(
             text=text,
             system_prompt=system_prompt,
@@ -43,11 +52,23 @@ class GeminiLLMProvider:
         )
         return Translation(utterance_id=utterance_id, text=translated)
 
+    async def close(self) -> None:
+        if self._internal_client is not None:
+            await self._internal_client.close()
+            self._internal_client = None
+
 
 @dataclass(slots=True)
 class GoogleGenaiGeminiClient:
     api_key: str
     model: str
+    _client: Any = field(init=False, default=None, repr=False)
+
+    def _get_client(self) -> Any:
+        if self._client is None:
+            from google import genai  # type: ignore
+            self._client = genai.Client(api_key=self.api_key)
+        return self._client
 
     async def translate(
         self,
@@ -57,23 +78,26 @@ class GoogleGenaiGeminiClient:
         source_language: str,
         target_language: str,
     ) -> str:
-        from google import genai  # type: ignore
         from google.genai import types  # type: ignore
 
-        prompt = f"Source language: {source_language}\nTarget language: {target_language}\n\n{text}"
+        # Apply template variables to system prompt
+        formatted_system_prompt = system_prompt.format(
+            source_language=source_language,
+            target_language=target_language,
+        ) if "{source_language}" in system_prompt else system_prompt
 
-        def _call() -> str:
-            client = genai.Client(api_key=self.api_key)
-            response = client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    thinking_config=types.ThinkingConfig(thinking_level="minimal"),
-                ),
-            )
-            if getattr(response, "text", None):
-                return str(response.text).strip()
-            raise RuntimeError("Gemini response did not contain text")
+        client = self._get_client()
+        response = await client.aio.models.generate_content(
+            model=self.model,
+            contents=text,
+            config=types.GenerateContentConfig(
+                system_instruction=formatted_system_prompt,
+                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
+            ),
+        )
+        if getattr(response, "text", None):
+            return str(response.text).strip()
+        raise RuntimeError("Gemini response did not contain text")
 
-        return await asyncio.to_thread(_call)
+    async def close(self) -> None:
+        self._client = None

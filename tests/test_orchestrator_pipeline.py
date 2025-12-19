@@ -40,6 +40,9 @@ class FakeLLM:
         await asyncio.sleep(0.01)
         return Translation(utterance_id=utterance_id, text="TRANSLATED")
 
+    async def close(self) -> None:
+        pass
+
 
 @dataclass(slots=True)
 class FakeSession:

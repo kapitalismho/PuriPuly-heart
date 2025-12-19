@@ -1,0 +1,106 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\salee\Documents\dev\A-Jebal-Daera-Translator
+configfile: pyproject.toml
+plugins: anyio-4.12.0, asyncio-1.3.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests\integration\test_e2e_latency_measurement.py 
+Loaded audio: test_speech.wav (79040 samples, 16000 Hz)
+
+============================================================
+Iteration 1/5
+============================================================
+[DEBUG] Deepgram WS Sent Open
+  [STT Final] 안녕하세요제이름은이서빈입니다.
+  Audio sent in 3932ms
+  [STT Final] 될지모르겠는데바보같네요.
+  [LLM Done] Hi, I'm Seobin Lee.
+  [OSC Sent] 안녕하세요제이름은이서빈입니다. (Hi, I'm Seobin Lee.)
+  STT Latency:     2825.9 ms
+  LLM Latency:     2371.0 ms
+  Total Latency:   5196.9 ms
+[DEBUG] Deepgram WS Closed: None None
+
+============================================================
+Iteration 2/5
+============================================================
+[DEBUG] Deepgram WS Sent Open
+  Audio sent in 2813ms
+  [STT Final] 안녕하세요제이름은이서빈입니다.
+  [LLM Done] Hello, my name is Seobin Lee.
+  [OSC Sent] 안녕하세요제이름은이서빈입니다. (Hello, my name is Seobin Lee.)
+  STT Latency:     2817.9 ms
+  LLM Latency:     1693.2 ms
+  Total Latency:   4511.1 ms
+[DEBUG] Deepgram WS Closed: None None
+
+============================================================
+Iteration 3/5
+============================================================
+[DEBUG] Deepgram WS Sent Open
+  Audio sent in 2759ms
+  [STT Final] 안녕하세요제이름은이서빈입니다.
+  [LLM Done] Hello, my name is Seobin Lee.
+  [OSC Sent] 안녕하세요제이름은이서빈입니다. (Hello, my name is Seobin Lee.)
+  STT Latency:     2793.5 ms
+  LLM Latency:     1635.2 ms
+  Total Latency:   4428.7 ms
+[DEBUG] Deepgram WS Closed: None None
+
+============================================================
+Iteration 4/5
+============================================================
+[DEBUG] Deepgram WS Sent Open
+  Audio sent in 2886ms
+  [STT Final] 안녕하세요제이름은이서빈입니다.
+  [LLM Done] Hi, I'm Seobin Lee.
+  [OSC Sent] 안녕하세요제이름은이서빈입니다. (Hi, I'm Seobin Lee.)
+  STT Latency:     2886.1 ms
+  LLM Latency:     1654.5 ms
+  Total Latency:   4540.6 ms
+[DEBUG] Deepgram WS Closed: None None
+
+============================================================
+Iteration 5/5
+============================================================
+[DEBUG] Deepgram WS Sent Open
+  [STT Final] 안녕하세요제이름은이서빈입니다.
+  Audio sent in 3277ms
+  [STT Final] 될지모르겠는데바보같네요.
+  [LLM Done] Hello, my name is Seobin Lee.
+  [OSC Sent] 안녕하세요제이름은이서빈입니다. (Hello, my name is Seobin Lee.)
+  STT Latency:     2706.4 ms
+  LLM Latency:     1798.3 ms
+  Total Latency:   4504.7 ms
+[DEBUG] Deepgram WS Closed: None None
+
+======================================================================
+E2E LATENCY MEASUREMENT RESULTS (5 Iterations)
+======================================================================
+Iter   STT (ms)     LLM (ms)     Total (ms)   Transcript
+----------------------------------------------------------------------
+0      2825.9       2371.0       5196.9       안녕하세요제이름은이서빈입니다....
+1      2817.9       1693.2       4511.1       안녕하세요제이름은이서빈입니다....
+2      2793.5       1635.2       4428.7       안녕하세요제이름은이서빈입니다....
+3      2886.1       1654.5       4540.6       안녕하세요제이름은이서빈입니다....
+4      2706.4       1798.3       4504.7       안녕하세요제이름은이서빈입니다....
+----------------------------------------------------------------------
+AVG    2806.0       1830.4       4636.4      
+MIN    2706.4       1635.2       4428.7      
+MAX    2886.1       2371.0       5196.9      
+======================================================================
+.
+
+============================== warnings summary ===============================
+tests/integration/test_e2e_latency_measurement.py::test_e2e_latency_5_iterations
+tests/integration/test_e2e_latency_measurement.py::test_e2e_latency_5_iterations
+tests/integration/test_e2e_latency_measurement.py::test_e2e_latency_5_iterations
+tests/integration/test_e2e_latency_measurement.py::test_e2e_latency_5_iterations
+tests/integration/test_e2e_latency_measurement.py::test_e2e_latency_5_iterations
+  C:\Users\salee\Documents\dev\A-Jebal-Daera-Translator\.venv\Lib\site-packages\google\genai\_api_client.py:744: DeprecationWarning: Inheritance class AiohttpClientSession from ClientSession is discouraged
+    class AiohttpClientSession(aiohttp.ClientSession):  # type: ignore[misc]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 1 passed, 5 warnings in 32.11s ========================

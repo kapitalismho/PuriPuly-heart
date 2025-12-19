@@ -16,10 +16,10 @@ async def test_deepgram_realtime_streaming_smoke():
         pytest.skip("missing env var DEEPGRAM_API_KEY")
 
     try:
-        from deepgram import DeepgramClient  # noqa: F401
+        import websocket  # noqa: F401
     except ModuleNotFoundError as exc:  # pragma: no cover
         raise RuntimeError(
-            "deepgram-sdk is required for this integration test; install with pip install deepgram-sdk"
+            "websocket-client is required for this integration test; install with pip install websocket-client"
         ) from exc
 
     from ajebal_daera_translator.providers.stt.deepgram import DeepgramRealtimeSTTBackend

@@ -81,6 +81,9 @@ class ClientHub:
         if self.stt is not None:
             await self.stt.close()
 
+        if self.llm is not None:
+            await self.llm.close()
+
     async def handle_vad_event(self, event: VadEvent) -> None:
         if self.stt is not None:
             await self.stt.handle_vad_event(event)

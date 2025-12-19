@@ -19,6 +19,8 @@ class LLMProvider(Protocol):
         target_language: str,
     ) -> Translation: ...
 
+    async def close(self) -> None: ...
+
 
 @dataclass(slots=True)
 class SemaphoreLLMProvider:
@@ -42,4 +44,7 @@ class SemaphoreLLMProvider:
                 source_language=source_language,
                 target_language=target_language,
             )
+
+    async def close(self) -> None:
+        await self.inner.close()
 
