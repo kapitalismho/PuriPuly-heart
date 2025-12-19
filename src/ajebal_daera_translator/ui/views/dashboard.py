@@ -1,7 +1,7 @@
 import flet as ft
 from flet.core.icons import Icons as icons
 from flet.core.colors import Colors as colors
-from ajebal_daera_translator.ui.theme import COLOR_SURFACE, COLOR_ON_BACKGROUND, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_ERROR
+from ajebal_daera_translator.ui.theme import COLOR_SURFACE, COLOR_ON_BACKGROUND, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_ERROR, COLOR_WARNING
 from ajebal_daera_translator.ui.components.bento_card import BentoCard
 
 class DashboardView(ft.Column):
@@ -127,6 +127,8 @@ class DashboardView(ft.Column):
         # State Initialization (if not already done)
         if not hasattr(self, 'is_translation_on'): self.is_translation_on = False
         if not hasattr(self, 'is_stt_on'): self.is_stt_on = False
+        if not hasattr(self, 'translation_needs_key'): self.translation_needs_key = False
+        if not hasattr(self, 'stt_needs_key'): self.stt_needs_key = False
 
         # Tile 1: Translation
         self.tile_translation = self._build_power_tile(
@@ -311,6 +313,7 @@ class DashboardView(ft.Column):
         icon_color = colors.WHITE if is_active else colors.GREY_500
         text_color = colors.WHITE if is_active else colors.GREY_500
         bg_color = COLOR_SUCCESS if is_active else colors.with_opacity(0.05, colors.WHITE)
+        hint_text = ""
         
         if label == "VOICE (STT)" and is_active:
              bg_color = COLOR_PRIMARY # Distinguish STT active color if desired, or keep uniform
@@ -319,7 +322,8 @@ class DashboardView(ft.Column):
             content=ft.Column([
                 ft.Icon(name=icon_name, size=28, color=icon_color),
                 ft.Text(label, size=10, weight=ft.FontWeight.BOLD, color=text_color),
-            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5, alignment=ft.MainAxisAlignment.CENTER),
+                ft.Text(hint_text, size=10, color=text_color, text_align=ft.TextAlign.CENTER),
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=3, alignment=ft.MainAxisAlignment.CENTER),
             padding=10,
             bgcolor=bg_color,
             border_radius=12,
@@ -330,37 +334,81 @@ class DashboardView(ft.Column):
         )
 
     def _toggle_translation(self, e):
-        self.is_translation_on = not self.is_translation_on
-        self._update_tile_visuals(self.tile_translation, self.is_translation_on, is_stt=False)
-        self.is_power_on = self.is_translation_on # Sync main power flag relative to Translation
+        # If already on, just turn off
+        if self.is_translation_on:
+            self.is_translation_on = False
+            self._translation_showing_warning = False
+            self._update_tile_visuals(self.tile_translation, False, is_stt=False, needs_key=False)
+        elif getattr(self, '_translation_showing_warning', False):
+            # Currently showing warning, click again to dismiss
+            self._translation_showing_warning = False
+            self._update_tile_visuals(self.tile_translation, False, is_stt=False, needs_key=False)
+        else:
+            # Trying to turn on - check if API key is missing
+            if self.translation_needs_key:
+                # Show warning state (orange) but don't actually enable
+                self._translation_showing_warning = True
+                self._update_tile_visuals(self.tile_translation, False, is_stt=False, needs_key=True)
+            else:
+                self.is_translation_on = True
+                self._update_tile_visuals(self.tile_translation, True, is_stt=False, needs_key=False)
+        
+        self.is_power_on = self.is_translation_on
         self.update()
         if self.on_toggle_translation:
             self.on_toggle_translation(self.is_translation_on)
 
     def _toggle_stt(self, e):
-        self.is_stt_on = not self.is_stt_on
-        self._update_tile_visuals(self.tile_stt, self.is_stt_on, is_stt=True)
+        # If already on, just turn off
+        if self.is_stt_on:
+            self.is_stt_on = False
+            self._stt_showing_warning = False
+            self._update_tile_visuals(self.tile_stt, False, is_stt=True, needs_key=False)
+        elif getattr(self, '_stt_showing_warning', False):
+            # Currently showing warning, click again to dismiss
+            self._stt_showing_warning = False
+            self._update_tile_visuals(self.tile_stt, False, is_stt=True, needs_key=False)
+        else:
+            # Trying to turn on - check if API key is missing
+            if self.stt_needs_key:
+                # Show warning state (orange) but don't actually enable
+                self._stt_showing_warning = True
+                self._update_tile_visuals(self.tile_stt, False, is_stt=True, needs_key=True)
+            else:
+                self.is_stt_on = True
+                self._update_tile_visuals(self.tile_stt, True, is_stt=True, needs_key=False)
+        
         self.update()
         if self.on_toggle_stt:
             self.on_toggle_stt(self.is_stt_on)
 
-    def _update_tile_visuals(self, tile, is_active, is_stt=False):
-        # Determine colors
-        if is_active:
-            bg_color = COLOR_PRIMARY if is_stt else COLOR_SUCCESS
+    def _update_tile_visuals(self, tile, is_active, is_stt=False, needs_key=False):
+        # Determine colors based on state
+        if needs_key:
+            bg_color = COLOR_WARNING
             fg_color = colors.WHITE
+            hint = "API Key Required"
+        elif is_active:
+            bg_color = COLOR_SUCCESS  # Both STT and Translation show green when active
+            fg_color = colors.WHITE
+            hint = ""
         else:
             bg_color = colors.with_opacity(0.05, colors.WHITE)
             fg_color = colors.GREY_500
+            hint = ""
             
         tile.bgcolor = bg_color
-        # Update content (Icon and Text)
+        # Update content (Icon, Label Text, Hint Text)
         col = tile.content
         icon = col.controls[0]
         text = col.controls[1]
+        hint_text = col.controls[2] if len(col.controls) > 2 else None
         
         icon.color = fg_color
         text.color = fg_color
+        if hint_text:
+            hint_text.value = hint
+            hint_text.color = fg_color
         tile.update()
 
     def _on_submit(self, e):
@@ -395,10 +443,22 @@ class DashboardView(ft.Column):
 
     def set_translation_enabled(self, enabled: bool) -> None:
         self.is_translation_on = bool(enabled)
-        self._update_tile_visuals(self.tile_translation, self.is_translation_on, is_stt=False)
+        # Only show warning if enabled AND needs_key; OFF state is always gray
+        self._update_tile_visuals(self.tile_translation, self.is_translation_on, is_stt=False, needs_key=False)
         self.update()
 
     def set_stt_enabled(self, enabled: bool) -> None:
         self.is_stt_on = bool(enabled)
-        self._update_tile_visuals(self.tile_stt, self.is_stt_on, is_stt=True)
+        # Only show warning if enabled AND needs_key; OFF state is always gray
+        self._update_tile_visuals(self.tile_stt, self.is_stt_on, is_stt=True, needs_key=False)
+        self.update()
+
+    def set_translation_needs_key(self, needs_key: bool) -> None:
+        self.translation_needs_key = bool(needs_key)
+        self._update_tile_visuals(self.tile_translation, self.is_translation_on, is_stt=False, needs_key=self.translation_needs_key)
+        self.update()
+
+    def set_stt_needs_key(self, needs_key: bool) -> None:
+        self.stt_needs_key = bool(needs_key)
+        self._update_tile_visuals(self.tile_stt, self.is_stt_on, is_stt=True, needs_key=self.stt_needs_key)
         self.update()

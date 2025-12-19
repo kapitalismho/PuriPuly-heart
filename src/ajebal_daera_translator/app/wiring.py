@@ -21,7 +21,6 @@ from ajebal_daera_translator.core.stt.backend import STTBackend
 from ajebal_daera_translator.providers.llm.gemini import GeminiLLMProvider
 from ajebal_daera_translator.providers.llm.qwen import QwenLLMProvider
 from ajebal_daera_translator.providers.stt.alibaba_model_studio import AlibabaModelStudioRealtimeSTTBackend
-from ajebal_daera_translator.providers.stt.google_speech_v2 import GoogleSpeechV2Backend
 
 SECRETS_PASSPHRASE_ENV = "AJEBAL_SECRETS_PASSPHRASE"
 
@@ -95,18 +94,6 @@ def create_llm_provider(settings: AppSettings, *, secrets: SecretStore) -> LLMPr
 
 
 def create_stt_backend(settings: AppSettings, *, secrets: SecretStore) -> STTBackend:
-    if settings.provider.stt == STTProviderName.GOOGLE:
-        recognizer_path = settings.google_speech.recognizer
-        if not recognizer_path:
-            raise ValueError("settings.google_speech.recognizer must be set for google STT")
-        endpoint = settings.google_speech.endpoint or "speech.googleapis.com"
-        return GoogleSpeechV2Backend(
-            recognizer=recognizer_path,
-            endpoint=endpoint,
-            sample_rate_hz=settings.audio.internal_sample_rate_hz,
-            language_codes=(settings.languages.source_language,),
-        )
-
     if settings.provider.stt == STTProviderName.ALIBABA:
         api_key = require_secret(secrets, key="alibaba_api_key", env_var="ALIBABA_API_KEY")
         model = settings.alibaba_stt.model

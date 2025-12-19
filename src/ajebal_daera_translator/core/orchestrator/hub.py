@@ -29,7 +29,7 @@ class STTProvider(Protocol):
 
 @dataclass(slots=True)
 class ClientHub:
-    stt: STTProvider
+    stt: STTProvider | None
     llm: LLMProvider | None
     osc: SmartOscQueue
     clock: Clock = SystemClock()
@@ -53,7 +53,8 @@ class ClientHub:
         if self._running:
             return
         self._running = True
-        self._stt_task = asyncio.create_task(self._run_stt_event_loop())
+        if self.stt is not None:
+            self._stt_task = asyncio.create_task(self._run_stt_event_loop())
         if auto_flush_osc:
             self._osc_flush_task = asyncio.create_task(self._run_osc_flush_loop())
 
@@ -77,10 +78,12 @@ class ClientHub:
         await asyncio.gather(*self._translation_tasks.values(), return_exceptions=True)
         self._translation_tasks.clear()
 
-        await self.stt.close()
+        if self.stt is not None:
+            await self.stt.close()
 
     async def handle_vad_event(self, event: VadEvent) -> None:
-        await self.stt.handle_vad_event(event)
+        if self.stt is not None:
+            await self.stt.handle_vad_event(event)
 
     async def submit_text(self, text: str, *, source: str = "You") -> UUID:
         text = text.strip()

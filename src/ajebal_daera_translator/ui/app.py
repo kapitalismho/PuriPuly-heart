@@ -85,13 +85,19 @@ class TranslatorApp:
 
     def _on_manual_submit(self, _source: str, text: str) -> None:
         # UI already wrote to hero/history; pipeline should run asynchronously.
-        self.page.run_task(self.controller.submit_text(text))
+        async def _task():
+            await self.controller.submit_text(text)
+        self.page.run_task(_task)
 
     def _on_translation_toggle(self, enabled: bool) -> None:
-        self.page.run_task(self.controller.set_translation_enabled(enabled))
+        async def _task():
+            await self.controller.set_translation_enabled(enabled)
+        self.page.run_task(_task)
 
     def _on_stt_toggle(self, enabled: bool) -> None:
-        self.page.run_task(self.controller.set_stt_enabled(enabled))
+        async def _task():
+            await self.controller.set_stt_enabled(enabled)
+        self.page.run_task(_task)
 
     def _on_language_change(self, source_code: str, target_code: str) -> None:
         if self.controller.settings is None:
@@ -99,13 +105,19 @@ class TranslatorApp:
         settings = self.controller.settings
         settings.languages.source_language = source_code
         settings.languages.target_language = target_code
-        self.page.run_task(self.controller.apply_settings(settings))
+        async def _task():
+            await self.controller.apply_settings(settings)
+        self.page.run_task(_task)
 
     def _on_settings_changed(self, settings) -> None:
-        self.page.run_task(self.controller.apply_settings(settings))
+        async def _task():
+            await self.controller.apply_settings(settings)
+        self.page.run_task(_task)
 
     def _on_providers_changed(self) -> None:
-        self.page.run_task(self.controller.apply_providers())
+        async def _task():
+            await self.controller.apply_providers()
+        self.page.run_task(_task)
 
 async def main_gui(page: ft.Page, *, config_path):
     app = TranslatorApp(page, config_path=config_path)

@@ -8,7 +8,6 @@ from typing import Any
 
 
 class STTProviderName(str, Enum):
-    GOOGLE = "google"
     ALIBABA = "alibaba"
     DEEPGRAM = "deepgram"
 
@@ -71,14 +70,6 @@ class STTSettings:
             raise ValueError("vad_speech_threshold must be in 0.0..1.0")
 
 
-@dataclass(slots=True)
-class GoogleSpeechSettings:
-    recognizer: str = ""
-    endpoint: str = ""
-
-    def validate(self) -> None:
-        if self.endpoint and not self.endpoint.strip():
-            raise ValueError("endpoint must be non-empty when set")
 
 
 @dataclass(slots=True)
@@ -139,7 +130,7 @@ class OSCSettings:
 
 @dataclass(slots=True)
 class ProviderSettings:
-    stt: STTProviderName = STTProviderName.GOOGLE
+    stt: STTProviderName = STTProviderName.DEEPGRAM
     llm: LLMProviderName = LLMProviderName.GEMINI
 
     def validate(self) -> None:
@@ -167,7 +158,6 @@ class AppSettings:
     languages: LanguageSettings = field(default_factory=LanguageSettings)
     audio: AudioSettings = field(default_factory=AudioSettings)
     stt: STTSettings = field(default_factory=STTSettings)
-    google_speech: GoogleSpeechSettings = field(default_factory=GoogleSpeechSettings)
     alibaba_stt: AlibabaSTTSettings = field(default_factory=AlibabaSTTSettings)
     deepgram_stt: DeepgramSTTSettings = field(default_factory=DeepgramSTTSettings)
     llm: LLMSettings = field(default_factory=LLMSettings)
@@ -180,7 +170,6 @@ class AppSettings:
         self.languages.validate()
         self.audio.validate()
         self.stt.validate()
-        self.google_speech.validate()
         self.alibaba_stt.validate()
         self.deepgram_stt.validate()
         self.llm.validate()
@@ -217,10 +206,6 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
             "drain_timeout_s": settings.stt.drain_timeout_s,
             "vad_speech_threshold": settings.stt.vad_speech_threshold,
         },
-        "google_speech": {
-            "recognizer": settings.google_speech.recognizer,
-            "endpoint": settings.google_speech.endpoint,
-        },
         "alibaba_stt": {
             "model": settings.alibaba_stt.model,
             "endpoint": settings.alibaba_stt.endpoint,
@@ -248,6 +233,14 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
     return _enum_to_value(data)  # type: ignore[return-value]
 
 
+def _parse_stt_provider(value: str) -> STTProviderName:
+    """Parse STT provider, falling back to DEEPGRAM for legacy/invalid values."""
+    try:
+        return STTProviderName(value)
+    except ValueError:
+        return STTProviderName.DEEPGRAM
+
+
 def from_dict(data: dict[str, Any]) -> AppSettings:
     audio_data = data.get("audio") or {}
     stt_data = data.get("stt") or {}
@@ -258,7 +251,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
 
     settings = AppSettings(
         provider=ProviderSettings(
-            stt=STTProviderName(data.get("provider", {}).get("stt", STTProviderName.GOOGLE.value)),
+            stt=_parse_stt_provider(data.get("provider", {}).get("stt", STTProviderName.DEEPGRAM.value)),
             llm=LLMProviderName(data.get("provider", {}).get("llm", LLMProviderName.GEMINI.value)),
         ),
         languages=LanguageSettings(
@@ -276,10 +269,6 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             reset_deadline_s=float(stt_data.get("reset_deadline_s", 90.0)),
             drain_timeout_s=float(stt_data.get("drain_timeout_s", 2.0)),
             vad_speech_threshold=float(vad_threshold_raw) if vad_threshold_raw is not None else 0.5,
-        ),
-        google_speech=GoogleSpeechSettings(
-            recognizer=str(data.get("google_speech", {}).get("recognizer", "")),
-            endpoint=str(data.get("google_speech", {}).get("endpoint", "")),
         ),
         alibaba_stt=AlibabaSTTSettings(
             model=str(data.get("alibaba_stt", {}).get("model", "paraformer-realtime-v2")),

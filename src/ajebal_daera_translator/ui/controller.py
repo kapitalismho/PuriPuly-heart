@@ -52,9 +52,13 @@ class GuiController:
 
         dash = getattr(self.app, "view_dashboard", None)
         if dash is not None:
-            dash.set_translation_enabled(self.hub.llm is not None)
+            # Set needs_key flags (used when user tries to toggle)
+            dash.translation_needs_key = (self.hub.llm is None)
+            dash.stt_needs_key = (self.hub.stt is None)
+            # Set initial enabled states (all start as off/gray)
+            dash.set_translation_enabled(False)
             dash.set_stt_enabled(False)
-            self.hub.translation_enabled = self.hub.llm is not None
+            self.hub.translation_enabled = False
 
         await self.hub.start(auto_flush_osc=True)
 
@@ -177,15 +181,19 @@ class GuiController:
         with contextlib.suppress(Exception):
             llm = create_llm_provider(self.settings, secrets=secrets)
 
-        backend = create_stt_backend(self.settings, secrets=secrets)
-        stt = ManagedSTTProvider(
-            backend=backend,
-            sample_rate_hz=self.settings.audio.internal_sample_rate_hz,
-            clock=self.clock,
-            reset_deadline_s=self.settings.stt.reset_deadline_s,
-            drain_timeout_s=self.settings.stt.drain_timeout_s,
-            bridging_ms=self.settings.audio.ring_buffer_ms,
-        )
+        stt = None
+        try:
+            backend = create_stt_backend(self.settings, secrets=secrets)
+            stt = ManagedSTTProvider(
+                backend=backend,
+                sample_rate_hz=self.settings.audio.internal_sample_rate_hz,
+                clock=self.clock,
+                reset_deadline_s=self.settings.stt.reset_deadline_s,
+                drain_timeout_s=self.settings.stt.drain_timeout_s,
+                bridging_ms=self.settings.audio.ring_buffer_ms,
+            )
+        except Exception as exc:
+            self._log_error(f"STT backend not available: {exc}")
 
         sender = VrchatOscUdpSender(
             host=self.settings.osc.host,

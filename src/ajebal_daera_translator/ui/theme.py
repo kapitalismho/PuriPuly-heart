@@ -7,6 +7,7 @@ COLOR_ON_BACKGROUND = "#FFFFFF"
 COLOR_PRIMARY = "#81D4FA"     # Subtle Light Blue for strict accents
 COLOR_ERROR = "#EF5350"
 COLOR_SUCCESS = "#66BB6A"
+COLOR_WARNING = "#FFA726"  # Orange for warning states
 COLOR_DIVIDER = "#424242"
 
 def get_app_theme() -> ft.Theme:

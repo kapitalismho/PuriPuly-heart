@@ -35,7 +35,6 @@ class SettingsView(ft.ListView):
         self.stt_provider = ft.Dropdown(
             label="STT Provider",
             options=[
-                ft.dropdown.Option("Google Speech v2"),
                 ft.dropdown.Option("Alibaba Model Studio"),
                 ft.dropdown.Option("Deepgram"),
             ],
@@ -67,18 +66,7 @@ class SettingsView(ft.ListView):
             border_radius=8,
         )
 
-        self.google_recognizer = ft.TextField(
-            label="Google Speech Recognizer",
-            hint_text="projects/.../locations/.../recognizers/...",
-            on_change=self._on_setting_change,
-            border_radius=8,
-        )
-        self.google_endpoint = ft.TextField(
-            label="Google Speech Endpoint (optional)",
-            hint_text="speech.googleapis.com",
-            on_change=self._on_setting_change,
-            border_radius=8,
-        )
+
 
         self.alibaba_stt_model = ft.TextField(
             label="Alibaba STT Model",
@@ -160,9 +148,6 @@ class SettingsView(ft.ListView):
                 [
                     ft.Text("Speech-to-Text (STT)", size=12, color=colors.GREY_400),
                     self.stt_provider,
-                    self.google_recognizer,
-                    self.google_endpoint,
-                    ft.Divider(height=5, color=colors.TRANSPARENT),
                     self.alibaba_stt_model,
                     self.alibaba_stt_endpoint,
                     ft.Divider(height=5, color=colors.TRANSPARENT),
@@ -199,16 +184,12 @@ class SettingsView(ft.ListView):
         self._settings = settings
         self._config_path = config_path
 
-        if settings.provider.stt == STTProviderName.GOOGLE:
-            self.stt_provider.value = "Google Speech v2"
-        elif settings.provider.stt == STTProviderName.ALIBABA:
+        if settings.provider.stt == STTProviderName.ALIBABA:
             self.stt_provider.value = "Alibaba Model Studio"
         else:
             self.stt_provider.value = "Deepgram"
         self.llm_provider.value = "Google Gemini" if settings.provider.llm == LLMProviderName.GEMINI else "Alibaba Qwen"
 
-        self.google_recognizer.value = settings.google_speech.recognizer
-        self.google_endpoint.value = settings.google_speech.endpoint
         self.alibaba_stt_model.value = settings.alibaba_stt.model
         self.alibaba_stt_endpoint.value = settings.alibaba_stt.endpoint
         self.deepgram_stt_model.value = settings.deepgram_stt.model
@@ -255,9 +236,7 @@ class SettingsView(ft.ListView):
             return
 
         stt_value = self.stt_provider.value
-        if stt_value == "Google Speech v2":
-            self._settings.provider.stt = STTProviderName.GOOGLE
-        elif stt_value == "Alibaba Model Studio":
+        if stt_value == "Alibaba Model Studio":
             self._settings.provider.stt = STTProviderName.ALIBABA
         else:
             self._settings.provider.stt = STTProviderName.DEEPGRAM
@@ -280,10 +259,6 @@ class SettingsView(ft.ListView):
 
         stt_provider = self._settings.provider.stt
 
-        is_google_stt = stt_provider == STTProviderName.GOOGLE
-        self.google_recognizer.visible = is_google_stt
-        self.google_endpoint.visible = is_google_stt
-
         is_alibaba_stt = stt_provider == STTProviderName.ALIBABA
         self.alibaba_stt_model.visible = is_alibaba_stt
         self.alibaba_stt_endpoint.visible = is_alibaba_stt
@@ -300,8 +275,6 @@ class SettingsView(ft.ListView):
         if self._settings is None:
             return
 
-        self._settings.google_speech.recognizer = self.google_recognizer.value or ""
-        self._settings.google_speech.endpoint = self.google_endpoint.value or ""
         self._settings.alibaba_stt.model = self.alibaba_stt_model.value or self._settings.alibaba_stt.model
         self._settings.alibaba_stt.endpoint = self.alibaba_stt_endpoint.value or self._settings.alibaba_stt.endpoint
         self._settings.deepgram_stt.model = self.deepgram_stt_model.value or self._settings.deepgram_stt.model

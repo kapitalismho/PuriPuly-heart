@@ -34,4 +34,5 @@ class HistoryView(ft.Container):
                 border_radius=8,
             )
         )
-        self.update()
+        if self.page is not None:
+            self.update()
