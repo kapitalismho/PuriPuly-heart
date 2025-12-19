@@ -49,6 +49,11 @@ class GuiController:
         self.settings = self._load_or_init_settings(self.config_path)
         self._sync_ui_from_settings()
 
+        # Attach log handler to LogsView for GUI log display
+        logs_view = getattr(self.app, "view_logs", None)
+        if logs_view is not None:
+            logs_view.attach_log_handler()
+
         await self._init_pipeline()
 
         assert self.hub is not None

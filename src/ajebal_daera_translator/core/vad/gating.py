@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 import uuid
 from dataclasses import dataclass
@@ -9,6 +10,8 @@ from uuid import UUID
 import numpy as np
 
 from ajebal_daera_translator.core.audio.ring_buffer import RingBufferF32
+
+logger = logging.getLogger(__name__)
 
 
 class VadEngine(Protocol):
@@ -120,6 +123,7 @@ class VadGating:
                 self._utterance_id = uuid.uuid4()
 
                 pre_roll = self._ring.get_last_samples(self._ring.capacity_samples)
+                logger.info(f"[VAD] SpeechStart: id={str(self._utterance_id)[:8]}, prob={prob:.2f}")
                 events.append(SpeechStart(self._utterance_id, pre_roll=pre_roll, chunk=chunk.copy()))
             self._ring.append(chunk)
             return events
@@ -133,6 +137,7 @@ class VadGating:
 
         self._silence_run += 1
         if self._silence_run >= self.hangover_chunks:
+            logger.info(f"[VAD] SpeechEnd: id={str(self._utterance_id)[:8]}")
             events.append(SpeechEnd(self._utterance_id))  # type: ignore[arg-type]
             self._in_speech = False
             self._utterance_id = None

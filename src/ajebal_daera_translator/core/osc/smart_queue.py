@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import textwrap
 from dataclasses import dataclass
 
 from ajebal_daera_translator.core.clock import Clock
 from ajebal_daera_translator.core.osc.sender import OscSender
 from ajebal_daera_translator.domain.models import OSCMessage
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -50,6 +53,7 @@ class SmartOscQueue:
         head = parts[0]
         tail = parts[1:]
 
+        logger.info(f"[OSC] Sending: '{head}'")
         self.sender.send_chatbox(head)
         self._next_send_at = now + self.cooldown_s
 
@@ -81,3 +85,7 @@ class SmartOscQueue:
             break_long_words=True,
             break_on_hyphens=False,
         )
+
+    def send_typing(self, is_typing: bool) -> None:
+        """Forward typing indicator to the OSC sender."""
+        self.sender.send_typing(is_typing)

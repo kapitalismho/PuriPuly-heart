@@ -67,9 +67,13 @@ class MockOscSender:
     """Mock OSC sender that records messages without network."""
 
     messages: list[str] = field(default_factory=list)
+    typing_states: list[bool] = field(default_factory=list)
 
     def send_chatbox(self, text: str) -> None:
         self.messages.append(text)
+
+    def send_typing(self, is_typing: bool) -> None:
+        self.typing_states.append(is_typing)
 
 
 class SimpleClock:

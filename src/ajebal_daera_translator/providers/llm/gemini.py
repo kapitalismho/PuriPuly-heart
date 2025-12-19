@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 from uuid import UUID
 
 from ajebal_daera_translator.domain.models import Translation
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiClient(Protocol):
@@ -100,6 +103,7 @@ class GoogleGenaiGeminiClient:
             target_language=target_language,
         ) if "{source_language}" in system_prompt else system_prompt
 
+        logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
         client = self._get_client()
         response = await client.aio.models.generate_content(
             model=self.model,
@@ -110,7 +114,10 @@ class GoogleGenaiGeminiClient:
             ),
         )
         if getattr(response, "text", None):
-            return str(response.text).strip()
+            result = str(response.text).strip()
+            logger.info(f"[LLM] Response: '{result}'")
+            return result
+        logger.error("[LLM] No text in response")
         raise RuntimeError("Gemini response did not contain text")
 
     async def close(self) -> None:

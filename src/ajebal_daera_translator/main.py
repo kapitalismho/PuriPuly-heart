@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import argparse
+import logging
 from pathlib import Path
 
 from ajebal_daera_translator.app.headless_mic import HeadlessMicRunner
@@ -10,6 +11,13 @@ from ajebal_daera_translator.app.wiring import create_llm_provider, create_secre
 from ajebal_daera_translator.config.paths import default_settings_path, default_vad_model_path
 from ajebal_daera_translator.config.settings import AppSettings, load_settings
 from ajebal_daera_translator.core.osc.udp_sender import VrchatOscUdpSender
+
+# Configure logging for the entire application
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 
 def build_parser() -> argparse.ArgumentParser:

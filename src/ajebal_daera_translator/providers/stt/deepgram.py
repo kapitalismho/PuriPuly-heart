@@ -137,6 +137,7 @@ class _DeepgramSDKSession(STTBackendSession):
                                 transcript = result.channel.alternatives[0].transcript
                                 if transcript:
                                     is_final = getattr(result, 'is_final', False)
+                                    logger.info(f"[STT] Transcript received: '{transcript}' (final={is_final})")
                                     event = STTBackendTranscriptEvent(text=transcript.strip(), is_final=is_final)
                                     self._put_event(event)
                     except Exception as e:
@@ -178,6 +179,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 logger.debug("Deepgram SDK connection and listening started")
 
                 # Audio sending loop
+                audio_chunks_sent = 0
                 while True:
                     try:
                         data = self._audio_q.get(timeout=0.1)
@@ -187,11 +189,17 @@ class _DeepgramSDKSession(STTBackendSession):
                         continue
 
                     if data is _STOP:
+                        logger.debug(f"Deepgram: Stop signal received after {audio_chunks_sent} chunks")
                         break
 
                     if isinstance(data, bytes):
                         try:
                             connection.send_media(data)
+                            audio_chunks_sent += 1
+                            if audio_chunks_sent == 1:
+                                logger.info(f"[STT] First audio chunk sent to Deepgram ({len(data)} bytes)")
+                            elif audio_chunks_sent % 50 == 0:
+                                logger.debug(f"[STT] Audio chunks sent: {audio_chunks_sent}")
                         except Exception as e:
                             logger.warning(f"Failed to send audio: {e}")
                             break

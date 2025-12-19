@@ -12,6 +12,7 @@ class VrchatOscUdpSender(OscSender):
     host: str = "127.0.0.1"
     port: int = 9000
     chatbox_address: str = "/chatbox/input"
+    typing_address: str = "/chatbox/typing"
     chatbox_send: bool = True
     chatbox_clear: bool = False
     _sock: socket.socket = field(init=False, repr=False)
@@ -36,5 +37,12 @@ class VrchatOscUdpSender(OscSender):
         builder.add_arg(text)
         builder.add_arg(self.chatbox_send)
         builder.add_arg(self.chatbox_clear)
+        packet = builder.build().dgram
+        self._sock.sendto(packet, (self.host, self.port))
+
+    def send_typing(self, is_typing: bool) -> None:
+        """Send typing indicator to VRChat chatbox."""
+        builder = self._OscMessageBuilder(address=self.typing_address)
+        builder.add_arg(is_typing)
         packet = builder.build().dgram
         self._sock.sendto(packet, (self.host, self.port))

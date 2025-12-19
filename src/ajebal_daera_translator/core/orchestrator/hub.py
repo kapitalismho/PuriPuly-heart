@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import UUID
 from uuid import uuid4
 
+logger = logging.getLogger(__name__)
+
 from ajebal_daera_translator.core.clock import Clock, SystemClock
 from ajebal_daera_translator.core.language import get_llm_language_name
 from ajebal_daera_translator.core.llm.provider import LLMProvider
 from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue
-from ajebal_daera_translator.core.vad.gating import VadEvent
+from ajebal_daera_translator.core.vad.gating import SpeechStart, VadEvent
 from ajebal_daera_translator.domain.events import (
     STTErrorEvent,
     STTFinalEvent,
@@ -86,6 +89,10 @@ class ClientHub:
             await self.llm.close()
 
     async def handle_vad_event(self, event: VadEvent) -> None:
+        # Start typing indicator when speech begins
+        if isinstance(event, SpeechStart):
+            self.osc.send_typing(True)
+        
         if self.stt is not None:
             await self.stt.handle_vad_event(event)
 
@@ -136,18 +143,22 @@ class ClientHub:
             return
 
         if isinstance(event, STTPartialEvent):
+            logger.debug(f"[Hub] STT Partial: '{event.transcript.text[:50]}...' id={str(event.transcript.utterance_id)[:8]}")
             await self._handle_transcript(event.transcript, is_final=False, source="Mic")
             return
 
         if isinstance(event, STTFinalEvent):
+            logger.info(f"[Hub] STT Final: '{event.transcript.text}' id={str(event.transcript.utterance_id)[:8]}")
             await self._handle_transcript(event.transcript, is_final=True, source="Mic")
             if self.llm is None or not self.translation_enabled:
+                logger.info(f"[Hub] Skipping translation (llm={self.llm is not None}, enabled={self.translation_enabled})")
                 await self._enqueue_osc(
                     event.transcript.utterance_id,
                     transcript_text=event.transcript.text,
                     translation_text=None,
                 )
             else:
+                logger.info(f"[Hub] Starting translation for id={str(event.transcript.utterance_id)[:8]}")
                 await self._ensure_translation(event.transcript)
             return
 
@@ -201,6 +212,7 @@ class ClientHub:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
+            logger.error(f"[Hub] Translation failed: {exc}")
             await self.ui_events.put(
                 UIEvent(
                     type=UIEventType.ERROR,
@@ -215,6 +227,7 @@ class ClientHub:
 
         bundle = self.get_or_create_bundle(utterance_id)
         bundle.with_translation(translation)
+        logger.info(f"[Hub] Translation done: '{translation.text}' id={str(utterance_id)[:8]}")
         await self.ui_events.put(
             UIEvent(
                 type=UIEventType.TRANSLATION_DONE,
@@ -232,7 +245,12 @@ class ClientHub:
             merged = f"{transcript_text} ({translation_text})"
 
         msg = OSCMessage(utterance_id=utterance_id, text=merged, created_at=self.clock.now())
+        logger.info(f"[Hub] OSC enqueue: '{merged[:50]}...' id={str(utterance_id)[:8]}")
         self.osc.enqueue(msg)
+        
+        # Stop typing indicator after message is sent
+        self.osc.send_typing(False)
+        
         await self.ui_events.put(
             UIEvent(
                 type=UIEventType.OSC_SENT,
