@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from typing import AsyncIterator
 from uuid import UUID
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from ajebal_daera_translator.core.audio.format import float32_to_pcm16le_bytes
 from ajebal_daera_translator.core.audio.ring_buffer import RingBufferF32
@@ -131,9 +134,11 @@ class ManagedSTTProvider:
         if self._active_session is not None:
             return
 
+        logger.info("[STT] Opening new session...")
         try:
             session = await self.backend.open_session()
         except Exception as exc:
+            logger.error(f"[STT] Failed to open session: {exc}")
             await self._events.put(STTErrorEvent(f"Failed to open STT session: {exc}"))
             raise
 
@@ -141,6 +146,7 @@ class ManagedSTTProvider:
         self._session_started_at = self.clock.now()
         self._consumer_task = asyncio.create_task(self._consume_session_events(session))
         await self._set_state(STTSessionState.STREAMING)
+        logger.info(f"[STT] Session opened (reset_deadline={self.reset_deadline_s}s)")
 
     async def _maybe_reset(self, *, is_speaking: bool) -> None:
         if self._active_session is None or self._session_started_at is None:
@@ -150,17 +156,21 @@ class ManagedSTTProvider:
         if elapsed < self.reset_deadline_s:
             return
 
+        logger.warning(f"[STT] Session exceeded {self.reset_deadline_s}s (elapsed={elapsed:.1f}s, speaking={is_speaking})")
         if is_speaking:
             await self._reset_with_bridging()
         else:
             await self._reset_on_silence()
 
     async def _reset_with_bridging(self) -> None:
+        logger.info("[STT] BRIDGING: Resetting session while speaking...")
         old_session = self._active_session
         old_consumer = self._consumer_task
 
         bridging_audio = self._audio_ring.get_last_samples(self._audio_ring.capacity_samples)  # type: ignore[union-attr]
+        bridging_ms = len(bridging_audio) / self.sample_rate_hz * 1000
 
+        logger.info(f"[STT] BRIDGING: Opening new session with {bridging_ms:.0f}ms audio buffer")
         new_session = await self.backend.open_session()
         self._active_session = new_session
         self._session_started_at = self.clock.now()
@@ -169,14 +179,17 @@ class ManagedSTTProvider:
         await self._set_state(STTSessionState.STREAMING)
 
         await new_session.send_audio(float32_to_pcm16le_bytes(bridging_audio))
+        logger.info("[STT] BRIDGING: New session ready, bridging audio sent")
 
         if old_session and old_consumer:
+            logger.info("[STT] BRIDGING: Starting drain of old session in background")
             self._draining.add(asyncio.create_task(self._drain_and_close(old_session, old_consumer)))
 
     async def _reset_on_silence(self) -> None:
         if self._active_session is None or self._consumer_task is None:
             return
 
+        logger.info("[STT] SILENCE RESET: Closing session during silence...")
         old_session = self._active_session
         old_consumer = self._consumer_task
         self._active_session = None
@@ -186,20 +199,25 @@ class ManagedSTTProvider:
         await self._set_state(STTSessionState.DRAINING)
         await self._drain_and_close(old_session, old_consumer)
         await self._set_state(STTSessionState.DISCONNECTED)
+        logger.info("[STT] SILENCE RESET: Session closed, will reconnect on next speech")
 
     async def _drain_and_close(self, session: STTBackendSession, consumer_task: asyncio.Task[None]) -> None:
+        logger.debug(f"[STT] DRAIN: Starting drain (timeout={self.drain_timeout_s}s)...")
         with contextlib.suppress(Exception):
             await session.stop()
 
         try:
             await asyncio.wait_for(consumer_task, timeout=self.drain_timeout_s)
+            logger.debug("[STT] DRAIN: Consumer task completed normally")
         except asyncio.TimeoutError:
+            logger.warning(f"[STT] DRAIN: Timeout after {self.drain_timeout_s}s, cancelling consumer task")
             consumer_task.cancel()
             with contextlib.suppress(Exception):
                 await consumer_task
 
         with contextlib.suppress(Exception):
             await session.close()
+        logger.debug("[STT] DRAIN: Session closed")
 
     async def _consume_session_events(self, session: STTBackendSession) -> None:
         try:
@@ -228,7 +246,9 @@ class ManagedSTTProvider:
     async def _set_state(self, state: STTSessionState) -> None:
         if self._state == state:
             return
+        old_state = self._state
         self._state = state
+        logger.info(f"[STT] State: {old_state.name} -> {state.name}")
         await self._events.put(STTSessionStateEvent(state))
 
 

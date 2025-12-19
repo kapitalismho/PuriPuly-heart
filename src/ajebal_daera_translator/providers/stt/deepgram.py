@@ -1,7 +1,8 @@
 """Deepgram Realtime STT Backend using official SDK v5.
 
 WebSocket-based Speech-to-Text using Deepgram's nova-3 model.
-Uses the official deepgram-sdk v5 for automatic keepalive and better stability.
+Uses the official deepgram-sdk v5 with manual KeepAlive messages (every 5 seconds)
+to prevent the 10-second timeout (NET-0001 error).
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ class DeepgramRealtimeSTTBackend(STTBackend):
     language: str  # Required: passed from wiring.py via get_deepgram_language()
     model: str = "nova-3"
     sample_rate_hz: int = 16000
-    # Note: endpointing disabled - local VAD (500ms hangover) handles utterance boundaries
+    # Note: Hybrid VAD - local VAD (700ms) + server VAD/endpointing (600ms) with 100ms safety buffer
 
     async def open_session(self) -> STTBackendSession:
         if self.sample_rate_hz not in (8000, 16000):
@@ -113,8 +114,9 @@ class _DeepgramSDKSession(STTBackendSession):
         try:
             from deepgram import DeepgramClient
             from deepgram.core.events import EventType
+            from deepgram.extensions.types.sockets import ListenV1ControlMessage
 
-            # Create client with api_key directly (thread-safe, no os.environ mutation)
+            # Create client with api_key
             client = DeepgramClient(api_key=self.api_key)
 
             # Connect with streaming options using v1.connect() API
@@ -126,7 +128,8 @@ class _DeepgramSDKSession(STTBackendSession):
                 channels=1,
                 interim_results=True,
                 punctuate=True,
-                endpointing=False,  # Disabled: local VAD + 500ms hangover handles utterance boundaries
+                vad_events=True,  # Enable server VAD (required for endpointing)
+                endpointing=600,  # 600ms server endpointing + 700ms local VAD (100ms safety buffer)
             ) as connection:
                 
                 # Set up event handlers
@@ -137,8 +140,11 @@ class _DeepgramSDKSession(STTBackendSession):
                                 transcript = result.channel.alternatives[0].transcript
                                 if transcript:
                                     is_final = getattr(result, 'is_final', False)
-                                    logger.info(f"[STT] Transcript received: '{transcript}' (final={is_final})")
-                                    event = STTBackendTranscriptEvent(text=transcript.strip(), is_final=is_final)
+                                    speech_final = getattr(result, 'speech_final', False)
+                                    # Treat as final if either is_final or speech_final is True
+                                    effective_final = is_final or speech_final
+                                    logger.info(f"[STT] Transcript: '{transcript}' (is_final={is_final}, speech_final={speech_final})")
+                                    event = STTBackendTranscriptEvent(text=transcript.strip(), is_final=effective_final)
                                     self._put_event(event)
                     except Exception as e:
                         logger.debug(f"Deepgram parse error: {e}")
@@ -169,14 +175,30 @@ class _DeepgramSDKSession(STTBackendSession):
                 
                 listen_thread = threading.Thread(target=listening_thread, daemon=True)
                 listen_thread.start()
-                
+
                 # Give time for connection to open
                 import time
                 time.sleep(0.3)
-                
+
                 # Signal that connection is established
                 self._connected.set()
                 logger.debug("Deepgram SDK connection and listening started")
+
+                # Start keepalive thread (sends KeepAlive every 5 seconds to prevent 10-second timeout)
+                def keepalive_thread():
+                    while not self._stopped:
+                        time.sleep(5.0)
+                        if self._stopped:
+                            break
+                        try:
+                            connection.send_control(ListenV1ControlMessage(type="KeepAlive"))
+                            logger.debug("[STT] KeepAlive sent")
+                        except Exception as e:
+                            logger.debug(f"KeepAlive failed: {e}")
+                            break
+
+                ka_thread = threading.Thread(target=keepalive_thread, daemon=True)
+                ka_thread.start()
 
                 # Audio sending loop
                 audio_chunks_sent = 0
