@@ -7,7 +7,7 @@ from pathlib import Path
 from ajebal_daera_translator.app.headless_mic import HeadlessMicRunner
 from ajebal_daera_translator.app.headless_stdin import HeadlessStdinRunner
 from ajebal_daera_translator.app.wiring import create_llm_provider, create_secret_store
-from ajebal_daera_translator.config.paths import default_settings_path
+from ajebal_daera_translator.config.paths import default_settings_path, default_vad_model_path
 from ajebal_daera_translator.config.settings import AppSettings, load_settings
 from ajebal_daera_translator.core.osc.udp_sender import VrchatOscUdpSender
 
@@ -36,7 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     mic = sub.add_parser("run-mic", help="Capture microphone audio (VAD→STT→LLM→OSC)")
-    mic.add_argument("--vad-model", type=Path, required=True, help="Path to Silero VAD ONNX model file")
+    mic.add_argument(
+        "--vad-model",
+        type=Path,
+        default=default_vad_model_path(),
+        help="Path to Silero VAD ONNX model file (default: user config dir)",
+    )
     mic.add_argument(
         "--use-llm",
         action="store_true",

@@ -27,8 +27,8 @@ If `settings.secrets.backend = "encrypted_file"`, set `AJEBAL_SECRETS_PASSPHRASE
   - Without LLM: `python3 -m ajebal_daera_translator.main run-stdin`
   - With LLM: `GOOGLE_API_KEY=... python3 -m ajebal_daera_translator.main run-stdin --use-llm`
 - Capture mic audio (VAD→STT→(LLM)→OSC):
-  - `python3 -m ajebal_daera_translator.main run-mic --vad-model /path/to/silero_vad.onnx`
-  - With LLM: `python3 -m ajebal_daera_translator.main run-mic --vad-model /path/to/silero_vad.onnx --use-llm`
+  - `python3 -m ajebal_daera_translator.main run-mic`
+  - With LLM: `python3 -m ajebal_daera_translator.main run-mic --use-llm`
 
 ## Integration Tests (Opt-in)
 

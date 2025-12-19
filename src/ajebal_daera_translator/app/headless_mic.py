@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from ajebal_daera_translator.app.wiring import create_llm_provider, create_secret_store, create_stt_backend
+from ajebal_daera_translator.config.paths import default_vad_model_path
 from ajebal_daera_translator.config.settings import AppSettings
 from ajebal_daera_translator.core.audio.format import normalize_audio_f32
 from ajebal_daera_translator.core.audio.source import AudioSource, SoundDeviceAudioSource, resolve_sounddevice_input_device
@@ -17,6 +18,7 @@ from ajebal_daera_translator.core.orchestrator.hub import ClientHub
 from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue
 from ajebal_daera_translator.core.osc.udp_sender import VrchatOscUdpSender
 from ajebal_daera_translator.core.stt.controller import ManagedSTTProvider
+from ajebal_daera_translator.core.vad.bundled import SILERO_VAD_VERSION, ensure_silero_vad_onnx
 from ajebal_daera_translator.core.vad.gating import VadGating
 from ajebal_daera_translator.core.vad.silero import SileroVadOnnx
 
@@ -70,6 +72,17 @@ class HeadlessMicRunner:
             system_prompt=self.settings.system_prompt,
             fallback_transcript_only=not self.use_llm,
         )
+
+        if self.vad_model_path == default_vad_model_path():
+            try:
+                self.vad_model_path = ensure_silero_vad_onnx(target_path=self.vad_model_path)
+            except Exception as exc:
+                logger.error("Failed to prepare Silero VAD model (%s): %s", SILERO_VAD_VERSION, exc)
+                return 2
+
+        if not self.vad_model_path.exists():
+            logger.error("VAD model file not found: %s", self.vad_model_path)
+            return 2
 
         vad = VadGating(
             engine=SileroVadOnnx(model_path=self.vad_model_path),
