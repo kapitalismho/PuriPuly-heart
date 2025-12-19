@@ -37,6 +37,7 @@ class SettingsView(ft.ListView):
             options=[
                 ft.dropdown.Option("Google Speech v2"),
                 ft.dropdown.Option("Alibaba Model Studio"),
+                ft.dropdown.Option("Deepgram"),
             ],
             on_change=self._on_provider_change,
             border_radius=8,
@@ -86,6 +87,20 @@ class SettingsView(ft.ListView):
         )
         self.alibaba_stt_endpoint = ft.TextField(
             label="Alibaba STT Endpoint",
+            on_change=self._on_setting_change,
+            border_radius=8,
+        )
+
+        self.deepgram_api_key = ft.TextField(
+            label="Deepgram API Key",
+            password=True,
+            can_reveal_password=True,
+            on_change=lambda e: self._on_secret_change("deepgram_api_key", self.deepgram_api_key.value),
+            border_radius=8,
+        )
+        self.deepgram_stt_model = ft.TextField(
+            label="Deepgram Model",
+            hint_text="nova-3",
             on_change=self._on_setting_change,
             border_radius=8,
         )
@@ -150,6 +165,9 @@ class SettingsView(ft.ListView):
                     ft.Divider(height=5, color=colors.TRANSPARENT),
                     self.alibaba_stt_model,
                     self.alibaba_stt_endpoint,
+                    ft.Divider(height=5, color=colors.TRANSPARENT),
+                    self.deepgram_api_key,
+                    self.deepgram_stt_model,
                     ft.Divider(height=10, color=colors.TRANSPARENT),
                     ft.Text("Translation (LLM)", size=12, color=colors.GREY_400),
                     self.llm_provider,
@@ -181,13 +199,19 @@ class SettingsView(ft.ListView):
         self._settings = settings
         self._config_path = config_path
 
-        self.stt_provider.value = "Google Speech v2" if settings.provider.stt == STTProviderName.GOOGLE else "Alibaba Model Studio"
+        if settings.provider.stt == STTProviderName.GOOGLE:
+            self.stt_provider.value = "Google Speech v2"
+        elif settings.provider.stt == STTProviderName.ALIBABA:
+            self.stt_provider.value = "Alibaba Model Studio"
+        else:
+            self.stt_provider.value = "Deepgram"
         self.llm_provider.value = "Google Gemini" if settings.provider.llm == LLMProviderName.GEMINI else "Alibaba Qwen"
 
         self.google_recognizer.value = settings.google_speech.recognizer
         self.google_endpoint.value = settings.google_speech.endpoint
         self.alibaba_stt_model.value = settings.alibaba_stt.model
         self.alibaba_stt_endpoint.value = settings.alibaba_stt.endpoint
+        self.deepgram_stt_model.value = settings.deepgram_stt.model
 
         self.audio_host_api.value = settings.audio.input_host_api or "(Default)"
         self._refresh_microphones()
@@ -196,11 +220,11 @@ class SettingsView(ft.ListView):
 
         self.system_prompt.value = settings.system_prompt
 
-        # Load secrets (best effort).
         with contextlib.suppress(Exception):
             store = create_secret_store(settings.secrets, config_path=config_path)
             self.google_api_key.value = store.get("google_api_key") or ""
             self.alibaba_api_key.value = store.get("alibaba_api_key") or ""
+            self.deepgram_api_key.value = store.get("deepgram_api_key") or ""
 
         self._update_provider_visibility()
         self.update()
@@ -230,9 +254,14 @@ class SettingsView(ft.ListView):
         if self._settings is None:
             return
 
-        self._settings.provider.stt = (
-            STTProviderName.GOOGLE if self.stt_provider.value == "Google Speech v2" else STTProviderName.ALIBABA
-        )
+        stt_value = self.stt_provider.value
+        if stt_value == "Google Speech v2":
+            self._settings.provider.stt = STTProviderName.GOOGLE
+        elif stt_value == "Alibaba Model Studio":
+            self._settings.provider.stt = STTProviderName.ALIBABA
+        else:
+            self._settings.provider.stt = STTProviderName.DEEPGRAM
+
         self._settings.provider.llm = (
             LLMProviderName.GEMINI if self.llm_provider.value == "Google Gemini" else LLMProviderName.QWEN
         )
@@ -249,12 +278,19 @@ class SettingsView(ft.ListView):
         if self._settings is None:
             return
 
-        is_google_stt = self._settings.provider.stt == STTProviderName.GOOGLE
+        stt_provider = self._settings.provider.stt
+
+        is_google_stt = stt_provider == STTProviderName.GOOGLE
         self.google_recognizer.visible = is_google_stt
         self.google_endpoint.visible = is_google_stt
 
-        self.alibaba_stt_model.visible = not is_google_stt
-        self.alibaba_stt_endpoint.visible = not is_google_stt
+        is_alibaba_stt = stt_provider == STTProviderName.ALIBABA
+        self.alibaba_stt_model.visible = is_alibaba_stt
+        self.alibaba_stt_endpoint.visible = is_alibaba_stt
+
+        is_deepgram_stt = stt_provider == STTProviderName.DEEPGRAM
+        self.deepgram_api_key.visible = is_deepgram_stt
+        self.deepgram_stt_model.visible = is_deepgram_stt
 
         self.google_api_key.visible = True
         self.alibaba_api_key.visible = True
@@ -268,6 +304,7 @@ class SettingsView(ft.ListView):
         self._settings.google_speech.endpoint = self.google_endpoint.value or ""
         self._settings.alibaba_stt.model = self.alibaba_stt_model.value or self._settings.alibaba_stt.model
         self._settings.alibaba_stt.endpoint = self.alibaba_stt_endpoint.value or self._settings.alibaba_stt.endpoint
+        self._settings.deepgram_stt.model = self.deepgram_stt_model.value or self._settings.deepgram_stt.model
         self._settings.system_prompt = self.system_prompt.value or ""
 
         self._emit_settings_changed()

@@ -118,4 +118,15 @@ def create_stt_backend(settings: AppSettings, *, secrets: SecretStore) -> STTBac
             sample_rate_hz=settings.audio.internal_sample_rate_hz,
         )
 
+    if settings.provider.stt == STTProviderName.DEEPGRAM:
+        from ajebal_daera_translator.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+
+        api_key = require_secret(secrets, key="deepgram_api_key", env_var="DEEPGRAM_API_KEY")
+        return DeepgramRealtimeSTTBackend(
+            api_key=api_key,
+            model=settings.deepgram_stt.model,
+            language=settings.languages.source_language,
+            sample_rate_hz=settings.audio.internal_sample_rate_hz,
+        )
+
     raise ValueError(f"Unsupported STT provider: {settings.provider.stt}")
