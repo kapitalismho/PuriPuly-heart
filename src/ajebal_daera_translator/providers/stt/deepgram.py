@@ -1,14 +1,14 @@
-"""Deepgram Realtime STT Backend using raw WebSocket connection.
+"""Deepgram Realtime STT Backend using official SDK v5.
 
 WebSocket-based Speech-to-Text using Deepgram's nova-3 model.
-Uses websocket-client for direct WebSocket control similar to Alibaba STT backend.
+Uses the official deepgram-sdk v5 for automatic keepalive and better stability.
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
+import logging
 import queue
 import threading
 from dataclasses import dataclass, field
@@ -20,15 +20,18 @@ from ajebal_daera_translator.core.stt.backend import (
     STTBackendTranscriptEvent,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(slots=True)
 class DeepgramRealtimeSTTBackend(STTBackend):
-    """Deepgram Realtime STT Backend using raw WebSocket."""
+    """Deepgram Realtime STT Backend using official SDK v5."""
 
     api_key: str
+    language: str  # Required: passed from wiring.py via get_deepgram_language()
     model: str = "nova-3"
-    language: str = "ko"
     sample_rate_hz: int = 16000
+    # Note: endpointing disabled - local VAD (500ms hangover) handles utterance boundaries
 
     async def open_session(self) -> STTBackendSession:
         if self.sample_rate_hz not in (8000, 16000):
@@ -36,7 +39,7 @@ class DeepgramRealtimeSTTBackend(STTBackend):
         if not self.api_key:
             raise ValueError("api_key must be non-empty")
 
-        session = _DeepgramWebSocketSession(
+        session = _DeepgramSDKSession(
             api_key=self.api_key,
             model=self.model,
             language=self.language,
@@ -45,13 +48,38 @@ class DeepgramRealtimeSTTBackend(STTBackend):
         await session.start()
         return session
 
+    @staticmethod
+    async def verify_api_key(api_key: str) -> bool:
+        if not api_key:
+            return False
+        
+        import urllib.request
+        import urllib.error
+
+        def _check():
+            req = urllib.request.Request(
+                "https://api.deepgram.com/v1/projects",
+                headers={"Authorization": f"Token {api_key}"}
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    if response.status == 200:
+                        return True
+                    return False
+            except urllib.error.HTTPError as e:
+                raise Exception(f"HTTP {e.code}: {e.reason}")
+            except Exception as e:
+                raise Exception(f"Connection failed: {e}")
+
+        return await asyncio.to_thread(_check)
+
 
 _STOP = object()
 
 
 @dataclass(slots=True)
-class _DeepgramWebSocketSession(STTBackendSession):
-    """Internal session using raw WebSocket for Deepgram Streaming API."""
+class _DeepgramSDKSession(STTBackendSession):
+    """Internal session using official Deepgram SDK v5 with threading."""
 
     api_key: str
     model: str
@@ -60,7 +88,6 @@ class _DeepgramWebSocketSession(STTBackendSession):
 
     _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(init=False, repr=False)
     _audio_q: queue.Queue[bytes | object] = field(init=False, repr=False)
-    _ws: Any = field(init=False, default=None, repr=False)
     _thread: threading.Thread | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
     _loop: asyncio.AbstractEventLoop | None = field(init=False, default=None, repr=False)
@@ -73,119 +100,107 @@ class _DeepgramWebSocketSession(STTBackendSession):
 
     async def start(self) -> None:
         self._loop = asyncio.get_event_loop()
-        self._thread = threading.Thread(target=self._run_sync, name="deepgram-ws", daemon=True)
+        self._thread = threading.Thread(target=self._run_sync, name="deepgram-sdk", daemon=True)
         self._thread.start()
-
-    def _build_url(self) -> str:
-        """Build Deepgram WebSocket URL with query parameters."""
-        base = "wss://api.deepgram.com/v1/listen"
-        params = [
-            f"model={self.model}",
-            f"language={self.language}",
-            f"encoding=linear16",
-            f"sample_rate={self.sample_rate_hz}",
-            f"channels=1",
-            f"interim_results=true",
-            f"punctuate=true",
-        ]
-        return f"{base}?{'&'.join(params)}"
+        
+        # Wait for connection to be established
+        connected = await asyncio.to_thread(self._connected.wait, 5.0)
+        if not connected:
+            self._put_event(RuntimeError("Deepgram SDK connection timeout"))
 
     def _run_sync(self) -> None:
-        """Run WebSocket connection in a separate thread."""
-        import websocket
-
+        """Run Deepgram SDK connection in a separate thread."""
         try:
-            url = self._build_url()
-            headers = {"Authorization": f"Token {self.api_key}"}
+            from deepgram import DeepgramClient
+            from deepgram.core.events import EventType
 
-            self._ws = websocket.WebSocketApp(
-                url,
-                header=headers,
-                on_message=self._on_message,
-                on_error=self._on_error,
-                on_close=self._on_close,
-                on_open=self._on_open,
-            )
+            # Create client with api_key directly (thread-safe, no os.environ mutation)
+            client = DeepgramClient(api_key=self.api_key)
 
-            # Start WebSocket in its own thread with run_forever
-            ws_thread = threading.Thread(target=self._ws.run_forever, daemon=True)
-            ws_thread.start()
-
-            # Wait for WebSocket connection to be established
-            if not self._connected.wait(timeout=5.0):
-                self._put_event(RuntimeError("Deepgram WebSocket connection timeout"))
-                return
-
-            # Audio sending loop
-            while True:
-                try:
-                    data = self._audio_q.get(timeout=0.1)
-                except queue.Empty:
-                    if self._stopped:
-                        break
-                    continue
-
-                if data is _STOP:
-                    break
-
-                if isinstance(data, bytes) and self._ws:
+            # Connect with streaming options using v1.connect() API
+            with client.listen.v1.connect(
+                model=self.model,
+                language=self.language,
+                encoding="linear16",
+                sample_rate=self.sample_rate_hz,
+                channels=1,
+                interim_results=True,
+                punctuate=True,
+                endpointing=False,  # Disabled: local VAD + 500ms hangover handles utterance boundaries
+            ) as connection:
+                
+                # Set up event handlers
+                def on_message(result: Any) -> None:
                     try:
-                        self._ws.send(data, opcode=websocket.ABNF.OPCODE_BINARY)
-                    except Exception:
+                        if hasattr(result, 'channel') and hasattr(result.channel, 'alternatives'):
+                            if result.channel.alternatives:
+                                transcript = result.channel.alternatives[0].transcript
+                                if transcript:
+                                    is_final = getattr(result, 'is_final', False)
+                                    event = STTBackendTranscriptEvent(text=transcript.strip(), is_final=is_final)
+                                    self._put_event(event)
+                    except Exception as e:
+                        logger.debug(f"Deepgram parse error: {e}")
+
+                def on_error(error: Any) -> None:
+                    logger.warning(f"Deepgram error: {error}")
+
+                def on_close(close_event: Any) -> None:
+                    _ = close_event
+                    logger.debug("Deepgram: Connection closed")
+
+                def on_open(open_event: Any) -> None:
+                    _ = open_event
+                    logger.debug("Deepgram: Connection opened")
+                    self._connected.set()
+
+                connection.on(EventType.OPEN, on_open)
+                connection.on(EventType.MESSAGE, on_message)
+                connection.on(EventType.ERROR, on_error)
+                connection.on(EventType.CLOSE, on_close)
+                
+                # Start listening in a separate thread (it's blocking)
+                def listening_thread():
+                    try:
+                        connection.start_listening()
+                    except Exception as e:
+                        logger.debug(f"Listening thread ended: {e}")
+                
+                listen_thread = threading.Thread(target=listening_thread, daemon=True)
+                listen_thread.start()
+                
+                # Give time for connection to open
+                import time
+                time.sleep(0.3)
+                
+                # Signal that connection is established
+                self._connected.set()
+                logger.debug("Deepgram SDK connection and listening started")
+
+                # Audio sending loop
+                while True:
+                    try:
+                        data = self._audio_q.get(timeout=0.1)
+                    except queue.Empty:
+                        if self._stopped:
+                            break
+                        continue
+
+                    if data is _STOP:
                         break
 
-            # Send CloseStream message
-            if self._ws:
-                with contextlib.suppress(Exception):
-                    self._ws.send(json.dumps({"type": "CloseStream"}))
+                    if isinstance(data, bytes):
+                        try:
+                            connection.send_media(data)
+                        except Exception as e:
+                            logger.warning(f"Failed to send audio: {e}")
+                            break
 
         except BaseException as exc:
+            logger.exception("Deepgram SDK thread error")
             self._put_event(exc)
         finally:
-            if self._ws:
-                with contextlib.suppress(Exception):
-                    self._ws.close()
             self._put_event(None)
-
-    def _on_open(self, ws: Any) -> None:
-        """Called when WebSocket connection is established."""
-        print("[DEBUG] Deepgram WS Sent Open", flush=True)
-        self._connected.set()
-        _ = ws
-
-    def _on_message(self, ws: Any, message: str) -> None:
-        """Handle incoming messages from Deepgram."""
-        _ = ws
-        try:
-            data = json.loads(message)
-            msg_type = data.get("type", "")
-
-            if msg_type == "Results":
-                channel = data.get("channel", {})
-                alternatives = channel.get("alternatives", [])
-                if alternatives:
-                    transcript = alternatives[0].get("transcript", "")
-                    # print(f"[DEBUG] Deepgram Msg: {transcript}", flush=True)
-                    if transcript:
-                        is_final = data.get("is_final", False)
-                        event = STTBackendTranscriptEvent(text=transcript.strip(), is_final=is_final)
-                        self._put_event(event)
-            else:
-                 print(f"[DEBUG] Deepgram Non-Result: {msg_type}", flush=True)
-
-        except Exception as e:
-            print(f"[DEBUG] Deepgram Parse Error: {e}", flush=True)
-
-    def _on_error(self, ws: Any, error: Any) -> None:
-        """Handle WebSocket errors."""
-        _ = ws
-        print(f"[DEBUG] Deepgram WS Error: {error}", flush=True)
-        self._put_event(RuntimeError(f"Deepgram WebSocket error: {error}"))
-
-    def _on_close(self, ws: Any, close_status_code: Any, close_msg: Any) -> None:
-        """Handle WebSocket close."""
-        print(f"[DEBUG] Deepgram WS Closed: {close_status_code} {close_msg}", flush=True)
-        _ = ws, close_status_code, close_msg
 
     def _put_event(self, event: STTBackendTranscriptEvent | BaseException | None) -> None:
         """Thread-safe event posting to the asyncio queue."""

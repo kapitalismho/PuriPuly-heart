@@ -26,6 +26,7 @@ class TranslatorApp:
 
         self.view_settings.on_settings_changed = self._on_settings_changed
         self.view_settings.on_providers_changed = self._on_providers_changed
+        self.view_settings.on_verify_api_key = self._on_verify_api_key
 
     def _setup_page(self):
         self.page.title = "A-Jebal-Daera Translator"
@@ -118,6 +119,9 @@ class TranslatorApp:
         async def _task():
             await self.controller.apply_providers()
         self.page.run_task(_task)
+
+    async def _on_verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
+        return await self.controller.verify_api_key(provider, key)
 
 async def main_gui(page: ft.Page, *, config_path):
     app = TranslatorApp(page, config_path=config_path)

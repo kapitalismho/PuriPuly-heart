@@ -7,6 +7,7 @@ from uuid import UUID
 from uuid import uuid4
 
 from ajebal_daera_translator.core.clock import Clock, SystemClock
+from ajebal_daera_translator.core.language import get_llm_language_name
 from ajebal_daera_translator.core.llm.provider import LLMProvider
 from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue
 from ajebal_daera_translator.core.vad.gating import VadEvent
@@ -34,7 +35,7 @@ class ClientHub:
     osc: SmartOscQueue
     clock: Clock = SystemClock()
 
-    source_language: str = "ko-KR"
+    source_language: str = "ko"
     target_language: str = "en"
     system_prompt: str = ""
     fallback_transcript_only: bool = False
@@ -185,10 +186,15 @@ class ClientHub:
         if self.llm is None:
             return
         try:
+            # Substitute language placeholders in system prompt
+            formatted_prompt = self.system_prompt
+            formatted_prompt = formatted_prompt.replace("${sourceName}", get_llm_language_name(self.source_language))
+            formatted_prompt = formatted_prompt.replace("${targetName}", get_llm_language_name(self.target_language))
+            
             translation = await self.llm.translate(
                 utterance_id=utterance_id,
                 text=text,
-                system_prompt=self.system_prompt,
+                system_prompt=formatted_prompt,
                 source_language=self.source_language,
                 target_language=self.target_language,
             )

@@ -217,13 +217,24 @@ async def test_e2e_latency_5_iterations():
             ttl_s=10.0,
         )
 
+        # Load default prompt
+        from ajebal_daera_translator.config.prompts import load_prompt
+        from ajebal_daera_translator.core.language import get_llm_language_name
+        
+        source_lang = "ko"
+        target_lang = "en"
+        system_prompt = load_prompt("default.txt") or "Translate naturally and concisely."
+        # Replace language placeholders in prompt
+        system_prompt = system_prompt.replace("${sourceName}", get_llm_language_name(source_lang))
+        system_prompt = system_prompt.replace("${targetName}", get_llm_language_name(target_lang))
+
         hub = ClientHub(
             stt=stt,
             llm=llm,
             osc=osc,
-            source_language="ko-KR",
-            target_language="en-US",
-            system_prompt="Translate naturally and concisely.",
+            source_language=source_lang,
+            target_language=target_lang,
+            system_prompt=system_prompt,
             fallback_transcript_only=True,
             translation_enabled=True,
         )

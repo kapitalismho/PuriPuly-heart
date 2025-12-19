@@ -20,7 +20,7 @@ dependencies = [
   "grpcio",
   "dashscope",
   "websockets",
-  "deepgram-sdk>=3.0.0",
+  "deepgram-sdk>=5.0.0",
   "keyring>=25.0",
   "flet>=0.25.0",
 ]

@@ -19,6 +19,9 @@ from ajebal_daera_translator.core.stt.controller import ManagedSTTProvider
 from ajebal_daera_translator.core.vad.bundled import SILERO_VAD_VERSION, ensure_silero_vad_onnx
 from ajebal_daera_translator.core.vad.gating import VadGating
 from ajebal_daera_translator.core.vad.silero import SileroVadOnnx
+from ajebal_daera_translator.providers.llm.gemini import GeminiLLMProvider
+from ajebal_daera_translator.providers.llm.qwen import QwenLLMProvider
+from ajebal_daera_translator.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 from ajebal_daera_translator.ui.event_bridge import UIEventBridge
 
 logger = logging.getLogger(__name__)
@@ -129,6 +132,31 @@ class GuiController:
             await self._stop_mic_loop()
             await self._start_mic_loop()
 
+    async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
+        """Verify API key using the respective provider's static check. Returns (success, error_msg)."""
+        if not key:
+            return False, "API Key is empty"
+        
+        try:
+            success = False
+            if provider == "google":
+                success = await GeminiLLMProvider.verify_api_key(key)
+            elif provider == "alibaba":
+                success = await QwenLLMProvider.verify_api_key(key)
+            elif provider == "deepgram":
+                success = await DeepgramRealtimeSTTBackend.verify_api_key(key)
+            else:
+                return False, f"Unknown provider: {provider}"
+
+            if success:
+                return True, "Verification successful"
+            else:
+                return False, "Verification failed (check logs/console for details)"
+        except Exception as exc:
+            msg = f"Verification error for {provider}: {exc}"
+            self._log_error(msg)
+            return False, str(exc)
+
     async def apply_providers(self) -> None:
         if self.settings is None:
             return
@@ -165,6 +193,9 @@ class GuiController:
 
         dash = getattr(self.app, "view_dashboard", None)
         if dash is not None:
+            dash.set_translation_needs_key(self.hub.llm is None)
+            dash.set_stt_needs_key(self.hub.stt is None)
+            
             self.hub.translation_enabled = bool(getattr(dash, "is_translation_on", True)) and self.hub.llm is not None
             dash.set_translation_enabled(self.hub.translation_enabled)
 
@@ -172,6 +203,9 @@ class GuiController:
 
         bridge = UIEventBridge(app=self.app, event_queue=self.hub.ui_events)
         self._bridge_task = asyncio.create_task(bridge.run())
+        
+        # Trigger background verification to sync button colors
+        asyncio.create_task(self._verify_and_update_status())
 
     async def _init_pipeline(self) -> None:
         assert self.settings is not None
@@ -323,3 +357,83 @@ class GuiController:
             logs = getattr(self.app, "view_logs", None)
             if logs is not None:
                 logs.append_log(f"ERROR: {message}")
+
+    async def _verify_and_update_status(self) -> None:
+        """Background task to verify keys and update dashboard status."""
+        if self.settings is None:
+            return
+
+        dash = getattr(self.app, "view_dashboard", None)
+        if dash is None:
+            return
+
+        # 1. Verify LLM
+        llm_valid = False
+        if self.hub and self.hub.llm:
+            # It was created, but is the key valid?
+            try:
+                secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
+                provider_name = self.settings.provider.llm
+                key = ""
+                if provider_name == "gemini":
+                    key = secrets.get("google_api_key") or ""
+                    llm_valid = await GeminiLLMProvider.verify_api_key(key)
+                elif provider_name == "qwen":
+                    key = secrets.get("alibaba_api_key") or ""
+                    llm_valid = await QwenLLMProvider.verify_api_key(key)
+                else:
+                    # Assume valid for others or if no key usage known
+                    llm_valid = True
+            except Exception:
+                llm_valid = False
+        
+        # If LLM verification failed, force needs_key = True even if provider object exists
+        if not llm_valid:
+             dash.set_translation_needs_key(True)
+             # If it was enabled, we potentially disable it or just let the warning show on next interaction
+             # User request: "Validation Fail -> Orange". Implicitly, if it's ON and fails, maybe we should turn it OFF?
+             # For now, setting needs_key=True ensures that if they try to toggle, it warns.
+             # If it is currently ON, we might want to flag it.
+             if self.hub: 
+                 self.hub.translation_enabled = False # Disable internally
+             dash.set_translation_enabled(False) # Visually turn off
+        else:
+             dash.set_translation_needs_key(False)
+
+
+        # 2. Verify STT
+        stt_valid = False
+        if self.hub and self.hub.stt:
+             try:
+                secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
+                provider_name = self.settings.provider.stt
+                
+                if provider_name == "deepgram":
+                    key = secrets.get("deepgram_api_key") or ""
+                    stt_valid = await DeepgramRealtimeSTTBackend.verify_api_key(key)
+                else:
+                    # Alibaba STT validation? Not implemented static verify yet?
+                    # The user only asked for Deepgram verify?
+                    # Wait, Qwen provider has verify_api_key, checking AlibabaModelStudio...
+                    # We only added verify to Gemini, Qwen, Deepgram.
+                    # Alibaba STT uses same key as Qwen usually? Or separate? 
+                    # settings.py: alibaba_api_key label says "(Qwen + Alibaba STT)"
+                    # So checking Qwen key (above) might have covered it, but STT validation is separate.
+                    # Let's check if valid:
+                    if provider_name == "alibaba":
+                         # Re-use Qwen verification for the shared key
+                         key = secrets.get("alibaba_api_key") or ""
+                         stt_valid = await QwenLLMProvider.verify_api_key(key)
+                    else:
+                        stt_valid = True
+             except Exception:
+                stt_valid = False
+        
+        if not stt_valid:
+            dash.set_stt_needs_key(True)
+            if self.hub:
+                # Close STT backend?
+                pass 
+            dash.set_stt_enabled(False)
+        else:
+            dash.set_stt_needs_key(False)

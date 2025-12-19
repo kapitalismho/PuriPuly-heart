@@ -49,7 +49,8 @@ class UIEventBridge:
             dash = getattr(self.app, "view_dashboard", None)
             if dash is not None:
                 dash.hero_text.value = transcript.text
-                dash.hero_text.update()
+                if dash.hero_text.page:
+                    dash.hero_text.update()
 
             if event.type == UIEventType.TRANSCRIPT_FINAL:
                 add_history = getattr(self.app, "add_history_entry", None)
@@ -74,7 +75,8 @@ class UIEventBridge:
             dash = getattr(self.app, "view_dashboard", None)
             if dash is not None:
                 dash.hero_text.value = msg.text
-                dash.hero_text.update()
+                if dash.hero_text.page:
+                    dash.hero_text.update()
             add_history = getattr(self.app, "add_history_entry", None)
             if add_history is not None:
                 add_history("VRChat", msg.text)

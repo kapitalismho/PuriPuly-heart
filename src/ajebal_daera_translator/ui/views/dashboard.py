@@ -1,16 +1,15 @@
 import flet as ft
 from flet.core.icons import Icons as icons
 from flet.core.colors import Colors as colors
+from ajebal_daera_translator.core.language import get_all_language_options, SUPPORTED_LANGUAGES
 from ajebal_daera_translator.ui.theme import COLOR_SURFACE, COLOR_ON_BACKGROUND, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_ERROR, COLOR_WARNING
 from ajebal_daera_translator.ui.components.bento_card import BentoCard
 
 class DashboardView(ft.Column):
-    LANG_LABEL_TO_CODE = {
-        "Korean": "ko-KR",
-        "English": "en-US",
-        "Japanese": "ja-JP",
-    }
-    LANG_CODE_TO_LABEL = {v: k for k, v in LANG_LABEL_TO_CODE.items()}
+    # Build language mappings from the language mapper
+    _LANG_OPTIONS = get_all_language_options()  # list of (code, name) tuples
+    LANG_LABEL_TO_CODE = {name: code for code, name in _LANG_OPTIONS}
+    LANG_CODE_TO_LABEL = {code: name for code, name in _LANG_OPTIONS}
 
     def __init__(self):
         super().__init__(expand=True, spacing=15) # increased spacing for grid gaps
@@ -51,9 +50,12 @@ class DashboardView(ft.Column):
         status_card = BentoCard(status_content)
 
          # 2. Language Control Section (Left Bottom)
+        # Get all language names for dropdowns
+        lang_names = [name for code, name in self._LANG_OPTIONS]
+        
         self.source_lang = ft.Dropdown(
             label="Source", 
-            options=[ft.dropdown.Option("Korean"), ft.dropdown.Option("English"), ft.dropdown.Option("Japanese")],
+            options=[ft.dropdown.Option(name) for name in lang_names],
             value="Korean", 
             expand=True, 
             text_size=15, 
@@ -69,7 +71,7 @@ class DashboardView(ft.Column):
         
         self.target_lang = ft.Dropdown(
             label="Target", 
-            options=[ft.dropdown.Option("English"), ft.dropdown.Option("Japanese"), ft.dropdown.Option("Korean")],
+            options=[ft.dropdown.Option(name) for name in lang_names],
             value="English", 
             expand=True, 
             text_size=15, 
@@ -305,8 +307,8 @@ class DashboardView(ft.Column):
             self.update()
 
         if self.on_language_change:
-            source_code = self.LANG_LABEL_TO_CODE.get(self.source_lang.value, "ko-KR")
-            target_code = self.LANG_LABEL_TO_CODE.get(self.target_lang.value, "en-US")
+            source_code = self.LANG_LABEL_TO_CODE.get(self.source_lang.value, "ko")
+            target_code = self.LANG_LABEL_TO_CODE.get(self.target_lang.value, "en")
             self.on_language_change(source_code, target_code)
         
     def _build_power_tile(self, label, icon_name, is_active, on_click):

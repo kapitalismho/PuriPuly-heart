@@ -24,8 +24,8 @@ class SecretsBackend(str, Enum):
 
 @dataclass(slots=True)
 class LanguageSettings:
-    source_language: str = "ko-KR"
-    target_language: str = "en-US"
+    source_language: str = "ko"
+    target_language: str = "en"
 
     def validate(self) -> None:
         if not self.source_language:
@@ -255,8 +255,8 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             llm=LLMProviderName(data.get("provider", {}).get("llm", LLMProviderName.GEMINI.value)),
         ),
         languages=LanguageSettings(
-            source_language=data.get("languages", {}).get("source_language", "ko-KR"),
-            target_language=data.get("languages", {}).get("target_language", "en-US"),
+            source_language=data.get("languages", {}).get("source_language", "ko"),
+            target_language=data.get("languages", {}).get("target_language", "en"),
         ),
         audio=AudioSettings(
             internal_sample_rate_hz=int(audio_data.get("internal_sample_rate_hz", 16000)),

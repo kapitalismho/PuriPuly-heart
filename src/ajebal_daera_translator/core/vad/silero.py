@@ -83,9 +83,14 @@ class SileroVadOnnx:
             self._sr_input_name = "sample_rate"
 
         state_inputs: list[str] = []
-        for name in ("h", "c"):
-            if name in inputs:
-                state_inputs.append(name)
+        # Silero VAD v5+ uses 'state' as a single input
+        if "state" in inputs:
+            state_inputs.append("state")
+        else:
+            # Older versions use 'h' and 'c' separately
+            for name in ("h", "c"):
+                if name in inputs:
+                    state_inputs.append(name)
         self._state_input_names = tuple(state_inputs)
 
         audio_shape = getattr(inputs[self._audio_input_name], "shape", None) or []
@@ -101,6 +106,17 @@ class SileroVadOnnx:
             self._prob_output_name = "prob"
         else:
             self._prob_output_name = outputs[0]
+
+        # Silero VAD v5+ output mapping
+        if "state" in self._state_input_names:
+            # v5 uses 'stateN' as output for 'state' input
+            for out_name in output_set:
+                if out_name.startswith("state") and out_name != "state":
+                    self._state_output_names["state"] = out_name
+                    break
+            # Fallback: if 'stateN' not found, try 'state' itself
+            if "state" not in self._state_output_names and "state" in output_set:
+                self._state_output_names["state"] = "state"
 
         if "h" in self._state_input_names:
             if "hn" in output_set:

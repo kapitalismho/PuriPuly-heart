@@ -57,6 +57,20 @@ class GeminiLLMProvider:
             await self._internal_client.close()
             self._internal_client = None
 
+    @staticmethod
+    async def verify_api_key(api_key: str) -> bool:
+        if not api_key:
+            return False
+        try:
+            from google import genai  # type: ignore
+            client = genai.Client(api_key=api_key)
+            # Try listing models as a lightweight auth check
+            async for _ in await client.aio.models.list(config={"page_size": 1}):
+                break
+            return True
+        except Exception:
+            return False
+
 
 @dataclass(slots=True)
 class GoogleGenaiGeminiClient:

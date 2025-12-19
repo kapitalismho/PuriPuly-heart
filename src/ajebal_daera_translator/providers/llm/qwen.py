@@ -46,6 +46,30 @@ class QwenLLMProvider:
     async def close(self) -> None:
         pass
 
+    @staticmethod
+    async def verify_api_key(api_key: str) -> bool:
+        if not api_key:
+            return False
+        try:
+            import dashscope  # type: ignore
+            
+            def _check():
+                try:
+                    dashscope.api_key = api_key
+                    # Use qwen-turbo for a cheap/fast check
+                    response = dashscope.Generation.call(
+                        model="qwen-turbo",
+                        messages=[{"role": "user", "content": "test"}],
+                        max_tokens=1
+                    )
+                    return response.status_code == 200
+                except Exception:
+                    return False
+
+            return await asyncio.to_thread(_check)
+        except Exception:
+            return False
+
 
 @dataclass(slots=True)
 class DashScopeQwenClient:

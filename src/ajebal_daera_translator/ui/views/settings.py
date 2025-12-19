@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 from pathlib import Path
@@ -29,6 +30,7 @@ class SettingsView(ft.ListView):
 
         self.on_settings_changed: Callable[[AppSettings], None] | None = None
         self.on_providers_changed: Callable[[], None] | None = None
+        self.on_verify_api_key: Callable[[str, str], object] | None = None  # Returns Awaitable[tuple[bool, str]]
 
         self._settings: AppSettings | None = None
         self._config_path: Path | None = None
@@ -58,13 +60,28 @@ class SettingsView(ft.ListView):
             can_reveal_password=True,
             on_change=lambda e: self._on_secret_change("google_api_key", self.google_api_key.value),
             border_radius=8,
+            expand=True,
         )
+        self.verify_google_btn = ft.IconButton(
+            icon=icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
+            icon_color=colors.GREY_400,
+            tooltip="Verify Key",
+            on_click=lambda e: self._on_verify_req("google", self.google_api_key.value, e.control),
+        )
+
         self.alibaba_api_key = ft.TextField(
             label="Alibaba API Key (Qwen + Alibaba STT)",
             password=True,
             can_reveal_password=True,
             on_change=lambda e: self._on_secret_change("alibaba_api_key", self.alibaba_api_key.value),
             border_radius=8,
+            expand=True,
+        )
+        self.verify_alibaba_btn = ft.IconButton(
+            icon=icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
+            icon_color=colors.GREY_400,
+            tooltip="Verify Key",
+            on_click=lambda e: self._on_verify_req("alibaba", self.alibaba_api_key.value, e.control),
         )
 
 
@@ -86,7 +103,15 @@ class SettingsView(ft.ListView):
             can_reveal_password=True,
             on_change=lambda e: self._on_secret_change("deepgram_api_key", self.deepgram_api_key.value),
             border_radius=8,
+            expand=True,
         )
+        self.verify_deepgram_btn = ft.IconButton(
+            icon=icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
+            icon_color=colors.GREY_400,
+            tooltip="Verify Key",
+            on_click=lambda e: self._on_verify_req("deepgram", self.deepgram_api_key.value, e.control),
+        )
+
         self.deepgram_stt_model = ft.TextField(
             label="Deepgram Model",
             hint_text="nova-3",
@@ -96,16 +121,12 @@ class SettingsView(ft.ListView):
 
         self.audio_host_api = ft.Dropdown(
             label="Audio Host API",
-            options=[
-                ft.dropdown.Option("(Default)"),
-                ft.dropdown.Option("MME"),
-                ft.dropdown.Option("DirectSound"),
-                ft.dropdown.Option("WASAPI"),
-                ft.dropdown.Option("ASIO"),
-            ],
+            options=[ft.dropdown.Option("(Default)")],  # Will be populated dynamically
             on_change=self._on_audio_change,
             border_radius=8,
         )
+        self._populate_host_apis()
+        
         self.microphone = ft.Dropdown(
             label="Microphone",
             options=[ft.dropdown.Option("(Default)")],
@@ -173,14 +194,14 @@ class SettingsView(ft.ListView):
                     self.alibaba_stt_model,
                     self.alibaba_stt_endpoint,
                     ft.Divider(height=5, color=colors.TRANSPARENT),
-                    self.deepgram_api_key,
+                    ft.Row([self.deepgram_api_key, self.verify_deepgram_btn]),
                     self.deepgram_stt_model,
                     ft.Divider(height=10, color=colors.TRANSPARENT),
                     ft.Text("Translation (LLM)", size=12, color=colors.GREY_400),
                     self.llm_provider,
                     ft.Divider(height=5, color=colors.TRANSPARENT),
-                    self.google_api_key,
-                    self.alibaba_api_key,
+                    ft.Row([self.google_api_key, self.verify_google_btn]),
+                    ft.Row([self.alibaba_api_key, self.verify_alibaba_btn]),
                     ft.Divider(height=10, color=colors.TRANSPARENT),
                     self.apply_providers_btn,
                 ],
@@ -298,9 +319,59 @@ class SettingsView(ft.ListView):
         is_deepgram_stt = stt_provider == STTProviderName.DEEPGRAM
         self.deepgram_api_key.visible = is_deepgram_stt
         self.deepgram_stt_model.visible = is_deepgram_stt
+        self.deepgram_api_key.visible = is_deepgram_stt
+        self.verify_deepgram_btn.visible = is_deepgram_stt
 
         self.google_api_key.visible = True
+        self.verify_google_btn.visible = True
         self.alibaba_api_key.visible = True
+        self.verify_alibaba_btn.visible = True
+
+    def _on_verify_req(self, provider: str, key: str, btn_control: ft.Control) -> None:
+        if not self.on_verify_api_key:
+            return
+        
+        if not key:
+            self.page.open(ft.SnackBar(ft.Text("API Key is empty!"), bgcolor=colors.RED_400))
+            return
+
+        async def _run():
+            original_icon = btn_control.icon
+            original_color = btn_control.icon_color
+            
+            btn_control.icon = icons.HOURGLASS_TOP_ROUNDED
+            btn_control.icon_color = colors.BLUE_400
+            if btn_control.page:
+                btn_control.update()
+            
+            try:
+                success, msg = await self.on_verify_api_key(provider, key)
+                if success:
+                    self.page.open(ft.SnackBar(ft.Text(f"{provider.capitalize()} Verified!"), bgcolor=colors.GREEN_400))
+                    btn_control.icon = icons.CHECK_CIRCLE_ROUNDED
+                    btn_control.icon_color = colors.GREEN_400
+                else:
+                    logger.error(f"Verification failed for {provider}: {msg}")
+                    # Also write to app logs UI
+                    self.page.open(ft.SnackBar(ft.Text(f"Failed: {msg}"), bgcolor=colors.RED_400))
+                    btn_control.icon = icons.ERROR_OUTLINE_ROUNDED
+                    btn_control.icon_color = colors.RED_400
+            except Exception as e:
+                self.page.open(ft.SnackBar(ft.Text(f"Error: {e}"), bgcolor=colors.RED_400))
+                btn_control.icon = icons.ERROR_OUTLINE_ROUNDED
+                btn_control.icon_color = colors.RED_400
+            
+            if btn_control.page:
+                btn_control.update()
+            
+            await asyncio.sleep(3)
+            
+            btn_control.icon = original_icon
+            btn_control.icon_color = original_color
+            if btn_control.page:
+                btn_control.update()
+
+        self.page.run_task(_run)
 
     def _on_setting_change(self, e) -> None:
         _ = e
@@ -340,16 +411,21 @@ class SettingsView(ft.ListView):
             host_api = ""
 
         devices = ["(Default)"]
-        with contextlib.suppress(Exception):
+        try:
             import sounddevice as sd  # type: ignore
 
             hostapi_index: int | None = None
             if host_api:
                 for idx, item in enumerate(sd.query_hostapis()):
                     name = str(item.get("name", "") or "")
-                    if name.lower() == host_api.lower():
+                    # Exact match since dropdown options now come from sounddevice directly
+                    if name == host_api:
                         hostapi_index = idx
                         break
+                
+                # If user selected a host API but it wasn't found, skip all devices
+                if hostapi_index is None:
+                    devices = ["(Default)"]  # No matching host API
 
             for dev in sd.query_devices():
                 if int(dev.get("max_input_channels", 0) or 0) <= 0:
@@ -359,6 +435,8 @@ class SettingsView(ft.ListView):
                 name = str(dev.get("name", "") or "").strip()
                 if name:
                     devices.append(name)
+        except Exception as e:
+            logger.warning(f"Failed to enumerate microphones: {e}")
 
         # Preserve selection if possible.
         current = self.microphone.value
@@ -367,6 +445,24 @@ class SettingsView(ft.ListView):
             self.microphone.value = current
         else:
             self.microphone.value = "(Default)"
+        
+        # Force UI update if component is attached to page
+        if self.microphone.page:
+            self.microphone.update()
+
+    def _populate_host_apis(self) -> None:
+        """Populate audio host API dropdown with available APIs from the system."""
+        options = [ft.dropdown.Option("(Default)")]
+        try:
+            import sounddevice as sd  # type: ignore
+            for api in sd.query_hostapis():
+                name = str(api.get("name", "") or "").strip()
+                if name:
+                    options.append(ft.dropdown.Option(name))
+        except Exception as e:
+            logger.warning(f"Failed to enumerate host APIs: {e}")
+        
+        self.audio_host_api.options = options
 
     def _emit_settings_changed(self) -> None:
         if self._settings is None:

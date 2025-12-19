@@ -16,4 +16,5 @@ class LogsView(ft.Container):
         self.log_list.controls.append(
             ft.Text(record, size=12, font_family="Consolas")
         )
-        self.update()
+        if self.page:
+            self.update()
