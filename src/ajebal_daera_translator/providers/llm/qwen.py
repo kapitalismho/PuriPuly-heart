@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
 from ajebal_daera_translator.domain.models import Translation
+
+logger = logging.getLogger(__name__)
 
 
 class QwenClient(Protocol):
@@ -22,7 +25,7 @@ class QwenClient(Protocol):
 @dataclass(slots=True)
 class QwenLLMProvider:
     api_key: str
-    model: str = "qwen-plus"
+    model: str = "qwen-mt-flash"
     client: QwenClient | None = None
 
     async def translate(
@@ -52,13 +55,14 @@ class QwenLLMProvider:
             return False
         try:
             import dashscope  # type: ignore
-            
+
             def _check():
                 try:
                     dashscope.api_key = api_key
-                    # Use qwen-turbo for a cheap/fast check
+                    dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
+                    # Use qwen-mt-lite for a cheap/fast check
                     response = dashscope.Generation.call(
-                        model="qwen-turbo",
+                        model="qwen-mt-lite",
                         messages=[{"role": "user", "content": "test"}],
                         max_tokens=1
                     )
@@ -86,16 +90,23 @@ class DashScopeQwenClient:
     ) -> str:
         import dashscope  # type: ignore
 
-        prompt = f"Source language: {source_language}\nTarget language: {target_language}\n\n{text}"
+        # Apply template variables to system prompt (like Gemini)
+        formatted_system_prompt = system_prompt.format(
+            source_language=source_language,
+            target_language=target_language,
+        ) if "{source_language}" in system_prompt else system_prompt
+
+        # Qwen-MT uses Custom Prompt (system role not supported)
+        full_prompt = f"{formatted_system_prompt}\n\n{text}"
+
+        logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
 
         def _call() -> str:
             dashscope.api_key = self.api_key
+            dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
             response = dashscope.Generation.call(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
-                ],
+                messages=[{"role": "user", "content": full_prompt}],
                 result_format="message",
             )
             output = getattr(response, "output", None)
@@ -106,6 +117,8 @@ class DashScopeQwenClient:
             content = message.get("content")
             if not content:
                 raise RuntimeError("DashScope response did not contain message content")
-            return str(content).strip()
+            result = str(content).strip()
+            logger.info(f"[LLM] Response: '{result}'")
+            return result
 
         return await asyncio.to_thread(_call)

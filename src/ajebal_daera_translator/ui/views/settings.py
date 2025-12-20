@@ -17,7 +17,7 @@ from ajebal_daera_translator.config.settings import (
     SecretsBackend,
     STTProviderName,
 )
-from ajebal_daera_translator.config.prompts import list_prompts, load_prompt
+from ajebal_daera_translator.config.prompts import load_prompt_for_provider
 from ajebal_daera_translator.ui.components.bento_card import BentoCard
 from ajebal_daera_translator.ui.theme import COLOR_PRIMARY
 
@@ -144,33 +144,17 @@ class SettingsView(ft.ListView):
             on_change_end=self._on_audio_change,
         )
 
+        self.prompt_provider_label = ft.Text(
+            "Prompt for: Gemini",
+            size=12,
+            color=colors.GREY_400,
+        )
         self.system_prompt = ft.TextField(
             label="System Prompt",
             multiline=True,
             min_lines=3,
             on_change=self._on_setting_change,
             border_radius=8,
-        )
-        
-        # Prompt file selector
-        prompt_files = list_prompts()
-        self.prompt_selector = ft.Dropdown(
-            label="Load from File",
-            options=[ft.dropdown.Option(p) for p in prompt_files] if prompt_files else [ft.dropdown.Option("(no prompts found)")],
-            value=prompt_files[0] if prompt_files else None,
-            on_change=self._on_prompt_file_change,
-            border_radius=8,
-            expand=True,
-        )
-        self.load_prompt_btn = ft.ElevatedButton(
-            text="Load",
-            icon=icons.FILE_OPEN_ROUNDED,
-            on_click=self._on_load_prompt_click,
-            style=ft.ButtonStyle(
-                color=colors.WHITE,
-                bgcolor=COLOR_PRIMARY,
-                shape=ft.RoundedRectangleBorder(radius=8),
-            ),
         )
 
         self.apply_providers_btn = ft.ElevatedButton(
@@ -218,10 +202,7 @@ class SettingsView(ft.ListView):
             self._build_section(
                 "Persona",
                 [
-                    ft.Row([
-                        self.prompt_selector,
-                        self.load_prompt_btn,
-                    ], spacing=10),
+                    self.prompt_provider_label,
                     self.system_prompt,
                 ],
             ),
@@ -246,13 +227,12 @@ class SettingsView(ft.ListView):
         self.microphone.value = settings.audio.input_device or "(Default)"
         self.vad_sensitivity.value = settings.stt.vad_speech_threshold
 
-        # Auto-load default prompt if empty
-        if settings.system_prompt:
-            self.system_prompt.value = settings.system_prompt
-        else:
-            self.system_prompt.value = load_prompt("default")
-            if self._settings:
-                self._settings.system_prompt = self.system_prompt.value
+        # Load prompt for current LLM provider
+        provider_name = "gemini" if settings.provider.llm == LLMProviderName.GEMINI else "qwen"
+        self.prompt_provider_label.value = f"Prompt for: {provider_name.capitalize()}"
+        self.system_prompt.value = load_prompt_for_provider(provider_name)
+        if self._settings:
+            self._settings.system_prompt = self.system_prompt.value
 
         with contextlib.suppress(Exception):
             store = create_secret_store(settings.secrets, config_path=config_path)
@@ -294,9 +274,22 @@ class SettingsView(ft.ListView):
         else:
             self._settings.provider.stt = STTProviderName.DEEPGRAM
 
-        self._settings.provider.llm = (
-            LLMProviderName.GEMINI if self.llm_provider.value == "Google Gemini" else LLMProviderName.QWEN
-        )
+        new_llm = LLMProviderName.GEMINI if self.llm_provider.value == "Google Gemini" else LLMProviderName.QWEN
+
+        # Load provider-specific prompt when LLM provider changes
+        if self._settings.provider.llm != new_llm:
+            self._settings.provider.llm = new_llm
+            provider_name = "gemini" if new_llm == LLMProviderName.GEMINI else "qwen"
+            self.prompt_provider_label.value = f"Prompt for: {provider_name.capitalize()}"
+            self.system_prompt.value = load_prompt_for_provider(provider_name)
+            self._settings.system_prompt = self.system_prompt.value
+            if self.prompt_provider_label.page:
+                self.prompt_provider_label.update()
+            if self.system_prompt.page:
+                self.system_prompt.update()
+        else:
+            self._settings.provider.llm = new_llm
+
         self._update_provider_visibility()
         self._emit_settings_changed()
 
@@ -469,18 +462,3 @@ class SettingsView(ft.ListView):
             return
         if self.on_settings_changed:
             self.on_settings_changed(self._settings)
-
-    def _on_prompt_file_change(self, e: ft.ControlEvent) -> None:
-        """Handle prompt file dropdown change (does not auto-load)."""
-        _ = e  # Just updates selection, user clicks Load to apply
-
-    def _on_load_prompt_click(self, e: ft.ControlEvent) -> None:
-        """Load the selected prompt file into the text field."""
-        _ = e
-        prompt_name = self.prompt_selector.value
-        if prompt_name and prompt_name != "(no prompts found)":
-            prompt_content = load_prompt(prompt_name)
-            self.system_prompt.value = prompt_content
-            if self.page:
-                self.system_prompt.update()
-            self._on_setting_change(None)  # Trigger settings update

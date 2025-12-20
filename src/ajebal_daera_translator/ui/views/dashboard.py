@@ -411,7 +411,8 @@ class DashboardView(ft.Column):
         if hint_text:
             hint_text.value = hint
             hint_text.color = fg_color
-        tile.update()
+        if tile.page:
+            tile.update()
 
     def _on_submit(self, e):
         text = self.input_field.value
