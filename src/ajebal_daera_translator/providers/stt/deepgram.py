@@ -32,7 +32,6 @@ class DeepgramRealtimeSTTBackend(STTBackend):
     language: str  # Required: passed from wiring.py via get_deepgram_language()
     model: str = "nova-3"
     sample_rate_hz: int = 16000
-    # Note: Hybrid VAD - local VAD (700ms) + server VAD/endpointing (600ms) with 100ms safety buffer
 
     async def open_session(self) -> STTBackendSession:
         if self.sample_rate_hz not in (8000, 16000):
@@ -76,6 +75,7 @@ class DeepgramRealtimeSTTBackend(STTBackend):
 
 
 _STOP = object()
+_FINALIZE = object()
 
 
 @dataclass(slots=True)
@@ -129,7 +129,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 interim_results=False,
                 punctuate=True,
                 vad_events=True,  # Enable server VAD (required for endpointing)
-                endpointing=600,  # 600ms server endpointing + 700ms local VAD (100ms safety buffer)
+                endpointing=1200,
             ) as connection:
                 
                 # Set up event handlers
@@ -141,7 +141,6 @@ class _DeepgramSDKSession(STTBackendSession):
                                 speech_final = getattr(result, 'speech_final', False)
                                 is_final = getattr(result, 'is_final', False)
                                 logger.info(f"[STT] Transcript: '{transcript}' (is_final={is_final}, speech_final={speech_final})")
-                                # With interim_results=False, accept is_final=True OR speech_final=True
                                 if (is_final or speech_final) and transcript:
                                     event = STTBackendTranscriptEvent(text=transcript.strip(), is_final=True)
                                     self._put_event(event)
@@ -213,10 +212,18 @@ class _DeepgramSDKSession(STTBackendSession):
                         logger.debug(f"Deepgram: Stop signal received after {audio_chunks_sent} chunks")
                         break
 
+                    if data is _FINALIZE:
+                        try:
+                            connection.send_control(ListenV1ControlMessage(type="Finalize"))
+                            logger.info("[STT] Finalize message sent to Deepgram")
+                        except Exception as e:
+                            logger.warning(f"Failed to send Finalize: {e}")
+                        continue
+
                     if isinstance(data, bytes):
                         try:
-                            # Log large chunks (likely trailing silence: 700ms = 22400 bytes)
-                            if len(data) > 10000:
+                            # Log large chunks (likely trailing silence: 300ms = 9600 bytes)
+                            if len(data) > 5000:
                                 logger.info(f"[STT] Sending large audio chunk to Deepgram ({len(data)} bytes) - likely trailing silence")
                             connection.send_media(data)
                             audio_chunks_sent += 1
@@ -243,6 +250,26 @@ class _DeepgramSDKSession(STTBackendSession):
         if self._stopped:
             return
         self._audio_q.put_nowait(pcm16le)
+
+    async def on_speech_end(self) -> None:
+        """Handle end of speech: send trailing silence, wait, then finalize."""
+        if self._stopped:
+            return
+        
+        # Send 200ms of silence
+        import numpy as np
+        silence_samples = int(self.sample_rate_hz * 0.2)
+        silence = np.zeros(silence_samples, dtype=np.float32)
+        # Convert float32 to PCM16LE bytes
+        pcm16 = (silence * 32767).astype(np.int16).tobytes()
+        self._audio_q.put_nowait(pcm16)
+        logger.info(f"[STT] Trailing silence sent ({silence_samples} samples, {len(pcm16)} bytes)")
+        
+        # Wait 100ms for Deepgram to process
+        await asyncio.sleep(0.1)
+        
+        # Send Finalize
+        self._audio_q.put_nowait(_FINALIZE)
 
     async def stop(self) -> None:
         if self._stopped:

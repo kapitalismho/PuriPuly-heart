@@ -67,7 +67,7 @@ class VadGating:
         sample_rate_hz: int,
         ring_buffer_ms: int = 500,
         speech_threshold: float = 0.5,
-        hangover_ms: int = 700,
+        hangover_ms: int = 1200,
         chunk_samples: int | None = None,
     ) -> None:
         if sample_rate_hz <= 0:
