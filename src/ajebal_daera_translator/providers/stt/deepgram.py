@@ -128,8 +128,8 @@ class _DeepgramSDKSession(STTBackendSession):
                 channels=1,
                 interim_results=False,
                 punctuate=True,
-                vad_events=True,  # Enable server VAD (required for endpointing)
-                endpointing=1200,
+                vad_events=False,  # Disabled: using local VAD + Finalize
+                endpointing=False,  # Disabled: using local VAD for speech boundaries
             ) as connection:
                 
                 # Set up event handlers

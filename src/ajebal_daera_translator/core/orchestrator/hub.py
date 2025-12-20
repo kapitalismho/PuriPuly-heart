@@ -43,7 +43,7 @@ class ClientHub:
     system_prompt: str = ""
     fallback_transcript_only: bool = False
     translation_enabled: bool = True
-    hangover_s: float = 1.2  # VAD hangover in seconds (for E2E latency calculation)
+    hangover_s: float = 1.1  # VAD hangover in seconds (for E2E latency calculation)
 
     ui_events: asyncio.Queue[UIEvent] = field(default_factory=asyncio.Queue)
 

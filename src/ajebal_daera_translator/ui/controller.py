@@ -263,7 +263,7 @@ class GuiController:
             system_prompt=self.settings.system_prompt,
             fallback_transcript_only=True,
             translation_enabled=True,
-            hangover_s=1.2,  # Match VadGating.hangover_ms (1200ms)
+            hangover_s=1.1,  # Match VadGating.hangover_ms (1100ms)
         )
 
         self.sender = sender
