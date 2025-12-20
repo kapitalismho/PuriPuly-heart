@@ -120,6 +120,15 @@ class ManagedSTTProvider:
         if self._active_utterance_id == event.utterance_id:
             self._active_utterance_id = None
         self._pending_final_utterance_id = event.utterance_id
+
+        # Send 800ms of silence to trigger server endpointing (600ms + 200ms safety margin)
+        if self._active_session is not None:
+            silence_samples = int(self.sample_rate_hz * 0.8)
+            silence = np.zeros(silence_samples, dtype=np.float32)
+            pcm = float32_to_pcm16le_bytes(silence)
+            await self._active_session.send_audio(pcm)
+            logger.info(f"[STT] Trailing silence sent ({silence_samples} samples) for id={str(event.utterance_id)[:8]}")
+
         await self._maybe_reset(is_speaking=False)
 
     async def _send_audio(self, samples_f32: np.ndarray) -> None:

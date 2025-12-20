@@ -126,7 +126,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 encoding="linear16",
                 sample_rate=self.sample_rate_hz,
                 channels=1,
-                interim_results=True,
+                interim_results=False,
                 punctuate=True,
                 vad_events=True,  # Enable server VAD (required for endpointing)
                 endpointing=600,  # 600ms server endpointing + 700ms local VAD (100ms safety buffer)
@@ -138,13 +138,12 @@ class _DeepgramSDKSession(STTBackendSession):
                         if hasattr(result, 'channel') and hasattr(result.channel, 'alternatives'):
                             if result.channel.alternatives:
                                 transcript = result.channel.alternatives[0].transcript
-                                if transcript:
-                                    is_final = getattr(result, 'is_final', False)
-                                    speech_final = getattr(result, 'speech_final', False)
-                                    # Treat as final if either is_final or speech_final is True
-                                    effective_final = is_final or speech_final
-                                    logger.info(f"[STT] Transcript: '{transcript}' (is_final={is_final}, speech_final={speech_final})")
-                                    event = STTBackendTranscriptEvent(text=transcript.strip(), is_final=effective_final)
+                                speech_final = getattr(result, 'speech_final', False)
+                                is_final = getattr(result, 'is_final', False)
+                                logger.info(f"[STT] Transcript: '{transcript}' (is_final={is_final}, speech_final={speech_final})")
+                                # With interim_results=False, accept is_final=True OR speech_final=True
+                                if (is_final or speech_final) and transcript:
+                                    event = STTBackendTranscriptEvent(text=transcript.strip(), is_final=True)
                                     self._put_event(event)
                     except Exception as e:
                         logger.debug(f"Deepgram parse error: {e}")
@@ -216,6 +215,9 @@ class _DeepgramSDKSession(STTBackendSession):
 
                     if isinstance(data, bytes):
                         try:
+                            # Log large chunks (likely trailing silence: 700ms = 22400 bytes)
+                            if len(data) > 10000:
+                                logger.info(f"[STT] Sending large audio chunk to Deepgram ({len(data)} bytes) - likely trailing silence")
                             connection.send_media(data)
                             audio_chunks_sent += 1
                             if audio_chunks_sent == 1:

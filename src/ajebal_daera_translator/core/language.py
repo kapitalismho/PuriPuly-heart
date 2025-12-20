@@ -54,12 +54,18 @@ SUPPORTED_LANGUAGES: dict[str, LanguageInfo] = {
     "tr": LanguageInfo(code="tr", name="Turkish"),
     "uk": LanguageInfo(code="uk", name="Ukrainian"),
     "vi": LanguageInfo(code="vi", name="Vietnamese"),
+    "zh-CN": LanguageInfo(code="zh-CN", name="Chinese (Simplified)"),
+    "zh-TW": LanguageInfo(code="zh-TW", name="Chinese (Traditional)"),
 }
 
 
 def get_language_info(code: str) -> LanguageInfo | None:
     """Get language info by code. Returns None if not supported."""
-    # Normalize: strip regional suffix (e.g., "ko-KR" -> "ko")
+    # 1. Try exact match (e.g. "zh-CN", "zh-TW")
+    if code in SUPPORTED_LANGUAGES:
+        return SUPPORTED_LANGUAGES[code]
+
+    # 2. Normalize: strip regional suffix (e.g., "ko-KR" -> "ko")
     normalized = code.split("-")[0].lower()
     return SUPPORTED_LANGUAGES.get(normalized)
 

@@ -433,7 +433,8 @@ class DashboardView(ft.Column):
         self.status_indicator.color = COLOR_SUCCESS if connected else COLOR_ERROR
         self.status_text.value = "Connected" if connected else "Disconnected"
         self.status_text.color = COLOR_SUCCESS if connected else colors.GREY_400
-        self.update()
+        if self.page:
+            self.update()
 
     def set_languages_from_codes(self, source_code: str, target_code: str) -> None:
         src_label = self.LANG_CODE_TO_LABEL.get(source_code, "Korean")
