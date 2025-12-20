@@ -13,7 +13,7 @@ from ajebal_daera_translator.core.clock import Clock, SystemClock
 from ajebal_daera_translator.core.language import get_llm_language_name
 from ajebal_daera_translator.core.llm.provider import LLMProvider
 from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue
-from ajebal_daera_translator.core.vad.gating import SpeechStart, VadEvent
+from ajebal_daera_translator.core.vad.gating import SpeechEnd, SpeechStart, VadEvent
 from ajebal_daera_translator.domain.events import (
     STTErrorEvent,
     STTFinalEvent,
@@ -43,12 +43,14 @@ class ClientHub:
     system_prompt: str = ""
     fallback_transcript_only: bool = False
     translation_enabled: bool = True
+    hangover_s: float = 1.2  # VAD hangover in seconds (for E2E latency calculation)
 
     ui_events: asyncio.Queue[UIEvent] = field(default_factory=asyncio.Queue)
 
     _utterances: dict[UUID, UtteranceBundle] = field(default_factory=dict)
     _translation_tasks: dict[UUID, asyncio.Task[None]] = field(default_factory=dict)
     _utterance_sources: dict[UUID, str] = field(default_factory=dict)
+    _utterance_start_times: dict[UUID, float] = field(default_factory=dict)  # For E2E latency tracking
     _stt_task: asyncio.Task[None] | None = None
     _osc_flush_task: asyncio.Task[None] | None = None
     _running: bool = False
@@ -92,6 +94,10 @@ class ClientHub:
         # Start typing indicator when speech begins
         if isinstance(event, SpeechStart):
             self.osc.send_typing(True)
+        
+        # Record start time for E2E latency tracking (from speech end)
+        if isinstance(event, SpeechEnd):
+            self._utterance_start_times[event.utterance_id] = self.clock.now()
         
         if self.stt is not None:
             await self.stt.handle_vad_event(event)
@@ -245,7 +251,16 @@ class ClientHub:
             merged = f"{transcript_text} ({translation_text})"
 
         msg = OSCMessage(utterance_id=utterance_id, text=merged, created_at=self.clock.now())
-        logger.info(f"[Hub] OSC enqueue: '{merged[:50]}...' id={str(utterance_id)[:8]}")
+        
+        # Calculate and log E2E latency (includes hangover time)
+        start_time = self._utterance_start_times.pop(utterance_id, None)
+        if start_time is not None:
+            processing_latency = self.clock.now() - start_time
+            total_e2e = processing_latency + self.hangover_s
+            logger.info(f"[Hub] OSC enqueue: '{merged[:50]}...' id={str(utterance_id)[:8]} (Latency: {total_e2e:.2f}s)")
+        else:
+            logger.info(f"[Hub] OSC enqueue: '{merged[:50]}...' id={str(utterance_id)[:8]}")
+        
         self.osc.enqueue(msg)
         
         # Stop typing indicator after message is sent

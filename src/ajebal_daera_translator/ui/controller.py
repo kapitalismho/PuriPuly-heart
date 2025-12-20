@@ -114,6 +114,10 @@ class GuiController:
             return
 
         await self._start_mic_loop()
+        # Pre-warm STT session for faster first response
+        if self.hub is not None and self.hub.stt is not None:
+            with contextlib.suppress(Exception):
+                await self.hub.stt.warmup()
 
     async def submit_text(self, text: str) -> None:
         if self.hub is None:
@@ -259,6 +263,7 @@ class GuiController:
             system_prompt=self.settings.system_prompt,
             fallback_transcript_only=True,
             translation_enabled=True,
+            hangover_s=1.2,  # Match VadGating.hangover_ms (1200ms)
         )
 
         self.sender = sender

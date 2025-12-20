@@ -100,6 +100,11 @@ class ManagedSTTProvider:
             item = await self._events.get()
             yield item
 
+    async def warmup(self) -> None:
+        """Pre-establish STT session for faster first response."""
+        await self._ensure_session()
+        logger.info("[STT] Session pre-warmed")
+
     async def _on_speech_start(self, event: SpeechStart) -> None:
         self._active_utterance_id = event.utterance_id
         self._pending_final_utterance_id = None

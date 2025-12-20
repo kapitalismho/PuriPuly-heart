@@ -222,9 +222,6 @@ class _DeepgramSDKSession(STTBackendSession):
 
                     if isinstance(data, bytes):
                         try:
-                            # Log large chunks (likely trailing silence: 300ms = 9600 bytes)
-                            if len(data) > 5000:
-                                logger.info(f"[STT] Sending large audio chunk to Deepgram ({len(data)} bytes) - likely trailing silence")
                             connection.send_media(data)
                             audio_chunks_sent += 1
                             if audio_chunks_sent == 1:
