@@ -182,6 +182,23 @@ class _QwenASRSession(STTBackendSession):
             self._connected.set()
             logger.debug("Qwen ASR SDK connection and session update complete")
 
+            # Keepalive: send 100ms silence every 50 seconds to prevent 60s timeout
+            import time
+            import numpy as np
+            last_activity = time.monotonic()
+            KEEPALIVE_INTERVAL = 50.0  # seconds
+            SILENCE_DURATION_MS = 100  # milliseconds
+
+            def send_keepalive_silence():
+                """Send 100ms of silence as keepalive."""
+                nonlocal last_activity
+                silence_samples = int(self.sample_rate_hz * SILENCE_DURATION_MS / 1000)
+                silence = np.zeros(silence_samples, dtype=np.int16).tobytes()
+                audio_b64 = base64.b64encode(silence).decode('ascii')
+                conversation.append_audio(audio_b64)
+                last_activity = time.monotonic()
+                logger.debug(f"[STT] Keepalive silence sent ({SILENCE_DURATION_MS}ms)")
+
             # Audio sending loop
             audio_chunks_sent = 0
             while True:
@@ -190,6 +207,12 @@ class _QwenASRSession(STTBackendSession):
                 except queue.Empty:
                     if self._stopped:
                         break
+                    # Check if keepalive needed
+                    if time.monotonic() - last_activity > KEEPALIVE_INTERVAL:
+                        try:
+                            send_keepalive_silence()
+                        except Exception as e:
+                            logger.warning(f"Keepalive failed: {e}")
                     continue
 
                 if data is _STOP:
@@ -210,6 +233,7 @@ class _QwenASRSession(STTBackendSession):
                         audio_b64 = base64.b64encode(data).decode('ascii')
                         conversation.append_audio(audio_b64)
                         audio_chunks_sent += 1
+                        last_activity = time.monotonic()  # Update activity time
                         if audio_chunks_sent == 1:
                             logger.info(f"[STT] First audio chunk sent to Qwen ASR ({len(data)} bytes)")
                         elif audio_chunks_sent % 50 == 0:

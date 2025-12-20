@@ -30,8 +30,8 @@ class ManagedSTTProvider:
     backend: STTBackend
     sample_rate_hz: int
     clock: Clock = SystemClock()
-    reset_deadline_s: float = 90.0
-    drain_timeout_s: float = 2.0
+    reset_deadline_s: float = 180.0
+    drain_timeout_s: float = 1.5
     bridging_ms: int = 500
 
     _state: STTSessionState = STTSessionState.DISCONNECTED
@@ -44,6 +44,7 @@ class ManagedSTTProvider:
     _active_utterance_id: UUID | None = None
     _pending_final_utterance_id: UUID | None = None
     _audio_ring: RingBufferF32 | None = None
+    _reset_timer: asyncio.Task[None] | None = None
 
     def __post_init__(self) -> None:
         if self.sample_rate_hz not in (8000, 16000):
@@ -64,6 +65,10 @@ class ManagedSTTProvider:
 
     async def close(self) -> None:
         await self._set_state(STTSessionState.DRAINING if self._active_session else STTSessionState.DISCONNECTED)
+
+        if self._reset_timer:
+            self._reset_timer.cancel()
+            self._reset_timer = None
 
         if self._consumer_task:
             self._consumer_task.cancel()
@@ -156,6 +161,7 @@ class ManagedSTTProvider:
         self._active_session = session
         self._session_started_at = self.clock.now()
         self._consumer_task = asyncio.create_task(self._consume_session_events(session))
+        self._schedule_reset_timer()
         await self._set_state(STTSessionState.STREAMING)
         logger.info(f"[STT] Session opened (reset_deadline={self.reset_deadline_s}s)")
 
@@ -186,6 +192,7 @@ class ManagedSTTProvider:
         self._active_session = new_session
         self._session_started_at = self.clock.now()
         self._consumer_task = asyncio.create_task(self._consume_session_events(new_session))
+        self._schedule_reset_timer()
 
         await self._set_state(STTSessionState.STREAMING)
 
@@ -261,6 +268,28 @@ class ManagedSTTProvider:
         self._state = state
         logger.info(f"[STT] State: {old_state.name} -> {state.name}")
         await self._events.put(STTSessionStateEvent(state))
+
+    def _schedule_reset_timer(self) -> None:
+        """Schedule a timer to reset the session after reset_deadline_s."""
+        if self._reset_timer:
+            self._reset_timer.cancel()
+        self._reset_timer = asyncio.create_task(self._reset_timer_task())
+
+    async def _reset_timer_task(self) -> None:
+        """Background task that resets the session when the deadline expires."""
+        try:
+            await asyncio.sleep(self.reset_deadline_s)
+            if self._active_session is None:
+                return
+            logger.info(f"[STT] Timer expired after {self.reset_deadline_s}s")
+            if self._active_utterance_id is not None:
+                # Speaking: reset with bridging
+                await self._reset_with_bridging()
+            else:
+                # Silence: close session
+                await self._reset_on_silence()
+        except asyncio.CancelledError:
+            pass
 
 
 import contextlib  # placed at bottom to keep the main logic compact
