@@ -449,20 +449,24 @@ class DashboardView(ft.Column):
         self.is_translation_on = bool(enabled)
         # Only show warning if enabled AND needs_key; OFF state is always gray
         self._update_tile_visuals(self.tile_translation, self.is_translation_on, is_stt=False, needs_key=False)
-        self.update()
+        if self.page:
+            self.update()
 
     def set_stt_enabled(self, enabled: bool) -> None:
         self.is_stt_on = bool(enabled)
         # Only show warning if enabled AND needs_key; OFF state is always gray
         self._update_tile_visuals(self.tile_stt, self.is_stt_on, is_stt=True, needs_key=False)
-        self.update()
+        if self.page:
+            self.update()
 
     def set_translation_needs_key(self, needs_key: bool) -> None:
         self.translation_needs_key = bool(needs_key)
         self._update_tile_visuals(self.tile_translation, self.is_translation_on, is_stt=False, needs_key=self.translation_needs_key)
-        self.update()
+        if self.page:
+            self.update()
 
     def set_stt_needs_key(self, needs_key: bool) -> None:
         self.stt_needs_key = bool(needs_key)
         self._update_tile_visuals(self.tile_stt, self.is_stt_on, is_stt=True, needs_key=self.stt_needs_key)
-        self.update()
+        if self.page:
+            self.update()

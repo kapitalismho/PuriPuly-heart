@@ -10,6 +10,7 @@ from typing import Any
 class STTProviderName(str, Enum):
     ALIBABA = "alibaba"
     DEEPGRAM = "deepgram"
+    QWEN_ASR = "qwen_asr"
 
 
 class LLMProviderName(str, Enum):
@@ -94,6 +95,18 @@ class DeepgramSTTSettings:
 
 
 @dataclass(slots=True)
+class QwenASRSTTSettings:
+    model: str = "qwen3-asr-flash-realtime"
+    endpoint: str = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+
+    def validate(self) -> None:
+        if not self.model:
+            raise ValueError("model must be non-empty")
+        if not self.endpoint:
+            raise ValueError("endpoint must be non-empty")
+
+
+@dataclass(slots=True)
 class LLMSettings:
     concurrency_limit: int = 1
 
@@ -160,6 +173,7 @@ class AppSettings:
     stt: STTSettings = field(default_factory=STTSettings)
     alibaba_stt: AlibabaSTTSettings = field(default_factory=AlibabaSTTSettings)
     deepgram_stt: DeepgramSTTSettings = field(default_factory=DeepgramSTTSettings)
+    qwen_asr_stt: QwenASRSTTSettings = field(default_factory=QwenASRSTTSettings)
     llm: LLMSettings = field(default_factory=LLMSettings)
     osc: OSCSettings = field(default_factory=OSCSettings)
     secrets: SecretsSettings = field(default_factory=SecretsSettings)
@@ -172,6 +186,7 @@ class AppSettings:
         self.stt.validate()
         self.alibaba_stt.validate()
         self.deepgram_stt.validate()
+        self.qwen_asr_stt.validate()
         self.llm.validate()
         self.osc.validate()
         self.secrets.validate()
@@ -212,6 +227,10 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
         },
         "deepgram_stt": {
             "model": settings.deepgram_stt.model,
+        },
+        "qwen_asr_stt": {
+            "model": settings.qwen_asr_stt.model,
+            "endpoint": settings.qwen_asr_stt.endpoint,
         },
         "llm": {"concurrency_limit": settings.llm.concurrency_limit},
         "osc": {
@@ -278,6 +297,12 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
         ),
         deepgram_stt=DeepgramSTTSettings(
             model=str(data.get("deepgram_stt", {}).get("model", "nova-3")),
+        ),
+        qwen_asr_stt=QwenASRSTTSettings(
+            model=str(data.get("qwen_asr_stt", {}).get("model", "qwen3-asr-flash-realtime")),
+            endpoint=str(
+                data.get("qwen_asr_stt", {}).get("endpoint", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime")
+            ),
         ),
         llm=LLMSettings(concurrency_limit=int(data.get("llm", {}).get("concurrency_limit", 1))),
         osc=OSCSettings(

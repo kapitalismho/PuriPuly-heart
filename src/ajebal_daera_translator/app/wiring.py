@@ -20,7 +20,6 @@ from ajebal_daera_translator.core.storage.secrets import (
 from ajebal_daera_translator.core.stt.backend import STTBackend
 from ajebal_daera_translator.providers.llm.gemini import GeminiLLMProvider
 from ajebal_daera_translator.providers.llm.qwen import QwenLLMProvider
-from ajebal_daera_translator.providers.stt.alibaba_model_studio import AlibabaModelStudioRealtimeSTTBackend
 
 SECRETS_PASSPHRASE_ENV = "AJEBAL_SECRETS_PASSPHRASE"
 
@@ -94,17 +93,6 @@ def create_llm_provider(settings: AppSettings, *, secrets: SecretStore) -> LLMPr
 
 
 def create_stt_backend(settings: AppSettings, *, secrets: SecretStore) -> STTBackend:
-    if settings.provider.stt == STTProviderName.ALIBABA:
-        api_key = require_secret(secrets, key="alibaba_api_key", env_var="ALIBABA_API_KEY")
-        model = settings.alibaba_stt.model
-        endpoint = settings.alibaba_stt.endpoint
-        return AlibabaModelStudioRealtimeSTTBackend(
-            api_key=api_key,
-            model=model,
-            endpoint=endpoint,
-            sample_rate_hz=settings.audio.internal_sample_rate_hz,
-        )
-
     if settings.provider.stt == STTProviderName.DEEPGRAM:
         from ajebal_daera_translator.core.language import get_deepgram_language
         from ajebal_daera_translator.providers.stt.deepgram import DeepgramRealtimeSTTBackend
@@ -114,6 +102,19 @@ def create_stt_backend(settings: AppSettings, *, secrets: SecretStore) -> STTBac
             api_key=api_key,
             model=settings.deepgram_stt.model,
             language=get_deepgram_language(settings.languages.source_language),
+            sample_rate_hz=settings.audio.internal_sample_rate_hz,
+        )
+
+    if settings.provider.stt == STTProviderName.QWEN_ASR:
+        from ajebal_daera_translator.core.language import get_qwen_asr_language
+        from ajebal_daera_translator.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
+
+        api_key = require_secret(secrets, key="alibaba_api_key", env_var="ALIBABA_API_KEY")
+        return QwenASRRealtimeSTTBackend(
+            api_key=api_key,
+            model=settings.qwen_asr_stt.model,
+            endpoint=settings.qwen_asr_stt.endpoint,
+            language=get_qwen_asr_language(settings.languages.source_language),
             sample_rate_hz=settings.audio.internal_sample_rate_hz,
         )
 

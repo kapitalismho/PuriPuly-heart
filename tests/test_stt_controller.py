@@ -31,6 +31,10 @@ class FakeSession:
         await self._queue.put(STTBackendTranscriptEvent(text="final", is_final=True))
         await self._queue.put(None)  # sentinel
 
+    async def on_speech_end(self) -> None:
+        """Handle end of speech (no-op for fake session)."""
+        pass
+
     async def close(self) -> None:
         self._closed = True
 

@@ -82,6 +82,46 @@ def get_llm_language_name(code: str) -> str:
     return info.name if info else "English"
 
 
+# Qwen ASR language code mapping (ISO 639-1 -> Qwen ASR codes)
+_QWEN_ASR_LANGUAGE_MAP: dict[str, str] = {
+    "zh-CN": "zh",
+    "zh-TW": "zh",  # Qwen ASR uses "zh" for both Mandarin variants
+    "ko": "ko",
+    "ja": "ja",
+    "en": "en",
+    "de": "de",
+    "ru": "ru",
+    "fr": "fr",
+    "pt": "pt",
+    "ar": "ar",
+    "it": "it",
+    "es": "es",
+    "hi": "hi",
+    "id": "id",
+    "th": "th",
+    "tr": "tr",
+    "uk": "uk",
+    "vi": "vi",
+    "cs": "cs",
+    "da": "da",
+    "fi": "fi",
+    "ms": "ms",
+    "no": "no",
+    "pl": "pl",
+    "sv": "sv",
+}
+
+
+def get_qwen_asr_language(code: str) -> str:
+    """Get Qwen-ASR compatible language code. Falls back to 'en' if unknown."""
+    # Try exact match first (e.g., "zh-CN")
+    if code in _QWEN_ASR_LANGUAGE_MAP:
+        return _QWEN_ASR_LANGUAGE_MAP[code]
+    # Try base code (e.g., "ko-KR" -> "ko")
+    base_code = code.split("-")[0].lower()
+    return _QWEN_ASR_LANGUAGE_MAP.get(base_code, "en")
+
+
 def get_all_language_options() -> Sequence[tuple[str, str]]:
     """Get all supported languages as (code, name) tuples for UI dropdowns.
     

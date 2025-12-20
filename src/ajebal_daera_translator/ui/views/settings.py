@@ -38,8 +38,8 @@ class SettingsView(ft.ListView):
         self.stt_provider = ft.Dropdown(
             label="STT Provider",
             options=[
-                ft.dropdown.Option("Alibaba Model Studio"),
                 ft.dropdown.Option("Deepgram"),
+                ft.dropdown.Option("Qwen ASR"),
             ],
             on_change=self._on_provider_change,
             border_radius=8,
@@ -212,9 +212,10 @@ class SettingsView(ft.ListView):
         self._settings = settings
         self._config_path = config_path
 
-        if settings.provider.stt == STTProviderName.ALIBABA:
-            self.stt_provider.value = "Alibaba Model Studio"
+        if settings.provider.stt == STTProviderName.QWEN_ASR:
+            self.stt_provider.value = "Qwen ASR"
         else:
+            # Default to Deepgram (handles DEEPGRAM and legacy ALIBABA)
             self.stt_provider.value = "Deepgram"
         self.llm_provider.value = "Google Gemini" if settings.provider.llm == LLMProviderName.GEMINI else "Alibaba Qwen"
 
@@ -269,8 +270,8 @@ class SettingsView(ft.ListView):
             return
 
         stt_value = self.stt_provider.value
-        if stt_value == "Alibaba Model Studio":
-            self._settings.provider.stt = STTProviderName.ALIBABA
+        if stt_value == "Qwen ASR":
+            self._settings.provider.stt = STTProviderName.QWEN_ASR
         else:
             self._settings.provider.stt = STTProviderName.DEEPGRAM
 
@@ -305,18 +306,21 @@ class SettingsView(ft.ListView):
 
         stt_provider = self._settings.provider.stt
 
-        is_alibaba_stt = stt_provider == STTProviderName.ALIBABA
-        self.alibaba_stt_model.visible = is_alibaba_stt
-        self.alibaba_stt_endpoint.visible = is_alibaba_stt
+        # Hide alibaba_stt fields (legacy, module deleted)
+        self.alibaba_stt_model.visible = False
+        self.alibaba_stt_endpoint.visible = False
 
         is_deepgram_stt = stt_provider == STTProviderName.DEEPGRAM
         self.deepgram_api_key.visible = is_deepgram_stt
         self.deepgram_stt_model.visible = is_deepgram_stt
-        self.deepgram_api_key.visible = is_deepgram_stt
         self.verify_deepgram_btn.visible = is_deepgram_stt
+
+        # Qwen ASR uses alibaba_api_key
+        is_qwen_asr = stt_provider == STTProviderName.QWEN_ASR
 
         self.google_api_key.visible = True
         self.verify_google_btn.visible = True
+        # Show Alibaba key for Qwen ASR or Qwen LLM
         self.alibaba_api_key.visible = True
         self.verify_alibaba_btn.visible = True
 
