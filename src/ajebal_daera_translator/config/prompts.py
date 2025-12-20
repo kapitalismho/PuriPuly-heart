@@ -8,9 +8,17 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import sys
+
 
 def get_prompts_dir() -> Path:
     """Get the prompts directory path."""
+    # PyInstaller frozen app: use _MEIPASS
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        meipass_prompts = Path(sys._MEIPASS) / "prompts"
+        if meipass_prompts.exists():
+            return meipass_prompts
+    
     # Try relative to the project root first
     candidates = [
         Path(__file__).parent.parent.parent.parent / "prompts",  # src/ajebal.../config -> project root

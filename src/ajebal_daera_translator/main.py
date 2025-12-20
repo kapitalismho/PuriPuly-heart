@@ -121,6 +121,19 @@ def main(argv: list[str] | None = None) -> int:
         )
         return asyncio.run(runner.run())
 
+    # Default: run GUI when no command specified (e.g., double-clicking EXE)
+    if args.command is None:
+        import flet as ft
+        from ajebal_daera_translator.ui.app import main_gui
+        
+        config_path = args.config
+
+        async def _target(page: ft.Page):
+            return await main_gui(page, config_path=config_path)
+
+        ft.app(target=_target)
+        return 0
+
     parser.print_help()
     return 2
 

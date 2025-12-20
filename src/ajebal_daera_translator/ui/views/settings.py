@@ -460,17 +460,24 @@ class SettingsView(ft.ListView):
             self.microphone.update()
 
     def _populate_host_apis(self) -> None:
-        """Populate audio host API dropdown with available APIs from the system."""
+        """Populate audio host API dropdown with available APIs from the system.
+
+        Only shows DirectSound and WASAPI to avoid user confusion:
+        - MME: High latency, can be unstable
+        - ASIO: Exclusive mode, prevents microphone sharing with other apps (e.g., VRChat)
+        """
         options = [ft.dropdown.Option("(Default)")]
+        # Only allow these host APIs for better compatibility
+        allowed_apis = {"windows directsound", "windows wasapi"}
         try:
             import sounddevice as sd  # type: ignore
             for api in sd.query_hostapis():
                 name = str(api.get("name", "") or "").strip()
-                if name:
+                if name and name.lower() in allowed_apis:
                     options.append(ft.dropdown.Option(name))
         except Exception as e:
             logger.warning(f"Failed to enumerate host APIs: {e}")
-        
+
         self.audio_host_api.options = options
 
     def _emit_settings_changed(self) -> None:

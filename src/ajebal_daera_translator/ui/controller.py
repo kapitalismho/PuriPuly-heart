@@ -297,7 +297,7 @@ class GuiController:
             )
 
         source = SoundDeviceAudioSource(
-            sample_rate_hz=self.settings.audio.internal_sample_rate_hz,
+            sample_rate_hz=None,  # Use device default; resampled later to internal rate
             channels=self.settings.audio.internal_channels,
             device=device_idx,
         )

@@ -21,7 +21,13 @@ class AudioSource(Protocol):
 
 @dataclass(slots=True)
 class SoundDeviceAudioSource(AudioSource):
-    sample_rate_hz: int
+    """Audio source using sounddevice/PortAudio.
+
+    If sample_rate_hz is None, the device's default sample rate is used.
+    This is important for WASAPI which may not support arbitrary sample rates.
+    """
+
+    sample_rate_hz: int | None = None
     channels: int = 1
     device: int | str | None = None
     blocksize: int | None = None
@@ -30,10 +36,11 @@ class SoundDeviceAudioSource(AudioSource):
     _queue: janus.Queue[np.ndarray | None] = field(init=False, repr=False)
     _stream: object = field(init=False, repr=False)
     _closed: bool = field(init=False, default=False)
+    _actual_sample_rate_hz: int = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        if self.sample_rate_hz <= 0:
-            raise ValueError("sample_rate_hz must be > 0")
+        if self.sample_rate_hz is not None and self.sample_rate_hz <= 0:
+            raise ValueError("sample_rate_hz must be > 0 or None")
         if self.channels <= 0:
             raise ValueError("channels must be > 0")
         if self.max_queue_frames <= 0:
@@ -56,7 +63,7 @@ class SoundDeviceAudioSource(AudioSource):
                 return
 
         stream = sd.InputStream(
-            samplerate=self.sample_rate_hz,
+            samplerate=self.sample_rate_hz,  # None = use device default
             channels=self.channels,
             dtype="float32",
             callback=_callback,
@@ -65,13 +72,14 @@ class SoundDeviceAudioSource(AudioSource):
         )
         stream.start()
         self._stream = stream
+        self._actual_sample_rate_hz = int(stream.samplerate)
 
     async def frames(self) -> AsyncIterator[AudioFrameF32]:
         while True:
             item = await self._queue.async_q.get()
             if item is None:
                 return
-            yield AudioFrameF32(samples=item, sample_rate_hz=self.sample_rate_hz)
+            yield AudioFrameF32(samples=item, sample_rate_hz=self._actual_sample_rate_hz)
 
     async def close(self) -> None:
         if self._closed:

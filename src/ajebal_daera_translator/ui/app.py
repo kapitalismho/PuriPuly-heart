@@ -1,5 +1,6 @@
 import flet as ft
 import logging
+import webbrowser
 
 from ajebal_daera_translator.ui.theme import get_app_theme, COLOR_BACKGROUND, COLOR_DIVIDER
 from ajebal_daera_translator.ui.components.sidebar import AppSidebar
@@ -9,6 +10,7 @@ from ajebal_daera_translator.ui.views.logs import LogsView
 from ajebal_daera_translator.ui.views.history import HistoryView  # Import HistoryView
 from ajebal_daera_translator.ui.controller import GuiController
 from ajebal_daera_translator.core.language import get_stt_compatibility_warning
+from ajebal_daera_translator.core.updater import check_for_update
 
 logger = logging.getLogger(__name__)
 
@@ -139,3 +141,41 @@ class TranslatorApp:
 async def main_gui(page: ft.Page, *, config_path):
     app = TranslatorApp(page, config_path=config_path)
     await app.controller.start()
+    
+    # Check for updates in background
+    await _check_and_notify_update(page)
+
+
+async def _check_and_notify_update(page: ft.Page) -> None:
+    """Check for updates and show notification if available."""
+    try:
+        update_info = await check_for_update()
+        if update_info is None:
+            return
+        
+        from flet.core.colors import Colors as colors
+        
+        def _open_download(_e):
+            webbrowser.open(update_info.download_url)
+            page.close(banner)
+        
+        def _dismiss(_e):
+            page.close(banner)
+        
+        banner = ft.Banner(
+            bgcolor=colors.BLUE_900,
+            leading=ft.Icon(ft.Icons.SYSTEM_UPDATE, color=colors.BLUE_200, size=40),
+            content=ft.Text(
+                f"새 버전 v{update_info.version}이 있습니다!",
+                color=colors.WHITE,
+                size=14,
+            ),
+            actions=[
+                ft.TextButton("다운로드", on_click=_open_download),
+                ft.TextButton("닫기", on_click=_dismiss),
+            ],
+        )
+        page.open(banner)
+        
+    except Exception as exc:
+        logger.debug(f"Update check notification failed: {exc}")
