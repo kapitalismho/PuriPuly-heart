@@ -18,6 +18,7 @@ from ajebal_daera_translator.config.settings import (
     STTProviderName,
 )
 from ajebal_daera_translator.config.prompts import load_prompt_for_provider
+from ajebal_daera_translator.core.language import get_stt_compatibility_warning
 from ajebal_daera_translator.ui.components.bento_card import BentoCard
 from ajebal_daera_translator.ui.theme import COLOR_PRIMARY
 
@@ -274,6 +275,17 @@ class SettingsView(ft.ListView):
             self._settings.provider.stt = STTProviderName.QWEN_ASR
         else:
             self._settings.provider.stt = STTProviderName.DEEPGRAM
+
+        # Check STT provider compatibility with current source language
+        source_lang = self._settings.languages.source_language
+        stt_provider = self._settings.provider.stt.value
+        warning = get_stt_compatibility_warning(source_lang, stt_provider)
+        if warning and self.page:
+            self.page.open(ft.SnackBar(
+                ft.Text(warning),
+                bgcolor=colors.ORANGE_700,
+                duration=4000,
+            ))
 
         new_llm = LLMProviderName.GEMINI if self.llm_provider.value == "Google Gemini" else LLMProviderName.QWEN
 

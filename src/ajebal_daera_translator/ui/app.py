@@ -8,6 +8,7 @@ from ajebal_daera_translator.ui.views.settings import SettingsView
 from ajebal_daera_translator.ui.views.logs import LogsView
 from ajebal_daera_translator.ui.views.history import HistoryView  # Import HistoryView
 from ajebal_daera_translator.ui.controller import GuiController
+from ajebal_daera_translator.core.language import get_stt_compatibility_warning
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,18 @@ class TranslatorApp:
         settings = self.controller.settings
         settings.languages.source_language = source_code
         settings.languages.target_language = target_code
+
+        # Check STT provider compatibility and show warning if needed
+        stt_provider = settings.provider.stt.value  # "deepgram" or "qwen_asr"
+        warning = get_stt_compatibility_warning(source_code, stt_provider)
+        if warning:
+            from flet.core.colors import Colors as colors
+            self.page.open(ft.SnackBar(
+                ft.Text(warning),
+                bgcolor=colors.ORANGE_700,
+                duration=4000,
+            ))
+
         async def _task():
             await self.controller.apply_settings(settings)
         self.page.run_task(_task)
