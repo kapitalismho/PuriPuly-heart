@@ -90,14 +90,9 @@ class DashScopeQwenClient:
     ) -> str:
         import dashscope  # type: ignore
 
-        # Apply template variables to system prompt (like Gemini)
-        formatted_system_prompt = system_prompt.format(
-            source_language=source_language,
-            target_language=target_language,
-        ) if "{source_language}" in system_prompt else system_prompt
-
         # Qwen-MT uses Custom Prompt (system role not supported)
-        full_prompt = f"{formatted_system_prompt}\n\n{text}"
+        # Template variables (${sourceName}, ${targetName}) are already substituted by hub.py
+        full_prompt = f"{system_prompt}\n\n{text}"
 
         logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
 

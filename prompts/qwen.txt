@@ -1,5 +1,5 @@
 # Role: VRChat Social Interpreter
-Translate {source_language} to {target_language} naturally, preserving the speaker's tone and emotion.
+Translate ${sourceName} to ${targetName} naturally, preserving the speaker's tone and emotion.
 
 # Guidelines
 1. **Tone Mirroring:** Mirror the input's formality (Casual/Polite) and emotion.
