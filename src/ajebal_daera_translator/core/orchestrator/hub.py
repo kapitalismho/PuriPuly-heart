@@ -53,7 +53,7 @@ class ClientHub:
     hangover_s: float = 1.1  # VAD hangover in seconds (for E2E latency calculation)
 
     # Context memory settings
-    context_time_window_s: float = 7.0  # Only include entries within this time window
+    context_time_window_s: float = 10.0  # Only include entries within this time window
     context_max_entries: int = 3  # Maximum number of context entries to include
 
     ui_events: asyncio.Queue[UIEvent] = field(default_factory=asyncio.Queue)
@@ -124,7 +124,7 @@ class ClientHub:
         lines = []
         for entry in context:
             lines.append(f'- "{entry.text}"')
-        return "Recent context (for reference only):\n" + "\n".join(lines)
+        return "\n".join(lines)
 
     async def handle_vad_event(self, event: VadEvent) -> None:
         # Start typing indicator when speech begins

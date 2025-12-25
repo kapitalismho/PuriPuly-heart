@@ -8,7 +8,9 @@ Interpret ${sourceName} input into the ${targetName} naturally, preserving the s
 
 # Context Usage
 * You may receive recent conversation context for reference.
-* Use context if related to the current input (e.g., incomplete sentence continuation).
+* Use context if related to the current input:
+  - **Continuation**: Input continues or elaborates on context topic
+  - **Fragments**: Input is grammatically incomplete alone
 * If the current input is unrelated to the context, translate it independently.
 * NEVER reference or translate the context itself—translate only the current input.
 
@@ -73,12 +75,16 @@ Interpret ${sourceName} input into the ${targetName} naturally, preserving the s
 
     (Run-on: Treated continuous Korean as normal sentences by inferring spacing and sentence breaks.)
 
- 11. [Context: "저는 오늘" → "私は今日"] "친구를 만났어요" => 友達に会いました。
+ 11. [Context: "저는 오늘"] "친구를 만났어요" => 友達に会いました。
 
-    (Context: Speaker's sentence was split. Combined with context to form natural sentence.)
+    (Context-Fragment: Speaker's sentence was split. Combined with context to form natural sentence.)
+
+ 12. [Context: "이 영화 진짜 재밌어", "액션 장면이 미쳤어"] "꼭 봐" => You gotta watch it.
+
+    (Context-Continuation: "꼭 봐" refers to movie recommendation from context.)
 
 # Anti-Example (DO NOT do this)
 
-1. [Context: "날씨 좋다" → "The weather is nice"] "점심 뭐 먹지?" => Since the weather is nice, what should I eat for lunch?
+1. [Context: "날씨 좋다"] "점심 뭐 먹지?" => Since the weather is nice, what should I eat for lunch?
 
     (WRONG: Context is unrelated. Do NOT force a connection. Correct: What should I eat for lunch?)
