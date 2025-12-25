@@ -25,6 +25,13 @@ from ajebal_daera_translator.domain.events import (
 from ajebal_daera_translator.domain.models import OSCMessage, Transcript, Translation, UtteranceBundle
 
 
+@dataclass(frozen=True, slots=True)
+class ContextEntry:
+    """Represents a recent utterance for context memory."""
+    text: str  # Original text
+    timestamp: float  # When the translation was requested
+
+
 class STTProvider(Protocol):
     async def handle_vad_event(self, event: VadEvent) -> None: ...
     async def close(self) -> None: ...
@@ -45,12 +52,17 @@ class ClientHub:
     translation_enabled: bool = True
     hangover_s: float = 1.1  # VAD hangover in seconds (for E2E latency calculation)
 
+    # Context memory settings
+    context_time_window_s: float = 7.0  # Only include entries within this time window
+    context_max_entries: int = 3  # Maximum number of context entries to include
+
     ui_events: asyncio.Queue[UIEvent] = field(default_factory=asyncio.Queue)
 
     _utterances: dict[UUID, UtteranceBundle] = field(default_factory=dict)
     _translation_tasks: dict[UUID, asyncio.Task[None]] = field(default_factory=dict)
     _utterance_sources: dict[UUID, str] = field(default_factory=dict)
     _utterance_start_times: dict[UUID, float] = field(default_factory=dict)  # For E2E latency tracking
+    _translation_history: list[ContextEntry] = field(default_factory=list)  # Context memory
     _stt_task: asyncio.Task[None] | None = None
     _osc_flush_task: asyncio.Task[None] | None = None
     _running: bool = False
@@ -89,6 +101,30 @@ class ClientHub:
 
         if self.llm is not None:
             await self.llm.close()
+
+    def clear_context(self) -> None:
+        """Clear the translation context history."""
+        self._translation_history.clear()
+        logger.info("[Hub] Context history cleared")
+
+    def _get_valid_context(self) -> list[ContextEntry]:
+        """Get context entries within time window and max entries limit."""
+        now = self.clock.now()
+        # Filter by time window and limit to max entries
+        valid = [
+            entry for entry in self._translation_history[-self.context_max_entries:]
+            if (now - entry.timestamp) < self.context_time_window_s
+        ]
+        return valid
+
+    def _format_context_for_llm(self, context: list[ContextEntry]) -> str:
+        """Format context entries as a string for LLM prompt."""
+        if not context:
+            return ""
+        lines = []
+        for entry in context:
+            lines.append(f'- "{entry.text}"')
+        return "Recent context (for reference only):\n" + "\n".join(lines)
 
     async def handle_vad_event(self, event: VadEvent) -> None:
         # Start typing indicator when speech begins
@@ -154,7 +190,6 @@ class ClientHub:
             return
 
         if isinstance(event, STTFinalEvent):
-            logger.info(f"[Hub] STT Final: '{event.transcript.text}' id={str(event.transcript.utterance_id)[:8]}")
             await self._handle_transcript(event.transcript, is_final=True, source="Mic")
             if self.llm is None or not self.translation_enabled:
                 logger.info(f"[Hub] Skipping translation (llm={self.llm is not None}, enabled={self.translation_enabled})")
@@ -164,7 +199,6 @@ class ClientHub:
                     translation_text=None,
                 )
             else:
-                logger.info(f"[Hub] Starting translation for id={str(event.transcript.utterance_id)[:8]}")
                 await self._ensure_translation(event.transcript)
             return
 
@@ -203,6 +237,26 @@ class ClientHub:
         if self.llm is None:
             return
         try:
+            # Get valid context for this translation
+            valid_context = self._get_valid_context()
+            now = self.clock.now()
+            
+            # Log context information
+            logger.info(f"[Hub] Context: {len(valid_context)} entries within {self.context_time_window_s}s window")
+            for i, entry in enumerate(valid_context):
+                age = now - entry.timestamp
+                logger.info(f"[Hub] Context[{i}]: \"{entry.text}\" ({age:.1f}s ago)")
+            
+            # Add current text to context history at REQUEST time
+            self._translation_history.append(
+                ContextEntry(text=text, timestamp=now)
+            )
+            if len(self._translation_history) > self.context_max_entries:
+                self._translation_history.pop(0)
+            
+            # Format context for LLM
+            context_str = self._format_context_for_llm(valid_context)
+            
             # Substitute language placeholders in system prompt
             formatted_prompt = self.system_prompt
             formatted_prompt = formatted_prompt.replace("${sourceName}", get_llm_language_name(self.source_language))
@@ -214,6 +268,7 @@ class ClientHub:
                 system_prompt=formatted_prompt,
                 source_language=self.source_language,
                 target_language=self.target_language,
+                context=context_str,
             )
         except asyncio.CancelledError:
             raise
@@ -233,7 +288,6 @@ class ClientHub:
 
         bundle = self.get_or_create_bundle(utterance_id)
         bundle.with_translation(translation)
-        logger.info(f"[Hub] Translation done: '{translation.text}' id={str(utterance_id)[:8]}")
         await self.ui_events.put(
             UIEvent(
                 type=UIEventType.TRANSLATION_DONE,

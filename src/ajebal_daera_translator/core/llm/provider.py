@@ -17,6 +17,7 @@ class LLMProvider(Protocol):
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> Translation: ...
 
     async def close(self) -> None: ...
@@ -35,6 +36,7 @@ class SemaphoreLLMProvider:
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> Translation:
         async with self.semaphore:
             return await self.inner.translate(
@@ -43,6 +45,7 @@ class SemaphoreLLMProvider:
                 system_prompt=system_prompt,
                 source_language=source_language,
                 target_language=target_language,
+                context=context,
             )
 
     async def close(self) -> None:

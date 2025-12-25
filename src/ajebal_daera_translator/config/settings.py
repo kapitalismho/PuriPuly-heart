@@ -58,13 +58,10 @@ class AudioSettings:
 
 @dataclass(slots=True)
 class STTSettings:
-    reset_deadline_s: float = 90.0
     drain_timeout_s: float = 2.0
     vad_speech_threshold: float = 0.5
 
     def validate(self) -> None:
-        if self.reset_deadline_s <= 0:
-            raise ValueError("reset_deadline_s must be > 0")
         if self.drain_timeout_s <= 0:
             raise ValueError("drain_timeout_s must be > 0")
         if not (0.0 <= self.vad_speech_threshold <= 1.0):
@@ -217,7 +214,6 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
             "input_device": settings.audio.input_device,
         },
         "stt": {
-            "reset_deadline_s": settings.stt.reset_deadline_s,
             "drain_timeout_s": settings.stt.drain_timeout_s,
             "vad_speech_threshold": settings.stt.vad_speech_threshold,
         },
@@ -285,7 +281,6 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             input_device=str(input_device_raw) if input_device_raw is not None else "",
         ),
         stt=STTSettings(
-            reset_deadline_s=float(stt_data.get("reset_deadline_s", 90.0)),
             drain_timeout_s=float(stt_data.get("drain_timeout_s", 2.0)),
             vad_speech_threshold=float(vad_threshold_raw) if vad_threshold_raw is not None else 0.5,
         ),

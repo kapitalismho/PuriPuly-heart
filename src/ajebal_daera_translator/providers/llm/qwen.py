@@ -19,6 +19,7 @@ class QwenClient(Protocol):
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> str: ...
 
 
@@ -36,6 +37,7 @@ class QwenLLMProvider:
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> Translation:
         client = self.client or DashScopeQwenClient(api_key=self.api_key, model=self.model)
         translated = await client.translate(
@@ -43,6 +45,7 @@ class QwenLLMProvider:
             system_prompt=system_prompt,
             source_language=source_language,
             target_language=target_language,
+            context=context,
         )
         return Translation(utterance_id=utterance_id, text=translated)
 
@@ -87,14 +90,18 @@ class DashScopeQwenClient:
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> str:
         import dashscope  # type: ignore
 
         # Qwen-MT uses Custom Prompt (system role not supported)
         # Template variables (${sourceName}, ${targetName}) are already substituted by hub.py
-        full_prompt = f"{system_prompt}\n\n{text}"
-
-        logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
+        if context:
+            full_prompt = f"{system_prompt}\n\nContext: {context}\n\nTranslate: {text}"
+            logger.info(f"[LLM] Request with context: '{text}' -> {source_language} to {target_language}")
+        else:
+            full_prompt = f"{system_prompt}\n\n{text}"
+            logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
 
         def _call() -> str:
             dashscope.api_key = self.api_key

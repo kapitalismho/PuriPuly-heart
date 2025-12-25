@@ -26,6 +26,9 @@ from ajebal_daera_translator.ui.event_bridge import UIEventBridge
 
 logger = logging.getLogger(__name__)
 
+# Hardcoded STT session reset deadline (not configurable via settings)
+STT_RESET_DEADLINE_S = 180.0
+
 
 @dataclass(slots=True)
 class GuiController:
@@ -103,6 +106,8 @@ class GuiController:
             self._log_error("Translation is ON but LLM provider is not configured.")
             return
 
+        # Clear context history when toggling translation
+        self.hub.clear_context()
         self.hub.translation_enabled = bool(enabled)
 
     async def set_stt_enabled(self, enabled: bool) -> None:
@@ -231,7 +236,7 @@ class GuiController:
                 backend=backend,
                 sample_rate_hz=self.settings.audio.internal_sample_rate_hz,
                 clock=self.clock,
-                reset_deadline_s=self.settings.stt.reset_deadline_s,
+                reset_deadline_s=STT_RESET_DEADLINE_S,
                 drain_timeout_s=self.settings.stt.drain_timeout_s,
                 bridging_ms=self.settings.audio.ring_buffer_ms,
             )

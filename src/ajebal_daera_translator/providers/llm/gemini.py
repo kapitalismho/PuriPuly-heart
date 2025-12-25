@@ -18,6 +18,7 @@ class GeminiClient(Protocol):
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> str: ...
 
     async def close(self) -> None: ...
@@ -45,6 +46,7 @@ class GeminiLLMProvider:
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> Translation:
         client = self._get_client()
         translated = await client.translate(
@@ -52,6 +54,7 @@ class GeminiLLMProvider:
             system_prompt=system_prompt,
             source_language=source_language,
             target_language=target_language,
+            context=context,
         )
         return Translation(utterance_id=utterance_id, text=translated)
 
@@ -94,6 +97,7 @@ class GoogleGenaiGeminiClient:
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> str:
         from google.genai import types  # type: ignore
 
@@ -103,11 +107,18 @@ class GoogleGenaiGeminiClient:
             target_language=target_language,
         ) if "{source_language}" in system_prompt else system_prompt
 
-        logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
+        # Build the message with context if provided
+        if context:
+            user_message = f"context: {context}\n\nTranslate: {text}"
+            logger.info(f"[LLM] Request with context: '{text}' -> {source_language} to {target_language}")
+        else:
+            user_message = text
+            logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
+        
         client = self._get_client()
         response = await client.aio.models.generate_content(
             model=self.model,
-            contents=text,
+            contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=formatted_system_prompt,
                 thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
