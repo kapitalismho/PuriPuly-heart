@@ -11,9 +11,11 @@ case "$(uname -s)" in
     fi
     ;;
   *)
-    if [ -x ".venv/bin/python" ]; then
-      exec ".venv/bin/python" -m pre_commit run --hook-stage pre-commit "$@"
-    fi
+    for candidate in .venv-wsl*/bin/python .venv/bin/python; do
+      if [ -x "$candidate" ]; then
+        exec "$candidate" -m pre_commit run --hook-stage pre-commit "$@"
+      fi
+    done
     ;;
 esac
 
