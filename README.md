@@ -7,6 +7,12 @@ VRChat real-time speech translation pipeline (STT → LLM → OSC).
 - `pip install -e .`
 - (Dev) `pip install -e '.[dev]'`
 
+## Dev Tools
+
+- Format: `black src tests`
+- Lint: `ruff check src tests`
+- Pre-commit: `pre-commit install` (run `pre-commit run --all-files` to verify)
+
 ## Secrets
 
 Provider API keys are read from `SecretStore` first, then fall back to environment variables.
