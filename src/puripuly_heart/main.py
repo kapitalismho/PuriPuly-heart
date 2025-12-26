@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from puripuly_heart.app.headless_mic import HeadlessMicRunner
@@ -18,6 +20,26 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )
+
+# Add file logging (RotatingFileHandler)
+if getattr(sys, "frozen", False):
+    # PyInstaller로 빌드된 경우
+    _app_dir = Path(sys.executable).parent
+else:
+    # 개발 환경
+    _app_dir = Path(__file__).parent
+
+_log_file = _app_dir / "puripuly_heart.log"
+_file_handler = RotatingFileHandler(
+    _log_file,
+    maxBytes=5 * 1024 * 1024,  # 5MB
+    backupCount=0,
+    encoding="utf-8",
+)
+_file_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S")
+)
+logging.getLogger().addHandler(_file_handler)
 
 
 def build_parser() -> argparse.ArgumentParser:

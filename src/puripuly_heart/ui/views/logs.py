@@ -4,6 +4,9 @@ import flet as ft
 
 from puripuly_heart.ui.theme import COLOR_SURFACE
 
+MAX_LOG_ENTRIES = 4000  # 최대 로그 항목 수
+CLEANUP_BATCH = 500  # 한 번에 삭제할 개수
+
 
 class FletLogHandler(logging.Handler):
     """Custom log handler that forwards logs to a LogsView."""
@@ -46,5 +49,8 @@ class LogsView(ft.Container):
         self.log_list.controls.append(
             ft.Text(record, size=12, font_family="Consolas", selectable=True)
         )
+        # 임계치 초과 시 배치 삭제 (4500개 → 4000개)
+        if len(self.log_list.controls) > MAX_LOG_ENTRIES + CLEANUP_BATCH:
+            del self.log_list.controls[:CLEANUP_BATCH]
         if self.page:
             self.update()
