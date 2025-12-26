@@ -53,7 +53,7 @@ class ClientHub:
     hangover_s: float = 1.1  # VAD hangover in seconds (for E2E latency calculation)
 
     # Context memory settings
-    context_time_window_s: float = 15.0  # Only include entries within this time window
+    context_time_window_s: float = 20.0  # Only include entries within this time window
     context_max_entries: int = 3  # Maximum number of context entries to include
 
     ui_events: asyncio.Queue[UIEvent] = field(default_factory=asyncio.Queue)

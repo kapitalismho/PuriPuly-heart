@@ -273,8 +273,7 @@ class TestContextFormatting:
         entries = [ContextEntry(text="안녕", timestamp=1.0)]
         result = hub._format_context_for_llm(entries)
         
-        assert "Recent context" in result
-        assert '"안녕"' in result
+        assert result == '- "안녕"'
 
     def test_format_context_multiple_entries(self):
         """Multiple entries should all be included."""

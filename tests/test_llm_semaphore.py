@@ -20,7 +20,9 @@ class CountingLLM:
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> Translation:
+        _ = (system_prompt, source_language, target_language, context)
         self.active += 1
         self.peak = max(self.peak, self.active)
         try:
@@ -49,4 +51,3 @@ def test_llm_semaphore_limits_concurrency():
         assert inner.peak <= 2
 
     asyncio.run(run())
-

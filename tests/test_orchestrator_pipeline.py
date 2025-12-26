@@ -18,12 +18,17 @@ from ajebal_daera_translator.domain.models import Translation
 @dataclass(slots=True)
 class FakeSender:
     sent: list[str]
+    typing: list[bool]
 
     def __init__(self) -> None:
         self.sent = []
+        self.typing = []
 
     def send_chatbox(self, text: str) -> None:
         self.sent.append(text)
+
+    def send_typing(self, is_typing: bool) -> None:
+        self.typing.append(is_typing)
 
 
 @dataclass(slots=True)
@@ -36,7 +41,9 @@ class FakeLLM:
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> Translation:
+        _ = (system_prompt, source_language, target_language, context)
         await asyncio.sleep(0.01)
         return Translation(utterance_id=utterance_id, text="TRANSLATED")
 
@@ -62,6 +69,11 @@ class FakeSession:
             self._seen_speech = True
             await self._queue.put(STTBackendTranscriptEvent(text="PARTIAL", is_final=False))
         elif self._seen_speech:
+            await self._queue.put(STTBackendTranscriptEvent(text="FINAL", is_final=True))
+            self._seen_speech = False
+
+    async def on_speech_end(self) -> None:
+        if self._seen_speech:
             await self._queue.put(STTBackendTranscriptEvent(text="FINAL", is_final=True))
             self._seen_speech = False
 

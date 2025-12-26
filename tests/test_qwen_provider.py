@@ -19,12 +19,14 @@ class FakeQwenClient(QwenClient):
         system_prompt: str,
         source_language: str,
         target_language: str,
+        context: str = "",
     ) -> str:
         self.last_call = {
             "text": text,
             "system_prompt": system_prompt,
             "source_language": source_language,
             "target_language": target_language,
+            "context": context,
         }
         return "TRANSLATED"
 
@@ -50,5 +52,5 @@ async def test_qwen_provider_uses_injected_client():
         "system_prompt": "PROMPT",
         "source_language": "ko-KR",
         "target_language": "en",
+        "context": "",
     }
-

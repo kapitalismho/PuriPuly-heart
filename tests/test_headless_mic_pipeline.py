@@ -45,12 +45,17 @@ class SequenceVadEngine:
 @dataclass(slots=True)
 class FakeSender:
     sent: list[str]
+    typing: list[bool]
 
     def __init__(self) -> None:
         self.sent = []
+        self.typing = []
 
     def send_chatbox(self, text: str) -> None:
         self.sent.append(text)
+
+    def send_typing(self, is_typing: bool) -> None:
+        self.typing.append(is_typing)
 
 
 @dataclass(slots=True)
@@ -71,6 +76,11 @@ class FakeSession:
             self._seen_speech = True
             await self._queue.put(STTBackendTranscriptEvent(text="PARTIAL", is_final=False))
         elif self._seen_speech:
+            await self._queue.put(STTBackendTranscriptEvent(text="FINAL", is_final=True))
+            self._seen_speech = False
+
+    async def on_speech_end(self) -> None:
+        if self._seen_speech:
             await self._queue.put(STTBackendTranscriptEvent(text="FINAL", is_final=True))
             self._seen_speech = False
 
@@ -138,4 +148,3 @@ def test_headless_mic_pipeline_smoke():
         await hub.stop()
 
     asyncio.run(run())
-
