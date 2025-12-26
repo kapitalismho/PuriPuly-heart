@@ -1,3 +1,3 @@
 def test_imports_smoke():
-    import ajebal_daera_translator  # noqa: F401
-    from ajebal_daera_translator import main  # noqa: F401
+    import puripuly_heart  # noqa: F401
+    from puripuly_heart import main  # noqa: F401

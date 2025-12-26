@@ -16,24 +16,24 @@ from pathlib import Path
 src_path = Path("src").resolve()
 sys.path.insert(0, str(src_path))
 
-from ajebal_daera_translator import __version__
+from puripuly_heart import __version__
 
 block_cipher = None
 
 # Collect data files
 datas = [
     # VAD model and data files
-    (str(src_path / "ajebal_daera_translator" / "data"), "ajebal_daera_translator/data"),
+    (str(src_path / "puripuly_heart" / "data"), "puripuly_heart/data"),
     # Prompt templates
     ("prompts", "prompts"),
 ]
 
 # Hidden imports for dynamic imports
 hiddenimports = [
-    "ajebal_daera_translator.providers.stt.deepgram",
-    "ajebal_daera_translator.providers.stt.qwen_asr",
-    "ajebal_daera_translator.providers.llm.gemini",
-    "ajebal_daera_translator.providers.llm.qwen",
+    "puripuly_heart.providers.stt.deepgram",
+    "puripuly_heart.providers.stt.qwen_asr",
+    "puripuly_heart.providers.llm.gemini",
+    "puripuly_heart.providers.llm.qwen",
     "google.genai",
     "dashscope",
     "deepgram",
@@ -46,7 +46,7 @@ hiddenimports = [
 ]
 
 a = Analysis(
-    [str(src_path / "ajebal_daera_translator" / "main.py")],
+    [str(src_path / "puripuly_heart" / "main.py")],
     pathex=[str(src_path)],
     binaries=[],
     datas=datas,

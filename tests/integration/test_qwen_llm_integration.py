@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from ajebal_daera_translator.providers.llm.qwen import QwenLLMProvider
+from puripuly_heart.providers.llm.qwen import QwenLLMProvider
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INTEGRATION") != "1", reason="set INTEGRATION=1 to run integration tests"

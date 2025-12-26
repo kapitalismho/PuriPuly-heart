@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 
-from ajebal_daera_translator.core.orchestrator.hub import ClientHub, ContextEntry
+from puripuly_heart.core.orchestrator.hub import ClientHub, ContextEntry
 
 # ── Mock classes ──────────────────────────────────────────────────────────────
 
@@ -42,7 +42,7 @@ class FakeLLMProvider:
         target_language: str,
         context: str = "",
     ):
-        from ajebal_daera_translator.domain.models import Translation
+        from puripuly_heart.domain.models import Translation
 
         self.calls.append(
             {

@@ -8,10 +8,10 @@ from uuid import uuid4
 
 import pytest
 
-from ajebal_daera_translator.config.prompts import load_prompt_for_provider
-from ajebal_daera_translator.core.orchestrator.hub import ClientHub
-from ajebal_daera_translator.domain.models import Translation
-from ajebal_daera_translator.providers.llm.qwen import DashScopeQwenClient
+from puripuly_heart.config.prompts import load_prompt_for_provider
+from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.qwen import DashScopeQwenClient
 
 
 class FakeClock:

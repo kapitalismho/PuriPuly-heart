@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from ajebal_daera_translator.core.audio.format import (
+from puripuly_heart.core.audio.format import (
     float32_to_pcm16le_bytes,
     mixdown_to_mono_f32,
     normalize_audio_f32,
     pcm16le_bytes_to_float32,
     resample_f32_linear,
 )
-from ajebal_daera_translator.core.audio.ring_buffer import RingBufferF32
+from puripuly_heart.core.audio.ring_buffer import RingBufferF32
 
 
 def test_mixdown_to_mono():

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from ajebal_daera_translator.providers.llm.qwen import QwenClient, QwenLLMProvider
+from puripuly_heart.providers.llm.qwen import QwenClient, QwenLLMProvider
 
 
 @dataclass

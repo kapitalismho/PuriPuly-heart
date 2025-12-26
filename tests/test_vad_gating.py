@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ajebal_daera_translator.core.vad.gating import SpeechEnd, SpeechStart, VadGating
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart, VadGating
 
 
 @dataclass(slots=True)

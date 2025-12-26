@@ -4,8 +4,8 @@ import uuid
 
 import pytest
 
-from ajebal_daera_translator.domain.events import STTFinalEvent, STTPartialEvent
-from ajebal_daera_translator.domain.models import Transcript, Translation, UtteranceBundle
+from puripuly_heart.domain.events import STTFinalEvent, STTPartialEvent
+from puripuly_heart.domain.models import Transcript, Translation, UtteranceBundle
 
 
 def test_utterance_bundle_merges_out_of_order():

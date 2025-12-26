@@ -24,17 +24,17 @@ Provider API keys are read from `SecretStore` first, then fall back to environme
   - `GOOGLE_API_KEY`
   - `ALIBABA_API_KEY`
 
-If `settings.secrets.backend = "encrypted_file"`, set `AJEBAL_SECRETS_PASSPHRASE` before running.
+If `settings.secrets.backend = "encrypted_file"`, set `PURIPULY_HEART_SECRETS_PASSPHRASE` before running.
 
 ## CLI
 
-- Send one message: `python3 -m ajebal_daera_translator.main osc-send "hello"`
+- Send one message: `python3 -m puripuly_heart.main osc-send "hello"`
 - Stream stdin to VRChat chatbox:
-  - Without LLM: `python3 -m ajebal_daera_translator.main run-stdin`
-  - With LLM: `GOOGLE_API_KEY=... python3 -m ajebal_daera_translator.main run-stdin --use-llm`
+  - Without LLM: `python3 -m puripuly_heart.main run-stdin`
+  - With LLM: `GOOGLE_API_KEY=... python3 -m puripuly_heart.main run-stdin --use-llm`
 - Capture mic audio (VAD→STT→(LLM)→OSC):
-  - `python3 -m ajebal_daera_translator.main run-mic`
-  - With LLM: `python3 -m ajebal_daera_translator.main run-mic --use-llm`
+  - `python3 -m puripuly_heart.main run-mic`
+  - With LLM: `python3 -m puripuly_heart.main run-mic --use-llm`
 
 ## Integration Tests (Opt-in)
 

@@ -57,16 +57,16 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
             "dashscope is required for this integration test; install project dependencies."
         ) from exc
 
-    from ajebal_daera_translator.config.prompts import load_prompt_for_provider
-    from ajebal_daera_translator.core.language import get_llm_language_name
-    from ajebal_daera_translator.core.llm.provider import SemaphoreLLMProvider
-    from ajebal_daera_translator.core.orchestrator.hub import ClientHub
-    from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue
-    from ajebal_daera_translator.core.stt.controller import ManagedSTTProvider
-    from ajebal_daera_translator.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
-    from ajebal_daera_translator.domain.events import UIEventType
-    from ajebal_daera_translator.providers.llm.qwen import QwenLLMProvider
-    from ajebal_daera_translator.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
+    from puripuly_heart.config.prompts import load_prompt_for_provider
+    from puripuly_heart.core.language import get_llm_language_name
+    from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
+    from puripuly_heart.core.orchestrator.hub import ClientHub
+    from puripuly_heart.core.osc.smart_queue import SmartOscQueue
+    from puripuly_heart.core.stt.controller import ManagedSTTProvider
+    from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
+    from puripuly_heart.domain.events import UIEventType
+    from puripuly_heart.providers.llm.qwen import QwenLLMProvider
+    from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 
     audio_env = os.getenv("TEST_AUDIO_PATH")
     audio_path = (

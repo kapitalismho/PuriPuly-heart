@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from ajebal_daera_translator.app.wiring import create_secret_store
-from ajebal_daera_translator.config.settings import SecretsBackend, SecretsSettings
-from ajebal_daera_translator.core.storage.secrets import (
+from puripuly_heart.app.wiring import create_secret_store
+from puripuly_heart.config.settings import SecretsBackend, SecretsSettings
+from puripuly_heart.core.storage.secrets import (
     EncryptedFileSecretStore,
     KeyringSecretStore,
 )

@@ -7,7 +7,7 @@ sys.path.insert(0, "src")
 
 from uuid import uuid4
 
-from ajebal_daera_translator.providers.llm.gemini import GeminiLLMProvider
+from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 
 
 async def run():

@@ -4,14 +4,14 @@ import json
 
 import pytest
 
-from ajebal_daera_translator.config.settings import (
+from puripuly_heart.config.settings import (
     AppSettings,
     AudioSettings,
     OSCSettings,
     load_settings,
     save_settings,
 )
-from ajebal_daera_translator.core.storage.secrets import EncryptedFileSecretStore, mask_secret
+from puripuly_heart.core.storage.secrets import EncryptedFileSecretStore, mask_secret
 
 
 def test_settings_roundtrip(tmp_path):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import ajebal_daera_translator.main as cli
+import puripuly_heart.main as cli
 
 
 @dataclass

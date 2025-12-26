@@ -5,14 +5,14 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ajebal_daera_translator.app.headless_mic import run_audio_vad_loop
-from ajebal_daera_translator.core.audio.format import AudioFrameF32
-from ajebal_daera_translator.core.clock import FakeClock
-from ajebal_daera_translator.core.orchestrator.hub import ClientHub
-from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue
-from ajebal_daera_translator.core.stt.backend import STTBackendTranscriptEvent
-from ajebal_daera_translator.core.stt.controller import ManagedSTTProvider
-from ajebal_daera_translator.core.vad.gating import VadGating
+from puripuly_heart.app.headless_mic import run_audio_vad_loop
+from puripuly_heart.core.audio.format import AudioFrameF32
+from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.osc.smart_queue import SmartOscQueue
+from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
+from puripuly_heart.core.stt.controller import ManagedSTTProvider
+from puripuly_heart.core.vad.gating import VadGating
 
 
 @dataclass(slots=True)

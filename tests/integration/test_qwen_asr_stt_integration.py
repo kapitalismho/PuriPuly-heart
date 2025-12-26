@@ -23,7 +23,7 @@ async def test_qwen_asr_realtime_streaming_smoke():
             "dashscope is required for this integration test; install project dependencies."
         ) from exc
 
-    from ajebal_daera_translator.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
+    from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 
     backend = QwenASRRealtimeSTTBackend(
         api_key=api_key,

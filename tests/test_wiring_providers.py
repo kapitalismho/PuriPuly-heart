@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from ajebal_daera_translator.app.wiring import create_llm_provider, create_stt_backend
-from ajebal_daera_translator.config.settings import (
+from puripuly_heart.app.wiring import create_llm_provider, create_stt_backend
+from puripuly_heart.config.settings import (
     AppSettings,
     DeepgramSTTSettings,
     LLMProviderName,
@@ -12,13 +12,13 @@ from ajebal_daera_translator.config.settings import (
     QwenASRSTTSettings,
     STTProviderName,
 )
-from ajebal_daera_translator.core.language import get_deepgram_language, get_qwen_asr_language
-from ajebal_daera_translator.core.llm.provider import SemaphoreLLMProvider
-from ajebal_daera_translator.core.storage.secrets import InMemorySecretStore
-from ajebal_daera_translator.providers.llm.gemini import GeminiLLMProvider
-from ajebal_daera_translator.providers.llm.qwen import QwenLLMProvider
-from ajebal_daera_translator.providers.stt.deepgram import DeepgramRealtimeSTTBackend
-from ajebal_daera_translator.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
+from puripuly_heart.core.language import get_deepgram_language, get_qwen_asr_language
+from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
+from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
+from puripuly_heart.providers.llm.qwen import QwenLLMProvider
+from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 
 
 def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:

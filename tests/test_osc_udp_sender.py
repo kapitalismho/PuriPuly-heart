@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import socket
 
-from ajebal_daera_translator.core.osc.encoding import encode_message
-from ajebal_daera_translator.core.osc.udp_sender import VrchatOscUdpSender
+from puripuly_heart.core.osc.encoding import encode_message
+from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
 
 
 def _read_osc_string(packet: bytes, offset: int) -> tuple[str, int]:

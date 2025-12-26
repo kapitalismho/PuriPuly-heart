@@ -164,14 +164,14 @@ async def test_e2e_latency_5_iterations():
     if not google_key:
         pytest.skip("missing GOOGLE_API_KEY env var")
 
-    from ajebal_daera_translator.core.llm.provider import SemaphoreLLMProvider
-    from ajebal_daera_translator.core.orchestrator.hub import ClientHub
-    from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue
-    from ajebal_daera_translator.core.stt.controller import ManagedSTTProvider
-    from ajebal_daera_translator.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
-    from ajebal_daera_translator.domain.events import UIEventType
-    from ajebal_daera_translator.providers.llm.gemini import GeminiLLMProvider
-    from ajebal_daera_translator.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+    from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
+    from puripuly_heart.core.orchestrator.hub import ClientHub
+    from puripuly_heart.core.osc.smart_queue import SmartOscQueue
+    from puripuly_heart.core.stt.controller import ManagedSTTProvider
+    from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
+    from puripuly_heart.domain.events import UIEventType
+    from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
+    from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 
     # Load audio file
     audio_env = os.getenv("TEST_AUDIO_PATH")
@@ -226,8 +226,8 @@ async def test_e2e_latency_5_iterations():
         )
 
         # Load default prompt
-        from ajebal_daera_translator.config.prompts import load_prompt
-        from ajebal_daera_translator.core.language import get_llm_language_name
+        from puripuly_heart.config.prompts import load_prompt
+        from puripuly_heart.core.language import get_llm_language_name
 
         source_lang = "ko"
         target_lang = "en"

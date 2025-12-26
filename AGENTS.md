@@ -12,61 +12,61 @@ Development Environment
 
 - Python >=3.12,<3.14 (see `pyproject.toml`).
 - Install: `pip install -e .` (dev: `pip install -e '.[dev]'`).
-- Entry point: `python -m ajebal_daera_translator.main ...`
+- Entry point: `python -m puripuly_heart.main ...`
 
 Repository Structure
 --------------------
 
-- `src/ajebal_daera_translator/app/`: CLI and headless runners (stdin/mic).
-- `src/ajebal_daera_translator/core/`: orchestrator, audio, VAD, OSC, STT, LLM.
-- `src/ajebal_daera_translator/providers/`: concrete STT/LLM providers.
-- `src/ajebal_daera_translator/ui/`: Flet UI, views, and controller.
-- `src/ajebal_daera_translator/config/`: settings, prompts, and paths.
+- `src/puripuly_heart/app/`: CLI and headless runners (stdin/mic).
+- `src/puripuly_heart/core/`: orchestrator, audio, VAD, OSC, STT, LLM.
+- `src/puripuly_heart/providers/`: concrete STT/LLM providers.
+- `src/puripuly_heart/ui/`: Flet UI, views, and controller.
+- `src/puripuly_heart/config/`: settings, prompts, and paths.
 - `prompts/`: system prompt files.
 - `tests/` and `tests/integration/`: unit and opt-in integration tests.
 
 Common Tasks
 ------------
 
-- Send one message: `python -m ajebal_daera_translator.main osc-send "hello"`.
-- Stream stdin: `python -m ajebal_daera_translator.main run-stdin [--use-llm]`.
-- Mic pipeline: `python -m ajebal_daera_translator.main run-mic [--use-llm]`.
+- Send one message: `python -m puripuly_heart.main osc-send "hello"`.
+- Stream stdin: `python -m puripuly_heart.main run-stdin [--use-llm]`.
+- Mic pipeline: `python -m puripuly_heart.main run-mic [--use-llm]`.
 
 Configuration and Settings
 --------------------------
 
-- Settings schema and validation: `src/ajebal_daera_translator/config/settings.py`.
-- Default settings path: `src/ajebal_daera_translator/config/paths.py`.
+- Settings schema and validation: `src/puripuly_heart/config/settings.py`.
+- Default settings path: `src/puripuly_heart/config/paths.py`.
 - Settings are JSON; `to_dict`/`from_dict` must stay in sync.
 - If you add or change settings:
   - Update dataclasses and validation in `settings.py`.
   - Update `to_dict`/`from_dict`.
-  - Wire UI fields in `src/ajebal_daera_translator/ui/views/settings.py`.
+  - Wire UI fields in `src/puripuly_heart/ui/views/settings.py`.
 
 Prompts
 -------
 
-- Prompt loader: `src/ajebal_daera_translator/config/prompts.py`.
-- Prompts are loaded from `prompts/` or `AJEBAL_DAERA_PROMPTS_DIR`.
+- Prompt loader: `src/puripuly_heart/config/prompts.py`.
+- Prompts are loaded from `prompts/` or `PURIPULY_HEART_PROMPTS_DIR`.
 - Provider-specific prompts: `prompts/gemini.txt`, `prompts/qwen.txt`.
 - If you add a new LLM provider or a default prompt, add a matching file.
 
 Providers
 ---------
 
-- STT interface: `src/ajebal_daera_translator/core/stt/backend.py`.
-- LLM interface: `src/ajebal_daera_translator/core/llm/provider.py`.
+- STT interface: `src/puripuly_heart/core/stt/backend.py`.
+- LLM interface: `src/puripuly_heart/core/llm/provider.py`.
 - Implement providers under:
-  - `src/ajebal_daera_translator/providers/stt/`
-  - `src/ajebal_daera_translator/providers/llm/`
-- Update enums and settings in `src/ajebal_daera_translator/config/settings.py`.
-- Wire provider selection in `src/ajebal_daera_translator/app/wiring.py` if needed.
+  - `src/puripuly_heart/providers/stt/`
+  - `src/puripuly_heart/providers/llm/`
+- Update enums and settings in `src/puripuly_heart/config/settings.py`.
+- Wire provider selection in `src/puripuly_heart/app/wiring.py` if needed.
 - Add unit tests in `tests/` and integration tests in `tests/integration/`.
 
 Orchestrator / Hub
 ------------------
 
-- Core pipeline coordinator is `ClientHub` in `src/ajebal_daera_translator/core/orchestrator/hub.py`.
+- Core pipeline coordinator is `ClientHub` in `src/puripuly_heart/core/orchestrator/hub.py`.
 - Flow: audio/VAD events -> STT -> (LLM translation) -> OSC queue -> UI events.
 - Owns task lifecycles for STT event loop and OSC flushing; `start()`/`stop()` manage cancellation and provider shutdown.
 
@@ -101,7 +101,7 @@ Secrets and Security
 
 - SecretStore reads from keyring or encrypted file, then falls back to env vars.
 - Known keys and env vars are documented in `README.md`.
-- If `secrets.backend = "encrypted_file"`, require `AJEBAL_SECRETS_PASSPHRASE`.
+- If `secrets.backend = "encrypted_file"`, require `PURIPULY_HEART_SECRETS_PASSPHRASE`.
 - Never commit real credentials or API keys.
 
 Testing
@@ -117,12 +117,12 @@ Build and Distribution
 
 - PyInstaller builds are configured in `build.spec`.
 - Windows installer is configured in `installer.iss`.
-- Package data lives under `src/ajebal_daera_translator/data/`.
+- Package data lives under `src/puripuly_heart/data/`.
 
 Release Checklist
 -----------------
 
-- Bump versions in `pyproject.toml`, `src/ajebal_daera_translator/__init__.py`, and `installer.iss` (MyAppVersion).
+- Bump versions in `pyproject.toml`, `src/puripuly_heart/__init__.py`, and `installer.iss` (MyAppVersion).
 - Run `pre-commit run --all-files` and `pytest` (plus integration tests if provider behavior changed).
 - Build the app: `pyinstaller build.spec`.
 - Build the installer: `ISCC installer.iss` (Windows/Inno Setup).
@@ -131,10 +131,10 @@ Release Checklist
 Provider Change Checklist
 -------------------------
 
-- Implement provider under `src/ajebal_daera_translator/providers/` to keep the shared interface working across the app.
-- Update enums/defaults/validation in `src/ajebal_daera_translator/config/settings.py` so settings can select and persist it.
-- Wire UI choices in `src/ajebal_daera_translator/ui/views/settings.py` so users can configure it.
-- Update provider wiring in `src/ajebal_daera_translator/app/wiring.py` so runtime selection resolves to the new class.
+- Implement provider under `src/puripuly_heart/providers/` to keep the shared interface working across the app.
+- Update enums/defaults/validation in `src/puripuly_heart/config/settings.py` so settings can select and persist it.
+- Wire UI choices in `src/puripuly_heart/ui/views/settings.py` so users can configure it.
+- Update provider wiring in `src/puripuly_heart/app/wiring.py` so runtime selection resolves to the new class.
 - Add LLM prompts in `prompts/{provider}.txt` to keep output quality consistent (LLM providers).
 - Add PyInstaller hidden imports in `build.spec` so bundled builds include dynamic provider modules.
 - Document secrets/env vars in `README.md` so users can run it without guesswork.

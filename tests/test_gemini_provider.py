@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from ajebal_daera_translator.providers.llm.gemini import GeminiClient, GeminiLLMProvider
+from puripuly_heart.providers.llm.gemini import GeminiClient, GeminiLLMProvider
 
 
 @dataclass

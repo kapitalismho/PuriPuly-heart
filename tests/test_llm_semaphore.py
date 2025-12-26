@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
-from ajebal_daera_translator.core.llm.provider import SemaphoreLLMProvider
-from ajebal_daera_translator.domain.models import Translation
+from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
+from puripuly_heart.domain.models import Translation
 
 
 @dataclass(slots=True)

@@ -23,7 +23,7 @@ async def test_deepgram_realtime_streaming_smoke():
             "websocket-client is required for this integration test; install with pip install websocket-client"
         ) from exc
 
-    from ajebal_daera_translator.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+    from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 
     backend = DeepgramRealtimeSTTBackend(
         api_key=api_key,

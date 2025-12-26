@@ -6,9 +6,9 @@ import pytest
 
 pytest.importorskip("flet")
 
-from ajebal_daera_translator.config.prompts import load_prompt_for_provider
-from ajebal_daera_translator.config.settings import AppSettings, LLMProviderName
-from ajebal_daera_translator.ui.views import settings as settings_view
+from puripuly_heart.config.prompts import load_prompt_for_provider
+from puripuly_heart.config.settings import AppSettings, LLMProviderName
+from puripuly_heart.ui.views import settings as settings_view
 
 
 class DummySecretStore:

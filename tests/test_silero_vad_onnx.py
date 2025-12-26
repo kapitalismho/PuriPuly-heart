@@ -6,7 +6,7 @@ from types import ModuleType
 import numpy as np
 import pytest
 
-from ajebal_daera_translator.core.vad.silero import SileroVadOnnx
+from puripuly_heart.core.vad.silero import SileroVadOnnx
 
 
 class _NodeArg:

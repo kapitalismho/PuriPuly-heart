@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from ajebal_daera_translator.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 
 
 @pytest.mark.asyncio

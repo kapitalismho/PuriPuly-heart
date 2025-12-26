@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from ajebal_daera_translator.providers.llm.qwen import QwenLLMProvider
-from ajebal_daera_translator.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
+from puripuly_heart.providers.llm.qwen import QwenLLMProvider
+from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 
 
 @pytest.mark.asyncio

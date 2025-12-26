@@ -62,4 +62,4 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-ajebal_daera_translator = ["data/**/*"]
+puripuly_heart = ["data/**/*"]

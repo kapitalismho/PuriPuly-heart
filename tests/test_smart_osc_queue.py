@@ -3,9 +3,9 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from ajebal_daera_translator.core.clock import FakeClock
-from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue
-from ajebal_daera_translator.domain.models import OSCMessage
+from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.osc.smart_queue import SmartOscQueue
+from puripuly_heart.domain.models import OSCMessage
 
 
 @dataclass(slots=True)
