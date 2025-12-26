@@ -31,6 +31,9 @@ SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+; Auto-upgrade: remember previous install location
+UsePreviousAppDir=yes
+UsePreviousGroup=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
