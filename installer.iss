@@ -1,11 +1,13 @@
-; Inno Setup Script for A-Jebal-Daera Translator
+; Inno Setup Script for PuriPuly <3
 ; Compile with: ISCC installer.iss
 
-#define MyAppName "A-Jebal-Daera Translator"
-#define MyAppVersion "0.1.0"
+#define MyAppName "PuriPuly <3"
+#define MyAppDirName "PuriPulyHeart"
+#define MyAppGroupName "PuriPulyHeart"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "salee"
-#define MyAppURL "https://github.com/kapitalismho/A-Jebal-Daera-Translator"
-#define MyAppExeName "AJebalDaeraTranslator.exe"
+#define MyAppURL "https://github.com/kapitalismho/PuriPuly-heart"
+#define MyAppExeName "PuriPulyHeart.exe"
 
 [Setup]
 ; NOTE: AppId uniquely identifies this application.
@@ -17,12 +19,12 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}/releases
-DefaultDirName={autopf}\{#MyAppName}
-DefaultGroupName={#MyAppName}
+DefaultDirName={autopf}\{#MyAppDirName}
+DefaultGroupName={#MyAppGroupName}
 AllowNoIcons=yes
 LicenseFile=LICENSE
 OutputDir=installer_output
-OutputBaseFilename=AJebalDaeraTranslator-Setup-{#MyAppVersion}
+OutputBaseFilename=PuriPulyHeart-Setup-{#MyAppVersion}
 SetupIconFile=
 Compression=lzma
 SolidCompression=yes
@@ -39,19 +41,19 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 6.1; Check: not IsAdminInstallMode
 
 [Files]
-Source: "dist\AJebalDaeraTranslator\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist\AJebalDaeraTranslator\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\PuriPulyHeart\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\PuriPulyHeart\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
+Name: "{group}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\{cm:UninstallProgram,{#MyAppGroupName}}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 ; Clean up user config on uninstall (optional)
-Type: filesandordirs; Name: "{localappdata}\ajebal-daera-translator"
+Type: filesandordirs; Name: "{localappdata}\puripuly-heart"

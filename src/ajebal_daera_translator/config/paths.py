@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-APP_DIR_NAME = "ajebal-daera-translator"
+APP_DIR_NAME = "puripuly-heart"
 SETTINGS_FILENAME = "settings.json"
 VAD_MODEL_FILENAME = "silero_vad.onnx"
 

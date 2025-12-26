@@ -1,10 +1,10 @@
-A-Jebal-Daera-Translator Agent Instructions
+PuriPuly <3 Agent Instructions
 ===========================================
 
 Project Overview
 ----------------
 
-A-Jebal-Daera-Translator is a VRChat real-time speech translation pipeline:
+PuriPuly <3 is a VRChat real-time speech translation pipeline:
 audio/VAD -> STT -> LLM -> OSC. It ships a GUI (Flet) and CLI entry points.
 
 Development Environment

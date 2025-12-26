@@ -21,7 +21,7 @@ logging.basicConfig(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="ajebal-daera-translator")
+    parser = argparse.ArgumentParser(prog="puripuly-heart")
     parser.add_argument("--version", action="store_true", help="Print version and exit")
 
     parser.add_argument(

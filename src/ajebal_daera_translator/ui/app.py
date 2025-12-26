@@ -34,7 +34,7 @@ class TranslatorApp:
         self.view_settings.on_verify_api_key = self._on_verify_api_key
 
     def _setup_page(self):
-        self.page.title = "A-Jebal-Daera Translator"
+        self.page.title = "PuriPuly <3"
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.theme = get_app_theme()
         self.page.bgcolor = COLOR_BACKGROUND

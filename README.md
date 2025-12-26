@@ -1,4 +1,4 @@
-# A-Jebal-Daera-Translator
+# PuriPuly <3
 
 VRChat real-time speech translation pipeline (STT → LLM → OSC).
 

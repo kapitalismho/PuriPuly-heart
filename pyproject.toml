@@ -3,8 +3,8 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ajebal-daera-translator"
-version = "0.1.0"
+name = "puripuly-heart"
+version = "0.2.0"
 description = "VRChat real-time speech translation pipeline (STT → LLM → OSC)"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"

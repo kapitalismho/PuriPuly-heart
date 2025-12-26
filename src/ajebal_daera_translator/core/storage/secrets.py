@@ -36,7 +36,7 @@ class InMemorySecretStore:
 
 @dataclass(slots=True)
 class KeyringSecretStore:
-    service_name: str = "ajebal-daera-translator"
+    service_name: str = "puripuly-heart"
 
     def _keyring(self):
         import keyring  # type: ignore
