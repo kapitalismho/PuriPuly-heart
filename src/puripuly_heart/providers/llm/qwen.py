@@ -102,13 +102,30 @@ class DashScopeQwenClient:
 
         # Qwen-MT uses Custom Prompt (system role not supported)
         # Template variables (${sourceName}, ${targetName}) are already substituted by hub.py
+        # Use XML tags to clearly separate system prompt, context, and translation target
         if context:
-            full_prompt = f"{system_prompt}\n\ncontext:\n{context}\n\nTranslate: {text}"
+            full_prompt = f"""<system_prompt>
+{system_prompt}
+</system_prompt>
+
+<context>
+{context}
+</context>
+
+<translate>
+{text}
+</translate>"""
             logger.info(
                 f"[LLM] Request with context: '{text}' -> {source_language} to {target_language}"
             )
         else:
-            full_prompt = f"{system_prompt}\n\n{text}"
+            full_prompt = f"""<system_prompt>
+{system_prompt}
+</system_prompt>
+
+<translate>
+{text}
+</translate>"""
             logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
 
         def _call() -> str:
