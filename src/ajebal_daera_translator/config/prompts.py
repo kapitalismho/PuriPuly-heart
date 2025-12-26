@@ -13,6 +13,12 @@ import sys
 
 def get_prompts_dir() -> Path:
     """Get the prompts directory path."""
+    env_dir = os.getenv("AJEBAL_DAERA_PROMPTS_DIR")
+    if env_dir:
+        env_path = Path(env_dir)
+        if env_path.exists():
+            return env_path
+
     # PyInstaller frozen app: use _MEIPASS
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         meipass_prompts = Path(sys._MEIPASS) / "prompts"
@@ -29,6 +35,18 @@ def get_prompts_dir() -> Path:
     for path in candidates:
         if path.exists():
             return path
+
+    # Walk up from cwd to find project root (pyproject.toml) with prompts/
+    for parent in [Path.cwd().resolve(), *Path.cwd().resolve().parents]:
+        candidate = parent / "prompts"
+        if (parent / "pyproject.toml").exists() and candidate.exists():
+            return candidate
+
+    # Walk up from cwd to find any prompts/ directory (e.g., when running from .venv)
+    for parent in [Path.cwd().resolve(), *Path.cwd().resolve().parents]:
+        candidate = parent / "prompts"
+        if candidate.exists():
+            return candidate
     
     # Default: relative to cwd
     return Path.cwd() / "prompts"

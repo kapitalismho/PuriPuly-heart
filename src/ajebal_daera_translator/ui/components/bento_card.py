@@ -1,6 +1,6 @@
 
 import flet as ft
-from flet.core.colors import Colors as colors
+from flet import Colors as colors
 from ajebal_daera_translator.ui.theme import COLOR_SURFACE
 
 class BentoCard(ft.Container):

@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Callable
 
 import flet as ft
-from flet.core.colors import Colors as colors
-from flet.core.icons import Icons as icons
+from flet import Colors as colors
+from flet import Icons as icons
 
 from ajebal_daera_translator.app.wiring import create_secret_store
 from ajebal_daera_translator.config.settings import (
@@ -42,7 +42,7 @@ class SettingsView(ft.ListView):
                 ft.dropdown.Option("Deepgram"),
                 ft.dropdown.Option("Qwen ASR"),
             ],
-            on_change=self._on_provider_change,
+            on_select=self._on_provider_change,
             border_radius=8,
         )
         self.llm_provider = ft.Dropdown(
@@ -51,7 +51,7 @@ class SettingsView(ft.ListView):
                 ft.dropdown.Option("Google Gemini"),
                 ft.dropdown.Option("Alibaba Qwen"),
             ],
-            on_change=self._on_provider_change,
+            on_select=self._on_provider_change,
             border_radius=8,
         )
 
@@ -87,17 +87,6 @@ class SettingsView(ft.ListView):
 
 
 
-        self.alibaba_stt_model = ft.TextField(
-            label="Alibaba STT Model",
-            on_change=self._on_setting_change,
-            border_radius=8,
-        )
-        self.alibaba_stt_endpoint = ft.TextField(
-            label="Alibaba STT Endpoint",
-            on_change=self._on_setting_change,
-            border_radius=8,
-        )
-
         self.deepgram_api_key = ft.TextField(
             label="Deepgram API Key",
             password=True,
@@ -123,7 +112,7 @@ class SettingsView(ft.ListView):
         self.audio_host_api = ft.Dropdown(
             label="Audio Host API",
             options=[ft.dropdown.Option("(Default)")],  # Will be populated dynamically
-            on_change=self._on_audio_change,
+            on_select=self._on_audio_change,
             border_radius=8,
         )
         self._populate_host_apis()
@@ -131,7 +120,7 @@ class SettingsView(ft.ListView):
         self.microphone = ft.Dropdown(
             label="Microphone",
             options=[ft.dropdown.Option("(Default)")],
-            on_change=self._on_audio_change,
+            on_select=self._on_audio_change,
             border_radius=8,
         )
 
@@ -159,7 +148,7 @@ class SettingsView(ft.ListView):
         )
 
         self.apply_providers_btn = ft.ElevatedButton(
-            text="Apply Provider Changes (Restart Pipeline)",
+            content=ft.Text("Apply Provider Changes (Restart Pipeline)"),
             icon=icons.PLAY_CIRCLE_FILL_ROUNDED,
             style=ft.ButtonStyle(
                 color=colors.WHITE,
@@ -176,8 +165,6 @@ class SettingsView(ft.ListView):
                 [
                     ft.Text("Speech-to-Text (STT)", size=12, color=colors.GREY_400),
                     self.stt_provider,
-                    self.alibaba_stt_model,
-                    self.alibaba_stt_endpoint,
                     ft.Divider(height=5, color=colors.TRANSPARENT),
                     ft.Row([self.deepgram_api_key, self.verify_deepgram_btn]),
                     self.deepgram_stt_model,
@@ -220,8 +207,6 @@ class SettingsView(ft.ListView):
             self.stt_provider.value = "Deepgram"
         self.llm_provider.value = "Google Gemini" if settings.provider.llm == LLMProviderName.GEMINI else "Alibaba Qwen"
 
-        self.alibaba_stt_model.value = settings.alibaba_stt.model
-        self.alibaba_stt_endpoint.value = settings.alibaba_stt.endpoint
         self.deepgram_stt_model.value = settings.deepgram_stt.model
 
         self.audio_host_api.value = settings.audio.input_host_api or "(Default)"
@@ -232,8 +217,16 @@ class SettingsView(ft.ListView):
         # Load prompt for current LLM provider
         provider_name = "gemini" if settings.provider.llm == LLMProviderName.GEMINI else "qwen"
         self.prompt_provider_label.value = f"Prompt for: {provider_name.capitalize()}"
-        self.system_prompt.value = load_prompt_for_provider(provider_name)
-        if self._settings:
+        saved_prompt = settings.system_prompt or ""
+        if saved_prompt.strip():
+            self.system_prompt.value = saved_prompt
+        else:
+            self.system_prompt.value = load_prompt_for_provider(provider_name)
+        if self.prompt_provider_label.page:
+            self.prompt_provider_label.update()
+        if self.system_prompt.page:
+            self.system_prompt.update()
+        if self._settings and not saved_prompt.strip():
             self._settings.system_prompt = self.system_prompt.value
 
         with contextlib.suppress(Exception):
@@ -250,8 +243,13 @@ class SettingsView(ft.ListView):
             content=ft.Column(
                 [
                     ft.Text(title, size=12, weight=ft.FontWeight.BOLD, color=colors.GREY_500),
-                    ft.Column(controls, spacing=15),
-                ]
+                    ft.Column(
+                        controls,
+                        spacing=15,
+                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             )
         )
 
@@ -281,7 +279,7 @@ class SettingsView(ft.ListView):
         stt_provider = self._settings.provider.stt.value
         warning = get_stt_compatibility_warning(source_lang, stt_provider)
         if warning and self.page:
-            self.page.open(ft.SnackBar(
+            self.page.show_dialog(ft.SnackBar(
                 ft.Text(warning),
                 bgcolor=colors.ORANGE_700,
                 duration=4000,
@@ -318,10 +316,6 @@ class SettingsView(ft.ListView):
 
         stt_provider = self._settings.provider.stt
 
-        # Hide alibaba_stt fields (legacy, module deleted)
-        self.alibaba_stt_model.visible = False
-        self.alibaba_stt_endpoint.visible = False
-
         is_deepgram_stt = stt_provider == STTProviderName.DEEPGRAM
         self.deepgram_api_key.visible = is_deepgram_stt
         self.deepgram_stt_model.visible = is_deepgram_stt
@@ -341,7 +335,7 @@ class SettingsView(ft.ListView):
             return
         
         if not key:
-            self.page.open(ft.SnackBar(ft.Text("API Key is empty!"), bgcolor=colors.RED_400))
+            self.page.show_dialog(ft.SnackBar(ft.Text("API Key is empty!"), bgcolor=colors.RED_400))
             return
 
         async def _run():
@@ -356,17 +350,17 @@ class SettingsView(ft.ListView):
             try:
                 success, msg = await self.on_verify_api_key(provider, key)
                 if success:
-                    self.page.open(ft.SnackBar(ft.Text(f"{provider.capitalize()} Verified!"), bgcolor=colors.GREEN_400))
+                    self.page.show_dialog(ft.SnackBar(ft.Text(f"{provider.capitalize()} Verified!"), bgcolor=colors.GREEN_400))
                     btn_control.icon = icons.CHECK_CIRCLE_ROUNDED
                     btn_control.icon_color = colors.GREEN_400
                 else:
                     logger.error(f"Verification failed for {provider}: {msg}")
                     # Also write to app logs UI
-                    self.page.open(ft.SnackBar(ft.Text(f"Failed: {msg}"), bgcolor=colors.RED_400))
+                    self.page.show_dialog(ft.SnackBar(ft.Text(f"Failed: {msg}"), bgcolor=colors.RED_400))
                     btn_control.icon = icons.ERROR_OUTLINE_ROUNDED
                     btn_control.icon_color = colors.RED_400
             except Exception as e:
-                self.page.open(ft.SnackBar(ft.Text(f"Error: {e}"), bgcolor=colors.RED_400))
+                self.page.show_dialog(ft.SnackBar(ft.Text(f"Error: {e}"), bgcolor=colors.RED_400))
                 btn_control.icon = icons.ERROR_OUTLINE_ROUNDED
                 btn_control.icon_color = colors.RED_400
             
@@ -387,8 +381,6 @@ class SettingsView(ft.ListView):
         if self._settings is None:
             return
 
-        self._settings.alibaba_stt.model = self.alibaba_stt_model.value or self._settings.alibaba_stt.model
-        self._settings.alibaba_stt.endpoint = self.alibaba_stt_endpoint.value or self._settings.alibaba_stt.endpoint
         self._settings.deepgram_stt.model = self.deepgram_stt_model.value or self._settings.deepgram_stt.model
         self._settings.system_prompt = self.system_prompt.value or ""
 
@@ -485,3 +477,14 @@ class SettingsView(ft.ListView):
             return
         if self.on_settings_changed:
             self.on_settings_changed(self._settings)
+
+    def refresh_prompt_if_empty(self) -> None:
+        if self._settings is None:
+            return
+        current = (self.system_prompt.value or "").strip()
+        if current:
+            return
+        provider_name = "gemini" if self._settings.provider.llm == LLMProviderName.GEMINI else "qwen"
+        self.system_prompt.value = load_prompt_for_provider(provider_name)
+        if self.system_prompt.page:
+            self.system_prompt.update()

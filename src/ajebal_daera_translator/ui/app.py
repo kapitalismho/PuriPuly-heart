@@ -80,6 +80,8 @@ class TranslatorApp:
             self.content_area.content = self.view_logs
         
         self.content_area.update()
+        if index == 2:
+            self.view_settings.refresh_prompt_if_empty()
 
     def add_history_entry(self, source: str, text: str):
         # Update History View
@@ -114,8 +116,8 @@ class TranslatorApp:
         stt_provider = settings.provider.stt.value  # "deepgram" or "qwen_asr"
         warning = get_stt_compatibility_warning(source_code, stt_provider)
         if warning:
-            from flet.core.colors import Colors as colors
-            self.page.open(ft.SnackBar(
+            from flet import Colors as colors
+            self.page.show_dialog(ft.SnackBar(
                 ft.Text(warning),
                 bgcolor=colors.ORANGE_700,
                 duration=4000,
@@ -153,29 +155,29 @@ async def _check_and_notify_update(page: ft.Page) -> None:
         if update_info is None:
             return
         
-        from flet.core.colors import Colors as colors
+        from flet import Colors as colors
         
         def _open_download(_e):
             webbrowser.open(update_info.download_url)
-            page.close(banner)
+            page.pop_dialog()
         
         def _dismiss(_e):
-            page.close(banner)
+            page.pop_dialog()
         
         banner = ft.Banner(
             bgcolor=colors.BLUE_900,
-            leading=ft.Icon(ft.Icons.SYSTEM_UPDATE, color=colors.BLUE_200, size=40),
+            leading=ft.Icon(icon=ft.Icons.SYSTEM_UPDATE, color=colors.BLUE_200, size=40),
             content=ft.Text(
                 f"새 버전 v{update_info.version}이 있습니다!",
                 color=colors.WHITE,
                 size=14,
             ),
             actions=[
-                ft.TextButton("다운로드", on_click=_open_download),
-                ft.TextButton("닫기", on_click=_dismiss),
+                ft.TextButton(content=ft.Text("다운로드"), on_click=_open_download),
+                ft.TextButton(content=ft.Text("닫기"), on_click=_dismiss),
             ],
         )
-        page.open(banner)
+        page.show_dialog(banner)
         
     except Exception as exc:
         logger.debug(f"Update check notification failed: {exc}")

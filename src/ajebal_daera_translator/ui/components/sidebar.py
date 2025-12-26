@@ -1,6 +1,6 @@
 import flet as ft
-from flet.core.icons import Icons as icons
-from flet.core.colors import Colors as colors
+from flet import Icons as icons
+from flet import Colors as colors
 from typing import Callable
 from ajebal_daera_translator.ui.components.bento_card import BentoCard
 
@@ -10,7 +10,7 @@ class AppSidebar(ft.Container):
             padding=0, 
             width=80,
             bgcolor=colors.TRANSPARENT,
-            alignment=ft.alignment.top_center
+            alignment=ft.Alignment.TOP_CENTER
         )
         self.on_nav_change = on_change
         self.selected_index = 0
@@ -48,10 +48,10 @@ class AppSidebar(ft.Container):
         
         return ft.Container(
             content=ft.Column([
-                ft.Icon(name=icon_name, color=icon_color, size=28),
+                ft.Icon(icon=icon_name, color=icon_color, size=28),
                 ft.Text(item["label"], size=10, color=icon_color, weight=ft.FontWeight.BOLD)
             ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
             expand=True, # Critical: Fill available space (3 equal parts)
             bgcolor=bg_color,
             on_click=lambda e: self._on_tile_click(index),

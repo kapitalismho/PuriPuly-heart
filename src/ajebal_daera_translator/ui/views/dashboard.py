@@ -1,6 +1,6 @@
 import flet as ft
-from flet.core.icons import Icons as icons
-from flet.core.colors import Colors as colors
+from flet import Icons as icons
+from flet import Colors as colors
 from ajebal_daera_translator.core.language import get_all_language_options, SUPPORTED_LANGUAGES
 from ajebal_daera_translator.ui.theme import COLOR_SURFACE, COLOR_ON_BACKGROUND, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_ERROR, COLOR_WARNING
 from ajebal_daera_translator.ui.components.bento_card import BentoCard
@@ -28,7 +28,7 @@ class DashboardView(ft.Column):
     def _build_ui(self):
         # 1. Status Card (Left Top)
         self.status_indicator = ft.Icon(
-            name=icons.CIRCLE,
+            icon=icons.CIRCLE,
             size=12,
             color=COLOR_ERROR,  # Default disconnected
             tooltip="VRChat Status: Disconnected"
@@ -62,11 +62,11 @@ class DashboardView(ft.Column):
             border_radius=12,
             content_padding=12,
             filled=True,
-            bgcolor=colors.GREY_800,
+            fill_color=colors.GREY_800,
             color=colors.WHITE,
             border_color=colors.GREY_700,
-            focused_bgcolor=colors.GREY_700,
-            on_change=self._on_lang_change,
+            focused_border_color=colors.GREY_700,
+            on_select=self._on_lang_change,
         )
         
         self.target_lang = ft.Dropdown(
@@ -78,11 +78,11 @@ class DashboardView(ft.Column):
             border_radius=12,
             content_padding=12,
             filled=True,
-            bgcolor=colors.GREY_800,
+            fill_color=colors.GREY_800,
             color=colors.WHITE,
             border_color=colors.GREY_700,
-            focused_bgcolor=colors.GREY_700,
-            on_change=self._on_lang_change,
+            focused_border_color=colors.GREY_700,
+            on_select=self._on_lang_change,
         )
         
         # Segmented Control for Presets
@@ -110,7 +110,7 @@ class DashboardView(ft.Column):
                 ft.Text("TRANSLATION PAIR", size=11, color=colors.GREY_500, weight=ft.FontWeight.BOLD),
                 ft.Row([
                     self.source_lang,
-                    ft.Icon(name=icons.ARROW_FORWARD_ROUNDED, color=colors.GREY_500),
+                    ft.Icon(icon=icons.ARROW_FORWARD_ROUNDED, color=colors.GREY_500),
                     self.target_lang,
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
                 preset_segment # Add segmented control
@@ -151,7 +151,7 @@ class DashboardView(ft.Column):
         power_content = ft.Column(
             controls=[
                 ft.Row([
-                    ft.Icon(name=icons.POWER_SETTINGS_NEW_ROUNDED, color=colors.GREY_500, size=16),
+                    ft.Icon(icon=icons.POWER_SETTINGS_NEW_ROUNDED, color=colors.GREY_500, size=16),
                     ft.Text("SYSTEM POWER", size=10, color=colors.GREY_500, weight=ft.FontWeight.BOLD),
                 ], spacing=5, alignment=ft.MainAxisAlignment.CENTER),
                 
@@ -202,7 +202,7 @@ class DashboardView(ft.Column):
         hero_content = ft.Column(
             controls=[
                 ft.Text("LAST TRANSLATED", size=11, color=colors.GREY_500, weight=ft.FontWeight.BOLD),
-                ft.Container(content=self.hero_text, alignment=ft.alignment.center, expand=True)
+                ft.Container(content=self.hero_text, alignment=ft.Alignment.CENTER, expand=True)
             ],
             expand=True
         )
@@ -322,7 +322,7 @@ class DashboardView(ft.Column):
         
         return ft.Container(
             content=ft.Column([
-                ft.Icon(name=icon_name, size=28, color=icon_color),
+                ft.Icon(icon=icon_name, size=28, color=icon_color),
                 ft.Text(label, size=10, weight=ft.FontWeight.BOLD, color=text_color),
                 ft.Text(hint_text, size=10, color=text_color, text_align=ft.TextAlign.CENTER),
             ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=3, alignment=ft.MainAxisAlignment.CENTER),

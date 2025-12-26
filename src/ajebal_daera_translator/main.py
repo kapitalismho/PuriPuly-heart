@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         async def _target(page: ft.Page):
             return await main_gui(page, config_path=config_path)
 
-        ft.app(target=_target)
+        ft.run(main=_target)
         return 0
 
     settings = _load_settings_or_default(args.config)
@@ -131,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         async def _target(page: ft.Page):
             return await main_gui(page, config_path=config_path)
 
-        ft.app(target=_target)
+        ft.run(main=_target)
         return 0
 
     parser.print_help()

@@ -13,9 +13,8 @@ COLOR_DIVIDER = "#424242"
 def get_app_theme() -> ft.Theme:
     return ft.Theme(
         color_scheme=ft.ColorScheme(
-            background=COLOR_BACKGROUND,
             surface=COLOR_SURFACE,
-            on_background=COLOR_ON_BACKGROUND,
+            on_surface=COLOR_ON_BACKGROUND,
             primary=COLOR_PRIMARY,
             error=COLOR_ERROR,
             outline=COLOR_DIVIDER,
