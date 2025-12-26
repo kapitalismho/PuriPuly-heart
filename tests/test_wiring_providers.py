@@ -39,12 +39,14 @@ def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:
 def test_create_llm_provider_qwen_uses_secret() -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.QWEN))
     secrets = InMemorySecretStore()
-    secrets.set("alibaba_api_key", "k2")
+    # Default region is Beijing, so we need alibaba_api_key_beijing
+    secrets.set("alibaba_api_key_beijing", "k2")
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, QwenLLMProvider)
     assert provider.inner.api_key == "k2"
+    assert provider.inner.base_url == "https://dashscope.aliyuncs.com/api/v1"
 
 
 def test_create_llm_provider_requires_secret(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -76,16 +78,17 @@ def test_create_stt_backend_qwen_asr_uses_settings_and_secret() -> None:
         provider=ProviderSettings(stt=STTProviderName.QWEN_ASR),
         qwen_asr_stt=QwenASRSTTSettings(
             model="qwen3-asr-flash-realtime",
-            endpoint="wss://example",
         ),
     )
     secrets = InMemorySecretStore()
-    secrets.set("alibaba_api_key", "k4")
+    # Default region is Beijing, so we need alibaba_api_key_beijing
+    secrets.set("alibaba_api_key_beijing", "k4")
 
     backend = create_stt_backend(settings, secrets=secrets)
     assert isinstance(backend, QwenASRRealtimeSTTBackend)
     assert backend.api_key == "k4"
     assert backend.model == "qwen3-asr-flash-realtime"
-    assert backend.endpoint == "wss://example"
+    # Endpoint is derived from region (Beijing default)
+    assert backend.endpoint == "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
     assert backend.sample_rate_hz == settings.audio.internal_sample_rate_hz
     assert backend.language == get_qwen_asr_language(settings.languages.source_language)

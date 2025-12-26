@@ -14,9 +14,14 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.mark.asyncio
 async def test_qwen_llm_translation_smoke() -> None:
-    api_key = os.getenv("ALIBABA_API_KEY") or os.getenv("DASHSCOPE_API_KEY")
+    # Support both region-specific keys and legacy ALIBABA_API_KEY
+    api_key = (
+        os.getenv("ALIBABA_API_KEY_BEIJING")
+        or os.getenv("ALIBABA_API_KEY")
+        or os.getenv("DASHSCOPE_API_KEY")
+    )
     if not api_key:
-        pytest.skip("missing env var ALIBABA_API_KEY (or DASHSCOPE_API_KEY)")
+        pytest.skip("missing env var ALIBABA_API_KEY_BEIJING (or ALIBABA_API_KEY)")
 
     try:
         import dashscope  # noqa: F401
@@ -25,8 +30,13 @@ async def test_qwen_llm_translation_smoke() -> None:
             "dashscope is required for this integration test; install project dependencies."
         ) from exc
 
+    # Determine base_url based on which key is being used
+    # Default to Beijing region
+    base_url = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/api/v1")
+
     provider = QwenLLMProvider(
         api_key=api_key,
+        base_url=base_url,
         model=os.getenv("QWEN_LLM_MODEL", "qwen-mt-flash"),
     )
 

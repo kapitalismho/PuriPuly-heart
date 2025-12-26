@@ -81,8 +81,20 @@ def create_llm_provider(settings: AppSettings, *, secrets: SecretStore) -> LLMPr
         api_key = require_secret(secrets, key="google_api_key", env_var="GOOGLE_API_KEY")
         base: LLMProvider = GeminiLLMProvider(api_key=api_key)
     elif settings.provider.llm == LLMProviderName.QWEN:
-        api_key = require_secret(secrets, key="alibaba_api_key", env_var="ALIBABA_API_KEY")
-        base = QwenLLMProvider(api_key=api_key)
+        from puripuly_heart.config.settings import QwenRegion
+
+        if settings.qwen.region == QwenRegion.BEIJING:
+            api_key = require_secret(
+                secrets, key="alibaba_api_key_beijing", env_var="ALIBABA_API_KEY_BEIJING"
+            )
+        else:
+            api_key = require_secret(
+                secrets, key="alibaba_api_key_singapore", env_var="ALIBABA_API_KEY_SINGAPORE"
+            )
+        base = QwenLLMProvider(
+            api_key=api_key,
+            base_url=settings.qwen.get_llm_base_url(),
+        )
     else:
         raise ValueError(f"Unsupported LLM provider: {settings.provider.llm}")
 
@@ -106,14 +118,23 @@ def create_stt_backend(settings: AppSettings, *, secrets: SecretStore) -> STTBac
         )
 
     if settings.provider.stt == STTProviderName.QWEN_ASR:
+        from puripuly_heart.config.settings import QwenRegion
         from puripuly_heart.core.language import get_qwen_asr_language
         from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 
-        api_key = require_secret(secrets, key="alibaba_api_key", env_var="ALIBABA_API_KEY")
+        if settings.qwen.region == QwenRegion.BEIJING:
+            api_key = require_secret(
+                secrets, key="alibaba_api_key_beijing", env_var="ALIBABA_API_KEY_BEIJING"
+            )
+        else:
+            api_key = require_secret(
+                secrets, key="alibaba_api_key_singapore", env_var="ALIBABA_API_KEY_SINGAPORE"
+            )
+        endpoint = settings.qwen.get_asr_endpoint()
         return QwenASRRealtimeSTTBackend(
             api_key=api_key,
             model=settings.qwen_asr_stt.model,
-            endpoint=settings.qwen_asr_stt.endpoint,
+            endpoint=endpoint,
             language=get_qwen_asr_language(settings.languages.source_language),
             sample_rate_hz=settings.audio.internal_sample_rate_hz,
         )

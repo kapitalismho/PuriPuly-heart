@@ -168,8 +168,16 @@ class GuiController:
             success = False
             if provider == "google":
                 success = await GeminiLLMProvider.verify_api_key(key)
-            elif provider == "alibaba":
-                success = await QwenLLMProvider.verify_api_key(key)
+            elif provider == "alibaba_beijing":
+                # Beijing region endpoint
+                success = await QwenLLMProvider.verify_api_key(
+                    key, base_url="https://dashscope.aliyuncs.com/api/v1"
+                )
+            elif provider == "alibaba_singapore":
+                # Singapore region endpoint
+                success = await QwenLLMProvider.verify_api_key(
+                    key, base_url="https://dashscope-intl.aliyuncs.com/api/v1"
+                )
             elif provider == "deepgram":
                 success = await DeepgramRealtimeSTTBackend.verify_api_key(key)
             else:

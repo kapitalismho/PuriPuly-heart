@@ -15,6 +15,7 @@ from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
+    QwenRegion,
     STTProviderName,
 )
 from puripuly_heart.core.language import get_stt_compatibility_warning
@@ -71,23 +72,52 @@ class SettingsView(ft.ListView):
             on_click=lambda e: self._on_verify_req("google", self.google_api_key.value, e.control),
         )
 
-        self.alibaba_api_key = ft.TextField(
-            label="Alibaba API Key (Qwen LLM/ASR)",
+        self.alibaba_api_key_beijing = ft.TextField(
+            label="Alibaba API Key (Beijing)",
             password=True,
             can_reveal_password=True,
             on_change=lambda e: self._on_secret_change(
-                "alibaba_api_key", self.alibaba_api_key.value
+                "alibaba_api_key_beijing", self.alibaba_api_key_beijing.value
             ),
             border_radius=8,
             expand=True,
         )
-        self.verify_alibaba_btn = ft.IconButton(
+        self.verify_alibaba_beijing_btn = ft.IconButton(
             icon=icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
             icon_color=colors.GREY_400,
             tooltip="Verify Key",
             on_click=lambda e: self._on_verify_req(
-                "alibaba", self.alibaba_api_key.value, e.control
+                "alibaba_beijing", self.alibaba_api_key_beijing.value, e.control
             ),
+        )
+
+        self.alibaba_api_key_singapore = ft.TextField(
+            label="Alibaba API Key (Singapore)",
+            password=True,
+            can_reveal_password=True,
+            on_change=lambda e: self._on_secret_change(
+                "alibaba_api_key_singapore", self.alibaba_api_key_singapore.value
+            ),
+            border_radius=8,
+            expand=True,
+        )
+        self.verify_alibaba_singapore_btn = ft.IconButton(
+            icon=icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
+            icon_color=colors.GREY_400,
+            tooltip="Verify Key",
+            on_click=lambda e: self._on_verify_req(
+                "alibaba_singapore", self.alibaba_api_key_singapore.value, e.control
+            ),
+        )
+
+        self.qwen_region = ft.Dropdown(
+            label="Qwen Region",
+            options=[
+                ft.dropdown.Option("Beijing"),
+                ft.dropdown.Option("Singapore"),
+            ],
+            on_select=self._on_qwen_region_change,
+            border_radius=8,
         )
 
         self.deepgram_api_key = ft.TextField(
@@ -180,7 +210,9 @@ class SettingsView(ft.ListView):
                     self.llm_provider,
                     ft.Divider(height=5, color=colors.TRANSPARENT),
                     ft.Row([self.google_api_key, self.verify_google_btn]),
-                    ft.Row([self.alibaba_api_key, self.verify_alibaba_btn]),
+                    ft.Row([self.alibaba_api_key_beijing, self.verify_alibaba_beijing_btn]),
+                    ft.Row([self.alibaba_api_key_singapore, self.verify_alibaba_singapore_btn]),
+                    self.qwen_region,
                     ft.Divider(height=10, color=colors.TRANSPARENT),
                     self.apply_providers_btn,
                 ],
@@ -215,6 +247,9 @@ class SettingsView(ft.ListView):
         self.llm_provider.value = (
             "Google Gemini" if settings.provider.llm == LLMProviderName.GEMINI else "Alibaba Qwen"
         )
+        self.qwen_region.value = (
+            "Beijing" if settings.qwen.region == QwenRegion.BEIJING else "Singapore"
+        )
 
         self.deepgram_stt_model.value = settings.deepgram_stt.model
 
@@ -240,7 +275,8 @@ class SettingsView(ft.ListView):
         with contextlib.suppress(Exception):
             store = create_secret_store(settings.secrets, config_path=config_path)
             self.google_api_key.value = store.get("google_api_key") or ""
-            self.alibaba_api_key.value = store.get("alibaba_api_key") or ""
+            self.alibaba_api_key_beijing.value = store.get("alibaba_api_key_beijing") or ""
+            self.alibaba_api_key_singapore.value = store.get("alibaba_api_key_singapore") or ""
             self.deepgram_api_key.value = store.get("deepgram_api_key") or ""
 
         self._update_provider_visibility()
@@ -323,6 +359,17 @@ class SettingsView(ft.ListView):
         if self.on_providers_changed:
             self.on_providers_changed()
 
+    def _on_qwen_region_change(self, e) -> None:
+        _ = e
+        if self._settings is None:
+            return
+
+        new_region = (
+            QwenRegion.BEIJING if self.qwen_region.value == "Beijing" else QwenRegion.SINGAPORE
+        )
+        self._settings.qwen.region = new_region
+        self._emit_settings_changed()
+
     def _update_provider_visibility(self) -> None:
         if self._settings is None:
             return
@@ -334,12 +381,20 @@ class SettingsView(ft.ListView):
         self.deepgram_stt_model.visible = is_deepgram_stt
         self.verify_deepgram_btn.visible = is_deepgram_stt
 
-        # Qwen ASR uses alibaba_api_key
+        # Google API key is always visible
         self.google_api_key.visible = True
         self.verify_google_btn.visible = True
-        # Show Alibaba key for Qwen ASR or Qwen LLM
-        self.alibaba_api_key.visible = True
-        self.verify_alibaba_btn.visible = True
+
+        # Show Qwen region dropdown and region-specific API keys when Qwen is used
+        is_qwen_used = (
+            stt_provider == STTProviderName.QWEN_ASR
+            or self._settings.provider.llm == LLMProviderName.QWEN
+        )
+        self.qwen_region.visible = is_qwen_used
+        self.alibaba_api_key_beijing.visible = is_qwen_used
+        self.verify_alibaba_beijing_btn.visible = is_qwen_used
+        self.alibaba_api_key_singapore.visible = is_qwen_used
+        self.verify_alibaba_singapore_btn.visible = is_qwen_used
 
     def _on_verify_req(self, provider: str, key: str, btn_control: ft.Control) -> None:
         if not self.on_verify_api_key:

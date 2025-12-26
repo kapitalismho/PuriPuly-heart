@@ -26,6 +26,7 @@ class QwenClient(Protocol):
 @dataclass(slots=True)
 class QwenLLMProvider:
     api_key: str
+    base_url: str = "https://dashscope.aliyuncs.com/api/v1"
     model: str = "qwen-mt-flash"
     client: QwenClient | None = None
 
@@ -39,7 +40,9 @@ class QwenLLMProvider:
         target_language: str,
         context: str = "",
     ) -> Translation:
-        client = self.client or DashScopeQwenClient(api_key=self.api_key, model=self.model)
+        client = self.client or DashScopeQwenClient(
+            api_key=self.api_key, model=self.model, base_url=self.base_url
+        )
         translated = await client.translate(
             text=text,
             system_prompt=system_prompt,
@@ -53,7 +56,9 @@ class QwenLLMProvider:
         pass
 
     @staticmethod
-    async def verify_api_key(api_key: str) -> bool:
+    async def verify_api_key(
+        api_key: str, base_url: str = "https://dashscope.aliyuncs.com/api/v1"
+    ) -> bool:
         if not api_key:
             return False
         try:
@@ -62,7 +67,7 @@ class QwenLLMProvider:
             def _check():
                 try:
                     dashscope.api_key = api_key
-                    dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
+                    dashscope.base_http_api_url = base_url
                     # Use qwen-mt-lite for a cheap/fast check
                     response = dashscope.Generation.call(
                         model="qwen-mt-lite",
@@ -82,6 +87,7 @@ class QwenLLMProvider:
 class DashScopeQwenClient:
     api_key: str
     model: str
+    base_url: str = "https://dashscope.aliyuncs.com/api/v1"
 
     async def translate(
         self,
@@ -107,7 +113,7 @@ class DashScopeQwenClient:
 
         def _call() -> str:
             dashscope.api_key = self.api_key
-            dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
+            dashscope.base_http_api_url = self.base_url
             response = dashscope.Generation.call(
                 model=self.model,
                 messages=[{"role": "user", "content": full_prompt}],

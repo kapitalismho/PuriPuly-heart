@@ -46,5 +46,9 @@ class HistoryView(ft.Container):
                 border_radius=8,
             )
         )
-        if self.page is not None:
-            self.update()
+        try:
+            if self.page is not None:
+                self.update()
+        except RuntimeError:
+            # Control not yet added to page - update will happen when attached
+            pass

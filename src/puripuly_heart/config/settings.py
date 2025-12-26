@@ -22,6 +22,11 @@ class SecretsBackend(str, Enum):
     ENCRYPTED_FILE = "encrypted_file"
 
 
+class QwenRegion(str, Enum):
+    BEIJING = "beijing"
+    SINGAPORE = "singapore"
+
+
 @dataclass(slots=True)
 class LanguageSettings:
     source_language: str = "ko"
@@ -148,6 +153,25 @@ class SecretsSettings:
 
 
 @dataclass(slots=True)
+class QwenSettings:
+    region: QwenRegion = QwenRegion.BEIJING
+
+    def validate(self) -> None:
+        if not isinstance(self.region, QwenRegion):
+            raise ValueError("invalid qwen region")
+
+    def get_llm_base_url(self) -> str:
+        if self.region == QwenRegion.BEIJING:
+            return "https://dashscope.aliyuncs.com/api/v1"
+        return "https://dashscope-intl.aliyuncs.com/api/v1"
+
+    def get_asr_endpoint(self) -> str:
+        if self.region == QwenRegion.BEIJING:
+            return "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+        return "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+
+
+@dataclass(slots=True)
 class AppSettings:
     provider: ProviderSettings = field(default_factory=ProviderSettings)
     languages: LanguageSettings = field(default_factory=LanguageSettings)
@@ -155,6 +179,7 @@ class AppSettings:
     stt: STTSettings = field(default_factory=STTSettings)
     deepgram_stt: DeepgramSTTSettings = field(default_factory=DeepgramSTTSettings)
     qwen_asr_stt: QwenASRSTTSettings = field(default_factory=QwenASRSTTSettings)
+    qwen: QwenSettings = field(default_factory=QwenSettings)
     llm: LLMSettings = field(default_factory=LLMSettings)
     osc: OSCSettings = field(default_factory=OSCSettings)
     secrets: SecretsSettings = field(default_factory=SecretsSettings)
@@ -167,6 +192,7 @@ class AppSettings:
         self.stt.validate()
         self.deepgram_stt.validate()
         self.qwen_asr_stt.validate()
+        self.qwen.validate()
         self.llm.validate()
         self.osc.validate()
         self.secrets.validate()
@@ -206,6 +232,9 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
         "qwen_asr_stt": {
             "model": settings.qwen_asr_stt.model,
             "endpoint": settings.qwen_asr_stt.endpoint,
+        },
+        "qwen": {
+            "region": settings.qwen.region.value,
         },
         "llm": {"concurrency_limit": settings.llm.concurrency_limit},
         "osc": {
@@ -277,6 +306,9 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
                     "endpoint", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
                 )
             ),
+        ),
+        qwen=QwenSettings(
+            region=QwenRegion(data.get("qwen", {}).get("region", QwenRegion.BEIJING.value)),
         ),
         llm=LLMSettings(concurrency_limit=int(data.get("llm", {}).get("concurrency_limit", 1))),
         osc=OSCSettings(
