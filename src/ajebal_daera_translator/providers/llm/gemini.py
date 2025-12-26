@@ -69,6 +69,7 @@ class GeminiLLMProvider:
             return False
         try:
             from google import genai  # type: ignore
+
             client = genai.Client(api_key=api_key)
             # Try listing models as a lightweight auth check
             async for _ in await client.aio.models.list(config={"page_size": 1}):
@@ -87,6 +88,7 @@ class GoogleGenaiGeminiClient:
     def _get_client(self) -> Any:
         if self._client is None:
             from google import genai  # type: ignore
+
             self._client = genai.Client(api_key=self.api_key)
         return self._client
 
@@ -102,19 +104,25 @@ class GoogleGenaiGeminiClient:
         from google.genai import types  # type: ignore
 
         # Apply template variables to system prompt
-        formatted_system_prompt = system_prompt.format(
-            source_language=source_language,
-            target_language=target_language,
-        ) if "{source_language}" in system_prompt else system_prompt
+        formatted_system_prompt = (
+            system_prompt.format(
+                source_language=source_language,
+                target_language=target_language,
+            )
+            if "{source_language}" in system_prompt
+            else system_prompt
+        )
 
         # Build the message with context if provided
         if context:
             user_message = f"context:\n{context}\n\nTranslate: {text}"
-            logger.info(f"[LLM] Request with context: '{text}' -> {source_language} to {target_language}")
+            logger.info(
+                f"[LLM] Request with context: '{text}' -> {source_language} to {target_language}"
+            )
         else:
             user_message = text
             logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
-        
+
         client = self._get_client()
         response = await client.aio.models.generate_content(
             model=self.model,

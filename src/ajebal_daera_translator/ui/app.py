@@ -1,18 +1,20 @@
-import flet as ft
 import logging
 import webbrowser
 
-from ajebal_daera_translator.ui.theme import get_app_theme, COLOR_BACKGROUND, COLOR_DIVIDER
-from ajebal_daera_translator.ui.components.sidebar import AppSidebar
-from ajebal_daera_translator.ui.views.dashboard import DashboardView
-from ajebal_daera_translator.ui.views.settings import SettingsView
-from ajebal_daera_translator.ui.views.logs import LogsView
-from ajebal_daera_translator.ui.views.history import HistoryView  # Import HistoryView
-from ajebal_daera_translator.ui.controller import GuiController
+import flet as ft
+
 from ajebal_daera_translator.core.language import get_stt_compatibility_warning
 from ajebal_daera_translator.core.updater import check_for_update
+from ajebal_daera_translator.ui.components.sidebar import AppSidebar
+from ajebal_daera_translator.ui.controller import GuiController
+from ajebal_daera_translator.ui.theme import COLOR_BACKGROUND, get_app_theme
+from ajebal_daera_translator.ui.views.dashboard import DashboardView
+from ajebal_daera_translator.ui.views.history import HistoryView  # Import HistoryView
+from ajebal_daera_translator.ui.views.logs import LogsView
+from ajebal_daera_translator.ui.views.settings import SettingsView
 
 logger = logging.getLogger(__name__)
+
 
 class TranslatorApp:
     def __init__(self, page: ft.Page, *, config_path):
@@ -20,7 +22,7 @@ class TranslatorApp:
         self.controller = GuiController(page=page, app=self, config_path=config_path)
         self._setup_page()
         self._build_layout()
-        
+
         # Link Dashboard submit to App's history handler
         self.view_dashboard.on_send_message = self._on_manual_submit
         self.view_dashboard.on_toggle_translation = self._on_translation_toggle
@@ -43,16 +45,14 @@ class TranslatorApp:
     def _build_layout(self):
         # Initialize Views
         self.view_dashboard = DashboardView()
-        self.view_history = HistoryView() # Init History
+        self.view_history = HistoryView()  # Init History
         self.view_settings = SettingsView()
         self.view_logs = LogsView()
 
         self.sidebar = AppSidebar(on_change=self._on_nav_change)
-        
+
         self.content_area = ft.Container(
-            expand=True,
-            padding=0,
-            content=self.view_dashboard  # Default view
+            expand=True, padding=0, content=self.view_dashboard  # Default view
         )
 
         self.layout = ft.Row(
@@ -63,22 +63,18 @@ class TranslatorApp:
             expand=True,
             spacing=20,
         )
-        self.page.add(ft.Container(
-            content=self.layout,
-            expand=True,
-            padding=20 
-        ))
+        self.page.add(ft.Container(content=self.layout, expand=True, padding=20))
 
     def _on_nav_change(self, index: int):
         if index == 0:
             self.content_area.content = self.view_dashboard
-        elif index == 1: # New History Tab
+        elif index == 1:  # New History Tab
             self.content_area.content = self.view_history
         elif index == 2:
             self.content_area.content = self.view_settings
         elif index == 3:
             self.content_area.content = self.view_logs
-        
+
         self.content_area.update()
         if index == 2:
             self.view_settings.refresh_prompt_if_empty()
@@ -86,23 +82,26 @@ class TranslatorApp:
     def add_history_entry(self, source: str, text: str):
         # Update History View
         self.view_history.add_message(source, text)
-        
+
         # Also update Dashboard's hero text if needed (it does it locally, but good to know)
 
     def _on_manual_submit(self, _source: str, text: str) -> None:
         # UI already wrote to hero/history; pipeline should run asynchronously.
         async def _task():
             await self.controller.submit_text(text)
+
         self.page.run_task(_task)
 
     def _on_translation_toggle(self, enabled: bool) -> None:
         async def _task():
             await self.controller.set_translation_enabled(enabled)
+
         self.page.run_task(_task)
 
     def _on_stt_toggle(self, enabled: bool) -> None:
         async def _task():
             await self.controller.set_stt_enabled(enabled)
+
         self.page.run_task(_task)
 
     def _on_language_change(self, source_code: str, target_code: str) -> None:
@@ -117,33 +116,40 @@ class TranslatorApp:
         warning = get_stt_compatibility_warning(source_code, stt_provider)
         if warning:
             from flet import Colors as colors
-            self.page.show_dialog(ft.SnackBar(
-                ft.Text(warning),
-                bgcolor=colors.ORANGE_700,
-                duration=4000,
-            ))
+
+            self.page.show_dialog(
+                ft.SnackBar(
+                    ft.Text(warning),
+                    bgcolor=colors.ORANGE_700,
+                    duration=4000,
+                )
+            )
 
         async def _task():
             await self.controller.apply_settings(settings)
+
         self.page.run_task(_task)
 
     def _on_settings_changed(self, settings) -> None:
         async def _task():
             await self.controller.apply_settings(settings)
+
         self.page.run_task(_task)
 
     def _on_providers_changed(self) -> None:
         async def _task():
             await self.controller.apply_providers()
+
         self.page.run_task(_task)
 
     async def _on_verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
         return await self.controller.verify_api_key(provider, key)
 
+
 async def main_gui(page: ft.Page, *, config_path):
     app = TranslatorApp(page, config_path=config_path)
     await app.controller.start()
-    
+
     # Check for updates in background
     await _check_and_notify_update(page)
 
@@ -154,16 +160,16 @@ async def _check_and_notify_update(page: ft.Page) -> None:
         update_info = await check_for_update()
         if update_info is None:
             return
-        
+
         from flet import Colors as colors
-        
+
         def _open_download(_e):
             webbrowser.open(update_info.download_url)
             page.pop_dialog()
-        
+
         def _dismiss(_e):
             page.pop_dialog()
-        
+
         banner = ft.Banner(
             bgcolor=colors.BLUE_900,
             leading=ft.Icon(icon=ft.Icons.SYSTEM_UPDATE, color=colors.BLUE_200, size=40),
@@ -178,6 +184,6 @@ async def _check_and_notify_update(page: ft.Page) -> None:
             ],
         )
         page.show_dialog(banner)
-        
+
     except Exception as exc:
         logger.debug(f"Update check notification failed: {exc}")

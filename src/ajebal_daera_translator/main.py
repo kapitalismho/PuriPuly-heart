@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import argparse
+import asyncio
 import logging
 from pathlib import Path
 
@@ -73,8 +73,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run-gui":
         import flet as ft
+
         from ajebal_daera_translator.ui.app import main_gui
-        
+
         config_path = args.config
 
         async def _target(page: ft.Page):
@@ -124,8 +125,9 @@ def main(argv: list[str] | None = None) -> int:
     # Default: run GUI when no command specified (e.g., double-clicking EXE)
     if args.command is None:
         import flet as ft
+
         from ajebal_daera_translator.ui.app import main_gui
-        
+
         config_path = args.config
 
         async def _target(page: ft.Page):

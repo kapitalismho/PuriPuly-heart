@@ -20,4 +20,3 @@ class STTBackendSession(Protocol):
 
 class STTBackend(Protocol):
     async def open_session(self) -> STTBackendSession: ...
-

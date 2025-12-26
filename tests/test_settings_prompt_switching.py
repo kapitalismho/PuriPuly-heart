@@ -20,7 +20,9 @@ def _make_settings_view(monkeypatch):
     monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
-    monkeypatch.setattr(settings_view, "create_secret_store", lambda *args, **kwargs: DummySecretStore())
+    monkeypatch.setattr(
+        settings_view, "create_secret_store", lambda *args, **kwargs: DummySecretStore()
+    )
     return settings_view.SettingsView()
 
 

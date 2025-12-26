@@ -4,7 +4,6 @@ import os
 import sys
 from pathlib import Path
 
-
 APP_DIR_NAME = "ajebal-daera-translator"
 SETTINGS_FILENAME = "settings.json"
 VAD_MODEL_FILENAME = "silero_vad.onnx"

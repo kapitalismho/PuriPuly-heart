@@ -50,4 +50,3 @@ def encode_message(address: str, args: Iterable[OscArg]) -> bytes:
 
     header = encode_string(address) + encode_string("".join(type_tags))
     return header + b"".join(encoded_args)
-

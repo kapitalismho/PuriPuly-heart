@@ -63,4 +63,3 @@ def test_smart_queue_ttl_drop():
     queue.process_due()
 
     assert sender.sent == ["first"]
-

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from ajebal_daera_translator.app.wiring import create_secret_store
@@ -35,6 +33,8 @@ def test_create_secret_store_encrypted_file_resolves_relative_path(tmp_path):
 def test_create_secret_store_encrypted_file_requires_passphrase(tmp_path):
     with pytest.raises(ValueError):
         create_secret_store(
-            SecretsSettings(backend=SecretsBackend.ENCRYPTED_FILE, encrypted_file_path="secrets.json"),
+            SecretsSettings(
+                backend=SecretsBackend.ENCRYPTED_FILE, encrypted_file_path="secrets.json"
+            ),
             config_path=tmp_path / "settings.json",
         )

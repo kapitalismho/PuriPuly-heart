@@ -12,7 +12,7 @@ import logging
 import queue
 import threading
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator
+from typing import AsyncIterator
 
 from ajebal_daera_translator.core.stt.backend import (
     STTBackend,
@@ -57,6 +57,7 @@ class QwenASRRealtimeSTTBackend(STTBackend):
 
         # Use the same verification as Qwen LLM (shared API key)
         from ajebal_daera_translator.providers.llm.qwen import QwenLLMProvider
+
         return await QwenLLMProvider.verify_api_key(api_key)
 
 
@@ -74,7 +75,9 @@ class _QwenASRSession(STTBackendSession):
     endpoint: str
     sample_rate_hz: int
 
-    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(init=False, repr=False)
+    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
+        init=False, repr=False
+    )
     _audio_q: queue.Queue[bytes | object] = field(init=False, repr=False)
     _thread: threading.Thread | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
@@ -100,7 +103,11 @@ class _QwenASRSession(STTBackendSession):
         """Run Qwen ASR SDK connection in a separate thread."""
         try:
             import dashscope
-            from dashscope.audio.qwen_omni import OmniRealtimeConversation, OmniRealtimeCallback, MultiModality
+            from dashscope.audio.qwen_omni import (
+                MultiModality,
+                OmniRealtimeCallback,
+                OmniRealtimeConversation,
+            )
             from dashscope.audio.qwen_omni.omni_realtime import TranscriptionParams
 
             # Set API key
@@ -120,34 +127,36 @@ class _QwenASRSession(STTBackendSession):
 
                 def on_event(cb_self, response):
                     try:
-                        event_type = response.get('type', '')
-                        
-                        if event_type == 'session.created':
-                            session_id = response.get('session', {}).get('id', 'unknown')
+                        event_type = response.get("type", "")
+
+                        if event_type == "session.created":
+                            session_id = response.get("session", {}).get("id", "unknown")
                             logger.debug(f"Qwen ASR: Session created: {session_id}")
-                        
-                        elif event_type == 'conversation.item.input_audio_transcription.completed':
+
+                        elif event_type == "conversation.item.input_audio_transcription.completed":
                             # Final transcript
-                            transcript = response.get('transcript', '').strip()
+                            transcript = response.get("transcript", "").strip()
                             if transcript:
                                 logger.info(f"[STT] Transcript: '{transcript}' (final)")
                                 event = STTBackendTranscriptEvent(text=transcript, is_final=True)
                                 cb_self.parent._put_event(event)
-                        
-                        elif event_type == 'conversation.item.input_audio_transcription.text':
+
+                        elif event_type == "conversation.item.input_audio_transcription.text":
                             # Intermediate result (stash)
-                            text = response.get('text', '').strip()
-                            stash = response.get('stash', '').strip()
+                            text = response.get("text", "").strip()
+                            stash = response.get("stash", "").strip()
                             if text or stash:
-                                logger.debug(f"Qwen ASR: Intermediate text='{text}', stash='{stash}'")
-                        
-                        elif event_type == 'input_audio_buffer.committed':
+                                logger.debug(
+                                    f"Qwen ASR: Intermediate text='{text}', stash='{stash}'"
+                                )
+
+                        elif event_type == "input_audio_buffer.committed":
                             logger.debug("Qwen ASR: Audio buffer committed")
-                        
-                        elif event_type == 'error':
-                            error_msg = response.get('error', {}).get('message', 'Unknown error')
+
+                        elif event_type == "error":
+                            error_msg = response.get("error", {}).get("message", "Unknown error")
                             logger.warning(f"Qwen ASR error: {error_msg}")
-                        
+
                     except Exception as e:
                         logger.debug(f"Qwen ASR callback error: {e}")
 
@@ -166,16 +175,14 @@ class _QwenASRSession(STTBackendSession):
 
             # Update session configuration (Manual Mode)
             transcription_params = TranscriptionParams(
-                language=self.language,
-                sample_rate=self.sample_rate_hz,
-                input_audio_format="pcm"
+                language=self.language, sample_rate=self.sample_rate_hz, input_audio_format="pcm"
             )
 
             conversation.update_session(
                 output_modalities=[MultiModality.TEXT],
                 enable_input_audio_transcription=True,
                 enable_turn_detection=False,  # Manual Mode: no server VAD
-                transcription_params=transcription_params
+                transcription_params=transcription_params,
             )
 
             # Signal that connection is established
@@ -184,7 +191,9 @@ class _QwenASRSession(STTBackendSession):
 
             # Keepalive: send 100ms silence every 50 seconds to prevent 60s timeout
             import time
+
             import numpy as np
+
             last_activity = time.monotonic()
             KEEPALIVE_INTERVAL = 50.0  # seconds
             SILENCE_DURATION_MS = 100  # milliseconds
@@ -194,7 +203,7 @@ class _QwenASRSession(STTBackendSession):
                 nonlocal last_activity
                 silence_samples = int(self.sample_rate_hz * SILENCE_DURATION_MS / 1000)
                 silence = np.zeros(silence_samples, dtype=np.int16).tobytes()
-                audio_b64 = base64.b64encode(silence).decode('ascii')
+                audio_b64 = base64.b64encode(silence).decode("ascii")
                 conversation.append_audio(audio_b64)
                 last_activity = time.monotonic()
                 logger.debug(f"[STT] Keepalive silence sent ({SILENCE_DURATION_MS}ms)")
@@ -230,12 +239,14 @@ class _QwenASRSession(STTBackendSession):
                 if isinstance(data, bytes):
                     try:
                         # Qwen ASR requires base64-encoded audio
-                        audio_b64 = base64.b64encode(data).decode('ascii')
+                        audio_b64 = base64.b64encode(data).decode("ascii")
                         conversation.append_audio(audio_b64)
                         audio_chunks_sent += 1
                         last_activity = time.monotonic()  # Update activity time
                         if audio_chunks_sent == 1:
-                            logger.info(f"[STT] First audio chunk sent to Qwen ASR ({len(data)} bytes)")
+                            logger.info(
+                                f"[STT] First audio chunk sent to Qwen ASR ({len(data)} bytes)"
+                            )
                         elif audio_chunks_sent % 50 == 0:
                             logger.debug(f"[STT] Audio chunks sent: {audio_chunks_sent}")
                     except Exception as e:
@@ -271,6 +282,7 @@ class _QwenASRSession(STTBackendSession):
 
         # Send a small amount of trailing silence before commit
         import numpy as np
+
         silence_samples = int(self.sample_rate_hz * 0.1)  # 100ms silence
         silence = np.zeros(silence_samples, dtype=np.float32)
         pcm16 = (silence * 32767).astype(np.int16).tobytes()

@@ -1,16 +1,20 @@
 import logging
+
 import flet as ft
+
 from ajebal_daera_translator.ui.theme import COLOR_SURFACE
 
 
 class FletLogHandler(logging.Handler):
     """Custom log handler that forwards logs to a LogsView."""
-    
+
     def __init__(self, logs_view: "LogsView"):
         super().__init__()
         self.logs_view = logs_view
-        self.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"))
-    
+        self.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
+        )
+
     def emit(self, record: logging.LogRecord) -> None:
         try:
             msg = self.format(record)

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import pytest
-
 import ajebal_daera_translator.main as cli
 
 

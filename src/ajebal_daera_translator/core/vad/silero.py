@@ -27,7 +27,9 @@ class SileroVadOnnx:
 
         import onnxruntime as ort  # type: ignore
 
-        self._session = ort.InferenceSession(str(self.model_path), providers=["CPUExecutionProvider"])
+        self._session = ort.InferenceSession(
+            str(self.model_path), providers=["CPUExecutionProvider"]
+        )
         self._configure_io()
         self.reset()
 

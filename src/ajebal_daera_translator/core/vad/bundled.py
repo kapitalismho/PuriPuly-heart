@@ -26,7 +26,9 @@ def ensure_silero_vad_onnx(*, target_path: Path | None = None) -> Path:
 
     bundled = bundled_silero_vad_onnx_path()
     if not bundled.is_file():
-        raise FileNotFoundError(f"Bundled Silero VAD model missing: {SILERO_VAD_RESOURCE_RELATIVE_PATH}")
+        raise FileNotFoundError(
+            f"Bundled Silero VAD model missing: {SILERO_VAD_RESOURCE_RELATIVE_PATH}"
+        )
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = target_path.with_suffix(target_path.suffix + ".tmp")

@@ -44,4 +44,3 @@ def test_event_type_validation():
         STTPartialEvent(utterance_id, final)
     with pytest.raises(ValueError):
         STTFinalEvent(utterance_id, partial)
-

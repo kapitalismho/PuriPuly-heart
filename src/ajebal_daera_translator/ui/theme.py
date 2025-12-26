@@ -2,13 +2,14 @@ import flet as ft
 
 # Matte Dark Scheme
 COLOR_BACKGROUND = "#1E1E1E"  # Solid Deep Matte Grey
-COLOR_SURFACE = "#2D2D2D"     # Slightly lighter for cards/inputs
+COLOR_SURFACE = "#2D2D2D"  # Slightly lighter for cards/inputs
 COLOR_ON_BACKGROUND = "#FFFFFF"
-COLOR_PRIMARY = "#81D4FA"     # Subtle Light Blue for strict accents
+COLOR_PRIMARY = "#81D4FA"  # Subtle Light Blue for strict accents
 COLOR_ERROR = "#EF5350"
 COLOR_SUCCESS = "#66BB6A"
 COLOR_WARNING = "#FFA726"  # Orange for warning states
 COLOR_DIVIDER = "#424242"
+
 
 def get_app_theme() -> ft.Theme:
     return ft.Theme(

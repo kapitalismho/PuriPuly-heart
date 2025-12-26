@@ -70,7 +70,9 @@ class HeadlessStdinRunner:
             else:
                 merged = text
 
-            osc.enqueue(OSCMessage(utterance_id=utterance_id, text=merged, created_at=self.clock.now()))
+            osc.enqueue(
+                OSCMessage(utterance_id=utterance_id, text=merged, created_at=self.clock.now())
+            )
 
     async def _flush_loop(self, osc: SmartOscQueue) -> None:
         try:
@@ -79,4 +81,3 @@ class HeadlessStdinRunner:
                 await asyncio.sleep(0.05)
         except asyncio.CancelledError:
             raise
-

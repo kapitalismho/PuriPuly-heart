@@ -64,7 +64,9 @@ class ManagedSTTProvider:
         return self._state
 
     async def close(self) -> None:
-        await self._set_state(STTSessionState.DRAINING if self._active_session else STTSessionState.DISCONNECTED)
+        await self._set_state(
+            STTSessionState.DRAINING if self._active_session else STTSessionState.DISCONNECTED
+        )
 
         if self._reset_timer:
             self._reset_timer.cancel()
@@ -173,7 +175,9 @@ class ManagedSTTProvider:
         if elapsed < self.reset_deadline_s:
             return
 
-        logger.warning(f"[STT] Session exceeded {self.reset_deadline_s}s (elapsed={elapsed:.1f}s, speaking={is_speaking})")
+        logger.warning(
+            f"[STT] Session exceeded {self.reset_deadline_s}s (elapsed={elapsed:.1f}s, speaking={is_speaking})"
+        )
         if is_speaking:
             await self._reset_with_bridging()
         else:
@@ -201,7 +205,9 @@ class ManagedSTTProvider:
 
         if old_session and old_consumer:
             logger.info("[STT] BRIDGING: Starting drain of old session in background")
-            self._draining.add(asyncio.create_task(self._drain_and_close(old_session, old_consumer)))
+            self._draining.add(
+                asyncio.create_task(self._drain_and_close(old_session, old_consumer))
+            )
 
     async def _reset_on_silence(self) -> None:
         if self._active_session is None or self._consumer_task is None:
@@ -219,7 +225,9 @@ class ManagedSTTProvider:
         await self._set_state(STTSessionState.DISCONNECTED)
         logger.info("[STT] SILENCE RESET: Session closed, will reconnect on next speech")
 
-    async def _drain_and_close(self, session: STTBackendSession, consumer_task: asyncio.Task[None]) -> None:
+    async def _drain_and_close(
+        self, session: STTBackendSession, consumer_task: asyncio.Task[None]
+    ) -> None:
         logger.debug(f"[STT] DRAIN: Starting drain (timeout={self.drain_timeout_s}s)...")
         with contextlib.suppress(Exception):
             await session.stop()
@@ -228,7 +236,9 @@ class ManagedSTTProvider:
             await asyncio.wait_for(consumer_task, timeout=self.drain_timeout_s)
             logger.debug("[STT] DRAIN: Consumer task completed normally")
         except asyncio.TimeoutError:
-            logger.warning(f"[STT] DRAIN: Timeout after {self.drain_timeout_s}s, cancelling consumer task")
+            logger.warning(
+                f"[STT] DRAIN: Timeout after {self.drain_timeout_s}s, cancelling consumer task"
+            )
             consumer_task.cancel()
             with contextlib.suppress(Exception):
                 await consumer_task
@@ -252,7 +262,10 @@ class ManagedSTTProvider:
                 )
                 if ev.is_final:
                     await self._events.put(STTFinalEvent(utterance_id, transcript))
-                    if self._pending_final_utterance_id == utterance_id and self._active_utterance_id is None:
+                    if (
+                        self._pending_final_utterance_id == utterance_id
+                        and self._active_utterance_id is None
+                    ):
                         self._pending_final_utterance_id = None
                 else:
                     await self._events.put(STTPartialEvent(utterance_id, transcript))

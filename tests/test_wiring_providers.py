@@ -5,12 +5,12 @@ import pytest
 from ajebal_daera_translator.app.wiring import create_llm_provider, create_stt_backend
 from ajebal_daera_translator.config.settings import (
     AppSettings,
+    DeepgramSTTSettings,
     LLMProviderName,
     LLMSettings,
     ProviderSettings,
-    STTProviderName,
-    DeepgramSTTSettings,
     QwenASRSTTSettings,
+    STTProviderName,
 )
 from ajebal_daera_translator.core.language import get_deepgram_language, get_qwen_asr_language
 from ajebal_daera_translator.core.llm.provider import SemaphoreLLMProvider
@@ -47,7 +47,8 @@ def test_create_llm_provider_qwen_uses_secret() -> None:
     assert provider.inner.api_key == "k2"
 
 
-def test_create_llm_provider_requires_secret() -> None:
+def test_create_llm_provider_requires_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.GEMINI))
     secrets = InMemorySecretStore()
     with pytest.raises(ValueError):

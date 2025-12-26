@@ -56,4 +56,3 @@ def test_vad_gating_pre_roll_contains_previous_audio():
     assert start.pre_roll.shape[0] == 1024
     assert np.allclose(start.pre_roll[:512], 0.0)
     assert np.allclose(start.pre_roll[512:], 1.0)
-

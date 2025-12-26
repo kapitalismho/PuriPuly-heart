@@ -8,8 +8,8 @@ from ajebal_daera_translator.config.settings import (
     AppSettings,
     AudioSettings,
     OSCSettings,
-    save_settings,
     load_settings,
+    save_settings,
 )
 from ajebal_daera_translator.core.storage.secrets import EncryptedFileSecretStore, mask_secret
 
@@ -67,4 +67,3 @@ def test_encrypted_file_secret_store_rejects_wrong_passphrase(tmp_path):
     wrong = EncryptedFileSecretStore(path, passphrase="wrong")
     with pytest.raises(ValueError):
         wrong.get("k")
-

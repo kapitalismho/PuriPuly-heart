@@ -3,8 +3,9 @@ from __future__ import annotations
 import socket
 from dataclasses import dataclass, field
 
-from ajebal_daera_translator.core.osc.sender import OscSender
 from pythonosc.osc_message_builder import OscMessageBuilder
+
+from ajebal_daera_translator.core.osc.sender import OscSender
 
 
 @dataclass(slots=True)

@@ -67,7 +67,7 @@ class QwenLLMProvider:
                     response = dashscope.Generation.call(
                         model="qwen-mt-lite",
                         messages=[{"role": "user", "content": "test"}],
-                        max_tokens=1
+                        max_tokens=1,
                     )
                     return response.status_code == 200
                 except Exception:
@@ -98,7 +98,9 @@ class DashScopeQwenClient:
         # Template variables (${sourceName}, ${targetName}) are already substituted by hub.py
         if context:
             full_prompt = f"{system_prompt}\n\ncontext:\n{context}\n\nTranslate: {text}"
-            logger.info(f"[LLM] Request with context: '{text}' -> {source_language} to {target_language}")
+            logger.info(
+                f"[LLM] Request with context: '{text}' -> {source_language} to {target_language}"
+            )
         else:
             full_prompt = f"{system_prompt}\n\n{text}"
             logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")

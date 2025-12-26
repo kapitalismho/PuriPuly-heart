@@ -6,9 +6,8 @@ Loads system prompts from files in the prompts/ directory.
 from __future__ import annotations
 
 import os
-from pathlib import Path
-
 import sys
+from pathlib import Path
 
 
 def get_prompts_dir() -> Path:
@@ -20,18 +19,19 @@ def get_prompts_dir() -> Path:
             return env_path
 
     # PyInstaller frozen app: use _MEIPASS
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
         meipass_prompts = Path(sys._MEIPASS) / "prompts"
         if meipass_prompts.exists():
             return meipass_prompts
-    
+
     # Try relative to the project root first
     candidates = [
-        Path(__file__).parent.parent.parent.parent / "prompts",  # src/ajebal.../config -> project root
+        Path(__file__).parent.parent.parent.parent
+        / "prompts",  # src/ajebal.../config -> project root
         Path.cwd() / "prompts",
         Path(__file__).parent / "prompts",
     ]
-    
+
     for path in candidates:
         if path.exists():
             return path
@@ -47,7 +47,7 @@ def get_prompts_dir() -> Path:
         candidate = parent / "prompts"
         if candidate.exists():
             return candidate
-    
+
     # Default: relative to cwd
     return Path.cwd() / "prompts"
 
@@ -57,32 +57,30 @@ def list_prompts() -> list[str]:
     prompts_dir = get_prompts_dir()
     if not prompts_dir.exists():
         return []
-    
-    return sorted([
-        f.stem for f in prompts_dir.glob("*.txt")
-    ])
+
+    return sorted([f.stem for f in prompts_dir.glob("*.txt")])
 
 
 def load_prompt(name: str = "default") -> str:
     """Load a prompt from file.
-    
+
     Args:
         name: Prompt file name (without .txt extension)
-        
+
     Returns:
         Prompt content, or empty string if not found
     """
     prompts_dir = get_prompts_dir()
     prompt_file = prompts_dir / f"{name}.txt"
-    
+
     if prompt_file.exists():
         return prompt_file.read_text(encoding="utf-8").strip()
-    
+
     # Fallback to default
     default_file = prompts_dir / "default.txt"
     if default_file.exists():
         return default_file.read_text(encoding="utf-8").strip()
-    
+
     return ""
 
 

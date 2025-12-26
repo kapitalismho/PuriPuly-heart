@@ -50,4 +50,3 @@ class SemaphoreLLMProvider:
 
     async def close(self) -> None:
         await self.inner.close()
-

@@ -8,9 +8,21 @@ from pathlib import Path
 
 import flet as ft
 
-from ajebal_daera_translator.app.wiring import create_llm_provider, create_secret_store, create_stt_backend
-from ajebal_daera_translator.config.settings import AppSettings, save_settings, load_settings
-from ajebal_daera_translator.core.audio.source import SoundDeviceAudioSource, resolve_sounddevice_input_device
+from ajebal_daera_translator.app.wiring import (
+    create_llm_provider,
+    create_secret_store,
+    create_stt_backend,
+)
+from ajebal_daera_translator.config.settings import (
+    AppSettings,
+    STTProviderName,
+    load_settings,
+    save_settings,
+)
+from ajebal_daera_translator.core.audio.source import (
+    SoundDeviceAudioSource,
+    resolve_sounddevice_input_device,
+)
 from ajebal_daera_translator.core.clock import SystemClock
 from ajebal_daera_translator.core.orchestrator.hub import ClientHub
 from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue
@@ -22,6 +34,7 @@ from ajebal_daera_translator.core.vad.silero import SileroVadOnnx
 from ajebal_daera_translator.providers.llm.gemini import GeminiLLMProvider
 from ajebal_daera_translator.providers.llm.qwen import QwenLLMProvider
 from ajebal_daera_translator.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+from ajebal_daera_translator.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 from ajebal_daera_translator.ui.event_bridge import UIEventBridge
 
 logger = logging.getLogger(__name__)
@@ -64,8 +77,8 @@ class GuiController:
         dash = getattr(self.app, "view_dashboard", None)
         if dash is not None:
             # Set needs_key flags (used when user tries to toggle)
-            dash.translation_needs_key = (self.hub.llm is None)
-            dash.stt_needs_key = (self.hub.stt is None)
+            dash.translation_needs_key = self.hub.llm is None
+            dash.stt_needs_key = self.hub.stt is None
             # Set initial enabled states (all start as off/gray)
             dash.set_translation_enabled(False)
             dash.set_stt_enabled(False)
@@ -150,7 +163,7 @@ class GuiController:
         """Verify API key using the respective provider's static check. Returns (success, error_msg)."""
         if not key:
             return False, "API Key is empty"
-        
+
         try:
             success = False
             if provider == "google":
@@ -209,15 +222,17 @@ class GuiController:
         if dash is not None:
             dash.set_translation_needs_key(self.hub.llm is None)
             dash.set_stt_needs_key(self.hub.stt is None)
-            
-            self.hub.translation_enabled = bool(getattr(dash, "is_translation_on", True)) and self.hub.llm is not None
+
+            self.hub.translation_enabled = (
+                bool(getattr(dash, "is_translation_on", True)) and self.hub.llm is not None
+            )
             dash.set_translation_enabled(self.hub.translation_enabled)
 
         await self.hub.start(auto_flush_osc=True)
 
         bridge = UIEventBridge(app=self.app, event_queue=self.hub.ui_events)
         self._bridge_task = asyncio.create_task(bridge.run())
-        
+
         # Trigger background verification to sync button colors
         asyncio.create_task(self._verify_and_update_status())
 
@@ -359,7 +374,9 @@ class GuiController:
         with contextlib.suppress(Exception):
             dash = getattr(self.app, "view_dashboard", None)
             if dash is not None:
-                dash.set_languages_from_codes(settings.languages.source_language, settings.languages.target_language)
+                dash.set_languages_from_codes(
+                    settings.languages.source_language, settings.languages.target_language
+                )
 
         with contextlib.suppress(Exception):
             view_settings = getattr(self.app, "view_settings", None)
@@ -401,54 +418,43 @@ class GuiController:
                     llm_valid = True
             except Exception:
                 llm_valid = False
-        
+
         # If LLM verification failed, force needs_key = True even if provider object exists
         if not llm_valid:
-             dash.set_translation_needs_key(True)
-             # If it was enabled, we potentially disable it or just let the warning show on next interaction
-             # User request: "Validation Fail -> Orange". Implicitly, if it's ON and fails, maybe we should turn it OFF?
-             # For now, setting needs_key=True ensures that if they try to toggle, it warns.
-             # If it is currently ON, we might want to flag it.
-             if self.hub: 
-                 self.hub.translation_enabled = False # Disable internally
-             dash.set_translation_enabled(False) # Visually turn off
+            dash.set_translation_needs_key(True)
+            # If it was enabled, we potentially disable it or just let the warning show on next interaction
+            # User request: "Validation Fail -> Orange". Implicitly, if it's ON and fails, maybe we should turn it OFF?
+            # For now, setting needs_key=True ensures that if they try to toggle, it warns.
+            # If it is currently ON, we might want to flag it.
+            if self.hub:
+                self.hub.translation_enabled = False  # Disable internally
+            dash.set_translation_enabled(False)  # Visually turn off
         else:
-             dash.set_translation_needs_key(False)
-
+            dash.set_translation_needs_key(False)
 
         # 2. Verify STT
         stt_valid = False
         if self.hub and self.hub.stt:
-             try:
+            try:
                 secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
                 provider_name = self.settings.provider.stt
-                
-                if provider_name == "deepgram":
+
+                if provider_name == STTProviderName.DEEPGRAM:
                     key = secrets.get("deepgram_api_key") or ""
                     stt_valid = await DeepgramRealtimeSTTBackend.verify_api_key(key)
+                elif provider_name == STTProviderName.QWEN_ASR:
+                    key = secrets.get("alibaba_api_key") or ""
+                    stt_valid = await QwenASRRealtimeSTTBackend.verify_api_key(key)
                 else:
-                    # Alibaba STT validation? Not implemented static verify yet?
-                    # The user only asked for Deepgram verify?
-                    # Wait, Qwen provider has verify_api_key, checking AlibabaModelStudio...
-                    # We only added verify to Gemini, Qwen, Deepgram.
-                    # Alibaba STT uses same key as Qwen usually? Or separate? 
-                    # settings.py: alibaba_api_key label says "(Qwen + Alibaba STT)"
-                    # So checking Qwen key (above) might have covered it, but STT validation is separate.
-                    # Let's check if valid:
-                    if provider_name == "alibaba":
-                         # Re-use Qwen verification for the shared key
-                         key = secrets.get("alibaba_api_key") or ""
-                         stt_valid = await QwenLLMProvider.verify_api_key(key)
-                    else:
-                        stt_valid = True
-             except Exception:
+                    stt_valid = True
+            except Exception:
                 stt_valid = False
-        
+
         if not stt_valid:
             dash.set_stt_needs_key(True)
             if self.hub:
                 # Close STT backend?
-                pass 
+                pass
             dash.set_stt_enabled(False)
         else:
             dash.set_stt_needs_key(False)

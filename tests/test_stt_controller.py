@@ -71,7 +71,9 @@ def test_stt_controller_connects_on_speech_start():
     async def run():
         clock = FakeClock()
         backend = FakeBackend()
-        stt = ManagedSTTProvider(backend=backend, sample_rate_hz=16000, clock=clock, reset_deadline_s=90.0)
+        stt = ManagedSTTProvider(
+            backend=backend, sample_rate_hz=16000, clock=clock, reset_deadline_s=90.0
+        )
 
         uid = __import__("uuid").uuid4()
         stream = stt.events()

@@ -17,8 +17,9 @@ from typing import Sequence
 @dataclass(frozen=True, slots=True)
 class LanguageInfo:
     """Language information for mapping."""
-    code: str   # ISO 639-1 code: "ko", "en", etc.
-    name: str   # English name: "Korean", "English"
+
+    code: str  # ISO 639-1 code: "ko", "en", etc.
+    name: str  # English name: "Korean", "English"
 
 
 # Supported languages for UI (union of Deepgram Nova-3 + Qwen ASR)
@@ -126,13 +127,12 @@ def get_qwen_asr_language(code: str) -> str:
 
 def get_all_language_options() -> Sequence[tuple[str, str]]:
     """Get all supported languages as (code, name) tuples for UI dropdowns.
-    
+
     Returns sorted list by English name.
     """
     return tuple(
         sorted(
-            ((info.code, info.name) for info in SUPPORTED_LANGUAGES.values()),
-            key=lambda x: x[1]
+            ((info.code, info.name) for info in SUPPORTED_LANGUAGES.values()), key=lambda x: x[1]
         )
     )
 
@@ -144,9 +144,39 @@ def is_supported_language(code: str) -> bool:
 
 # Deepgram Nova-3 supported languages (subset of SUPPORTED_LANGUAGES)
 _DEEPGRAM_SUPPORTED: set[str] = {
-    "bg", "ca", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr",
-    "hi", "hu", "id", "it", "ja", "ko", "lt", "lv", "ms", "nl", "no",
-    "pl", "pt", "ro", "ru", "sk", "sv", "tr", "uk", "vi", "zh-CN", "zh-TW",
+    "bg",
+    "ca",
+    "cs",
+    "da",
+    "de",
+    "el",
+    "en",
+    "es",
+    "et",
+    "fi",
+    "fr",
+    "hi",
+    "hu",
+    "id",
+    "it",
+    "ja",
+    "ko",
+    "lt",
+    "lv",
+    "ms",
+    "nl",
+    "no",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "sk",
+    "sv",
+    "tr",
+    "uk",
+    "vi",
+    "zh-CN",
+    "zh-TW",
 }
 
 

@@ -51,7 +51,9 @@ def normalize_audio_f32(
 ) -> AudioFrameF32:
     mono = mixdown_to_mono_f32(raw_samples)
     if input_sample_rate_hz != target_sample_rate_hz:
-        mono = resample_f32_linear(mono, from_rate_hz=input_sample_rate_hz, to_rate_hz=target_sample_rate_hz)
+        mono = resample_f32_linear(
+            mono, from_rate_hz=input_sample_rate_hz, to_rate_hz=target_sample_rate_hz
+        )
     return AudioFrameF32(samples=mono, sample_rate_hz=target_sample_rate_hz)
 
 
@@ -65,4 +67,3 @@ def float32_to_pcm16le_bytes(samples: np.ndarray) -> bytes:
 def pcm16le_bytes_to_float32(data: bytes) -> np.ndarray:
     arr = np.frombuffer(data, dtype="<i2").astype(np.float32)
     return arr / 32768.0
-

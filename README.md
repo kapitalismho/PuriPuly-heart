@@ -42,18 +42,11 @@ Integration tests are skipped by default. Run with:
 
 - `INTEGRATION=1 python3 -m pytest`
 
-### Google STT v2
+Test audio (for E2E/STT+LLM tests):
 
-Required env vars:
+- Set `TEST_AUDIO_PATH` to a local WAV file, or place it at `.test_audio/test_speech.wav` (gitignored).
 
-- `GOOGLE_SPEECH_RECOGNIZER` (e.g. `projects/.../locations/.../recognizers/...`)
-
-Optional:
-
-- `GOOGLE_SPEECH_ENDPOINT` (default: `speech.googleapis.com`)
-- `GOOGLE_SPEECH_LANGUAGE` (default: `en-US`)
-
-### Alibaba Model Studio STT (DashScope)
+### Qwen ASR (DashScope)
 
 Required env vars:
 
@@ -61,6 +54,7 @@ Required env vars:
 
 Optional:
 
-- `ALIBABA_STT_MODEL` (default: `fun-asr-realtime`)
-- `ALIBABA_STT_ENDPOINT` (default: `wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference`)
-- `ALIBABA_STT_SAMPLE_RATE` (default: `16000`)
+- `QWEN_ASR_MODEL` (default: `qwen3-asr-flash-realtime`)
+- `QWEN_ASR_ENDPOINT` (default: `wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime`)
+- `QWEN_ASR_LANGUAGE` (default: `ko`)
+- `QWEN_ASR_SAMPLE_RATE` (default: `16000`)

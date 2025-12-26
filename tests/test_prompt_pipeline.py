@@ -68,6 +68,7 @@ class DummyGeneration:
     @classmethod
     def call(cls, *_, **kwargs):
         cls.last_call = kwargs
+
         class Response:
             status_code = 200
             output = {"choices": [{"message": {"content": "OK"}}]}

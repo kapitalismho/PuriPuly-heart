@@ -14,12 +14,10 @@ import time
 import wave
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import numpy as np
 import pytest
-
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INTEGRATION") != "1",
@@ -147,7 +145,7 @@ def print_summary_table(results: list[IterationMetrics]) -> None:
 
 @pytest.mark.asyncio
 async def test_e2e_latency_5_iterations():
-    """Measure E2E latency for 5 iterations using test_speech.wav.
+    """Measure E2E latency for 5 iterations using test audio.
 
     Pipeline: Audio → Deepgram STT → Gemini LLM → OSC
 
@@ -155,6 +153,7 @@ async def test_e2e_latency_5_iterations():
         set DEEPGRAM_API_KEY=your_key
         set GOOGLE_API_KEY=your_key
         set INTEGRATION=1
+        set TEST_AUDIO_PATH=path\to\test_speech.wav
         python -m pytest tests/integration/test_e2e_latency_measurement.py -v -s
     """
     deepgram_key = os.getenv("DEEPGRAM_API_KEY")
@@ -175,7 +174,12 @@ async def test_e2e_latency_5_iterations():
     from ajebal_daera_translator.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 
     # Load audio file
-    audio_path = Path(__file__).parent.parent.parent / ".test_audio" / "test_speech.wav"
+    audio_env = os.getenv("TEST_AUDIO_PATH")
+    audio_path = (
+        Path(audio_env)
+        if audio_env
+        else Path(__file__).parent.parent.parent / ".test_audio" / "test_speech.wav"
+    )
     if not audio_path.exists():
         pytest.skip(f"Audio file not found: {audio_path}")
 
@@ -224,7 +228,7 @@ async def test_e2e_latency_5_iterations():
         # Load default prompt
         from ajebal_daera_translator.config.prompts import load_prompt
         from ajebal_daera_translator.core.language import get_llm_language_name
-        
+
         source_lang = "ko"
         target_lang = "en"
         system_prompt = load_prompt("default.txt") or "Translate naturally and concisely."
@@ -303,7 +307,9 @@ async def test_e2e_latency_5_iterations():
             if chunks:
                 pre_roll = np.zeros(chunk_samples, dtype=np.float32)
                 first_chunk = chunks[0]
-                await hub.handle_vad_event(SpeechStart(utterance_id, pre_roll=pre_roll, chunk=first_chunk))
+                await hub.handle_vad_event(
+                    SpeechStart(utterance_id, pre_roll=pre_roll, chunk=first_chunk)
+                )
                 await asyncio.sleep(0.05)
 
                 # Send remaining chunks as SpeechChunk
@@ -315,7 +321,9 @@ async def test_e2e_latency_5_iterations():
                 await hub.handle_vad_event(SpeechEnd(utterance_id))
 
             metrics.audio_send_end = time.perf_counter()
-            print(f"  Audio sent in {(metrics.audio_send_end - metrics.audio_send_start)*1000:.0f}ms")
+            print(
+                f"  Audio sent in {(metrics.audio_send_end - metrics.audio_send_start)*1000:.0f}ms"
+            )
 
             # Wait for pipeline completion (timeout: 15s)
             try:

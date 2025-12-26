@@ -50,4 +50,3 @@ class UtteranceBundle:
             raise ValueError("utterance_id mismatch")
         self.translation = translation
         return self
-

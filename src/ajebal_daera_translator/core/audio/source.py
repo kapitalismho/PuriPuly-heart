@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import queue
 from dataclasses import dataclass, field
@@ -125,7 +124,10 @@ def resolve_sounddevice_input_device(*, host_api: str = "", device: str = "") ->
         with contextlib.suppress(ValueError):
             idx = int(device)
             if 0 <= idx < len(devices) and int(devices[idx].get("max_input_channels", 0) or 0) > 0:
-                if hostapi_index is None or int(devices[idx].get("hostapi", -1) or -1) == hostapi_index:
+                if (
+                    hostapi_index is None
+                    or int(devices[idx].get("hostapi", -1) or -1) == hostapi_index
+                ):
                     return idx
 
     if hostapi_index is not None and not device:

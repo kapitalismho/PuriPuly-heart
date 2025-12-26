@@ -37,7 +37,9 @@ def test_resample_length_ratio():
 def test_normalize_audio_resamples_only_when_needed():
     raw = np.linspace(-1.0, 1.0, num=480, dtype=np.float32)
     first = normalize_audio_f32(raw, input_sample_rate_hz=48000, target_sample_rate_hz=16000)
-    second = normalize_audio_f32(first.samples, input_sample_rate_hz=16000, target_sample_rate_hz=16000)
+    second = normalize_audio_f32(
+        first.samples, input_sample_rate_hz=16000, target_sample_rate_hz=16000
+    )
     assert first.sample_rate_hz == 16000
     assert second.sample_rate_hz == 16000
     assert second.samples.shape == first.samples.shape
@@ -49,4 +51,3 @@ def test_ring_buffer_returns_last_samples():
     rb.append(np.arange(6, 16, dtype=np.float32))
     last = rb.get_last_samples(5)
     assert np.allclose(last, np.array([11, 12, 13, 14, 15], dtype=np.float32))
-

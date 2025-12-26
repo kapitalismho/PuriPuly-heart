@@ -66,4 +66,3 @@ class RingBufferF32:
         head_len = count - tail.size
         head = self._buffer[:head_len].copy()
         return np.concatenate([tail, head])
-

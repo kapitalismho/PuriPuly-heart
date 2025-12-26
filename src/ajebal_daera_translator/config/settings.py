@@ -8,7 +8,6 @@ from typing import Any
 
 
 class STTProviderName(str, Enum):
-    ALIBABA = "alibaba"
     DEEPGRAM = "deepgram"
     QWEN_ASR = "qwen_asr"
 
@@ -66,20 +65,6 @@ class STTSettings:
             raise ValueError("drain_timeout_s must be > 0")
         if not (0.0 <= self.vad_speech_threshold <= 1.0):
             raise ValueError("vad_speech_threshold must be in 0.0..1.0")
-
-
-
-
-@dataclass(slots=True)
-class AlibabaSTTSettings:
-    model: str = "paraformer-realtime-v2"
-    endpoint: str = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
-
-    def validate(self) -> None:
-        if not self.model:
-            raise ValueError("model must be non-empty")
-        if not self.endpoint:
-            raise ValueError("endpoint must be non-empty")
 
 
 @dataclass(slots=True)
@@ -168,7 +153,6 @@ class AppSettings:
     languages: LanguageSettings = field(default_factory=LanguageSettings)
     audio: AudioSettings = field(default_factory=AudioSettings)
     stt: STTSettings = field(default_factory=STTSettings)
-    alibaba_stt: AlibabaSTTSettings = field(default_factory=AlibabaSTTSettings)
     deepgram_stt: DeepgramSTTSettings = field(default_factory=DeepgramSTTSettings)
     qwen_asr_stt: QwenASRSTTSettings = field(default_factory=QwenASRSTTSettings)
     llm: LLMSettings = field(default_factory=LLMSettings)
@@ -181,7 +165,6 @@ class AppSettings:
         self.languages.validate()
         self.audio.validate()
         self.stt.validate()
-        self.alibaba_stt.validate()
         self.deepgram_stt.validate()
         self.qwen_asr_stt.validate()
         self.llm.validate()
@@ -217,10 +200,6 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
             "drain_timeout_s": settings.stt.drain_timeout_s,
             "vad_speech_threshold": settings.stt.vad_speech_threshold,
         },
-        "alibaba_stt": {
-            "model": settings.alibaba_stt.model,
-            "endpoint": settings.alibaba_stt.endpoint,
-        },
         "deepgram_stt": {
             "model": settings.deepgram_stt.model,
         },
@@ -249,7 +228,9 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
 
 
 def _parse_stt_provider(value: str) -> STTProviderName:
-    """Parse STT provider, falling back to DEEPGRAM for legacy/invalid values."""
+    """Parse STT provider, mapping legacy values to supported providers."""
+    if value == "alibaba":
+        return STTProviderName.QWEN_ASR
     try:
         return STTProviderName(value)
     except ValueError:
@@ -266,7 +247,9 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
 
     settings = AppSettings(
         provider=ProviderSettings(
-            stt=_parse_stt_provider(data.get("provider", {}).get("stt", STTProviderName.DEEPGRAM.value)),
+            stt=_parse_stt_provider(
+                data.get("provider", {}).get("stt", STTProviderName.DEEPGRAM.value)
+            ),
             llm=LLMProviderName(data.get("provider", {}).get("llm", LLMProviderName.GEMINI.value)),
         ),
         languages=LanguageSettings(
@@ -284,19 +267,15 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             drain_timeout_s=float(stt_data.get("drain_timeout_s", 2.0)),
             vad_speech_threshold=float(vad_threshold_raw) if vad_threshold_raw is not None else 0.5,
         ),
-        alibaba_stt=AlibabaSTTSettings(
-            model=str(data.get("alibaba_stt", {}).get("model", "paraformer-realtime-v2")),
-            endpoint=str(
-                data.get("alibaba_stt", {}).get("endpoint", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference")
-            ),
-        ),
         deepgram_stt=DeepgramSTTSettings(
             model=str(data.get("deepgram_stt", {}).get("model", "nova-3")),
         ),
         qwen_asr_stt=QwenASRSTTSettings(
             model=str(data.get("qwen_asr_stt", {}).get("model", "qwen3-asr-flash-realtime")),
             endpoint=str(
-                data.get("qwen_asr_stt", {}).get("endpoint", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime")
+                data.get("qwen_asr_stt", {}).get(
+                    "endpoint", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+                )
             ),
         ),
         llm=LLMSettings(concurrency_limit=int(data.get("llm", {}).get("concurrency_limit", 1))),
@@ -311,7 +290,9 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             ttl_s=float(data.get("osc", {}).get("ttl_s", 7.0)),
         ),
         secrets=SecretsSettings(
-            backend=SecretsBackend(data.get("secrets", {}).get("backend", SecretsBackend.KEYRING.value)),
+            backend=SecretsBackend(
+                data.get("secrets", {}).get("backend", SecretsBackend.KEYRING.value)
+            ),
             encrypted_file_path=data.get("secrets", {}).get("encrypted_file_path", "secrets.json"),
         ),
         system_prompt=str(data.get("system_prompt", "")),

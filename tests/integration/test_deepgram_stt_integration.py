@@ -5,8 +5,9 @@ import os
 
 import pytest
 
-
-pytestmark = pytest.mark.skipif(os.getenv("INTEGRATION") != "1", reason="set INTEGRATION=1 to run integration tests")
+pytestmark = pytest.mark.skipif(
+    os.getenv("INTEGRATION") != "1", reason="set INTEGRATION=1 to run integration tests"
+)
 
 
 @pytest.mark.asyncio

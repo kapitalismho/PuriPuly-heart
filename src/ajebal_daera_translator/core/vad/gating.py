@@ -124,7 +124,9 @@ class VadGating:
 
                 pre_roll = self._ring.get_last_samples(self._ring.capacity_samples)
                 logger.info(f"[VAD] SpeechStart: id={str(self._utterance_id)[:8]}, prob={prob:.2f}")
-                events.append(SpeechStart(self._utterance_id, pre_roll=pre_roll, chunk=chunk.copy()))
+                events.append(
+                    SpeechStart(self._utterance_id, pre_roll=pre_roll, chunk=chunk.copy())
+                )
             self._ring.append(chunk)
             return events
 

@@ -115,7 +115,9 @@ def test_headless_mic_pipeline_smoke():
         await hub.start(auto_flush_osc=False)
 
         probs = [0.0, 0.0, 0.9, 0.9, 0.0, 0.0, 0.0]
-        vad = VadGating(SequenceVadEngine(probs=probs), sample_rate_hz=16000, ring_buffer_ms=64, hangover_ms=64)
+        vad = VadGating(
+            SequenceVadEngine(probs=probs), sample_rate_hz=16000, ring_buffer_ms=64, hangover_ms=64
+        )
 
         chunks = [
             np.zeros((512,), dtype=np.float32),

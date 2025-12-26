@@ -5,8 +5,9 @@ import os
 
 import pytest
 
-
-pytestmark = pytest.mark.skipif(os.getenv("INTEGRATION") != "1", reason="set INTEGRATION=1 to run integration tests")
+pytestmark = pytest.mark.skipif(
+    os.getenv("INTEGRATION") != "1", reason="set INTEGRATION=1 to run integration tests"
+)
 
 
 @pytest.mark.asyncio
@@ -27,7 +28,9 @@ async def test_qwen_asr_realtime_streaming_smoke():
     backend = QwenASRRealtimeSTTBackend(
         api_key=api_key,
         model=os.getenv("QWEN_ASR_MODEL", "qwen3-asr-flash-realtime"),
-        endpoint=os.getenv("QWEN_ASR_ENDPOINT", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"),
+        endpoint=os.getenv(
+            "QWEN_ASR_ENDPOINT", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+        ),
         language=os.getenv("QWEN_ASR_LANGUAGE", "ko"),
         sample_rate_hz=int(os.getenv("QWEN_ASR_SAMPLE_RATE", "16000")),
     )

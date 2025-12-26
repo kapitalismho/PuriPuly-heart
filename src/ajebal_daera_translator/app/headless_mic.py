@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import logging
 from dataclasses import dataclass
@@ -8,11 +7,19 @@ from pathlib import Path
 
 import numpy as np
 
-from ajebal_daera_translator.app.wiring import create_llm_provider, create_secret_store, create_stt_backend
+from ajebal_daera_translator.app.wiring import (
+    create_llm_provider,
+    create_secret_store,
+    create_stt_backend,
+)
 from ajebal_daera_translator.config.paths import default_vad_model_path
 from ajebal_daera_translator.config.settings import AppSettings
 from ajebal_daera_translator.core.audio.format import normalize_audio_f32
-from ajebal_daera_translator.core.audio.source import AudioSource, SoundDeviceAudioSource, resolve_sounddevice_input_device
+from ajebal_daera_translator.core.audio.source import (
+    AudioSource,
+    SoundDeviceAudioSource,
+    resolve_sounddevice_input_device,
+)
 from ajebal_daera_translator.core.clock import SystemClock
 from ajebal_daera_translator.core.orchestrator.hub import ClientHub
 from ajebal_daera_translator.core.osc.smart_queue import SmartOscQueue

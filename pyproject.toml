@@ -53,7 +53,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
-ignore = ["E501"]
+ignore = ["E402", "E501", "E701"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

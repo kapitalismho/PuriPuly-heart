@@ -26,4 +26,3 @@ class FakeClock:
         if seconds < 0:
             raise ValueError("seconds must be >= 0")
         self._now += seconds
-

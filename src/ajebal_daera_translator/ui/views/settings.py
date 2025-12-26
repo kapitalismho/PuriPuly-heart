@@ -11,13 +11,12 @@ from flet import Colors as colors
 from flet import Icons as icons
 
 from ajebal_daera_translator.app.wiring import create_secret_store
+from ajebal_daera_translator.config.prompts import load_prompt_for_provider
 from ajebal_daera_translator.config.settings import (
     AppSettings,
     LLMProviderName,
-    SecretsBackend,
     STTProviderName,
 )
-from ajebal_daera_translator.config.prompts import load_prompt_for_provider
 from ajebal_daera_translator.core.language import get_stt_compatibility_warning
 from ajebal_daera_translator.ui.components.bento_card import BentoCard
 from ajebal_daera_translator.ui.theme import COLOR_PRIMARY
@@ -31,7 +30,9 @@ class SettingsView(ft.ListView):
 
         self.on_settings_changed: Callable[[AppSettings], None] | None = None
         self.on_providers_changed: Callable[[], None] | None = None
-        self.on_verify_api_key: Callable[[str, str], object] | None = None  # Returns Awaitable[tuple[bool, str]]
+        self.on_verify_api_key: Callable[[str, str], object] | None = (
+            None  # Returns Awaitable[tuple[bool, str]]
+        )
 
         self._settings: AppSettings | None = None
         self._config_path: Path | None = None
@@ -71,10 +72,12 @@ class SettingsView(ft.ListView):
         )
 
         self.alibaba_api_key = ft.TextField(
-            label="Alibaba API Key (Qwen + Alibaba STT)",
+            label="Alibaba API Key (Qwen LLM/ASR)",
             password=True,
             can_reveal_password=True,
-            on_change=lambda e: self._on_secret_change("alibaba_api_key", self.alibaba_api_key.value),
+            on_change=lambda e: self._on_secret_change(
+                "alibaba_api_key", self.alibaba_api_key.value
+            ),
             border_radius=8,
             expand=True,
         )
@@ -82,16 +85,18 @@ class SettingsView(ft.ListView):
             icon=icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
             icon_color=colors.GREY_400,
             tooltip="Verify Key",
-            on_click=lambda e: self._on_verify_req("alibaba", self.alibaba_api_key.value, e.control),
+            on_click=lambda e: self._on_verify_req(
+                "alibaba", self.alibaba_api_key.value, e.control
+            ),
         )
-
-
 
         self.deepgram_api_key = ft.TextField(
             label="Deepgram API Key",
             password=True,
             can_reveal_password=True,
-            on_change=lambda e: self._on_secret_change("deepgram_api_key", self.deepgram_api_key.value),
+            on_change=lambda e: self._on_secret_change(
+                "deepgram_api_key", self.deepgram_api_key.value
+            ),
             border_radius=8,
             expand=True,
         )
@@ -99,7 +104,9 @@ class SettingsView(ft.ListView):
             icon=icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
             icon_color=colors.GREY_400,
             tooltip="Verify Key",
-            on_click=lambda e: self._on_verify_req("deepgram", self.deepgram_api_key.value, e.control),
+            on_click=lambda e: self._on_verify_req(
+                "deepgram", self.deepgram_api_key.value, e.control
+            ),
         )
 
         self.deepgram_stt_model = ft.TextField(
@@ -116,7 +123,7 @@ class SettingsView(ft.ListView):
             border_radius=8,
         )
         self._populate_host_apis()
-        
+
         self.microphone = ft.Dropdown(
             label="Microphone",
             options=[ft.dropdown.Option("(Default)")],
@@ -147,7 +154,7 @@ class SettingsView(ft.ListView):
             border_radius=8,
         )
 
-        self.apply_providers_btn = ft.ElevatedButton(
+        self.apply_providers_btn = ft.Button(
             content=ft.Text("Apply Provider Changes (Restart Pipeline)"),
             icon=icons.PLAY_CIRCLE_FILL_ROUNDED,
             style=ft.ButtonStyle(
@@ -205,7 +212,9 @@ class SettingsView(ft.ListView):
         else:
             # Default to Deepgram (handles DEEPGRAM and legacy ALIBABA)
             self.stt_provider.value = "Deepgram"
-        self.llm_provider.value = "Google Gemini" if settings.provider.llm == LLMProviderName.GEMINI else "Alibaba Qwen"
+        self.llm_provider.value = (
+            "Google Gemini" if settings.provider.llm == LLMProviderName.GEMINI else "Alibaba Qwen"
+        )
 
         self.deepgram_stt_model.value = settings.deepgram_stt.model
 
@@ -222,9 +231,8 @@ class SettingsView(ft.ListView):
             self.system_prompt.value = saved_prompt
         else:
             self.system_prompt.value = load_prompt_for_provider(provider_name)
-        if self.prompt_provider_label.page:
+        with contextlib.suppress(RuntimeError):
             self.prompt_provider_label.update()
-        if self.system_prompt.page:
             self.system_prompt.update()
         if self._settings and not saved_prompt.strip():
             self._settings.system_prompt = self.system_prompt.value
@@ -279,13 +287,19 @@ class SettingsView(ft.ListView):
         stt_provider = self._settings.provider.stt.value
         warning = get_stt_compatibility_warning(source_lang, stt_provider)
         if warning and self.page:
-            self.page.show_dialog(ft.SnackBar(
-                ft.Text(warning),
-                bgcolor=colors.ORANGE_700,
-                duration=4000,
-            ))
+            self.page.show_dialog(
+                ft.SnackBar(
+                    ft.Text(warning),
+                    bgcolor=colors.ORANGE_700,
+                    duration=4000,
+                )
+            )
 
-        new_llm = LLMProviderName.GEMINI if self.llm_provider.value == "Google Gemini" else LLMProviderName.QWEN
+        new_llm = (
+            LLMProviderName.GEMINI
+            if self.llm_provider.value == "Google Gemini"
+            else LLMProviderName.QWEN
+        )
 
         # Load provider-specific prompt when LLM provider changes
         if self._settings.provider.llm != new_llm:
@@ -294,9 +308,8 @@ class SettingsView(ft.ListView):
             self.prompt_provider_label.value = f"Prompt for: {provider_name.capitalize()}"
             self.system_prompt.value = load_prompt_for_provider(provider_name)
             self._settings.system_prompt = self.system_prompt.value
-            if self.prompt_provider_label.page:
+            with contextlib.suppress(RuntimeError):
                 self.prompt_provider_label.update()
-            if self.system_prompt.page:
                 self.system_prompt.update()
         else:
             self._settings.provider.llm = new_llm
@@ -322,8 +335,6 @@ class SettingsView(ft.ListView):
         self.verify_deepgram_btn.visible = is_deepgram_stt
 
         # Qwen ASR uses alibaba_api_key
-        is_qwen_asr = stt_provider == STTProviderName.QWEN_ASR
-
         self.google_api_key.visible = True
         self.verify_google_btn.visible = True
         # Show Alibaba key for Qwen ASR or Qwen LLM
@@ -333,7 +344,7 @@ class SettingsView(ft.ListView):
     def _on_verify_req(self, provider: str, key: str, btn_control: ft.Control) -> None:
         if not self.on_verify_api_key:
             return
-        
+
         if not key:
             self.page.show_dialog(ft.SnackBar(ft.Text("API Key is empty!"), bgcolor=colors.RED_400))
             return
@@ -341,34 +352,40 @@ class SettingsView(ft.ListView):
         async def _run():
             original_icon = btn_control.icon
             original_color = btn_control.icon_color
-            
+
             btn_control.icon = icons.HOURGLASS_TOP_ROUNDED
             btn_control.icon_color = colors.BLUE_400
             if btn_control.page:
                 btn_control.update()
-            
+
             try:
                 success, msg = await self.on_verify_api_key(provider, key)
                 if success:
-                    self.page.show_dialog(ft.SnackBar(ft.Text(f"{provider.capitalize()} Verified!"), bgcolor=colors.GREEN_400))
+                    self.page.show_dialog(
+                        ft.SnackBar(
+                            ft.Text(f"{provider.capitalize()} Verified!"), bgcolor=colors.GREEN_400
+                        )
+                    )
                     btn_control.icon = icons.CHECK_CIRCLE_ROUNDED
                     btn_control.icon_color = colors.GREEN_400
                 else:
                     logger.error(f"Verification failed for {provider}: {msg}")
                     # Also write to app logs UI
-                    self.page.show_dialog(ft.SnackBar(ft.Text(f"Failed: {msg}"), bgcolor=colors.RED_400))
+                    self.page.show_dialog(
+                        ft.SnackBar(ft.Text(f"Failed: {msg}"), bgcolor=colors.RED_400)
+                    )
                     btn_control.icon = icons.ERROR_OUTLINE_ROUNDED
                     btn_control.icon_color = colors.RED_400
             except Exception as e:
                 self.page.show_dialog(ft.SnackBar(ft.Text(f"Error: {e}"), bgcolor=colors.RED_400))
                 btn_control.icon = icons.ERROR_OUTLINE_ROUNDED
                 btn_control.icon_color = colors.RED_400
-            
+
             if btn_control.page:
                 btn_control.update()
-            
+
             await asyncio.sleep(3)
-            
+
             btn_control.icon = original_icon
             btn_control.icon_color = original_color
             if btn_control.page:
@@ -381,7 +398,9 @@ class SettingsView(ft.ListView):
         if self._settings is None:
             return
 
-        self._settings.deepgram_stt.model = self.deepgram_stt_model.value or self._settings.deepgram_stt.model
+        self._settings.deepgram_stt.model = (
+            self.deepgram_stt_model.value or self._settings.deepgram_stt.model
+        )
         self._settings.system_prompt = self.system_prompt.value or ""
 
         self._emit_settings_changed()
@@ -423,7 +442,7 @@ class SettingsView(ft.ListView):
                     if name == host_api:
                         hostapi_index = idx
                         break
-                
+
                 # If user selected a host API but it wasn't found, skip all devices
                 if hostapi_index is None:
                     devices = ["(Default)"]  # No matching host API
@@ -446,7 +465,7 @@ class SettingsView(ft.ListView):
             self.microphone.value = current
         else:
             self.microphone.value = "(Default)"
-        
+
         # Force UI update if component is attached to page
         if self.microphone.page:
             self.microphone.update()
@@ -463,6 +482,7 @@ class SettingsView(ft.ListView):
         allowed_apis = {"windows directsound", "windows wasapi"}
         try:
             import sounddevice as sd  # type: ignore
+
             for api in sd.query_hostapis():
                 name = str(api.get("name", "") or "").strip()
                 if name and name.lower() in allowed_apis:
@@ -484,7 +504,9 @@ class SettingsView(ft.ListView):
         current = (self.system_prompt.value or "").strip()
         if current:
             return
-        provider_name = "gemini" if self._settings.provider.llm == LLMProviderName.GEMINI else "qwen"
+        provider_name = (
+            "gemini" if self._settings.provider.llm == LLMProviderName.GEMINI else "qwen"
+        )
         self.system_prompt.value = load_prompt_for_provider(provider_name)
         if self.system_prompt.page:
             self.system_prompt.update()
