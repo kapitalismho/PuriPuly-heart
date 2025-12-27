@@ -96,6 +96,13 @@ Team Rules
 - Style tools: format with `black`, lint with `ruff` via `pre-commit`.
 - Release scope: bump version, tag, and produce PyInstaller builds.
 
+External Documentation
+----------------------
+
+- Always use Context7 MCP tools for code generation, setup steps, or library documentation.
+- Automatically use Context7 without explicit request.
+- For Flet: always check both `/websites/flet_dev` and `/flet-dev/flet` sources, as Context7's Flet documentation may be outdated (v0.28.3 vs actual latest).
+
 Secrets and Security
 --------------------
 
