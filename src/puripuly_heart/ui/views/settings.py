@@ -61,7 +61,7 @@ class SettingsView(ft.ListView):
             label="Google API Key (Gemini)",
             password=True,
             can_reveal_password=True,
-            on_change=lambda e: self._on_secret_change("google_api_key", self.google_api_key.value),
+            on_change=lambda e: self._on_secret_change("google_api_key", e),
             border_radius=8,
             expand=True,
         )
@@ -76,9 +76,7 @@ class SettingsView(ft.ListView):
             label="Alibaba API Key (Beijing)",
             password=True,
             can_reveal_password=True,
-            on_change=lambda e: self._on_secret_change(
-                "alibaba_api_key_beijing", self.alibaba_api_key_beijing.value
-            ),
+            on_change=lambda e: self._on_secret_change("alibaba_api_key_beijing", e),
             border_radius=8,
             expand=True,
         )
@@ -95,9 +93,7 @@ class SettingsView(ft.ListView):
             label="Alibaba API Key (Singapore)",
             password=True,
             can_reveal_password=True,
-            on_change=lambda e: self._on_secret_change(
-                "alibaba_api_key_singapore", self.alibaba_api_key_singapore.value
-            ),
+            on_change=lambda e: self._on_secret_change("alibaba_api_key_singapore", e),
             border_radius=8,
             expand=True,
         )
@@ -124,9 +120,7 @@ class SettingsView(ft.ListView):
             label="Deepgram API Key",
             password=True,
             can_reveal_password=True,
-            on_change=lambda e: self._on_secret_change(
-                "deepgram_api_key", self.deepgram_api_key.value
-            ),
+            on_change=lambda e: self._on_secret_change("deepgram_api_key", e),
             border_radius=8,
             expand=True,
         )
@@ -297,9 +291,23 @@ class SettingsView(ft.ListView):
             )
         )
 
-    def _on_secret_change(self, key: str, value: str) -> None:
+    def _on_secret_change(self, key: str, e) -> None:
         if self._settings is None or self._config_path is None:
             return
+        value = None
+        data = getattr(e, "data", None)
+        if isinstance(data, str):
+            value = data
+        else:
+            control = getattr(e, "control", None)
+            control_value = getattr(control, "value", None)
+            if isinstance(control_value, str):
+                value = control_value
+        if value is None:
+            return
+        control = getattr(e, "control", None)
+        if control is not None:
+            control.value = value
         with contextlib.suppress(Exception):
             store = create_secret_store(self._settings.secrets, config_path=self._config_path)
             if value:
@@ -522,7 +530,7 @@ class SettingsView(ft.ListView):
             self.microphone.value = "(Default)"
 
         # Force UI update if component is attached to page
-        if self.microphone.page:
+        with contextlib.suppress(RuntimeError):
             self.microphone.update()
 
     def _populate_host_apis(self) -> None:
