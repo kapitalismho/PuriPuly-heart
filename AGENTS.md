@@ -99,9 +99,10 @@ Team Rules
 External Documentation
 ----------------------
 
-- Always use Context7 MCP tools for code generation, setup steps, or library documentation.
-- Automatically use Context7 without explicit request.
-- For Flet: always check both `/websites/flet_dev` and `/flet-dev/flet` sources, as Context7's Flet documentation may be outdated (v0.28.3 vs actual latest).
+- If Context7 MCP is available:
+  - Always use Context7 for code generation, setup steps, or library documentation.
+  - Use Context7 automatically without explicit request.
+  - For Flet: always check both `/websites/flet_dev` and `/flet-dev/flet` sources, as Context7's Flet documentation may be outdated (v0.28.3 vs actual latest).
 
 Secrets and Security
 --------------------
