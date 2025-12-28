@@ -4,7 +4,7 @@
 #define MyAppName "PuriPuly <3"
 #define MyAppDirName "PuriPulyHeart"
 #define MyAppGroupName "PuriPulyHeart"
-#define MyAppVersion "0.3.0"
+#define MyAppVersion "0.3.1"
 #define MyAppPublisher "salee"
 #define MyAppURL "https://github.com/kapitalismho/PuriPuly-heart"
 #define MyAppExeName "PuriPulyHeart.exe"
