@@ -117,7 +117,7 @@ class TranslatorApp:
         if warning:
             from flet import Colors as colors
 
-            self.page.show_dialog(
+            self.page.open(
                 ft.SnackBar(
                     ft.Text(warning),
                     bgcolor=colors.ORANGE_700,
@@ -165,25 +165,25 @@ async def _check_and_notify_update(page: ft.Page) -> None:
 
         def _open_download(_e):
             webbrowser.open(update_info.download_url)
-            page.pop_dialog()
+            page.close(banner)
 
         def _dismiss(_e):
-            page.pop_dialog()
+            page.close(banner)
 
         banner = ft.Banner(
             bgcolor=colors.BLUE_900,
-            leading=ft.Icon(icon=ft.Icons.SYSTEM_UPDATE, color=colors.BLUE_200, size=40),
+            leading=ft.Icon(name=ft.Icons.SYSTEM_UPDATE, color=colors.BLUE_200, size=40),
             content=ft.Text(
                 f"새 버전 v{update_info.version}이 있습니다!",
                 color=colors.WHITE,
                 size=14,
             ),
             actions=[
-                ft.TextButton(content=ft.Text("다운로드"), on_click=_open_download),
-                ft.TextButton(content=ft.Text("닫기"), on_click=_dismiss),
+                ft.TextButton(text="다운로드", on_click=_open_download),
+                ft.TextButton(text="닫기", on_click=_dismiss),
             ],
         )
-        page.show_dialog(banner)
+        page.open(banner)
 
     except Exception as exc:
         logger.debug(f"Update check notification failed: {exc}")

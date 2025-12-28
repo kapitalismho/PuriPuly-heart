@@ -387,36 +387,34 @@ wheels = [
 
 [[package]]
 name = "flet"
-version = "0.80.0"
+version = "0.28.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx", marker = "platform_system != 'Pyodide'" },
-    { name = "msgpack" },
     { name = "oauthlib", marker = "platform_system != 'Pyodide'" },
     { name = "repath" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/ab/038c52c3dc5c3e330a582ae7bbd5e57697a8f583ed9fa2dc5b6bf144f0d7/flet-0.80.0.tar.gz", hash = "sha256:f2d4607d2e5d1e55286799c2a4c8188386b21641ac56481384d0fc58ec171cbd", size = 349614, upload-time = "2025-12-25T01:32:48.719Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/25/be/59da1b8760a2e786d5efed9be9e53c1499508fdedba1f5f0e5ac5f413e4c/flet-0.80.0-py3-none-any.whl", hash = "sha256:06cf3bef89c6448c5ae285a5bfba4af23ce67897293ea4552a6f6f546f485916", size = 440670, upload-time = "2025-12-25T01:32:47.102Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/d0/9ba4ee34972e9e0cf54b1f7d17c695491632421f81301993f2aec8d12105/flet-0.28.3-py3-none-any.whl", hash = "sha256:649bfc4af7933956ecf44963df6c0d997bff9ceeaf89d3c86d96803840cab83e", size = 463000, upload-time = "2025-05-20T19:44:58.651Z" },
 ]
 
 [[package]]
 name = "flet-desktop"
-version = "0.80.0"
+version = "0.28.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "flet" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c1/85/4671e70c779c5719a636d113d7761429821be23c6e52acadaf8ae269c30c/flet_desktop-0.80.0.tar.gz", hash = "sha256:9cdb55af8ef154f639c093246ed55d236af3600a9293ae0ec9b51810dacecbf9", size = 3279, upload-time = "2025-12-25T01:33:24.912Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/0e/f797d3052de953fa42b804b6ff170ad5c7708fc2959ffcce9d2a49a4b56c/flet_desktop-0.28.3.tar.gz", hash = "sha256:3e5db7b152de8cd3935e98eb39c162bf5c66f595d30c006f28d48d60e77a463d", size = 39876159, upload-time = "2025-05-20T19:39:28.548Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/eb/ac/f5c167384cf819df1a326a694707da6050331f521bb23e52b569c161291f/flet_desktop-0.80.0-py3-none-macosx_10_14_x86_64.whl", hash = "sha256:87d49392ddca3c69237b148406d933f9a4b7146d59f250b4d285720b72de39b7", size = 48323710, upload-time = "2025-12-25T01:32:56.721Z" },
-    { url = "https://files.pythonhosted.org/packages/ff/f6/2d105e5b97d686cf9fed86d32a96bb78b7942e5677335c9c621e86ee0d08/flet_desktop-0.80.0-py3-none-macosx_12_0_arm64.whl", hash = "sha256:c7d5cd1e653799bf73b6035c6e998873b84dceab1eb1e29790390c044c129d04", size = 48323704, upload-time = "2025-12-25T01:33:22.863Z" },
-    { url = "https://files.pythonhosted.org/packages/16/9c/cbcdccc3cf174103d384f0c9cdb318f7eada543bd90602fb1576a420c058/flet_desktop-0.80.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:14e0cb96e5cdd897cb87fce19c5dd47911a537004e9ae4714499dc8dd34a8490", size = 21680346, upload-time = "2025-12-25T01:33:00.688Z" },
-    { url = "https://files.pythonhosted.org/packages/66/8e/caf5a718a514aaec7d70ce0e297e959216815613e352702b6c3f5d0ddf2b/flet_desktop-0.80.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:aef79e445772c1143a45e5a732e056aa77f57498022902121bb5c352130d1c2f", size = 22064922, upload-time = "2025-12-25T01:33:27.304Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/16/21007a8b11240aaeb82e06c66df7cf092157349ea878fb6a59b74b554e7b/flet_desktop-0.80.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:25dd68eb756cc18bab690cf9011995ec5c21e6d58376521b657f74632ab8bd62", size = 21680337, upload-time = "2025-12-25T01:33:04.78Z" },
-    { url = "https://files.pythonhosted.org/packages/68/b3/34c555525afc63c479c99fecf9d1af628cf43bacfdd434db386b1a74afce/flet_desktop-0.80.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:89f63e29728ff686cd1b0b3c3f150ff84ffe825f1fde4d6c2e457f29df80d2ad", size = 22064912, upload-time = "2025-12-25T01:33:13.117Z" },
-    { url = "https://files.pythonhosted.org/packages/1c/37/1ffcd67963b37ea4e8e1b7eeeb35edf3ed98459641219211f058f61c143e/flet_desktop-0.80.0-py3-none-win32.whl", hash = "sha256:4863f44480b660bac0f61a97819f01388e3b4b3a7b227a6dcf7d81aa08f56458", size = 38098099, upload-time = "2025-12-25T01:33:09.457Z" },
-    { url = "https://files.pythonhosted.org/packages/fe/70/e1c15619c0fb71d1869a120049cc547e19faa1a75b7f7ebd713995cc9844/flet_desktop-0.80.0-py3-none-win_amd64.whl", hash = "sha256:27e71276278f84ad4f77c6300efc7c902ed71997cda3de80b32e9576a1a648bf", size = 38098104, upload-time = "2025-12-25T01:33:17.569Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/e6/280350788df36041b825a1e2ceeb2a60672f208164f3f2ff75c2cc16f1c8/flet_desktop-0.28.3-py3-none-macosx_10_14_x86_64.whl", hash = "sha256:6763b8e14863b0ee93e310720efa02202acae6d6ce8ff783663380f350f4f382", size = 47048073, upload-time = "2025-05-20T19:42:36.252Z" },
+    { url = "https://files.pythonhosted.org/packages/34/e0/7a1486d8f71bca34ae928f5f8833d19ec0bda5ad5975e8db9e0543ae577b/flet_desktop-0.28.3-py3-none-macosx_12_0_arm64.whl", hash = "sha256:89797a387e743808733f308c7faa1158ab768966180c0fc4207f3e95d3b25db3", size = 47048072, upload-time = "2025-05-20T19:42:41.787Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/fb/246d20657e0261c528f5a177919142c0d91721384b21e741fe6fc487fe94/flet_desktop-0.28.3-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:178f026f5c11555f06639ef96920b8f2e51281467543f7449f092a67878451d5", size = 15434420, upload-time = "2025-05-20T19:34:50.12Z" },
+    { url = "https://files.pythonhosted.org/packages/62/c6/c51c770371d3fe7901905611f6e68628e5348324de52ca571aeeae01c079/flet_desktop-0.28.3-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:539b33a0412e9ee17dccdf5f6ded99c48f1c390d6c8bb038b54e301833e56d0c", size = 16036176, upload-time = "2025-05-20T19:35:38.203Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/48/ea869c8c2c90d823bfa4556c11df18f73eb8417c08adf2f3da9f9ea90da5/flet_desktop-0.28.3-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:99715d68ba0001ff0d17f5aa0d937a39d9eaa57ba93e6bbb206f0c17f0b0911e", size = 15434409, upload-time = "2025-05-20T19:34:53.285Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/87/0c1966d834dbd74e7564946594755be8e427ec2b5c11cb308466e893c1bd/flet_desktop-0.28.3-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:6825a5a6d3e513526692475c14c790ea6874f4aec0132710fd5b9a1c9b4499bf", size = 16036166, upload-time = "2025-05-20T19:35:40.493Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/5f/85e74518b6ef0cebc6f7b1dfc63b523df821602745cf3a31a9607be18cf5/flet_desktop-0.28.3-py3-none-win32.whl", hash = "sha256:dc24f57ba725b974b4795b46e35f2b5348c4843f5117e9fc18b25c4abfa5caf4", size = 40265313, upload-time = "2025-05-20T19:39:19.761Z" },
+    { url = "https://files.pythonhosted.org/packages/b1/d0/c953ee675f2751f14329e23dbf538bb703c64ca1ad1c88e244ca17fe459e/flet_desktop-0.28.3-py3-none-win_amd64.whl", hash = "sha256:35db313302fd4c376ba9be4d43f953a5c67d1ba99180dc6afee702699ed14749", size = 40265319, upload-time = "2025-05-20T19:39:24.527Z" },
 ]
 
 [[package]]
@@ -722,32 +720,6 @@ wheels = [
 ]
 
 [[package]]
-name = "msgpack"
-version = "1.1.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4d/f2/bfb55a6236ed8725a96b0aa3acbd0ec17588e6a2c3b62a93eb513ed8783f/msgpack-1.1.2.tar.gz", hash = "sha256:3b60763c1373dd60f398488069bcdc703cd08a711477b5d480eecc9f9626f47e", size = 173581, upload-time = "2025-10-08T09:15:56.596Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ad/bd/8b0d01c756203fbab65d265859749860682ccd2a59594609aeec3a144efa/msgpack-1.1.2-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:70a0dff9d1f8da25179ffcf880e10cf1aad55fdb63cd59c9a49a1b82290062aa", size = 81939, upload-time = "2025-10-08T09:15:01.472Z" },
-    { url = "https://files.pythonhosted.org/packages/34/68/ba4f155f793a74c1483d4bdef136e1023f7bcba557f0db4ef3db3c665cf1/msgpack-1.1.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:446abdd8b94b55c800ac34b102dffd2f6aa0ce643c55dfc017ad89347db3dbdb", size = 85064, upload-time = "2025-10-08T09:15:03.764Z" },
-    { url = "https://files.pythonhosted.org/packages/f2/60/a064b0345fc36c4c3d2c743c82d9100c40388d77f0b48b2f04d6041dbec1/msgpack-1.1.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c63eea553c69ab05b6747901b97d620bb2a690633c77f23feb0c6a947a8a7b8f", size = 417131, upload-time = "2025-10-08T09:15:05.136Z" },
-    { url = "https://files.pythonhosted.org/packages/65/92/a5100f7185a800a5d29f8d14041f61475b9de465ffcc0f3b9fba606e4505/msgpack-1.1.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:372839311ccf6bdaf39b00b61288e0557916c3729529b301c52c2d88842add42", size = 427556, upload-time = "2025-10-08T09:15:06.837Z" },
-    { url = "https://files.pythonhosted.org/packages/f5/87/ffe21d1bf7d9991354ad93949286f643b2bb6ddbeab66373922b44c3b8cc/msgpack-1.1.2-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:2929af52106ca73fcb28576218476ffbb531a036c2adbcf54a3664de124303e9", size = 404920, upload-time = "2025-10-08T09:15:08.179Z" },
-    { url = "https://files.pythonhosted.org/packages/ff/41/8543ed2b8604f7c0d89ce066f42007faac1eaa7d79a81555f206a5cdb889/msgpack-1.1.2-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:be52a8fc79e45b0364210eef5234a7cf8d330836d0a64dfbb878efa903d84620", size = 415013, upload-time = "2025-10-08T09:15:09.83Z" },
-    { url = "https://files.pythonhosted.org/packages/41/0d/2ddfaa8b7e1cee6c490d46cb0a39742b19e2481600a7a0e96537e9c22f43/msgpack-1.1.2-cp312-cp312-win32.whl", hash = "sha256:1fff3d825d7859ac888b0fbda39a42d59193543920eda9d9bea44d958a878029", size = 65096, upload-time = "2025-10-08T09:15:11.11Z" },
-    { url = "https://files.pythonhosted.org/packages/8c/ec/d431eb7941fb55a31dd6ca3404d41fbb52d99172df2e7707754488390910/msgpack-1.1.2-cp312-cp312-win_amd64.whl", hash = "sha256:1de460f0403172cff81169a30b9a92b260cb809c4cb7e2fc79ae8d0510c78b6b", size = 72708, upload-time = "2025-10-08T09:15:12.554Z" },
-    { url = "https://files.pythonhosted.org/packages/c5/31/5b1a1f70eb0e87d1678e9624908f86317787b536060641d6798e3cf70ace/msgpack-1.1.2-cp312-cp312-win_arm64.whl", hash = "sha256:be5980f3ee0e6bd44f3a9e9dea01054f175b50c3e6cdb692bc9424c0bbb8bf69", size = 64119, upload-time = "2025-10-08T09:15:13.589Z" },
-    { url = "https://files.pythonhosted.org/packages/6b/31/b46518ecc604d7edf3a4f94cb3bf021fc62aa301f0cb849936968164ef23/msgpack-1.1.2-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:4efd7b5979ccb539c221a4c4e16aac1a533efc97f3b759bb5a5ac9f6d10383bf", size = 81212, upload-time = "2025-10-08T09:15:14.552Z" },
-    { url = "https://files.pythonhosted.org/packages/92/dc/c385f38f2c2433333345a82926c6bfa5ecfff3ef787201614317b58dd8be/msgpack-1.1.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:42eefe2c3e2af97ed470eec850facbe1b5ad1d6eacdbadc42ec98e7dcf68b4b7", size = 84315, upload-time = "2025-10-08T09:15:15.543Z" },
-    { url = "https://files.pythonhosted.org/packages/d3/68/93180dce57f684a61a88a45ed13047558ded2be46f03acb8dec6d7c513af/msgpack-1.1.2-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1fdf7d83102bf09e7ce3357de96c59b627395352a4024f6e2458501f158bf999", size = 412721, upload-time = "2025-10-08T09:15:16.567Z" },
-    { url = "https://files.pythonhosted.org/packages/5d/ba/459f18c16f2b3fc1a1ca871f72f07d70c07bf768ad0a507a698b8052ac58/msgpack-1.1.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:fac4be746328f90caa3cd4bc67e6fe36ca2bf61d5c6eb6d895b6527e3f05071e", size = 424657, upload-time = "2025-10-08T09:15:17.825Z" },
-    { url = "https://files.pythonhosted.org/packages/38/f8/4398c46863b093252fe67368b44edc6c13b17f4e6b0e4929dbf0bdb13f23/msgpack-1.1.2-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:fffee09044073e69f2bad787071aeec727183e7580443dfeb8556cbf1978d162", size = 402668, upload-time = "2025-10-08T09:15:19.003Z" },
-    { url = "https://files.pythonhosted.org/packages/28/ce/698c1eff75626e4124b4d78e21cca0b4cc90043afb80a507626ea354ab52/msgpack-1.1.2-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:5928604de9b032bc17f5099496417f113c45bc6bc21b5c6920caf34b3c428794", size = 419040, upload-time = "2025-10-08T09:15:20.183Z" },
-    { url = "https://files.pythonhosted.org/packages/67/32/f3cd1667028424fa7001d82e10ee35386eea1408b93d399b09fb0aa7875f/msgpack-1.1.2-cp313-cp313-win32.whl", hash = "sha256:a7787d353595c7c7e145e2331abf8b7ff1e6673a6b974ded96e6d4ec09f00c8c", size = 65037, upload-time = "2025-10-08T09:15:21.416Z" },
-    { url = "https://files.pythonhosted.org/packages/74/07/1ed8277f8653c40ebc65985180b007879f6a836c525b3885dcc6448ae6cb/msgpack-1.1.2-cp313-cp313-win_amd64.whl", hash = "sha256:a465f0dceb8e13a487e54c07d04ae3ba131c7c5b95e2612596eafde1dccf64a9", size = 72631, upload-time = "2025-10-08T09:15:22.431Z" },
-    { url = "https://files.pythonhosted.org/packages/e5/db/0314e4e2db56ebcf450f277904ffd84a7988b9e5da8d0d61ab2d057df2b6/msgpack-1.1.2-cp313-cp313-win_arm64.whl", hash = "sha256:e69b39f8c0aa5ec24b57737ebee40be647035158f14ed4b40e6f150077e21a84", size = 64118, upload-time = "2025-10-08T09:15:23.402Z" },
-]
-
-[[package]]
 name = "multidict"
 version = "6.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1037,7 +1009,7 @@ wheels = [
 
 [[package]]
 name = "puripuly-heart"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
@@ -1075,8 +1047,8 @@ requires-dist = [
     { name = "cryptography", specifier = ">=41.0" },
     { name = "dashscope" },
     { name = "deepgram-sdk", specifier = ">=5.0.0" },
-    { name = "flet", specifier = ">=0.80,<0.81" },
-    { name = "flet-desktop", specifier = ">=0.80,<0.81" },
+    { name = "flet", specifier = "==0.28.3" },
+    { name = "flet-desktop", specifier = "==0.28.3" },
     { name = "google-genai", specifier = ">=1.56.0" },
     { name = "grpcio" },
     { name = "httpx", specifier = ">=0.27" },

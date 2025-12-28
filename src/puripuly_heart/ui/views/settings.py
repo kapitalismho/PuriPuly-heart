@@ -25,6 +25,19 @@ from puripuly_heart.ui.theme import COLOR_PRIMARY
 logger = logging.getLogger(__name__)
 
 
+def _load_secret_value(store, key: str, *, legacy_keys: tuple[str, ...] = ()) -> str:
+    value = store.get(key) or ""
+    if value or not legacy_keys:
+        return value
+    for legacy_key in legacy_keys:
+        legacy_value = store.get(legacy_key) or ""
+        if legacy_value:
+            with contextlib.suppress(Exception):
+                store.set(key, legacy_value)
+            return legacy_value
+    return ""
+
+
 class SettingsView(ft.ListView):
     def __init__(self):
         super().__init__(expand=True, spacing=15, padding=10)
@@ -45,7 +58,7 @@ class SettingsView(ft.ListView):
                 ft.dropdown.Option("Qwen ASR"),
                 ft.dropdown.Option("Soniox"),
             ],
-            on_select=self._on_provider_change,
+            on_change=self._on_provider_change,
             border_radius=8,
         )
         self.llm_provider = ft.Dropdown(
@@ -54,7 +67,7 @@ class SettingsView(ft.ListView):
                 ft.dropdown.Option("Google Gemini"),
                 ft.dropdown.Option("Alibaba Qwen"),
             ],
-            on_select=self._on_provider_change,
+            on_change=self._on_provider_change,
             border_radius=8,
         )
 
@@ -113,7 +126,7 @@ class SettingsView(ft.ListView):
                 ft.dropdown.Option("Beijing"),
                 ft.dropdown.Option("Singapore"),
             ],
-            on_select=self._on_qwen_region_change,
+            on_change=self._on_qwen_region_change,
             border_radius=8,
         )
 
@@ -184,7 +197,7 @@ class SettingsView(ft.ListView):
         self.audio_host_api = ft.Dropdown(
             label="Audio Host API",
             options=[ft.dropdown.Option("(Default)")],  # Will be populated dynamically
-            on_select=self._on_audio_change,
+            on_change=self._on_audio_change,
             border_radius=8,
         )
         self._populate_host_apis()
@@ -192,7 +205,7 @@ class SettingsView(ft.ListView):
         self.microphone = ft.Dropdown(
             label="Microphone",
             options=[ft.dropdown.Option("(Default)")],
-            on_select=self._on_audio_change,
+            on_change=self._on_audio_change,
             border_radius=8,
         )
 
@@ -219,7 +232,7 @@ class SettingsView(ft.ListView):
             border_radius=8,
         )
         self.reset_prompt_btn = ft.Button(
-            content=ft.Text("Reset Prompt"),
+            text="Reset Prompt",
             icon=icons.REFRESH_ROUNDED,
             style=ft.ButtonStyle(
                 color=colors.WHITE,
@@ -230,7 +243,7 @@ class SettingsView(ft.ListView):
         )
 
         self.apply_providers_btn = ft.Button(
-            content=ft.Text("Apply Provider Changes (Restart Pipeline)"),
+            text="Apply Provider Changes (Restart Pipeline)",
             icon=icons.PLAY_CIRCLE_FILL_ROUNDED,
             style=ft.ButtonStyle(
                 color=colors.WHITE,
@@ -324,22 +337,31 @@ class SettingsView(ft.ListView):
             self.system_prompt.value = saved_prompt
         else:
             self.system_prompt.value = load_prompt_for_provider(provider_name)
-        with contextlib.suppress(RuntimeError):
+        if self.prompt_provider_label.page:
             self.prompt_provider_label.update()
+        if self.system_prompt.page:
             self.system_prompt.update()
         if self._settings and not saved_prompt.strip():
             self._settings.system_prompt = self.system_prompt.value
 
-        with contextlib.suppress(Exception):
+        try:
             store = create_secret_store(settings.secrets, config_path=config_path)
+        except Exception as exc:
+            logger.warning("Failed to load secrets: %s", exc)
+        else:
             self.google_api_key.value = store.get("google_api_key") or ""
-            self.alibaba_api_key_beijing.value = store.get("alibaba_api_key_beijing") or ""
-            self.alibaba_api_key_singapore.value = store.get("alibaba_api_key_singapore") or ""
+            self.alibaba_api_key_beijing.value = _load_secret_value(
+                store, "alibaba_api_key_beijing", legacy_keys=("alibaba_api_key",)
+            )
+            self.alibaba_api_key_singapore.value = _load_secret_value(
+                store, "alibaba_api_key_singapore", legacy_keys=("alibaba_api_key",)
+            )
             self.deepgram_api_key.value = store.get("deepgram_api_key") or ""
             self.soniox_api_key.value = store.get("soniox_api_key") or ""
 
         self._update_provider_visibility()
-        self.update()
+        if self.page:
+            self.update()
 
     def _build_section(self, title: str, controls: list[ft.Control]) -> ft.Control:
         return BentoCard(
@@ -398,7 +420,7 @@ class SettingsView(ft.ListView):
         stt_provider = self._settings.provider.stt.value
         warning = get_stt_compatibility_warning(source_lang, stt_provider)
         if warning and self.page:
-            self.page.show_dialog(
+            self.page.open(
                 ft.SnackBar(
                     ft.Text(warning),
                     bgcolor=colors.ORANGE_700,
@@ -497,7 +519,7 @@ class SettingsView(ft.ListView):
             return
 
         if not key:
-            self.page.show_dialog(ft.SnackBar(ft.Text("API Key is empty!"), bgcolor=colors.RED_400))
+            self.page.open(ft.SnackBar(ft.Text("API Key is empty!"), bgcolor=colors.RED_400))
             return
 
         async def _run():
@@ -512,7 +534,7 @@ class SettingsView(ft.ListView):
             try:
                 success, msg = await self.on_verify_api_key(provider, key)
                 if success:
-                    self.page.show_dialog(
+                    self.page.open(
                         ft.SnackBar(
                             ft.Text(f"{provider.capitalize()} Verified!"), bgcolor=colors.GREEN_400
                         )
@@ -522,13 +544,13 @@ class SettingsView(ft.ListView):
                 else:
                     logger.error(f"Verification failed for {provider}: {msg}")
                     # Also write to app logs UI
-                    self.page.show_dialog(
+                    self.page.open(
                         ft.SnackBar(ft.Text(f"Failed: {msg}"), bgcolor=colors.RED_400)
                     )
                     btn_control.icon = icons.ERROR_OUTLINE_ROUNDED
                     btn_control.icon_color = colors.RED_400
             except Exception as e:
-                self.page.show_dialog(ft.SnackBar(ft.Text(f"Error: {e}"), bgcolor=colors.RED_400))
+                self.page.open(ft.SnackBar(ft.Text(f"Error: {e}"), bgcolor=colors.RED_400))
                 btn_control.icon = icons.ERROR_OUTLINE_ROUNDED
                 btn_control.icon_color = colors.RED_400
 
@@ -636,8 +658,7 @@ class SettingsView(ft.ListView):
         else:
             self.microphone.value = "(Default)"
 
-        # Force UI update if component is attached to page
-        with contextlib.suppress(RuntimeError):
+        if self.microphone.page:
             self.microphone.update()
 
     def _populate_host_apis(self) -> None:

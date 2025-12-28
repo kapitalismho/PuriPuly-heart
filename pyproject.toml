@@ -22,8 +22,8 @@ dependencies = [
   "websockets",
   "deepgram-sdk>=5.0.0",
   "keyring>=25.0",
-  "flet>=0.80,<0.81",
-  "flet-desktop>=0.80,<0.81",
+  "flet==0.28.3",
+  "flet-desktop==0.28.3",
   "httpx>=0.27",
 ]
 

@@ -12,6 +12,8 @@ import os
 import sys
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_data_files
+
 # Add src to path for imports
 src_path = Path("src").resolve()
 sys.path.insert(0, str(src_path))
@@ -26,7 +28,7 @@ datas = [
     (str(src_path / "puripuly_heart" / "data"), "puripuly_heart/data"),
     # Prompt templates
     ("prompts", "prompts"),
-]
+] + collect_data_files("flet_desktop")
 
 # Hidden imports for dynamic imports
 hiddenimports = [
@@ -40,6 +42,7 @@ hiddenimports = [
     "deepgram",
     "websockets",
     "flet",
+    "flet_desktop",
     "httpx",
     "keyring.backends.Windows",
     "onnxruntime",

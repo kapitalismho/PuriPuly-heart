@@ -35,7 +35,7 @@ class DashboardView(ft.Column):
     def _build_ui(self):
         # 1. Status Card (Left Top)
         self.status_indicator = ft.Icon(
-            icon=icons.CIRCLE,
+            name=icons.CIRCLE,
             size=12,
             color=COLOR_ERROR,  # Default disconnected
             tooltip="VRChat Status: Disconnected",
@@ -79,11 +79,11 @@ class DashboardView(ft.Column):
             border_radius=12,
             content_padding=12,
             filled=True,
-            fill_color=colors.GREY_800,
+            bgcolor=colors.GREY_800,
             color=colors.WHITE,
             border_color=colors.GREY_700,
-            focused_border_color=colors.GREY_700,
-            on_select=self._on_lang_change,
+            focused_bgcolor=colors.GREY_700,
+            on_change=self._on_lang_change,
         )
 
         self.target_lang = ft.Dropdown(
@@ -95,11 +95,11 @@ class DashboardView(ft.Column):
             border_radius=12,
             content_padding=12,
             filled=True,
-            fill_color=colors.GREY_800,
+            bgcolor=colors.GREY_800,
             color=colors.WHITE,
             border_color=colors.GREY_700,
-            focused_border_color=colors.GREY_700,
-            on_select=self._on_lang_change,
+            focused_bgcolor=colors.GREY_700,
+            on_change=self._on_lang_change,
         )
 
         # Segmented Control for Presets
@@ -130,7 +130,7 @@ class DashboardView(ft.Column):
                 ft.Row(
                     [
                         self.source_lang,
-                        ft.Icon(icon=icons.ARROW_FORWARD_ROUNDED, color=colors.GREY_500),
+                        ft.Icon(name=icons.ARROW_FORWARD_ROUNDED, color=colors.GREY_500),
                         self.target_lang,
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -175,7 +175,7 @@ class DashboardView(ft.Column):
                 ft.Row(
                     [
                         ft.Icon(
-                            icon=icons.POWER_SETTINGS_NEW_ROUNDED, color=colors.GREY_500, size=16
+                            name=icons.POWER_SETTINGS_NEW_ROUNDED, color=colors.GREY_500, size=16
                         ),
                         ft.Text(
                             "SYSTEM POWER",
@@ -232,7 +232,7 @@ class DashboardView(ft.Column):
                 ft.Text(
                     "LAST TRANSLATED", size=11, color=colors.GREY_500, weight=ft.FontWeight.BOLD
                 ),
-                ft.Container(content=self.hero_text, alignment=ft.Alignment.CENTER, expand=True),
+                ft.Container(content=self.hero_text, alignment=ft.alignment.center, expand=True),
             ],
             expand=True,
         )
@@ -355,7 +355,7 @@ class DashboardView(ft.Column):
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Icon(icon=icon_name, size=28, color=icon_color),
+                        ft.Icon(name=icon_name, size=28, color=icon_color),
                     ft.Text(label, size=10, weight=ft.FontWeight.BOLD, color=text_color),
                     ft.Text(hint_text, size=10, color=text_color, text_align=ft.TextAlign.CENTER),
                 ],

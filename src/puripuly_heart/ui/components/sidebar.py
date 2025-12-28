@@ -10,7 +10,7 @@ from puripuly_heart.ui.components.bento_card import BentoCard
 class AppSidebar(ft.Container):
     def __init__(self, on_change: Callable[[int], None]):
         super().__init__(
-            padding=0, width=80, bgcolor=colors.TRANSPARENT, alignment=ft.Alignment.TOP_CENTER
+            padding=0, width=80, bgcolor=colors.TRANSPARENT, alignment=ft.alignment.top_center
         )
         self.on_nav_change = on_change
         self.selected_index = 0
@@ -63,14 +63,14 @@ class AppSidebar(ft.Container):
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Icon(icon=icon_name, color=icon_color, size=28),
+                    ft.Icon(name=icon_name, color=icon_color, size=28),
                     ft.Text(item["label"], size=10, color=icon_color, weight=ft.FontWeight.BOLD),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=5,
             ),
-            alignment=ft.Alignment.CENTER,
+            alignment=ft.alignment.center,
             expand=True,  # Critical: Fill available space (3 equal parts)
             bgcolor=bg_color,
             on_click=lambda e: self._on_tile_click(index),
