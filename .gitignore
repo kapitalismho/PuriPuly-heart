@@ -141,6 +141,7 @@ celerybeat.pid
 .venv
 .venv-wsl312/
 .venv-wsl/
+.venv-linux/
 env/
 venv/
 ENV/
