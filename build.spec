@@ -32,11 +32,13 @@ datas = [
 hiddenimports = [
     "puripuly_heart.providers.stt.deepgram",
     "puripuly_heart.providers.stt.qwen_asr",
+    "puripuly_heart.providers.stt.soniox",
     "puripuly_heart.providers.llm.gemini",
     "puripuly_heart.providers.llm.qwen",
     "google.genai",
     "dashscope",
     "deepgram",
+    "websockets",
     "flet",
     "httpx",
     "keyring.backends.Windows",

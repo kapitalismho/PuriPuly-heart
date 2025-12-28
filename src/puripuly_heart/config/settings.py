@@ -10,6 +10,7 @@ from typing import Any
 class STTProviderName(str, Enum):
     DEEPGRAM = "deepgram"
     QWEN_ASR = "qwen_asr"
+    SONIOX = "soniox"
 
 
 class LLMProviderName(str, Enum):
@@ -91,6 +92,24 @@ class QwenASRSTTSettings:
             raise ValueError("model must be non-empty")
         if not self.endpoint:
             raise ValueError("endpoint must be non-empty")
+
+
+@dataclass(slots=True)
+class SonioxSTTSettings:
+    model: str = "stt-rt-v3"
+    endpoint: str = "wss://stt-rt.soniox.com/transcribe-websocket"
+    keepalive_interval_s: float = 10.0
+    trailing_silence_ms: int = 100
+
+    def validate(self) -> None:
+        if not self.model:
+            raise ValueError("model must be non-empty")
+        if not self.endpoint:
+            raise ValueError("endpoint must be non-empty")
+        if self.keepalive_interval_s <= 0:
+            raise ValueError("keepalive_interval_s must be > 0")
+        if self.trailing_silence_ms < 0:
+            raise ValueError("trailing_silence_ms must be >= 0")
 
 
 @dataclass(slots=True)
@@ -179,6 +198,7 @@ class AppSettings:
     stt: STTSettings = field(default_factory=STTSettings)
     deepgram_stt: DeepgramSTTSettings = field(default_factory=DeepgramSTTSettings)
     qwen_asr_stt: QwenASRSTTSettings = field(default_factory=QwenASRSTTSettings)
+    soniox_stt: SonioxSTTSettings = field(default_factory=SonioxSTTSettings)
     qwen: QwenSettings = field(default_factory=QwenSettings)
     llm: LLMSettings = field(default_factory=LLMSettings)
     osc: OSCSettings = field(default_factory=OSCSettings)
@@ -192,6 +212,7 @@ class AppSettings:
         self.stt.validate()
         self.deepgram_stt.validate()
         self.qwen_asr_stt.validate()
+        self.soniox_stt.validate()
         self.qwen.validate()
         self.llm.validate()
         self.osc.validate()
@@ -232,6 +253,12 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
         "qwen_asr_stt": {
             "model": settings.qwen_asr_stt.model,
             "endpoint": settings.qwen_asr_stt.endpoint,
+        },
+        "soniox_stt": {
+            "model": settings.soniox_stt.model,
+            "endpoint": settings.soniox_stt.endpoint,
+            "keepalive_interval_s": settings.soniox_stt.keepalive_interval_s,
+            "trailing_silence_ms": settings.soniox_stt.trailing_silence_ms,
         },
         "qwen": {
             "region": settings.qwen.region.value,
@@ -306,6 +333,18 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
                     "endpoint", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
                 )
             ),
+        ),
+        soniox_stt=SonioxSTTSettings(
+            model=str(data.get("soniox_stt", {}).get("model", "stt-rt-v3")),
+            endpoint=str(
+                data.get("soniox_stt", {}).get(
+                    "endpoint", "wss://stt-rt.soniox.com/transcribe-websocket"
+                )
+            ),
+            keepalive_interval_s=float(
+                data.get("soniox_stt", {}).get("keepalive_interval_s", 10.0)
+            ),
+            trailing_silence_ms=int(data.get("soniox_stt", {}).get("trailing_silence_ms", 100)),
         ),
         qwen=QwenSettings(
             region=QwenRegion(data.get("qwen", {}).get("region", QwenRegion.BEIJING.value)),

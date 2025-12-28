@@ -43,6 +43,7 @@ class SettingsView(ft.ListView):
             options=[
                 ft.dropdown.Option("Deepgram"),
                 ft.dropdown.Option("Qwen ASR"),
+                ft.dropdown.Option("Soniox"),
             ],
             on_select=self._on_provider_change,
             border_radius=8,
@@ -133,9 +134,49 @@ class SettingsView(ft.ListView):
             ),
         )
 
+        self.soniox_api_key = ft.TextField(
+            label="Soniox API Key",
+            password=True,
+            can_reveal_password=True,
+            on_change=lambda e: self._on_secret_change("soniox_api_key", e),
+            border_radius=8,
+            expand=True,
+        )
+        self.verify_soniox_btn = ft.IconButton(
+            icon=icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
+            icon_color=colors.GREY_400,
+            tooltip="Verify Key",
+            on_click=lambda e: self._on_verify_req("soniox", self.soniox_api_key.value, e.control),
+        )
+
         self.deepgram_stt_model = ft.TextField(
             label="Deepgram Model",
             hint_text="nova-3",
+            on_change=self._on_setting_change,
+            border_radius=8,
+        )
+
+        self.soniox_stt_model = ft.TextField(
+            label="Soniox Model",
+            hint_text="stt-rt-v3",
+            on_change=self._on_setting_change,
+            border_radius=8,
+        )
+        self.soniox_stt_endpoint = ft.TextField(
+            label="Soniox Endpoint",
+            hint_text="wss://stt-rt.soniox.com/transcribe-websocket",
+            on_change=self._on_setting_change,
+            border_radius=8,
+        )
+        self.soniox_keepalive_s = ft.TextField(
+            label="Soniox Keepalive (seconds)",
+            hint_text="10",
+            on_change=self._on_setting_change,
+            border_radius=8,
+        )
+        self.soniox_trailing_silence_ms = ft.TextField(
+            label="Soniox Trailing Silence (ms)",
+            hint_text="100",
             on_change=self._on_setting_change,
             border_radius=8,
         )
@@ -209,6 +250,12 @@ class SettingsView(ft.ListView):
                     ft.Divider(height=5, color=colors.TRANSPARENT),
                     ft.Row([self.deepgram_api_key, self.verify_deepgram_btn]),
                     self.deepgram_stt_model,
+                    ft.Divider(height=5, color=colors.TRANSPARENT),
+                    ft.Row([self.soniox_api_key, self.verify_soniox_btn]),
+                    self.soniox_stt_model,
+                    self.soniox_stt_endpoint,
+                    self.soniox_keepalive_s,
+                    self.soniox_trailing_silence_ms,
                     ft.Divider(height=10, color=colors.TRANSPARENT),
                     ft.Text("Translation (LLM)", size=12, color=colors.GREY_400),
                     self.llm_provider,
@@ -246,6 +293,8 @@ class SettingsView(ft.ListView):
 
         if settings.provider.stt == STTProviderName.QWEN_ASR:
             self.stt_provider.value = "Qwen ASR"
+        elif settings.provider.stt == STTProviderName.SONIOX:
+            self.stt_provider.value = "Soniox"
         else:
             # Default to Deepgram (handles DEEPGRAM and legacy ALIBABA)
             self.stt_provider.value = "Deepgram"
@@ -257,6 +306,10 @@ class SettingsView(ft.ListView):
         )
 
         self.deepgram_stt_model.value = settings.deepgram_stt.model
+        self.soniox_stt_model.value = settings.soniox_stt.model
+        self.soniox_stt_endpoint.value = settings.soniox_stt.endpoint
+        self.soniox_keepalive_s.value = str(settings.soniox_stt.keepalive_interval_s)
+        self.soniox_trailing_silence_ms.value = str(settings.soniox_stt.trailing_silence_ms)
 
         self.audio_host_api.value = settings.audio.input_host_api or "(Default)"
         self._refresh_microphones()
@@ -283,6 +336,7 @@ class SettingsView(ft.ListView):
             self.alibaba_api_key_beijing.value = store.get("alibaba_api_key_beijing") or ""
             self.alibaba_api_key_singapore.value = store.get("alibaba_api_key_singapore") or ""
             self.deepgram_api_key.value = store.get("deepgram_api_key") or ""
+            self.soniox_api_key.value = store.get("soniox_api_key") or ""
 
         self._update_provider_visibility()
         self.update()
@@ -334,6 +388,8 @@ class SettingsView(ft.ListView):
         stt_value = self.stt_provider.value
         if stt_value == "Qwen ASR":
             self._settings.provider.stt = STTProviderName.QWEN_ASR
+        elif stt_value == "Soniox":
+            self._settings.provider.stt = STTProviderName.SONIOX
         else:
             self._settings.provider.stt = STTProviderName.DEEPGRAM
 
@@ -413,6 +469,14 @@ class SettingsView(ft.ListView):
         self.deepgram_stt_model.visible = is_deepgram_stt
         self.verify_deepgram_btn.visible = is_deepgram_stt
 
+        is_soniox_stt = stt_provider == STTProviderName.SONIOX
+        self.soniox_api_key.visible = is_soniox_stt
+        self.soniox_stt_model.visible = is_soniox_stt
+        self.soniox_stt_endpoint.visible = is_soniox_stt
+        self.soniox_keepalive_s.visible = is_soniox_stt
+        self.soniox_trailing_silence_ms.visible = is_soniox_stt
+        self.verify_soniox_btn.visible = is_soniox_stt
+
         # Google API key is always visible
         self.google_api_key.visible = True
         self.verify_google_btn.visible = True
@@ -488,6 +552,25 @@ class SettingsView(ft.ListView):
         self._settings.deepgram_stt.model = (
             self.deepgram_stt_model.value or self._settings.deepgram_stt.model
         )
+        self._settings.soniox_stt.model = (
+            self.soniox_stt_model.value or self._settings.soniox_stt.model
+        )
+        if self.soniox_stt_endpoint.value:
+            self._settings.soniox_stt.endpoint = self.soniox_stt_endpoint.value
+        if self.soniox_keepalive_s.value:
+            try:
+                self._settings.soniox_stt.keepalive_interval_s = float(
+                    self.soniox_keepalive_s.value
+                )
+            except ValueError:
+                pass
+        if self.soniox_trailing_silence_ms.value:
+            try:
+                self._settings.soniox_stt.trailing_silence_ms = int(
+                    self.soniox_trailing_silence_ms.value
+                )
+            except ValueError:
+                pass
         self._settings.system_prompt = self.system_prompt.value or ""
 
         self._emit_settings_changed()

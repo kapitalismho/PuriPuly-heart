@@ -2,6 +2,7 @@
 
 Provides consistent language codes and names across:
 - Deepgram STT (Nova-3 language codes)
+- Soniox STT (language hints)
 - LLM prompts (Gemini, Qwen)
 - UI display
 
@@ -125,6 +126,15 @@ def get_qwen_asr_language(code: str) -> str:
     return _QWEN_ASR_LANGUAGE_MAP.get(base_code, "en")
 
 
+def get_soniox_language_hints(code: str) -> list[str]:
+    """Get Soniox language hints from UI language code. Falls back to ['en']."""
+    info = get_language_info(code)
+    if not info:
+        return ["en"]
+    base_code = info.code.split("-")[0].lower()
+    return [base_code or "en"]
+
+
 def get_all_language_options() -> Sequence[tuple[str, str]]:
     """Get all supported languages as (code, name) tuples for UI dropdowns.
 
@@ -196,6 +206,11 @@ def is_qwen_asr_supported(code: str) -> bool:
     return base_code in _QWEN_ASR_LANGUAGE_MAP
 
 
+def is_soniox_supported(code: str) -> bool:
+    """Check if a language is supported by Soniox (UI language list)."""
+    return get_language_info(code) is not None
+
+
 def get_stt_compatibility_warning(code: str, stt_provider: str) -> str | None:
     """Get a warning message if the language is not fully supported by the STT provider.
 
@@ -214,5 +229,8 @@ def get_stt_compatibility_warning(code: str, stt_provider: str) -> str | None:
         if is_deepgram_supported(code):
             return f"{lang_name} is not supported by Qwen ASR. Use Deepgram instead."
         return f"{lang_name} is not supported by Qwen ASR."
+
+    if stt_provider == "soniox" and not is_soniox_supported(code):
+        return f"{lang_name} is not supported by Soniox."
 
     return None

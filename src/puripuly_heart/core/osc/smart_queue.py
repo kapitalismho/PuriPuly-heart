@@ -54,7 +54,11 @@ class SmartOscQueue:
         tail = parts[1:]
 
         logger.info(f"[OSC] Sending: '{head}'")
-        self.sender.send_chatbox(head)
+        try:
+            self.sender.send_chatbox(head)
+        except OSError as exc:
+            logger.warning(f"[OSC] Send failed: {exc}")
+            return
         self._next_send_at = now + self.cooldown_s
 
         self._pending.clear()
@@ -88,4 +92,7 @@ class SmartOscQueue:
 
     def send_typing(self, is_typing: bool) -> None:
         """Forward typing indicator to the OSC sender."""
-        self.sender.send_typing(is_typing)
+        try:
+            self.sender.send_typing(is_typing)
+        except OSError as exc:
+            logger.warning(f"[OSC] Typing send failed: {exc}")

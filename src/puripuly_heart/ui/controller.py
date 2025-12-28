@@ -35,6 +35,7 @@ from puripuly_heart.core.vad.silero import SileroVadOnnx
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.qwen import QwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 from puripuly_heart.ui.event_bridge import UIEventBridge
 
 logger = logging.getLogger(__name__)
@@ -180,6 +181,8 @@ class GuiController:
                 )
             elif provider == "deepgram":
                 success = await DeepgramRealtimeSTTBackend.verify_api_key(key)
+            elif provider == "soniox":
+                success = await SonioxRealtimeSTTBackend.verify_api_key(key)
             else:
                 return False, f"Unknown provider: {provider}"
 
@@ -462,6 +465,9 @@ class GuiController:
                 elif provider_name == STTProviderName.QWEN_ASR:
                     key, base_url = self._get_qwen_key_and_base_url(secrets)
                     stt_valid = await QwenLLMProvider.verify_api_key(key, base_url=base_url)
+                elif provider_name == STTProviderName.SONIOX:
+                    key = secrets.get("soniox_api_key") or ""
+                    stt_valid = await SonioxRealtimeSTTBackend.verify_api_key(key)
                 else:
                     stt_valid = True
             except Exception:

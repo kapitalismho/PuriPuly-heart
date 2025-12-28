@@ -139,4 +139,19 @@ def create_stt_backend(settings: AppSettings, *, secrets: SecretStore) -> STTBac
             sample_rate_hz=settings.audio.internal_sample_rate_hz,
         )
 
+    if settings.provider.stt == STTProviderName.SONIOX:
+        from puripuly_heart.core.language import get_soniox_language_hints
+        from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
+
+        api_key = require_secret(secrets, key="soniox_api_key", env_var="SONIOX_API_KEY")
+        return SonioxRealtimeSTTBackend(
+            api_key=api_key,
+            model=settings.soniox_stt.model,
+            endpoint=settings.soniox_stt.endpoint,
+            language_hints=get_soniox_language_hints(settings.languages.source_language),
+            sample_rate_hz=settings.audio.internal_sample_rate_hz,
+            keepalive_interval_s=settings.soniox_stt.keepalive_interval_s,
+            trailing_silence_ms=settings.soniox_stt.trailing_silence_ms,
+        )
+
     raise ValueError(f"Unsupported STT provider: {settings.provider.stt}")

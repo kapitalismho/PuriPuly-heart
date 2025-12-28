@@ -20,9 +20,13 @@ Provider API keys are read from `SecretStore` first, then fall back to environme
 - Secret keys:
   - `google_api_key` (Gemini)
   - `alibaba_api_key` (Qwen, Alibaba STT)
+  - `deepgram_api_key` (Deepgram STT)
+  - `soniox_api_key` (Soniox STT)
 - Env vars:
   - `GOOGLE_API_KEY`
   - `ALIBABA_API_KEY`
+  - `DEEPGRAM_API_KEY`
+  - `SONIOX_API_KEY`
 
 If `settings.secrets.backend = "encrypted_file"`, set `PURIPULY_HEART_SECRETS_PASSPHRASE` before running.
 
@@ -58,3 +62,18 @@ Optional:
 - `QWEN_ASR_ENDPOINT` (default: `wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime`)
 - `QWEN_ASR_LANGUAGE` (default: `ko`)
 - `QWEN_ASR_SAMPLE_RATE` (default: `16000`)
+
+### Soniox STT (WebSocket)
+
+Required env vars:
+
+- `SONIOX_API_KEY`
+
+Optional:
+
+- `SONIOX_STT_MODEL` (default: `stt-rt-v3`)
+- `SONIOX_STT_ENDPOINT` (default: `wss://stt-rt.soniox.com/transcribe-websocket`)
+- `SONIOX_STT_LANGUAGE` (default: `ko`)
+- `SONIOX_STT_SAMPLE_RATE` (default: `16000`)
+- `SONIOX_STT_KEEPALIVE` (default: `10`)
+- `SONIOX_STT_TRAILING_SILENCE_MS` (default: `100`)

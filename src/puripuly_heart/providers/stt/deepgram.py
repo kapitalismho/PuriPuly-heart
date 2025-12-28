@@ -263,10 +263,10 @@ class _DeepgramSDKSession(STTBackendSession):
         if self._stopped:
             return
 
-        # Send 200ms of silence
+        # Send 100ms of silence
         import numpy as np
 
-        silence_samples = int(self.sample_rate_hz * 0.2)
+        silence_samples = int(self.sample_rate_hz * 0.1)
         silence = np.zeros(silence_samples, dtype=np.float32)
         # Convert float32 to PCM16LE bytes
         pcm16 = (silence * 32767).astype(np.int16).tobytes()
