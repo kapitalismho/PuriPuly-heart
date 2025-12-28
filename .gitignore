@@ -213,3 +213,4 @@ __marimo__/
 .specs/
 .test_audio/
 Installer_output/
+.references/

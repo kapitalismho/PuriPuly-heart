@@ -23,10 +23,8 @@ logging.basicConfig(
 
 # Add file logging (RotatingFileHandler)
 if getattr(sys, "frozen", False):
-    # PyInstaller로 빌드된 경우
     _app_dir = Path(sys.executable).parent
 else:
-    # 개발 환경
     _app_dir = Path(__file__).parent
 
 _log_file = _app_dir / "puripuly_heart.log"
