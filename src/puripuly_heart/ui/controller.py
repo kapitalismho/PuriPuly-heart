@@ -15,6 +15,7 @@ from puripuly_heart.app.wiring import (
 )
 from puripuly_heart.config.settings import (
     AppSettings,
+    QwenRegion,
     STTProviderName,
     load_settings,
     save_settings,
@@ -34,7 +35,6 @@ from puripuly_heart.core.vad.silero import SileroVadOnnx
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.qwen import QwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
-from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 from puripuly_heart.ui.event_bridge import UIEventBridge
 
 logger = logging.getLogger(__name__)
@@ -398,6 +398,15 @@ class GuiController:
             if logs is not None:
                 logs.append_log(f"ERROR: {message}")
 
+    def _get_qwen_key_and_base_url(self, secrets) -> tuple[str, str]:
+        if self.settings is None:
+            return "", ""
+        if self.settings.qwen.region == QwenRegion.BEIJING:
+            api_key = secrets.get("alibaba_api_key_beijing") or ""
+        else:
+            api_key = secrets.get("alibaba_api_key_singapore") or ""
+        return api_key, self.settings.qwen.get_llm_base_url()
+
     async def _verify_and_update_status(self) -> None:
         """Background task to verify keys and update dashboard status."""
         if self.settings is None:
@@ -419,8 +428,8 @@ class GuiController:
                     key = secrets.get("google_api_key") or ""
                     llm_valid = await GeminiLLMProvider.verify_api_key(key)
                 elif provider_name == "qwen":
-                    key = secrets.get("alibaba_api_key") or ""
-                    llm_valid = await QwenLLMProvider.verify_api_key(key)
+                    key, base_url = self._get_qwen_key_and_base_url(secrets)
+                    llm_valid = await QwenLLMProvider.verify_api_key(key, base_url=base_url)
                 else:
                     # Assume valid for others or if no key usage known
                     llm_valid = True
@@ -451,8 +460,8 @@ class GuiController:
                     key = secrets.get("deepgram_api_key") or ""
                     stt_valid = await DeepgramRealtimeSTTBackend.verify_api_key(key)
                 elif provider_name == STTProviderName.QWEN_ASR:
-                    key = secrets.get("alibaba_api_key") or ""
-                    stt_valid = await QwenASRRealtimeSTTBackend.verify_api_key(key)
+                    key, base_url = self._get_qwen_key_and_base_url(secrets)
+                    stt_valid = await QwenLLMProvider.verify_api_key(key, base_url=base_url)
                 else:
                     stt_valid = True
             except Exception:
