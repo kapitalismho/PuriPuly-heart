@@ -33,7 +33,20 @@ class ContextEntry:
     """Represents a recent utterance for context memory."""
 
     text: str  # Original text
+    source_language: str
+    target_language: str
     timestamp: float  # When the translation was requested
+
+
+@dataclass(frozen=True, slots=True)
+class TranslationMemoryEntry:
+    """Represents a recent source/target pair for translation memory."""
+
+    source: str
+    target: str
+    source_language: str
+    target_language: str
+    timestamp: float  # When the translation was completed
 
 
 class STTProvider(Protocol):
@@ -69,6 +82,7 @@ class ClientHub:
         default_factory=dict
     )  # For E2E latency tracking
     _translation_history: list[ContextEntry] = field(default_factory=list)  # Context memory
+    _translation_memory: list[TranslationMemoryEntry] = field(default_factory=list)  # TM list
     _stt_task: asyncio.Task[None] | None = None
     _osc_flush_task: asyncio.Task[None] | None = None
     _running: bool = False
@@ -109,8 +123,9 @@ class ClientHub:
             await self.llm.close()
 
     def clear_context(self) -> None:
-        """Clear the translation context history."""
+        """Clear the translation context history and translation memory."""
         self._translation_history.clear()
+        self._translation_memory.clear()
         logger.info("[Hub] Context history cleared")
 
     def _get_valid_context(self) -> list[ContextEntry]:
@@ -121,6 +136,9 @@ class ClientHub:
             entry
             for entry in self._translation_history[-self.context_max_entries :]
             if (now - entry.timestamp) < self.context_time_window_s
+            and entry.source_language == self.source_language
+            and entry.target_language == self.target_language
+            and len(entry.text) >= 2
         ]
         return valid
 
@@ -132,6 +150,54 @@ class ClientHub:
         for entry in context:
             lines.append(f'- "{entry.text}"')
         return "\n".join(lines)
+
+    def _get_tm_list(self) -> list[dict[str, str]]:
+        """Build a tm_list payload from recent translation memory."""
+        if not self._translation_memory:
+            return []
+        now = self.clock.now()
+        valid = [
+            entry
+            for entry in self._translation_memory[-self.context_max_entries :]
+            if (now - entry.timestamp) < self.context_time_window_s
+            and entry.source_language == self.source_language
+            and entry.target_language == self.target_language
+            and len(entry.source) >= 2
+            and len(entry.target) >= 2
+        ]
+        return [{"source": entry.source, "target": entry.target} for entry in valid]
+
+    def _remember_context_entry(self, text: str, timestamp: float) -> None:
+        text_clean = text.strip()
+        if len(text_clean) < 2:
+            return
+        self._translation_history.append(
+            ContextEntry(
+                text=text_clean,
+                source_language=self.source_language,
+                target_language=self.target_language,
+                timestamp=timestamp,
+            )
+        )
+        if len(self._translation_history) > self.context_max_entries:
+            self._translation_history.pop(0)
+
+    def _remember_translation_pair(self, source: str, target: str) -> None:
+        source_clean = source.strip()
+        target_clean = target.strip()
+        if len(source_clean) < 2 or len(target_clean) < 2:
+            return
+        self._translation_memory.append(
+            TranslationMemoryEntry(
+                source=source_clean,
+                target=target_clean,
+                source_language=self.source_language,
+                target_language=self.target_language,
+                timestamp=self.clock.now(),
+            )
+        )
+        if len(self._translation_memory) > self.context_max_entries:
+            self._translation_memory.pop(0)
 
     async def handle_vad_event(self, event: VadEvent) -> None:
         # Start typing indicator when speech begins
@@ -267,12 +333,11 @@ class ClientHub:
                 logger.info(f'[Hub] Context[{i}]: "{entry.text}" ({age:.1f}s ago)')
 
             # Add current text to context history at REQUEST time
-            self._translation_history.append(ContextEntry(text=text, timestamp=now))
-            if len(self._translation_history) > self.context_max_entries:
-                self._translation_history.pop(0)
+            self._remember_context_entry(text, now)
 
             # Format context for LLM
             context_str = self._format_context_for_llm(valid_context)
+            tm_list = self._get_tm_list()
 
             # Substitute language placeholders in system prompt
             formatted_prompt = self.system_prompt
@@ -290,6 +355,7 @@ class ClientHub:
                 source_language=self.source_language,
                 target_language=self.target_language,
                 context=context_str,
+                context_pairs=tm_list,
             )
         except asyncio.CancelledError:
             raise
@@ -309,6 +375,7 @@ class ClientHub:
 
         bundle = self.get_or_create_bundle(utterance_id)
         bundle.with_translation(translation)
+        self._remember_translation_pair(text, translation.text)
         await self.ui_events.put(
             UIEvent(
                 type=UIEventType.TRANSLATION_DONE,

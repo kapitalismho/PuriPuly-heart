@@ -7,7 +7,11 @@ from uuid import uuid4
 
 import pytest
 
-from puripuly_heart.core.orchestrator.hub import ClientHub, ContextEntry
+from puripuly_heart.core.orchestrator.hub import (
+    ClientHub,
+    ContextEntry,
+    TranslationMemoryEntry,
+)
 
 # ── Mock classes ──────────────────────────────────────────────────────────────
 
@@ -41,6 +45,7 @@ class FakeLLMProvider:
         source_language: str,
         target_language: str,
         context: str = "",
+        context_pairs: list[dict[str, str]] | None = None,
     ):
         from puripuly_heart.domain.models import Translation
 
@@ -49,6 +54,7 @@ class FakeLLMProvider:
                 "utterance_id": utterance_id,
                 "text": text,
                 "context": context,
+                "context_pairs": context_pairs,
             }
         )
         return Translation(utterance_id=utterance_id, text=self.response_text)
@@ -93,9 +99,9 @@ class TestContextFiltering:
 
         # Add entries at different times
         hub._translation_history = [
-            ContextEntry(text="old", timestamp=3.0),  # 7s ago - excluded
-            ContextEntry(text="recent1", timestamp=6.0),  # 4s ago - included
-            ContextEntry(text="recent2", timestamp=8.0),  # 2s ago - included
+            ContextEntry(text="old", source_language="ko", target_language="en", timestamp=3.0),
+            ContextEntry(text="recent1", source_language="ko", target_language="en", timestamp=6.0),
+            ContextEntry(text="recent2", source_language="ko", target_language="en", timestamp=8.0),
         ]
 
         valid = hub._get_valid_context()
@@ -112,14 +118,14 @@ class TestContextFiltering:
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
             clock=clock,
-            context_time_window_s=10.0,  # Large window
+            context_time_window_s=20.0,  # Default window
             context_max_entries=2,
         )
 
         hub._translation_history = [
-            ContextEntry(text="first", timestamp=7.0),
-            ContextEntry(text="second", timestamp=8.0),
-            ContextEntry(text="third", timestamp=9.0),
+            ContextEntry(text="first", source_language="ko", target_language="en", timestamp=7.0),
+            ContextEntry(text="second", source_language="ko", target_language="en", timestamp=8.0),
+            ContextEntry(text="third", source_language="ko", target_language="en", timestamp=9.0),
         ]
 
         valid = hub._get_valid_context()
@@ -128,6 +134,48 @@ class TestContextFiltering:
         assert len(valid) == 2
         assert valid[0].text == "second"
         assert valid[1].text == "third"
+
+    def test_context_filters_by_language_pair(self):
+        """Only entries with the current language pair should be included."""
+        clock = FakeClock(initial_time=10.0)
+        hub = ClientHub(
+            stt=None,
+            llm=FakeLLMProvider(),
+            osc=FakeOscQueue(),
+            clock=clock,
+            context_time_window_s=20.0,
+        )
+
+        hub._translation_history = [
+            ContextEntry(text="wrong", source_language="ja", target_language="en", timestamp=9.0),
+            ContextEntry(text="ok", source_language="ko", target_language="en", timestamp=9.5),
+        ]
+
+        valid = hub._get_valid_context()
+
+        assert len(valid) == 1
+        assert valid[0].text == "ok"
+
+    def test_context_filters_short_entries(self):
+        """Entries shorter than 2 characters should be excluded."""
+        clock = FakeClock(initial_time=10.0)
+        hub = ClientHub(
+            stt=None,
+            llm=FakeLLMProvider(),
+            osc=FakeOscQueue(),
+            clock=clock,
+            context_time_window_s=20.0,
+        )
+
+        hub._translation_history = [
+            ContextEntry(text="a", source_language="ko", target_language="en", timestamp=9.0),
+            ContextEntry(text="ok", source_language="ko", target_language="en", timestamp=9.5),
+        ]
+
+        valid = hub._get_valid_context()
+
+        assert len(valid) == 1
+        assert valid[0].text == "ok"
 
     def test_context_cleared_on_clear_context(self):
         """clear_context() should empty the history."""
@@ -139,12 +187,22 @@ class TestContextFiltering:
         )
 
         hub._translation_history = [
-            ContextEntry(text="test", timestamp=1.0),
+            ContextEntry(text="test", source_language="ko", target_language="en", timestamp=1.0),
+        ]
+        hub._translation_memory = [
+            TranslationMemoryEntry(
+                source="hi",
+                target="hello",
+                source_language="ko",
+                target_language="en",
+                timestamp=1.0,
+            )
         ]
 
         hub.clear_context()
 
         assert len(hub._translation_history) == 0
+        assert len(hub._translation_memory) == 0
 
     def test_old_entries_removed_when_full(self):
         """When max_entries is exceeded, oldest should be removed."""
@@ -159,13 +217,15 @@ class TestContextFiltering:
 
         # Add 3 entries (at capacity)
         hub._translation_history = [
-            ContextEntry(text="e1", timestamp=7.0),
-            ContextEntry(text="e2", timestamp=8.0),
-            ContextEntry(text="e3", timestamp=9.0),
+            ContextEntry(text="e1", source_language="ko", target_language="en", timestamp=7.0),
+            ContextEntry(text="e2", source_language="ko", target_language="en", timestamp=8.0),
+            ContextEntry(text="e3", source_language="ko", target_language="en", timestamp=9.0),
         ]
 
         # Add a 4th entry
-        hub._translation_history.append(ContextEntry(text="e4", timestamp=10.0))
+        hub._translation_history.append(
+            ContextEntry(text="e4", source_language="ko", target_language="en", timestamp=10.0)
+        )
         if len(hub._translation_history) > hub.context_max_entries:
             hub._translation_history.pop(0)
 
@@ -192,7 +252,7 @@ class TestContextPassedToLLM:
 
         # Add some context
         hub._translation_history = [
-            ContextEntry(text="hello", timestamp=8.0),
+            ContextEntry(text="hello", source_language="ko", target_language="en", timestamp=8.0),
         ]
 
         # Translate a new text
@@ -239,7 +299,7 @@ class TestContextPassedToLLM:
 
         # All entries are very old
         hub._translation_history = [
-            ContextEntry(text="old", timestamp=1.0),  # 99s ago
+            ContextEntry(text="old", source_language="ko", target_language="en", timestamp=1.0),
         ]
 
         utterance_id = uuid4()
@@ -273,7 +333,9 @@ class TestContextFormatting:
             clock=FakeClock(),
         )
 
-        entries = [ContextEntry(text="안녕", timestamp=1.0)]
+        entries = [
+            ContextEntry(text="안녕", source_language="ko", target_language="en", timestamp=1.0)
+        ]
         result = hub._format_context_for_llm(entries)
 
         assert result == '- "안녕"'
@@ -288,10 +350,93 @@ class TestContextFormatting:
         )
 
         entries = [
-            ContextEntry(text="a", timestamp=1.0),
-            ContextEntry(text="b", timestamp=2.0),
+            ContextEntry(text="a", source_language="ko", target_language="en", timestamp=1.0),
+            ContextEntry(text="b", source_language="ko", target_language="en", timestamp=2.0),
         ]
         result = hub._format_context_for_llm(entries)
 
         assert '"a"' in result
         assert '"b"' in result
+
+
+class TestTranslationMemory:
+    """Test translation memory tm_list behavior."""
+
+    def test_tm_list_filters_by_language_and_length(self):
+        clock = FakeClock(initial_time=10.0)
+        hub = ClientHub(
+            stt=None,
+            llm=FakeLLMProvider(),
+            osc=FakeOscQueue(),
+            clock=clock,
+            context_time_window_s=5.0,
+            context_max_entries=3,
+        )
+        hub.source_language = "ko"
+        hub.target_language = "en"
+
+        hub._translation_memory = [
+            TranslationMemoryEntry(
+                source="old",
+                target="old",
+                source_language="ko",
+                target_language="en",
+                timestamp=1.0,
+            ),
+            TranslationMemoryEntry(
+                source="ok",
+                target="fine",
+                source_language="ko",
+                target_language="en",
+                timestamp=9.0,
+            ),
+            TranslationMemoryEntry(
+                source="no",
+                target="nah",
+                source_language="ja",
+                target_language="en",
+                timestamp=9.5,
+            ),
+            TranslationMemoryEntry(
+                source="a",
+                target="b",
+                source_language="ko",
+                target_language="en",
+                timestamp=9.7,
+            ),
+        ]
+
+        tm_list = hub._get_tm_list()
+
+        assert tm_list == [{"source": "ok", "target": "fine"}]
+
+    @pytest.mark.asyncio
+    async def test_tm_list_passed_to_llm(self):
+        clock = FakeClock(initial_time=10.0)
+        fake_llm = FakeLLMProvider()
+        hub = ClientHub(
+            stt=None,
+            llm=fake_llm,
+            osc=FakeOscQueue(),
+            clock=clock,
+            context_time_window_s=5.0,
+            context_max_entries=3,
+        )
+        hub.source_language = "ko"
+        hub.target_language = "en"
+
+        hub._translation_memory = [
+            TranslationMemoryEntry(
+                source="hello",
+                target="hi",
+                source_language="ko",
+                target_language="en",
+                timestamp=9.0,
+            )
+        ]
+
+        utterance_id = uuid4()
+        await hub._translate_and_enqueue(utterance_id, "world")
+
+        assert len(fake_llm.calls) == 1
+        assert fake_llm.calls[0]["context_pairs"] == [{"source": "hello", "target": "hi"}]

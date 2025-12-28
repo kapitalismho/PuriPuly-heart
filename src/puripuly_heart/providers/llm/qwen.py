@@ -16,10 +16,10 @@ class QwenClient(Protocol):
         self,
         *,
         text: str,
-        system_prompt: str,
         source_language: str,
         target_language: str,
-        context: str = "",
+        domain_prompt: str = "",
+        context_pairs: list[dict[str, str]] | None = None,
     ) -> str: ...
 
 
@@ -39,16 +39,19 @@ class QwenLLMProvider:
         source_language: str,
         target_language: str,
         context: str = "",
+        context_pairs: list[dict[str, str]] | None = None,
     ) -> Translation:
+        _ = context
+        domain_prompt = system_prompt
         client = self.client or DashScopeQwenClient(
             api_key=self.api_key, model=self.model, base_url=self.base_url
         )
         translated = await client.translate(
             text=text,
-            system_prompt=system_prompt,
             source_language=source_language,
             target_language=target_language,
-            context=context,
+            domain_prompt=domain_prompt,
+            context_pairs=context_pairs,
         )
         return Translation(utterance_id=utterance_id, text=translated)
 
@@ -89,52 +92,48 @@ class DashScopeQwenClient:
     model: str
     base_url: str = "https://dashscope.aliyuncs.com/api/v1"
 
+    @staticmethod
+    def _normalize_language_code(code: str) -> str:
+        if not code:
+            return "auto"
+        normalized = code.lower()
+        if normalized in {"auto"}:
+            return "auto"
+        if normalized in {"zh-cn", "zh-hans", "zh"}:
+            return "zh"
+        if normalized in {"zh-tw", "zh-hant", "zh_tw"}:
+            return "zh_tw"
+        return normalized.split("-")[0]
+
     async def translate(
         self,
         *,
         text: str,
-        system_prompt: str,
         source_language: str,
         target_language: str,
-        context: str = "",
+        domain_prompt: str = "",
+        context_pairs: list[dict[str, str]] | None = None,
     ) -> str:
         import dashscope  # type: ignore
 
-        # Qwen-MT uses Custom Prompt (system role not supported)
-        # Template variables (${sourceName}, ${targetName}) are already substituted by hub.py
-        # Use XML tags to clearly separate system prompt, context, and translation target
-        if context:
-            full_prompt = f"""<system_prompt>
-{system_prompt}
-</system_prompt>
-
-<context>
-{context}
-</context>
-
-<translate>
-{text}
-</translate>"""
-            logger.info(
-                f"[LLM] Request with context: '{text}' -> {source_language} to {target_language}"
-            )
-        else:
-            full_prompt = f"""<system_prompt>
-{system_prompt}
-</system_prompt>
-
-<translate>
-{text}
-</translate>"""
-            logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
+        logger.info(f"[LLM] Request: '{text}' -> {source_language} to {target_language}")
 
         def _call() -> str:
             dashscope.api_key = self.api_key
             dashscope.base_http_api_url = self.base_url
+            translation_options = {
+                "source_lang": self._normalize_language_code(source_language),
+                "target_lang": self._normalize_language_code(target_language),
+            }
+            if domain_prompt:
+                translation_options["domains"] = domain_prompt
+            if context_pairs:
+                translation_options["tm_list"] = context_pairs
             response = dashscope.Generation.call(
                 model=self.model,
-                messages=[{"role": "user", "content": full_prompt}],
+                messages=[{"role": "user", "content": text}],
                 result_format="message",
+                translation_options=translation_options,
             )
             output = getattr(response, "output", None)
             if not output:

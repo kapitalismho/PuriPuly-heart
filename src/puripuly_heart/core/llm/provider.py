@@ -18,6 +18,7 @@ class LLMProvider(Protocol):
         source_language: str,
         target_language: str,
         context: str = "",
+        context_pairs: list[dict[str, str]] | None = None,
     ) -> Translation: ...
 
     async def close(self) -> None: ...
@@ -37,6 +38,7 @@ class SemaphoreLLMProvider:
         source_language: str,
         target_language: str,
         context: str = "",
+        context_pairs: list[dict[str, str]] | None = None,
     ) -> Translation:
         async with self.semaphore:
             return await self.inner.translate(
@@ -46,6 +48,7 @@ class SemaphoreLLMProvider:
                 source_language=source_language,
                 target_language=target_language,
                 context=context,
+                context_pairs=context_pairs,
             )
 
     async def close(self) -> None:

@@ -177,6 +177,16 @@ class SettingsView(ft.ListView):
             on_change=self._on_setting_change,
             border_radius=8,
         )
+        self.reset_prompt_btn = ft.Button(
+            content=ft.Text("Reset Prompt"),
+            icon=icons.REFRESH_ROUNDED,
+            style=ft.ButtonStyle(
+                color=colors.WHITE,
+                bgcolor=colors.BLUE_GREY_700,
+                shape=ft.RoundedRectangleBorder(radius=8),
+            ),
+            on_click=self._on_prompt_reset,
+        )
 
         self.apply_providers_btn = ft.Button(
             content=ft.Text("Apply Provider Changes (Restart Pipeline)"),
@@ -225,6 +235,7 @@ class SettingsView(ft.ListView):
                 [
                     self.prompt_provider_label,
                     self.system_prompt,
+                    ft.Row([self.reset_prompt_btn], alignment=ft.MainAxisAlignment.END),
                 ],
             ),
         ]
@@ -366,6 +377,19 @@ class SettingsView(ft.ListView):
         self._emit_settings_changed()
         if self.on_providers_changed:
             self.on_providers_changed()
+
+    def _on_prompt_reset(self, e) -> None:
+        _ = e
+        if self._settings is None:
+            return
+        provider_name = (
+            "gemini" if self._settings.provider.llm == LLMProviderName.GEMINI else "qwen"
+        )
+        self.system_prompt.value = load_prompt_for_provider(provider_name)
+        self._settings.system_prompt = self.system_prompt.value
+        with contextlib.suppress(RuntimeError):
+            self.system_prompt.update()
+        self._emit_settings_changed()
 
     def _on_qwen_region_change(self, e) -> None:
         _ = e
