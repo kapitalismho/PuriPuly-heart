@@ -126,13 +126,16 @@ Build and Distribution
 - PyInstaller builds are configured in `build.spec`.
 - Windows installer is configured in `installer.iss`.
 - Package data lives under `src/puripuly_heart/data/`.
+- IMPORTANT: Always use `.venv` for builds to ensure correct dependencies:
+  - Build app: `.venv\Scripts\pyinstaller.exe build.spec`
+  - Do NOT use system Python; always use the project's virtual environment.
 
 Release Checklist
 -----------------
 
 - Bump versions in `pyproject.toml`, `src/puripuly_heart/__init__.py`, and `installer.iss` (MyAppVersion).
 - Run `pre-commit run --all-files` and `pytest` (plus integration tests if provider behavior changed).
-- Build the app: `pyinstaller build.spec`.
+- Build the app: `.venv\Scripts\pyinstaller.exe build.spec`.
 - Build the installer: `ISCC installer.iss` (Windows/Inno Setup).
 - Tag the release on `main`: `git tag vX.Y.Z` and publish artifacts.
 
