@@ -39,7 +39,7 @@ Interpret ${sourceName} input into the ${targetName} naturally, preserving the s
 
     (Context: Interpreted 'Eo' as affirmative 'Yeah', not a filler word.)
 
- 2. 저기 혹시 저희랑 같이 게임 하실래요 => Hey, do you guys wanna join us for a game?
+ 2. 저기 혹시 저희랑 같이 게임 하실래요 => Hey, do you wanna join us for a game?
 
     (Social: Inferred request. Used 'Polite Friendly' tone with 'guys' for natural address.)
 
@@ -59,27 +59,23 @@ Interpret ${sourceName} input into the ${targetName} naturally, preserving the s
 
     (Social: Mirrored the 'Mixed Politeness' (Polite greeting + Casual affection) common in close social relationships. Translated 'Sseudam-sseudam' to 'Nade-nade'.)
 
- 7. 그러므로 본인은 여기 남도록 하겠습니다 => 所以我打算留在这里。
-
-    (Filter: Converted formal written words 'Therefore/Bon-in' to spoken 'So/I'.)
-
- 8. 풀트래킹이라서 발도 움직일 수 있어 => 我是全身追踪，所以脚也能动。
+ 7. 풀트래킹이라서 발도 움직일 수 있어 => 我是全身追踪，所以脚也能动。
 
     (Tech: Translated 'Full Tracking' to 'Quanshen Zhuizong'. Added logical connector.)
 
- 9. 저 혹시 이거 좀 봐주시겠어요 => 能帮我看一下这个吗？
+ 8. 저 혹시 이거 좀 봐주시겠어요 => 能帮我看一下这个吗？
 
     (Tone: Converted Korean honorific request to soft Chinese with 一下 ending.)
     
- 10. 어제거기갔었는데와진짜사람엄청많더라발디딜틈도없었어진짜로 => 昨日そこ行ってきたんだけど、うわー、マジで人多すぎたよ。足の踏み場もないくらい、本当に。
+ 9. 어제거기갔었는데와진짜사람엄청많더라발디딜틈도없었어진짜로 => 昨日そこ行ってきたんだけど、うわー、マジで人多すぎたよ。足の踏み場もないくらい、本当に。
 
     (Run-on: Treated continuous Korean as normal sentences by inferring spacing and sentence breaks.)
 
- 11. [Context: "저는 오늘"] "친구를 만났어요" => 友達に会いました。
+ 10. [Context: "저는 오늘"] "친구를 만났어요" => 友達に会いました。
 
     (Context-Fragment: Speaker's sentence was split. Combined with context to form natural sentence.)
 
- 12. [Context: "이 영화 진짜 재밌어", "액션 장면이 미쳤어"] "꼭 봐" => You gotta watch it.
+ 11. [Context: "이 영화 진짜 재밌어", "액션 장면이 미쳤어"] "꼭 봐" => You gotta watch it.
 
     (Context-Continuation: "꼭 봐" refers to movie recommendation from context.)
 
