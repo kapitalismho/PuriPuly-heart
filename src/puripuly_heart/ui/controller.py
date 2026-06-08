@@ -877,6 +877,10 @@ class GuiController:
     def _managed_openrouter_local_key_available(self) -> bool:
         if self.settings is None:
             return False
+        if self._is_managed_china_connection():
+            result = self._managed_qq_key_available()
+            logger.info("[QQAuth] _managed_openrouter_local_key_available: China mode, qq_key=%s", result)
+            return result
         try:
             secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
             resolution = resolve_openrouter_credentials(
@@ -886,15 +890,33 @@ class GuiController:
             )
         except Exception:
             return False
-        return resolution.api_key is not None
+        has_key = resolution.api_key is not None
+        logger.info("[ManagedAuth] _managed_openrouter_local_key_available: non-China mode, has_key=%s", has_key)
+        return has_key
+
+    def _managed_qq_key_available(self) -> bool:
+        if self.settings is None:
+            return False
+        try:
+            secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
+            result = bool(secrets.get("openrouter_managed_qq_api_key"))
+            logger.info("[QQAuth] _managed_qq_key_available: %s", result)
+            return result
+        except Exception as exc:
+            logger.warning("[QQAuth] _managed_qq_key_available: exception: %s", exc)
+            return False
 
     def dashboard_managed_auth_action(self) -> str:
         if not self._managed_openrouter_selected():
             return "continue"
         if self._discord_managed_auth_in_progress or self._managed_trial_pending_auth:
+            logger.info("[ManagedAuth] dashboard_managed_auth_action: in_progress (discord=%s pending=%s)", self._discord_managed_auth_in_progress, self._managed_trial_pending_auth)
             return "in_progress"
         if self._managed_openrouter_local_key_available():
+            logger.info("[ManagedAuth] dashboard_managed_auth_action: continue (key available)")
             return "continue"
+        is_china = self._is_managed_china_connection()
+        logger.info("[ManagedAuth] dashboard_managed_auth_action: prompt (is_china=%s)", is_china)
         return "prompt"
 
     def _discord_auth_message_key(self, result) -> str:  # noqa: ANN001
@@ -981,6 +1003,100 @@ class GuiController:
         finally:
             if self._discord_managed_auth_callback_received_hook is on_callback_received:
                 self._discord_managed_auth_callback_received_hook = previous_callback
+            self._discord_managed_auth_in_progress = False
+            self._set_managed_trial_pending_auth(False)
+
+    def _is_managed_china_connection(self) -> bool:
+        if self.settings is None:
+            return False
+        return (
+            self.settings.translation.connection == TranslationConnection.MANAGED_CHINA
+        )
+
+    async def start_qq_managed_auth_from_dialog(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+    ) -> bool:
+        logger.info("[QQAuth] start_qq_managed_auth_from_dialog: qq_identity=%s credential_len=%d", qq_identity, len(credential or ""))
+        service = self._managed_openrouter_release_service
+        if service is None:
+            logger.warning("[QQAuth] start_qq_managed_auth_from_dialog: service is None")
+            self._set_managed_trial_pending_auth(False)
+            self._show_short_message("qq_auth.error.retry")
+            return False
+
+        normalized_qq_identity = (qq_identity or "").strip()
+        normalized_credential = (credential or "").strip()
+        if not normalized_qq_identity or not normalized_credential:
+            logger.warning("[QQAuth] start_qq_managed_auth_from_dialog: empty input qq=%s credential=%s", bool(normalized_qq_identity), bool(normalized_credential))
+            self._show_short_message("qq_auth.error.invalid_input")
+            return False
+
+        self._discord_managed_auth_in_progress = True
+        self._set_managed_trial_pending_auth(True)
+        try:
+            try:
+                logger.info("[QQAuth] start_qq_managed_auth_from_dialog: calling prepare_from_qq_assertion")
+                result = await service.prepare_from_qq_assertion(
+                    qq_identity=normalized_qq_identity,
+                    credential=normalized_credential,
+                )
+                logger.info("[QQAuth] start_qq_managed_auth_from_dialog: result behavior=%s local_key=%s", result.behavior, result.local_key_available)
+            except Exception as exc:
+                self.log_basic(
+                    f"[QQAuth] QQ auth start failed: {exc}",
+                    level=logging.ERROR,
+                )
+                self._show_short_message("qq_auth.error.retry")
+                return False
+
+            if (
+                result.behavior == ManagedOpenRouterReleaseBehavior.READY
+                and result.local_key_available
+            ):
+                if self.hub is None:
+                    self._show_short_message("qq_auth.error.retry")
+                    return False
+                if self.hub.llm is None:
+                    await self._rebuild_llm_provider()
+                if self.hub.llm is None:
+                    self._show_short_message("qq_auth.error.retry")
+                    return False
+                result_referral_id = normalize_owned_referral_id(
+                    getattr(result, "referral_id", None)
+                )
+                self._set_managed_usage_view_state(
+                    view_settings=getattr(self.app, "view_settings", None),
+                    visible=True,
+                    remaining_percent=None,
+                    referral_id=result_referral_id or self._current_owned_referral_id(),
+                    pass_status=getattr(result, "pass_status", None),
+                )
+                self._schedule_managed_trial_usage_refresh()
+                return True
+
+            diagnostics = result.diagnostics
+            subcode = getattr(diagnostics, "subcode", None)
+            if subcode == "qq_credential_mismatch":
+                message_key = "qq_auth.error.credential_mismatch"
+            elif subcode == "qq_lifetime_used":
+                message_key = "qq_auth.error.lifetime_used"
+            else:
+                message_key = getattr(result, "message_key", "qq_auth.error.retry")
+            self.log_basic(
+                "[ManagedAuth] QQ auth failed: "
+                f"message_key={message_key} "
+                f"class={getattr(diagnostics, 'error_class', None) or 'unknown'}",
+                level=logging.ERROR,
+            )
+            self._show_short_message(
+                message_key,
+                **dict(result.message_kwargs),
+            )
+            return False
+        finally:
             self._discord_managed_auth_in_progress = False
             self._set_managed_trial_pending_auth(False)
 

@@ -1,0 +1,127 @@
+QQ 认证修改文件清单
+==================
+
+说明：本次改动为「托管（中国）」入口新增 QQ 号 + 凭证认证链路。
+用户在客户端输入 QQ 号和 QQ 群机器人下发的 HMAC 凭证后，客户端
+POST 到服务器端 Broker（https://puripuly-heart-broker.kapitalismho.workers.dev/
+v1/auth/qq/assert），服务器验证后返回 OpenRouter API key。
+
+Discord 认证和 QQ 认证完全独立：
+- Discord key 存到 openrouter_managed_api_key
+- QQ key 存到 openrouter_managed_qq_api_key
+- 选「托管」走 Discord，选「托管（中国）」走 QQ，互不影响
+
+
+客户端 Python 侧（src/puripuly_heart）
+-------------------------------------
+[修改] src/puripuly_heart/core/openrouter_credentials.py
+  - 新增 OPENROUTER_MANAGED_QQ_API_KEY_SECRET = "openrouter_managed_qq_api_key"
+  - resolve_openrouter_credentials 按连接类型严格分离：
+    China 只查 QQ key，其它只查 Discord key，无 fallback。
+  - 新增 logger 日志输出。
+
+[修改] src/puripuly_heart/core/managed_openrouter_broker_client.py
+  - 新增 logger。
+  - HttpManagedOpenRouterBrokerClient 新增 assert_qq_credential(...)：
+    POST /v1/auth/qq/assert 并解析 ManagedOpenRouterIssueSuccess。
+  - 请求/响应全流程日志。
+
+[修改] src/puripuly_heart/core/managed_openrouter_release.py
+  - 新增 logger。
+  - 导入 OPENROUTER_MANAGED_QQ_API_KEY_SECRET。
+  - ManagedOpenRouterReleaseClient Protocol 新增 assert_qq_credential。
+  - UnavailableManagedOpenRouterReleaseClient 新增对应不可用实现。
+  - ManagedOpenRouterReleaseService 新增 prepare_from_qq_assertion(...)：
+    直接调用 broker（不检查已有 key），成功后用
+    secret_key=OPENROUTER_MANAGED_QQ_API_KEY_SECRET 存储，与 Discord key 分开。
+  - _persist_managed_issue_success 新增 secret_key 参数（默认 Discord key）。
+  - 全流程日志。
+
+[新增] src/puripuly_heart/ui/components/qq_managed_auth_dialog.py
+  - QqManagedAuthDialog：两个输入框（QQ 号、激活凭证），
+    提交/取消/关闭按钮，set_waiting 禁用输入并更新说明文案。
+
+[修改] src/puripuly_heart/ui/app.py
+  - 引入 QqManagedAuthDialog。
+  - _on_translation_toggle 在 managed_auth_action == "prompt" 时
+    根据当前连接方式选择弹窗：
+    Managed China -> QQ 弹窗；其它 Managed -> Discord 弹窗。
+  - _on_providers_changed 在 Settings Apply 后检查 China 模式
+    是否需要弹 QQ 认证。
+  - 新增 _is_managed_china_connection / show_qq_managed_auth_dialog /
+    _start_qq_managed_auth / _close_qq_managed_auth_dialog。
+  - 关键决策点日志。
+
+[修改] src/puripuly_heart/ui/controller.py
+  - 新增 _is_managed_china_connection：判断当前连接是否为托管中国。
+  - _managed_openrouter_local_key_available：中国模式时检查 QQ key，
+    其它模式检查 Discord/BYOK key。
+  - 新增 _managed_qq_key_available：专门检查 QQ key 是否存在。
+  - 新增 start_qq_managed_auth_from_dialog(qq_identity, credential)：
+    参数校验、调用 service.prepare_from_qq_assertion、成功后重建 LLM provider
+    并刷新 managed usage，错误映射到 QQ 专属 i18n key。
+  - dashboard_managed_auth_action 关键决策点日志。
+
+
+国际化
+------
+[修改] src/puripuly_heart/data/i18n/en.json
+[修改] src/puripuly_heart/data/i18n/ja.json
+[修改] src/puripuly_heart/data/i18n/ko.json
+[修改] src/puripuly_heart/data/i18n/zh-CN.json
+  - 新增 qq_auth.* 文案：弹窗标题/说明、输入框标签/帮助、提交/取消、
+    等待文案、成功提示、错误提示（invalid_input / credential_mismatch /
+    lifetime_used / retry）。
+
+
+根目录
+------
+[新增] QQ认证修改文件清单.txt（本文件）
+
+
+验证方式
+--------
+1. Python（本仓库根目录）：
+   uv sync  # 安装依赖
+   python -m puripuly_heart.main  # 启动应用
+
+2. 手动端到端：
+   - 启动应用 -> 选择「托管（中国）」 -> 点击翻译或在 Settings Apply。
+   - 弹出 QQ 认证弹窗 -> 输入 QQ 号 + 机器人下发的凭证 -> 提交。
+   - 客户端 POST 到 salee 的 broker 服务器。
+   - 成功后自动进入翻译流程。
+   - 即使已有 Discord key，选「托管（中国）」仍会弹 QQ 框。
+
+
+请求规范
+--------
+POST https://puripuly-heart-broker.kapitalismho.workers.dev/v1/auth/qq/assert
+
+Headers: Content-Type: application/json
+
+Body:
+{
+  "qq_identity": "用户的明文QQ号",
+  "credential": "机器人下发的64位全小写HMAC凭证",
+  "asserted_at": "2026-06-05T12:03:00.000Z"
+}
+
+
+========================================
+PR 需要上传的文件列表（共 11 个文件）
+========================================
+
+修改的文件（8 个）：
+  src/puripuly_heart/core/openrouter_credentials.py
+  src/puripuly_heart/core/managed_openrouter_broker_client.py
+  src/puripuly_heart/core/managed_openrouter_release.py
+  src/puripuly_heart/ui/app.py
+  src/puripuly_heart/ui/controller.py
+  src/puripuly_heart/data/i18n/en.json
+  src/puripuly_heart/data/i18n/ja.json
+  src/puripuly_heart/data/i18n/ko.json
+  src/puripuly_heart/data/i18n/zh-CN.json
+
+新增的文件（2 个）：
+  src/puripuly_heart/ui/components/qq_managed_auth_dialog.py
+  QQ认证修改文件清单.txt
