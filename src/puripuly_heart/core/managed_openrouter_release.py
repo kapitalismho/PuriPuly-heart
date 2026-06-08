@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import inspect
+import logging
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import InitVar, dataclass, field, replace
@@ -36,6 +37,7 @@ from puripuly_heart.core.managed_identity import (
 )
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     best_effort_store_managed_openrouter_user_identifier,
     clear_temporary_managed_release_state,
     resolve_openrouter_credentials,
@@ -43,6 +45,8 @@ from puripuly_heart.core.openrouter_credentials import (
 from puripuly_heart.core.openrouter_handoff import store_managed_entitlement_snapshot
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.domain.models import Translation
+
+logger = logging.getLogger(__name__)
 
 MANAGED_OPENROUTER_TRIAL_BUDGET_USD = 0.07
 BINDING_MISMATCH_SUBCODES = {
@@ -237,6 +241,14 @@ class ManagedOpenRouterReleaseClient(Protocol):
         request: dict[str, object],
     ) -> ManagedOpenRouterIssueSuccess: ...
 
+    async def assert_qq_credential(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+        asserted_at: str,
+    ) -> ManagedOpenRouterIssueSuccess: ...
+
     async def get_trial_status(
         self,
         *,
@@ -295,6 +307,20 @@ class UnavailableManagedOpenRouterReleaseClient:
         request: dict[str, object],
     ) -> ManagedOpenRouterIssueSuccess:
         _ = request
+        raise ManagedOpenRouterReleaseError(
+            code="trial_unavailable",
+            error_class="retryable",
+            message="managed OpenRouter release is unavailable",
+        )
+
+    async def assert_qq_credential(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+        asserted_at: str,
+    ) -> ManagedOpenRouterIssueSuccess:
+        _ = qq_identity, credential, asserted_at
         raise ManagedOpenRouterReleaseError(
             code="trial_unavailable",
             error_class="retryable",
@@ -402,6 +428,47 @@ class ManagedOpenRouterReleaseService:
             self._run_prepare_flow(referral_id=referral_id),
         )
         return await self._await_shared_task(task, single_flight_reused=False)
+
+    async def prepare_from_qq_assertion(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+    ) -> ManagedOpenRouterReleaseResult:
+        logger.info("[QQAuth] prepare_from_qq_assertion: qq_identity=%s credential_len=%d", qq_identity, len(credential))
+        resolution = resolve_openrouter_credentials(
+            self.settings,
+            secrets=self.secrets,
+            request_intent="TRANS",
+        )
+        if resolution.selected_source != OpenRouterCredentialSource.MANAGED:
+            logger.warning("[QQAuth] prepare_from_qq_assertion: selected_source=%s, not MANAGED, stopping", resolution.selected_source)
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="managed_release.stop",
+            )
+
+        retry_result = self._result_for_retry_after_window()
+        if retry_result is not None:
+            logger.info("[QQAuth] prepare_from_qq_assertion: in retry_after window, returning retry")
+            return retry_result
+
+        try:
+            logger.info("[QQAuth] prepare_from_qq_assertion: calling client.assert_qq_credential")
+            issue_response = await self.client.assert_qq_credential(
+                qq_identity=qq_identity,
+                credential=credential,
+                asserted_at=self.signed_at_provider(),
+            )
+            logger.info("[QQAuth] prepare_from_qq_assertion: broker returned success, persisting key")
+        except ManagedOpenRouterReleaseError as exc:
+            logger.warning("[QQAuth] prepare_from_qq_assertion: broker error code=%s subcode=%s message=%s", exc.code, exc.subcode, exc.message)
+            return self._handle_release_error(exc, operation="qq_assert")
+
+        return self._persist_managed_issue_success(
+            issue_response,
+            secret_key=OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+        )
 
     async def ensure_key_for_llm_start(self) -> ManagedOpenRouterReleaseResult:
         resolution = resolve_openrouter_credentials(self.settings, secrets=self.secrets)
@@ -751,9 +818,11 @@ class ManagedOpenRouterReleaseService:
     def _persist_managed_issue_success(
         self,
         issue_response: ManagedOpenRouterIssueSuccess,
+        *,
+        secret_key: str = OPENROUTER_MANAGED_API_KEY_SECRET,
     ) -> ManagedOpenRouterReleaseResult:
         try:
-            self.secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, issue_response.openrouter_api_key)
+            self.secrets.set(secret_key, issue_response.openrouter_api_key)
         except Exception:
             previous_release_token = self.settings.managed_identity.release_token
             previous_release_token_expires_at = (
@@ -764,7 +833,7 @@ class ManagedOpenRouterReleaseService:
                 self.settings.managed_identity.verified_hardware_hash_salt_version
             )
             try:
-                self.secrets.delete(OPENROUTER_MANAGED_API_KEY_SECRET)
+                self.secrets.delete(secret_key)
             except Exception:
                 pass
             clear_temporary_managed_release_state(self.settings)

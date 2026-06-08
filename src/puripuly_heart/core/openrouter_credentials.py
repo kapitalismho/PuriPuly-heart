@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from enum import Enum
 
-from puripuly_heart.config.settings import AppSettings, OpenRouterCredentialSource
+from puripuly_heart.config.settings import AppSettings, OpenRouterCredentialSource, TranslationConnection
 from puripuly_heart.core.storage.secrets import SecretStore
+
+logger = logging.getLogger(__name__)
 
 OPENROUTER_BYOK_API_KEY_SECRET = "openrouter_api_key"
 OPENROUTER_MANAGED_API_KEY_SECRET = "openrouter_managed_api_key"
+OPENROUTER_MANAGED_QQ_API_KEY_SECRET = "openrouter_managed_qq_api_key"
 OPENROUTER_MANAGED_USER_ID_SECRET = "openrouter_managed_user_id"
 OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET = "openrouter_managed_user_installation_id"
 OPENROUTER_MANAGED_USER_ID_MAX_LENGTH = 256
@@ -52,17 +56,53 @@ def resolve_openrouter_credentials(
         )
 
     managed_api_key = _normalize_secret(secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET))
-    if managed_api_key is not None:
+    managed_qq_api_key = _normalize_secret(secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET))
+
+    # Strict separation by connection type:
+    # - Managed China: ONLY use QQ key
+    # - Other Managed: ONLY use Discord key
+    is_china = (
+        getattr(getattr(settings, "translation", None), "connection", None)
+        == TranslationConnection.MANAGED_CHINA
+    )
+    if is_china:
+        # China mode: only QQ key, never Discord key
+        logger.info(
+            "[QQAuth] Managed China mode: qq_key=%s discord_key=%s",
+            "found" if managed_qq_api_key else "missing",
+            "found(ignored)" if managed_api_key else "missing",
+        )
+        if managed_qq_api_key is not None:
+            return OpenRouterCredentialResolution(
+                selected_source=selected_source,
+                api_key=managed_qq_api_key,
+            )
+        # No QQ key → needs auth
+        logger.info("[QQAuth] Managed China: no QQ key, needs auth")
         return OpenRouterCredentialResolution(
             selected_source=selected_source,
-            api_key=managed_api_key,
+            api_key=None,
+            requires_managed_challenge=_is_trans_intent(request_intent),
         )
-
-    return OpenRouterCredentialResolution(
-        selected_source=selected_source,
-        api_key=None,
-        requires_managed_challenge=_is_trans_intent(request_intent),
-    )
+    else:
+        # Other Managed mode: only Discord key, never QQ key
+        logger.info(
+            "[ManagedAuth] Non-China Managed mode: discord_key=%s qq_key=%s",
+            "found" if managed_api_key else "missing",
+            "found(ignored)" if managed_qq_api_key else "missing",
+        )
+        if managed_api_key is not None:
+            return OpenRouterCredentialResolution(
+                selected_source=selected_source,
+                api_key=managed_api_key,
+            )
+        # No Discord key → needs auth
+        logger.info("[ManagedAuth] Non-China Managed: no Discord key, needs auth")
+        return OpenRouterCredentialResolution(
+            selected_source=selected_source,
+            api_key=None,
+            requires_managed_challenge=_is_trans_intent(request_intent),
+        )
 
 
 def require_openrouter_execution_api_key(settings: AppSettings, *, secrets: SecretStore) -> str:

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from puripuly_heart.config.settings import normalize_owned_referral_id
 from puripuly_heart.core.managed_openrouter_release import (
@@ -172,6 +175,46 @@ class HttpManagedOpenRouterBrokerClient:
         except ValueError as exc:
             raise _retryable_error(
                 "discord_issue", f"broker returned malformed payload: {exc}"
+            ) from exc
+
+    async def assert_qq_credential(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+        asserted_at: str,
+    ) -> ManagedOpenRouterIssueSuccess:
+        logger.info("[QQAuth] assert_qq_credential: POST /v1/auth/qq/assert qq_identity=%s asserted_at=%s base_url=%s", qq_identity, asserted_at, self.base_url)
+        payload = await self._post_json(
+            path="/v1/auth/qq/assert",
+            request_body={
+                "qq_identity": qq_identity,
+                "credential": credential,
+                "asserted_at": asserted_at,
+            },
+            operation="qq_assert",
+        )
+        logger.info("[QQAuth] assert_qq_credential: broker responded, parsing payload")
+        logger.info("[QQAuth] assert_qq_credential: raw payload keys=%s", list(payload.keys()) if hasattr(payload, 'keys') else 'N/A')
+        logger.info("[QQAuth] assert_qq_credential: raw payload=%s", dict(payload) if hasattr(payload, 'keys') else payload)
+        try:
+            result = ManagedOpenRouterIssueSuccess(
+                openrouter_api_key=_require_text(payload, "openrouter_api_key"),
+                managed_credential_ref=_require_optional_text(payload, "managed_credential_ref"),
+                expires_at=_require_optional_text(payload, "expires_at"),
+                openrouter_user_id=normalize_managed_openrouter_user_identifier(
+                    payload.get("openrouter_user_id")
+                ),
+                referral_bonus_applied=_parse_referral_bonus_applied(payload),
+                referral_id=_parse_owned_referral_id(payload),
+                pass_status=_parse_talk_together_pass_status(payload),
+            )
+            logger.info("[QQAuth] assert_qq_credential: success, got openrouter_api_key")
+            return result
+        except ValueError as exc:
+            logger.warning("[QQAuth] assert_qq_credential: malformed payload: %s", exc)
+            raise _retryable_error(
+                "qq_assert", f"broker returned malformed payload: {exc}"
             ) from exc
 
     async def get_trial_status(

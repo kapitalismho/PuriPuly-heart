@@ -32,6 +32,7 @@ from puripuly_heart.core.updater import check_for_update
 from puripuly_heart.ui.components.bottom_nav import BottomNavBar
 from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
 from puripuly_heart.ui.components.discord_managed_auth_dialog import DiscordManagedAuthDialog
+from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog
 from puripuly_heart.ui.components.founder_letter_dialog import FounderLetterDialog
 from puripuly_heart.ui.components.local_qwen_hallucination_dialog import (
     LocalQwenHallucinationDialog,
@@ -817,10 +818,16 @@ class TranslatorApp:
         )
         if enabled:
             managed_auth_action = self._dashboard_managed_auth_action()
+            logger.info("[ManagedAuth] _on_translation_toggle: action=%s enabled=%s", managed_auth_action, enabled)
             if managed_auth_action in {"prompt", "in_progress"}:
                 self._revert_dashboard_translation_toggle()
                 if managed_auth_action == "prompt":
-                    self.show_discord_managed_auth_dialog(preview=False)
+                    if self._is_managed_china_connection():
+                        logger.info("[QQAuth] Showing QQ auth dialog (China mode)")
+                        self.show_qq_managed_auth_dialog(preview=False)
+                    else:
+                        logger.info("[ManagedAuth] Showing Discord auth dialog (non-China mode)")
+                        self.show_discord_managed_auth_dialog(preview=False)
                 return False
 
         async def _task():
@@ -1027,6 +1034,11 @@ class TranslatorApp:
             else:
                 await self.controller.apply_providers(pending_settings)
 
+            # Check if China mode needs QQ auth
+            if self._is_managed_china_connection() and not self.controller._managed_qq_key_available():
+                logger.info("[QQAuth] Settings apply: China mode without QQ key, showing dialog")
+                self.show_qq_managed_auth_dialog(preview=False)
+
         self._queue_settings_mutation_task(_task)
 
     def _on_local_llm_secret_changed(self) -> None:
@@ -1089,6 +1101,85 @@ class TranslatorApp:
         close = getattr(dialog, "close", None)
         if callable(close):
             close()
+
+    def _is_managed_china_connection(self) -> bool:
+        controller = getattr(self, "controller", None)
+        is_managed_china = getattr(controller, "_is_managed_china_connection", None)
+        if callable(is_managed_china):
+            try:
+                return bool(is_managed_china())
+            except Exception:
+                return False
+        return False
+
+    def _close_qq_managed_auth_dialog(self) -> None:
+        dialog = getattr(self, "_qq_managed_auth_dialog", None)
+        close = getattr(dialog, "close", None)
+        if callable(close):
+            close()
+
+    def show_qq_managed_auth_dialog(self, preview: bool = False) -> None:
+        if not preview:
+            self._mark_launch_high_priority_feedback_shown("auth_required")
+        if preview:
+            on_submit = self._close_qq_managed_auth_dialog
+            on_close = self._close_qq_managed_auth_dialog
+            on_cancel = self._close_qq_managed_auth_dialog
+        else:
+            on_submit = self._start_qq_managed_auth
+            on_close = self._close_qq_managed_auth_dialog
+            on_cancel = self._close_qq_managed_auth_dialog
+
+        dialog = QqManagedAuthDialog(
+            self.page,
+            on_submit=on_submit,
+            on_close=on_close,
+            on_cancel=on_cancel,
+        )
+        self._qq_managed_auth_dialog = dialog
+        dialog.open()
+
+    def _start_qq_managed_auth(self) -> None:
+        dialog = getattr(self, "_qq_managed_auth_dialog", None)
+        raw_qq_identity = getattr(dialog, "qq_identity", "")
+        raw_credential = getattr(dialog, "credential", "")
+        qq_identity = raw_qq_identity.strip() if isinstance(raw_qq_identity, str) else ""
+        credential = raw_credential.strip() if isinstance(raw_credential, str) else ""
+        logger.info("[QQAuth] _start_qq_managed_auth: qq_identity=%s credential_len=%d", qq_identity, len(credential))
+        if not qq_identity or not credential:
+            self._show_snackbar(t("qq_auth.error.invalid_input"), ft.Colors.ORANGE_700)
+            return
+        set_waiting = getattr(dialog, "set_waiting", None)
+        if callable(set_waiting):
+            set_waiting()
+
+        async def _task() -> None:
+            controller = getattr(self, "controller", None)
+            start_auth = getattr(controller, "start_qq_managed_auth_from_dialog", None)
+            if not callable(start_auth):
+                return
+            try:
+                ok = await start_auth(
+                    qq_identity=qq_identity,
+                    credential=credential,
+                )
+                if not ok:
+                    return
+                enable_translation = getattr(controller, "set_translation_enabled", None)
+                if not callable(enable_translation):
+                    return
+                enable_result = await enable_translation(True)
+                if not self._translation_enable_succeeded(controller, enable_result):
+                    return
+            except asyncio.CancelledError:
+                return
+            except Exception:
+                logger.exception("QQ managed auth task failed")
+                return
+            finally:
+                self._close_qq_managed_auth_dialog()
+
+        self.page.run_task(_task)
 
     def show_discord_managed_auth_dialog(self, preview: bool = False) -> None:
         if not preview:
