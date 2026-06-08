@@ -7138,8 +7138,11 @@ def test_apply_locale_refreshes_custom_vocabulary_text(
     assert view._custom_vocab_description_text.value == t("settings.custom_vocabulary.description")
     assert view._custom_vocab_tag_editor._input_field.hint_text == ""  # noqa: SLF001
     assert view._custom_vocab_tag_editor._empty_text.visible is False  # noqa: SLF001
+    assert view._custom_vocab_tag_editor._remove_label_template == t(  # noqa: SLF001
+        "settings.custom_vocabulary.remove_hint"
+    )
     chip = view._custom_vocab_tag_editor._chips_wrap.controls[0]  # noqa: SLF001
-    assert chip.tooltip == t("settings.custom_vocabulary.remove_hint", term="Puripuly")
+    assert chip.tooltip is None
 
 
 def test_settings_view_uses_generic_subtab_shell(monkeypatch: pytest.MonkeyPatch) -> None:
