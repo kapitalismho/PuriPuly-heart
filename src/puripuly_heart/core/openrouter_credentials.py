@@ -5,7 +5,11 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 
-from puripuly_heart.config.settings import AppSettings, OpenRouterCredentialSource, TranslationConnection
+from puripuly_heart.config.settings import (
+    AppSettings,
+    OpenRouterCredentialSource,
+    TranslationConnection,
+)
 from puripuly_heart.core.storage.secrets import SecretStore
 
 logger = logging.getLogger(__name__)
@@ -55,9 +59,6 @@ def resolve_openrouter_credentials(
             api_key=_get_byok_api_key(secrets),
         )
 
-    managed_api_key = _normalize_secret(secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET))
-    managed_qq_api_key = _normalize_secret(secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET))
-
     # Strict separation by connection type:
     # - Managed China: ONLY use QQ key
     # - Other Managed: ONLY use Discord key
@@ -66,11 +67,11 @@ def resolve_openrouter_credentials(
         == TranslationConnection.MANAGED_CHINA
     )
     if is_china:
+        managed_qq_api_key = _normalize_secret(secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET))
         # China mode: only QQ key, never Discord key
         logger.info(
-            "[QQAuth] Managed China mode: qq_key=%s discord_key=%s",
+            "[QQAuth] Managed China mode: qq_key=%s",
             "found" if managed_qq_api_key else "missing",
-            "found(ignored)" if managed_api_key else "missing",
         )
         if managed_qq_api_key is not None:
             return OpenRouterCredentialResolution(
@@ -85,11 +86,11 @@ def resolve_openrouter_credentials(
             requires_managed_challenge=_is_trans_intent(request_intent),
         )
     else:
+        managed_api_key = _normalize_secret(secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET))
         # Other Managed mode: only Discord key, never QQ key
         logger.info(
-            "[ManagedAuth] Non-China Managed mode: discord_key=%s qq_key=%s",
+            "[ManagedAuth] Non-China Managed mode: discord_key=%s",
             "found" if managed_api_key else "missing",
-            "found(ignored)" if managed_qq_api_key else "missing",
         )
         if managed_api_key is not None:
             return OpenRouterCredentialResolution(
