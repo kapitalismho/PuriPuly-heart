@@ -55,13 +55,7 @@ EXACT_DYNAMIC_I18N_KEYS = frozenset(
 )
 
 TEMPORARILY_ALLOWED_UNREFERENCED_I18N_KEYS = frozenset(
-    SHIPPING_DESKTOP_OVERLAY_I18N_KEYS
-    | DESKTOP_OVERLAY_RECOVERY_I18N_KEYS
-    | {
-        # Runtime usage is owned by the later QQ dialog lifecycle/i18n task.
-        "qq_auth.cancel",
-        "qq_auth.success",
-    }
+    SHIPPING_DESKTOP_OVERLAY_I18N_KEYS | DESKTOP_OVERLAY_RECOVERY_I18N_KEYS
 )
 
 
