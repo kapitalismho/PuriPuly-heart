@@ -132,6 +132,9 @@ class TranslatorApp:
         self._discord_managed_auth_generation = 0
         self._discord_managed_auth_cancelled = False
         self._discord_managed_auth_task_handle = None
+        self._qq_managed_auth_generation = 0
+        self._qq_managed_auth_cancelled = False
+        self._qq_managed_auth_task_handle = None
         self._github_star_prompt_launch_pending = True
         self._launch_high_priority_feedback_shown = False
         self._launch_high_priority_feedback_reason: str | None = None
@@ -1041,7 +1044,7 @@ class TranslatorApp:
             # Check if China mode needs QQ auth
             if (
                 self._is_managed_china_connection()
-                and not self.controller._managed_qq_key_available()
+                and not self._managed_openrouter_local_key_available()
             ):
                 logger.info("[QQAuth] Settings apply: China mode without QQ key, showing dialog")
                 self.show_qq_managed_auth_dialog(preview=False)
@@ -1119,6 +1122,22 @@ class TranslatorApp:
                 return False
         return False
 
+    def _managed_openrouter_local_key_available(self) -> bool:
+        controller = getattr(self, "controller", None)
+        availability = getattr(controller, "_managed_openrouter_local_key_available", None)
+        if callable(availability):
+            try:
+                return bool(availability())
+            except Exception:
+                return False
+        qq_availability = getattr(controller, "_managed_qq_key_available", None)
+        if callable(qq_availability):
+            try:
+                return bool(qq_availability())
+            except Exception:
+                return False
+        return False
+
     def _close_qq_managed_auth_dialog(self) -> None:
         dialog = getattr(self, "_qq_managed_auth_dialog", None)
         close = getattr(dialog, "close", None)
@@ -1135,7 +1154,7 @@ class TranslatorApp:
         else:
             on_submit = self._start_qq_managed_auth
             on_close = self._close_qq_managed_auth_dialog
-            on_cancel = self._close_qq_managed_auth_dialog
+            on_cancel = self._cancel_qq_managed_auth
 
         dialog = QqManagedAuthDialog(
             self.page,
@@ -1204,6 +1223,18 @@ class TranslatorApp:
         except (TypeError, ValueError):
             return None
         return max(0, min(retry_after_ms, 86_400_000))
+
+    def _next_qq_managed_auth_generation(self) -> int:
+        generation = int(getattr(self, "_qq_managed_auth_generation", 0)) + 1
+        self._qq_managed_auth_generation = generation
+        self._qq_managed_auth_cancelled = False
+        return generation
+
+    def _is_current_qq_managed_auth_generation(self, generation: int) -> bool:
+        return bool(
+            generation == getattr(self, "_qq_managed_auth_generation", None)
+            and not getattr(self, "_qq_managed_auth_cancelled", False)
+        )
 
     def _set_qq_managed_auth_recoverable_error(
         self,
@@ -1291,6 +1322,37 @@ class TranslatorApp:
             return False
         return getattr(dialog, "is_open", True) is not False
 
+    def _is_current_qq_managed_auth_completion(
+        self,
+        app_generation: int,
+        dialog: object,
+        dialog_generation: int | None,
+    ) -> bool:
+        return bool(
+            self._is_current_qq_managed_auth_generation(app_generation)
+            and self._is_current_qq_managed_auth_dialog(dialog, dialog_generation)
+        )
+
+    def _cancel_qq_managed_auth(self) -> None:
+        self._qq_managed_auth_cancelled = True
+        task_handle = getattr(self, "_qq_managed_auth_task_handle", None)
+        cancel = getattr(task_handle, "cancel", None)
+        if callable(cancel):
+            with contextlib.suppress(Exception):
+                cancel()
+        self._qq_managed_auth_task_handle = None
+        controller = getattr(self, "controller", None)
+        cancel_auth = getattr(controller, "cancel_qq_managed_auth", None)
+        if callable(cancel_auth):
+            result = cancel_auth()
+            if inspect.isawaitable(result):
+
+                async def _task() -> None:
+                    await result
+
+                self.page.run_task(_task)
+        self._close_qq_managed_auth_dialog()
+
     def _start_qq_managed_auth(self) -> None:
         dialog = getattr(self, "_qq_managed_auth_dialog", None)
         raw_qq_identity = getattr(dialog, "qq_identity", "")
@@ -1303,6 +1365,7 @@ class TranslatorApp:
         set_waiting = getattr(dialog, "set_waiting", None)
         if callable(set_waiting):
             set_waiting()
+        app_generation = self._next_qq_managed_auth_generation()
         dialog_generation = getattr(dialog, "auth_generation", None)
 
         async def _task() -> None:
@@ -1318,6 +1381,12 @@ class TranslatorApp:
             except asyncio.CancelledError:
                 return
             except Exception:
+                if not self._is_current_qq_managed_auth_completion(
+                    app_generation,
+                    dialog,
+                    dialog_generation,
+                ):
+                    return
                 logger.error("QQ managed auth start failed")
                 self._set_qq_managed_auth_recoverable_error(
                     dialog,
@@ -1328,14 +1397,18 @@ class TranslatorApp:
                 )
                 return
 
+            if not self._is_current_qq_managed_auth_completion(
+                app_generation,
+                dialog,
+                dialog_generation,
+            ):
+                return
             if not self._qq_managed_auth_result_is_success(auth_result):
                 self._handle_qq_managed_auth_failure_result(
                     dialog,
                     auth_result,
                     generation=dialog_generation,
                 )
-                return
-            if not self._is_current_qq_managed_auth_dialog(dialog, dialog_generation):
                 return
 
             enable_translation = getattr(controller, "set_translation_enabled", None)
@@ -1354,11 +1427,23 @@ class TranslatorApp:
             except asyncio.CancelledError:
                 return
             except Exception:
+                if not self._is_current_qq_managed_auth_completion(
+                    app_generation,
+                    dialog,
+                    dialog_generation,
+                ):
+                    return
                 logger.error("QQ managed auth translation enable failed")
                 self._complete_qq_managed_auth_translation_enable_failed(
                     dialog,
                     generation=dialog_generation,
                 )
+                return
+            if not self._is_current_qq_managed_auth_completion(
+                app_generation,
+                dialog,
+                dialog_generation,
+            ):
                 return
             if not translation_enabled:
                 self._complete_qq_managed_auth_translation_enable_failed(
@@ -1372,8 +1457,10 @@ class TranslatorApp:
             ):
                 return
             self._set_dashboard_translation_visual_state(True)
+            if self._is_current_qq_managed_auth_generation(app_generation):
+                self._qq_managed_auth_task_handle = None
 
-        self.page.run_task(_task)
+        self._qq_managed_auth_task_handle = self.page.run_task(_task)
 
     def show_discord_managed_auth_dialog(self, preview: bool = False) -> None:
         if not preview:
