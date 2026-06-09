@@ -1089,6 +1089,10 @@ class GuiController:
 
         self._qq_managed_auth_in_progress = True
         self._set_managed_trial_pending_auth(True)
+
+        def issue_persistence_allowed() -> bool:
+            return self._is_current_qq_managed_auth_generation(auth_generation)
+
         try:
             try:
                 logger.info(
@@ -1097,6 +1101,7 @@ class GuiController:
                 result = await service.prepare_from_qq_assertion(
                     qq_identity=normalized_qq_identity,
                     credential=normalized_credential,
+                    issue_persistence_allowed=issue_persistence_allowed,
                 )
             except asyncio.CancelledError:
                 raise

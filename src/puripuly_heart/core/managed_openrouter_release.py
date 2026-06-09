@@ -434,6 +434,28 @@ class ManagedOpenRouterReleaseService:
         *,
         referral_id: str | None = None,
     ) -> ManagedOpenRouterReleaseResult:
+        if _is_managed_china_connection(self.settings):
+            resolution = resolve_openrouter_credentials(
+                self.settings,
+                secrets=self.secrets,
+                request_intent="TRANS",
+            )
+            if resolution.selected_source != OpenRouterCredentialSource.MANAGED:
+                return ManagedOpenRouterReleaseResult(
+                    behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                    message_key="managed_release.stop",
+                )
+            if resolution.api_key is not None:
+                self._clear_retry_after()
+                return ManagedOpenRouterReleaseResult(
+                    behavior=ManagedOpenRouterReleaseBehavior.READY,
+                    message_key="managed_release.ready",
+                    api_key=resolution.api_key,
+                    local_key_available=True,
+                )
+            self._clear_retry_after()
+            return _managed_china_key_unavailable_result()
+
         if self._issue_task is not None and not self._issue_task.done():
             return await self._await_shared_task(self._issue_task, single_flight_reused=True)
         if self._prepare_task is not None and not self._prepare_task.done():
@@ -450,6 +472,7 @@ class ManagedOpenRouterReleaseService:
         *,
         qq_identity: str,
         credential: str,
+        issue_persistence_allowed: Callable[[], bool] | None = None,
     ) -> ManagedOpenRouterReleaseResult:
         logger.info("[QQAuth] prepare_from_qq_assertion: starting QQ assertion flow")
         resolution = resolve_openrouter_credentials(
@@ -513,6 +536,10 @@ class ManagedOpenRouterReleaseService:
             qq_assert_response.issue.openrouter_api_key
         )
         if normalized_qq_api_key is None:
+            self._clear_retry_after()
+            return _managed_china_key_unavailable_result()
+
+        if issue_persistence_allowed is not None and not issue_persistence_allowed():
             self._clear_retry_after()
             return _managed_china_key_unavailable_result()
 

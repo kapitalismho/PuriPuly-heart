@@ -60,6 +60,7 @@ class FakeManagedReleaseClient:
     trial_status_result: object | None = None
     challenge_gate: asyncio.Event | None = None
     discord_start_gate: asyncio.Event | None = None
+    discord_start_started: asyncio.Event | None = None
     issue_gate: asyncio.Event | None = None
     issue_started: asyncio.Event | None = None
     discord_issue_gate: asyncio.Event | None = None
@@ -131,6 +132,8 @@ class FakeManagedReleaseClient:
         if referral_id is not None:
             payload["referral_id"] = referral_id
         self.calls.append(("discord_start", payload))
+        if self.discord_start_started is not None:
+            self.discord_start_started.set()
         if self.discord_start_gate is not None:
             await self.discord_start_gate.wait()
         result = self.discord_start_result
@@ -431,6 +434,43 @@ async def test_prepare_from_qq_assertion_persists_issued_wrapper_to_qq_secret_an
     assert result.api_key == "qq-managed-key"
     assert result.local_key_available is True
     assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) == "qq-managed-key"
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "discord-managed-key"
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_persistence_guard_blocks_stale_issued_key() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    secrets = InMemorySecretStore()
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterQqAssertSuccess(
+            status="issued",
+            qq_subject_ref="ph-qq-subject-v1_guard-block-test-sentinel",
+            issue=ManagedOpenRouterIssueSuccess(openrouter_api_key="qq-managed-key"),
+        )
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+    guard_checks: list[str] = []
+
+    def issue_persistence_allowed() -> bool:
+        guard_checks.append("checked")
+        return False
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-guard-block-identity-sentinel",
+        credential="qq-guard-block-credential-sentinel",
+        issue_persistence_allowed=issue_persistence_allowed,
+    )
+
+    assert guard_checks == ["checked"]
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "qq_auth.error.key_unavailable"
+    assert result.api_key is None
+    assert result.local_key_available is False
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
     assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "discord-managed-key"
     assert [name for name, _payload in client.calls] == ["qq_assert"]
 
@@ -2106,6 +2146,74 @@ async def test_prepare_for_translation_reuses_single_flight_for_repeated_trans_a
         False,
         True,
     ]
+
+
+@pytest.mark.asyncio
+async def test_prepare_for_translation_managed_china_does_not_reuse_in_flight_discord_prepare_task() -> (
+    None
+):
+    discord_start_started = asyncio.Event()
+    discord_start_gate = asyncio.Event()
+    client = FakeManagedReleaseClient(
+        discord_start_result=_make_discord_start_success(),
+        discord_issue_result=ManagedOpenRouterIssueSuccess(openrouter_api_key="managed-key"),
+        discord_start_gate=discord_start_gate,
+        discord_start_started=discord_start_started,
+    )
+    service, settings, secrets, _client, _harness = _make_discord_service(client=client)
+    first_task = asyncio.create_task(service.prepare_for_translation())
+    await discord_start_started.wait()
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+
+    try:
+        result = await asyncio.wait_for(service.prepare_for_translation(), timeout=0.5)
+        assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+        assert result.message_key == "qq_auth.error.key_unavailable"
+        assert result.api_key is None
+        assert result.local_key_available is False
+        assert result.single_flight_reused is False
+        assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+        assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) is None
+    finally:
+        discord_start_gate.set()
+        await asyncio.gather(first_task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_prepare_for_translation_managed_china_does_not_reuse_in_flight_managed_issue_task() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    secrets = InMemorySecretStore()
+    ensure_managed_identity_bundle(settings, secrets, persist_settings=lambda _updated: None)
+    settings.managed_identity.release_token = "release-token-1"
+    settings.managed_identity.release_token_expires_at = "2026-04-08T06:15:00.000Z"
+    _set_verified_snapshot(settings)
+    issue_started = asyncio.Event()
+    issue_gate = asyncio.Event()
+    client = FakeManagedReleaseClient(
+        issue_result=ManagedOpenRouterIssueSuccess(openrouter_api_key="managed-key"),
+        issue_gate=issue_gate,
+        issue_started=issue_started,
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+    first_task = asyncio.create_task(service.prepare_for_translation())
+    await issue_started.wait()
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+
+    try:
+        result = await asyncio.wait_for(service.prepare_for_translation(), timeout=0.5)
+        assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+        assert result.message_key == "qq_auth.error.key_unavailable"
+        assert result.api_key is None
+        assert result.local_key_available is False
+        assert result.single_flight_reused is False
+        assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+        assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) is None
+    finally:
+        issue_gate.set()
+        await asyncio.gather(first_task, return_exceptions=True)
 
 
 @pytest.mark.asyncio
