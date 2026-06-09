@@ -55,7 +55,13 @@ EXACT_DYNAMIC_I18N_KEYS = frozenset(
 )
 
 TEMPORARILY_ALLOWED_UNREFERENCED_I18N_KEYS = frozenset(
-    SHIPPING_DESKTOP_OVERLAY_I18N_KEYS | DESKTOP_OVERLAY_RECOVERY_I18N_KEYS
+    SHIPPING_DESKTOP_OVERLAY_I18N_KEYS
+    | DESKTOP_OVERLAY_RECOVERY_I18N_KEYS
+    | {
+        # Runtime usage is owned by the later QQ dialog lifecycle/i18n task.
+        "qq_auth.cancel",
+        "qq_auth.success",
+    }
 )
 
 
@@ -332,6 +338,18 @@ def test_managed_key_card_keys_are_localized() -> None:
             value = bundle[key]
             assert "Referral ID" not in value, (locale_name, key, value)
             assert "Referral reward" not in value, (locale_name, key, value)
+
+
+def test_qq_key_unavailable_error_key_is_localized_for_all_supported_locales() -> None:
+    bundles = _load_bundles()
+    runtime_source = _runtime_python_source()
+    key = "qq_auth.error.key_unavailable"
+
+    assert key in runtime_source
+    for locale, bundle in bundles.items():
+        assert key in bundle, locale
+        assert bundle[key].strip()
+        assert bundle[key] != key
 
 
 def test_i18n_bundles_do_not_keep_unused_runtime_keys() -> None:

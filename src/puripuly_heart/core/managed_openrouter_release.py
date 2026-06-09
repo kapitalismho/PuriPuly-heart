@@ -122,7 +122,7 @@ class ManagedOpenRouterReleaseResult:
     message_kwargs: Mapping[str, object] = field(default_factory=dict)
     diagnostics: ManagedOpenRouterReleaseDiagnostics | None = None
     retry_after_ms: int | None = None
-    api_key: str | None = None
+    api_key: str | None = field(default=None, repr=False)
     local_key_available: bool = False
     pending_issue: bool = False
     single_flight_reused: bool = False
@@ -162,13 +162,20 @@ class ManagedOpenRouterVerifySuccess:
 
 @dataclass(frozen=True, slots=True)
 class ManagedOpenRouterIssueSuccess:
-    openrouter_api_key: str
+    openrouter_api_key: str = field(repr=False)
     managed_credential_ref: str | None = None
     expires_at: str | None = None
     openrouter_user_id: str | None = None
     referral_bonus_applied: bool = False
     referral_id: str | None = None
     pass_status: TalkTogetherPassStatus | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedOpenRouterQqAssertSuccess:
+    status: str
+    qq_subject_ref: str = field(repr=False)
+    issue: ManagedOpenRouterIssueSuccess | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,7 +254,7 @@ class ManagedOpenRouterReleaseClient(Protocol):
         qq_identity: str,
         credential: str,
         asserted_at: str,
-    ) -> ManagedOpenRouterIssueSuccess: ...
+    ) -> ManagedOpenRouterQqAssertSuccess: ...
 
     async def get_trial_status(
         self,
@@ -319,7 +326,7 @@ class UnavailableManagedOpenRouterReleaseClient:
         qq_identity: str,
         credential: str,
         asserted_at: str,
-    ) -> ManagedOpenRouterIssueSuccess:
+    ) -> ManagedOpenRouterQqAssertSuccess:
         _ = qq_identity, credential, asserted_at
         raise ManagedOpenRouterReleaseError(
             code="trial_unavailable",
@@ -435,14 +442,14 @@ class ManagedOpenRouterReleaseService:
         qq_identity: str,
         credential: str,
     ) -> ManagedOpenRouterReleaseResult:
-        logger.info("[QQAuth] prepare_from_qq_assertion: qq_identity=%s credential_len=%d", qq_identity, len(credential))
+        logger.info("[QQAuth] prepare_from_qq_assertion: starting QQ assertion flow")
         resolution = resolve_openrouter_credentials(
             self.settings,
             secrets=self.secrets,
             request_intent="TRANS",
         )
         if resolution.selected_source != OpenRouterCredentialSource.MANAGED:
-            logger.warning("[QQAuth] prepare_from_qq_assertion: selected_source=%s, not MANAGED, stopping", resolution.selected_source)
+            logger.warning("[QQAuth] prepare_from_qq_assertion: selected source is not Managed")
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.STOP,
                 message_key="managed_release.stop",
@@ -450,23 +457,43 @@ class ManagedOpenRouterReleaseService:
 
         retry_result = self._result_for_retry_after_window()
         if retry_result is not None:
-            logger.info("[QQAuth] prepare_from_qq_assertion: in retry_after window, returning retry")
+            logger.info(
+                "[QQAuth] prepare_from_qq_assertion: in retry_after window, returning retry"
+            )
             return retry_result
 
         try:
             logger.info("[QQAuth] prepare_from_qq_assertion: calling client.assert_qq_credential")
-            issue_response = await self.client.assert_qq_credential(
+            qq_assert_response = await self.client.assert_qq_credential(
                 qq_identity=qq_identity,
                 credential=credential,
                 asserted_at=self.signed_at_provider(),
             )
-            logger.info("[QQAuth] prepare_from_qq_assertion: broker returned success, persisting key")
+            logger.info(
+                "[QQAuth] prepare_from_qq_assertion: broker returned status=%s issued=%s",
+                qq_assert_response.status,
+                qq_assert_response.issue is not None,
+            )
         except ManagedOpenRouterReleaseError as exc:
-            logger.warning("[QQAuth] prepare_from_qq_assertion: broker error code=%s subcode=%s message=%s", exc.code, exc.subcode, exc.message)
-            return self._handle_release_error(exc, operation="qq_assert")
+            safe_error = _sanitize_qq_assert_release_error(exc)
+            logger.warning(
+                "[QQAuth] prepare_from_qq_assertion: broker error code=%s class=%s subcode=%s retry_after_ms=%s",
+                safe_error.code,
+                safe_error.error_class,
+                safe_error.subcode,
+                safe_error.retry_after_ms,
+            )
+            return self._handle_release_error(safe_error, operation="qq_assert")
+
+        if qq_assert_response.issue is None:
+            self._clear_retry_after()
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="qq_auth.error.key_unavailable",
+            )
 
         return self._persist_managed_issue_success(
-            issue_response,
+            qq_assert_response.issue,
             secret_key=OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
         )
 
@@ -1233,6 +1260,28 @@ def _discord_callback_release_error(error: Exception) -> ManagedOpenRouterReleas
         ),
         operation="discord_callback",
     )
+
+
+def _sanitize_qq_assert_release_error(
+    error: ManagedOpenRouterReleaseError,
+) -> ManagedOpenRouterReleaseError:
+    return ManagedOpenRouterReleaseError(
+        operation=error.operation or "qq_assert",
+        code=error.code,
+        error_class=error.error_class,
+        subcode=error.subcode,
+        retry_after_ms=_normalize_retry_after_ms(error.retry_after_ms),
+        message=_qq_assert_safe_error_message(error.subcode),
+        managed_lifecycle=error.managed_lifecycle,
+    )
+
+
+def _qq_assert_safe_error_message(subcode: str | None) -> str:
+    if subcode == "ip_rate_limited":
+        return "QQ credential verification is rate limited"
+    if subcode == "qq_lifetime_used":
+        return "QQ credential has already been used"
+    return "QQ credential verification failed"
 
 
 def _exception_message(error: Exception, *, default: str) -> str:
