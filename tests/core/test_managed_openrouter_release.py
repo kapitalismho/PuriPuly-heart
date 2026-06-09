@@ -4,6 +4,7 @@ import asyncio
 import base64
 import contextlib
 import hashlib
+import logging
 import threading
 from dataclasses import dataclass
 from typing import Any
@@ -24,6 +25,7 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterFingerprintSalt,
     ManagedOpenRouterIssueSuccess,
     ManagedOpenRouterLLMProvider,
+    ManagedOpenRouterQqAssertSuccess,
     ManagedOpenRouterReleaseBehavior,
     ManagedOpenRouterReleaseDiagnostics,
     ManagedOpenRouterReleaseError,
@@ -37,6 +39,7 @@ from puripuly_heart.core.managed_openrouter_release import (
 )
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     OPENROUTER_MANAGED_USER_ID_SECRET,
     OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
     load_managed_openrouter_user_identifier,
@@ -52,6 +55,7 @@ class FakeManagedReleaseClient:
     issue_result: object | None = None
     discord_start_result: object | None = None
     discord_issue_result: object | None = None
+    qq_assert_result: object | None = None
     trial_status_result: object | None = None
     challenge_gate: asyncio.Event | None = None
     discord_start_gate: asyncio.Event | None = None
@@ -140,6 +144,28 @@ class FakeManagedReleaseClient:
         if self.discord_issue_gate is not None:
             await self.discord_issue_gate.wait()
         result = self.discord_issue_result
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    async def assert_qq_credential(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+        asserted_at: str,
+    ):
+        self.calls.append(
+            (
+                "qq_assert",
+                {
+                    "qq_identity": qq_identity,
+                    "credential": credential,
+                    "asserted_at": asserted_at,
+                },
+            )
+        )
+        result = self.qq_assert_result
         if isinstance(result, Exception):
             raise result
         return result
@@ -350,6 +376,114 @@ def _set_verified_snapshot(
 ) -> None:
     settings.managed_identity.verified_hardware_hash = hardware_hash
     settings.managed_identity.verified_hardware_hash_salt_version = salt_version
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_persists_issued_wrapper_to_qq_secret() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    secrets = InMemorySecretStore()
+    issue = ManagedOpenRouterIssueSuccess(
+        openrouter_api_key="qq-managed-key",
+        managed_credential_ref="qq-managed-ref",
+        openrouter_user_id=" qq-user-123 ",
+    )
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterQqAssertSuccess(
+            status="issued",
+            qq_subject_ref="ph-qq-subject-v1_issued-test-sentinel",
+            issue=issue,
+        )
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-issued-identity-sentinel",
+        credential="qq-issued-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.READY
+    assert result.message_key == "managed_release.ready"
+    assert result.api_key == "qq-managed-key"
+    assert result.local_key_available is True
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) == "qq-managed-key"
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) is None
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_verified_only_returns_key_unavailable_without_persisting() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    secrets = InMemorySecretStore()
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterQqAssertSuccess(
+            status="verified",
+            qq_subject_ref="ph-qq-subject-v1_verified-only-test-sentinel",
+            issue=None,
+        )
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-verified-only-identity-sentinel",
+        credential="qq-verified-only-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "qq_auth.error.key_unavailable"
+    assert result.api_key is None
+    assert result.local_key_available is False
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) is None
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_redacts_sensitive_values_from_logs_and_diagnostics(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    qq_identity = "qq-prepare-identity-sensitive"
+    credential = "qq-prepare-credential-sensitive"
+    subject_ref = "ph-qq-subject-v1_prepare-sensitive"
+    raw_broker_message = f"raw Broker message with {qq_identity} {credential} {subject_ref}"
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterReleaseError(
+            code="rate_limited",
+            error_class="retryable",
+            subcode="ip_rate_limited",
+            retry_after_ms=5_000,
+            message=raw_broker_message,
+            operation="qq_assert",
+        )
+    )
+    service, _, _ = _make_service(client=client)
+    caplog.set_level(
+        logging.INFO,
+        logger="puripuly_heart.core.managed_openrouter_release",
+    )
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity=qq_identity,
+        credential=credential,
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+    assert result.message_key == "managed_release.retry_after_ms"
+    assert result.diagnostics is not None
+    assert result.diagnostics.message != raw_broker_message
+    assert result.diagnostics.message == "QQ credential verification is rate limited"
+    for sensitive in (
+        qq_identity,
+        credential,
+        subject_ref,
+        raw_broker_message,
+        f"credential_len={len(credential)}",
+    ):
+        assert sensitive not in caplog.text
+        assert sensitive not in repr(result.diagnostics)
 
 
 @pytest.mark.asyncio
