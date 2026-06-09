@@ -121,13 +121,13 @@ async def test_deepseek_provider_close_cleans_up() -> None:
     assert provider._internal_client is None
 
 
-def test_deepseek_provider_passes_max_tokens_to_internal_httpx_client() -> None:
-    provider = DeepSeekLLMProvider(api_key="k", max_tokens=17)
+def test_deepseek_provider_does_not_configure_translation_max_tokens_cap() -> None:
+    provider = DeepSeekLLMProvider(api_key="k")
 
     client = provider._get_client()
 
     assert isinstance(client, HttpxDeepSeekClient)
-    assert client.max_tokens == 17
+    assert not hasattr(client, "max_tokens")
 
 
 def test_deepseek_provider_passes_v4_pro_model_to_internal_httpx_client() -> None:
@@ -171,7 +171,7 @@ async def test_httpx_deepseek_client_builds_non_thinking_request(monkeypatch) ->
 
     body = fake_client.last_request["json"]
     assert body["model"] == "deepseek-v4-flash"
-    assert body["max_tokens"] == 100
+    assert "max_tokens" not in body
     assert body["thinking"] == {"type": "disabled"}
     assert "reasoning" not in body
     assert "reasoning_effort" not in body

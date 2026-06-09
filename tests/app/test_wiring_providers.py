@@ -226,7 +226,6 @@ def test_create_llm_provider_deepseek_uses_secret_and_model() -> None:
     assert provider.inner.api_key == "ds-key"
     assert provider.inner.model == "deepseek-v4-flash"
     assert provider.inner.base_url == "https://api.deepseek.com"
-    assert provider.inner.max_tokens == 100
     assert provider.semaphore._value == 4  # type: ignore[attr-defined]
 
 

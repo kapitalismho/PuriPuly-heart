@@ -155,7 +155,6 @@ class DeepSeekLLMProvider:
     api_key: str
     base_url: str = "https://api.deepseek.com"
     model: str = "deepseek-v4-flash"
-    max_tokens: int = 100
     timeout: float = 30.0
     runtime_logging: SessionRuntimeLoggingService | None = None
     client: DeepSeekClient | None = None
@@ -169,7 +168,6 @@ class DeepSeekLLMProvider:
                 api_key=self.api_key,
                 model=self.model,
                 base_url=self.base_url,
-                max_tokens=self.max_tokens,
                 timeout=self.timeout,
                 runtime_logging=self.runtime_logging,
             )
@@ -232,7 +230,6 @@ class HttpxDeepSeekClient:
     api_key: str
     model: str
     base_url: str = "https://api.deepseek.com"
-    max_tokens: int = 100
     timeout: float = 30.0
     runtime_logging: SessionRuntimeLoggingService | None = None
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
@@ -270,7 +267,6 @@ class HttpxDeepSeekClient:
                 {"role": "user", "content": user_message},
             ],
             "thinking": {"type": "disabled"},
-            "max_tokens": self.max_tokens,
         }
         return request_body
 
