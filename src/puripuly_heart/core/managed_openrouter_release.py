@@ -54,6 +54,14 @@ BINDING_MISMATCH_SUBCODES = {
     "device_public_key_registered",
     "installation_binding_mismatch",
 }
+QQ_ASSERT_CREDENTIAL_SUBCODES = frozenset(
+    {
+        "qq_credential_invalid",
+        "qq_credential_mismatch",
+    }
+)
+QQ_ASSERT_LIFETIME_USED_SUBCODE = "qq_lifetime_used"
+QQ_ASSERT_RATE_LIMITED_SUBCODE = "ip_rate_limited"
 HardwareFingerprintProvider = Callable[[], str | Awaitable[str]]
 DiscordOAuthListenerFactory = Callable[[], DiscordOAuthLoopbackListener]
 DiscordOAuthCallbackRunner = Callable[
@@ -492,6 +500,9 @@ class ManagedOpenRouterReleaseService:
                 safe_error.subcode,
                 safe_error.retry_after_ms,
             )
+            qq_error_result = self._handle_qq_assert_release_error(safe_error)
+            if qq_error_result is not None:
+                return qq_error_result
             return self._handle_release_error(safe_error, operation="qq_assert")
 
         if qq_assert_response.issue is None:
@@ -1064,6 +1075,50 @@ class ManagedOpenRouterReleaseService:
             diagnostics=diagnostics,
         )
 
+    def _handle_qq_assert_release_error(
+        self,
+        error: ManagedOpenRouterReleaseError,
+    ) -> ManagedOpenRouterReleaseResult | None:
+        diagnostics = error.to_diagnostics()
+        if diagnostics.operation is None:
+            diagnostics = replace(diagnostics, operation="qq_assert")
+
+        if error.subcode in QQ_ASSERT_CREDENTIAL_SUBCODES:
+            self._clear_retry_after()
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+                message_key="qq_auth.error.credential_mismatch",
+                diagnostics=diagnostics,
+            )
+
+        if error.subcode == QQ_ASSERT_LIFETIME_USED_SUBCODE:
+            self._clear_retry_after()
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="qq_auth.error.lifetime_used",
+                diagnostics=diagnostics,
+            )
+
+        if error.subcode == QQ_ASSERT_RATE_LIMITED_SUBCODE:
+            retry_after_ms = _normalize_retry_after_ms(error.retry_after_ms)
+            diagnostics = replace(diagnostics, retry_after_ms=retry_after_ms)
+            message_kwargs: dict[str, object] = {}
+            if retry_after_ms is not None:
+                self._retry_after_deadline_ms = self.monotonic_ms_provider() + retry_after_ms
+                self._retry_after_diagnostics = diagnostics
+                message_kwargs["retry_after_ms"] = retry_after_ms
+            else:
+                self._clear_retry_after()
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+                message_key="qq_auth.error.retry",
+                message_kwargs=message_kwargs,
+                diagnostics=diagnostics,
+                retry_after_ms=retry_after_ms,
+            )
+
+        return None
+
     async def _resolve_hardware_hash(
         self,
         *,
@@ -1107,11 +1162,17 @@ class ManagedOpenRouterReleaseService:
             return None
         remaining_ms = self._retry_after_deadline_ms - now_ms
         diagnostics = self._retry_after_diagnostics
+        message_key = "managed_release.retry_after_ms"
         if diagnostics is not None:
             diagnostics = replace(diagnostics, retry_after_ms=remaining_ms)
+            if (
+                diagnostics.operation == "qq_assert"
+                and diagnostics.subcode == QQ_ASSERT_RATE_LIMITED_SUBCODE
+            ):
+                message_key = "qq_auth.error.retry"
         return ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-            message_key="managed_release.retry_after_ms",
+            message_key=message_key,
             message_kwargs={"retry_after_ms": remaining_ms},
             diagnostics=diagnostics,
             retry_after_ms=remaining_ms,
