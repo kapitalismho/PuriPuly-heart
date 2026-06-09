@@ -413,7 +413,9 @@ class DummyQqManagedReleaseService(DummyManagedReleaseService):
         *,
         qq_identity: str,
         credential: str,
+        issue_persistence_allowed: Callable[[], bool] | None = None,
     ) -> ManagedOpenRouterReleaseResult:
+        _ = issue_persistence_allowed
         self.qq_prepare_calls += 1
         self.qq_assertions.append((qq_identity, credential))
         if self.on_prepare_from_qq is not None:
@@ -3142,6 +3144,78 @@ async def test_stale_qq_managed_auth_ready_result_returns_neutral_without_key() 
 
 
 @pytest.mark.asyncio
+async def test_stale_qq_managed_auth_persistence_guard_blocks_service_side_effect() -> None:
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=DummyDashboard(),
+            view_settings=CapturingManagedKeySettingsView(),
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+
+    class GuardedSyntheticPersistingQqService:
+        def __init__(self) -> None:
+            self.prepare_entered = asyncio.Event()
+            self.allow_guard_check = asyncio.Event()
+            self.guard_results: list[bool] = []
+            self.persisted: list[str] = []
+
+        async def prepare_from_qq_assertion(
+            self,
+            *,
+            qq_identity: str,
+            credential: str,
+            issue_persistence_allowed: Callable[[], bool] | None = None,
+        ) -> ManagedOpenRouterReleaseResult:
+            _ = credential
+            self.prepare_entered.set()
+            await self.allow_guard_check.wait()
+            allowed = issue_persistence_allowed() if issue_persistence_allowed is not None else True
+            self.guard_results.append(allowed)
+            if allowed:
+                self.persisted.append(qq_identity)
+                return ManagedOpenRouterReleaseResult(
+                    behavior=ManagedOpenRouterReleaseBehavior.READY,
+                    message_key="managed_release.ready",
+                    api_key="managed-qq-key",
+                    local_key_available=True,
+                )
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="qq_auth.error.key_unavailable",
+            )
+
+    service = GuardedSyntheticPersistingQqService()
+    controller._managed_openrouter_release_service = service  # type: ignore[assignment]
+    task = asyncio.create_task(
+        controller.start_qq_managed_auth_from_dialog(
+            qq_identity="qq-guarded-synthetic-user",
+            credential="a" * 64,
+        )
+    )
+    await service.prepare_entered.wait()
+    newer_generation = controller._qq_managed_auth_generation + 1
+    controller._qq_managed_auth_generation = newer_generation
+    controller._qq_managed_auth_cancelled = False
+    controller._qq_managed_auth_in_progress = True
+    controller._set_managed_trial_pending_auth(True)
+    service.allow_guard_check.set()
+
+    result = await task
+
+    assert isinstance(result, ManagedOpenRouterReleaseResult)
+    assert result.behavior != ManagedOpenRouterReleaseBehavior.READY
+    assert result.local_key_available is False
+    assert result.api_key is None
+    assert service.guard_results == [False]
+    assert service.persisted == []
+
+
+@pytest.mark.asyncio
 async def test_superseding_qq_managed_auth_cancels_previous_before_synthetic_persist() -> None:
     controller = _make_controller(
         app=SimpleNamespace(
@@ -3168,8 +3242,9 @@ async def test_superseding_qq_managed_auth_cancels_previous_before_synthetic_per
             *,
             qq_identity: str,
             credential: str,
+            issue_persistence_allowed: Callable[[], bool] | None = None,
         ) -> ManagedOpenRouterReleaseResult:
-            _ = credential
+            _ = credential, issue_persistence_allowed
             if qq_identity == "qq-old-synthetic-user":
                 self.old_prepare_entered.set()
                 try:
