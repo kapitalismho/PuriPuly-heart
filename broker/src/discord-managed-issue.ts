@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import {
   checkActiveIssuanceBrake,
   checkEndpointRateLimit,
+  getManagedDailyIssuanceCapState,
   checkVelocityCapHook,
   extractRequestNetworkMetadata,
   getBrokerAbuseControlsConfig,
@@ -1484,19 +1485,42 @@ async function insertOrUpdateIssuingDiscordEntitlement(
     maxCount === null
       ? '1 = 1'
       : `(
-          SELECT COUNT(*)
-            FROM openrouter_entitlements capped
-           WHERE (
-             capped.discord_issue_status = 'issuing'
-             AND capped.discord_issue_reserved_at >= ?
-             AND capped.discord_issue_reserved_at < ?
-           )
-           OR (
-             capped.status = 'active'
-             AND COALESCE(capped.discord_issue_delivered_at, capped.issued_at) IS NOT NULL
-             AND COALESCE(capped.discord_issue_delivered_at, capped.issued_at) >= ?
-             AND COALESCE(capped.discord_issue_delivered_at, capped.issued_at) < ?
-           )
+          (
+            SELECT COUNT(*)
+              FROM openrouter_entitlements capped
+             WHERE (
+               capped.discord_issue_status = 'issuing'
+               AND capped.discord_issue_reserved_at >= ?
+               AND capped.discord_issue_reserved_at < ?
+             )
+             OR (
+               capped.status = 'active'
+               AND COALESCE(capped.discord_issue_delivered_at, capped.issued_at) IS NOT NULL
+               AND COALESCE(capped.discord_issue_delivered_at, capped.issued_at) >= ?
+               AND COALESCE(capped.discord_issue_delivered_at, capped.issued_at) < ?
+             )
+          ) + (
+            SELECT COUNT(*)
+              FROM qq_managed_entitlements qq_capped
+             WHERE (
+               qq_capped.status IN ('issuing', 'cleanup_required')
+               AND qq_capped.reserved_at >= ?
+               AND qq_capped.reserved_at < ?
+             )
+             OR (
+               qq_capped.status = 'active'
+               AND COALESCE(
+                 qq_capped.delivered_at,
+                 qq_capped.issued_at,
+                 qq_capped.reserved_at
+               ) >= ?
+               AND COALESCE(
+                 qq_capped.delivered_at,
+                 qq_capped.issued_at,
+                 qq_capped.reserved_at
+               ) < ?
+             )
+          )
         ) < ?`;
   const result = await db
     .prepare(
@@ -1565,6 +1589,10 @@ async function insertOrUpdateIssuingDiscordEntitlement(
       ...(maxCount === null
         ? []
         : [
+            capWindow.startIso,
+            capWindow.endIso,
+            capWindow.startIso,
+            capWindow.endIso,
             capWindow.startIso,
             capWindow.endIso,
             capWindow.startIso,
@@ -1684,43 +1712,10 @@ async function getDiscordDailyIssuanceCapState(
   db: D1Database,
   now: Date,
 ): Promise<{ reached: boolean; retryAfterMs: number | null }> {
-  const controls = await getBrokerAbuseControlsConfig(db);
-  const maxCount = controls.newActiveEntitlementsPerDay.maxCount;
-  if (maxCount === null) {
-    return { reached: false, retryAfterMs: null };
-  }
-
-  const capWindow = getDailyCapWindow(
-    now,
-    controls.newActiveEntitlementsPerDay.windowDays,
-  );
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS count
-         FROM openrouter_entitlements capped
-        WHERE (
-          capped.discord_issue_status = 'issuing'
-          AND capped.discord_issue_reserved_at >= ?
-          AND capped.discord_issue_reserved_at < ?
-        )
-        OR (
-          capped.status = 'active'
-          AND COALESCE(capped.discord_issue_delivered_at, capped.issued_at) IS NOT NULL
-          AND COALESCE(capped.discord_issue_delivered_at, capped.issued_at) >= ?
-          AND COALESCE(capped.discord_issue_delivered_at, capped.issued_at) < ?
-        )`,
-    )
-    .bind(
-      capWindow.startIso,
-      capWindow.endIso,
-      capWindow.startIso,
-      capWindow.endIso,
-    )
-    .first<{ count: number }>();
-  const count = Number(row?.count ?? 0);
+  const cap = await getManagedDailyIssuanceCapState(db, now);
   return {
-    reached: count >= maxCount,
-    retryAfterMs: Math.max(capWindow.end.getTime() - now.getTime(), 0),
+    reached: cap.reached,
+    retryAfterMs: cap.retryAfterMs,
   };
 }
 

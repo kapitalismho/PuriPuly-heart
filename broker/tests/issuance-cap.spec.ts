@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import app from '../src/index';
 import {
+  checkDailyIssuanceCap,
+  getManagedDailyIssuanceCapState,
+} from '../src/abuse-controls';
+import {
   createDeviceKeyPair,
   signCanonicalIssueRequest,
   signCanonicalStatusRequest,
@@ -509,4 +513,128 @@ describe('broker daily issuance cap enforcement', () => {
       release_token_expires_at: pendingRelease.releaseTokenExpiresAt,
     });
   });
+
+  it.each(['issuing', 'active', 'cleanup_required'] as const)(
+    'counts QQ %s entitlements toward the global daily managed issuance cap',
+    async (status) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-08T06:00:00Z'));
+
+      const env = createTestBrokerEnv();
+      updateAbuseControls(env, (controls) => {
+        controls.newActiveEntitlementsPerDay.maxCount = 1;
+      });
+      insertQqManagedEntitlement(env, {
+        status,
+        qqSubjectRef: `ph-qq-subject-v1_synthetic-cap-${status}`,
+        issueRef: `qq-issue-cap-${status}`,
+        reservedAt: '2026-04-08T05:59:00.000Z',
+        issuedAt: status === 'active' ? '2026-04-08T06:00:00.000Z' : null,
+        expiresAt: status === 'active' ? '2026-07-08T06:00:00.000Z' : null,
+        deliveredAt: status === 'active' ? '2026-04-08T06:00:00.000Z' : null,
+        managedCredentialRef:
+          status === 'issuing' ? null : `hash_qq_managed_cap_${status}`,
+      });
+
+      const decision = await checkDailyIssuanceCap(
+        env.BROKER_DB,
+        new Date('2026-04-08T06:00:00.000Z'),
+        null,
+      );
+
+      expect(decision).toEqual({
+        status: 503,
+        code: 'issuance_suspended',
+        class: 'retryable',
+        message: 'new entitlement issuance is temporarily suspended',
+        subcode: 'global_cap_reached',
+        retryAfterMs: 64_800_000,
+      });
+      expect(
+        env.__db
+          .prepare('SELECT COUNT(*) AS count FROM openrouter_entitlements')
+          .get(),
+      ).toEqual({ count: 0 });
+    },
+  );
+
+  it('can exclude the current QQ reservation by source-aware subject and issue refs for post-reservation cap checks', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-08T06:00:00Z'));
+
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.newActiveEntitlementsPerDay.maxCount = 1;
+    });
+    const qqSubjectRef = 'ph-qq-subject-v1_synthetic-cap-current';
+    const issueRef = 'qq-issue-cap-current';
+    insertQqManagedEntitlement(env, {
+      status: 'issuing',
+      qqSubjectRef,
+      issueRef,
+      reservedAt: '2026-04-08T05:59:00.000Z',
+    });
+
+    const cap = await getManagedDailyIssuanceCapState(
+      env.BROKER_DB,
+      new Date('2026-04-08T06:00:00.000Z'),
+      {
+        excludeCurrent: {
+          issueSource: 'qq',
+          subjectRef: qqSubjectRef,
+          issueRef,
+        },
+      },
+    );
+
+    expect(cap).toEqual({
+      reached: false,
+      retryAfterMs: null,
+      count: 0,
+      maxCount: 1,
+    });
+  });
 });
+
+function insertQqManagedEntitlement(
+  env: ReturnType<typeof createTestBrokerEnv>,
+  input: {
+    qqSubjectRef: string;
+    status: 'issuing' | 'active' | 'cleanup_required';
+    issueRef: string;
+    reservedAt: string;
+    issuedAt?: string | null;
+    expiresAt?: string | null;
+    deliveredAt?: string | null;
+    managedCredentialRef?: string | null;
+  },
+): void {
+  env.__db
+    .prepare(
+      `INSERT INTO qq_managed_entitlements (
+          qq_subject_ref,
+          status,
+          issue_ref,
+          managed_credential_ref,
+          budget_usd,
+          reserved_at,
+          issued_at,
+          expires_at,
+          delivered_at,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, 0.07, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      input.qqSubjectRef,
+      input.status,
+      input.issueRef,
+      input.managedCredentialRef ?? null,
+      input.reservedAt,
+      input.issuedAt ?? null,
+      input.expiresAt ?? null,
+      input.deliveredAt ?? null,
+      input.reservedAt,
+      input.reservedAt,
+    );
+}

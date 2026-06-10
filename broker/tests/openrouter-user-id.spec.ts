@@ -65,4 +65,24 @@ describe('managed OpenRouter user ID derivation', () => {
       'ph-or-user-v1_go9aombjO-0-BaEdvbVm07vdsObUvd9hYu_Vr-hCqu8',
     ]);
   });
+
+  it('derives a source-aware QQ user ID from qq_subject_ref without treating it as an installation', async () => {
+    const qqSubjectRef = 'ph-qq-subject-v1_synthetic-subject-ref';
+    const secret = 'test-managed-user-hmac-secret';
+
+    const [qqUserId, discordStyleUserId] = await Promise.all([
+      deriveManagedOpenRouterUserId({
+        issueSource: 'qq',
+        subjectRef: qqSubjectRef,
+        secret,
+      }),
+      deriveManagedOpenRouterUserId({
+        installationId: qqSubjectRef,
+        secret,
+      }),
+    ]);
+
+    expect(qqUserId).toMatch(/^ph-or-user-v1_[A-Za-z0-9_-]+$/u);
+    expect(qqUserId).not.toBe(discordStyleUserId);
+  });
 });

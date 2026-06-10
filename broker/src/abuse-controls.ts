@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 
 import type { PublicErrorClass, PublicErrorCode } from './broker-error';
 import type { BrokerEnv } from './contract';
+import type { ManagedIssueMetadata } from './managed-issuance';
 import {
   BROKER_RUNTIME_CONFIG_KEYS,
   DEFAULT_BROKER_ABUSE_CONTROLS,
@@ -10,6 +11,7 @@ import {
   type BrokerAbuseRuntimeStateValue,
   type BrokerEndpointRateLimitConfig,
   type OpenRouterEntitlementRecord,
+  type QqManagedEntitlementRecord,
 } from './persistence';
 
 export interface RequestAbuseContext {
@@ -27,6 +29,22 @@ export interface AbuseDecision {
   message: string;
   subcode: string | null;
   retryAfterMs: number | null;
+}
+
+type ActiveIssuanceBrakeEntitlement =
+  | Pick<OpenRouterEntitlementRecord, 'status'>
+  | Pick<QqManagedEntitlementRecord, 'status'>
+  | null;
+
+export interface ManagedDailyIssuanceCapState {
+  reached: boolean;
+  retryAfterMs: number | null;
+  count: number;
+  maxCount: number | null;
+}
+
+export interface ManagedDailyIssuanceCapOptions {
+  excludeCurrent?: ManagedIssueMetadata;
 }
 
 export interface RequestNetworkMetadata {
@@ -235,7 +253,7 @@ function sqliteBoolean(value: boolean): number {
 
 export async function checkActiveIssuanceBrake(
   db: D1Database,
-  currentEntitlement: OpenRouterEntitlementRecord | null,
+  currentEntitlement: ActiveIssuanceBrakeEntitlement,
 ): Promise<AbuseDecision | null> {
   const runtimeState = await getBrokerAbuseRuntimeState(db);
   if (!runtimeState.brake.active) {
@@ -467,7 +485,7 @@ export async function matchSubjectHook(
 export async function checkDailyIssuanceCap(
   db: D1Database,
   now: Date,
-  currentEntitlement: OpenRouterEntitlementRecord | null,
+  currentEntitlement: ActiveIssuanceBrakeEntitlement,
 ): Promise<AbuseDecision | null> {
   if (
     currentEntitlement?.status === 'pending_release' ||
@@ -476,33 +494,8 @@ export async function checkDailyIssuanceCap(
     return null;
   }
 
-  const controls = await getBrokerAbuseControlsConfig(db);
-  const maxCount = controls.newActiveEntitlementsPerDay.maxCount;
-  if (maxCount === null) {
-    return null;
-  }
-
-  const windowStart = startOfUtcDay(now);
-  windowStart.setUTCDate(
-    windowStart.getUTCDate() - (controls.newActiveEntitlementsPerDay.windowDays - 1),
-  );
-  const windowEnd = new Date(windowStart.getTime());
-  windowEnd.setUTCDate(
-    windowEnd.getUTCDate() + controls.newActiveEntitlementsPerDay.windowDays,
-  );
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS count, MIN(issued_at) AS oldest
-         FROM openrouter_entitlements
-        WHERE issued_at IS NOT NULL
-          AND issued_at >= ?
-          AND issued_at < ?`,
-    )
-    .bind(windowStart.toISOString(), windowEnd.toISOString())
-    .first<{ count: number; oldest: string | null }>();
-
-  const count = Number(row?.count ?? 0);
-  if (count < maxCount) {
+  const cap = await getManagedDailyIssuanceCapState(db, now);
+  if (!cap.reached) {
     return null;
   }
 
@@ -512,7 +505,128 @@ export async function checkDailyIssuanceCap(
     class: 'retryable',
     message: 'new entitlement issuance is temporarily suspended',
     subcode: 'global_cap_reached',
-    retryAfterMs: Math.max(windowEnd.getTime() - now.getTime(), 0),
+    retryAfterMs: cap.retryAfterMs,
+  };
+}
+
+export async function getManagedDailyIssuanceCapState(
+  db: D1Database,
+  now: Date,
+  options: ManagedDailyIssuanceCapOptions = {},
+): Promise<ManagedDailyIssuanceCapState> {
+  const controls = await getBrokerAbuseControlsConfig(db);
+  const maxCount = controls.newActiveEntitlementsPerDay.maxCount;
+  if (maxCount === null) {
+    return { reached: false, retryAfterMs: null, count: 0, maxCount };
+  }
+
+  const window = getManagedDailyIssuanceCapWindow(
+    now,
+    controls.newActiveEntitlementsPerDay.windowDays,
+  );
+  const count = await countManagedDailyIssuances(db, window, options.excludeCurrent);
+  const reached = count >= maxCount;
+  return {
+    reached,
+    retryAfterMs: reached ? Math.max(window.end.getTime() - now.getTime(), 0) : null,
+    count,
+    maxCount,
+  };
+}
+
+async function countManagedDailyIssuances(
+  db: D1Database,
+  window: { startIso: string; endIso: string },
+  excludeCurrent?: ManagedIssueMetadata,
+): Promise<number> {
+  const openRouterExcludeClause =
+    excludeCurrent?.issueSource === 'discord'
+      ? 'AND capped.installation_id <> ?'
+      : '';
+  const openRouterExcludeParams =
+    excludeCurrent?.issueSource === 'discord' ? [excludeCurrent.subjectRef] : [];
+  const qqExcludeClause =
+    excludeCurrent?.issueSource === 'qq'
+      ? 'AND NOT (qq_capped.qq_subject_ref = ? AND qq_capped.issue_ref = ?)'
+      : '';
+  const qqExcludeParams =
+    excludeCurrent?.issueSource === 'qq'
+      ? [excludeCurrent.subjectRef, excludeCurrent.issueRef]
+      : [];
+
+  const row = await db
+    .prepare(
+      `SELECT (
+          SELECT COUNT(*)
+            FROM openrouter_entitlements capped
+           WHERE (
+             (
+               capped.issued_at IS NOT NULL
+               AND capped.issued_at >= ?
+               AND capped.issued_at < ?
+             )
+             OR (
+               capped.discord_issue_status = 'issuing'
+               AND capped.discord_issue_reserved_at >= ?
+               AND capped.discord_issue_reserved_at < ?
+             )
+           )
+           ${openRouterExcludeClause}
+        ) + (
+          SELECT COUNT(*)
+            FROM qq_managed_entitlements qq_capped
+           WHERE (
+             (
+               qq_capped.status IN ('issuing', 'cleanup_required')
+               AND qq_capped.reserved_at >= ?
+               AND qq_capped.reserved_at < ?
+             )
+             OR (
+               qq_capped.status = 'active'
+               AND COALESCE(
+                 qq_capped.delivered_at,
+                 qq_capped.issued_at,
+                 qq_capped.reserved_at
+               ) >= ?
+               AND COALESCE(
+                 qq_capped.delivered_at,
+                 qq_capped.issued_at,
+                 qq_capped.reserved_at
+               ) < ?
+             )
+           )
+           ${qqExcludeClause}
+        ) AS count`,
+    )
+    .bind(
+      window.startIso,
+      window.endIso,
+      window.startIso,
+      window.endIso,
+      ...openRouterExcludeParams,
+      window.startIso,
+      window.endIso,
+      window.startIso,
+      window.endIso,
+      ...qqExcludeParams,
+    )
+    .first<{ count: number }>();
+
+  return Number(row?.count ?? 0);
+}
+
+function getManagedDailyIssuanceCapWindow(
+  now: Date,
+  windowDays: number,
+): { startIso: string; endIso: string; end: Date } {
+  const start = startOfUtcDay(now);
+  start.setUTCDate(start.getUTCDate() - (windowDays - 1));
+  const end = new Date(start.getTime());
+  end.setUTCDate(end.getUTCDate() + windowDays);
+  return {
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+    end,
   };
 }
 

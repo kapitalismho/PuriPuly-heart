@@ -1,4 +1,5 @@
 import { MANAGED_TRIAL_BUDGET_POLICY } from './contract';
+import type { ManagedIssueMetadata } from './managed-issuance';
 
 const OPENROUTER_MANAGEMENT_API_BASE_URL = 'https://openrouter.ai/api/v1';
 const MANAGED_CHILD_KEY_NAME_PREFIX = 'puripuly-heart';
@@ -30,6 +31,27 @@ export interface ManagedChildKeyMaterial {
   rawKey: string;
   hash: string;
 }
+
+type LegacyManagedChildKeyMetadata = {
+  installationId: string;
+  releaseSessionRef: string;
+  issueSource?: never;
+  subjectRef?: never;
+  issueRef?: never;
+};
+
+type SourceAwareManagedChildKeyMetadata = ManagedIssueMetadata & {
+  installationId?: never;
+  releaseSessionRef?: never;
+};
+
+export type CreateManagedChildKeyInput = {
+  managementApiKey: string;
+  expiresAt: string;
+  limitUsd?: number;
+  requireEffectiveLimitVerification?: boolean;
+  fetchImpl?: FetchImpl;
+} & (LegacyManagedChildKeyMetadata | SourceAwareManagedChildKeyMetadata);
 
 export type ManagedChildKeyCleanupStepResult =
   | { ok: true }
@@ -74,15 +96,9 @@ export class OpenRouterManagementError extends Error {
   }
 }
 
-export async function createManagedChildKey(input: {
-  managementApiKey: string;
-  installationId: string;
-  releaseSessionRef: string;
-  expiresAt: string;
-  limitUsd?: number;
-  requireEffectiveLimitVerification?: boolean;
-  fetchImpl?: FetchImpl;
-}): Promise<{ rawKey: string; hash: string }> {
+export async function createManagedChildKey(
+  input: CreateManagedChildKeyInput,
+): Promise<{ rawKey: string; hash: string }> {
   const requestedLimitUsd = input.limitUsd ?? MANAGED_TRIAL_BUDGET_POLICY.hardLimit;
   const response = await requestOpenRouter({
     operation: 'create_key',
@@ -91,7 +107,7 @@ export async function createManagedChildKey(input: {
     fetchImpl: input.fetchImpl,
     method: 'POST',
     body: {
-      name: `${MANAGED_CHILD_KEY_NAME_PREFIX}:${input.installationId}:${input.releaseSessionRef}`,
+      name: buildManagedChildKeyName(input),
       limit: requestedLimitUsd,
       limit_reset: MANAGED_TRIAL_BUDGET_POLICY.limitReset,
       include_byok_in_limit: false,
@@ -138,6 +154,18 @@ export async function createManagedChildKey(input: {
   }
 
   return childKey;
+}
+
+function buildManagedChildKeyName(input: CreateManagedChildKeyInput): string {
+  if (input.issueSource === 'qq') {
+    return `${MANAGED_CHILD_KEY_NAME_PREFIX}:qq:${input.issueRef.trim()}`;
+  }
+
+  if (input.issueSource === 'discord') {
+    return `${MANAGED_CHILD_KEY_NAME_PREFIX}:${input.subjectRef.trim()}:${input.issueRef.trim()}`;
+  }
+
+  return `${MANAGED_CHILD_KEY_NAME_PREFIX}:${input.installationId}:${input.releaseSessionRef}`;
 }
 
 function assertEffectiveLimitAtLeastRequested(
