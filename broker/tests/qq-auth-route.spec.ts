@@ -497,6 +497,109 @@ describe('QQ auth assertion route', () => {
     expect(openRouter.openRouterCreateCalls).toHaveLength(0);
   });
 
+  it('returns qq_already_issuing for a simultaneous duplicate while first issuance is in progress', async () => {
+    const env = createTestBrokerEnv();
+    const qqIdentity = 'qq-openid-concurrent-issue-user';
+    const credential = await signQqCredential(env.QQ_AUTH_HMAC_PSK, qqIdentity);
+    let releaseCreate!: () => void;
+    let createGateReleased = false;
+    const createGate = new Promise<void>((resolve) => {
+      releaseCreate = () => {
+        createGateReleased = true;
+        resolve();
+      };
+    });
+    const openRouterCreateCalls: Array<{ input: string | URL; init?: RequestInit }> = [];
+    const openRouterGuardrailCalls: Array<{ input: string | URL; init?: RequestInit }> = [];
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+
+      if (url === OPENROUTER_KEYS_URL && method === 'POST') {
+        openRouterCreateCalls.push({ input, init });
+        await createGate;
+        return jsonResponse(
+          {
+            key: 'or-qq-managed-child-key-concurrent-1',
+            data: { hash: 'hash_qq_managed_child_concurrent_1' },
+          },
+          201,
+        );
+      }
+
+      if (url === OPENROUTER_GUARDRAIL_URL && method === 'POST') {
+        openRouterGuardrailCalls.push({ input, init });
+        return jsonResponse({ assigned_count: 1 });
+      }
+
+      throw new Error(`unexpected OpenRouter API request: ${method} ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+
+    const assertion = {
+      qq_identity: qqIdentity,
+      credential,
+      asserted_at: '2026-06-05T12:03:00Z',
+    };
+    const firstResponsePromise = postQqAssertion(env, assertion);
+    try {
+      await waitForCondition(() => openRouterCreateCalls.length === 1);
+
+      const duplicateResponse = await postQqAssertion(env, assertion);
+
+      expect(duplicateResponse.status).toBe(409);
+      const duplicateBody = (await duplicateResponse.json()) as {
+        error?: { retry_after_ms?: unknown } & Record<string, unknown>;
+      };
+      expect(duplicateBody).toEqual(
+        expect.objectContaining({
+          error: expect.objectContaining({
+            code: 'trial_not_eligible',
+            class: 'retryable',
+            subcode: 'qq_already_issuing',
+            message: 'QQ managed issuance is already in progress',
+          }),
+        }),
+      );
+      expect(duplicateBody.error?.retry_after_ms).toEqual(expect.any(Number));
+      expect(duplicateBody.error?.retry_after_ms as number).toBeGreaterThan(0);
+      expect(duplicateBody.error?.retry_after_ms as number).toBeLessThanOrEqual(
+        900000,
+      );
+      expect(openRouterCreateCalls).toHaveLength(1);
+      expect(openRouterGuardrailCalls).toHaveLength(0);
+
+      releaseCreate();
+      const firstResponse = await firstResponsePromise;
+      expect(firstResponse.status).toBe(200);
+      await expect(firstResponse.json()).resolves.toEqual(
+        expect.objectContaining({
+          ok: true,
+          status: 'issued',
+          openrouter_api_key: 'or-qq-managed-child-key-concurrent-1',
+          managed_credential_ref: 'hash_qq_managed_child_concurrent_1',
+        }),
+      );
+      expect(openRouterCreateCalls).toHaveLength(1);
+      expect(openRouterGuardrailCalls).toHaveLength(1);
+      const qqSubjectRef = await deriveExpectedQqSubjectRef(
+        env.QQ_AUTH_HMAC_PSK,
+        qqIdentity,
+      );
+      expect(readQqManagedEntitlement(env, qqSubjectRef)).toEqual(
+        expect.objectContaining({
+          status: 'active',
+          managed_credential_ref: 'hash_qq_managed_child_concurrent_1',
+        }),
+      );
+    } finally {
+      if (!createGateReleased) {
+        releaseCreate();
+      }
+      await firstResponsePromise.catch(() => undefined);
+    }
+  });
+
   it('reclaims stale no-key issuing reservations but blocks stale key-hash issuing rows as cleanup candidates', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW_ISO));
@@ -1292,6 +1395,22 @@ async function postQqAssertion(
     },
     env,
   );
+}
+
+async function waitForCondition(
+  predicate: () => boolean,
+  maxAttempts = 50,
+): Promise<void> {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
+
+  throw new Error('timed out waiting for concurrent QQ assertion checkpoint');
 }
 
 async function signQqCredential(secret: string, qqIdentity: string): Promise<string> {
