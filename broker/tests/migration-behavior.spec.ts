@@ -966,4 +966,63 @@ describe('broker migration behavior', () => {
       expect(entitlementCount.count).toBe(0);
     });
   });
+
+  it('adds QQ managed entitlements without rewriting existing QQ assertion evidence', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, { through: '0008_add_qq_auth_assertions.sql' });
+      db.prepare(
+        `INSERT INTO qq_auth_assertions (
+          qq_subject_ref,
+          credential_hash,
+          asserted_at,
+          received_at,
+          status
+        ) VALUES (?, ?, ?, ?, 'verified')`,
+      ).run(
+        'ph-qq-subject-v1_existing-assertion-only',
+        'sha256-base64url-v1_existing-credential-hash',
+        '2026-06-05T12:03:00.000Z',
+        '2026-06-05T12:04:00.000Z',
+      );
+
+      applyBrokerMigrations(db, { after: '0008_add_qq_auth_assertions.sql' });
+
+      const assertionRow = db
+        .prepare('SELECT * FROM qq_auth_assertions WHERE qq_subject_ref = ?')
+        .get('ph-qq-subject-v1_existing-assertion-only') as Record<string, unknown>;
+      expect(assertionRow).toEqual({
+        qq_subject_ref: 'ph-qq-subject-v1_existing-assertion-only',
+        credential_hash: 'sha256-base64url-v1_existing-credential-hash',
+        asserted_at: '2026-06-05T12:03:00.000Z',
+        received_at: '2026-06-05T12:04:00.000Z',
+        status: 'verified',
+      });
+
+      const entitlementCount = db
+        .prepare('SELECT COUNT(*) AS count FROM qq_managed_entitlements')
+        .get() as { count: number };
+      expect(entitlementCount.count).toBe(0);
+
+      expect(() =>
+        db.prepare(
+          `INSERT INTO qq_managed_entitlements (
+            qq_subject_ref,
+            status,
+            issue_ref,
+            budget_usd,
+            reserved_at
+          ) VALUES (?, 'issuing', ?, ?, ?)`,
+        ).run(
+          'ph-qq-subject-v1_existing-assertion-only',
+          'qq-issue-first-production-attempt',
+          0.07,
+          '2026-06-10T10:00:00.000Z',
+        ),
+      ).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
 });
