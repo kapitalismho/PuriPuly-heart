@@ -4,6 +4,7 @@ import asyncio
 import base64
 import contextlib
 import hashlib
+import logging
 import threading
 from dataclasses import dataclass
 from typing import Any
@@ -16,6 +17,7 @@ from puripuly_heart.config.settings import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
+    TranslationConnection,
 )
 from puripuly_heart.core.discord_oauth_loopback import DiscordOAuthCallbackError
 from puripuly_heart.core.managed_identity import ensure_managed_identity_bundle
@@ -24,6 +26,7 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterFingerprintSalt,
     ManagedOpenRouterIssueSuccess,
     ManagedOpenRouterLLMProvider,
+    ManagedOpenRouterQqAssertSuccess,
     ManagedOpenRouterReleaseBehavior,
     ManagedOpenRouterReleaseDiagnostics,
     ManagedOpenRouterReleaseError,
@@ -37,6 +40,7 @@ from puripuly_heart.core.managed_openrouter_release import (
 )
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     OPENROUTER_MANAGED_USER_ID_SECRET,
     OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
     load_managed_openrouter_user_identifier,
@@ -52,9 +56,11 @@ class FakeManagedReleaseClient:
     issue_result: object | None = None
     discord_start_result: object | None = None
     discord_issue_result: object | None = None
+    qq_assert_result: object | None = None
     trial_status_result: object | None = None
     challenge_gate: asyncio.Event | None = None
     discord_start_gate: asyncio.Event | None = None
+    discord_start_started: asyncio.Event | None = None
     issue_gate: asyncio.Event | None = None
     issue_started: asyncio.Event | None = None
     discord_issue_gate: asyncio.Event | None = None
@@ -126,6 +132,8 @@ class FakeManagedReleaseClient:
         if referral_id is not None:
             payload["referral_id"] = referral_id
         self.calls.append(("discord_start", payload))
+        if self.discord_start_started is not None:
+            self.discord_start_started.set()
         if self.discord_start_gate is not None:
             await self.discord_start_gate.wait()
         result = self.discord_start_result
@@ -140,6 +148,28 @@ class FakeManagedReleaseClient:
         if self.discord_issue_gate is not None:
             await self.discord_issue_gate.wait()
         result = self.discord_issue_result
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    async def assert_qq_credential(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+        asserted_at: str,
+    ):
+        self.calls.append(
+            (
+                "qq_assert",
+                {
+                    "qq_identity": qq_identity,
+                    "credential": credential,
+                    "asserted_at": asserted_at,
+                },
+            )
+        )
+        result = self.qq_assert_result
         if isinstance(result, Exception):
             raise result
         return result
@@ -184,12 +214,17 @@ class FailingManagedKeySecretStore(InMemorySecretStore):
         super().__init__()
         self.fail_on_key = fail_on_key
         self.set_attempts: list[tuple[str, str]] = []
+        self.delete_attempts: list[str] = []
 
     def set(self, key: str, value: str) -> None:
         self.set_attempts.append((key, value))
         super().set(key, value)
         if key == self.fail_on_key:
             raise RuntimeError("managed key persistence failed")
+
+    def delete(self, key: str) -> None:
+        self.delete_attempts.append(key)
+        super().delete(key)
 
 
 def _make_service(
@@ -352,6 +387,661 @@ def _set_verified_snapshot(
     settings.managed_identity.verified_hardware_hash_salt_version = salt_version
 
 
+def _managed_identity_release_state(settings: AppSettings) -> tuple[object, ...]:
+    return (
+        settings.managed_identity.installation_id,
+        settings.managed_identity.release_token,
+        settings.managed_identity.release_token_expires_at,
+        settings.managed_identity.verified_hardware_hash,
+        settings.managed_identity.verified_hardware_hash_salt_version,
+        settings.managed_identity.active_managed_credential_ref,
+        settings.managed_identity.active_managed_expires_at,
+        settings.managed_identity.founder_letter_seen_credential_ref,
+        settings.managed_identity.referral_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_persists_issued_wrapper_to_qq_secret_and_leaves_discord_secret() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    secrets = InMemorySecretStore()
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    issue = ManagedOpenRouterIssueSuccess(
+        openrouter_api_key="qq-managed-key",
+        managed_credential_ref="qq-managed-ref",
+        openrouter_user_id=" qq-user-123 ",
+    )
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterQqAssertSuccess(
+            status="issued",
+            qq_subject_ref="ph-qq-subject-v1_issued-test-sentinel",
+            issue=issue,
+        )
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-issued-identity-sentinel",
+        credential="qq-issued-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.READY
+    assert result.message_key == "managed_release.ready"
+    assert result.api_key == "qq-managed-key"
+    assert result.local_key_available is True
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) == "qq-managed-key"
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "discord-managed-key"
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_persistence_guard_blocks_stale_issued_key() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    secrets = InMemorySecretStore()
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterQqAssertSuccess(
+            status="issued",
+            qq_subject_ref="ph-qq-subject-v1_guard-block-test-sentinel",
+            issue=ManagedOpenRouterIssueSuccess(openrouter_api_key="qq-managed-key"),
+        )
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+    guard_checks: list[str] = []
+
+    def issue_persistence_allowed() -> bool:
+        guard_checks.append("checked")
+        return False
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-guard-block-identity-sentinel",
+        credential="qq-guard-block-credential-sentinel",
+        issue_persistence_allowed=issue_persistence_allowed,
+    )
+
+    assert guard_checks == ["checked"]
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "qq_auth.error.key_unavailable"
+    assert result.api_key is None
+    assert result.local_key_available is False
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "discord-managed-key"
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_persists_only_qq_key_without_shared_metadata_mutation() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    settings.managed_identity.installation_id = "qq-installation-unchanged"
+    settings.managed_identity.release_token = "release-token-unchanged"
+    settings.managed_identity.release_token_expires_at = "2026-04-08T06:15:00.000Z"
+    settings.managed_identity.verified_hardware_hash = "verified-hardware-hash-unchanged"
+    settings.managed_identity.verified_hardware_hash_salt_version = 7
+    settings.managed_identity.active_managed_credential_ref = "discord-active-ref"
+    settings.managed_identity.active_managed_expires_at = "2026-04-08T07:00:00.000Z"
+    settings.managed_identity.founder_letter_seen_credential_ref = "discord-active-ref"
+    settings.managed_identity.referral_id = "8H3J4N"
+    secrets = InMemorySecretStore()
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    secrets.set(OPENROUTER_MANAGED_USER_ID_SECRET, "discord-user-id")
+    secrets.set(OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET, "discord-installation-id")
+    issue = ManagedOpenRouterIssueSuccess(
+        openrouter_api_key=" qq-managed-key ",
+        managed_credential_ref="qq-managed-ref-should-not-persist",
+        expires_at="2026-04-08T08:00:00.000Z",
+        openrouter_user_id="qq-user-id-should-not-persist",
+        referral_id="4J7K2M",
+    )
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterQqAssertSuccess(
+            status="issued",
+            qq_subject_ref="ph-qq-subject-v1_metadata-isolation-test-sentinel",
+            issue=issue,
+        )
+    )
+    persist_calls: list[tuple[str | None, str | None]] = []
+    service, _, _ = _make_service(
+        client=client,
+        settings=settings,
+        secrets=secrets,
+        persist_calls=persist_calls,
+    )
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-metadata-isolation-identity-sentinel",
+        credential="qq-metadata-isolation-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.READY
+    assert result.message_key == "managed_release.ready"
+    assert result.api_key == "qq-managed-key"
+    assert result.local_key_available is True
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) == "qq-managed-key"
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "discord-managed-key"
+    assert secrets.get(OPENROUTER_MANAGED_USER_ID_SECRET) == "discord-user-id"
+    assert secrets.get(OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET) == "discord-installation-id"
+    assert settings.managed_identity.installation_id == "qq-installation-unchanged"
+    assert settings.managed_identity.release_token == "release-token-unchanged"
+    assert settings.managed_identity.release_token_expires_at == "2026-04-08T06:15:00.000Z"
+    assert settings.managed_identity.verified_hardware_hash == "verified-hardware-hash-unchanged"
+    assert settings.managed_identity.verified_hardware_hash_salt_version == 7
+    assert settings.managed_identity.active_managed_credential_ref == "discord-active-ref"
+    assert settings.managed_identity.active_managed_expires_at == "2026-04-08T07:00:00.000Z"
+    assert settings.managed_identity.founder_letter_seen_credential_ref == "discord-active-ref"
+    assert settings.managed_identity.referral_id == "8H3J4N"
+    assert persist_calls == []
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_verified_only_returns_key_unavailable_without_persisting() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    secrets = InMemorySecretStore()
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterQqAssertSuccess(
+            status="verified",
+            qq_subject_ref="ph-qq-subject-v1_verified-only-test-sentinel",
+            issue=None,
+        )
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-verified-only-identity-sentinel",
+        credential="qq-verified-only-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "qq_auth.error.key_unavailable"
+    assert result.api_key is None
+    assert result.local_key_available is False
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "discord-managed-key"
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_rejects_non_china_managed_without_persisting() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED
+    secrets = InMemorySecretStore()
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterQqAssertSuccess(
+            status="issued",
+            qq_subject_ref="ph-qq-subject-v1_non-china-route-test-sentinel",
+            issue=ManagedOpenRouterIssueSuccess(openrouter_api_key="qq-managed-key"),
+        )
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-non-china-identity-sentinel",
+        credential="qq-non-china-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "managed_release.stop"
+    assert result.api_key is None
+    assert result.local_key_available is False
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) is None
+    assert client.calls == []
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_blank_issued_key_returns_key_unavailable_without_persisting() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    secrets = InMemorySecretStore()
+    issue = ManagedOpenRouterIssueSuccess(openrouter_api_key="   ")
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterQqAssertSuccess(
+            status="issued",
+            qq_subject_ref="ph-qq-subject-v1_blank-issued-key-test-sentinel",
+            issue=issue,
+        )
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-blank-issued-key-identity-sentinel",
+        credential="qq-blank-issued-key-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "qq_auth.error.key_unavailable"
+    assert result.api_key is None
+    assert result.local_key_available is False
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) is None
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_rolls_back_only_qq_secret_when_qq_store_fails() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    settings.managed_identity.installation_id = "qq-installation-preserved"
+    settings.managed_identity.release_token = "release-token-preserved"
+    settings.managed_identity.release_token_expires_at = "2026-04-08T06:15:00.000Z"
+    settings.managed_identity.verified_hardware_hash = "verified-hardware-hash-preserved"
+    settings.managed_identity.verified_hardware_hash_salt_version = 7
+    settings.managed_identity.active_managed_credential_ref = "discord-active-ref"
+    settings.managed_identity.active_managed_expires_at = "2026-04-08T07:00:00.000Z"
+    settings.managed_identity.founder_letter_seen_credential_ref = "discord-active-ref"
+    settings.managed_identity.referral_id = "8H3J4N"
+    secrets = FailingManagedKeySecretStore(
+        fail_on_key=OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+    )
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    secrets.set(OPENROUTER_MANAGED_USER_ID_SECRET, "discord-user-id")
+    secrets.set(OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET, "discord-installation-id")
+    secrets.set_attempts.clear()
+    secrets.delete_attempts.clear()
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterQqAssertSuccess(
+            status="issued",
+            qq_subject_ref="ph-qq-subject-v1_qq-store-fail-test-sentinel",
+            issue=ManagedOpenRouterIssueSuccess(
+                openrouter_api_key="qq-managed-key",
+                managed_credential_ref="qq-managed-ref-should-not-persist",
+                expires_at="2026-04-08T08:00:00.000Z",
+                openrouter_user_id="qq-user-id-should-not-persist",
+                referral_id="4J7K2M",
+            ),
+        )
+    )
+    persist_calls: list[tuple[str | None, str | None]] = []
+    service, _, _ = _make_service(
+        client=client,
+        settings=settings,
+        secrets=secrets,
+        persist_calls=persist_calls,
+    )
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-store-fail-identity-sentinel",
+        credential="qq-store-fail-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "managed_release.stop"
+    assert result.api_key is None
+    assert result.local_key_available is False
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "discord-managed-key"
+    assert secrets.get(OPENROUTER_MANAGED_USER_ID_SECRET) == "discord-user-id"
+    assert secrets.get(OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET) == "discord-installation-id"
+    assert secrets.set_attempts == [(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, "qq-managed-key")]
+    assert secrets.delete_attempts == [OPENROUTER_MANAGED_QQ_API_KEY_SECRET]
+    assert settings.managed_identity.installation_id == "qq-installation-preserved"
+    assert settings.managed_identity.release_token == "release-token-preserved"
+    assert settings.managed_identity.release_token_expires_at == "2026-04-08T06:15:00.000Z"
+    assert settings.managed_identity.verified_hardware_hash == "verified-hardware-hash-preserved"
+    assert settings.managed_identity.verified_hardware_hash_salt_version == 7
+    assert settings.managed_identity.active_managed_credential_ref == "discord-active-ref"
+    assert settings.managed_identity.active_managed_expires_at == "2026-04-08T07:00:00.000Z"
+    assert settings.managed_identity.founder_letter_seen_credential_ref == "discord-active-ref"
+    assert settings.managed_identity.referral_id == "8H3J4N"
+    assert persist_calls == []
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_redacts_sensitive_values_from_logs_and_diagnostics(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    qq_identity = "qq-prepare-identity-sensitive"
+    credential = "qq-prepare-credential-sensitive"
+    subject_ref = "ph-qq-subject-v1_prepare-sensitive"
+    raw_broker_message = f"raw Broker message with {qq_identity} {credential} {subject_ref}"
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterReleaseError(
+            code="rate_limited",
+            error_class="retryable",
+            subcode="ip_rate_limited",
+            retry_after_ms=5_000,
+            message=raw_broker_message,
+            operation="qq_assert",
+        )
+    )
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    service, _, _ = _make_service(client=client, settings=settings)
+    caplog.set_level(
+        logging.INFO,
+        logger="puripuly_heart.core.managed_openrouter_release",
+    )
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity=qq_identity,
+        credential=credential,
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+    assert result.message_key == "qq_auth.error.retry"
+    assert result.message_kwargs == {"retry_after_ms": 5_000}
+    assert result.retry_after_ms == 5_000
+    assert result.diagnostics is not None
+    assert result.diagnostics.message != raw_broker_message
+    assert result.diagnostics.message == "QQ credential verification is rate limited"
+    for sensitive in (
+        qq_identity,
+        credential,
+        subject_ref,
+        raw_broker_message,
+        f"credential_len={len(credential)}",
+    ):
+        assert sensitive not in caplog.text
+        assert sensitive not in repr(result.diagnostics)
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_qq_credential_invalid_security_fail_is_recoverable_without_state_or_secret_side_effects() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    settings.managed_identity.installation_id = "qq-installation-preserved"
+    settings.managed_identity.release_token = "release-token-preserved"
+    settings.managed_identity.release_token_expires_at = "2026-04-08T06:15:00.000Z"
+    settings.managed_identity.verified_hardware_hash = "verified-hardware-hash-preserved"
+    settings.managed_identity.verified_hardware_hash_salt_version = 7
+    settings.managed_identity.active_managed_credential_ref = "discord-active-ref"
+    settings.managed_identity.active_managed_expires_at = "2026-04-08T07:00:00.000Z"
+    settings.managed_identity.founder_letter_seen_credential_ref = "discord-active-ref"
+    settings.managed_identity.referral_id = "8H3J4N"
+    secrets = FailingManagedKeySecretStore(fail_on_key="unused-test-secret-key")
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    secrets.set("unrelated-secret", "preserved-secret-value")
+    secrets.set_attempts.clear()
+    secrets.delete_attempts.clear()
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterReleaseError(
+            code="trial_not_eligible",
+            error_class="security_fail",
+            subcode="qq_credential_invalid",
+            message="raw broker invalid credential detail should not surface",
+            operation="qq_assert",
+        )
+    )
+    persist_calls: list[tuple[str | None, str | None]] = []
+    service, _, _ = _make_service(
+        client=client,
+        settings=settings,
+        secrets=secrets,
+        persist_calls=persist_calls,
+    )
+    before_state = _managed_identity_release_state(settings)
+    before_secrets = dict(secrets._items)
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-invalid-identity-sentinel",
+        credential="qq-invalid-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+    assert result.message_key == "qq_auth.error.credential_mismatch"
+    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
+        operation="qq_assert",
+        code="trial_not_eligible",
+        error_class="security_fail",
+        subcode="qq_credential_invalid",
+        retry_after_ms=None,
+        message="QQ credential verification failed",
+    )
+    assert _managed_identity_release_state(settings) == before_state
+    assert secrets._items == before_secrets
+    assert secrets.set_attempts == []
+    assert secrets.delete_attempts == []
+    assert persist_calls == []
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_qq_credential_mismatch_terminal_is_recoverable_without_state_or_secret_side_effects() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    settings.managed_identity.installation_id = "qq-installation-preserved"
+    settings.managed_identity.release_token = "release-token-preserved"
+    settings.managed_identity.release_token_expires_at = "2026-04-08T06:15:00.000Z"
+    settings.managed_identity.verified_hardware_hash = "verified-hardware-hash-preserved"
+    settings.managed_identity.verified_hardware_hash_salt_version = 7
+    secrets = FailingManagedKeySecretStore(fail_on_key="unused-test-secret-key")
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    secrets.set_attempts.clear()
+    secrets.delete_attempts.clear()
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterReleaseError(
+            code="trial_not_eligible",
+            error_class="terminal",
+            subcode="qq_credential_mismatch",
+            message="raw broker mismatch detail should not surface",
+            operation="qq_assert",
+        )
+    )
+    persist_calls: list[tuple[str | None, str | None]] = []
+    service, _, _ = _make_service(
+        client=client,
+        settings=settings,
+        secrets=secrets,
+        persist_calls=persist_calls,
+    )
+    before_state = _managed_identity_release_state(settings)
+    before_secrets = dict(secrets._items)
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-mismatch-identity-sentinel",
+        credential="qq-mismatch-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+    assert result.message_key == "qq_auth.error.credential_mismatch"
+    assert result.diagnostics is not None
+    assert result.diagnostics.subcode == "qq_credential_mismatch"
+    assert result.diagnostics.message == "QQ credential verification failed"
+    assert _managed_identity_release_state(settings) == before_state
+    assert secrets._items == before_secrets
+    assert secrets.set_attempts == []
+    assert secrets.delete_attempts == []
+    assert persist_calls == []
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_qq_lifetime_used_maps_to_qq_copy_without_state_or_secret_side_effects() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    settings.managed_identity.installation_id = "qq-installation-preserved"
+    settings.managed_identity.release_token = "release-token-preserved"
+    settings.managed_identity.release_token_expires_at = "2026-04-08T06:15:00.000Z"
+    settings.managed_identity.verified_hardware_hash = "verified-hardware-hash-preserved"
+    settings.managed_identity.verified_hardware_hash_salt_version = 7
+    secrets = FailingManagedKeySecretStore(fail_on_key="unused-test-secret-key")
+    secrets.set_attempts.clear()
+    secrets.delete_attempts.clear()
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterReleaseError(
+            code="trial_not_eligible",
+            error_class="terminal",
+            subcode="qq_lifetime_used",
+            message="raw broker lifetime detail should not surface",
+            operation="qq_assert",
+        )
+    )
+    persist_calls: list[tuple[str | None, str | None]] = []
+    service, _, _ = _make_service(
+        client=client,
+        settings=settings,
+        secrets=secrets,
+        persist_calls=persist_calls,
+    )
+    before_state = _managed_identity_release_state(settings)
+    before_secrets = dict(secrets._items)
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-lifetime-identity-sentinel",
+        credential="qq-lifetime-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "qq_auth.error.lifetime_used"
+    assert result.diagnostics is not None
+    assert result.diagnostics.subcode == "qq_lifetime_used"
+    assert result.diagnostics.message == "QQ credential has already been used"
+    assert _managed_identity_release_state(settings) == before_state
+    assert secrets._items == before_secrets
+    assert secrets.set_attempts == []
+    assert secrets.delete_attempts == []
+    assert persist_calls == []
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_ip_rate_limited_terminal_retries_with_sanitized_timing_without_state_or_secret_side_effects() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    settings.managed_identity.installation_id = "qq-installation-preserved"
+    settings.managed_identity.release_token = "release-token-preserved"
+    settings.managed_identity.release_token_expires_at = "2026-04-08T06:15:00.000Z"
+    settings.managed_identity.verified_hardware_hash = "verified-hardware-hash-preserved"
+    settings.managed_identity.verified_hardware_hash_salt_version = 7
+    secrets = FailingManagedKeySecretStore(fail_on_key="unused-test-secret-key")
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    secrets.set_attempts.clear()
+    secrets.delete_attempts.clear()
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterReleaseError(
+            code="rate_limited",
+            error_class="terminal",
+            subcode="ip_rate_limited",
+            retry_after_ms=-2_500,
+            message="raw broker rate limit detail should not surface",
+            operation="qq_assert",
+        )
+    )
+    persist_calls: list[tuple[str | None, str | None]] = []
+    service, _, _ = _make_service(
+        client=client,
+        settings=settings,
+        secrets=secrets,
+        persist_calls=persist_calls,
+    )
+    before_state = _managed_identity_release_state(settings)
+    before_secrets = dict(secrets._items)
+
+    result = await service.prepare_from_qq_assertion(
+        qq_identity="qq-rate-limited-identity-sentinel",
+        credential="qq-rate-limited-credential-sentinel",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+    assert result.message_key == "qq_auth.error.retry"
+    assert result.message_kwargs == {"retry_after_ms": 0}
+    assert result.retry_after_ms == 0
+    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
+        operation="qq_assert",
+        code="rate_limited",
+        error_class="terminal",
+        subcode="ip_rate_limited",
+        retry_after_ms=0,
+        message="QQ credential verification is rate limited",
+    )
+    assert _managed_identity_release_state(settings) == before_state
+    assert secrets._items == before_secrets
+    assert secrets.set_attempts == []
+    assert secrets.delete_attempts == []
+    assert persist_calls == []
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
+@pytest.mark.asyncio
+async def test_prepare_from_qq_assertion_reuses_qq_rate_limit_window_with_qq_retry_copy() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    client = FakeManagedReleaseClient(
+        qq_assert_result=ManagedOpenRouterReleaseError(
+            code="rate_limited",
+            error_class="terminal",
+            subcode="ip_rate_limited",
+            retry_after_ms=5_000,
+            message="raw broker rate limit detail should not surface",
+            operation="qq_assert",
+        )
+    )
+    monotonic_now = {"value": 1_000}
+    service = ManagedOpenRouterReleaseService(
+        settings=settings,
+        secrets=InMemorySecretStore(),
+        client=client,
+        persist_settings=lambda _updated: None,
+        app_version="2.0.0",
+        raw_hardware_fingerprint_provider=lambda: "raw-hardware-fingerprint-test",
+        signed_at_provider=lambda: "2026-04-08T06:00:45.000Z",
+        monotonic_ms_provider=lambda: monotonic_now["value"],
+    )
+
+    first = await service.prepare_from_qq_assertion(
+        qq_identity="qq-rate-window-identity-sentinel",
+        credential="qq-rate-window-credential-sentinel",
+    )
+    monotonic_now["value"] = 2_500
+    second = await service.prepare_from_qq_assertion(
+        qq_identity="qq-rate-window-identity-sentinel",
+        credential="qq-rate-window-credential-sentinel",
+    )
+
+    assert first.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+    assert first.message_key == "qq_auth.error.retry"
+    assert first.message_kwargs == {"retry_after_ms": 5_000}
+    assert first.retry_after_ms == 5_000
+    assert second.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+    assert second.message_key == "qq_auth.error.retry"
+    assert second.message_kwargs == {"retry_after_ms": 3_500}
+    assert second.retry_after_ms == 3_500
+    assert second.diagnostics == ManagedOpenRouterReleaseDiagnostics(
+        operation="qq_assert",
+        code="rate_limited",
+        error_class="terminal",
+        subcode="ip_rate_limited",
+        retry_after_ms=3_500,
+        message="QQ credential verification is rate limited",
+    )
+    assert [name for name, _payload in client.calls] == ["qq_assert"]
+
+
 @pytest.mark.asyncio
 async def test_prepare_for_translation_short_circuits_when_managed_key_exists() -> None:
     settings = AppSettings()
@@ -408,6 +1098,73 @@ async def test_discord_oauth_short_circuits_local_key_without_listener_or_broker
     assert client.calls == []
     assert bind_calls == []
     assert callback_calls == []
+
+
+@pytest.mark.asyncio
+async def test_prepare_for_translation_managed_china_without_qq_key_stops_without_discord_oauth() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    secrets = InMemorySecretStore()
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    harness = FakeDiscordOAuthHarness()
+    client = FakeManagedReleaseClient(
+        discord_start_result=_make_discord_start_success(
+            redirect_uri=harness.redirect_uri,
+        ),
+        discord_issue_result=ManagedOpenRouterIssueSuccess(
+            openrouter_api_key="discord-issued-key",
+        ),
+    )
+    service, _, _ = _make_service(
+        client=client,
+        settings=settings,
+        secrets=secrets,
+        discord_oauth_listener_factory=harness.bind_listener,
+        discord_oauth_callback_runner=harness.run_callback_flow,
+    )
+
+    result = await service.prepare_for_translation()
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "qq_auth.error.key_unavailable"
+    assert result.api_key is None
+    assert result.local_key_available is False
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "discord-managed-key"
+    assert client.calls == []
+    assert harness.listeners == []
+
+
+@pytest.mark.asyncio
+async def test_ensure_key_for_llm_start_managed_china_without_qq_key_stops_without_legacy_issue() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    secrets = InMemorySecretStore()
+    ensure_managed_identity_bundle(settings, secrets, persist_settings=lambda _updated: None)
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    settings.managed_identity.release_token = "release-token-1"
+    settings.managed_identity.release_token_expires_at = "2026-04-08T06:15:00.000Z"
+    _set_verified_snapshot(settings)
+    client = FakeManagedReleaseClient(
+        issue_result=ManagedOpenRouterIssueSuccess(openrouter_api_key="managed-key"),
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+
+    result = await service.ensure_key_for_llm_start()
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "qq_auth.error.key_unavailable"
+    assert result.api_key is None
+    assert result.local_key_available is False
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "discord-managed-key"
+    assert client.calls == []
 
 
 @pytest.mark.asyncio
@@ -1389,6 +2146,74 @@ async def test_prepare_for_translation_reuses_single_flight_for_repeated_trans_a
         False,
         True,
     ]
+
+
+@pytest.mark.asyncio
+async def test_prepare_for_translation_managed_china_does_not_reuse_in_flight_discord_prepare_task() -> (
+    None
+):
+    discord_start_started = asyncio.Event()
+    discord_start_gate = asyncio.Event()
+    client = FakeManagedReleaseClient(
+        discord_start_result=_make_discord_start_success(),
+        discord_issue_result=ManagedOpenRouterIssueSuccess(openrouter_api_key="managed-key"),
+        discord_start_gate=discord_start_gate,
+        discord_start_started=discord_start_started,
+    )
+    service, settings, secrets, _client, _harness = _make_discord_service(client=client)
+    first_task = asyncio.create_task(service.prepare_for_translation())
+    await discord_start_started.wait()
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+
+    try:
+        result = await asyncio.wait_for(service.prepare_for_translation(), timeout=0.5)
+        assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+        assert result.message_key == "qq_auth.error.key_unavailable"
+        assert result.api_key is None
+        assert result.local_key_available is False
+        assert result.single_flight_reused is False
+        assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+        assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) is None
+    finally:
+        discord_start_gate.set()
+        await asyncio.gather(first_task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_prepare_for_translation_managed_china_does_not_reuse_in_flight_managed_issue_task() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    secrets = InMemorySecretStore()
+    ensure_managed_identity_bundle(settings, secrets, persist_settings=lambda _updated: None)
+    settings.managed_identity.release_token = "release-token-1"
+    settings.managed_identity.release_token_expires_at = "2026-04-08T06:15:00.000Z"
+    _set_verified_snapshot(settings)
+    issue_started = asyncio.Event()
+    issue_gate = asyncio.Event()
+    client = FakeManagedReleaseClient(
+        issue_result=ManagedOpenRouterIssueSuccess(openrouter_api_key="managed-key"),
+        issue_gate=issue_gate,
+        issue_started=issue_started,
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+    first_task = asyncio.create_task(service.prepare_for_translation())
+    await issue_started.wait()
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+
+    try:
+        result = await asyncio.wait_for(service.prepare_for_translation(), timeout=0.5)
+        assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+        assert result.message_key == "qq_auth.error.key_unavailable"
+        assert result.api_key is None
+        assert result.local_key_available is False
+        assert result.single_flight_reused is False
+        assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) is None
+        assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) is None
+    finally:
+        issue_gate.set()
+        await asyncio.gather(first_task, return_exceptions=True)
 
 
 @pytest.mark.asyncio

@@ -396,6 +396,35 @@ class DummyManagedReleaseService:
         self.close_calls += 1
 
 
+class DummyQqManagedReleaseService(DummyManagedReleaseService):
+    def __init__(
+        self,
+        result: ManagedOpenRouterReleaseResult,
+        *,
+        on_prepare_from_qq: Callable[[], object] | None = None,
+    ) -> None:
+        super().__init__(result)
+        self.on_prepare_from_qq = on_prepare_from_qq
+        self.qq_prepare_calls = 0
+        self.qq_assertions: list[tuple[str, str]] = []
+
+    async def prepare_from_qq_assertion(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+        issue_persistence_allowed: Callable[[], bool] | None = None,
+    ) -> ManagedOpenRouterReleaseResult:
+        _ = issue_persistence_allowed
+        self.qq_prepare_calls += 1
+        self.qq_assertions.append((qq_identity, credential))
+        if self.on_prepare_from_qq is not None:
+            prepare_result = self.on_prepare_from_qq()
+            if asyncio.iscoroutine(prepare_result):
+                await prepare_result
+        return self.result
+
+
 class InspectingManagedReleaseService(DummyManagedReleaseService):
     def __init__(
         self,
@@ -2882,6 +2911,612 @@ async def test_start_discord_managed_auth_from_dialog_does_not_log_raw_broker_di
     logged_messages = [message for _level, message in controller._runtime_logging.basic_messages]
     assert not any(raw_subcode in message for message in logged_messages)
     assert not any(raw_message in message for message in logged_messages)
+
+
+@pytest.mark.asyncio
+async def test_start_qq_managed_auth_uses_qq_state_not_discord_state() -> None:
+    dash = DummyDashboard()
+    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+    observed_state: list[tuple[bool, bool, bool]] = []
+    result = ManagedOpenRouterReleaseResult(
+        behavior=ManagedOpenRouterReleaseBehavior.READY,
+        message_key="managed_release.ready",
+        api_key="managed-qq-key",
+        local_key_available=True,
+    )
+
+    def observe_state() -> None:
+        observed_state.append(
+            (
+                controller._discord_managed_auth_in_progress,
+                getattr(controller, "_qq_managed_auth_in_progress", False),
+                controller.managed_auth_pending,
+            )
+        )
+
+    service = DummyQqManagedReleaseService(result, on_prepare_from_qq=observe_state)
+    controller._managed_openrouter_release_service = service
+
+    ok = await controller.start_qq_managed_auth_from_dialog(
+        qq_identity="qq-synthetic-user",
+        credential="a" * 64,
+    )
+
+    assert ok is True
+    assert observed_state == [(False, True, True)]
+    assert controller._discord_managed_auth_in_progress is False
+    assert getattr(controller, "_qq_managed_auth_in_progress", False) is False
+    assert controller.managed_auth_pending is False
+    assert dash.managed_auth_pending_calls == [True, False]
+
+
+@pytest.mark.asyncio
+async def test_start_qq_managed_auth_returns_recoverable_result_without_snackbar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snackbar_calls: list[tuple[str, str]] = []
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=DummyDashboard(),
+            _show_snackbar=lambda message, color: snackbar_calls.append((message, color)),
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+    release_result = ManagedOpenRouterReleaseResult(
+        behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+        message_key="qq_auth.error.credential_mismatch",
+        diagnostics=ManagedOpenRouterReleaseDiagnostics(
+            operation="qq_assert",
+            code="trial_not_eligible",
+            error_class="recoverable",
+            subcode="qq_credential_invalid",
+            message="synthetic raw broker message",
+        ),
+    )
+    controller._managed_openrouter_release_service = DummyQqManagedReleaseService(release_result)
+    monkeypatch.setattr(controller_module, "t", lambda key, **_kwargs: key)
+
+    result = await controller.start_qq_managed_auth_from_dialog(
+        qq_identity="qq-synthetic-user",
+        credential="a" * 64,
+    )
+
+    assert result is release_result
+    assert snackbar_calls == []
+
+
+@pytest.mark.asyncio
+async def test_start_qq_managed_auth_logs_no_identity_or_credential_length(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="puripuly_heart.ui.controller")
+    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+    controller._managed_openrouter_release_service = DummyQqManagedReleaseService(
+        ManagedOpenRouterReleaseResult(
+            behavior=ManagedOpenRouterReleaseBehavior.READY,
+            message_key="managed_release.ready",
+            api_key="managed-qq-key",
+            local_key_available=True,
+        )
+    )
+
+    await controller.start_qq_managed_auth_from_dialog(
+        qq_identity="SYNTHETIC_QQ_IDENTITY_SENTINEL",
+        credential="a" * 64,
+    )
+
+    assert "SYNTHETIC_QQ_IDENTITY_SENTINEL" not in caplog.text
+    assert "credential_len" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_cancel_qq_managed_auth_prevents_late_controller_side_effects(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    caplog.set_level(logging.INFO, logger="puripuly_heart.ui.controller")
+    settings_view = CapturingManagedKeySettingsView()
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=DummyDashboard(),
+            view_settings=settings_view,
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+    release_prepare_entered = asyncio.Event()
+    release_prepare_continue = asyncio.Event()
+    scheduled_refreshes: list[str] = []
+
+    async def wait_until_cancelled() -> None:
+        release_prepare_entered.set()
+        await release_prepare_continue.wait()
+
+    controller._managed_openrouter_release_service = DummyQqManagedReleaseService(
+        ManagedOpenRouterReleaseResult(
+            behavior=ManagedOpenRouterReleaseBehavior.READY,
+            message_key="managed_release.ready",
+            api_key="managed-qq-key",
+            local_key_available=True,
+        ),
+        on_prepare_from_qq=wait_until_cancelled,
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_schedule_managed_trial_usage_refresh",
+        lambda self: scheduled_refreshes.append("usage"),
+    )
+
+    task = asyncio.create_task(
+        controller.start_qq_managed_auth_from_dialog(
+            qq_identity="qq-synthetic-user",
+            credential="a" * 64,
+        )
+    )
+    await release_prepare_entered.wait()
+    controller.cancel_qq_managed_auth()
+    release_prepare_continue.set()
+
+    result: ManagedOpenRouterReleaseResult | None = None
+    with contextlib.suppress(asyncio.CancelledError):
+        result = await task
+
+    if result is not None:
+        assert isinstance(result, ManagedOpenRouterReleaseResult)
+        assert result.behavior != ManagedOpenRouterReleaseBehavior.READY
+        assert result.local_key_available is False
+        assert result.api_key is None
+    assert settings_view.managed_key_state_calls == []
+    assert scheduled_refreshes == []
+    assert "result behavior" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_stale_qq_managed_auth_ready_result_returns_neutral_without_key() -> None:
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=DummyDashboard(),
+            view_settings=CapturingManagedKeySettingsView(),
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+    release_prepare_entered = asyncio.Event()
+    release_prepare_continue = asyncio.Event()
+    ready_result = ManagedOpenRouterReleaseResult(
+        behavior=ManagedOpenRouterReleaseBehavior.READY,
+        message_key="managed_release.ready",
+        api_key="managed-qq-key",
+        local_key_available=True,
+    )
+
+    async def wait_for_stale_generation() -> None:
+        release_prepare_entered.set()
+        await release_prepare_continue.wait()
+
+    controller._managed_openrouter_release_service = DummyQqManagedReleaseService(
+        ready_result,
+        on_prepare_from_qq=wait_for_stale_generation,
+    )
+
+    task = asyncio.create_task(
+        controller.start_qq_managed_auth_from_dialog(
+            qq_identity="qq-synthetic-user",
+            credential="a" * 64,
+        )
+    )
+    await release_prepare_entered.wait()
+    newer_generation = controller._qq_managed_auth_generation + 1
+    controller._qq_managed_auth_generation = newer_generation
+    controller._qq_managed_auth_cancelled = False
+    controller._qq_managed_auth_in_progress = True
+    controller._set_managed_trial_pending_auth(True)
+    release_prepare_continue.set()
+
+    result = await task
+
+    assert isinstance(result, ManagedOpenRouterReleaseResult)
+    assert result is not ready_result
+    assert result is not True
+    assert result.behavior != ManagedOpenRouterReleaseBehavior.READY
+    assert result.local_key_available is False
+    assert result.api_key is None
+
+
+@pytest.mark.asyncio
+async def test_stale_qq_managed_auth_persistence_guard_blocks_service_side_effect() -> None:
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=DummyDashboard(),
+            view_settings=CapturingManagedKeySettingsView(),
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+
+    class GuardedSyntheticPersistingQqService:
+        def __init__(self) -> None:
+            self.prepare_entered = asyncio.Event()
+            self.allow_guard_check = asyncio.Event()
+            self.guard_results: list[bool] = []
+            self.persisted: list[str] = []
+
+        async def prepare_from_qq_assertion(
+            self,
+            *,
+            qq_identity: str,
+            credential: str,
+            issue_persistence_allowed: Callable[[], bool] | None = None,
+        ) -> ManagedOpenRouterReleaseResult:
+            _ = credential
+            self.prepare_entered.set()
+            await self.allow_guard_check.wait()
+            allowed = issue_persistence_allowed() if issue_persistence_allowed is not None else True
+            self.guard_results.append(allowed)
+            if allowed:
+                self.persisted.append(qq_identity)
+                return ManagedOpenRouterReleaseResult(
+                    behavior=ManagedOpenRouterReleaseBehavior.READY,
+                    message_key="managed_release.ready",
+                    api_key="managed-qq-key",
+                    local_key_available=True,
+                )
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="qq_auth.error.key_unavailable",
+            )
+
+    service = GuardedSyntheticPersistingQqService()
+    controller._managed_openrouter_release_service = service  # type: ignore[assignment]
+    task = asyncio.create_task(
+        controller.start_qq_managed_auth_from_dialog(
+            qq_identity="qq-guarded-synthetic-user",
+            credential="a" * 64,
+        )
+    )
+    await service.prepare_entered.wait()
+    newer_generation = controller._qq_managed_auth_generation + 1
+    controller._qq_managed_auth_generation = newer_generation
+    controller._qq_managed_auth_cancelled = False
+    controller._qq_managed_auth_in_progress = True
+    controller._set_managed_trial_pending_auth(True)
+    service.allow_guard_check.set()
+
+    result = await task
+
+    assert isinstance(result, ManagedOpenRouterReleaseResult)
+    assert result.behavior != ManagedOpenRouterReleaseBehavior.READY
+    assert result.local_key_available is False
+    assert result.api_key is None
+    assert service.guard_results == [False]
+    assert service.persisted == []
+
+
+@pytest.mark.asyncio
+async def test_superseding_qq_managed_auth_cancels_previous_before_synthetic_persist() -> None:
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=DummyDashboard(),
+            view_settings=CapturingManagedKeySettingsView(),
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+
+    class SyntheticPersistingQqService:
+        def __init__(self) -> None:
+            self.old_prepare_entered = asyncio.Event()
+            self.new_prepare_entered = asyncio.Event()
+            self.allow_old_persist = asyncio.Event()
+            self.cancelled: list[str] = []
+            self.persisted: list[str] = []
+
+        async def prepare_from_qq_assertion(
+            self,
+            *,
+            qq_identity: str,
+            credential: str,
+            issue_persistence_allowed: Callable[[], bool] | None = None,
+        ) -> ManagedOpenRouterReleaseResult:
+            _ = credential, issue_persistence_allowed
+            if qq_identity == "qq-old-synthetic-user":
+                self.old_prepare_entered.set()
+                try:
+                    await self.allow_old_persist.wait()
+                except asyncio.CancelledError:
+                    self.cancelled.append(qq_identity)
+                    raise
+                self.persisted.append(qq_identity)
+                return ManagedOpenRouterReleaseResult(
+                    behavior=ManagedOpenRouterReleaseBehavior.READY,
+                    message_key="managed_release.ready",
+                    api_key="managed-qq-key",
+                    local_key_available=True,
+                )
+
+            self.new_prepare_entered.set()
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+                message_key="qq_auth.error.retry",
+            )
+
+    service = SyntheticPersistingQqService()
+    controller._managed_openrouter_release_service = service  # type: ignore[assignment]
+
+    old_task = asyncio.create_task(
+        controller.start_qq_managed_auth_from_dialog(
+            qq_identity="qq-old-synthetic-user",
+            credential="a" * 64,
+        )
+    )
+    await service.old_prepare_entered.wait()
+
+    new_task = asyncio.create_task(
+        controller.start_qq_managed_auth_from_dialog(
+            qq_identity="qq-new-synthetic-user",
+            credential="b" * 64,
+        )
+    )
+    await service.new_prepare_entered.wait()
+    service.allow_old_persist.set()
+
+    old_result: bool | ManagedOpenRouterReleaseResult | None = None
+    with contextlib.suppress(asyncio.CancelledError):
+        old_result = await old_task
+    new_result = await new_task
+
+    if old_result is not None:
+        assert isinstance(old_result, ManagedOpenRouterReleaseResult)
+        assert old_result.behavior != ManagedOpenRouterReleaseBehavior.READY
+        assert old_result.local_key_available is False
+        assert old_result.api_key is None
+    assert isinstance(new_result, ManagedOpenRouterReleaseResult)
+    assert service.cancelled == ["qq-old-synthetic-user"]
+    assert service.persisted == []
+
+
+@pytest.mark.asyncio
+async def test_cancel_qq_managed_auth_during_rebuild_prevents_success_side_effects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings_view = CapturingManagedKeySettingsView()
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=DummyDashboard(),
+            view_settings=settings_view,
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=None)
+    rebuild_entered = asyncio.Event()
+    rebuild_continue = asyncio.Event()
+    scheduled_refreshes: list[str] = []
+    controller._managed_openrouter_release_service = DummyQqManagedReleaseService(
+        ManagedOpenRouterReleaseResult(
+            behavior=ManagedOpenRouterReleaseBehavior.READY,
+            message_key="managed_release.ready",
+            api_key="managed-qq-key",
+            local_key_available=True,
+        )
+    )
+
+    async def rebuild_llm_provider(self: GuiController) -> None:
+        rebuild_entered.set()
+        await rebuild_continue.wait()
+        assert self.hub is not None
+        self.hub.llm = object()
+
+    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", rebuild_llm_provider)
+    monkeypatch.setattr(
+        GuiController,
+        "_schedule_managed_trial_usage_refresh",
+        lambda self: scheduled_refreshes.append("usage"),
+    )
+
+    task = asyncio.create_task(
+        controller.start_qq_managed_auth_from_dialog(
+            qq_identity="qq-synthetic-user",
+            credential="a" * 64,
+        )
+    )
+    await rebuild_entered.wait()
+    controller.cancel_qq_managed_auth()
+    rebuild_continue.set()
+
+    result: bool | ManagedOpenRouterReleaseResult | None = None
+    with contextlib.suppress(asyncio.CancelledError):
+        result = await task
+
+    if result is not None:
+        assert result is not True
+        assert isinstance(result, ManagedOpenRouterReleaseResult)
+        assert result.behavior != ManagedOpenRouterReleaseBehavior.READY
+        assert result.local_key_available is False
+        assert result.api_key is None
+    assert settings_view.managed_key_state_calls == []
+    assert scheduled_refreshes == []
+
+
+@pytest.mark.asyncio
+async def test_stale_qq_managed_auth_rebuild_completion_preserves_newer_pending_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings_view = CapturingManagedKeySettingsView()
+    dash = DummyDashboard()
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=dash,
+            view_settings=settings_view,
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=None)
+    rebuild_entered = asyncio.Event()
+    rebuild_continue = asyncio.Event()
+    scheduled_refreshes: list[str] = []
+    controller._managed_openrouter_release_service = DummyQqManagedReleaseService(
+        ManagedOpenRouterReleaseResult(
+            behavior=ManagedOpenRouterReleaseBehavior.READY,
+            message_key="managed_release.ready",
+            api_key="managed-qq-key",
+            local_key_available=True,
+        )
+    )
+
+    async def rebuild_llm_provider(self: GuiController) -> None:
+        rebuild_entered.set()
+        await rebuild_continue.wait()
+        assert self.hub is not None
+        self.hub.llm = object()
+
+    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", rebuild_llm_provider)
+    monkeypatch.setattr(
+        GuiController,
+        "_schedule_managed_trial_usage_refresh",
+        lambda self: scheduled_refreshes.append("usage"),
+    )
+
+    task = asyncio.create_task(
+        controller.start_qq_managed_auth_from_dialog(
+            qq_identity="qq-synthetic-user",
+            credential="a" * 64,
+        )
+    )
+    await rebuild_entered.wait()
+    newer_generation = controller._qq_managed_auth_generation + 1
+    controller._qq_managed_auth_generation = newer_generation
+    controller._qq_managed_auth_cancelled = False
+    controller._qq_managed_auth_in_progress = True
+    controller._set_managed_trial_pending_auth(True)
+    rebuild_continue.set()
+
+    result = await task
+
+    assert result is not True
+    assert settings_view.managed_key_state_calls == []
+    assert scheduled_refreshes == []
+    assert controller._qq_managed_auth_generation == newer_generation
+    assert controller._qq_managed_auth_in_progress is True
+    assert controller.managed_auth_pending is True
+    assert dash.managed_auth_pending is True
+
+
+@pytest.mark.parametrize(
+    ("secrets", "expected_available", "expected_action"),
+    [
+        ({"openrouter_managed_api_key": "discord-managed-key"}, False, "prompt"),
+        ({"openrouter_managed_qq_api_key": "   "}, False, "prompt"),
+        ({"openrouter_managed_qq_api_key": "managed-qq-key"}, True, "continue"),
+    ],
+)
+def test_managed_china_dashboard_key_gate_uses_normalized_qq_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+    secrets: dict[str, str],
+    expected_available: bool,
+    expected_action: str,
+) -> None:
+    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    monkeypatch.setattr(
+        controller_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets(secrets),
+    )
+
+    assert controller._managed_openrouter_local_key_available() is expected_available
+    assert controller.dashboard_managed_auth_action() == expected_action
+
+
+@pytest.mark.asyncio
+async def test_managed_china_no_key_translation_enable_does_not_prepare_discord_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snackbar_calls: list[tuple[str, str]] = []
+    dash = DummyDashboard()
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=dash,
+            view_settings=DummySettingsView(),
+            _show_snackbar=lambda message, color: snackbar_calls.append((message, color)),
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+    monkeypatch.setattr(
+        controller_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets({}),
+    )
+    monkeypatch.setattr(controller_module, "t", lambda key, **_kwargs: key)
+
+    class NoDiscordPrepareService:
+        async def prepare_for_translation(self):
+            raise AssertionError("Managed China no-key path must not prepare Discord auth")
+
+    controller._managed_openrouter_release_service = NoDiscordPrepareService()  # type: ignore[assignment]
+
+    ok = await controller.set_translation_enabled(True)
+
+    assert ok is False
+    assert snackbar_calls == [("qq_auth.error.key_unavailable", ft.Colors.ORANGE_700)]
+    assert dash.translation_enabled is False
+    assert controller.hub.translation_enabled is False
+
+
+def test_managed_china_no_key_readiness_cannot_attempt_translation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+    monkeypatch.setattr(
+        controller_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets({"openrouter_managed_api_key": "discord"}),
+    )
+
+    assert controller._managed_openrouter_can_attempt_translation() is False
 
 
 def test_discord_auth_message_key_falls_back_to_result_message_key() -> None:

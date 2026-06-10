@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import logging
+
 import pytest
 
-from puripuly_heart.config.settings import AppSettings, OpenRouterCredentialSource
+from puripuly_heart.config.settings import (
+    AppSettings,
+    OpenRouterCredentialSource,
+    TranslationConnection,
+)
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_SECRET,
     OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     OPENROUTER_MANAGED_USER_ID_MAX_LENGTH,
     OPENROUTER_MANAGED_USER_ID_SECRET,
     OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
@@ -18,6 +25,19 @@ from puripuly_heart.core.openrouter_credentials import (
     resolve_openrouter_credentials,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
+
+
+class ReadGuardSecretStore(InMemorySecretStore):
+    def __init__(self, *, raise_on_get: set[str]) -> None:
+        super().__init__()
+        self.raise_on_get = raise_on_get
+        self.get_calls: list[str] = []
+
+    def get(self, key: str) -> str | None:
+        self.get_calls.append(key)
+        if key in self.raise_on_get:
+            raise RuntimeError(f"unexpected secret read: {key}")
+        return super().get(key)
 
 
 def test_resolve_openrouter_credentials_respects_explicit_none_selection_even_with_stored_keys() -> (
@@ -83,6 +103,128 @@ def test_resolve_openrouter_credentials_requires_explicit_trans_intent_before_ma
     assert resolution.requires_managed_challenge is False
     assert trans_resolution.api_key is None
     assert trans_resolution.requires_managed_challenge is True
+
+
+def test_resolve_openrouter_credentials_managed_china_uses_only_qq_key() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    store = InMemorySecretStore()
+    store.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    store.set(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, " qq-managed-key ")
+
+    resolution = resolve_openrouter_credentials(settings, secrets=store)
+
+    assert resolution.selected_source == OpenRouterCredentialSource.MANAGED
+    assert resolution.api_key == "qq-managed-key"
+    assert resolution.requires_managed_challenge is False
+
+
+def test_resolve_openrouter_credentials_managed_china_ignores_discord_key() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    store = InMemorySecretStore()
+    store.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+
+    resolution = resolve_openrouter_credentials(
+        settings,
+        secrets=store,
+        request_intent="TRANS",
+    )
+
+    assert resolution.selected_source == OpenRouterCredentialSource.MANAGED
+    assert resolution.api_key is None
+    assert resolution.requires_managed_challenge is True
+
+
+def test_resolve_openrouter_credentials_non_china_managed_uses_only_discord_key() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED
+    store = InMemorySecretStore()
+    store.set(OPENROUTER_MANAGED_API_KEY_SECRET, " discord-managed-key ")
+    store.set(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, "qq-managed-key")
+
+    resolution = resolve_openrouter_credentials(settings, secrets=store)
+
+    assert resolution.selected_source == OpenRouterCredentialSource.MANAGED
+    assert resolution.api_key == "discord-managed-key"
+    assert resolution.requires_managed_challenge is False
+
+
+def test_resolve_openrouter_credentials_non_china_managed_ignores_qq_key() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED
+    store = InMemorySecretStore()
+    store.set(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, "qq-managed-key")
+
+    resolution = resolve_openrouter_credentials(
+        settings,
+        secrets=store,
+        request_intent="TRANS",
+    )
+
+    assert resolution.selected_source == OpenRouterCredentialSource.MANAGED
+    assert resolution.api_key is None
+    assert resolution.requires_managed_challenge is True
+
+
+def test_resolve_openrouter_credentials_whitespace_qq_key_is_unavailable() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    store = InMemorySecretStore()
+    store.set(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, "   ")
+
+    resolution = resolve_openrouter_credentials(
+        settings,
+        secrets=store,
+        request_intent="TRANS",
+    )
+
+    assert resolution.selected_source == OpenRouterCredentialSource.MANAGED
+    assert resolution.api_key is None
+    assert resolution.requires_managed_challenge is True
+
+
+def test_resolve_openrouter_credentials_managed_china_does_not_read_discord_secret(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    store = ReadGuardSecretStore(raise_on_get={OPENROUTER_MANAGED_API_KEY_SECRET})
+    store.set(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, "qq-managed-key")
+    caplog.set_level(logging.INFO, logger="puripuly_heart.core.openrouter_credentials")
+
+    resolution = resolve_openrouter_credentials(settings, secrets=store)
+
+    assert resolution.api_key == "qq-managed-key"
+    assert resolution.requires_managed_challenge is False
+    assert store.get_calls == [OPENROUTER_MANAGED_QQ_API_KEY_SECRET]
+    assert "discord_key" not in caplog.text
+    assert "ignored" not in caplog.text
+
+
+def test_resolve_openrouter_credentials_non_china_managed_does_not_read_qq_secret(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED
+    store = ReadGuardSecretStore(raise_on_get={OPENROUTER_MANAGED_QQ_API_KEY_SECRET})
+    store.set(OPENROUTER_MANAGED_API_KEY_SECRET, "discord-managed-key")
+    caplog.set_level(logging.INFO, logger="puripuly_heart.core.openrouter_credentials")
+
+    resolution = resolve_openrouter_credentials(settings, secrets=store)
+
+    assert resolution.api_key == "discord-managed-key"
+    assert resolution.requires_managed_challenge is False
+    assert store.get_calls == [OPENROUTER_MANAGED_API_KEY_SECRET]
+    assert "qq_key" not in caplog.text
+    assert "ignored" not in caplog.text
 
 
 @pytest.mark.parametrize(

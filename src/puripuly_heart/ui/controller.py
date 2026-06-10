@@ -13,7 +13,7 @@ import sys
 import threading
 import traceback
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Protocol
@@ -86,6 +86,7 @@ from puripuly_heart.core.managed_openrouter_broker_client import (
 )
 from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterReleaseBehavior,
+    ManagedOpenRouterReleaseResult,
     ManagedOpenRouterReleaseService,
     ManagedOpenRouterStatusRefreshResult,
     TalkTogetherPassStatus,
@@ -473,6 +474,14 @@ class GuiController:
     )
     _managed_trial_pending_auth: bool = field(init=False, default=False)
     _discord_managed_auth_in_progress: bool = field(init=False, default=False)
+    _qq_managed_auth_in_progress: bool = field(init=False, default=False)
+    _qq_managed_auth_generation: int = field(init=False, default=0)
+    _qq_managed_auth_cancelled: bool = field(init=False, default=False)
+    _qq_managed_auth_task_handle: asyncio.Task[object] | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _discord_managed_auth_callback_received_hook: Callable[[], None] | None = field(
         init=False,
         default=None,
@@ -822,13 +831,18 @@ class GuiController:
         return build_peer_stt_provider_signature(settings)
 
     def _managed_openrouter_can_attempt_translation(self) -> bool:
-        return bool(
+        can_attempt = bool(
             self.settings is not None
             and self.settings.provider.llm == LLMProviderName.OPENROUTER
             and self.settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
             and self.hub is not None
             and self.hub.llm is not None
         )
+        if not can_attempt:
+            return False
+        if self._is_managed_china_connection():
+            return self._managed_openrouter_local_key_available()
+        return True
 
     def _sync_managed_auth_dashboard_notice(self) -> None:
         dash = getattr(self.app, "view_dashboard", None)
@@ -886,15 +900,56 @@ class GuiController:
             )
         except Exception:
             return False
-        return resolution.api_key is not None
+        has_key = resolution.api_key is not None
+        if self._is_managed_china_connection():
+            logger.info(
+                "[QQAuth] _managed_openrouter_local_key_available: China mode, qq_key=%s",
+                has_key,
+            )
+        else:
+            logger.info(
+                "[ManagedAuth] _managed_openrouter_local_key_available: non-China mode, has_key=%s",
+                has_key,
+            )
+        return has_key
+
+    def _managed_qq_key_available(self) -> bool:
+        if self.settings is None:
+            return False
+        try:
+            secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
+            resolution = resolve_openrouter_credentials(
+                self.settings,
+                secrets=secrets,
+                request_intent="TRANS",
+            )
+            result = resolution.api_key is not None
+            logger.info("[QQAuth] _managed_qq_key_available: %s", result)
+            return result
+        except Exception as exc:
+            logger.warning("[QQAuth] _managed_qq_key_available: exception: %s", exc)
+            return False
 
     def dashboard_managed_auth_action(self) -> str:
         if not self._managed_openrouter_selected():
             return "continue"
-        if self._discord_managed_auth_in_progress or self._managed_trial_pending_auth:
+        if (
+            self._discord_managed_auth_in_progress
+            or self._qq_managed_auth_in_progress
+            or self._managed_trial_pending_auth
+        ):
+            logger.info(
+                "[ManagedAuth] dashboard_managed_auth_action: in_progress (discord=%s qq=%s pending=%s)",
+                self._discord_managed_auth_in_progress,
+                self._qq_managed_auth_in_progress,
+                self._managed_trial_pending_auth,
+            )
             return "in_progress"
         if self._managed_openrouter_local_key_available():
+            logger.info("[ManagedAuth] dashboard_managed_auth_action: continue (key available)")
             return "continue"
+        is_china = self._is_managed_china_connection()
+        logger.info("[ManagedAuth] dashboard_managed_auth_action: prompt (is_china=%s)", is_china)
         return "prompt"
 
     def _discord_auth_message_key(self, result) -> str:  # noqa: ANN001
@@ -983,6 +1038,185 @@ class GuiController:
                 self._discord_managed_auth_callback_received_hook = previous_callback
             self._discord_managed_auth_in_progress = False
             self._set_managed_trial_pending_auth(False)
+
+    def _is_managed_china_connection(self) -> bool:
+        if self.settings is None:
+            return False
+        return self.settings.translation.connection == TranslationConnection.MANAGED_CHINA
+
+    async def start_qq_managed_auth_from_dialog(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+    ) -> bool | ManagedOpenRouterReleaseResult:
+        logger.info("[QQAuth] start_qq_managed_auth_from_dialog: starting")
+        current_task = asyncio.current_task()
+        previous_task = self._qq_managed_auth_task_handle
+        if (
+            previous_task is not None
+            and previous_task is not current_task
+            and not previous_task.done()
+        ):
+            previous_task.cancel()
+        if current_task is not None:
+            self._qq_managed_auth_task_handle = current_task
+        self._qq_managed_auth_generation += 1
+        auth_generation = self._qq_managed_auth_generation
+        self._qq_managed_auth_cancelled = False
+
+        service = self._managed_openrouter_release_service
+        if service is None:
+            logger.warning("[QQAuth] start_qq_managed_auth_from_dialog: service is None")
+            if current_task is not None and self._qq_managed_auth_task_handle is current_task:
+                self._qq_managed_auth_task_handle = None
+            self._qq_managed_auth_in_progress = False
+            self._set_managed_trial_pending_auth(False)
+            return self._neutral_qq_managed_auth_result()
+
+        normalized_qq_identity = (qq_identity or "").strip()
+        normalized_credential = (credential or "").strip()
+        if not normalized_qq_identity or not normalized_credential:
+            logger.warning("[QQAuth] start_qq_managed_auth_from_dialog: empty input")
+            if current_task is not None and self._qq_managed_auth_task_handle is current_task:
+                self._qq_managed_auth_task_handle = None
+            self._qq_managed_auth_in_progress = False
+            self._set_managed_trial_pending_auth(False)
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+                message_key="qq_auth.error.invalid_input",
+            )
+
+        self._qq_managed_auth_in_progress = True
+        self._set_managed_trial_pending_auth(True)
+
+        def issue_persistence_allowed() -> bool:
+            return self._is_current_qq_managed_auth_generation(auth_generation)
+
+        try:
+            try:
+                logger.info(
+                    "[QQAuth] start_qq_managed_auth_from_dialog: calling prepare_from_qq_assertion"
+                )
+                result = await service.prepare_from_qq_assertion(
+                    qq_identity=normalized_qq_identity,
+                    credential=normalized_credential,
+                    issue_persistence_allowed=issue_persistence_allowed,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                if not self._is_current_qq_managed_auth_generation(auth_generation):
+                    return self._neutral_qq_managed_auth_result()
+                self.log_basic(
+                    "[QQAuth] QQ auth start failed",
+                    level=logging.ERROR,
+                )
+                logger.warning(
+                    "[QQAuth] start_qq_managed_auth_from_dialog: release error class=%s",
+                    exc.__class__.__name__,
+                )
+                return ManagedOpenRouterReleaseResult(
+                    behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+                    message_key="qq_auth.error.retry",
+                )
+
+            if not self._is_current_qq_managed_auth_generation(auth_generation):
+                return self._neutral_qq_managed_auth_result()
+            logger.info(
+                "[QQAuth] start_qq_managed_auth_from_dialog: result behavior=%s local_key=%s",
+                result.behavior,
+                result.local_key_available,
+            )
+
+            if (
+                result.behavior == ManagedOpenRouterReleaseBehavior.READY
+                and result.local_key_available
+            ):
+                if self.hub is None:
+                    return ManagedOpenRouterReleaseResult(
+                        behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+                        message_key="qq_auth.error.retry",
+                    )
+                if self.hub.llm is None:
+                    await self._rebuild_llm_provider()
+                    if not self._is_current_qq_managed_auth_generation(auth_generation):
+                        return self._neutral_qq_managed_auth_result()
+                if self.hub.llm is None:
+                    return ManagedOpenRouterReleaseResult(
+                        behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+                        message_key="qq_auth.error.retry",
+                    )
+                result_referral_id = normalize_owned_referral_id(
+                    getattr(result, "referral_id", None)
+                )
+                self._set_managed_usage_view_state(
+                    view_settings=getattr(self.app, "view_settings", None),
+                    visible=True,
+                    remaining_percent=None,
+                    referral_id=result_referral_id or self._current_owned_referral_id(),
+                    pass_status=getattr(result, "pass_status", None),
+                )
+                self._schedule_managed_trial_usage_refresh()
+                return True
+
+            result = self._qq_managed_auth_result_for_dialog(result)
+            diagnostics = result.diagnostics
+            subcode = getattr(diagnostics, "subcode", None)
+            self.log_basic(
+                "[ManagedAuth] QQ auth failed: "
+                f"message_key={result.message_key} "
+                f"subcode={subcode or 'none'} "
+                f"class={getattr(diagnostics, 'error_class', None) or 'unknown'}",
+                level=logging.ERROR,
+            )
+            return result
+        finally:
+            if self._is_current_qq_managed_auth_generation(auth_generation) and (
+                current_task is None or self._qq_managed_auth_task_handle is current_task
+            ):
+                if current_task is not None:
+                    self._qq_managed_auth_task_handle = None
+                self._qq_managed_auth_in_progress = False
+                self._set_managed_trial_pending_auth(False)
+
+    def _neutral_qq_managed_auth_result(self) -> ManagedOpenRouterReleaseResult:
+        return ManagedOpenRouterReleaseResult(
+            behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+            message_key="qq_auth.error.retry",
+        )
+
+    def _is_current_qq_managed_auth_generation(self, generation: int) -> bool:
+        return bool(
+            generation == self._qq_managed_auth_generation and not self._qq_managed_auth_cancelled
+        )
+
+    def _qq_managed_auth_result_for_dialog(
+        self,
+        result: ManagedOpenRouterReleaseResult,
+    ) -> ManagedOpenRouterReleaseResult:
+        diagnostics = result.diagnostics
+        subcode = getattr(diagnostics, "subcode", None)
+        if subcode in {"qq_credential_invalid", "qq_credential_mismatch"}:
+            if result.message_key == "qq_auth.error.credential_mismatch":
+                return result
+            return replace(result, message_key="qq_auth.error.credential_mismatch")
+        if subcode == "qq_lifetime_used":
+            if result.message_key == "qq_auth.error.lifetime_used":
+                return result
+            return replace(result, message_key="qq_auth.error.lifetime_used")
+        return result
+
+    def cancel_qq_managed_auth(self) -> None:
+        self._qq_managed_auth_cancelled = True
+        task_handle = self._qq_managed_auth_task_handle
+        cancel = getattr(task_handle, "cancel", None)
+        if callable(cancel):
+            with contextlib.suppress(Exception):
+                cancel()
+        self._qq_managed_auth_task_handle = None
+        self._qq_managed_auth_in_progress = False
+        self._set_managed_trial_pending_auth(False)
 
     def _managed_trial_remaining_percent(
         self, usage_metadata: OpenRouterKeyMetadata | None
@@ -3204,6 +3438,17 @@ class GuiController:
             return True
         if self.settings.openrouter.selected_source != OpenRouterCredentialSource.MANAGED:
             return True
+        if (
+            self._is_managed_china_connection()
+            and not self._managed_openrouter_local_key_available()
+        ):
+            self._set_managed_trial_pending_auth(False)
+            self.hub.translation_enabled = False
+            dash = getattr(self.app, "view_dashboard", None)
+            if dash is not None:
+                dash.set_translation_enabled(False)
+            self._show_short_message("qq_auth.error.key_unavailable")
+            return False
         if await self._should_route_managed_trans_to_founder_letter():
             return False
         service = self._managed_openrouter_release_service

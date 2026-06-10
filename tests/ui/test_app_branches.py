@@ -1593,6 +1593,610 @@ async def test_start_discord_managed_auth_failure_does_not_show_success_snackbar
 
 
 @pytest.mark.asyncio
+async def test_start_qq_managed_auth_completes_success_only_after_translation_enable() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    completion_generations: list[int | None] = []
+    close_calls: list[str] = []
+    set_waiting_calls: list[str] = []
+    dialog = SimpleNamespace(
+        qq_identity="qq-user-123",
+        credential="a" * 64,
+        auth_generation=17,
+        set_waiting=lambda: set_waiting_calls.append("waiting"),
+        complete_success=lambda *, generation=None: (
+            completion_generations.append(generation) or True
+        ),
+        close=lambda: close_calls.append("close"),
+    )
+    app._qq_managed_auth_dialog = dialog
+    start_kwargs: list[dict[str, str]] = []
+    enable_calls: list[bool] = []
+    dashboard_translation_calls: list[bool] = []
+    hub = SimpleNamespace(llm=object(), translation_enabled=False)
+    app.view_dashboard = SimpleNamespace(
+        set_translation_enabled=lambda enabled: dashboard_translation_calls.append(enabled)
+    )
+    app._show_snackbar = lambda _message, _color: pytest.fail(
+        "QQ success should be emitted through the dialog completion callback"
+    )
+
+    async def fake_start_qq_managed_auth_from_dialog(**kwargs) -> bool:
+        start_kwargs.append(kwargs)
+        return True
+
+    async def fake_set_translation_enabled(enabled: bool) -> bool:
+        enable_calls.append(enabled)
+        hub.translation_enabled = enabled
+        return True
+
+    app.controller = SimpleNamespace(
+        hub=hub,
+        start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
+        set_translation_enabled=fake_set_translation_enabled,
+    )
+
+    app._start_qq_managed_auth()
+
+    assert set_waiting_calls == ["waiting"]
+    assert start_kwargs == []
+    assert len(app.page.tasks) == 1
+
+    await app.page.tasks[0]()
+
+    assert start_kwargs == [{"qq_identity": "qq-user-123", "credential": "a" * 64}]
+    assert enable_calls == [True]
+    assert dashboard_translation_calls == [True]
+    assert completion_generations == [17]
+    assert close_calls == []
+
+
+@pytest.mark.asyncio
+async def test_start_qq_managed_auth_does_not_complete_success_when_enable_fails() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    close_calls: list[str] = []
+    dialog = SimpleNamespace(
+        qq_identity="qq-user-123",
+        credential="a" * 64,
+        auth_generation=17,
+        set_waiting=lambda: None,
+        complete_success=lambda *, generation=None: pytest.fail(
+            f"unexpected QQ success generation={generation}"
+        ),
+        close=lambda: close_calls.append("close"),
+    )
+    app._qq_managed_auth_dialog = dialog
+    enable_calls: list[bool] = []
+    dashboard_translation_calls: list[bool] = []
+    app.view_dashboard = SimpleNamespace(
+        set_translation_enabled=lambda enabled: dashboard_translation_calls.append(enabled)
+    )
+    app._show_snackbar = lambda _message, _color: None
+
+    async def fake_start_qq_managed_auth_from_dialog(**_kwargs) -> bool:
+        return True
+
+    async def fake_set_translation_enabled(enabled: bool) -> bool:
+        enable_calls.append(enabled)
+        return False
+
+    app.controller = SimpleNamespace(
+        start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
+        set_translation_enabled=fake_set_translation_enabled,
+    )
+
+    app._start_qq_managed_auth()
+    await app.page.tasks[0]()
+
+    assert enable_calls == [True]
+    assert dashboard_translation_calls == []
+    assert close_calls == ["close"]
+
+
+@pytest.mark.asyncio
+async def test_start_qq_managed_auth_enable_exception_completes_translation_failure() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    recoverable_calls: list[dict[str, object]] = []
+    translation_failure_generations: list[int | None] = []
+    success_generations: list[int | None] = []
+    close_calls: list[str] = []
+    dialog = SimpleNamespace(
+        qq_identity="qq-user-123",
+        credential="a" * 64,
+        auth_generation=17,
+        set_waiting=lambda: None,
+        set_recoverable_error=lambda message_key, **kwargs: recoverable_calls.append(
+            {"message_key": message_key, **kwargs}
+        )
+        or True,
+        complete_translation_enable_failed=lambda *, generation=None: (
+            translation_failure_generations.append(generation) or True
+        ),
+        complete_success=lambda *, generation=None: success_generations.append(generation) or True,
+        close=lambda: close_calls.append("close"),
+    )
+    app._qq_managed_auth_dialog = dialog
+    enable_calls: list[bool] = []
+    dashboard_translation_calls: list[bool] = []
+    app.view_dashboard = SimpleNamespace(
+        set_translation_enabled=lambda enabled: dashboard_translation_calls.append(enabled)
+    )
+    app._show_snackbar = lambda _message, _color: pytest.fail(
+        "translation-enable exception should complete through dialog failure path"
+    )
+
+    async def fake_start_qq_managed_auth_from_dialog(**_kwargs) -> bool:
+        return True
+
+    async def fake_set_translation_enabled(enabled: bool) -> bool:
+        enable_calls.append(enabled)
+        raise RuntimeError("UNSAFE_QQ_ENABLE_EXCEPTION_DETAIL")
+
+    app.controller = SimpleNamespace(
+        start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
+        set_translation_enabled=fake_set_translation_enabled,
+    )
+
+    app._start_qq_managed_auth()
+    await app.page.tasks[0]()
+
+    assert enable_calls == [True]
+    assert translation_failure_generations == [17]
+    assert recoverable_calls == []
+    assert success_generations == []
+    assert dashboard_translation_calls == []
+    assert close_calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_stage", ["auth", "enable"])
+async def test_start_qq_managed_auth_exception_logs_do_not_include_raw_message(
+    caplog: pytest.LogCaptureFixture,
+    failure_stage: str,
+) -> None:
+    caplog.set_level(app_module.logging.ERROR, logger="puripuly_heart.ui.app")
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    raw_message = f"UNSAFE_QQ_{failure_stage.upper()}_EXCEPTION_DETAIL"
+    dialog = SimpleNamespace(
+        qq_identity="qq-user-123",
+        credential="a" * 64,
+        auth_generation=17,
+        set_waiting=lambda: None,
+        set_recoverable_error=lambda *_args, **_kwargs: True,
+        complete_translation_enable_failed=lambda *, generation=None: True,
+        close=lambda: None,
+    )
+    app._qq_managed_auth_dialog = dialog
+    app.view_dashboard = SimpleNamespace(set_translation_enabled=lambda _enabled: None)
+    app._show_snackbar = lambda _message, _color: None
+
+    async def fake_start_qq_managed_auth_from_dialog(**_kwargs) -> bool:
+        if failure_stage == "auth":
+            raise RuntimeError(raw_message)
+        return True
+
+    async def fake_set_translation_enabled(_enabled: bool) -> bool:
+        if failure_stage == "enable":
+            raise RuntimeError(raw_message)
+        return True
+
+    app.controller = SimpleNamespace(
+        start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
+        set_translation_enabled=fake_set_translation_enabled,
+    )
+
+    app._start_qq_managed_auth()
+    await app.page.tasks[0]()
+
+    assert raw_message not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_start_qq_managed_auth_late_success_after_close_does_not_enable_translation() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    completion_generations: list[int | None] = []
+    close_calls: list[str] = []
+    recoverable_calls: list[str] = []
+    translation_failure_generations: list[int | None] = []
+    dialog = SimpleNamespace(
+        qq_identity="qq-user-123",
+        credential="a" * 64,
+        auth_generation=17,
+        is_open=True,
+        set_waiting=lambda: None,
+        set_recoverable_error=lambda message_key, **_kwargs: recoverable_calls.append(message_key)
+        or True,
+        complete_translation_enable_failed=lambda *, generation=None: (
+            translation_failure_generations.append(generation) or True
+        ),
+        complete_success=lambda *, generation=None: (
+            completion_generations.append(generation) and False
+        ),
+        close=lambda: close_calls.append("close"),
+    )
+    app._qq_managed_auth_dialog = dialog
+    enable_calls: list[bool] = []
+    dashboard_translation_calls: list[bool] = []
+    hub = SimpleNamespace(llm=object(), translation_enabled=False)
+    app.view_dashboard = SimpleNamespace(
+        set_translation_enabled=lambda enabled: dashboard_translation_calls.append(enabled)
+    )
+    app._show_snackbar = lambda _message, _color: pytest.fail(
+        "stale QQ success should not show success"
+    )
+    start_entered = asyncio.Event()
+    release_start = asyncio.Event()
+
+    async def fake_start_qq_managed_auth_from_dialog(**_kwargs) -> bool:
+        start_entered.set()
+        await release_start.wait()
+        return True
+
+    async def fake_set_translation_enabled(enabled: bool) -> bool:
+        enable_calls.append(enabled)
+        hub.translation_enabled = enabled
+        return True
+
+    app.controller = SimpleNamespace(
+        hub=hub,
+        start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
+        set_translation_enabled=fake_set_translation_enabled,
+    )
+
+    app._start_qq_managed_auth()
+    task = asyncio.create_task(app.page.tasks[0]())
+    await start_entered.wait()
+    dialog.auth_generation = 18
+    dialog.is_open = False
+    release_start.set()
+    await task
+
+    assert enable_calls == []
+    assert dashboard_translation_calls == []
+    assert completion_generations == []
+    assert translation_failure_generations == []
+    assert recoverable_calls == []
+    assert close_calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_mode", ["false", "exception"])
+async def test_start_qq_managed_auth_recoverable_failure_keeps_dialog_open(
+    failure_mode: str,
+) -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    recoverable_calls: list[dict[str, object]] = []
+    close_calls: list[str] = []
+    dialog = SimpleNamespace(
+        qq_identity="qq-user-123",
+        credential="a" * 64,
+        auth_generation=17,
+        set_waiting=lambda: None,
+        set_recoverable_error=lambda message_key, **kwargs: recoverable_calls.append(
+            {"message_key": message_key, **kwargs}
+        )
+        or True,
+        close=lambda: close_calls.append("close"),
+    )
+    app._qq_managed_auth_dialog = dialog
+    enable_calls: list[bool] = []
+    dashboard_translation_calls: list[bool] = []
+    app.view_dashboard = SimpleNamespace(
+        set_translation_enabled=lambda enabled: dashboard_translation_calls.append(enabled)
+    )
+    app._show_snackbar = lambda _message, _color: pytest.fail(
+        "recoverable QQ auth failure should stay in the dialog"
+    )
+
+    async def fake_start_qq_managed_auth_from_dialog(**_kwargs) -> bool:
+        if failure_mode == "exception":
+            raise RuntimeError("network unavailable")
+        return False
+
+    async def fake_set_translation_enabled(enabled: bool) -> None:
+        enable_calls.append(enabled)
+
+    app.controller = SimpleNamespace(
+        start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
+        set_translation_enabled=fake_set_translation_enabled,
+    )
+
+    app._start_qq_managed_auth()
+    await app.page.tasks[0]()
+
+    assert recoverable_calls == [
+        {
+            "message_key": "qq_auth.error.retry",
+            "clear_credential": False,
+            "message_kwargs": {},
+            "generation": 17,
+        }
+    ]
+    assert enable_calls == []
+    assert dashboard_translation_calls == []
+    assert close_calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("subcode", "message_key", "message_kwargs", "expected_clear", "expected_kwargs"),
+    [
+        (
+            "qq_credential_invalid",
+            "qq_auth.error.credential_mismatch",
+            {},
+            True,
+            {},
+        ),
+        (
+            "qq_credential_mismatch",
+            "qq_auth.error.credential_mismatch",
+            {},
+            True,
+            {},
+        ),
+        (
+            "ip_rate_limited",
+            "qq_auth.error.retry",
+            {"retry_after_ms": 999_999_999, "details": "raw broker detail"},
+            False,
+            {"retry_after_ms": 86_400_000},
+        ),
+    ],
+)
+async def test_start_qq_managed_auth_result_like_recoverable_errors_update_dialog(
+    subcode: str,
+    message_key: str,
+    message_kwargs: dict[str, object],
+    expected_clear: bool,
+    expected_kwargs: dict[str, object],
+) -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    recoverable_calls: list[dict[str, object]] = []
+    close_calls: list[str] = []
+    dialog = SimpleNamespace(
+        qq_identity="qq-user-123",
+        credential="a" * 64,
+        auth_generation=17,
+        set_waiting=lambda: None,
+        set_recoverable_error=lambda message_key, **kwargs: recoverable_calls.append(
+            {"message_key": message_key, **kwargs}
+        )
+        or True,
+        close=lambda: close_calls.append("close"),
+    )
+    app._qq_managed_auth_dialog = dialog
+    enable_calls: list[bool] = []
+    dashboard_translation_calls: list[bool] = []
+    app.view_dashboard = SimpleNamespace(
+        set_translation_enabled=lambda enabled: dashboard_translation_calls.append(enabled)
+    )
+    app._show_snackbar = lambda _message, _color: pytest.fail(
+        "recoverable QQ auth failure should stay in the dialog"
+    )
+    result = SimpleNamespace(
+        message_key=message_key,
+        message_kwargs=message_kwargs,
+        diagnostics=SimpleNamespace(subcode=subcode),
+    )
+
+    async def fake_start_qq_managed_auth_from_dialog(**_kwargs):
+        return result
+
+    async def fake_set_translation_enabled(enabled: bool) -> None:
+        enable_calls.append(enabled)
+
+    app.controller = SimpleNamespace(
+        start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
+        set_translation_enabled=fake_set_translation_enabled,
+    )
+
+    app._start_qq_managed_auth()
+    await app.page.tasks[0]()
+
+    assert recoverable_calls == [
+        {
+            "message_key": message_key,
+            "clear_credential": expected_clear,
+            "message_kwargs": expected_kwargs,
+            "generation": 17,
+        }
+    ]
+    assert enable_calls == []
+    assert dashboard_translation_calls == []
+    assert close_calls == []
+
+
+@pytest.mark.asyncio
+async def test_start_qq_managed_auth_ignored_success_completion_does_not_mutate_ui() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    completion_generations: list[int | None] = []
+    close_calls: list[str] = []
+    dialog = SimpleNamespace(
+        qq_identity="qq-user-123",
+        credential="a" * 64,
+        auth_generation=17,
+        set_waiting=lambda: None,
+        complete_success=lambda *, generation=None: (
+            completion_generations.append(generation) and False
+        ),
+        close=lambda: close_calls.append("close"),
+    )
+    app._qq_managed_auth_dialog = dialog
+    enable_calls: list[bool] = []
+    dashboard_translation_calls: list[bool] = []
+    hub = SimpleNamespace(llm=object(), translation_enabled=False)
+    app.view_dashboard = SimpleNamespace(
+        set_translation_enabled=lambda enabled: dashboard_translation_calls.append(enabled)
+    )
+    app._show_snackbar = lambda _message, _color: pytest.fail(
+        "stale QQ completion should not show success"
+    )
+
+    async def fake_start_qq_managed_auth_from_dialog(**_kwargs) -> bool:
+        return True
+
+    async def fake_set_translation_enabled(enabled: bool) -> bool:
+        enable_calls.append(enabled)
+        hub.translation_enabled = enabled
+        return True
+
+    app.controller = SimpleNamespace(
+        hub=hub,
+        start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
+        set_translation_enabled=fake_set_translation_enabled,
+    )
+
+    app._start_qq_managed_auth()
+    await app.page.tasks[0]()
+
+    assert completion_generations == [17]
+    assert enable_calls == [True]
+    assert dashboard_translation_calls == []
+    assert close_calls == []
+
+
+@pytest.mark.asyncio
+async def test_cancel_qq_managed_auth_prevents_late_failure_side_effects() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    close_calls: list[str] = []
+    recoverable_calls: list[dict[str, object]] = []
+    key_unavailable_generations: list[int | None] = []
+    dialog = SimpleNamespace(
+        qq_identity="qq-synthetic-user",
+        credential="a" * 64,
+        auth_generation=17,
+        is_open=True,
+        set_waiting=lambda: None,
+        set_recoverable_error=lambda message_key, **kwargs: recoverable_calls.append(
+            {"message_key": message_key, **kwargs}
+        )
+        or True,
+        complete_key_unavailable=lambda *, generation=None: (
+            key_unavailable_generations.append(generation) or True
+        ),
+        close=lambda: close_calls.append("close"),
+    )
+    app._qq_managed_auth_dialog = dialog
+    snackbar_calls: list[tuple[str, object]] = []
+    enable_calls: list[bool] = []
+    dashboard_translation_calls: list[bool] = []
+    cancel_calls: list[str] = []
+    app.view_dashboard = SimpleNamespace(
+        set_translation_enabled=lambda enabled: dashboard_translation_calls.append(enabled)
+    )
+    app._show_snackbar = lambda message, color: snackbar_calls.append((message, color))
+    start_entered = asyncio.Event()
+    release_start = asyncio.Event()
+    late_result = SimpleNamespace(
+        message_key="qq_auth.error.credential_mismatch",
+        message_kwargs={},
+        diagnostics=SimpleNamespace(subcode="qq_credential_invalid"),
+    )
+
+    async def fake_start_qq_managed_auth_from_dialog(**_kwargs):
+        start_entered.set()
+        await release_start.wait()
+        return late_result
+
+    async def fake_set_translation_enabled(enabled: bool) -> bool:
+        enable_calls.append(enabled)
+        return True
+
+    app.controller = SimpleNamespace(
+        start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
+        set_translation_enabled=fake_set_translation_enabled,
+        cancel_qq_managed_auth=lambda: cancel_calls.append("cancel"),
+    )
+
+    app._start_qq_managed_auth()
+    task = asyncio.create_task(app.page.tasks[0]())
+    await start_entered.wait()
+
+    app._cancel_qq_managed_auth()
+    release_start.set()
+    await task
+
+    assert close_calls == ["close"]
+    assert cancel_calls == ["cancel"]
+    assert recoverable_calls == []
+    assert key_unavailable_generations == []
+    assert snackbar_calls == []
+    assert enable_calls == []
+    assert dashboard_translation_calls == []
+
+
+@pytest.mark.asyncio
+async def test_start_qq_managed_auth_stale_failure_does_not_mutate_ui() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    recoverable_calls: list[dict[str, object]] = []
+    close_calls: list[str] = []
+    dialog = SimpleNamespace(
+        qq_identity="qq-synthetic-user",
+        credential="a" * 64,
+        auth_generation=17,
+        is_open=True,
+        set_waiting=lambda: None,
+        set_recoverable_error=lambda message_key, **kwargs: recoverable_calls.append(
+            {"message_key": message_key, **kwargs}
+        )
+        or True,
+        close=lambda: close_calls.append("close"),
+    )
+    app._qq_managed_auth_dialog = dialog
+    snackbar_calls: list[tuple[str, object]] = []
+    enable_calls: list[bool] = []
+    dashboard_translation_calls: list[bool] = []
+    app.view_dashboard = SimpleNamespace(
+        set_translation_enabled=lambda enabled: dashboard_translation_calls.append(enabled)
+    )
+    app._show_snackbar = lambda message, color: snackbar_calls.append((message, color))
+    start_entered = asyncio.Event()
+    release_start = asyncio.Event()
+    stale_result = SimpleNamespace(
+        message_key="qq_auth.error.credential_mismatch",
+        message_kwargs={},
+        diagnostics=SimpleNamespace(subcode="qq_credential_invalid"),
+    )
+
+    async def fake_start_qq_managed_auth_from_dialog(**_kwargs):
+        start_entered.set()
+        await release_start.wait()
+        return stale_result
+
+    async def fake_set_translation_enabled(enabled: bool) -> bool:
+        enable_calls.append(enabled)
+        return True
+
+    app.controller = SimpleNamespace(
+        start_qq_managed_auth_from_dialog=fake_start_qq_managed_auth_from_dialog,
+        set_translation_enabled=fake_set_translation_enabled,
+    )
+
+    app._start_qq_managed_auth()
+    task = asyncio.create_task(app.page.tasks[0]())
+    await start_entered.wait()
+    dialog.auth_generation = 18
+    release_start.set()
+    await task
+
+    assert recoverable_calls == []
+    assert snackbar_calls == []
+    assert enable_calls == []
+    assert dashboard_translation_calls == []
+    assert close_calls == []
+
+
+@pytest.mark.asyncio
 async def test_cancel_discord_managed_auth_prevents_late_success_and_enable() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
@@ -2825,6 +3429,36 @@ async def test_submit_toggle_and_settings_wrappers_schedule_controller_tasks() -
         ("apply_settings", "settings"),
         ("apply_providers", True),
     ]
+
+
+@pytest.mark.asyncio
+async def test_providers_changed_managed_china_uses_normalized_key_gate_for_qq_prompt() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    app.view_settings = SimpleNamespace(has_provider_changes=False)
+    app.view_dashboard = SimpleNamespace()
+    app.view_logs = SimpleNamespace(scroll_to_bottom=lambda: asyncio.sleep(0))
+    app.content_area = DummyContent()
+    prompts: list[bool] = []
+
+    async def fake_apply_providers(_settings=None) -> None:
+        return None
+
+    app.controller = SimpleNamespace(
+        apply_providers=fake_apply_providers,
+        _is_managed_china_connection=lambda: True,
+        _managed_openrouter_local_key_available=lambda: False,
+        _managed_qq_key_available=lambda: pytest.fail(
+            "settings apply should use normalized managed key resolution"
+        ),
+    )
+    app.show_qq_managed_auth_dialog = lambda preview=False: prompts.append(preview)
+
+    app._on_providers_changed()
+
+    assert len(app.page.tasks) == 1
+    await app.page.tasks[0]()
+    assert prompts == [False]
 
 
 @pytest.mark.asyncio

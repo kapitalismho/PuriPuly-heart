@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 from collections.abc import Callable
 
 import httpx
@@ -450,6 +451,316 @@ async def test_issue_discord_managed_key_parses_talk_together_pass_status() -> N
         invite_limit=5,
         bonus_translations_per_friend=200,
     )
+    await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["verified", "already_verified"])
+async def test_assert_qq_credential_parses_verified_only_success_without_issue(
+    status: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    qq_identity = "qq-test-identity-sentinel"
+    credential = "a" * 64
+    asserted_at = "2026-06-09T06:00:45.000Z"
+    subject_ref = "ph-qq-subject-v1_test-subject-sentinel"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/v1/auth/qq/assert"
+        assert json.loads(request.content) == {
+            "qq_identity": qq_identity,
+            "credential": credential,
+            "asserted_at": asserted_at,
+        }
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "status": status,
+                "qq_subject_ref": subject_ref,
+            },
+        )
+
+    client, _transport = _build_client(handler)
+    caplog.set_level(
+        logging.INFO,
+        logger="puripuly_heart.core.managed_openrouter_broker_client",
+    )
+
+    result = await client.assert_qq_credential(
+        qq_identity=qq_identity,
+        credential=credential,
+        asserted_at=asserted_at,
+    )
+
+    assert result.status == status
+    assert result.qq_subject_ref == subject_ref
+    assert result.issue is None
+    for sensitive in (qq_identity, credential, subject_ref):
+        assert sensitive not in caplog.text
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_assert_qq_credential_parses_top_level_key_bearing_success_as_issued(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    qq_identity = "qq-key-identity-sentinel"
+    credential = "b" * 64
+    asserted_at = "2026-06-09T06:00:45.000Z"
+    subject_ref = "ph-qq-subject-v1_key-subject-sentinel"
+    raw_openrouter_key = "  managed-openrouter-api-key-qq  "
+    openrouter_key = raw_openrouter_key.strip()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content) == {
+            "qq_identity": qq_identity,
+            "credential": credential,
+            "asserted_at": asserted_at,
+        }
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "status": "verified",
+                "qq_subject_ref": subject_ref,
+                "openrouter_api_key": raw_openrouter_key,
+                "managed_credential_ref": "managed-credential-ref-qq",
+                "expires_at": None,
+                "openrouter_user_id": " user-qq ",
+            },
+        )
+
+    client, _transport = _build_client(handler)
+    caplog.set_level(
+        logging.INFO,
+        logger="puripuly_heart.core.managed_openrouter_broker_client",
+    )
+
+    result = await client.assert_qq_credential(
+        qq_identity=qq_identity,
+        credential=credential,
+        asserted_at=asserted_at,
+    )
+
+    assert result.status == "issued"
+    assert result.qq_subject_ref == subject_ref
+    assert result.issue == ManagedOpenRouterIssueSuccess(
+        openrouter_api_key=openrouter_key,
+        managed_credential_ref="managed-credential-ref-qq",
+        expires_at=None,
+        openrouter_user_id="user-qq",
+    )
+    assert result.issue is not None
+    assert openrouter_key not in repr(result)
+    assert openrouter_key not in repr(result.issue)
+    assert subject_ref not in repr(result)
+    for sensitive in (qq_identity, credential, subject_ref, openrouter_key):
+        assert sensitive not in caplog.text
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_assert_qq_credential_blank_key_field_remains_verified_only() -> None:
+    subject_ref = "ph-qq-subject-v1_blank-key-subject-sentinel"
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "status": "already_verified",
+                "qq_subject_ref": subject_ref,
+                "openrouter_api_key": "   ",
+                "managed_credential_ref": "managed-credential-ref-must-not-be-used",
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.assert_qq_credential(
+        qq_identity="qq-blank-key-identity-sentinel",
+        credential="c" * 64,
+        asserted_at="2026-06-09T06:00:45.000Z",
+    )
+
+    assert result.status == "already_verified"
+    assert result.qq_subject_ref == subject_ref
+    assert result.issue is None
+    await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("openrouter_api_key", [123, True, {"value": "managed-key"}])
+async def test_assert_qq_credential_rejects_present_non_string_openrouter_api_key(
+    openrouter_api_key: object,
+) -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "status": "verified",
+                "qq_subject_ref": "ph-qq-subject-v1_non-string-key-test-sentinel",
+                "openrouter_api_key": openrouter_api_key,
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    with pytest.raises(ManagedOpenRouterReleaseError) as exc_info:
+        await client.assert_qq_credential(
+            qq_identity="qq-non-string-key-identity-sentinel",
+            credential="1" * 64,
+            asserted_at="2026-06-09T06:00:45.000Z",
+        )
+
+    assert exc_info.value.operation == "qq_assert"
+    assert exc_info.value.code == "trial_unavailable"
+    assert exc_info.value.error_class == "retryable"
+    assert "malformed QQ assertion payload" in exc_info.value.message
+    await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("subcode", ["qq_credential_invalid", "qq_credential_mismatch"])
+async def test_assert_qq_credential_preserves_bounded_credential_subcodes_and_redacts_message(
+    subcode: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    qq_identity = "qq-error-identity-sentinel"
+    credential = "d" * 64
+    raw_broker_message = f"raw broker message mentions {qq_identity} and {credential}"
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            403,
+            json={
+                "error": {
+                    "code": "trial_not_eligible",
+                    "class": "terminal",
+                    "subcode": subcode,
+                    "retry_after_ms": None,
+                    "message": raw_broker_message,
+                    "details": {"credential": credential},
+                }
+            },
+        )
+
+    client, _transport = _build_client(handler)
+    caplog.set_level(
+        logging.INFO,
+        logger="puripuly_heart.core.managed_openrouter_broker_client",
+    )
+
+    with pytest.raises(ManagedOpenRouterReleaseError) as exc_info:
+        await client.assert_qq_credential(
+            qq_identity=qq_identity,
+            credential=credential,
+            asserted_at="2026-06-09T06:00:45.000Z",
+        )
+
+    assert exc_info.value.operation == "qq_assert"
+    assert exc_info.value.subcode == subcode
+    assert exc_info.value.message == "QQ credential verification failed"
+    error_text = str(exc_info.value)
+    assert raw_broker_message not in error_text
+    assert qq_identity not in error_text
+    assert credential not in error_text
+    diagnostics_text = repr(exc_info.value.to_diagnostics())
+    for sensitive in (raw_broker_message, qq_identity, credential):
+        assert sensitive not in caplog.text
+        assert sensitive not in diagnostics_text
+    await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_class", ["retryable", "terminal", "security_fail"])
+async def test_assert_qq_credential_maps_ip_rate_limited_with_sanitized_retry_timing(
+    error_class: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    qq_identity = "qq-rate-limit-identity-sentinel"
+    credential = "e" * 64
+    raw_broker_message = "raw Broker rate-limit message with operational detail"
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            429,
+            json={
+                "error": {
+                    "code": "rate_limited",
+                    "class": error_class,
+                    "subcode": "ip_rate_limited",
+                    "retry_after_ms": -250,
+                    "message": raw_broker_message,
+                    "details": {"retryAfterMs": -250, "credential": credential},
+                }
+            },
+        )
+
+    client, _transport = _build_client(handler)
+    caplog.set_level(
+        logging.INFO,
+        logger="puripuly_heart.core.managed_openrouter_broker_client",
+    )
+
+    with pytest.raises(ManagedOpenRouterReleaseError) as exc_info:
+        await client.assert_qq_credential(
+            qq_identity=qq_identity,
+            credential=credential,
+            asserted_at="2026-06-09T06:00:45.000Z",
+        )
+
+    assert exc_info.value.operation == "qq_assert"
+    assert exc_info.value.code == "rate_limited"
+    assert exc_info.value.error_class == error_class
+    assert exc_info.value.subcode == "ip_rate_limited"
+    assert exc_info.value.retry_after_ms == 0
+    assert exc_info.value.message == "QQ credential verification is rate limited"
+    assert raw_broker_message not in str(exc_info.value)
+    diagnostics_text = repr(exc_info.value.to_diagnostics())
+    for sensitive in (raw_broker_message, qq_identity, credential):
+        assert sensitive not in caplog.text
+        assert sensitive not in diagnostics_text
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_assert_qq_credential_drops_unknown_subcode_and_redacts_error_details() -> None:
+    raw_subcode = "qq_unbounded_sensitive_subcode"
+    raw_broker_message = "raw Broker details include ph-qq-subject-v1_error-subject-sentinel"
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            json={
+                "error": {
+                    "code": "invalid_request",
+                    "class": "terminal",
+                    "subcode": raw_subcode,
+                    "retry_after_ms": None,
+                    "message": raw_broker_message,
+                    "details": {"qq_subject_ref": "ph-qq-subject-v1_error-subject-sentinel"},
+                }
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    with pytest.raises(ManagedOpenRouterReleaseError) as exc_info:
+        await client.assert_qq_credential(
+            qq_identity="qq-unknown-subcode-identity-sentinel",
+            credential="f" * 64,
+            asserted_at="2026-06-09T06:00:45.000Z",
+        )
+
+    assert exc_info.value.operation == "qq_assert"
+    assert exc_info.value.subcode is None
+    assert exc_info.value.message == "QQ credential verification failed"
+    assert raw_subcode not in str(exc_info.value)
+    assert raw_broker_message not in str(exc_info.value)
     await client.close()
 
 
@@ -1164,6 +1475,35 @@ def test_rejects_broker_base_url_with_path_prefix() -> None:
             lambda _request: httpx.Response(200, json={}),
             base_url="https://broker.example.test/prefix",
         )
+
+
+@pytest.mark.parametrize(
+    ("base_url", "message"),
+    [
+        ("http://broker.example.test", "HTTPS"),
+        ("https://user:pass@broker.example.test", "userinfo"),
+        ("https://broker.example.test?debug=true", "query"),
+    ],
+)
+def test_rejects_unsafe_real_broker_base_url_shapes(
+    base_url: str,
+    message: str,
+) -> None:
+    from puripuly_heart.core.managed_openrouter_broker_client import (
+        HttpManagedOpenRouterBrokerClient,
+    )
+
+    with pytest.raises(ValueError, match=message):
+        HttpManagedOpenRouterBrokerClient(base_url=base_url, timeout=1.0)
+
+
+def test_allows_non_https_broker_base_url_with_injected_transport() -> None:
+    client, _transport = _build_client(
+        lambda _request: httpx.Response(200, json={}),
+        base_url="http://127.0.0.1:8787",
+    )
+
+    assert client.base_url == "http://127.0.0.1:8787"
 
 
 @pytest.mark.asyncio

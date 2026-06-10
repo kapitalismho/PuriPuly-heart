@@ -34,6 +34,52 @@ GITHUB_STAR_SNACKBAR_KEYS = (
     "github_star.snackbar.action",
 )
 OVERLAY_STEAMVR_NOT_RUNNING_KEY = "settings.overlay.failure.steamvr_not_running"
+REQUIRED_QQ_RUNTIME_I18N_KEYS = frozenset(
+    {
+        "qq_auth.body",
+        "qq_auth.submit",
+        "qq_auth.close",
+        "qq_auth.cancel",
+        "qq_auth.waiting_body",
+        "qq_auth.success",
+        "qq_auth.qq_identity.label",
+        "qq_auth.qq_identity.helper",
+        "qq_auth.credential.label",
+        "qq_auth.credential.helper",
+        "qq_auth.error.invalid_input",
+        "qq_auth.error.credential_mismatch",
+        "qq_auth.error.lifetime_used",
+        "qq_auth.error.retry",
+        "qq_auth.error.key_unavailable",
+    }
+)
+QQ_RUNTIME_KEYS_REQUIRED_IN_SOURCE = frozenset(
+    {
+        "qq_auth.cancel",
+        "qq_auth.success",
+        "qq_auth.error.key_unavailable",
+    }
+)
+NON_CHINESE_QQ_COPY_LOCALES = ("en", "ja", "ko")
+EXPECTED_LOCALIZED_QQ_GROUP_NUMBER_COPY = {
+    "en": "QQ group number 647594597",
+    "ja": "QQグループ番号 647594597",
+    "ko": "QQ 그룹 번호 647594597",
+}
+FORBIDDEN_QQ_IMMEDIATE_PROMISE_FRAGMENTS = {
+    "en": (
+        "receive it right after QQ verification",
+        "right after QQ verification",
+        "immediately after QQ verification",
+    ),
+    "ja": ("QQ認証後、すぐに付与", "すぐに付与されます", "即時発行"),
+    "ko": ("QQ 인증 후 바로 발급", "바로 발급돼요", "즉시 발급"),
+    "zh-CN": ("完成 QQ 认证后会立即发放", "立即发放", "马上发放"),
+}
+FORBIDDEN_EN_QQ_PRIVACY_PROMISES = (
+    "We don't keep personal information",
+    "We do not keep personal information",
+)
 
 EXPECTED_GITHUB_STAR_SNACKBAR_KO_COPY = {
     "github_star.snackbar.message": "PuriPuly가 도움이 됐다면 GitHub에서 Star를 눌러주세요! 큰 힘이 되어요!",
@@ -429,6 +475,85 @@ def test_managed_key_card_keys_are_localized() -> None:
             value = bundle[key]
             assert "Referral ID" not in value, (locale_name, key, value)
             assert "Referral reward" not in value, (locale_name, key, value)
+
+
+def test_qq_key_unavailable_error_key_is_localized_for_all_supported_locales() -> None:
+    bundles = _load_bundles()
+    runtime_source = _runtime_python_source()
+    key = "qq_auth.error.key_unavailable"
+
+    assert key in runtime_source
+    for locale, bundle in bundles.items():
+        assert key in bundle, locale
+        assert bundle[key].strip()
+        assert bundle[key] != key
+
+
+def test_required_qq_runtime_keys_are_localized_for_all_supported_locales() -> None:
+    bundles = _load_bundles()
+
+    assert set(bundles) == set(available_locales())
+    for locale, bundle in bundles.items():
+        missing = sorted(REQUIRED_QQ_RUNTIME_I18N_KEYS - set(bundle))
+        assert missing == [], locale
+        for key in REQUIRED_QQ_RUNTIME_I18N_KEYS:
+            assert bundle[key].strip(), (locale, key)
+            assert bundle[key] != key, (locale, key)
+
+
+def test_qq_runtime_completion_keys_are_used_and_not_allowlisted() -> None:
+    runtime_source = _runtime_python_source()
+
+    for key in QQ_RUNTIME_KEYS_REQUIRED_IN_SOURCE:
+        assert key not in TEMPORARILY_ALLOWED_UNREFERENCED_I18N_KEYS
+        assert key in runtime_source
+
+    assert (
+        _unused_i18n_keys(
+            sorted(QQ_RUNTIME_KEYS_REQUIRED_IN_SOURCE),
+            runtime_source,
+        )
+        == []
+    )
+
+
+def test_qq_auth_body_copy_distinguishes_verification_from_key_issuance() -> None:
+    bundles = _load_bundles()
+    english_body = bundles["en"]["qq_auth.body"]
+
+    assert "PuriPuly Broker" in english_body
+    assert "verify eligibility" in english_body
+    assert "when available" in english_body
+    assert "issue a Managed key" in english_body
+    assert "does not persist the raw QQ" in english_body
+    assert "stores only the Managed key" in english_body
+    for forbidden in FORBIDDEN_EN_QQ_PRIVACY_PROMISES:
+        assert forbidden not in english_body
+
+    for locale, fragments in FORBIDDEN_QQ_IMMEDIATE_PROMISE_FRAGMENTS.items():
+        qq_copy = "\n".join(
+            bundles[locale][key]
+            for key in (
+                "qq_auth.body",
+                "qq_auth.waiting_body",
+                "qq_auth.success",
+                "qq_auth.error.key_unavailable",
+            )
+        )
+        for fragment in fragments:
+            assert fragment not in qq_copy, (locale, fragment)
+
+
+def test_non_chinese_qq_auth_copy_localizes_group_number_reference() -> None:
+    bundles = _load_bundles()
+
+    for locale in NON_CHINESE_QQ_COPY_LOCALES:
+        body = bundles[locale]["qq_auth.body"]
+        assert "群号" not in body, locale
+        assert "群號" not in body, locale
+        assert "（群" not in body, locale
+        if "647594597" in body:
+            assert EXPECTED_LOCALIZED_QQ_GROUP_NUMBER_COPY[locale] in body
 
 
 def test_i18n_bundles_do_not_keep_unused_runtime_keys() -> None:
