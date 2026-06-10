@@ -10,12 +10,18 @@ import {
   internalErrorResponse,
 } from './broker-error';
 import type { BrokerEnv } from './contract';
-import { nonEmptyString } from './public-input';
+import { stringValue } from './public-input';
 
 const QQ_AUTH_ASSERT_ENDPOINT = 'POST /v1/auth/qq/assert';
 const QQ_SUBJECT_REF_PREFIX = 'ph-qq-subject-v1_';
 const QQ_SUBJECT_REF_PAYLOAD_PREFIX = 'puripuly-heart:qq-subject:v1';
 const CREDENTIAL_HASH_PREFIX = 'sha256-base64url-v1_';
+const QQ_IDENTITY_MAX_LENGTH = 2048;
+const ASSERTED_AT_MAX_LENGTH = 64;
+const QQ_CREDENTIAL_PATTERN = /^[0-9a-f]{64}$/u;
+const STRICT_ISO_8601_TIMESTAMP =
+  /^(?<year>\d{4})-(?<month>0[1-9]|1[0-2])-(?<day>0[1-9]|[12]\d|3[01])T(?<hour>[01]\d|2[0-3]):(?<minute>[0-5]\d):(?<second>[0-5]\d)(?:\.(?<millisecond>\d{3}))?(?:(?<utc>Z)|(?<offsetSign>[+-])(?<offsetHour>[01]\d|2[0-3]):(?<offsetMinute>[0-5]\d))$/u;
+const CONTROL_OR_NEWLINE_PATTERN = /[\p{Cc}\r\n\u0085\u2028\u2029]/u;
 const textEncoder = new TextEncoder();
 
 interface QqAuthAssertRequestBody {
@@ -69,8 +75,8 @@ export async function handleQqAuthAssert(
     return invalidRequestResponse(c, input.message);
   }
 
-  const hmacPsk = c.env.QQ_AUTH_HMAC_PSK;
-  if (hmacPsk.trim().length === 0) {
+  const hmacPsk = stringValue(c.env.QQ_AUTH_HMAC_PSK);
+  if (!hmacPsk || hmacPsk.trim().length === 0) {
     return internalErrorResponse(c);
   }
 
@@ -101,10 +107,40 @@ export async function handleQqAuthAssert(
     .bind(qqSubjectRef, credentialHash, input.value.assertedAt)
     .run();
 
+  if (!isQqIssuanceRuntimeEnabled(c.env)) {
+    return legacyVerificationResponse(c, {
+      insertResult,
+      qqSubjectRef,
+    });
+  }
+
+  // Production issuance is intentionally gated until the reservation/OpenRouter
+  // lifecycle is implemented. Do not return legacy readiness when issuance is on.
+  return internalErrorResponse(c);
+}
+
+function isQqIssuanceRuntimeEnabled(env: BrokerEnv['Bindings']): boolean {
+  return (
+    isPresentRuntimeSecret(env.OPENROUTER_MANAGEMENT_API_KEY) &&
+    isPresentRuntimeSecret(env.OPENROUTER_MANAGED_GUARDRAIL_ID)
+  );
+}
+
+function isPresentRuntimeSecret(value: unknown): boolean {
+  return stringValue(value)?.trim().length ? true : false;
+}
+
+function legacyVerificationResponse(
+  c: Context<BrokerEnv>,
+  input: { insertResult: D1Result; qqSubjectRef: string },
+): Response {
   return c.json({
     ok: true,
-    status: Number(insertResult.meta.changes ?? 0) > 0 ? 'verified' : 'already_verified',
-    qq_subject_ref: qqSubjectRef,
+    status:
+      Number(input.insertResult.meta.changes ?? 0) > 0
+        ? 'verified'
+        : 'already_verified',
+    qq_subject_ref: input.qqSubjectRef,
   });
 }
 
@@ -113,14 +149,34 @@ function validateQqAuthAssertInput(
 ):
   | { ok: true; value: QqAuthAssertInput }
   | { ok: false; message: string } {
-  const qqIdentity = nonEmptyString(body.qq_identity);
-  const credential = nonEmptyString(body.credential);
-  const assertedAt = nonEmptyString(body.asserted_at);
+  const qqIdentity = stringValue(body.qq_identity);
+  const credential = stringValue(body.credential);
+  const assertedAt = stringValue(body.asserted_at);
 
-  if (!qqIdentity || !credential || !assertedAt) {
+  if (qqIdentity === null || credential === null || assertedAt === null) {
     return {
       ok: false,
       message: 'qq_identity, credential, and asserted_at are required',
+    };
+  }
+
+  const qqIdentityError = validateQqIdentity(qqIdentity);
+  if (qqIdentityError) {
+    return { ok: false, message: qqIdentityError };
+  }
+
+  if (!QQ_CREDENTIAL_PATTERN.test(credential)) {
+    return {
+      ok: false,
+      message: 'credential must be exactly 64 lowercase hexadecimal characters',
+    };
+  }
+
+  const assertedAtDate = parseStrictIsoDate(assertedAt);
+  if (!assertedAtDate) {
+    return {
+      ok: false,
+      message: 'asserted_at must be a valid ISO-8601 timestamp',
     };
   }
 
@@ -129,9 +185,71 @@ function validateQqAuthAssertInput(
     value: {
       qqIdentity,
       credential,
-      assertedAt,
+      assertedAt: assertedAtDate.toISOString(),
     },
   };
+}
+
+function validateQqIdentity(value: string): string | null {
+  const characterCount = Array.from(value).length;
+  if (
+    value.trim().length === 0 ||
+    characterCount < 1 ||
+    characterCount > QQ_IDENTITY_MAX_LENGTH
+  ) {
+    return `qq_identity must be between 1 and ${QQ_IDENTITY_MAX_LENGTH} characters`;
+  }
+
+  if (CONTROL_OR_NEWLINE_PATTERN.test(value)) {
+    return 'qq_identity must not contain control characters or newlines';
+  }
+
+  return null;
+}
+
+function parseStrictIsoDate(value: string): Date | null {
+  if (
+    value.trim().length === 0 ||
+    Array.from(value).length > ASSERTED_AT_MAX_LENGTH
+  ) {
+    return null;
+  }
+
+  const match = STRICT_ISO_8601_TIMESTAMP.exec(value);
+  if (!match?.groups) {
+    return null;
+  }
+
+  const year = Number(match.groups.year);
+  const month = Number(match.groups.month);
+  const day = Number(match.groups.day);
+  const hour = Number(match.groups.hour);
+  const minute = Number(match.groups.minute);
+  const second = Number(match.groups.second);
+  const millisecond = Number(match.groups.millisecond ?? '0');
+  const offsetMinutes = match.groups.utc
+    ? 0
+    : (match.groups.offsetSign === '-' ? -1 : 1) *
+      (Number(match.groups.offsetHour) * 60 + Number(match.groups.offsetMinute));
+
+  const timestamp =
+    Date.UTC(year, month - 1, day, hour, minute, second, millisecond) -
+    offsetMinutes * 60_000;
+  const reconstructedLocalTime = new Date(timestamp + offsetMinutes * 60_000);
+
+  if (
+    reconstructedLocalTime.getUTCFullYear() !== year ||
+    reconstructedLocalTime.getUTCMonth() + 1 !== month ||
+    reconstructedLocalTime.getUTCDate() !== day ||
+    reconstructedLocalTime.getUTCHours() !== hour ||
+    reconstructedLocalTime.getUTCMinutes() !== minute ||
+    reconstructedLocalTime.getUTCSeconds() !== second ||
+    reconstructedLocalTime.getUTCMilliseconds() !== millisecond
+  ) {
+    return null;
+  }
+
+  return new Date(timestamp);
 }
 
 async function readJsonBody<T>(
