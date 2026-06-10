@@ -11,6 +11,7 @@ import {
 } from './broker-error';
 import type { BrokerEnv } from './contract';
 import { stringValue } from './public-input';
+import { issueQqManagedEntitlement } from './qq-managed-issue';
 
 const QQ_AUTH_ASSERT_ENDPOINT = 'POST /v1/auth/qq/assert';
 const QQ_SUBJECT_REF_PREFIX = 'ph-qq-subject-v1_';
@@ -114,9 +115,10 @@ export async function handleQqAuthAssert(
     });
   }
 
-  // Production issuance is intentionally gated until the reservation/OpenRouter
-  // lifecycle is implemented. Do not return legacy readiness when issuance is on.
-  return internalErrorResponse(c);
+  return issueQqManagedEntitlement(c, {
+    qqSubjectRef,
+    now,
+  });
 }
 
 function isQqIssuanceRuntimeEnabled(env: BrokerEnv['Bindings']): boolean {
