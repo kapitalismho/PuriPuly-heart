@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from puripuly_heart.config.settings import normalize_owned_referral_id
 from puripuly_heart.core.managed_openrouter_release import (
@@ -14,6 +17,7 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterFingerprintSalt,
     ManagedOpenRouterIssueSuccess,
     ManagedOpenRouterPreflightStop,
+    ManagedOpenRouterQqAssertSuccess,
     ManagedOpenRouterReleaseError,
     ManagedOpenRouterTrialStatusSuccess,
     ManagedOpenRouterVerifySuccess,
@@ -38,6 +42,17 @@ PUBLIC_ERROR_CODES = frozenset(
     }
 )
 PUBLIC_ERROR_CLASSES = frozenset({"retryable", "terminal", "security_fail"})
+QQ_ASSERT_VERIFIED_STATUSES = frozenset({"verified", "already_verified"})
+QQ_ASSERT_WIRE_STATUSES = QQ_ASSERT_VERIFIED_STATUSES | {"issued"}
+QQ_ASSERT_PUBLIC_SUBCODES = frozenset(
+    {
+        "qq_credential_invalid",
+        "qq_credential_mismatch",
+        "qq_lifetime_used",
+        "ip_rate_limited",
+    }
+)
+QQ_ASSERT_CREDENTIAL_SUBCODES = frozenset({"qq_credential_invalid", "qq_credential_mismatch"})
 
 
 @dataclass(slots=True)
@@ -49,7 +64,10 @@ class HttpManagedOpenRouterBrokerClient:
     _client_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
 
     def __post_init__(self) -> None:
-        self.base_url = _normalize_base_url(self.base_url)
+        self.base_url = _normalize_base_url(
+            self.base_url,
+            allow_insecure_scheme=self.transport is not None,
+        )
 
     async def challenge(
         self,
@@ -172,6 +190,37 @@ class HttpManagedOpenRouterBrokerClient:
         except ValueError as exc:
             raise _retryable_error(
                 "discord_issue", f"broker returned malformed payload: {exc}"
+            ) from exc
+
+    async def assert_qq_credential(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+        asserted_at: str,
+    ) -> ManagedOpenRouterQqAssertSuccess:
+        logger.info("[QQAuth] assert_qq_credential: posting QQ assertion request")
+        payload = await self._post_json(
+            path="/v1/auth/qq/assert",
+            request_body={
+                "qq_identity": qq_identity,
+                "credential": credential,
+                "asserted_at": asserted_at,
+            },
+            operation="qq_assert",
+        )
+        try:
+            result = _parse_qq_assert_success(payload)
+            logger.info(
+                "[QQAuth] assert_qq_credential: broker accepted assertion status=%s issued=%s",
+                result.status,
+                result.issue is not None,
+            )
+            return result
+        except ValueError as exc:
+            logger.warning("[QQAuth] assert_qq_credential: malformed broker payload")
+            raise _retryable_error(
+                "qq_assert", "broker returned malformed QQ assertion payload"
             ) from exc
 
     async def get_trial_status(
@@ -323,6 +372,46 @@ def _parse_json_int(value: object) -> int | None:
     return value
 
 
+def _parse_qq_assert_success(payload: Mapping[str, object]) -> ManagedOpenRouterQqAssertSuccess:
+    if payload.get("ok") is not True:
+        raise ValueError("ok must be true")
+
+    wire_status = _require_text(payload, "status")
+    if wire_status not in QQ_ASSERT_WIRE_STATUSES:
+        raise ValueError("status must be verified, already_verified, or issued")
+
+    qq_subject_ref = _require_text(payload, "qq_subject_ref")
+    openrouter_api_key = _normalize_qq_assert_openrouter_api_key(payload.get("openrouter_api_key"))
+
+    if openrouter_api_key is None:
+        if wire_status == "issued":
+            raise ValueError("issued status requires openrouter_api_key")
+        return ManagedOpenRouterQqAssertSuccess(
+            status=wire_status,
+            qq_subject_ref=qq_subject_ref,
+            issue=None,
+        )
+
+    return ManagedOpenRouterQqAssertSuccess(
+        status="issued",
+        qq_subject_ref=qq_subject_ref,
+        issue=ManagedOpenRouterIssueSuccess(
+            openrouter_api_key=openrouter_api_key,
+            managed_credential_ref=_require_optional_stripped_text(
+                payload,
+                "managed_credential_ref",
+            ),
+            expires_at=_require_optional_text(payload, "expires_at"),
+            openrouter_user_id=normalize_managed_openrouter_user_identifier(
+                payload.get("openrouter_user_id")
+            ),
+            referral_bonus_applied=_parse_referral_bonus_applied(payload),
+            referral_id=_parse_owned_referral_id(payload),
+            pass_status=_parse_talk_together_pass_status(payload),
+        ),
+    )
+
+
 def _parse_error_response(
     response: httpx.Response, *, operation: str
 ) -> ManagedOpenRouterReleaseError:
@@ -341,6 +430,13 @@ def _parse_error_response(
         if isinstance(lifecycle, str) and lifecycle:
             managed_lifecycle = lifecycle
 
+    if operation == "qq_assert":
+        return _parse_qq_assert_error_response(
+            raw_error,
+            operation=operation,
+            managed_lifecycle=managed_lifecycle,
+        )
+
     try:
         return ManagedOpenRouterReleaseError(
             operation=operation,
@@ -353,6 +449,64 @@ def _parse_error_response(
         )
     except ValueError as exc:
         return _retryable_error(operation, f"broker returned malformed error payload: {exc}")
+
+
+def _parse_qq_assert_error_response(
+    raw_error: Mapping[str, object],
+    *,
+    operation: str,
+    managed_lifecycle: str | None,
+) -> ManagedOpenRouterReleaseError:
+    try:
+        subcode = _normalize_qq_assert_subcode(raw_error.get("subcode"))
+        return ManagedOpenRouterReleaseError(
+            operation=operation,
+            code=_require_public_error_code(raw_error, "code"),
+            error_class=_require_public_error_class(raw_error, "class"),
+            subcode=subcode,
+            retry_after_ms=_normalize_qq_assert_retry_after_ms(raw_error.get("retry_after_ms")),
+            message=_qq_assert_error_message(subcode),
+            managed_lifecycle=managed_lifecycle,
+        )
+    except ValueError as exc:
+        return _retryable_error(
+            operation,
+            f"broker returned malformed QQ assertion error payload: {exc}",
+        )
+
+
+def _normalize_qq_assert_subcode(value: object) -> str | None:
+    if not isinstance(value, str) or not value:
+        return None
+    if value not in QQ_ASSERT_PUBLIC_SUBCODES:
+        return None
+    return value
+
+
+def _normalize_qq_assert_retry_after_ms(value: object) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return max(0, min(value, _MAX_SAFE_JSON_INTEGER))
+
+
+def _normalize_qq_assert_openrouter_api_key(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("openrouter_api_key must be a string or null")
+    return value.strip() or None
+
+
+def _qq_assert_error_message(subcode: str | None) -> str:
+    if subcode in QQ_ASSERT_CREDENTIAL_SUBCODES:
+        return "QQ credential verification failed"
+    if subcode == "qq_lifetime_used":
+        return "QQ credential has already been used"
+    if subcode == "ip_rate_limited":
+        return "QQ credential verification is rate limited"
+    return "QQ credential verification failed"
 
 
 def _parse_json_mapping(response: httpx.Response, *, operation: str) -> Mapping[str, object]:
@@ -409,6 +563,23 @@ def _require_optional_text(payload: Mapping[str, object], key: str) -> str | Non
     return value
 
 
+def _require_optional_stripped_text(payload: Mapping[str, object], key: str) -> str | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    normalized = _normalize_optional_stripped_text(value)
+    if normalized is None:
+        raise ValueError(f"{key} must be a non-empty string or null")
+    return normalized
+
+
+def _normalize_optional_stripped_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
 def _require_int(payload: Mapping[str, object], key: str) -> int:
     value = payload.get(key)
     if isinstance(value, bool) or not isinstance(value, int):
@@ -434,11 +605,17 @@ def _retryable_error(operation: str, detail: str) -> ManagedOpenRouterReleaseErr
     )
 
 
-def _normalize_base_url(base_url: str) -> str:
+def _normalize_base_url(base_url: str, *, allow_insecure_scheme: bool = False) -> str:
     if not isinstance(base_url, str) or not base_url.strip():
         raise ValueError("broker base_url must be a non-empty string")
     normalized = base_url.strip().rstrip("/")
     parsed = urlsplit(normalized)
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("broker base_url must not include userinfo")
+    if parsed.query:
+        raise ValueError("broker base_url must not include a query string")
     if parsed.path not in {"", "/"}:
         raise ValueError("broker base_url must not include a path prefix")
+    if parsed.scheme != "https" and not (allow_insecure_scheme and parsed.scheme == "http"):
+        raise ValueError("broker base_url must use HTTPS")
     return normalized

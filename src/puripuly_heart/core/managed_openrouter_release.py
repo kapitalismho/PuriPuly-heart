@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import inspect
+import logging
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import InitVar, dataclass, field, replace
@@ -18,6 +19,7 @@ from puripuly_heart.config.llm_profiles import (
 from puripuly_heart.config.settings import (
     AppSettings,
     OpenRouterCredentialSource,
+    TranslationConnection,
     normalize_owned_referral_id,
 )
 from puripuly_heart.core.discord_managed_oauth import run_discord_oauth_callback_flow
@@ -36,6 +38,7 @@ from puripuly_heart.core.managed_identity import (
 )
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     best_effort_store_managed_openrouter_user_identifier,
     clear_temporary_managed_release_state,
     resolve_openrouter_credentials,
@@ -44,11 +47,21 @@ from puripuly_heart.core.openrouter_handoff import store_managed_entitlement_sna
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.domain.models import Translation
 
+logger = logging.getLogger(__name__)
+
 MANAGED_OPENROUTER_TRIAL_BUDGET_USD = 0.07
 BINDING_MISMATCH_SUBCODES = {
     "device_public_key_registered",
     "installation_binding_mismatch",
 }
+QQ_ASSERT_CREDENTIAL_SUBCODES = frozenset(
+    {
+        "qq_credential_invalid",
+        "qq_credential_mismatch",
+    }
+)
+QQ_ASSERT_LIFETIME_USED_SUBCODE = "qq_lifetime_used"
+QQ_ASSERT_RATE_LIMITED_SUBCODE = "ip_rate_limited"
 HardwareFingerprintProvider = Callable[[], str | Awaitable[str]]
 DiscordOAuthListenerFactory = Callable[[], DiscordOAuthLoopbackListener]
 DiscordOAuthCallbackRunner = Callable[
@@ -118,7 +131,7 @@ class ManagedOpenRouterReleaseResult:
     message_kwargs: Mapping[str, object] = field(default_factory=dict)
     diagnostics: ManagedOpenRouterReleaseDiagnostics | None = None
     retry_after_ms: int | None = None
-    api_key: str | None = None
+    api_key: str | None = field(default=None, repr=False)
     local_key_available: bool = False
     pending_issue: bool = False
     single_flight_reused: bool = False
@@ -158,13 +171,20 @@ class ManagedOpenRouterVerifySuccess:
 
 @dataclass(frozen=True, slots=True)
 class ManagedOpenRouterIssueSuccess:
-    openrouter_api_key: str
+    openrouter_api_key: str = field(repr=False)
     managed_credential_ref: str | None = None
     expires_at: str | None = None
     openrouter_user_id: str | None = None
     referral_bonus_applied: bool = False
     referral_id: str | None = None
     pass_status: TalkTogetherPassStatus | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedOpenRouterQqAssertSuccess:
+    status: str
+    qq_subject_ref: str = field(repr=False)
+    issue: ManagedOpenRouterIssueSuccess | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,6 +257,14 @@ class ManagedOpenRouterReleaseClient(Protocol):
         request: dict[str, object],
     ) -> ManagedOpenRouterIssueSuccess: ...
 
+    async def assert_qq_credential(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+        asserted_at: str,
+    ) -> ManagedOpenRouterQqAssertSuccess: ...
+
     async def get_trial_status(
         self,
         *,
@@ -295,6 +323,20 @@ class UnavailableManagedOpenRouterReleaseClient:
         request: dict[str, object],
     ) -> ManagedOpenRouterIssueSuccess:
         _ = request
+        raise ManagedOpenRouterReleaseError(
+            code="trial_unavailable",
+            error_class="retryable",
+            message="managed OpenRouter release is unavailable",
+        )
+
+    async def assert_qq_credential(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+        asserted_at: str,
+    ) -> ManagedOpenRouterQqAssertSuccess:
+        _ = qq_identity, credential, asserted_at
         raise ManagedOpenRouterReleaseError(
             code="trial_unavailable",
             error_class="retryable",
@@ -392,6 +434,28 @@ class ManagedOpenRouterReleaseService:
         *,
         referral_id: str | None = None,
     ) -> ManagedOpenRouterReleaseResult:
+        if _is_managed_china_connection(self.settings):
+            resolution = resolve_openrouter_credentials(
+                self.settings,
+                secrets=self.secrets,
+                request_intent="TRANS",
+            )
+            if resolution.selected_source != OpenRouterCredentialSource.MANAGED:
+                return ManagedOpenRouterReleaseResult(
+                    behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                    message_key="managed_release.stop",
+                )
+            if resolution.api_key is not None:
+                self._clear_retry_after()
+                return ManagedOpenRouterReleaseResult(
+                    behavior=ManagedOpenRouterReleaseBehavior.READY,
+                    message_key="managed_release.ready",
+                    api_key=resolution.api_key,
+                    local_key_available=True,
+                )
+            self._clear_retry_after()
+            return _managed_china_key_unavailable_result()
+
         if self._issue_task is not None and not self._issue_task.done():
             return await self._await_shared_task(self._issue_task, single_flight_reused=True)
         if self._prepare_task is not None and not self._prepare_task.done():
@@ -402,6 +466,84 @@ class ManagedOpenRouterReleaseService:
             self._run_prepare_flow(referral_id=referral_id),
         )
         return await self._await_shared_task(task, single_flight_reused=False)
+
+    async def prepare_from_qq_assertion(
+        self,
+        *,
+        qq_identity: str,
+        credential: str,
+        issue_persistence_allowed: Callable[[], bool] | None = None,
+    ) -> ManagedOpenRouterReleaseResult:
+        logger.info("[QQAuth] prepare_from_qq_assertion: starting QQ assertion flow")
+        resolution = resolve_openrouter_credentials(
+            self.settings,
+            secrets=self.secrets,
+            request_intent="TRANS",
+        )
+        if resolution.selected_source != OpenRouterCredentialSource.MANAGED:
+            logger.warning("[QQAuth] prepare_from_qq_assertion: selected source is not Managed")
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="managed_release.stop",
+            )
+        if not _is_managed_china_connection(self.settings):
+            logger.warning(
+                "[QQAuth] prepare_from_qq_assertion: selected connection is not Managed China"
+            )
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="managed_release.stop",
+            )
+
+        retry_result = self._result_for_retry_after_window()
+        if retry_result is not None:
+            logger.info(
+                "[QQAuth] prepare_from_qq_assertion: in retry_after window, returning retry"
+            )
+            return retry_result
+
+        try:
+            logger.info("[QQAuth] prepare_from_qq_assertion: calling client.assert_qq_credential")
+            qq_assert_response = await self.client.assert_qq_credential(
+                qq_identity=qq_identity,
+                credential=credential,
+                asserted_at=self.signed_at_provider(),
+            )
+            logger.info(
+                "[QQAuth] prepare_from_qq_assertion: broker returned status=%s issued=%s",
+                qq_assert_response.status,
+                qq_assert_response.issue is not None,
+            )
+        except ManagedOpenRouterReleaseError as exc:
+            safe_error = _sanitize_qq_assert_release_error(exc)
+            logger.warning(
+                "[QQAuth] prepare_from_qq_assertion: broker error code=%s class=%s subcode=%s retry_after_ms=%s",
+                safe_error.code,
+                safe_error.error_class,
+                safe_error.subcode,
+                safe_error.retry_after_ms,
+            )
+            qq_error_result = self._handle_qq_assert_release_error(safe_error)
+            if qq_error_result is not None:
+                return qq_error_result
+            return self._handle_release_error(safe_error, operation="qq_assert")
+
+        if qq_assert_response.issue is None:
+            self._clear_retry_after()
+            return _managed_china_key_unavailable_result()
+
+        normalized_qq_api_key = _normalize_optional_text(
+            qq_assert_response.issue.openrouter_api_key
+        )
+        if normalized_qq_api_key is None:
+            self._clear_retry_after()
+            return _managed_china_key_unavailable_result()
+
+        if issue_persistence_allowed is not None and not issue_persistence_allowed():
+            self._clear_retry_after()
+            return _managed_china_key_unavailable_result()
+
+        return self._persist_qq_managed_issue_success(normalized_qq_api_key)
 
     async def ensure_key_for_llm_start(self) -> ManagedOpenRouterReleaseResult:
         resolution = resolve_openrouter_credentials(self.settings, secrets=self.secrets)
@@ -418,6 +560,9 @@ class ManagedOpenRouterReleaseService:
                 api_key=resolution.api_key,
                 local_key_available=True,
             )
+        if _is_managed_china_connection(self.settings):
+            self._clear_retry_after()
+            return _managed_china_key_unavailable_result()
 
         if self._prepare_task is not None and not self._prepare_task.done():
             prepare_result = await self._await_shared_task(
@@ -575,6 +720,9 @@ class ManagedOpenRouterReleaseService:
                 api_key=resolution.api_key,
                 local_key_available=True,
             )
+        if _is_managed_china_connection(self.settings):
+            self._clear_retry_after()
+            return _managed_china_key_unavailable_result()
 
         bundle = ensure_managed_identity_bundle(
             self.settings,
@@ -701,6 +849,9 @@ class ManagedOpenRouterReleaseService:
                 api_key=resolution.api_key,
                 local_key_available=True,
             )
+        if _is_managed_china_connection(self.settings):
+            self._clear_retry_after()
+            return _managed_china_key_unavailable_result()
 
         if self._issue_task is not None and not self._issue_task.done():
             return await self._await_shared_task(self._issue_task, single_flight_reused=True)
@@ -713,6 +864,10 @@ class ManagedOpenRouterReleaseService:
         return await self._await_shared_task(task, single_flight_reused=False)
 
     async def _run_issue_flow(self) -> ManagedOpenRouterReleaseResult:
+        if _is_managed_china_connection(self.settings):
+            self._clear_retry_after()
+            return _managed_china_key_unavailable_result()
+
         bundle = ensure_managed_identity_bundle(
             self.settings,
             self.secrets,
@@ -751,9 +906,11 @@ class ManagedOpenRouterReleaseService:
     def _persist_managed_issue_success(
         self,
         issue_response: ManagedOpenRouterIssueSuccess,
+        *,
+        secret_key: str = OPENROUTER_MANAGED_API_KEY_SECRET,
     ) -> ManagedOpenRouterReleaseResult:
         try:
-            self.secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, issue_response.openrouter_api_key)
+            self.secrets.set(secret_key, issue_response.openrouter_api_key)
         except Exception:
             previous_release_token = self.settings.managed_identity.release_token
             previous_release_token_expires_at = (
@@ -764,7 +921,7 @@ class ManagedOpenRouterReleaseService:
                 self.settings.managed_identity.verified_hardware_hash_salt_version
             )
             try:
-                self.secrets.delete(OPENROUTER_MANAGED_API_KEY_SECRET)
+                self.secrets.delete(secret_key)
             except Exception:
                 pass
             clear_temporary_managed_release_state(self.settings)
@@ -814,6 +971,31 @@ class ManagedOpenRouterReleaseService:
             referral_bonus_applied=issue_response.referral_bonus_applied is True,
             referral_id=final_referral_id,
             pass_status=pass_status,
+        )
+
+    def _persist_qq_managed_issue_success(
+        self,
+        api_key: str,
+    ) -> ManagedOpenRouterReleaseResult:
+        try:
+            self.secrets.set(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, api_key)
+        except Exception:
+            try:
+                self.secrets.delete(OPENROUTER_MANAGED_QQ_API_KEY_SECRET)
+            except Exception:
+                pass
+            self._clear_retry_after()
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="managed_release.stop",
+            )
+
+        self._clear_retry_after()
+        return ManagedOpenRouterReleaseResult(
+            behavior=ManagedOpenRouterReleaseBehavior.READY,
+            message_key="managed_release.ready",
+            api_key=api_key,
+            local_key_available=True,
         )
 
     def _handle_release_error(
@@ -920,6 +1102,50 @@ class ManagedOpenRouterReleaseService:
             diagnostics=diagnostics,
         )
 
+    def _handle_qq_assert_release_error(
+        self,
+        error: ManagedOpenRouterReleaseError,
+    ) -> ManagedOpenRouterReleaseResult | None:
+        diagnostics = error.to_diagnostics()
+        if diagnostics.operation is None:
+            diagnostics = replace(diagnostics, operation="qq_assert")
+
+        if error.subcode in QQ_ASSERT_CREDENTIAL_SUBCODES:
+            self._clear_retry_after()
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+                message_key="qq_auth.error.credential_mismatch",
+                diagnostics=diagnostics,
+            )
+
+        if error.subcode == QQ_ASSERT_LIFETIME_USED_SUBCODE:
+            self._clear_retry_after()
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="qq_auth.error.lifetime_used",
+                diagnostics=diagnostics,
+            )
+
+        if error.subcode == QQ_ASSERT_RATE_LIMITED_SUBCODE:
+            retry_after_ms = _normalize_retry_after_ms(error.retry_after_ms)
+            diagnostics = replace(diagnostics, retry_after_ms=retry_after_ms)
+            message_kwargs: dict[str, object] = {}
+            if retry_after_ms is not None:
+                self._retry_after_deadline_ms = self.monotonic_ms_provider() + retry_after_ms
+                self._retry_after_diagnostics = diagnostics
+                message_kwargs["retry_after_ms"] = retry_after_ms
+            else:
+                self._clear_retry_after()
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.RETRY,
+                message_key="qq_auth.error.retry",
+                message_kwargs=message_kwargs,
+                diagnostics=diagnostics,
+                retry_after_ms=retry_after_ms,
+            )
+
+        return None
+
     async def _resolve_hardware_hash(
         self,
         *,
@@ -963,11 +1189,17 @@ class ManagedOpenRouterReleaseService:
             return None
         remaining_ms = self._retry_after_deadline_ms - now_ms
         diagnostics = self._retry_after_diagnostics
+        message_key = "managed_release.retry_after_ms"
         if diagnostics is not None:
             diagnostics = replace(diagnostics, retry_after_ms=remaining_ms)
+            if (
+                diagnostics.operation == "qq_assert"
+                and diagnostics.subcode == QQ_ASSERT_RATE_LIMITED_SUBCODE
+            ):
+                message_key = "qq_auth.error.retry"
         return ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-            message_key="managed_release.retry_after_ms",
+            message_key=message_key,
             message_kwargs={"retry_after_ms": remaining_ms},
             diagnostics=diagnostics,
             retry_after_ms=remaining_ms,
@@ -1123,6 +1355,20 @@ def _normalize_optional_text(value: str | None) -> str | None:
     return normalized or None
 
 
+def _is_managed_china_connection(settings: AppSettings) -> bool:
+    return (
+        getattr(getattr(settings, "translation", None), "connection", None)
+        == TranslationConnection.MANAGED_CHINA
+    )
+
+
+def _managed_china_key_unavailable_result() -> ManagedOpenRouterReleaseResult:
+    return ManagedOpenRouterReleaseResult(
+        behavior=ManagedOpenRouterReleaseBehavior.STOP,
+        message_key="qq_auth.error.key_unavailable",
+    )
+
+
 def _discord_listener_release_error(error: Exception) -> ManagedOpenRouterReleaseError:
     message = _exception_message(
         error,
@@ -1164,6 +1410,28 @@ def _discord_callback_release_error(error: Exception) -> ManagedOpenRouterReleas
         ),
         operation="discord_callback",
     )
+
+
+def _sanitize_qq_assert_release_error(
+    error: ManagedOpenRouterReleaseError,
+) -> ManagedOpenRouterReleaseError:
+    return ManagedOpenRouterReleaseError(
+        operation=error.operation or "qq_assert",
+        code=error.code,
+        error_class=error.error_class,
+        subcode=error.subcode,
+        retry_after_ms=_normalize_retry_after_ms(error.retry_after_ms),
+        message=_qq_assert_safe_error_message(error.subcode),
+        managed_lifecycle=error.managed_lifecycle,
+    )
+
+
+def _qq_assert_safe_error_message(subcode: str | None) -> str:
+    if subcode == "ip_rate_limited":
+        return "QQ credential verification is rate limited"
+    if subcode == "qq_lifetime_used":
+        return "QQ credential has already been used"
+    return "QQ credential verification failed"
 
 
 def _exception_message(error: Exception, *, default: str) -> str:
