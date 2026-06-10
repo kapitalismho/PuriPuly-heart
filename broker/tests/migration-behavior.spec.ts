@@ -100,7 +100,9 @@ describe('broker migration behavior', () => {
         .all() as Array<{ name: string }>;
       expect(issueEventColumns.map(({ name }) => name)).toEqual([
         'id',
+        'issue_source',
         'installation_id',
+        'subject_ref',
         'managed_credential_ref',
         'ip_hash',
         'ip_prefix_hash',
@@ -1021,6 +1023,242 @@ describe('broker migration behavior', () => {
           '2026-06-10T10:00:00.000Z',
         ),
       ).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('migrates issue-success events to source-aware subjects while preserving Discord evidence and allowing QQ rows', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, { through: '0009_add_qq_managed_entitlements.sql' });
+      db.prepare(
+        `INSERT INTO installations (
+          installation_id,
+          device_public_key,
+          app_version,
+          created_at,
+          last_seen_at
+        ) VALUES (?, ?, ?, ?, ?)`,
+      ).run(
+        'install-source-aware-discord-existing',
+        'device-key-source-aware-discord-existing',
+        '1.2.3',
+        '2026-06-10T09:59:00.000Z',
+        '2026-06-10T09:59:00.000Z',
+      );
+      db.prepare(
+        `INSERT INTO broker_issue_success_events (
+          id,
+          installation_id,
+          managed_credential_ref,
+          ip_hash,
+          ip_prefix_hash,
+          asn,
+          country,
+          http_protocol,
+          tls_version,
+          tls_cipher,
+          risk_label,
+          observed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        42,
+        'install-source-aware-discord-existing',
+        'managed-source-aware-discord-existing',
+        'ip-source-aware-discord-existing',
+        'prefix-source-aware-discord-existing',
+        64512,
+        'US',
+        'HTTP/2',
+        'TLSv1.3',
+        'TLS_AES_128_GCM_SHA256',
+        'low',
+        '2026-06-10T10:00:00.000Z',
+      );
+
+      applyBrokerMigrations(db, { after: '0009_add_qq_managed_entitlements.sql' });
+
+      const migratedDiscordRow = db
+        .prepare(
+          `SELECT id,
+                  issue_source,
+                  installation_id,
+                  subject_ref,
+                  managed_credential_ref,
+                  observed_at
+             FROM broker_issue_success_events
+            WHERE installation_id = ?`,
+        )
+        .get('install-source-aware-discord-existing') as Record<string, unknown>;
+      expect(migratedDiscordRow).toEqual({
+        id: 42,
+        issue_source: 'discord',
+        installation_id: 'install-source-aware-discord-existing',
+        subject_ref: 'install-source-aware-discord-existing',
+        managed_credential_ref: 'managed-source-aware-discord-existing',
+        observed_at: '2026-06-10T10:00:00.000Z',
+      });
+
+      expect(() =>
+        db.prepare(
+          `INSERT INTO broker_issue_success_events (
+            issue_source,
+            installation_id,
+            subject_ref,
+            managed_credential_ref,
+            ip_hash,
+            ip_prefix_hash,
+            asn,
+            country,
+            http_protocol,
+            tls_version,
+            tls_cipher,
+            risk_label,
+            observed_at
+          ) VALUES ('qq', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          'ph-qq-subject-v1_source-aware-monitoring-subject',
+          'managed-source-aware-qq-existing',
+          'ip-source-aware-qq-existing',
+          'prefix-source-aware-qq-existing',
+          64513,
+          'CN',
+          'HTTP/2',
+          'TLSv1.3',
+          'TLS_AES_128_GCM_SHA256',
+          'low',
+          '2026-06-10T10:05:00.000Z',
+        ),
+      ).not.toThrow();
+
+      const qqRow = db
+        .prepare(
+          `SELECT issue_source,
+                  installation_id,
+                  subject_ref,
+                  managed_credential_ref,
+                  observed_at
+             FROM broker_issue_success_events
+            WHERE issue_source = 'qq'
+              AND subject_ref = ?
+              AND observed_at >= ?`,
+        )
+        .get(
+          'ph-qq-subject-v1_source-aware-monitoring-subject',
+          '2026-06-10T10:00:00.000Z',
+        ) as Record<string, unknown>;
+      expect(qqRow).toEqual({
+        issue_source: 'qq',
+        installation_id: null,
+        subject_ref: 'ph-qq-subject-v1_source-aware-monitoring-subject',
+        managed_credential_ref: 'managed-source-aware-qq-existing',
+        observed_at: '2026-06-10T10:05:00.000Z',
+      });
+
+      const sourceSubjectIndexColumns = db
+        .prepare("SELECT name FROM pragma_index_info('idx_broker_issue_success_events_source_subject_time') ORDER BY seqno")
+        .all() as Array<{ name: string }>;
+      expect(sourceSubjectIndexColumns.map(({ name }) => name)).toEqual([
+        'issue_source',
+        'subject_ref',
+        'observed_at',
+      ]);
+
+      expect(() =>
+        db.prepare(
+          `INSERT INTO broker_issue_success_events (
+            issue_source,
+            installation_id,
+            subject_ref,
+            managed_credential_ref,
+            observed_at
+          ) VALUES ('qq', NULL, 'ph-qq-subject-v1_', ?, ?)`,
+        ).run(
+          'managed-source-aware-qq-prefix-only-rejected',
+          '2026-06-10T10:06:00.000Z',
+        ),
+      ).toThrow(/constraint/i);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('preserves issue-success AUTOINCREMENT sequence when deleted high-id rows existed before source-aware migration', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, { through: '0009_add_qq_managed_entitlements.sql' });
+      db.prepare(
+        `INSERT INTO installations (
+          installation_id,
+          device_public_key,
+          app_version,
+          created_at,
+          last_seen_at
+        ) VALUES (?, ?, ?, ?, ?)`,
+      ).run(
+        'install-source-aware-sequence-existing',
+        'device-key-source-aware-sequence-existing',
+        '1.2.3',
+        '2026-06-10T09:59:00.000Z',
+        '2026-06-10T09:59:00.000Z',
+      );
+      const insertLegacyIssueSuccess = db.prepare(
+        `INSERT INTO broker_issue_success_events (
+          id,
+          installation_id,
+          managed_credential_ref,
+          observed_at
+        ) VALUES (?, ?, ?, ?)`,
+      );
+      insertLegacyIssueSuccess.run(
+        42,
+        'install-source-aware-sequence-existing',
+        'managed-source-aware-sequence-existing-low',
+        '2026-06-10T10:00:00.000Z',
+      );
+      insertLegacyIssueSuccess.run(
+        100,
+        'install-source-aware-sequence-existing',
+        'managed-source-aware-sequence-existing-deleted-high',
+        '2026-06-10T10:01:00.000Z',
+      );
+      db.prepare(
+        'DELETE FROM broker_issue_success_events WHERE id = ?',
+      ).run(100);
+
+      applyBrokerMigrations(db, { after: '0009_add_qq_managed_entitlements.sql' });
+
+      db.prepare(
+        `INSERT INTO broker_issue_success_events (
+          issue_source,
+          installation_id,
+          subject_ref,
+          managed_credential_ref,
+          observed_at
+        ) VALUES ('discord', ?, ?, ?, ?)`,
+      ).run(
+        'install-source-aware-sequence-existing',
+        'install-source-aware-sequence-existing',
+        'managed-source-aware-sequence-new-after-migration',
+        '2026-06-10T10:02:00.000Z',
+      );
+
+      const insertedRow = db
+        .prepare(
+          `SELECT id
+             FROM broker_issue_success_events
+            WHERE managed_credential_ref = ?`,
+        )
+        .get('managed-source-aware-sequence-new-after-migration') as { id: number };
+      const sequenceRow = db
+        .prepare("SELECT seq FROM sqlite_sequence WHERE name = 'broker_issue_success_events'")
+        .get() as { seq: number };
+
+      expect(insertedRow.id).toBe(101);
+      expect(sequenceRow.seq).toBe(101);
     } finally {
       db.close();
     }

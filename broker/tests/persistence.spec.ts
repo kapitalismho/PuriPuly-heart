@@ -419,7 +419,9 @@ describe('broker persistent state model', () => {
           purpose: ['issue success alerting', 'daily reporting', 'asn-based heuristics'],
           columns: [
             'id',
+            'issue_source',
             'installation_id',
+            'subject_ref',
             'managed_credential_ref',
             'ip_hash',
             'ip_prefix_hash',
@@ -434,6 +436,7 @@ describe('broker persistent state model', () => {
           appendOnly: true,
           indexed: [
             'installation_id + observed_at',
+            'issue_source + subject_ref + observed_at',
             'managed_credential_ref + observed_at',
             'ip_hash + observed_at',
             'ip_prefix_hash + observed_at',
@@ -540,6 +543,7 @@ describe('broker persistent state model', () => {
       '0007_simplify_referral_id_checks.sql',
       '0008_add_qq_auth_assertions.sql',
       '0009_add_qq_managed_entitlements.sql',
+      '0010_source_aware_issue_success_events.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);
@@ -577,6 +581,9 @@ describe('broker persistent state model', () => {
     );
     const qqManagedEntitlementsMigration = readBrokerMigrationSql(
       '0009_add_qq_managed_entitlements.sql',
+    );
+    const sourceAwareIssueSuccessMigration = readBrokerMigrationSql(
+      '0010_source_aware_issue_success_events.sql',
     );
 
     expect(migration).toContain('CREATE TABLE broker_config');
@@ -739,6 +746,21 @@ describe('broker persistent state model', () => {
     expect(qqManagedEntitlementsMigration).not.toContain('qq_identity');
     expect(qqManagedEntitlementsMigration).not.toContain('credential TEXT');
     expect(qqManagedEntitlementsMigration).not.toContain('openrouter_api_key');
+    expect(sourceAwareIssueSuccessMigration).toContain(
+      'CREATE TABLE broker_issue_success_events_source_v2',
+    );
+    expect(sourceAwareIssueSuccessMigration).toContain('issue_source TEXT NOT NULL');
+    expect(sourceAwareIssueSuccessMigration).toContain('installation_id TEXT REFERENCES installations(installation_id) ON DELETE CASCADE');
+    expect(sourceAwareIssueSuccessMigration).toContain('subject_ref TEXT NOT NULL');
+    expect(sourceAwareIssueSuccessMigration).toContain(
+      'INSERT INTO broker_issue_success_events_source_v2',
+    );
+    expect(sourceAwareIssueSuccessMigration).toContain(
+      'CREATE INDEX idx_broker_issue_success_events_source_subject_time',
+    );
+    expect(sourceAwareIssueSuccessMigration).not.toContain('qq_identity');
+    expect(sourceAwareIssueSuccessMigration).not.toContain('credential TEXT');
+    expect(sourceAwareIssueSuccessMigration).not.toContain('openrouter_api_key');
   });
 
   it('inserts the QQ auth assertion abuse-control default without replacing tuned JSON', () => {

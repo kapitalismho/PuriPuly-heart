@@ -7,6 +7,7 @@ import {
   type RequestNetworkMetadata,
 } from './abuse-controls';
 import type { BrokerBindings } from './contract';
+import type { BrokerIssueSuccessSource } from './contract';
 import { sendDiscordEmbed } from './discord-alerts';
 
 type AlertLevel = 'warn1' | 'warn2' | 'warn3' | 'critical';
@@ -22,7 +23,9 @@ const TIMELINE_BUCKET_COUNT = 12;
 const RUNTIME_STATE_PERSIST_MAX_ATTEMPTS = 3;
 
 interface IssueSuccessWindowRow {
-  installation_id: string;
+  issue_source: BrokerIssueSuccessSource;
+  installation_id: string | null;
+  subject_ref: string;
   ip_hash: string | null;
   ip_prefix_hash: string | null;
   asn: number | null;
@@ -120,19 +123,37 @@ export interface ImmediateAbuseEvaluationResult {
   packet: InterpretationPacket;
 }
 
+interface CommonIssueSuccessInput {
+  managedCredentialRef: string;
+  observedAt: string;
+  network: RequestNetworkMetadata;
+}
+
+export type RecordIssueSuccessInput = CommonIssueSuccessInput &
+  (
+    | {
+        issueSource?: 'discord';
+        installationId: string;
+        subjectRef?: string;
+      }
+    | {
+        issueSource: 'qq';
+        installationId?: null;
+        subjectRef: string;
+      }
+  );
+
 export async function recordIssueSuccess(
   db: D1Database,
-  input: {
-    installationId: string;
-    managedCredentialRef: string;
-    observedAt: string;
-    network: RequestNetworkMetadata;
-  },
+  input: RecordIssueSuccessInput,
 ): Promise<void> {
+  const issueSubject = normalizeIssueSuccessSubject(input);
   await db
     .prepare(
       `INSERT INTO broker_issue_success_events (
+          issue_source,
           installation_id,
+          subject_ref,
           managed_credential_ref,
           ip_hash,
           ip_prefix_hash,
@@ -143,10 +164,12 @@ export async function recordIssueSuccess(
           tls_cipher,
           risk_label,
           observed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
-      input.installationId,
+      issueSubject.issueSource,
+      issueSubject.installationId,
+      issueSubject.subjectRef,
       input.managedCredentialRef,
       input.network.ipHash,
       input.network.ipPrefixHash,
@@ -161,6 +184,35 @@ export async function recordIssueSuccess(
     .run();
 }
 
+function normalizeIssueSuccessSubject(input: RecordIssueSuccessInput): {
+  issueSource: BrokerIssueSuccessSource;
+  installationId: string | null;
+  subjectRef: string;
+} {
+  if (input.issueSource === 'qq') {
+    const subjectRef = input.subjectRef;
+    if (!subjectRef.trim()) {
+      throw new Error('QQ issue-success subject_ref is required');
+    }
+    return {
+      issueSource: 'qq',
+      installationId: null,
+      subjectRef,
+    };
+  }
+
+  const installationId = input.installationId;
+  const subjectRef = input.subjectRef ?? input.installationId;
+  if (!installationId.trim() || !subjectRef.trim()) {
+    throw new Error('Discord issue-success installation_id and subject_ref are required');
+  }
+  return {
+    issueSource: 'discord',
+    installationId,
+    subjectRef,
+  };
+}
+
 export async function evaluateImmediateAbuseState(
   db: D1Database,
   now: Date,
@@ -172,8 +224,8 @@ export async function evaluateImmediateAbuseState(
   const [issueSuccessRows, requestEventRows, historicalHourlyRows] = await Promise.all([
     db
       .prepare(
-        `SELECT installation_id, ip_hash, ip_prefix_hash, asn, country,
-                http_protocol, tls_version, tls_cipher, risk_label, observed_at
+        `SELECT issue_source, installation_id, subject_ref, ip_hash, ip_prefix_hash,
+                asn, country, http_protocol, tls_version, tls_cipher, risk_label, observed_at
            FROM broker_issue_success_events
           WHERE observed_at >= ?
             AND observed_at <= ?
@@ -480,6 +532,9 @@ function buildInterpretationPacket(input: {
   const riskLabelMix = countStringValues(
     input.issueSuccessEvents.map(({ risk_label }) => risk_label),
   );
+  const sourceQualifiedIssueSubjects = input.issueSuccessEvents.map(
+    toSourceQualifiedIssueSubjectKey,
+  );
   const suspiciousProtoComboCount = input.issueSuccessEvents.filter(
     ({ http_protocol, tls_version }) =>
       http_protocol === 'HTTP/1.1' &&
@@ -533,13 +588,11 @@ function buildInterpretationPacket(input: {
       unique_ip_prefixes_60m: countUnique(
         input.issueSuccessEvents.map(({ ip_prefix_hash }) => ip_prefix_hash),
       ),
-      unique_installations_60m: countUnique(
-        input.issueSuccessEvents.map(({ installation_id }) => installation_id),
-      ),
+      unique_installations_60m: countUnique(sourceQualifiedIssueSubjects),
       top_ip_prefix_share: topIpPrefixShare,
       issues_per_installation_avg: safeRatio(
         issueSuccess1h,
-        countUnique(input.issueSuccessEvents.map(({ installation_id }) => installation_id)),
+        countUnique(sourceQualifiedIssueSubjects),
       ) ?? 0,
     },
     protocol_risk_signals: {
@@ -563,6 +616,14 @@ function buildInterpretationPacket(input: {
       browser_like_signal_weak: suspiciousProtoComboCount > 0,
     },
   };
+}
+
+function toSourceQualifiedIssueSubjectKey(row: IssueSuccessWindowRow): string {
+  if (row.issue_source === 'discord') {
+    return `discord:${row.installation_id ?? row.subject_ref}`;
+  }
+
+  return `qq:${row.subject_ref}`;
 }
 
 function updateAlertLatches(

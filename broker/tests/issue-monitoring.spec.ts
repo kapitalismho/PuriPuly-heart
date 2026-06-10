@@ -4,6 +4,7 @@ import app from '../src/index';
 import {
   deliverImmediateMonitoringSideEffects,
   evaluateImmediateAbuseState,
+  recordIssueSuccess,
 } from '../src/abuse-monitoring';
 import { updateAbuseControls, readAbuseRuntimeState } from './test-support/abuse-controls';
 import { createDeviceKeyPair } from './test-support/ed25519';
@@ -62,6 +63,201 @@ describe('broker immediate abuse monitoring', () => {
         critical: true,
       },
     });
+  });
+
+  it('records QQ issue success with a nullable installation and includes it in immediate alert counts', async () => {
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.immediateAlerts.warn1 = 1;
+      controls.immediateAlerts.warn2 = 10;
+      controls.immediateAlerts.warn3 = 20;
+      controls.immediateAlerts.critical = 30;
+      controls.asnFastPath.enabled = false;
+    });
+
+    await recordIssueSuccess(env.BROKER_DB, {
+      issueSource: 'qq',
+      installationId: null,
+      subjectRef: 'ph-qq-subject-v1_monitoring-safe-subject',
+      managedCredentialRef: 'managed-qq-monitoring-safe-ref',
+      observedAt: '2026-06-10T10:05:00.000Z',
+      network: {
+        ipHash: 'ip-hash-qq-monitoring',
+        ipPrefixHash: 'ip-prefix-qq-monitoring',
+        asn: 64588,
+        country: 'CN',
+        httpProtocol: 'HTTP/2',
+        tlsVersion: 'TLSv1.3',
+        tlsCipher: 'TLS_AES_128_GCM_SHA256',
+        riskLabel: 'low',
+      },
+    });
+    await recordIssueSuccess(env.BROKER_DB, {
+      issueSource: 'qq',
+      installationId: null,
+      subjectRef: 'ph-qq-subject-v1_monitoring-safe-subject',
+      managedCredentialRef: 'managed-qq-monitoring-safe-ref-2',
+      observedAt: '2026-06-10T10:06:00.000Z',
+      network: {
+        ipHash: 'ip-hash-qq-monitoring-2',
+        ipPrefixHash: 'ip-prefix-qq-monitoring-2',
+        asn: 64588,
+        country: 'CN',
+        httpProtocol: 'HTTP/2',
+        tlsVersion: 'TLSv1.3',
+        tlsCipher: 'TLS_AES_128_GCM_SHA256',
+        riskLabel: 'low',
+      },
+    });
+
+    const row = env.__db
+      .prepare(
+        `SELECT issue_source,
+                installation_id,
+                subject_ref,
+                managed_credential_ref,
+                asn,
+                observed_at
+           FROM broker_issue_success_events
+          WHERE issue_source = 'qq'
+            AND subject_ref = ?`,
+      )
+      .get('ph-qq-subject-v1_monitoring-safe-subject') as Record<string, unknown>;
+    expect(row).toEqual({
+      issue_source: 'qq',
+      installation_id: null,
+      subject_ref: 'ph-qq-subject-v1_monitoring-safe-subject',
+      managed_credential_ref: 'managed-qq-monitoring-safe-ref',
+      asn: 64588,
+      observed_at: '2026-06-10T10:05:00.000Z',
+    });
+
+    const result = await evaluateImmediateAbuseState(
+      env.BROKER_DB,
+      new Date('2026-06-10T10:10:00.000Z'),
+    );
+
+    expect(result.packet.rolling_issue_counts.issue_success.last_60m).toBe(2);
+    expect(result.alertsToEmit).toEqual(['warn1']);
+    expect(JSON.stringify(result.packet)).not.toContain('qq_identity');
+    expect(JSON.stringify(result.packet)).not.toContain('credential');
+  });
+
+  it('preserves Discord installation IDs exactly when defaulting source-aware subject metadata', async () => {
+    const env = createTestBrokerEnv();
+    const installationId = ' install-discord-source-aware-exact ';
+    env.__db
+      .prepare(
+        `INSERT INTO installations (
+            installation_id,
+            device_public_key,
+            app_version,
+            created_at,
+            last_seen_at
+          ) VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(
+        installationId,
+        'device-key-discord-source-aware-exact',
+        '1.2.3',
+        '2026-06-10T10:15:00.000Z',
+        '2026-06-10T10:15:00.000Z',
+      );
+
+    await recordIssueSuccess(env.BROKER_DB, {
+      installationId,
+      managedCredentialRef: 'managed-discord-source-aware-exact',
+      observedAt: '2026-06-10T10:15:00.000Z',
+      network: {
+        ipHash: 'ip-hash-discord-source-aware-exact',
+        ipPrefixHash: 'ip-prefix-discord-source-aware-exact',
+        asn: 64589,
+        country: 'US',
+        httpProtocol: 'HTTP/2',
+        tlsVersion: 'TLSv1.3',
+        tlsCipher: 'TLS_AES_128_GCM_SHA256',
+        riskLabel: 'low',
+      },
+    });
+
+    const row = env.__db
+      .prepare(
+        `SELECT issue_source, installation_id, subject_ref
+           FROM broker_issue_success_events
+          WHERE managed_credential_ref = ?`,
+      )
+      .get('managed-discord-source-aware-exact') as Record<string, unknown>;
+    expect(row).toEqual({
+      issue_source: 'discord',
+      installation_id: installationId,
+      subject_ref: installationId,
+    });
+  });
+
+  it('keeps Discord installation IDs and QQ subject refs distinct when spread metrics collide as strings', async () => {
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.immediateAlerts.warn1 = 10;
+      controls.immediateAlerts.warn2 = 20;
+      controls.immediateAlerts.warn3 = 30;
+      controls.immediateAlerts.critical = 40;
+      controls.asnFastPath.enabled = false;
+    });
+    const collidingSubjectRef = 'ph-qq-subject-v1_metric-collision';
+
+    insertIssueSuccessEvent(env, {
+      installationId: collidingSubjectRef,
+      managedCredentialRef: 'managed-discord-metric-collision',
+      ipHash: 'ip-discord-metric-collision',
+      ipPrefixHash: 'prefix-discord-metric-collision',
+      asn: 64590,
+      country: 'US',
+      httpProtocol: 'HTTP/2',
+      tlsVersion: 'TLSv1.3',
+      tlsCipher: 'TLS_AES_128_GCM_SHA256',
+      riskLabel: 'low',
+      observedAt: '2026-06-10T10:20:00.000Z',
+    });
+    env.__db
+      .prepare(
+        `INSERT INTO broker_issue_success_events (
+            issue_source,
+            installation_id,
+            subject_ref,
+            managed_credential_ref,
+            ip_hash,
+            ip_prefix_hash,
+            asn,
+            country,
+            http_protocol,
+            tls_version,
+            tls_cipher,
+            risk_label,
+            observed_at
+          ) VALUES ('qq', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        collidingSubjectRef,
+        'managed-qq-metric-collision',
+        'ip-qq-metric-collision',
+        'prefix-qq-metric-collision',
+        64591,
+        'CN',
+        'HTTP/2',
+        'TLSv1.3',
+        'TLS_AES_128_GCM_SHA256',
+        'low',
+        '2026-06-10T10:21:00.000Z',
+      );
+
+    const result = await evaluateImmediateAbuseState(
+      env.BROKER_DB,
+      new Date('2026-06-10T10:30:00.000Z'),
+    );
+
+    expect(result.packet.rolling_issue_counts.issue_success.last_60m).toBe(2);
+    expect(result.packet.spread_metrics.unique_installations_60m).toBe(2);
+    expect(result.packet.spread_metrics.issues_per_installation_avg).toBe(1);
   });
 
   it('engages the ASN fast-path brake when cloud concentration crosses the approved threshold', async () => {
@@ -933,7 +1129,9 @@ function insertIssueSuccessEvent(
   env.__db
     .prepare(
       `INSERT INTO broker_issue_success_events (
+          issue_source,
           installation_id,
+          subject_ref,
           managed_credential_ref,
           ip_hash,
           ip_prefix_hash,
@@ -944,9 +1142,10 @@ function insertIssueSuccessEvent(
           tls_cipher,
           risk_label,
           observed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES ('discord', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
+      input.installationId,
       input.installationId,
       input.managedCredentialRef,
       input.ipHash,

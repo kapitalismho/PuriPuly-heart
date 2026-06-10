@@ -395,6 +395,8 @@ export const REFERRAL_REFERRER_BONUS_STATUS_VALUES = [
 export type OpenRouterEntitlementStatus =
   (typeof OPENROUTER_ENTITLEMENT_STATUS_VALUES)[number];
 
+export type BrokerIssueSuccessSource = 'discord' | 'qq';
+
 export type QqManagedEntitlementStatus =
   (typeof QQ_MANAGED_ENTITLEMENT_STATUS_VALUES)[number];
 
@@ -512,7 +514,9 @@ export interface QqManagedEntitlementRecord {
 
 export interface BrokerIssueSuccessEventRecord {
   id: number;
-  installation_id: string;
+  issue_source: BrokerIssueSuccessSource;
+  installation_id: string | null;
+  subject_ref: string;
   managed_credential_ref: string | null;
   ip_hash: string | null;
   ip_prefix_hash: string | null;
@@ -886,7 +890,9 @@ export const BROKER_PERSISTENCE_MODEL = {
       purpose: ['issue success alerting', 'daily reporting', 'asn-based heuristics'],
       columns: [
         'id',
+        'issue_source',
         'installation_id',
+        'subject_ref',
         'managed_credential_ref',
         'ip_hash',
         'ip_prefix_hash',
@@ -901,6 +907,7 @@ export const BROKER_PERSISTENCE_MODEL = {
       appendOnly: true,
       indexed: [
         'installation_id + observed_at',
+        'issue_source + subject_ref + observed_at',
         'managed_credential_ref + observed_at',
         'ip_hash + observed_at',
         'ip_prefix_hash + observed_at',

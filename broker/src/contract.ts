@@ -54,6 +54,7 @@ export type {
   BrokerAbuseControlsConfigValue,
   BrokerAbuseSubjectHookRecord,
   BrokerConfigRow,
+  BrokerIssueSuccessSource,
   BrokerIssueSuccessEventRecord,
   BrokerRequestEventRecord,
   BrokerVelocityCapHookRecord,
