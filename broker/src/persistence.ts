@@ -813,7 +813,7 @@ export const BROKER_PERSISTENCE_MODEL = {
     qqAuthAssertions: {
       name: 'qq_auth_assertions',
       purpose:
-        'durable anonymized QQ Bot HMAC assertion evidence for the test endpoint',
+        'durable anonymized QQ Bot HMAC assertion evidence for verification-only compatibility and production issuance eligibility',
       primaryKey: 'qq_subject_ref',
       columns: [
         'qq_subject_ref',
@@ -888,6 +888,20 @@ export const BROKER_PERSISTENCE_MODEL = {
     brokerIssueSuccessEvents: {
       name: 'broker_issue_success_events',
       purpose: ['issue success alerting', 'daily reporting', 'asn-based heuristics'],
+      issueSources: ['discord', 'qq'],
+      sourceAwareSubjectModel: {
+        discord: {
+          issue_source: 'discord',
+          installation_id: 'required existing installation identity',
+          subject_ref: 'same value as installation_id',
+        },
+        qq: {
+          issue_source: 'qq',
+          installation_id: null,
+          subject_ref: 'qq_subject_ref',
+        },
+        fakeInstallationRowsAllowed: false,
+      },
       columns: [
         'id',
         'issue_source',

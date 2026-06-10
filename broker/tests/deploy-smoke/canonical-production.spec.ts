@@ -199,6 +199,116 @@ describe('broker deploy smoke helpers', () => {
       expect((error as Error).message).not.toContain(malformedDerivedUserId);
     }
   });
+
+  it('redacts deploy-smoke sensitive values from failure text', () => {
+    const syntheticKey = 'sk-or-v1-deploy-smoke-sensitive-key';
+    const syntheticCredential = 'a'.repeat(64);
+    const syntheticIdentity = 'deploy-smoke-qq-sensitive-identity';
+    const syntheticSubjectRef = 'ph-qq-subject-v1_sensitiveSubject';
+
+    const redacted = redactIssueBody(
+      JSON.stringify({
+        openrouter_api_key: syntheticKey,
+        qq_identity: syntheticIdentity,
+        credential: syntheticCredential,
+        qq_subject_ref: syntheticSubjectRef,
+      }) +
+        ` Authorization: Bearer ${syntheticKey} qq_identity=${syntheticIdentity} credential=${syntheticCredential}`,
+    );
+
+    expect(redacted).not.toContain(syntheticKey);
+    expect(redacted).not.toContain(syntheticCredential);
+    expect(redacted).not.toContain(syntheticIdentity);
+    expect(redacted).not.toContain(syntheticSubjectRef);
+    expect(redacted).toContain('[REDACTED]');
+  });
+
+  it('does not include raw OpenRouter chat completion response bodies in failure messages', () => {
+    const sensitivePayload = buildSensitiveFailurePayloadText();
+    let failureMessage = '';
+
+    try {
+      assertSuccessfulChatCompletionResponse(
+        {
+          status: 502,
+          body: {
+            error: {
+              message: sensitivePayload,
+            },
+          },
+        },
+        'qwen/qwen3.5-flash-02-23',
+      );
+    } catch (error) {
+      failureMessage = readErrorMessage(error);
+    }
+
+    expect(failureMessage).toContain('qwen/qwen3.5-flash-02-23');
+    expect(failureMessage).toContain('502');
+    expect(failureMessage).toContain('response body redacted');
+    expectFailureMessageExcludesSensitiveSentinels(failureMessage);
+  });
+
+  it('does not include raw duplicate QQ assertion response fields in failure messages', () => {
+    const subcodeMismatchMessage = captureDuplicateQqAssertionFailureMessage({
+      error: SENSITIVE_FAILURE_SENTINELS.rawBrokerMessageText,
+      credential: SENSITIVE_FAILURE_SENTINELS.credential,
+      qq_identity: SENSITIVE_FAILURE_SENTINELS.qqIdentity,
+      qq_subject_ref: SENSITIVE_FAILURE_SENTINELS.subjectRef,
+      raw_payload_text: SENSITIVE_FAILURE_SENTINELS.rawProviderPayloadText,
+    });
+    const keyFieldPresentMessage = captureDuplicateQqAssertionFailureMessage({
+      error: {
+        subcode: 'qq_lifetime_used',
+      },
+      openrouter_api_key: SENSITIVE_FAILURE_SENTINELS.keyLikeValue,
+      qq_identity: SENSITIVE_FAILURE_SENTINELS.qqIdentity,
+      credential: SENSITIVE_FAILURE_SENTINELS.credential,
+      qq_subject_ref: SENSITIVE_FAILURE_SENTINELS.subjectRef,
+      raw_payload_text: SENSITIVE_FAILURE_SENTINELS.rawProviderPayloadText,
+    });
+
+    const failureMessages = [subcodeMismatchMessage, keyFieldPresentMessage];
+
+    expect(
+      failureMessages.filter(countFailureMessageSensitiveSentinels).length,
+      'duplicate QQ assertion failure messages must not include sentinel raw payload fields',
+    ).toBe(0);
+    for (const failureMessage of failureMessages) {
+      expect(failureMessage).toContain('duplicate QQ assertion');
+      expect(failureMessage).toContain('qq_lifetime_used');
+      expect(failureMessage).toContain('response body redacted');
+      expect(failureMessage).not.toContain('openrouter_api_key');
+    }
+  });
+
+  it('does not include raw response bodies in requestJson non-ok failure messages', async () => {
+    const message = await captureRequestJsonFailureMessage({
+      responseText: buildSensitiveFailurePayloadText(),
+      status: 502,
+      targetPath: '/v1/auth/qq/assert',
+    });
+
+    expect(message).toContain('POST /v1/auth/qq/assert');
+    expect(message).toContain('502');
+    expect(message).toContain('failed');
+    expect(message).toContain('response body redacted');
+    expectFailureMessageExcludesSensitiveSentinels(message);
+  });
+
+  it('does not include raw response bodies in requestJson non-JSON failure messages', async () => {
+    const message = await captureRequestJsonFailureMessage({
+      responseText: buildSensitiveFailurePayloadText(),
+      status: 200,
+      targetPath: '/healthz',
+    });
+
+    expect(message).toContain('POST /healthz');
+    expect(message).toContain('200');
+    expect(message).toContain('non-JSON');
+    expect(message).toContain('response body redacted');
+    expectFailureMessageExcludesSensitiveSentinels(message);
+  });
 });
 
 describeDeploySmoke('broker direct deploy smoke', () => {
@@ -257,8 +367,20 @@ describeDeploySmoke('broker direct deploy smoke', () => {
     });
     expect(qqAssertion.status).toBe(200);
     expect(qqAssertion.body.ok).toBe(true);
-    expect(qqAssertion.body.status).toBe('verified');
-    assertQqSubjectRef(qqAssertion.body);
+    expect(qqAssertion.body.status).toBe('issued');
+    const qqIssuedKey = assertQqIssuedResponse(qqAssertion.body);
+
+    const duplicateQqAssertion = await requestJsonAllowFailure({
+      method: 'POST',
+      url: new URL('/v1/auth/qq/assert', baseUrl),
+      body: {
+        qq_identity: qqIdentity,
+        credential: qqCredential,
+        asserted_at: new Date().toISOString(),
+      },
+    });
+    expect(duplicateQqAssertion.status).toBe(409);
+    assertDuplicateQqLifetimeUsedResponse(duplicateQqAssertion.body);
 
     const challenge = await requestJson({
       method: 'POST',
@@ -351,17 +473,17 @@ describeDeploySmoke('broker direct deploy smoke', () => {
           method: 'GET',
           url: new URL('/api/v1/key', OPENROUTER_API_BASE_URL),
           headers: {
-            authorization: `Bearer ${issue.body.openrouter_api_key}`,
+            authorization: `Bearer ${qqIssuedKey.openrouterApiKey}`,
           },
         })
       ).body,
     );
     expect(issuedKeyMetadata.limit).toBe(ISSUE_BUDGET_USD);
-    expect(Date.parse(issuedKeyMetadata.expiresAt)).toBe(Date.parse(issue.body.expires_at));
+    expect(Date.parse(issuedKeyMetadata.expiresAt)).toBe(Date.parse(qqIssuedKey.expiresAt));
 
     for (const managedModel of POSITIVE_ROUTING_PROBE_MODELS) {
       const managedModelProbe = await requestOpenRouterChatCompletion(
-        issue.body.openrouter_api_key,
+        qqIssuedKey.openrouterApiKey,
         managedModel,
         'Reply with the single word routed.',
       );
@@ -370,7 +492,7 @@ describeDeploySmoke('broker direct deploy smoke', () => {
     }
 
     const guardrailProbe = await requestOpenRouterChatCompletion(
-      issue.body.openrouter_api_key,
+      qqIssuedKey.openrouterApiKey,
       disallowedModel,
       'Reply with the single word blocked.',
     );
@@ -394,6 +516,105 @@ type LiveDeploySmokeInputs = {
   disallowedModel: string;
   qqAuthHmacPsk: string;
 };
+
+type QqIssuedKey = {
+  openrouterApiKey: string;
+  managedCredentialRef: string;
+  expiresAt: string;
+};
+
+const SENSITIVE_FAILURE_SENTINELS = {
+  rawProviderPayloadText: 'SENTINEL_RAW_PROVIDER_PAYLOAD_DO_NOT_LEAK',
+  rawBrokerMessageText: 'SENTINEL_RAW_BROKER_MESSAGE_DO_NOT_LEAK',
+  keyLikeValue: 'sk-or-v1-deploy-smoke-raw-leak-sentinel',
+  qqIdentity: 'deploy-smoke-qq-raw-identity-sentinel',
+  credential: 'b'.repeat(64),
+  subjectRef: 'ph-qq-subject-v1_rawSubjectSentinel',
+} as const;
+
+function buildSensitiveFailurePayloadText(): string {
+  const {
+    credential,
+    keyLikeValue,
+    qqIdentity,
+    rawBrokerMessageText,
+    rawProviderPayloadText,
+    subjectRef,
+  } = SENSITIVE_FAILURE_SENTINELS;
+
+  return `${JSON.stringify({
+    error: {
+      details: {
+        credential,
+        openrouter_api_key: keyLikeValue,
+        qq_identity: qqIdentity,
+        qq_subject_ref: subjectRef,
+        raw_broker_message: rawBrokerMessageText,
+      },
+      message: rawProviderPayloadText,
+    },
+  })} Authorization: Bearer ${keyLikeValue} qq_identity=${qqIdentity} credential=${credential}`;
+}
+
+function expectFailureMessageExcludesSensitiveSentinels(message: string): void {
+  for (const sentinel of Object.values(SENSITIVE_FAILURE_SENTINELS)) {
+    expect(message).not.toContain(sentinel);
+  }
+}
+
+function countFailureMessageSensitiveSentinels(message: string): number {
+  const sensitiveIndicators = new Set(
+    Object.values(SENSITIVE_FAILURE_SENTINELS).flatMap((sentinel) => [
+      sentinel,
+      sentinel.slice(0, Math.min(24, sentinel.length)),
+    ]),
+  );
+
+  return [...sensitiveIndicators].filter((indicator) => message.includes(indicator))
+    .length;
+}
+
+function captureDuplicateQqAssertionFailureMessage(payload: unknown): string {
+  try {
+    assertDuplicateQqLifetimeUsedResponse(payload);
+  } catch (error) {
+    return readErrorMessage(error);
+  }
+
+  throw new Error('duplicate QQ assertion fixture should have failed');
+}
+
+async function captureRequestJsonFailureMessage({
+  responseText,
+  status,
+  targetPath,
+}: {
+  responseText: string;
+  status: number;
+  targetPath: string;
+}): Promise<string> {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(responseText, {
+      status,
+      headers: {
+        'content-type': 'application/json',
+      },
+    })) as typeof fetch;
+
+  try {
+    await requestJson({
+      method: 'POST',
+      url: new URL(targetPath, 'https://puripuly-heart-broker.example.workers.dev'),
+    });
+  } catch (error) {
+    return readErrorMessage(error);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  throw new Error('requestJson should have thrown for the deploy-smoke failure fixture');
+}
 
 function shouldRunDeploySmoke(rawValue: string | undefined): boolean {
   return rawValue === 'true';
@@ -468,6 +689,62 @@ function assertQqSubjectRef(payload: unknown): void {
   if (typeof subjectRef !== 'string' || !QQ_SUBJECT_REF_PATTERN.test(subjectRef)) {
     throw new Error('QQ assertion response must include a valid qq_subject_ref');
   }
+}
+
+function assertQqIssuedResponse(payload: unknown): QqIssuedKey {
+  const body = readRecord(payload, 'QQ issued response');
+
+  if (body.ok !== true || body.status !== 'issued') {
+    throw new Error('QQ issued response must have ok true and status issued');
+  }
+
+  assertQqSubjectRef(body);
+  assertManagedOpenRouterUserId(body.openrouter_user_id);
+
+  const openrouterApiKey = body.openrouter_api_key;
+  const managedCredentialRef = body.managed_credential_ref;
+  const expiresAt = body.expires_at;
+
+  if (typeof openrouterApiKey !== 'string' || openrouterApiKey.length === 0) {
+    throw new Error('QQ issued response must include a one-time openrouter_api_key');
+  }
+
+  if (typeof managedCredentialRef !== 'string' || managedCredentialRef.length === 0) {
+    throw new Error('QQ issued response must include managed_credential_ref');
+  }
+
+  if (typeof expiresAt !== 'string' || Number.isNaN(Date.parse(expiresAt))) {
+    throw new Error('QQ issued response must include a valid expires_at timestamp');
+  }
+
+  return {
+    openrouterApiKey,
+    managedCredentialRef,
+    expiresAt,
+  };
+}
+
+function assertDuplicateQqLifetimeUsedResponse(payload: unknown): void {
+  const body = readRecord(payload, 'duplicate QQ assertion response');
+  const errorSubcode = readPublicErrorSubcode(body.error);
+  const includesOneTimeKey = Object.prototype.hasOwnProperty.call(
+    body,
+    'openrouter_api_key',
+  );
+
+  if (errorSubcode !== 'qq_lifetime_used' || includesOneTimeKey) {
+    throw new Error(
+      'duplicate QQ assertion response must return qq_lifetime_used without a one-time key; response body redacted',
+    );
+  }
+}
+
+function readPublicErrorSubcode(error: unknown): string | undefined {
+  if (!isRecord(error)) {
+    return undefined;
+  }
+
+  return typeof error.subcode === 'string' ? error.subcode : undefined;
 }
 
 function requireQqAuthHmacPsk(value: string | undefined): string {
@@ -595,7 +872,7 @@ function assertSuccessfulChatCompletionResponse(
 ): void {
   if (response.status !== 200) {
     throw new Error(
-      `Expected successful chat completion for ${requestedModel}, got ${response.status}: ${stringifyForPatternMatch(response.body)}`,
+      `Expected successful chat completion for ${requestedModel}, got ${response.status}; response body redacted`,
     );
   }
 
@@ -720,11 +997,10 @@ async function requestJson({ method, url, body, headers = {} }: JsonRequestOptio
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const rawText = await response.text();
-  const safeText = redactIssueBody(rawText);
 
   if (!response.ok) {
     throw new Error(
-      `${method} ${url.pathname} failed with ${response.status}: ${safeText}`,
+      formatRequestJsonFailureMessage(method, url.pathname, response.status, 'failed'),
     );
   }
 
@@ -735,8 +1011,24 @@ async function requestJson({ method, url, body, headers = {} }: JsonRequestOptio
       body: JSON.parse(rawText),
     };
   } catch {
-    throw new Error(`${method} ${url.pathname} returned non-JSON: ${safeText}`);
+    throw new Error(
+      formatRequestJsonFailureMessage(
+        method,
+        url.pathname,
+        response.status,
+        'returned non-JSON',
+      ),
+    );
   }
+}
+
+function formatRequestJsonFailureMessage(
+  method: string,
+  path: string,
+  status: number,
+  context: 'failed' | 'returned non-JSON',
+): string {
+  return `${method} ${path} ${context} with ${status}; response body redacted`;
 }
 
 async function requestJsonAllowFailure({
@@ -805,5 +1097,10 @@ function redactIssueBody(rawText: string): string {
     .replace(
       /"qq_subject_ref"\s*:\s*"[^"]+"/gu,
       '"qq_subject_ref":"[REDACTED]"',
-    );
+    )
+    .replace(/Bearer\s+sk-or-[A-Za-z0-9._~-]+/giu, 'Bearer [REDACTED]')
+    .replace(/sk-or-v1-[A-Za-z0-9._~-]+/gu, '[REDACTED]')
+    .replace(/\bqq_identity=[^\s&]+/gu, 'qq_identity=[REDACTED]')
+    .replace(/\bcredential=[0-9a-f]{64}\b/giu, 'credential=[REDACTED]')
+    .replace(/ph-qq-subject-v1_[A-Za-z0-9_-]+/gu, '[REDACTED]');
 }

@@ -432,7 +432,7 @@ jobs:
                   raise SystemExit(f'{label} enforce_zdr must be false')
           PY
 
-      - name: Sync worker secrets for managed issuance, QQ assertions, and Discord OAuth operations
+      - name: Sync worker secrets for managed issuance, QQ production issuance, and Discord OAuth operations
         shell: bash
         working-directory: broker
         env:
@@ -463,7 +463,8 @@ jobs:
           # for each installation at runtime via OPENROUTER_MANAGED_USER_HMAC_SECRET.
           printf '%s' "$OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION" \
             | pnpm exec wrangler secret put OPENROUTER_MANAGED_USER_HMAC_SECRET --config "${{ steps.render.outputs.config_path }}"
-          # QQ_AUTH_HMAC_PSK_PRODUCTION verifies the test-only QQ Bot assertion route at runtime.
+          # QQ_AUTH_HMAC_PSK_PRODUCTION verifies QQ Bot assertions; with the OpenRouter
+          # management key and guardrail id present, the route performs QQ production issuance.
           printf '%s' "$QQ_AUTH_HMAC_PSK_PRODUCTION" \
             | pnpm exec wrangler secret put QQ_AUTH_HMAC_PSK --config "${{ steps.render.outputs.config_path }}"
           # Discord OAuth runtime secrets are required for the GUI-managed onboarding flow.
@@ -508,7 +509,7 @@ jobs:
           echo "Timed out waiting for deployed broker healthz at $healthz_url" >&2
           exit 1
 
-      - name: Run deployed broker smoke test
+      - name: Run deployed broker production QQ issuance smoke test
         timeout-minutes: 10
         env:
           BROKER_DEPLOY_SMOKE_RUN: 'true'
@@ -527,7 +528,7 @@ jobs:
           cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
           Direct broker smoke passed.
 
-          Verified issued child-key metadata, positive Qwen/DeepSeek/Gemini routing, and disallowed-model guardrail enforcement.
+          Verified synthetic QQ production issuance, one-time child-key metadata, positive Qwen/DeepSeek/Gemini routing, and disallowed-model guardrail enforcement.
 
           Do not connect app / public traffic to the broker until this run has been reviewed and an explicit cutover is approved.
           EOF

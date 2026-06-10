@@ -83,7 +83,7 @@ What it does **not** mean:
 - [ ] production OpenRouter management key prepared (`OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION`)
 - [ ] production OpenRouter managed guardrail id prepared (`OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION`)
 - [ ] production OpenRouter managed user-id HMAC secret prepared (`OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION`)
-- [ ] production QQ assertion HMAC PSK prepared (`QQ_AUTH_HMAC_PSK_PRODUCTION`, copied to Worker secret `QQ_AUTH_HMAC_PSK`; never store the value in the repo)
+- [ ] production QQ assertion HMAC PSK prepared (`QQ_AUTH_HMAC_PSK_PRODUCTION`, copied to Worker secret `QQ_AUTH_HMAC_PSK`; required with `OPENROUTER_MANAGEMENT_API_KEY` and `OPENROUTER_MANAGED_GUARDRAIL_ID` for QQ production issuance; never store the value in the repo)
 - [ ] production Discord OAuth client id prepared (`DISCORD_CLIENT_ID_PRODUCTION`, copied to Worker secret `DISCORD_CLIENT_ID`)
 - [ ] production Discord OAuth client secret prepared (`DISCORD_CLIENT_SECRET_PRODUCTION`, copied to Worker secret `DISCORD_CLIENT_SECRET`; never store the value in the repo)
 - [ ] production Discord redirect allowlist prepared (`DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION`, copied to Worker secret `DISCORD_REDIRECT_URI_ALLOWLIST`)
@@ -145,7 +145,7 @@ Minimum automated smoke coverage should include the broker’s real HTTP contrac
 - [x] `POST /v1/trial/challenge/verify`
 - [x] `GET /v1/trial/status`
 - [x] `POST /v1/providers/openrouter/issue`
-- [x] `POST /v1/auth/qq/assert` with a synthetic non-PII `deploy-smoke-qq-<uuid>` identity and a credential computed from `BROKER_DEPLOY_SMOKE_QQ_AUTH_HMAC_PSK`
+- [x] `POST /v1/auth/qq/assert` with a synthetic non-PII `deploy-smoke-qq-<uuid>` identity and a credential computed from `BROKER_DEPLOY_SMOKE_QQ_AUTH_HMAC_PSK`; when production issuance configuration is present, this returns `issued` with a one-time `openrouter_api_key`
 
 Implementation notes for the minimum smoke path:
 
@@ -162,7 +162,7 @@ Implementation notes for the minimum smoke path:
 - [x] prefer existing broker test helpers where possible:
   - `broker/tests/test-support/ed25519.ts`
   - `broker/tests/test-support/trial-api.ts`
-- [x] redact or avoid logging full `issue` responses because successful responses contain `openrouter_api_key`
+- [x] redact or avoid logging full `issue` and QQ assertion responses because successful responses contain `openrouter_api_key`
 
 Recommended failure-path smoke coverage:
 
@@ -173,11 +173,13 @@ Recommended failure-path smoke coverage:
 
 Canonical production smoke now also verifies:
 
-- [x] issued child-key metadata reflects the managed limit / expiry contract
-- [x] the test-only QQ assertion endpoint verifies a synthetic HMAC assertion without logging the PSK, raw identity, raw credential, or derived subject material
+- [x] synthetic non-PII QQ Managed issuance returns `issued`, includes a one-time `openrouter_api_key`, and redacts the key, QQ identity, credential, and derived subject material from success/failure output
+- [x] issued QQ child-key metadata reflects the managed limit / expiry contract
+- [x] repeat QQ assertion for the same synthetic subject proves one-time key-bearing behavior by returning lifetime-used behavior without key recovery
 - [x] the deploy path performs guardrail reconcile before deploy / smoke
 - [x] positive routing for `qwen/qwen3.5-flash-02-23`, `deepseek/deepseek-v4-flash`, and `google/gemini-2.5-flash-lite`
 - [x] a known disallowed model is rejected after guardrail assignment
+- [x] operational docs distinguish issuance-disabled verification-only behavior from enabled production issuance failures; enabled failures must use bounded retryable/internal envelopes rather than falling back to `verified`
 
 Recommended later expansion:
 
@@ -204,7 +206,7 @@ The remaining rollout work is operational, not repo-side automation:
     - `OPENROUTER_MANAGED_API_KEY_PRODUCTION` remains transitional compatibility only
     - `OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION` and `OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION` are required for child-key issuance
     - `OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION` must be registered so deploy sync can populate runtime `OPENROUTER_MANAGED_USER_HMAC_SECRET` for deterministic managed OpenRouter user ids
-    - `QQ_AUTH_HMAC_PSK_PRODUCTION` must be registered so deploy sync can populate runtime `QQ_AUTH_HMAC_PSK` and the smoke test can exercise `POST /v1/auth/qq/assert`
+    - `QQ_AUTH_HMAC_PSK_PRODUCTION` must be registered so deploy sync can populate runtime `QQ_AUTH_HMAC_PSK` and the smoke test can exercise QQ production issuance through `POST /v1/auth/qq/assert`
     - `DISCORD_CLIENT_ID_PRODUCTION`, `DISCORD_CLIENT_SECRET_PRODUCTION`, `DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION`, and `DISCORD_USER_REF_SECRET_PRODUCTION` must be registered so deploy sync can populate runtime `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI_ALLOWLIST`, and `DISCORD_USER_REF_SECRET` for Discord OAuth onboarding
     - `BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION` must be set to a model blocked by the configured guardrail
 2. create or confirm the production D1 database and capture its `database_id`
