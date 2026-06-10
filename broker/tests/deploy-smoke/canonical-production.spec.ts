@@ -21,6 +21,9 @@ const ISSUE_MODEL = MANAGED_ALLOWLIST_MODELS[0];
 const POSITIVE_ROUTING_PROBE_MODELS = MANAGED_ALLOWLIST_MODELS.filter(
   (model) => model !== ISSUE_MODEL,
 );
+const EMPTY_CONTENT_ALLOWED_POSITIVE_ROUTING_MODELS = new Set([
+  'deepseek/deepseek-v4-flash',
+]);
 const BOOTSTRAP_PLACEHOLDER = '__BOOTSTRAP_REQUIRED__';
 const OPENROUTER_API_BASE_URL = new URL('https://openrouter.ai');
 const smokeRunEnabled = process.env.BROKER_DEPLOY_SMOKE_RUN === 'true';
@@ -91,6 +94,28 @@ describe('broker deploy smoke helpers', () => {
           },
         },
         'qwen/qwen3.5-flash-02-23',
+      ),
+    ).not.toThrow();
+  });
+
+  it('accepts empty assistant content for the DeepSeek positive routing probe', () => {
+    expect(() =>
+      assertSuccessfulChatCompletionResponse(
+        {
+          status: 200,
+          body: {
+            id: 'chatcmpl-deepseek-empty-content',
+            choices: [
+              {
+                message: {
+                  role: 'assistant',
+                  content: '',
+                },
+              },
+            ],
+          },
+        },
+        'deepseek/deepseek-v4-flash',
       ),
     ).not.toThrow();
   });
@@ -914,7 +939,10 @@ function assertSuccessfulChatCompletionResponse(
     );
   }
 
-  if (!hasNonEmptyChatCompletionContent(message.content)) {
+  if (
+    !hasNonEmptyChatCompletionContent(message.content) &&
+    !EMPTY_CONTENT_ALLOWED_POSITIVE_ROUTING_MODELS.has(requestedModel)
+  ) {
     throw new Error(
       `OpenRouter chat completion response for ${requestedModel} must include non-empty assistant content`,
     );
