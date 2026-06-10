@@ -335,6 +335,34 @@ export const OPENROUTER_ENTITLEMENT_STATUS_VALUES = [
   'revoked',
 ] as const;
 
+export const QQ_MANAGED_ENTITLEMENT_STATUS_VALUES = [
+  'issuing',
+  'active',
+  'cleanup_required',
+  'revoked',
+] as const;
+
+export const QQ_MANAGED_ENTITLEMENT_AUTOMATIC_REISSUE_BLOCKING_STATUS_VALUES = [
+  'active',
+  'cleanup_required',
+  'revoked',
+] as const;
+
+export const QQ_MANAGED_ENTITLEMENT_STALE_ISSUING_POLICY = {
+  ttlMinutes: 15,
+  withoutManagedCredentialRef:
+    'eligible for same-subject release/reclaim by a later valid request after TTL',
+  withManagedCredentialRef:
+    'cleanup/remediation candidate; must not be silently overwritten',
+} as const;
+
+export const QQ_SUBJECT_REF_POLICY = {
+  prefix: 'ph-qq-subject-v1_',
+  hmacSecretBinding: 'QQ_AUTH_HMAC_PSK',
+  rotationGuardrail:
+    'production QQ_AUTH_HMAC_PSK replacement requires a versioned subject-ref rotation plan with dual lookup/backfill semantics; simple secret replacement is not allowed',
+} as const;
+
 export const DISCORD_OAUTH_SESSION_STATUS_VALUES = [
   'pending',
   'processing',
@@ -366,6 +394,11 @@ export const REFERRAL_REFERRER_BONUS_STATUS_VALUES = [
 
 export type OpenRouterEntitlementStatus =
   (typeof OPENROUTER_ENTITLEMENT_STATUS_VALUES)[number];
+
+export type BrokerIssueSuccessSource = 'discord' | 'qq';
+
+export type QqManagedEntitlementStatus =
+  (typeof QQ_MANAGED_ENTITLEMENT_STATUS_VALUES)[number];
 
 export type DiscordOAuthSessionStatus =
   (typeof DISCORD_OAUTH_SESSION_STATUS_VALUES)[number];
@@ -465,9 +498,25 @@ export interface QqAuthAssertionRecord {
   status: 'verified';
 }
 
+export interface QqManagedEntitlementRecord {
+  qq_subject_ref: string;
+  status: QqManagedEntitlementStatus;
+  issue_ref: string;
+  managed_credential_ref: string | null;
+  budget_usd: number;
+  reserved_at: string;
+  issued_at: string | null;
+  expires_at: string | null;
+  delivered_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BrokerIssueSuccessEventRecord {
   id: number;
-  installation_id: string;
+  issue_source: BrokerIssueSuccessSource;
+  installation_id: string | null;
+  subject_ref: string;
   managed_credential_ref: string | null;
   ip_hash: string | null;
   ip_prefix_hash: string | null;
@@ -764,7 +813,7 @@ export const BROKER_PERSISTENCE_MODEL = {
     qqAuthAssertions: {
       name: 'qq_auth_assertions',
       purpose:
-        'durable anonymized QQ Bot HMAC assertion evidence for the test endpoint',
+        'durable anonymized QQ Bot HMAC assertion evidence for verification-only compatibility and production issuance eligibility',
       primaryKey: 'qq_subject_ref',
       columns: [
         'qq_subject_ref',
@@ -776,6 +825,53 @@ export const BROKER_PERSISTENCE_MODEL = {
       storedStatuses: ['verified'],
       rawIdentityStorage: false,
       duplicateHandling: 'preserve original row; duplicate assertions are idempotent',
+    },
+    qqManagedEntitlements: {
+      name: 'qq_managed_entitlements',
+      purpose:
+        'durable QQ Managed production issuance lifecycle keyed by stable subject reference',
+      primaryKey: 'qq_subject_ref',
+      lifecycleDecisionSource: 'qq_managed_entitlements, not qq_auth_assertions',
+      rowCardinality: 'zero-or-one-row-per-qq_subject_ref',
+      absenceRepresents: 'no production issuance has been reserved or used',
+      storedStatuses: QQ_MANAGED_ENTITLEMENT_STATUS_VALUES,
+      automaticReissueBlockedStatuses:
+        QQ_MANAGED_ENTITLEMENT_AUTOMATIC_REISSUE_BLOCKING_STATUS_VALUES,
+      columns: [
+        'qq_subject_ref',
+        'status',
+        'issue_ref',
+        'managed_credential_ref',
+        'budget_usd',
+        'reserved_at',
+        'issued_at',
+        'expires_at',
+        'delivered_at',
+        'created_at',
+        'updated_at',
+      ],
+      unique: ['issue_ref'],
+      partialUniqueIndexes: [
+        {
+          name: 'idx_qq_managed_entitlements_managed_credential_ref',
+          columns: ['managed_credential_ref'],
+          predicate: 'managed_credential_ref IS NOT NULL',
+        },
+      ],
+      indexed: ['status + updated_at', 'expires_at', 'issue_ref'],
+      stateInvariants: {
+        active:
+          'requires managed_credential_ref, issued_at, expires_at, and delivered_at',
+        cleanup_required: 'requires managed_credential_ref',
+        issuing:
+          'may be stale-reclaimed only when managed_credential_ref is NULL; issuing with a credential ref requires cleanup/remediation',
+        revoked: 'blocks automatic reissue',
+      },
+      staleIssuingPolicy: QQ_MANAGED_ENTITLEMENT_STALE_ISSUING_POLICY,
+      subjectRefPolicy: QQ_SUBJECT_REF_POLICY,
+      rawIdentityStorage: false,
+      rawCredentialStorage: false,
+      rawOpenRouterKeyStorage: false,
     },
     brokerRequestEvents: {
       name: 'broker_request_events',
@@ -792,9 +888,25 @@ export const BROKER_PERSISTENCE_MODEL = {
     brokerIssueSuccessEvents: {
       name: 'broker_issue_success_events',
       purpose: ['issue success alerting', 'daily reporting', 'asn-based heuristics'],
+      issueSources: ['discord', 'qq'],
+      sourceAwareSubjectModel: {
+        discord: {
+          issue_source: 'discord',
+          installation_id: 'required existing installation identity',
+          subject_ref: 'same value as installation_id',
+        },
+        qq: {
+          issue_source: 'qq',
+          installation_id: null,
+          subject_ref: 'qq_subject_ref',
+        },
+        fakeInstallationRowsAllowed: false,
+      },
       columns: [
         'id',
+        'issue_source',
         'installation_id',
+        'subject_ref',
         'managed_credential_ref',
         'ip_hash',
         'ip_prefix_hash',
@@ -809,6 +921,7 @@ export const BROKER_PERSISTENCE_MODEL = {
       appendOnly: true,
       indexed: [
         'installation_id + observed_at',
+        'issue_source + subject_ref + observed_at',
         'managed_credential_ref + observed_at',
         'ip_hash + observed_at',
         'ip_prefix_hash + observed_at',

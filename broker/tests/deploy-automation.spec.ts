@@ -178,7 +178,7 @@ describe('broker direct deploy automation', () => {
     }
   });
 
-  it('ships a manual direct-deploy workflow that renders config, applies remote D1 changes, syncs the transitional and child-key management secrets, deploys the canonical worker, and runs smoke', () => {
+  it('ships a manual direct-deploy workflow that renders config, applies remote D1 changes, syncs the transitional and child-key management secrets, deploys the canonical worker, and runs production QQ issuance smoke', () => {
     const workflow = readFileSync(deployWorkflow, 'utf8');
     const smokeSpec = readFileSync(deploySmokeSpec, 'utf8');
     const readme = readFileSync(brokerReadme, 'utf8');
@@ -379,6 +379,7 @@ describe('broker direct deploy automation', () => {
     expect(workflow).toContain('app / public traffic');
     expect(workflow).toContain('transitional runtime compatibility');
     expect(workflow).toContain('managed child-key creation and cleanup');
+    expect(workflow).toContain('QQ production issuance');
     expect(workflow).toContain('assign the canonical production guardrail');
     expect(workflow).toContain('positive Qwen/DeepSeek/Gemini routing');
     expect(smokeSpec).not.toContain("process.env.CI === 'true'");
@@ -397,6 +398,10 @@ describe('broker direct deploy automation', () => {
     expect(smokeSpec).toContain('/v1/auth/qq/assert');
     expect(smokeSpec).toContain('deploy-smoke-qq-');
     expect(smokeSpec).toContain('ph-qq-subject-v1_');
+    expect(smokeSpec).toContain("expect(qqAssertion.body.status).toBe('issued')");
+    expect(smokeSpec).not.toContain("expect(qqAssertion.body.status).toBe('verified')");
+    expect(smokeSpec).toContain('assertQqIssuedResponse');
+    expect(smokeSpec).toContain('qqIssuedKey.openrouterApiKey');
     expect(smokeSpec).toContain('reads issued child-key metadata');
     expect(smokeSpec).toContain('recognizes model-routing failures as guardrail enforcement');
     expect(smokeSpec).toContain('assertSuccessfulChatCompletionResponse');
@@ -424,6 +429,15 @@ describe('broker direct deploy automation', () => {
     expect(readme).toContain('QQ_AUTH_HMAC_PSK_PRODUCTION');
     expect(readme).toContain('QQ_AUTH_HMAC_PSK');
     expect(readme).toContain('POST /v1/auth/qq/assert');
+    expect(readme).toContain('production issuance-capable when runtime issuance configuration is present');
+    expect(readme).toContain('issuance-disabled verification-only behavior');
+    expect(readme).toContain('bounded retryable/internal error envelope');
+    expect(readme).toContain('qq_managed_entitlements');
+    expect(readme).toContain('broker_issue_success_events');
+    expect(readme).toContain('issue_source');
+    expect(readme).toContain('subject_ref');
+    expect(readme).not.toContain('test-only `POST /v1/auth/qq/assert`');
+    expect(readme).not.toContain('test-only QQ Bot assertion evidence');
     expect(readme).toContain('0008_add_qq_auth_assertions.sql');
     expect(readme).toContain('qq_auth_assertions');
     expect(readme).toContain('qqAuthAssertIp');
@@ -451,6 +465,11 @@ describe('broker direct deploy automation', () => {
     expect(checklist).toContain('QQ_AUTH_HMAC_PSK_PRODUCTION');
     expect(checklist).toContain('QQ_AUTH_HMAC_PSK');
     expect(checklist).toContain('POST /v1/auth/qq/assert');
+    expect(checklist).toContain('returns `issued`');
+    expect(checklist).toContain('one-time `openrouter_api_key`');
+    expect(checklist).toContain('QQ production issuance');
+    expect(checklist).toContain('synthetic non-PII QQ Managed issuance');
+    expect(checklist).not.toContain('test-only QQ assertion endpoint');
     expect(checklist).toContain('DISCORD_CLIENT_ID_PRODUCTION');
     expect(checklist).toContain('DISCORD_CLIENT_SECRET_PRODUCTION');
     expect(checklist).toContain('DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION');

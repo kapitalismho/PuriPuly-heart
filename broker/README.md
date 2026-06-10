@@ -20,13 +20,14 @@ Use `pnpm --filter @puripuly-heart/broker run verify:config` to exercise the pin
 
 - `broker/scripts/render-production-wrangler-config.mjs` renders a temporary deploy-time Wrangler config from `broker/wrangler.jsonc`, injects the production D1 `database_id`, and fails if the checked-in worker name stops being the canonical `puripuly-heart-broker`.
 - `broker/deploy/fingerprint-bootstrap.template.sql` plus `broker/scripts/render-fingerprint-bootstrap-sql.mjs` render guarded bootstrap SQL for `wrangler d1 execute --file ... --yes`. The rendered SQL only replaces the migration placeholder and fails before mutating `broker_config` if the placeholder is already gone.
-- `.github/workflows/deploy-broker-direct.yml` is the manual `workflow_dispatch` path for the first canonical deploy. It applies remote D1 migrations, bootstraps the fingerprint salt, reconciles the production OpenRouter guardrail through `PATCH /api/v1/guardrails/{id}`, syncs the OpenRouter, Discord, and QQ worker secrets needed for managed child-key issuance and test-only QQ assertions, deploys the canonical worker, and runs `broker/tests/deploy-smoke/canonical-production.spec.ts` against the canonical `workers.dev` URL.
-- `OPENROUTER_MANAGED_API_KEY_PRODUCTION` remains transitional runtime compatibility only; `OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION` drives managed child-key creation / cleanup, `OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION` assigns the production guardrail to each issued key, and `OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION` is copied into the runtime secret `OPENROUTER_MANAGED_USER_HMAC_SECRET` so the worker can derive a deterministic versioned managed OpenRouter user id per installation.
-- `QQ_AUTH_HMAC_PSK_PRODUCTION` is copied into the runtime secret `QQ_AUTH_HMAC_PSK` for the test-only `POST /v1/auth/qq/assert` endpoint. The endpoint accepts QQ Bot HMAC assertions only; it does not issue OpenRouter keys or bind app installations, and the PSK value must stay out of source, docs, logs, and test output.
+- `.github/workflows/deploy-broker-direct.yml` is the manual `workflow_dispatch` path for the first canonical deploy. It applies remote D1 migrations, bootstraps the fingerprint salt, reconciles the production OpenRouter guardrail through `PATCH /api/v1/guardrails/{id}`, syncs the OpenRouter, Discord, and QQ worker secrets needed for managed child-key issuance and QQ production issuance, deploys the canonical worker, and runs `broker/tests/deploy-smoke/canonical-production.spec.ts` against the canonical `workers.dev` URL.
+- `OPENROUTER_MANAGED_API_KEY_PRODUCTION` remains transitional runtime compatibility only; `OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION` drives managed child-key creation / cleanup, `OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION` assigns the production guardrail to each issued key, and `OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION` is copied into the runtime secret `OPENROUTER_MANAGED_USER_HMAC_SECRET` so the worker can derive a deterministic versioned managed OpenRouter user id per installation or QQ subject.
+- `QQ_AUTH_HMAC_PSK_PRODUCTION` is copied into the runtime secret `QQ_AUTH_HMAC_PSK` for `POST /v1/auth/qq/assert`. The endpoint is production issuance-capable when runtime issuance configuration is present (`QQ_AUTH_HMAC_PSK`, `OPENROUTER_MANAGEMENT_API_KEY`, and `OPENROUTER_MANAGED_GUARDRAIL_ID` are all non-blank). The issuance-disabled verification-only behavior preserves `verified` / `already_verified` compatibility without touching `qq_managed_entitlements`; when issuance is enabled, OpenRouter, guardrail, cleanup, or D1 failures return a bounded retryable/internal error envelope instead of falling back to verification-only success. The PSK value, raw QQ identity, raw credential, and raw key-bearing payloads must stay out of source, docs, logs, and test output.
 - `DISCORD_CLIENT_ID_PRODUCTION`, `DISCORD_CLIENT_SECRET_PRODUCTION`, `DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION`, and `DISCORD_USER_REF_SECRET_PRODUCTION` are copied into the runtime secrets `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI_ALLOWLIST`, and `DISCORD_USER_REF_SECRET` for Discord OAuth onboarding.
 - `DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION` is copied into the runtime secrets `DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL` and `DISCORD_DAILY_REPORT_WEBHOOK_URL` so the broker can send real-time alerts, while the minute-resolution cron trigger consults `abuse_controls.dailyReport` plus persisted `abuse_runtime_state` to emit the daily Discord heartbeat only once per UTC day.
 - The deploy reconcile step sets `allowed_models` to `google/gemma-4-26b-a4b-it`, `qwen/qwen3.5-flash-02-23`, `deepseek/deepseek-v4-flash`, and `google/gemini-2.5-flash-lite`, clears provider restrictions inside the guardrail (`allowed_providers` / `ignored_providers`), and sets `enforce_zdr = false` before smoke.
-- The deploy smoke verifies a synthetic non-PII QQ assertion through `POST /v1/auth/qq/assert`, verifies issued child-key metadata through `https://openrouter.ai/api/v1/key`, proves positive routing through `qwen/qwen3.5-flash-02-23`, `deepseek/deepseek-v4-flash`, and `google/gemini-2.5-flash-lite`, and still probes `https://openrouter.ai/api/v1/chat/completions` with `BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION` to confirm guardrail enforcement.
+- The deploy smoke verifies a synthetic non-PII QQ Managed assertion through `POST /v1/auth/qq/assert`, expects `status: "issued"` with a one-time `openrouter_api_key`, verifies duplicate/lifetime guardrail behavior without key recovery, verifies issued child-key metadata through `https://openrouter.ai/api/v1/key`, proves positive routing through `qwen/qwen3.5-flash-02-23`, `deepseek/deepseek-v4-flash`, and `google/gemini-2.5-flash-lite`, and still probes `https://openrouter.ai/api/v1/chat/completions` with `BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION` to confirm guardrail enforcement.
+- Config verification is split by surface: `pnpm --filter @puripuly-heart/broker run verify:config` checks the checked-in Worker binding contract, while the direct-deploy guard step fails before migrations if the production secrets `QQ_AUTH_HMAC_PSK_PRODUCTION`, `OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION`, or `OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION` are missing or blank. Neither path prints secret values.
 - Account-level OpenRouter privacy / provider settings remain outside repo control and may still narrow effective routing even after the guardrail reconcile; the production smoke is the proof point for the resulting path.
 - The workflow expects CI-managed secrets / vars in the `production` GitHub Environment: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `BROKER_D1_DATABASE_ID_PRODUCTION`, `OPENROUTER_MANAGED_API_KEY_PRODUCTION`, `OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION`, `OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION`, `OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION`, `QQ_AUTH_HMAC_PSK_PRODUCTION`, `DISCORD_CLIENT_ID_PRODUCTION`, `DISCORD_CLIENT_SECRET_PRODUCTION`, `DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION`, `DISCORD_USER_REF_SECRET_PRODUCTION`, `DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION`, `BROKER_CANONICAL_WORKERS_DEV_URL`, and `BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION`.
 - App / public traffic must stay disconnected from the broker until the direct deploy smoke run passes and is explicitly reviewed.
@@ -102,6 +103,15 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
   - the child key is created with the managed-trial limit (`0.07` USD), a three-month expiry anchored to `issued_at`, and the configured managed guardrail before the broker returns it
   - live remaining budget and usage stay upstream in OpenRouter metadata and are not mirrored into the issue response
   - manual broker revocation is only a broker-local stop for future onboarding; because the app calls OpenRouter directly after issue succeeds, operators must also disable or delete the upstream OpenRouter child key when they need a revocation to stop existing direct use
+- `POST /v1/auth/qq/assert`
+  - request body remains `qq_identity`, `credential`, and `asserted_at`; no installation ID, device key, hardware hash, or app-side endpoint sequence is required for QQ production issuance
+  - `credential` remains `HMAC-SHA256-HEX(QQ_AUTH_HMAC_PSK, qq_identity)`; `asserted_at` is validated as bounded timestamp text but is not part of the HMAC payload
+  - `QQ_AUTH_HMAC_PSK` is mandatory for all QQ assertion handling; `OPENROUTER_MANAGEMENT_API_KEY` and `OPENROUTER_MANAGED_GUARDRAIL_ID` are the runtime gate for production issuance
+  - with the OpenRouter issuance gate disabled, valid assertions preserve verification-only compatibility and return `verified` / `already_verified` without creating or mutating `qq_managed_entitlements`
+  - with the gate enabled, an eligible first assertion returns `issued`, `qq_subject_ref`, one-time top-level `openrouter_api_key`, `managed_credential_ref`, `expires_at`, and optional `openrouter_user_id`; the Broker never stores the raw key
+  - duplicate active, cleanup-required, or revoked QQ entitlements return `qq_lifetime_used`; concurrent current issuance returns `qq_already_issuing`; invalid credentials return `qq_credential_invalid`
+  - QQ uses the base Managed trial budget, expiry, allowed-model policy, OpenRouter child-key creation, and configured guardrail; it does not run Discord referral reservation/rewards, owned Referral ID, Talk Together Pass, or referral bonus budget paths
+  - QQ lifetime, monitoring, and cleanup use `qq_subject_ref` / `issue_ref` metadata and must not create fake installation rows or pass raw QQ identity to OpenRouter child-key names
 
 ## Persistence model
 
@@ -112,7 +122,9 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
 - `0003_add_abuse_runtime_state_and_issue_success_events.sql` adds the persisted abuse runtime-state row plus append-only issue-success and runtime-audit tables used by alerting, brake state, daily heartbeat delivery, and retention.
 - `0004_add_discord_oauth_managed_issue.sql` adds Discord OAuth session and identity storage plus Discord-managed issue columns on `openrouter_entitlements`.
 - `0005_add_referral_persistence_foundation.sql` adds nullable OAuth session `referral_id` storage plus the referral code and referral reward ledger foundation.
-- `0008_add_qq_auth_assertions.sql` adds the test-only `qq_auth_assertions` table and inserts the `qqAuthAssertIp` abuse-control default without replacing operator-tuned `abuse_controls` values.
+- `0008_add_qq_auth_assertions.sql` adds the `qq_auth_assertions` evidence table and inserts the `qqAuthAssertIp` abuse-control default without replacing operator-tuned `abuse_controls` values.
+- `0009_add_qq_managed_entitlements.sql` adds the `qq_managed_entitlements` lifecycle table for QQ production issuance without rewriting existing assertion evidence.
+- `0010_source_aware_issue_success_events.sql` rebuilds `broker_issue_success_events` so successful issue monitoring is source-aware: Discord rows keep installation identity, while QQ rows use `issue_source = 'qq'`, nullable `installation_id`, and `subject_ref = qq_subject_ref` instead of fake installation rows.
 
 - `broker_config`
   - columns: `key`, `value`, `updated_at`
@@ -131,6 +143,9 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
 - `broker_issue_success_events`
   - append-only successful issue observations recorded only after child-key creation and entitlement persistence both succeed
   - feeds immediate-alert evaluation, daily heartbeat rollups, and retention cleanup
+  - columns include `issue_source`, nullable `installation_id`, `subject_ref`, `managed_credential_ref`, safe network metadata, and `observed_at`
+  - Discord rows use `issue_source = 'discord'`, retain `installation_id`, and set `subject_ref` to that same installation identity; QQ rows use `issue_source = 'qq'`, leave `installation_id` `NULL`, and set `subject_ref` to `qq_subject_ref`
+  - QQ monitoring/reporting must not synthesize installation rows, and no raw QQ identity, raw credential, raw OpenRouter key, raw Broker payload, or raw OpenRouter payload belongs in issue-success events
 - `broker_abuse_runtime_audit`
   - append-only audit trail for brake transitions and other persisted abuse-runtime actions
 - `broker_request_events`
@@ -168,9 +183,16 @@ Broker verification is Linux-only. Run `pnpm install`, Vitest, and Wrangler from
   - columns: `discord_user_ref`, `entitlement_installation_id`, `status`, `ref_secret_version`, `created_at`, `updated_at`
   - `entitlement_installation_id` uses `ON DELETE SET NULL` so identity evidence is not cascade-deleted with aged installation rows
 - `qq_auth_assertions`
-  - test-only QQ Bot assertion evidence keyed by derived `qq_subject_ref`
+  - QQ Bot HMAC assertion evidence keyed by derived `qq_subject_ref`; it supports verification-only compatibility and production issuance eligibility, but does not own entitlement lifecycle
   - columns: `qq_subject_ref`, `credential_hash`, `asserted_at`, `received_at`, `status`
   - stores only derived subject references and credential digests; raw QQ identities and raw credentials do not belong in D1, logs, docs, or checked-in tests
+- `qq_managed_entitlements`
+  - QQ Managed production issuance lifecycle keyed by derived `qq_subject_ref`; absence means the subject has not reserved or used production issuance
+  - columns: `qq_subject_ref`, `status`, `issue_ref`, nullable `managed_credential_ref`, `budget_usd`, `reserved_at`, `issued_at`, `expires_at`, `delivered_at`, `created_at`, and `updated_at`
+  - stored statuses are `issuing`, `active`, `cleanup_required`, and `revoked`; `active`, `cleanup_required`, and `revoked` block automatic reissue
+  - `active` requires `managed_credential_ref`, `issued_at`, `expires_at`, and `delivered_at`; `cleanup_required` requires `managed_credential_ref`; stale `issuing` rows can be reclaimed only when no child-key hash was recorded
+  - existing `qq_auth_assertions` rows without a `qq_managed_entitlements` row remain eligible for their first production issuance
+  - stores derived and operational metadata only; raw QQ identities, raw credentials, and raw OpenRouter API keys do not belong in this table
 - `referral_codes`
   - stable owned Referral ID rows keyed by `referral_id`
   - columns: `referral_id`, `owner_discord_user_ref`, `owner_installation_id`, `status`, `created_at`, `updated_at`

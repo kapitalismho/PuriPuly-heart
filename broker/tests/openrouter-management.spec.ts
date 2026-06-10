@@ -15,7 +15,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 describe('OpenRouter management client', () => {
   it('creates a child key and returns the raw key plus hash', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse(
         {
           key: 'or-child-key-123',
@@ -57,6 +57,51 @@ describe('OpenRouter management client', () => {
         }),
       }),
     );
+  });
+
+  it('creates a QQ child key with source-aware metadata without installation identity', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      jsonResponse(
+        {
+          key: 'or-qq-managed-child-key-123',
+          data: {
+            hash: 'hash_qq_managed_child_123',
+            expires_at: '2026-10-10T06:00:00.000Z',
+            limit: 0.07,
+            limit_reset: null,
+          },
+        },
+        201,
+      ),
+    );
+    const qqSubjectRef = 'ph-qq-subject-v1_synthetic-subject-ref';
+    const issueRef = 'qq-issue-ref-20260610T060000Z';
+
+    const result = await createManagedChildKey({
+      managementApiKey: 'mgmt-key',
+      issueSource: 'qq',
+      subjectRef: qqSubjectRef,
+      issueRef,
+      expiresAt: '2026-10-10T06:00:00.000Z',
+      fetchImpl: fetchMock,
+    });
+
+    expect(result).toEqual({
+      rawKey: 'or-qq-managed-child-key-123',
+      hash: 'hash_qq_managed_child_123',
+    });
+
+    const requestBody = JSON.parse(
+      String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body),
+    ) as { name?: string; limit?: number };
+    expect(requestBody).toEqual(
+      expect.objectContaining({
+        name: `puripuly-heart:qq:${issueRef}`,
+        limit: 0.07,
+      }),
+    );
+    expect(requestBody.name).not.toContain(qqSubjectRef);
+    expect(requestBody.name).not.toContain('installation');
   });
 
   it('creates a child key with an explicit absolute limit and verifies the effective limit', async () => {

@@ -69,7 +69,9 @@ interface DiscordIdentityRow {
 }
 
 interface IssueSuccessEventRow {
+  issue_source: string;
   installation_id: string;
+  subject_ref: string;
   managed_credential_ref: string;
   ip_hash: string | null;
   ip_prefix_hash: string | null;
@@ -193,7 +195,9 @@ describe('Discord issue gate', () => {
     const issueSuccessEvents = readIssueSuccessEvents(started.env);
     expect(issueSuccessEvents).toEqual([
       expect.objectContaining({
+        issue_source: 'discord',
         installation_id: started.installationId,
+        subject_ref: started.installationId,
         managed_credential_ref: 'hash_discord_managed_child_test_1',
         observed_at: NOW_ISO,
       }),
@@ -1765,12 +1769,19 @@ describe('Discord issue gate', () => {
     env.__db
       .prepare(
         `INSERT INTO broker_issue_success_events (
+            issue_source,
             installation_id,
+            subject_ref,
             managed_credential_ref,
             observed_at
-          ) VALUES (?, ?, ?)`,
+          ) VALUES ('discord', ?, ?, ?, ?)`,
       )
-      .run('install-discord-monitoring-existing', 'existing-monitoring-event', NOW_ISO);
+      .run(
+        'install-discord-monitoring-existing',
+        'install-discord-monitoring-existing',
+        'existing-monitoring-event',
+        NOW_ISO,
+      );
     const started = await startDiscordSession('install-discord-monitoring-cleanup-required', env);
     rawState = started.state;
     rawPkceVerifier = (await readSessionByState(env, started.state)).pkce_code_verifier;
@@ -2096,7 +2107,9 @@ async function readDiscordIdentity(
 function readIssueSuccessEvents(env: TestBrokerEnv): IssueSuccessEventRow[] {
   return env.__db
     .prepare(
-      `SELECT installation_id,
+      `SELECT issue_source,
+              installation_id,
+              subject_ref,
               managed_credential_ref,
               ip_hash,
               ip_prefix_hash,

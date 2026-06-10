@@ -163,6 +163,70 @@ describe('broker daily heartbeat', () => {
     expect(sent.payload.summary.cloud_asn_share_24h).toBe(17);
   });
 
+  it('counts QQ nullable-installation issue successes in the daily heartbeat without raw identity', async () => {
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.dailyReport.enabled = true;
+      controls.dailyReport.hourUtc = 0;
+      controls.dailyReport.minuteUtc = 0;
+    });
+
+    insertIssueSuccessEvent(env, {
+      installationId: 'daily-source-aware-discord',
+      managedCredentialRef: 'daily-source-aware-discord-managed',
+      asn: 64570,
+      observedAt: '2026-06-09T23:00:00.000Z',
+    });
+    env.__db
+      .prepare(
+        `INSERT INTO broker_issue_success_events (
+            issue_source,
+            installation_id,
+            subject_ref,
+            managed_credential_ref,
+            ip_hash,
+            ip_prefix_hash,
+            asn,
+            country,
+            http_protocol,
+            tls_version,
+            tls_cipher,
+            risk_label,
+            observed_at
+          ) VALUES ('qq', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'ph-qq-subject-v1_daily-safe-subject',
+        'daily-source-aware-qq-managed',
+        'ip-hash-daily-qq',
+        'ip-prefix-daily-qq',
+        64571,
+        'CN',
+        'HTTP/2',
+        'TLSv1.3',
+        'TLS_AES_128_GCM_SHA256',
+        'low',
+        '2026-06-09T23:10:00.000Z',
+      );
+
+    const packet = await buildDailyHeartbeatPacket(
+      env.BROKER_DB,
+      new Date('2026-06-10T00:00:00.000Z'),
+    );
+
+    expect(packet.summary.issue_success_24h).toBe(2);
+    expect(packet.summary.top_asns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          asn: 64571,
+          count: 1,
+        }),
+      ]),
+    );
+    expect(JSON.stringify(packet)).not.toContain('qq_identity');
+    expect(JSON.stringify(packet)).not.toContain('credential');
+  });
+
   it('omits monthly budget exposure from daily heartbeat payloads after retention cleanup', async () => {
     const env = createTestBrokerEnv();
     updateAbuseControls(env, (controls) => {
@@ -327,7 +391,9 @@ function insertIssueSuccessEvent(
   env.__db
     .prepare(
       `INSERT INTO broker_issue_success_events (
+          issue_source,
           installation_id,
+          subject_ref,
           managed_credential_ref,
           ip_hash,
           ip_prefix_hash,
@@ -338,9 +404,10 @@ function insertIssueSuccessEvent(
           tls_cipher,
           risk_label,
           observed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES ('discord', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
+      input.installationId,
       input.installationId,
       input.managedCredentialRef,
       `ip-hash-${input.installationId}`,

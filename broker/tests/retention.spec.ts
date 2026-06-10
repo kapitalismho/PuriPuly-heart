@@ -128,7 +128,9 @@ describe('broker persistence retention model', () => {
 
     const insertIssueSuccess = env.__db.prepare(
       `INSERT INTO broker_issue_success_events (
+          issue_source,
           installation_id,
+          subject_ref,
           managed_credential_ref,
           ip_hash,
           ip_prefix_hash,
@@ -139,9 +141,10 @@ describe('broker persistence retention model', () => {
           tls_cipher,
           risk_label,
           observed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES ('discord', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     insertIssueSuccess.run(
+      'install-retention-old',
       'install-retention-old',
       'managed-retention-old',
       'ip-old',
@@ -155,6 +158,7 @@ describe('broker persistence retention model', () => {
       '2026-03-31T00:00:00.000Z',
     );
     insertIssueSuccess.run(
+      'install-retention-new',
       'install-retention-new',
       'managed-retention-new',
       'ip-new',
