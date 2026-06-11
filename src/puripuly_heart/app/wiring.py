@@ -339,6 +339,9 @@ class ResolvedPeerSTTConfig:
     soniox_endpoint: str | None = None
     soniox_keepalive_interval_s: float | None = None
     soniox_trailing_silence_ms: int | None = None
+    sixtydb_endpoint: str | None = None
+    sixtydb_utterance_end_ms: int | None = None
+    sixtydb_trailing_silence_ms: int | None = None
 
 
 def create_secret_store(
@@ -615,6 +618,21 @@ def create_stt_backend(
             context_terms=effective_terms,
         )
 
+    if settings.provider.stt == STTProviderName.SIXTYDB:
+        from puripuly_heart.core.language import get_60db_languages
+        from puripuly_heart.providers.stt.sixtydb import SixtyDBRealtimeSTTBackend
+
+        api_key = require_secret(secrets, key="sixtydb_api_key", env_var="SIXTYDB_API_KEY")
+        return SixtyDBRealtimeSTTBackend(
+            api_key=api_key,
+            endpoint=settings.sixtydb_stt.endpoint,
+            language_codes=get_60db_languages(settings.languages.source_language),
+            sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
+            utterance_end_ms=settings.sixtydb_stt.utterance_end_ms,
+            trailing_silence_ms=settings.sixtydb_stt.trailing_silence_ms,
+            context_terms=effective_terms,
+        )
+
     raise ValueError(f"Unsupported STT provider: {settings.provider.stt}")
 
 
@@ -654,6 +672,17 @@ def resolve_peer_stt_config(settings: AppSettings) -> ResolvedPeerSTTConfig:
             soniox_trailing_silence_ms=settings.soniox_stt.trailing_silence_ms,
         )
 
+    if provider == STTProviderName.SIXTYDB:
+        return ResolvedPeerSTTConfig(
+            provider=provider,
+            source_language=peer_source_language,
+            sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
+            keyterms=keyterms,
+            sixtydb_endpoint=settings.sixtydb_stt.endpoint,
+            sixtydb_utterance_end_ms=settings.sixtydb_stt.utterance_end_ms,
+            sixtydb_trailing_silence_ms=settings.sixtydb_stt.trailing_silence_ms,
+        )
+
     if provider == STTProviderName.LOCAL_QWEN:
         return ResolvedPeerSTTConfig(
             provider=provider,
@@ -678,6 +707,9 @@ def build_peer_stt_provider_signature(settings: AppSettings) -> tuple[object, ..
         resolved.soniox_endpoint,
         resolved.soniox_keepalive_interval_s,
         resolved.soniox_trailing_silence_ms,
+        resolved.sixtydb_endpoint,
+        resolved.sixtydb_utterance_end_ms,
+        resolved.sixtydb_trailing_silence_ms,
         resolved.keyterms,
     )
 
@@ -743,6 +775,21 @@ def create_peer_stt_backend(
             sample_rate_hz=resolved.sample_rate_hz,
             keepalive_interval_s=resolved.soniox_keepalive_interval_s,
             trailing_silence_ms=resolved.soniox_trailing_silence_ms,
+            context_terms=resolved.keyterms,
+        )
+
+    if resolved.provider == STTProviderName.SIXTYDB:
+        from puripuly_heart.core.language import get_60db_languages
+        from puripuly_heart.providers.stt.sixtydb import SixtyDBRealtimeSTTBackend
+
+        api_key = require_secret(secrets, key="sixtydb_api_key", env_var="SIXTYDB_API_KEY")
+        return SixtyDBRealtimeSTTBackend(
+            api_key=api_key,
+            endpoint=resolved.sixtydb_endpoint,
+            language_codes=get_60db_languages(resolved.source_language),
+            sample_rate_hz=resolved.sample_rate_hz,
+            utterance_end_ms=resolved.sixtydb_utterance_end_ms,
+            trailing_silence_ms=resolved.sixtydb_trailing_silence_ms,
             context_terms=resolved.keyterms,
         )
 

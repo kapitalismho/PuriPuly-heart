@@ -3,6 +3,7 @@
 Provides consistent language codes and names across:
 - Deepgram STT (Nova-3 language codes)
 - Soniox STT (language hints)
+- 60db STT (ISO 639-1 language codes)
 - LLM prompts (Gemini, Qwen)
 - UI display
 
@@ -159,6 +160,15 @@ def get_soniox_language_hints(code: str) -> list[str]:
     return [base_code or "en"]
 
 
+def get_60db_languages(code: str) -> list[str]:
+    """Get 60db language codes from a UI language code. Falls back to ['en']."""
+    info = get_language_info(code)
+    if not info:
+        return ["en"]
+    base_code = info.code.split("-")[0].lower()
+    return [base_code or "en"]
+
+
 def get_all_language_options() -> Sequence[tuple[str, str]]:
     """Get all supported languages as (code, name) tuples for UI dropdowns.
 
@@ -235,6 +245,48 @@ def is_soniox_supported(code: str) -> bool:
     return get_language_info(code) is not None
 
 
+# 60db supported languages (subset of SUPPORTED_LANGUAGES).
+# 60db explicitly rejects Japanese, Korean, Mandarin/Chinese, Thai, Vietnamese,
+# Indonesian, Turkish (and others outside the UI set). Malay is excluded
+# conservatively as 60db documents only European + Indic + Arabic coverage.
+_SIXTYDB_SUPPORTED: set[str] = {
+    "ar",
+    "bg",
+    "ca",
+    "cs",
+    "da",
+    "de",
+    "el",
+    "en",
+    "es",
+    "et",
+    "fi",
+    "fr",
+    "hi",
+    "hu",
+    "it",
+    "lt",
+    "lv",
+    "nl",
+    "no",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "sk",
+    "sv",
+    "uk",
+}
+
+
+def is_60db_supported(code: str) -> bool:
+    """Check if a language is supported by 60db STT."""
+    if code in _SIXTYDB_SUPPORTED:
+        return True
+    base_code = code.split("-")[0].lower()
+    return base_code in _SIXTYDB_SUPPORTED
+
+
 def get_stt_compatibility_warning(code: str, stt_provider: str) -> SttCompatibilityWarning | None:
     """Return a warning key if the language is not supported by the STT provider."""
     lang_info = get_language_info(code)
@@ -252,5 +304,8 @@ def get_stt_compatibility_warning(code: str, stt_provider: str) -> SttCompatibil
 
     if stt_provider == "soniox" and not is_soniox_supported(code):
         return SttCompatibilityWarning("warning.soniox_not_supported", lang_code)
+
+    if stt_provider == "60db" and not is_60db_supported(code):
+        return SttCompatibilityWarning("warning.60db_not_supported", lang_code)
 
     return None

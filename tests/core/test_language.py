@@ -7,10 +7,12 @@ from puripuly_heart.core.language import (
     get_all_language_options,
     get_deepgram_language,
     get_language_info,
+    get_60db_languages,
     get_llm_language_name,
     get_qwen_asr_language,
     get_soniox_language_hints,
     get_stt_compatibility_warning,
+    is_60db_supported,
     is_deepgram_supported,
     is_qwen_asr_supported,
     is_soniox_supported,
@@ -30,6 +32,8 @@ def test_language_helpers_fallback_for_unknown() -> None:
     assert get_llm_language_name("xx") == "English"
     assert get_qwen_asr_language("xx") == "en"
     assert get_soniox_language_hints("xx") == ["en"]
+    assert get_60db_languages("xx") == ["en"]
+    assert get_60db_languages("zh-CN") == ["zh"]
 
 
 def test_qwen_asr_language_normalization() -> None:
@@ -61,6 +65,13 @@ def test_supported_language_checks() -> None:
     assert is_deepgram_supported("ar") is False
     assert is_qwen_asr_supported("ar") is True
     assert is_soniox_supported("ja") is True
+    # 60db supports European + Indic + Arabic, but rejects ja/ko/zh/th/vi/id/tr.
+    assert is_60db_supported("en") is True
+    assert is_60db_supported("ar") is True
+    assert is_60db_supported("hi") is True
+    assert is_60db_supported("ja") is False
+    assert is_60db_supported("ko") is False
+    assert is_60db_supported("zh-CN") is False
 
 
 def test_stt_compatibility_warning_variants() -> None:
@@ -87,7 +98,13 @@ def test_stt_compatibility_warning_variants() -> None:
     assert warning.key == "warning.soniox_not_supported"
     assert warning.language_code == "xx"
 
+    warning = get_stt_compatibility_warning("ja", "60db")
+    assert warning is not None
+    assert warning.key == "warning.60db_not_supported"
+    assert warning.language_code == "ja"
+
     assert get_stt_compatibility_warning("en", "deepgram") is None
+    assert get_stt_compatibility_warning("en", "60db") is None
 
 
 @pytest.mark.parametrize("code", ["en", "ko", "zh-CN"])

@@ -31,6 +31,7 @@ from puripuly_heart.config.settings import (
     QwenLLMModel,
     QwenRegion,
     QwenSettings,
+    SixtyDBSTTSettings,
     SonioxSTTSettings,
     STTProviderName,
     STTSettings,
@@ -58,6 +59,7 @@ from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
+from puripuly_heart.providers.stt.sixtydb import SixtyDBRealtimeSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
 
@@ -1379,3 +1381,54 @@ def test_create_stt_backend_soniox_passes_effective_custom_terms() -> None:
 
     assert isinstance(backend, SonioxRealtimeSTTBackend)
     assert list(backend.context_terms) == ["Puripuly", "VRChat"]
+
+
+def test_create_stt_backend_sixtydb_uses_secret() -> None:
+    settings = AppSettings(
+        provider=ProviderSettings(stt=STTProviderName.SIXTYDB),
+        sixtydb_stt=SixtyDBSTTSettings(endpoint="wss://api.60db.ai/ws/stt"),
+    )
+    settings.audio.internal_sample_rate_hz = 8000
+    secrets = InMemorySecretStore()
+    secrets.set("sixtydb_api_key", "k7")
+
+    backend = create_stt_backend(settings, secrets=secrets)
+    assert isinstance(backend, SixtyDBRealtimeSTTBackend)
+    assert backend.api_key == "k7"
+    assert backend.endpoint == "wss://api.60db.ai/ws/stt"
+    assert backend.sample_rate_hz == 16000
+    assert list(backend.context_terms) == ["아이리", "시나노"]
+
+
+def test_create_stt_backend_sixtydb_passes_effective_custom_terms() -> None:
+    settings = AppSettings(
+        provider=ProviderSettings(stt=STTProviderName.SIXTYDB),
+        sixtydb_stt=SixtyDBSTTSettings(),
+        stt=STTSettings(
+            custom_vocabulary_enabled=True,
+            custom_terms={"ko": [" Puripuly ", "VRChat", "Puripuly", " "]},
+        ),
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("sixtydb_api_key", "k7")
+
+    backend = create_stt_backend(settings, secrets=secrets)
+
+    assert isinstance(backend, SixtyDBRealtimeSTTBackend)
+    assert list(backend.context_terms) == ["Puripuly", "VRChat"]
+
+
+def test_create_peer_stt_backend_uses_peer_selected_sixtydb_provider() -> None:
+    settings = AppSettings()
+    settings.provider.peer_stt = STTProviderName.SIXTYDB
+    settings.languages.peer_source_language = "en"
+    settings.sixtydb_stt.endpoint = "wss://api.60db.ai/ws/stt"
+    secrets = InMemorySecretStore()
+    secrets.set("sixtydb_api_key", "peer-60db")
+
+    backend = create_peer_stt_backend(settings, secrets=secrets)
+
+    assert isinstance(backend, SixtyDBRealtimeSTTBackend)
+    assert backend.api_key == "peer-60db"
+    assert backend.endpoint == "wss://api.60db.ai/ws/stt"
+    assert backend.sample_rate_hz == 16000

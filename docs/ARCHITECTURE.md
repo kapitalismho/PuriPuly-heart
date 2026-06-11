@@ -12,7 +12,7 @@ flowchart LR
   end
 
   subgraph Providers[Cloud / local providers]
-    STT[STT providers\nDeepgram / Soniox / Qwen / Local]
+    STT[STT providers\nDeepgram / Soniox / 60db / Qwen / Local]
     LLM[LLM providers\nOpenRouter / Gemini / DeepSeek / Qwen / Local]
   end
 

@@ -1686,6 +1686,7 @@ class TranslatorApp:
         field_by_provider = {
             "deepgram": "_deepgram_key",
             "soniox": "_soniox_key",
+            "sixtydb": "_sixtydb_key",
             "google": "_google_key",
             "openrouter": "_openrouter_key",
             "deepseek": "_deepseek_key",
@@ -1717,7 +1718,7 @@ class TranslatorApp:
         save_settings(self.controller.config_path, self.controller.settings)
 
         # Sync verification result with dashboard needs_key flags (UI update on user click)
-        if provider in ("deepgram", "soniox", "qwen_asr"):
+        if provider in ("deepgram", "soniox", "sixtydb", "qwen_asr"):
             self.view_dashboard.set_stt_needs_key(not success, update_ui=False)
         elif provider in (
             "google",
@@ -1736,6 +1737,7 @@ class TranslatorApp:
         key_to_provider = {
             "deepgram_api_key": "deepgram",
             "soniox_api_key": "soniox",
+            "sixtydb_api_key": "sixtydb",
             "google_api_key": "google",
             "openrouter_api_key": "openrouter",
             "deepseek_api_key": "deepseek",
@@ -1749,7 +1751,7 @@ class TranslatorApp:
             save_settings(self.controller.config_path, self.controller.settings)
 
             # Update dashboard needs_key flag
-            if provider in ("deepgram", "soniox"):
+            if provider in ("deepgram", "soniox", "sixtydb"):
                 self.view_dashboard.set_stt_needs_key(True, update_ui=False)
             elif provider in (
                 "google",

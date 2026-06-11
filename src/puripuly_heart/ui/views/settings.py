@@ -821,6 +821,16 @@ class SettingsView(ft.Column):
                 self.show_snackbar(msg, bg) if self.show_snackbar else None
             ),
         )
+        self._sixtydb_key = ApiKeyField(
+            "settings.sixtydb_api_key",
+            "sixtydb_api_key",
+            "sixtydb",
+            on_verify=self._verify_key,
+            on_save=self._on_secret_change,
+            show_snackbar=lambda msg, bg: (
+                self.show_snackbar(msg, bg) if self.show_snackbar else None
+            ),
+        )
         self._google_key = ApiKeyField(
             "settings.google_api_key",
             "google_api_key",
@@ -967,6 +977,7 @@ class SettingsView(ft.Column):
                 # self._qwen_region_row removed
                 self._deepgram_key,
                 self._soniox_key,
+                self._sixtydb_key,
                 self._google_key,
                 self._openrouter_key,
                 self._openrouter_pkce_button_row,
@@ -2803,6 +2814,7 @@ class SettingsView(ft.Column):
         self._deepseek_key.value = store.get("deepseek_api_key") or ""
         self._deepgram_key.value = store.get("deepgram_api_key") or ""
         self._soniox_key.value = store.get("soniox_api_key") or ""
+        self._sixtydb_key.value = store.get("sixtydb_api_key") or ""
         self._local_llm_api_key.value = store.get("local_llm_api_key") or ""
 
         # Alibaba keys with legacy fallback
@@ -2827,6 +2839,7 @@ class SettingsView(ft.Column):
         field_map = [
             (self._deepgram_key, self._deepgram_key.value, verified.deepgram),
             (self._soniox_key, self._soniox_key.value, verified.soniox),
+            (self._sixtydb_key, self._sixtydb_key.value, verified.sixtydb),
             (self._google_key, self._google_key.value, verified.google),
             (self._openrouter_key, self._openrouter_key.value, verified.openrouter),
             (self._deepseek_key, self._deepseek_key.value, verified.deepseek),
@@ -2901,6 +2914,7 @@ class SettingsView(ft.Column):
         active_stt_providers = {stt, peer_stt}
         self._deepgram_key.visible = STTProviderName.DEEPGRAM in active_stt_providers
         self._soniox_key.visible = STTProviderName.SONIOX in active_stt_providers
+        self._sixtydb_key.visible = STTProviderName.SIXTYDB in active_stt_providers
 
         self._google_key.visible = llm == LLMProviderName.GEMINI
         self._sync_managed_key_card(settings)
@@ -4766,6 +4780,7 @@ class SettingsView(ft.Column):
         # Components
         self._deepgram_key.apply_locale()
         self._soniox_key.apply_locale()
+        self._sixtydb_key.apply_locale()
         self._google_key.apply_locale()
         self._managed_trial_usage_bar.apply_locale()
         self._openrouter_key.apply_locale()

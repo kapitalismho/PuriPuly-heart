@@ -121,6 +121,7 @@ class STTProviderName(str, Enum):
     DEEPGRAM = "deepgram"
     QWEN_ASR = "qwen_asr"
     SONIOX = "soniox"
+    SIXTYDB = "60db"
 
 
 class LLMProviderName(str, Enum):
@@ -549,6 +550,21 @@ class SonioxSTTSettings:
 
 
 @dataclass(slots=True)
+class SixtyDBSTTSettings:
+    endpoint: str = "wss://api.60db.ai/ws/stt"
+    utterance_end_ms: int = 300
+    trailing_silence_ms: int = 400
+
+    def validate(self) -> None:
+        if not self.endpoint:
+            raise ValueError("endpoint must be non-empty")
+        if self.utterance_end_ms < 300:
+            raise ValueError("utterance_end_ms must be >= 300")
+        if self.trailing_silence_ms < 0:
+            raise ValueError("trailing_silence_ms must be >= 0")
+
+
+@dataclass(slots=True)
 class PeerQwenASRSTTSettings:
     model: str | None = None
     region: QwenRegion | None = None
@@ -576,6 +592,21 @@ class PeerSonioxSTTSettings:
             raise ValueError("peer soniox keepalive override must be > 0")
         if self.trailing_silence_ms is not None and self.trailing_silence_ms < 0:
             raise ValueError("peer soniox trailing silence override must be >= 0")
+
+
+@dataclass(slots=True)
+class PeerSixtyDBSTTSettings:
+    endpoint: str | None = None
+    utterance_end_ms: int | None = None
+    trailing_silence_ms: int | None = None
+
+    def validate(self) -> None:
+        if self.endpoint is not None and not self.endpoint:
+            raise ValueError("peer 60db endpoint override must be non-empty")
+        if self.utterance_end_ms is not None and self.utterance_end_ms < 300:
+            raise ValueError("peer 60db utterance_end_ms override must be >= 300")
+        if self.trailing_silence_ms is not None and self.trailing_silence_ms < 0:
+            raise ValueError("peer 60db trailing silence override must be >= 0")
 
 
 @dataclass(slots=True)
@@ -923,6 +954,7 @@ class ApiKeyVerificationSettings:
 
     deepgram: bool = False
     soniox: bool = False
+    sixtydb: bool = False
     google: bool = False
     openrouter: bool = False
     deepseek: bool = False
@@ -991,8 +1023,10 @@ class AppSettings:
     deepgram_stt: DeepgramSTTSettings = field(default_factory=DeepgramSTTSettings)
     qwen_asr_stt: QwenASRSTTSettings = field(default_factory=QwenASRSTTSettings)
     soniox_stt: SonioxSTTSettings = field(default_factory=SonioxSTTSettings)
+    sixtydb_stt: SixtyDBSTTSettings = field(default_factory=SixtyDBSTTSettings)
     peer_qwen_asr_stt: PeerQwenASRSTTSettings = field(default_factory=PeerQwenASRSTTSettings)
     peer_soniox_stt: PeerSonioxSTTSettings = field(default_factory=PeerSonioxSTTSettings)
+    peer_sixtydb_stt: PeerSixtyDBSTTSettings = field(default_factory=PeerSixtyDBSTTSettings)
     gemini: GeminiSettings = field(default_factory=GeminiSettings)
     openrouter: OpenRouterSettings = field(default_factory=OpenRouterSettings)
     qwen: QwenSettings = field(default_factory=QwenSettings)
@@ -1028,8 +1062,10 @@ class AppSettings:
         self.deepgram_stt.validate()
         self.qwen_asr_stt.validate()
         self.soniox_stt.validate()
+        self.sixtydb_stt.validate()
         self.peer_qwen_asr_stt.validate()
         self.peer_soniox_stt.validate()
+        self.peer_sixtydb_stt.validate()
         self.gemini.validate()
         self.openrouter.validate()
         self.qwen.validate()
@@ -1384,6 +1420,11 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
             "keepalive_interval_s": settings.soniox_stt.keepalive_interval_s,
             "trailing_silence_ms": settings.soniox_stt.trailing_silence_ms,
         },
+        "sixtydb_stt": {
+            "endpoint": settings.sixtydb_stt.endpoint,
+            "utterance_end_ms": settings.sixtydb_stt.utterance_end_ms,
+            "trailing_silence_ms": settings.sixtydb_stt.trailing_silence_ms,
+        },
         "gemini": {
             "llm_model": settings.gemini.llm_model.value,
         },
@@ -1447,6 +1488,7 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
         "api_key_verified": {
             "deepgram": settings.api_key_verified.deepgram,
             "soniox": settings.api_key_verified.soniox,
+            "sixtydb": settings.api_key_verified.sixtydb,
             "google": settings.api_key_verified.google,
             "openrouter": settings.api_key_verified.openrouter,
             "deepseek": settings.api_key_verified.deepseek,
@@ -2407,6 +2449,11 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
             "keepalive_interval_s": None,
             "trailing_silence_ms": None,
         },
+        "peer_sixtydb_stt": {
+            "endpoint": None,
+            "utterance_end_ms": None,
+            "trailing_silence_ms": None,
+        },
     }
 
     version = _coerce_int(data.get("settings_version"), 1)
@@ -3270,6 +3317,9 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     peer_soniox_data = (
         data.get("peer_soniox_stt") if isinstance(data.get("peer_soniox_stt"), dict) else {}
     )
+    peer_sixtydb_data = (
+        data.get("peer_sixtydb_stt") if isinstance(data.get("peer_sixtydb_stt"), dict) else {}
+    )
     raw_provider_data = data.get("provider")
     provider_data = raw_provider_data if isinstance(raw_provider_data, dict) else {}
     if raw_provider_data is None:
@@ -3440,6 +3490,15 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             ),
             trailing_silence_ms=int(data.get("soniox_stt", {}).get("trailing_silence_ms", 100)),
         ),
+        sixtydb_stt=SixtyDBSTTSettings(
+            endpoint=str(
+                data.get("sixtydb_stt", {}).get("endpoint", "wss://api.60db.ai/ws/stt")
+            ),
+            utterance_end_ms=int(data.get("sixtydb_stt", {}).get("utterance_end_ms", 300)),
+            trailing_silence_ms=int(
+                data.get("sixtydb_stt", {}).get("trailing_silence_ms", 400)
+            ),
+        ),
         peer_qwen_asr_stt=PeerQwenASRSTTSettings(
             model=_parse_optional_str(peer_qwen_raw.get("model")),
             region=(
@@ -3455,6 +3514,13 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
                 peer_soniox_data.get("keepalive_interval_s")
             ),
             trailing_silence_ms=_parse_optional_int(peer_soniox_data.get("trailing_silence_ms")),
+        ),
+        peer_sixtydb_stt=PeerSixtyDBSTTSettings(
+            endpoint=_parse_optional_str(peer_sixtydb_data.get("endpoint")),
+            utterance_end_ms=_parse_optional_int(peer_sixtydb_data.get("utterance_end_ms")),
+            trailing_silence_ms=_parse_optional_int(
+                peer_sixtydb_data.get("trailing_silence_ms")
+            ),
         ),
         gemini=GeminiSettings(
             llm_model=_parse_gemini_llm_model(
@@ -3541,6 +3607,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
         api_key_verified=ApiKeyVerificationSettings(
             deepgram=bool(data.get("api_key_verified", {}).get("deepgram", False)),
             soniox=bool(data.get("api_key_verified", {}).get("soniox", False)),
+            sixtydb=bool(data.get("api_key_verified", {}).get("sixtydb", False)),
             google=bool(data.get("api_key_verified", {}).get("google", False)),
             openrouter=bool(data.get("api_key_verified", {}).get("openrouter", False)),
             deepseek=bool(data.get("api_key_verified", {}).get("deepseek", False)),

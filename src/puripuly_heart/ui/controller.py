@@ -138,6 +138,7 @@ from puripuly_heart.providers.llm.qwen import QwenLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaLoadError
+from puripuly_heart.providers.stt.sixtydb import SixtyDBRealtimeSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 from puripuly_heart.ui.event_bridge import UIEventBridge
 from puripuly_heart.ui.i18n import get_locale, set_locale, t
@@ -709,6 +710,7 @@ class GuiController:
             STTProviderName.DEEPGRAM,
             STTProviderName.LOCAL_QWEN,
             STTProviderName.SONIOX,
+            STTProviderName.SIXTYDB,
         )
 
     def _stt_provider_requires_secret(self, provider: STTProviderName) -> bool:
@@ -716,6 +718,7 @@ class GuiController:
             STTProviderName.DEEPGRAM,
             STTProviderName.QWEN_ASR,
             STTProviderName.SONIOX,
+            STTProviderName.SIXTYDB,
         )
 
     def _llm_provider_requires_secret(self, provider: LLMProviderName) -> bool:
@@ -816,6 +819,21 @@ class GuiController:
             (
                 settings.soniox_stt.trailing_silence_ms
                 if settings.provider.stt == STTProviderName.SONIOX
+                else None
+            ),
+            (
+                settings.sixtydb_stt.endpoint
+                if settings.provider.stt == STTProviderName.SIXTYDB
+                else None
+            ),
+            (
+                settings.sixtydb_stt.utterance_end_ms
+                if settings.provider.stt == STTProviderName.SIXTYDB
+                else None
+            ),
+            (
+                settings.sixtydb_stt.trailing_silence_ms
+                if settings.provider.stt == STTProviderName.SIXTYDB
                 else None
             ),
             local_qwen_identity,
@@ -4186,6 +4204,8 @@ class GuiController:
                 success = await DeepgramRealtimeSTTBackend.verify_api_key(key)
             elif provider == "soniox":
                 success = await SonioxRealtimeSTTBackend.verify_api_key(key)
+            elif provider == "sixtydb":
+                success = await SixtyDBRealtimeSTTBackend.verify_api_key(key)
             else:
                 return False, f"Unknown provider: {provider}"
 
@@ -6153,6 +6173,9 @@ class GuiController:
                 elif provider_name == STTProviderName.SONIOX:
                     key = secrets.get("soniox_api_key") or "" if secrets is not None else ""
                     stt_valid = await SonioxRealtimeSTTBackend.verify_api_key(key)
+                elif provider_name == STTProviderName.SIXTYDB:
+                    key = secrets.get("sixtydb_api_key") or "" if secrets is not None else ""
+                    stt_valid = await SixtyDBRealtimeSTTBackend.verify_api_key(key)
                 else:
                     stt_valid = True
             except Exception:

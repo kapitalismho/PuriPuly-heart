@@ -129,6 +129,7 @@ runtime_binaries += collect_vendored_openvr_runtime_binaries()
 hiddenimports = [
     "puripuly_heart.providers.stt.deepgram",
     "puripuly_heart.providers.stt.qwen_asr",
+    "puripuly_heart.providers.stt.sixtydb",
     "puripuly_heart.providers.stt.soniox",
     "puripuly_heart.providers.llm.gemini",
     "puripuly_heart.providers.llm.qwen",
