@@ -152,11 +152,11 @@ class _LanguageRow(ft.Container):
         if self._label_text.page is not None:
             self._label_text.update()
 
-    def set_languages(self, source: str, target: str) -> None:
-        size = _row_text_size(source, target)
-        self._source_text.size = size
-        self._target_text.size = size
-        self._arrow_icon.size = size + _ARROW_SIZE_DELTA
+    def set_languages(self, source: str, target: str, *, size: int | None = None) -> None:
+        resolved_size = size if size is not None else _row_text_size(source, target)
+        self._source_text.size = resolved_size
+        self._target_text.size = resolved_size
+        self._arrow_icon.size = resolved_size + _ARROW_SIZE_DELTA
         self._source_text.value = source
         self._target_text.value = target
 
@@ -227,5 +227,12 @@ class LanguageCard(ft.Container):
         peer_source: str,
         peer_target: str,
     ):
-        self._self_row.set_languages(self_source, self_target)
-        self._peer_row.set_languages(peer_source, peer_target)
+        # Unified font sizing: pick the smaller size of the two rows so both
+        # self and peer rows share the same scale. _row_text_size is monotonically
+        # decreasing with length, so min() aligns to the longer row's scale.
+        unified_size = min(
+            _row_text_size(self_source, self_target),
+            _row_text_size(peer_source, peer_target),
+        )
+        self._self_row.set_languages(self_source, self_target, size=unified_size)
+        self._peer_row.set_languages(peer_source, peer_target, size=unified_size)

@@ -142,6 +142,30 @@ def test_language_card_hover_and_set_languages(monkeypatch: pytest.MonkeyPatch) 
     assert card._peer_row._target_text.value == "D" * 24
 
 
+def test_language_card_unifies_font_size_to_smaller_row(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When one row is long and the other short, both rows must share the smaller size."""
+    card = _build_language_card()
+    monkeypatch.setattr(type(card._self_row._source_text), "update", lambda self: None)
+    monkeypatch.setattr(type(card._self_row._target_text), "update", lambda self: None)
+    monkeypatch.setattr(type(card._self_row._arrow_icon), "update", lambda self: None)
+    monkeypatch.setattr(type(card._peer_row._source_text), "update", lambda self: None)
+    monkeypatch.setattr(type(card._peer_row._target_text), "update", lambda self: None)
+    monkeypatch.setattr(type(card._peer_row._arrow_icon), "update", lambda self: None)
+
+    short_size = language_card_module._row_text_size("Korean", "English")
+    long_size = language_card_module._row_text_size("A" * 24, "B" * 24)
+    assert long_size < short_size
+
+    card.set_languages("Korean", "English", "A" * 24, "B" * 24)
+
+    assert card._self_row._source_text.size == long_size
+    assert card._self_row._target_text.size == long_size
+    assert card._self_row._arrow_icon.size == long_size + 4
+    assert card._peer_row._source_text.size == long_size
+    assert card._peer_row._target_text.size == long_size
+    assert card._peer_row._arrow_icon.size == long_size + 4
+
+
 def test_language_card_uses_single_direction_arrow_icon() -> None:
     card = _build_language_card()
 
