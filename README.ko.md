@@ -30,7 +30,7 @@
 
 <video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
-데모 영상 유튜브 링크:
+PuriPuly를 통해 다른 외국인들과 실제로 소통하는 모습을 더 보고 싶다면:
 - [데모 1](https://www.youtube.com/watch?v=3p0CamYui0o)
 - [데모 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
 - [데모 3](https://www.youtube.com/watch?v=D0npvp68xNY)
