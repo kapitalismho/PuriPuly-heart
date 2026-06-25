@@ -30,7 +30,7 @@
 
 <video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
-If you want to see more of actual communication with other foreigners through PuriPuly:
+If you want to see more of actual communication with other foreign friends through PuriPuly:
 - [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
 - [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
 - [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)

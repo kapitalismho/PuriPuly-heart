@@ -30,7 +30,7 @@
 
 <video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
-如果你想看更多通过 PuriPuly 与其他外国人实际交流的画面：
+如果你想看更多通过 PuriPuly 与其他外国朋友实际交流的画面：
 - [演示 1](https://www.youtube.com/watch?v=3p0CamYui0o)
 - [演示 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
 - [演示 3](https://www.youtube.com/watch?v=D0npvp68xNY)

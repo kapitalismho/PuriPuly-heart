@@ -30,7 +30,7 @@
 
 <video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
-PuriPulyを通じて他の外国人と実際に交流している様子をもっと見たい方は：
+PuriPulyを通じて他の外国人の友達と実際に交流している様子をもっと見たい方は：
 - [デモ 1](https://www.youtube.com/watch?v=3p0CamYui0o)
 - [デモ 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
 - [デモ 3](https://www.youtube.com/watch?v=D0npvp68xNY)
