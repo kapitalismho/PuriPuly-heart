@@ -24,7 +24,7 @@
 
 ## Demo
 
-![](docs/images/demo/ko-jp_screenshot.png)
+![PuriPuly（Deepgram + Gemini 3 Flash）と VRCT（Google Web Speech + Google Translate）の翻訳比較。PuriPuly 音声認識：「진짜한개도없어서완전허탈했어.」、翻訳：「（本当に一つもなくて、すごくがっかりしちゃった。）」 | VRCT 音声認識：「진짜 한 개도 없어서 완전 허탈했다」、翻訳：「本当の犬もいませんでした。」](docs/images/demo/ko-jp_screenshot.png)
 
 ---
 
@@ -80,7 +80,7 @@ PuriPulyを通じて他の外国人の友達と実際に交流している様子
 ---
 
 ## 翻訳比較
-![comparison](docs/images/performance/1.png)
+![翻訳品質ベンチマークチャート。韓国語から英語、日本語、中国語簡体字への216個のマルチターン会話サンプルをGemba MQMフレームワーク（判定モデル：Gemini 3.1 Pro Preview）で評価した1文あたりの平均エラーペナルティ（低いほど良）の結果を示す。各スコア：Gemini 3.1 Flash-lite 0.573、Gemini 3 Flash 0.596、Gemma 4 26B A4B 0.813、Qwen 3.5 Plus 0.958、DeepSeek V4 Flash 1.025、Gemma 4 26B A4B (no-context) 1.265、DeepSeek V4 Flash (no-context) 1.647、Qwen 3.5 Flash 2.198、DeepL 4.963、DeepL (no-context) 5.717、Google Translation Basic 5.998。](docs/images/performance/1.png)
 
 - マイクロソフトのGemba MQMフレームワークを使って実験しました。
 - 実際の会話に近づけるため、マルチターン環境で構成しました。
