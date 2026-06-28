@@ -516,13 +516,20 @@ impl OverlayRuntime {
             .apply_calibration(self.state.calibration())
             .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
         let detailed_logging = logger.is_detailed();
-        let blocks = self.caption_blocks_for_render(detailed_logging);
+        // Detailed logging should remain file/stream diagnostics only.  Visual
+        // debug prefixes and the native debug watermark obscure captions in
+        // live overlays, so never couple runtime logging mode to rendered text.
+        let visual_debug_overlays = false;
+        let blocks = self.caption_blocks_for_render(visual_debug_overlays);
         self.emit_pending_peer_overlay_first_emit_hooks(logger)
             .await?;
         log_runtime_info(logger, format_caption_blocks_built_log(&blocks)).await?;
         let has_drawable_text = blocks.iter().any(CaptionBlock::has_drawable_text);
-        let debug_overlay =
-            debug_overlay_for_frame(detailed_logging, self.state.snapshot().revision, &blocks);
+        let debug_overlay = debug_overlay_for_frame(
+            visual_debug_overlays,
+            self.state.snapshot().revision,
+            &blocks,
+        );
         let peer_overlay_first_render_ids = peer_overlay_first_render_block_ids_from_caption_blocks(
             &blocks,
             &self.pending_peer_first_render_ids,
