@@ -1134,7 +1134,7 @@ def test_create_peer_stt_backend_uses_peer_selected_soniox_provider() -> None:
     settings = AppSettings()
     settings.provider.peer_stt = STTProviderName.SONIOX
     settings.languages.peer_source_language = "ko"
-    settings.soniox_stt.model = "stt-rt-v4"
+    settings.soniox_stt.model = "stt-rt-v5"
     secrets = InMemorySecretStore()
     secrets.set("soniox_api_key", "peer-soniox")
 
@@ -1142,7 +1142,7 @@ def test_create_peer_stt_backend_uses_peer_selected_soniox_provider() -> None:
 
     assert isinstance(backend, SonioxRealtimeSTTBackend)
     assert backend.api_key == "peer-soniox"
-    assert backend.model == "stt-rt-v4"
+    assert backend.model == "stt-rt-v5"
 
 
 def test_create_peer_stt_backend_uses_shared_qwen_region_for_endpoint_and_secret() -> None:
@@ -1163,14 +1163,14 @@ def test_build_peer_stt_provider_signature_includes_backend_affecting_values() -
     settings = AppSettings()
     settings.provider.peer_stt = STTProviderName.SONIOX
     settings.languages.peer_source_language = "zh-CN"
-    settings.soniox_stt.model = "stt-rt-v4"
+    settings.soniox_stt.model = "stt-rt-v5"
     settings.soniox_stt.trailing_silence_ms = 350
 
     signature = build_peer_stt_provider_signature(settings)
 
     assert STTProviderName.SONIOX in signature
     assert "zh-CN" in signature
-    assert "stt-rt-v4" in signature
+    assert "stt-rt-v5" in signature
     assert 350 in signature
 
 
@@ -1351,7 +1351,7 @@ def test_create_stt_backend_qwen_asr_uses_legacy_alibaba_secret_key() -> None:
 def test_create_stt_backend_soniox_uses_secret() -> None:
     settings = AppSettings(
         provider=ProviderSettings(stt=STTProviderName.SONIOX),
-        soniox_stt=SonioxSTTSettings(model="stt-rt-v4"),
+        soniox_stt=SonioxSTTSettings(model="stt-rt-v5"),
     )
     secrets = InMemorySecretStore()
     secrets.set("soniox_api_key", "k6")
@@ -1365,7 +1365,7 @@ def test_create_stt_backend_soniox_uses_secret() -> None:
 def test_create_stt_backend_soniox_passes_effective_custom_terms() -> None:
     settings = AppSettings(
         provider=ProviderSettings(stt=STTProviderName.SONIOX),
-        soniox_stt=SonioxSTTSettings(model="stt-rt-v4"),
+        soniox_stt=SonioxSTTSettings(model="stt-rt-v5"),
         stt=STTSettings(
             custom_vocabulary_enabled=True,
             custom_terms={"ko": [" Puripuly ", "VRChat", "Puripuly", " "]},

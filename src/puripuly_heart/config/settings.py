@@ -532,7 +532,7 @@ class QwenASRSTTSettings:
 
 @dataclass(slots=True)
 class SonioxSTTSettings:
-    model: str = "stt-rt-v4"
+    model: str = "stt-rt-v5"
     endpoint: str = "wss://stt-rt.soniox.com/transcribe-websocket"
     keepalive_interval_s: float = 10.0
     trailing_silence_ms: int = 100
@@ -2842,10 +2842,12 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     soniox_data = data.get("soniox_stt")
     if isinstance(soniox_data, dict):
         model = soniox_data.get("model")
-        # Preserve explicit custom model values and only upgrade legacy default v3.
-        if isinstance(model, str) and model.strip() == "stt-rt-v3":
-            soniox_data["model"] = "stt-rt-v4"
-            changed = True
+        # Preserve explicit custom model values and only upgrade legacy defaults.
+        if isinstance(model, str):
+            normalized = model.strip()
+            if normalized in ("stt-rt-v3", "stt-rt-v4"):
+                soniox_data["model"] = "stt-rt-v5"
+                changed = True
 
     gemini_data = data.get("gemini")
     if not isinstance(gemini_data, dict):
@@ -3429,7 +3431,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             endpoint=qwen_settings.get_asr_endpoint(),
         ),
         soniox_stt=SonioxSTTSettings(
-            model=str(data.get("soniox_stt", {}).get("model", "stt-rt-v4")),
+            model=str(data.get("soniox_stt", {}).get("model", "stt-rt-v5")),
             endpoint=str(
                 data.get("soniox_stt", {}).get(
                     "endpoint", "wss://stt-rt.soniox.com/transcribe-websocket"
