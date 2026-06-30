@@ -4,7 +4,7 @@ import copy
 import json
 import locale
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -2278,11 +2278,36 @@ def resolve_first_run_ui_locale(system_locale: str | None) -> str:
     return "en"
 
 
+def _is_china_first_run_locale(system_locale: str | None) -> bool:
+    return resolve_first_run_ui_locale(system_locale) == "zh-CN"
+
+
+def _apply_china_managed_first_run_defaults(settings: AppSettings) -> None:
+    settings.openrouter = replace(
+        settings.openrouter,
+        selection_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED,
+        provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY,
+        fallback_selection_alias=OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH_CHINA,
+    )
+    settings.translation = _derive_translation_settings_from_runtime_values(
+        provider_llm=settings.provider.llm,
+        openrouter_model=settings.openrouter.llm_model,
+        openrouter_selected_source=settings.openrouter.selected_source,
+        openrouter_provider_routing=settings.openrouter.provider_routing,
+        gemini_model=settings.gemini.llm_model,
+        qwen_model=settings.qwen.llm_model,
+        deepseek_model=settings.deepseek.llm_model,
+        history=settings.translation.connection_history,
+    )
+
+
 def new_settings_for_first_run(system_locale: str | None = None) -> AppSettings:
     if system_locale is None:
         system_locale = detect_system_locale()
     settings = AppSettings()
     settings.ui.locale = resolve_first_run_ui_locale(system_locale)
+    if _is_china_first_run_locale(system_locale):
+        _apply_china_managed_first_run_defaults(settings)
     ensure_prompt_defaults(settings)
     settings.validate()
     return settings

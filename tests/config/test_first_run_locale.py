@@ -10,7 +10,13 @@ from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
     OpenRouterCredentialSource,
+    OpenRouterFallbackSelectionAlias,
+    OpenRouterLLMModel,
+    OpenRouterProviderRouting,
+    OpenRouterSelectionAlias,
     STTProviderName,
+    TranslationConnection,
+    TranslationModel,
     from_dict,
     load_settings,
     save_settings,
@@ -117,6 +123,14 @@ def test_first_run_settings_preserve_prompt_defaults() -> None:
     assert settings.system_prompts == {}
 
 
+def test_first_run_china_locale_preserves_prompt_defaults() -> None:
+    settings = _new_first_run_settings("zh_CN")
+    default_prompt = load_prompt_for_provider("gemini")
+
+    assert settings.system_prompt == default_prompt
+    assert settings.system_prompts == {}
+
+
 def test_first_run_settings_preserve_provider_defaults() -> None:
     settings = _new_first_run_settings("zh_CN")
 
@@ -172,4 +186,128 @@ def test_main_first_run_uses_detected_system_locale(
     loaded = _load_settings_or_default(path)
 
     assert loaded.ui.locale == "zh-CN"
+    assert loaded.translation.connection == TranslationConnection.MANAGED_CHINA
+    assert loaded.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert loaded.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
     assert not path.exists()
+
+
+@pytest.mark.parametrize(
+    "system_locale",
+    [
+        "zh",
+        "zh-CN",
+        "zh_CN",
+        "zh-Hans",
+        "zh-SG",
+        "Chinese_China.936",
+        "zh-TW",
+        "zh-HK",
+        "zh-Hant",
+        "Chinese_Taiwan.950",
+    ],
+)
+def test_first_run_china_locale_selects_managed_china_defaults(
+    system_locale: str,
+) -> None:
+    settings = _new_first_run_settings(system_locale)
+
+    assert settings.ui.locale == "zh-CN"
+    assert settings.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
+    assert settings.translation.connection == TranslationConnection.MANAGED_CHINA
+    assert settings.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
+    assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
+    assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
+    assert settings.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert (
+        settings.openrouter.fallback_selection_alias
+        == OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH_CHINA
+    )
+    assert (
+        settings.translation.connection_history.get(TranslationModel.DEEPSEEK_V4_FLASH.value)
+        == TranslationConnection.MANAGED_CHINA
+    )
+
+
+@pytest.mark.parametrize("system_locale", ["ko_KR", "ja_JP", "en_US", "fr_FR"])
+def test_first_run_non_china_locale_preserves_default_managed_connection(
+    system_locale: str,
+) -> None:
+    settings = _new_first_run_settings(system_locale)
+
+    assert settings.translation.model == TranslationModel.GEMMA4
+    assert settings.translation.connection == TranslationConnection.MANAGED
+    assert settings.openrouter.provider_routing == OpenRouterProviderRouting.DEFAULT
+    assert settings.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+    assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
+
+
+def test_first_run_china_locale_managed_china_roundtrip_through_dict() -> None:
+    settings = _new_first_run_settings("zh_CN")
+
+    restored = from_dict(to_dict(settings))
+
+    assert restored.ui.locale == "zh-CN"
+    assert restored.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
+    assert restored.translation.connection == TranslationConnection.MANAGED_CHINA
+    assert restored.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert restored.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
+    assert restored.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
+    assert (
+        restored.openrouter.fallback_selection_alias
+        == OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH_CHINA
+    )
+
+
+def test_first_run_china_locale_saved_and_loaded_preserves_managed_china(
+    tmp_path,
+) -> None:
+    path = tmp_path / "settings.json"
+    settings = _new_first_run_settings("zh_CN")
+    save_settings(path, settings)
+
+    loaded = load_settings(path)
+
+    assert loaded.ui.locale == "zh-CN"
+    assert loaded.translation.connection == TranslationConnection.MANAGED_CHINA
+    assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
+    assert loaded.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
+
+
+def test_first_run_china_locale_controller_persists_managed_china(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings_module, "detect_system_locale", lambda: "zh_CN", raising=False)
+    path = tmp_path / "settings.json"
+    controller = GuiController(page=object(), app=object(), config_path=path)
+
+    loaded = controller._load_or_init_settings(path)
+
+    assert loaded.ui.locale == "zh-CN"
+    assert loaded.translation.connection == TranslationConnection.MANAGED_CHINA
+    assert loaded.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    assert persisted["ui"]["locale"] == "zh-CN"
+    assert persisted["translation"]["connection"] == TranslationConnection.MANAGED_CHINA.value
+    assert (
+        persisted["openrouter"]["provider_routing"] == OpenRouterProviderRouting.DEEPSEEK_ONLY.value
+    )
+
+
+def test_existing_settings_not_overwritten_by_china_locale_detection(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings_module, "detect_system_locale", lambda: "zh_CN", raising=False)
+    path = tmp_path / "settings.json"
+    saved = AppSettings()
+    saved.ui.locale = "en"
+    save_settings(path, saved)
+
+    loaded = load_settings(path)
+
+    assert loaded.ui.locale == "en"
+    assert loaded.translation.connection == TranslationConnection.MANAGED
+    assert loaded.openrouter.provider_routing == OpenRouterProviderRouting.DEFAULT
