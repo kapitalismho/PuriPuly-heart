@@ -319,7 +319,34 @@ async def test_httpx_openrouter_client_non_gemma_latency_routing_preserves_laten
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_deepseek_only_routing_locks_provider_without_fallbacks(
+async def test_httpx_openrouter_client_deepseek_default_routing_prefers_cloudflare_then_deepseek_then_parasail(
+    monkeypatch,
+) -> None:
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
+
+    client = HttpxOpenRouterClient(
+        api_key="test-key",
+        model="deepseek/deepseek-v4-flash",
+        base_url="https://example",
+    )
+    await client.translate(
+        text="hello",
+        system_prompt="SYSTEM",
+        source_language="ko-KR",
+        target_language="zh-CN",
+    )
+
+    body = fake_client.last_request["json"]
+    assert body["provider"] == {
+        "order": ["cloudflare", "deepseek", "parasail/fp8"],
+        "only": ["cloudflare", "deepseek", "parasail"],
+        "allow_fallbacks": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_httpx_openrouter_client_deepseek_china_routing_prefers_deepseek_then_baidu_qianfan(
     monkeypatch,
 ) -> None:
     fake_client = FakeAsyncClient()
@@ -341,8 +368,9 @@ async def test_httpx_openrouter_client_deepseek_only_routing_locks_provider_with
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["deepseek"],
-        "allow_fallbacks": False,
+        "order": ["deepseek", "baidu/fp8"],
+        "only": ["deepseek", "baidu"],
+        "allow_fallbacks": True,
     }
 
 

@@ -151,7 +151,11 @@ def _build_provider_preferences(
     model: str | None = None,
 ) -> dict[str, object]:
     if provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY:
-        return {"only": ["deepseek"], "allow_fallbacks": False}
+        return {
+            "order": ["deepseek", "baidu/fp8"],
+            "only": ["deepseek", "baidu"],
+            "allow_fallbacks": True,
+        }
     if routing_mode == OpenRouterRoutingMode.PARASAIL_FIRST:
         return {"order": ["Parasail", "Novita"], "allow_fallbacks": True}
     if routing_mode == OpenRouterRoutingMode.NOVITA_FIRST:
@@ -160,6 +164,12 @@ def _build_provider_preferences(
         return {
             "order": ["cloudflare", "parasail/bf16", "wafer/fp8"],
             "only": ["cloudflare", "parasail", "wafer"],
+            "allow_fallbacks": True,
+        }
+    if model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value:
+        return {
+            "order": ["cloudflare", "deepseek", "parasail/fp8"],
+            "only": ["cloudflare", "deepseek", "parasail"],
             "allow_fallbacks": True,
         }
     return {
