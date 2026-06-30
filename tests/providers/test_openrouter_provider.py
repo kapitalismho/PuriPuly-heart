@@ -252,9 +252,9 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
     assert body["reasoning"] == {"effort": "none"}
     assert body["user"] == "managed-user-123"
     assert body["provider"] == {
-        "sort": "latency",
+        "order": ["cloudflare", "parasail/bf16", "wafer/fp8"],
+        "only": ["cloudflare", "parasail", "wafer"],
         "allow_fallbacks": True,
-        "ignore": ["venice", "deepinfra", "google-vertex"],
     }
     assert body["messages"][0] == {"role": "system", "content": "SYSTEM"}
     assert body["messages"][1]["role"] == "user"
@@ -265,7 +265,7 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_latency_routing_ignores_venice_and_deepinfra_providers_and_preserves_latency_sort(
+async def test_httpx_openrouter_client_gemma_latency_routing_prefers_cloudflare_then_parasail_then_wafer(
     monkeypatch,
 ) -> None:
     fake_client = FakeAsyncClient()
@@ -274,6 +274,33 @@ async def test_httpx_openrouter_client_latency_routing_ignores_venice_and_deepin
     client = HttpxOpenRouterClient(
         api_key="test-key",
         model="google/gemma-4-26b-a4b-it",
+        base_url="https://example",
+    )
+    await client.translate(
+        text="hello",
+        system_prompt="SYSTEM",
+        source_language="ko-KR",
+        target_language="en",
+    )
+
+    body = fake_client.last_request["json"]
+    assert body["provider"] == {
+        "order": ["cloudflare", "parasail/bf16", "wafer/fp8"],
+        "only": ["cloudflare", "parasail", "wafer"],
+        "allow_fallbacks": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_httpx_openrouter_client_non_gemma_latency_routing_preserves_latency_sort(
+    monkeypatch,
+) -> None:
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
+
+    client = HttpxOpenRouterClient(
+        api_key="test-key",
+        model="qwen/qwen3.5-flash-02-23",
         base_url="https://example",
     )
     await client.translate(

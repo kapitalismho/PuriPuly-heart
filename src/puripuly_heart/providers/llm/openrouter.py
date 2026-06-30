@@ -9,7 +9,11 @@ from uuid import UUID
 
 import httpx
 
-from puripuly_heart.config.settings import OpenRouterProviderRouting, OpenRouterRoutingMode
+from puripuly_heart.config.settings import (
+    OpenRouterLLMModel,
+    OpenRouterProviderRouting,
+    OpenRouterRoutingMode,
+)
 from puripuly_heart.core.openrouter_credentials import normalize_managed_openrouter_user_identifier
 from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 from puripuly_heart.domain.models import Translation
@@ -143,6 +147,8 @@ def _has_length_finish_reason(data: object) -> bool:
 def _build_provider_preferences(
     routing_mode: OpenRouterRoutingMode,
     provider_routing: OpenRouterProviderRouting = OpenRouterProviderRouting.DEFAULT,
+    *,
+    model: str | None = None,
 ) -> dict[str, object]:
     if provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY:
         return {"only": ["deepseek"], "allow_fallbacks": False}
@@ -150,6 +156,12 @@ def _build_provider_preferences(
         return {"order": ["Parasail", "Novita"], "allow_fallbacks": True}
     if routing_mode == OpenRouterRoutingMode.NOVITA_FIRST:
         return {"order": ["Novita", "Parasail"], "allow_fallbacks": True}
+    if model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value:
+        return {
+            "order": ["cloudflare", "parasail/bf16", "wafer/fp8"],
+            "only": ["cloudflare", "parasail", "wafer"],
+            "allow_fallbacks": True,
+        }
     return {
         "sort": "latency",
         "allow_fallbacks": True,
@@ -330,6 +342,7 @@ class HttpxOpenRouterClient:
             "provider": _build_provider_preferences(
                 self.routing_mode,
                 self.provider_routing,
+                model=self.model,
             ),
             "max_tokens": self.max_tokens,
         }
