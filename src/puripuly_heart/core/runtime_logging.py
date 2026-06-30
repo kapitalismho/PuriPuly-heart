@@ -25,6 +25,12 @@ _QUEUE_HANDLER_CLOSED_ATTR = "_puripuly_heart_queue_closed"
 _QUEUE_HANDLER_REFCOUNT_ATTR = "_puripuly_heart_queue_refcount"
 _QUEUE_HANDLER_QUEUE_ATTR = "_puripuly_heart_queue"
 
+LATENCY_DOMINANT_STAGE_STT_FINALIZATION = "stt_finalization"
+LATENCY_DOMINANT_STAGE_POST_STT_OUTPUT = "post_stt_output"
+LATENCY_DOMINANT_STAGE_NORMAL = "normal"
+LATENCY_DOMINANT_STAGE_THRESHOLD_MS = 1500
+LATENCY_CAUSE_E2E_THRESHOLD_MS = 5000
+
 
 LOG_FORMAT = "%(asctime)s.%(msecs)03d [%(levelname)s] %(name)s: %(message)s"
 LOG_DATE_FORMAT = "%H:%M:%S"
@@ -116,6 +122,7 @@ def format_detailed_latency_breakdown(
     e2e_ms: int,
     speech_end_to_stt_final_ms: int | None = None,
     stt_final_to_final_output_ms: int | None = None,
+    dominant_stage: str | None = None,
 ) -> str:
     parts = [
         f"channel={channel}",
@@ -125,7 +132,44 @@ def format_detailed_latency_breakdown(
         parts.append(f"speech_end_to_stt_final_ms={speech_end_to_stt_final_ms}")
     if stt_final_to_final_output_ms is not None:
         parts.append(f"stt_final_to_final_output_ms={stt_final_to_final_output_ms}")
+    if dominant_stage is not None:
+        parts.append(f"dominant_stage={dominant_stage}")
     return f"[Detailed][LatencyBreakdown] {' '.join(parts)}"
+
+
+def compute_latency_dominant_stage(
+    *,
+    speech_end_to_stt_final_ms: int | None,
+    stt_final_to_final_output_ms: int | None,
+) -> str:
+    stt_final_ms = speech_end_to_stt_final_ms if speech_end_to_stt_final_ms is not None else 0
+    post_stt_ms = stt_final_to_final_output_ms if stt_final_to_final_output_ms is not None else 0
+    if stt_final_ms >= LATENCY_DOMINANT_STAGE_THRESHOLD_MS and stt_final_ms >= post_stt_ms:
+        return LATENCY_DOMINANT_STAGE_STT_FINALIZATION
+    if post_stt_ms >= LATENCY_DOMINANT_STAGE_THRESHOLD_MS:
+        return LATENCY_DOMINANT_STAGE_POST_STT_OUTPUT
+    return LATENCY_DOMINANT_STAGE_NORMAL
+
+
+def format_latency_cause_metric(
+    *,
+    channel: str,
+    e2e_ms: int,
+    dominant_stage: str,
+    speech_end_to_stt_final_ms: int | None = None,
+    stt_final_to_final_output_ms: int | None = None,
+) -> str:
+    parts = [
+        "[Metric] latency_cause",
+        f"channel={channel}",
+        f"e2e_ms={e2e_ms}",
+        f"dominant_stage={dominant_stage}",
+    ]
+    if speech_end_to_stt_final_ms is not None:
+        parts.append(f"speech_end_to_stt_final_ms={speech_end_to_stt_final_ms}")
+    if stt_final_to_final_output_ms is not None:
+        parts.append(f"stt_final_to_final_output_ms={stt_final_to_final_output_ms}")
+    return " ".join(parts)
 
 
 def format_translation_ready_for_output(

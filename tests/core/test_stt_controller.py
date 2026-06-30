@@ -1081,6 +1081,103 @@ async def test_managed_stt_provider_multiple_pending_finals_resolve_fifo() -> No
         await stt.close()
 
 
+async def test_managed_stt_provider_logs_delayed_pending_finalization_lag() -> None:
+    backend = Float32Backend()
+    clock = FakeClock(10.0)
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        clock=clock,
+        stt_provider_name=STTProviderName.SONIOX,
+        runtime_logging=runtime_logging,
+        reset_deadline_s=90.0,
+    )
+
+    first_utterance_id = uuid4()
+    second_utterance_id = uuid4()
+    stream = stt.events()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                first_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(first_utterance_id))
+        clock.advance(2.0)
+        await stt.handle_vad_event(
+            SpeechStart(
+                second_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await stt.handle_vad_event(SpeechEnd(second_utterance_id))
+        await backend.sessions[0]._queue.put(
+            STTBackendTranscriptEvent(text="first final", is_final=True)
+        )
+
+        event = await _next_typed_event(stream, STTFinalEvent)
+
+        assert event.utterance_id == first_utterance_id
+        messages = _runtime_log_messages(log_stream)
+        diagnostic = next(message for message in messages if "[STT][FinalizationLag]" in message)
+        assert f"utterance_id={str(first_utterance_id)[:8]}" in diagnostic
+        assert "pending_age_ms=2000" in diagnostic
+        assert "pending_queue_size=2" in diagnostic
+        assert "active_utterance_id=none" in diagnostic
+        assert "provider=soniox" in diagnostic
+    finally:
+        runtime_logging.close()
+        await stt.close()
+
+
+async def test_managed_stt_provider_normal_pending_finalization_does_not_log_lag() -> None:
+    backend = Float32Backend()
+    clock = FakeClock(10.0)
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        clock=clock,
+        stt_provider_name=STTProviderName.SONIOX,
+        runtime_logging=runtime_logging,
+        reset_deadline_s=90.0,
+    )
+
+    utterance_id = uuid4()
+    stream = stt.events()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(utterance_id))
+        clock.advance(0.1)
+        await backend.sessions[0]._queue.put(STTBackendTranscriptEvent(text="final", is_final=True))
+
+        event = await _next_typed_event(stream, STTFinalEvent)
+
+        assert event.utterance_id == utterance_id
+        assert not any(
+            "[STT][FinalizationLag]" in message for message in _runtime_log_messages(log_stream)
+        )
+    finally:
+        runtime_logging.close()
+        await stt.close()
+
+
 async def test_managed_stt_provider_drops_stale_pending_final_before_later_final() -> None:
     backend = Float32Backend()
     clock = FakeClock(10.0)

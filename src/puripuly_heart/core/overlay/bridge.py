@@ -249,13 +249,6 @@ class OverlayBridge:
             revision = payload.get("payload", {}).get("revision")  # type: ignore[assignment]
             block_update_ids = self._snapshot_block_update_ids(payload)
         start_time = time.perf_counter()
-        self._log_broadcast_marker(
-            stage="start",
-            payload_type=str(payload.get("type")),
-            revision=revision,
-            block_update_ids=block_update_ids,
-            authenticated_connections=len(self._authenticated_connections),
-        )
         stale_connections: list[ServerConnection] = []
         for connection in tuple(self._authenticated_connections):
             try:
@@ -326,19 +319,21 @@ class OverlayBridge:
     ) -> None:
         if not self._should_log_detailed_broadcast(payload_type):
             return
+        if stage != "finish":
+            return
         parts = [
             "[OverlayBridge][Broadcast]",
             f"stage={stage}",
             f"overlay_instance_id={self.overlay_instance_id}",
             f"type={payload_type}",
             f"revision={revision}",
-            f"authenticated_connections={authenticated_connections}",
-            f"block_update_ids={block_update_ids}",
+            f"authenticated={authenticated_connections}",
         ]
         if stale_connections is not None:
-            parts.append(f"stale_connections={stale_connections}")
+            parts.append(f"stale={stale_connections}")
         if elapsed_ms is not None:
             parts.append(f"elapsed_ms={elapsed_ms}")
+        parts.append(f"update_ids={block_update_ids}")
         logger.info(" ".join(parts))
 
     def _connection_id(self, connection: ServerConnection) -> str:

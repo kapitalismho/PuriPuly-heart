@@ -583,9 +583,9 @@ class SoundDeviceAudioSource(AudioSource):
         self._last_reported_queue_drop_count = queue_drop_count
         with contextlib.suppress(Exception):
             logger.warning(
-                "SoundDevice audio callback status/drop observed: "
-                "callback status count=%s callback status new=%s "
-                "last_status=%s queue drop count=%s queue drop new=%s",
+                "[AudioDiag][Drop][self] source=sounddevice "
+                "callback_status_total=%s callback_status_new=%s "
+                "last_status=%s queue_drop_total=%s queue_drop_new=%s",
                 callback_status_count,
                 max(0, status_new_count),
                 self._last_callback_status,

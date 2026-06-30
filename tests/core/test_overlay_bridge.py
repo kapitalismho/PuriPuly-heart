@@ -666,18 +666,12 @@ async def test_overlay_bridge_snapshot_broadcast_logs_only_in_detailed_mode(
     ]
 
     assert not any("overlay_instance_id=basic-overlay" in message for message in broadcast_messages)
-    assert any(
-        "stage=start" in message
-        and "overlay_instance_id=detailed-overlay" in message
-        and "revision=1" in message
-        and "block_update_ids=['bridge-upd-1', 'bridge-upd-2']" in message
-        for message in broadcast_messages
-    )
+    assert not any("stage=start" in message for message in broadcast_messages)
     assert any(
         "stage=finish" in message
         and "overlay_instance_id=detailed-overlay" in message
         and "revision=1" in message
-        and "block_update_ids=['bridge-upd-1', 'bridge-upd-2']" in message
+        and "update_ids=['bridge-upd-1', 'bridge-upd-2']" in message
         and "elapsed_ms=" in message
         for message in broadcast_messages
     )

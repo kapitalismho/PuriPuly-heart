@@ -14,6 +14,8 @@ from puripuly_heart.config.settings import STTProviderName
 logger = logging.getLogger(__name__)
 MANAGED_STT_SAMPLE_RATE_HZ = 16000
 PENDING_FINAL_QUEUE_WARN_SIZE = 8
+STT_FINALIZATION_LAG_AGE_MS = 1500
+STT_FINALIZATION_LAG_QUEUE_SIZE = 2
 
 from puripuly_heart.core.audio.diagnostics import AudioFaultProfile, normalize_audio_fault_profile
 from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes
@@ -641,6 +643,46 @@ class ManagedSTTProvider:
             and is_known_local_qwen_hallucination(text)
         )
 
+    def _maybe_emit_finalization_lag(
+        self,
+        *,
+        utterance_id: UUID | None,
+        pending_queue_size_before: int,
+        text_len: int,
+    ) -> None:
+        if utterance_id is None:
+            return
+        ended_at = self._pending_final_utterance_times.get(utterance_id)
+        if ended_at is None:
+            if pending_queue_size_before < STT_FINALIZATION_LAG_QUEUE_SIZE:
+                return
+            pending_age_ms = 0
+        else:
+            pending_age_ms = max(0, int(round((self.clock.now() - ended_at) * 1000.0)))
+            if (
+                pending_age_ms < STT_FINALIZATION_LAG_AGE_MS
+                and pending_queue_size_before < STT_FINALIZATION_LAG_QUEUE_SIZE
+            ):
+                return
+        provider_name = (
+            self.stt_provider_name.value if self.stt_provider_name is not None else "unknown"
+        )
+        active_utterance_id = (
+            str(self._active_utterance_id)[:8] if self._active_utterance_id is not None else "none"
+        )
+        self._emit_detailed(
+            "[STT][FinalizationLag] channel=%s provider=%s utterance_id=%s "
+            "pending_age_ms=%s pending_queue_size=%s active_utterance_id=%s text_len=%s",
+            self.channel,
+            provider_name,
+            str(utterance_id)[:8],
+            pending_age_ms,
+            pending_queue_size_before,
+            active_utterance_id,
+            text_len,
+            fallback_level=logging.INFO,
+        )
+
     async def _handle_suppressed_final_transcript(
         self,
         *,
@@ -691,6 +733,17 @@ class ManagedSTTProvider:
             async for ev in session.events():
                 if ev.is_final:
                     self._drop_stale_pending_final_utterance_ids()
+                    pending_queue_size_before = len(self._pending_final_utterance_ids)
+                    assigned_utterance_id = (
+                        self._pending_final_utterance_ids[0]
+                        if self._pending_final_utterance_ids
+                        else self._active_utterance_id
+                    )
+                    self._maybe_emit_finalization_lag(
+                        utterance_id=assigned_utterance_id,
+                        pending_queue_size_before=pending_queue_size_before,
+                        text_len=len(ev.text),
+                    )
                     utterance_id = (
                         self._pending_final_utterance_ids.popleft()
                         if self._pending_final_utterance_ids

@@ -889,6 +889,63 @@ class TestRuntimeLatencyLogging:
 
         await hub.stop()
 
+    @pytest.mark.asyncio
+    async def test_latency_breakdown_marks_stt_finalization_as_dominant(self):
+        clock = FakeClock(initial_time=10.0)
+        runtime_logging, log_stream = _make_runtime_logging_capture()
+        runtime_logging.set_mode(SessionLoggingMode.DETAILED)
+        hub = ClientHub(
+            stt=None,
+            llm=None,
+            osc=FakeOscQueue(),
+            clock=clock,
+            runtime_logging=runtime_logging,
+            low_latency_mode=True,
+        )
+        utterance_id = uuid4()
+
+        try:
+            hub._record_latency_stage(
+                channel="self",
+                utterance_id=utterance_id,
+                stage="speech_end",
+                timestamp=10.0,
+                publish_now=False,
+            )
+            hub._record_latency_stage(
+                channel="self",
+                utterance_id=utterance_id,
+                stage="stt_final",
+                timestamp=18.0,
+                publish_now=False,
+            )
+            hub._record_latency_stage(
+                channel="self",
+                utterance_id=utterance_id,
+                stage="self_chatbox_enqueue",
+                timestamp=18.5,
+                publish_now=False,
+            )
+            hub._emit_latency_summary_if_ready(
+                channel="self",
+                utterance_id=utterance_id,
+                final_output_stage="self_chatbox_enqueue",
+            )
+
+            messages = _runtime_log_messages(log_stream)
+            breakdown = next(
+                message for message in messages if "[Detailed][LatencyBreakdown]" in message
+            )
+            cause = next(message for message in messages if "[Metric] latency_cause" in message)
+
+            assert "dominant_stage=stt_finalization" in breakdown
+            assert "speech_end_to_stt_final_ms=8000" in breakdown
+            assert "dominant_stage=stt_finalization" in cause
+            assert "speech_end_to_stt_final_ms=8000" in cause
+        finally:
+            runtime_logging.close()
+            await hub.stop()
+
 
 class TestAwaitingVadEndTimeout:
     """Test awaiting_vad_end timeout mechanism."""

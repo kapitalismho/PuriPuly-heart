@@ -368,6 +368,8 @@ async def run_audio_vad_loop(
     gate_passed_audio_ms = 0.0
     gate_log_accumulated_ms = 0.0
     vad_input_accumulated_audio_ms = 0.0
+    vad_input_last_log_ms = 0.0
+    vad_input_was_near_silent: bool | None = None
 
     def _diagnostics_enabled() -> bool:
         if is_detailed_enabled is None or log_detailed is None:
@@ -398,7 +400,9 @@ async def run_audio_vad_loop(
                             gate_gated_audio_ms += chunk_ms
                         else:
                             gate_passed_audio_ms += chunk_ms
-                        if gate_log_accumulated_ms >= 1000.0:
+                        if gate_log_accumulated_ms >= 1000.0 and (
+                            gate_gated_audio_ms > 0.0 or gate_log_accumulated_ms >= 10000.0
+                        ):
                             _log_detailed_best_effort(
                                 f"[AudioDiag][Gate][{channel_label}] "
                                 f"enabled={audio_gate.enabled} "
@@ -440,8 +444,24 @@ async def run_audio_vad_loop(
                     )
                     vad_input_metrics = compute_audio_frame_metrics(vad_input_frame)
                     vad_input_accumulated_audio_ms += vad_input_metrics.audio_ms
-                    if vad_input_accumulated_audio_ms >= 1000.0:
-                        vad_input_accumulated_audio_ms = 0.0
+                    near_silent = (
+                        vad_input_metrics.rms_db <= -60.0 and vad_input_metrics.zero_ratio >= 0.98
+                    )
+                    should_log_vad_input = vad_input_last_log_ms <= 0.0
+                    if vad_input_was_near_silent is not None:
+                        should_log_vad_input = should_log_vad_input or (
+                            near_silent != vad_input_was_near_silent
+                        )
+                    should_log_vad_input = should_log_vad_input or (
+                        near_silent
+                        and vad_input_accumulated_audio_ms - vad_input_last_log_ms >= 3000.0
+                    )
+                    should_log_vad_input = should_log_vad_input or (
+                        vad_input_accumulated_audio_ms - vad_input_last_log_ms >= 10000.0
+                    )
+                    if should_log_vad_input:
+                        vad_input_last_log_ms = vad_input_accumulated_audio_ms
+                        vad_input_was_near_silent = near_silent
                         _log_detailed_best_effort(
                             f"[AudioDiag][VADInput][{channel_label}] "
                             f"source_rate={frame.sample_rate_hz} "

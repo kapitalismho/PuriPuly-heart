@@ -6541,9 +6541,14 @@ async def test_presenter_pair_state_same_text_different_turn_replacement_still_p
 
         assert len(bridge.snapshots) == 2
         assert [block.id for block in bridge.snapshots[-1].blocks] == [f"self:{second_turn_id}"]
-        assert any(
-            f"entry=self:{second_turn_id}" in message and "publish_kind=first_visible" in message
-            for message in _overlay_presenter_pair_messages(log_stream)
+        assert _overlay_presenter_pair_messages(log_stream) == []
+        assert (
+            sum(
+                1
+                for message in _runtime_log_messages(log_stream)
+                if "[OverlayPresenter] Snapshot publish" in message
+            )
+            == 2
         )
     finally:
         runtime_logging.close()
@@ -6823,45 +6828,14 @@ async def test_presenter_pair_state_logs_publish_kind_and_sources_only_in_detail
         )
 
         assert _overlay_presenter_pair_messages(basic_stream) == []
-        pair_messages = _overlay_presenter_pair_messages(detailed_stream)
-
-        assert any(
-            "publish_kind=first_visible" in message
-            and "block_variant=active_peer" in message
-            and "update_id=None" in message
-            and "original_seq=1" in message
-            and "translation_seq=None" in message
-            and "rendered_pair_state=source_only" in message
-            and "rendered_primary_source=blank" in message
-            and "rendered_secondary_source=source" in message
-            for message in pair_messages
-        )
-        assert any(
-            "publish_kind=visible_update" in message
-            and "update_id=upd-peer-1" in message
-            and f"origin_wall_clock_ms={origin_wall_clock_ms}" in message
-            and "source_text_hash=hash-peer-1" in message
-            and "source_text_len=13" in message
-            and "original_seq=1" in message
-            and "translation_seq=2" in message
-            and "rendered_pair_state=translation_with_original" in message
-            and "rendered_primary_source=translation" in message
-            and "rendered_secondary_source=source" in message
-            and "elapsed_ms=" in message
-            for message in pair_messages
-        )
-        assert any(
-            "publish_kind=visible_update" in message
-            and "update_id=upd-peer-2" in message
-            and "source_text_hash=hash-peer-2" in message
-            and "source_text_len=16" in message
-            and "original_seq=1" in message
-            and "translation_seq=3" in message
-            and "rendered_pair_state=translation_with_original" in message
-            and "rendered_primary_source=translation" in message
-            and "rendered_secondary_source=source" in message
-            for message in pair_messages
-        )
+        assert _overlay_presenter_pair_messages(detailed_stream) == []
+        snapshot_messages = [
+            message
+            for message in _runtime_log_messages(detailed_stream)
+            if "[OverlayPresenter] Snapshot publish" in message
+        ]
+        assert any("upd-peer-1" in message for message in snapshot_messages)
+        assert any("upd-peer-2" in message for message in snapshot_messages)
     finally:
         basic_runtime_logging.close()
         detailed_runtime_logging.close()
@@ -6902,13 +6876,11 @@ async def test_presenter_pair_state_logs_hidden_peer_original_as_blank() -> None
             )
         )
 
+        assert _overlay_presenter_pair_messages(log_stream) == []
         assert any(
-            "publish_kind=first_visible" in message
-            and "update_id=upd-peer-hidden-original" in message
-            and "rendered_pair_state=translation_only" in message
-            and "rendered_primary_source=translation" in message
-            and "rendered_secondary_source=blank" in message
-            for message in _overlay_presenter_pair_messages(log_stream)
+            "[OverlayPresenter] Snapshot publish" in message
+            and "upd-peer-hidden-original" in message
+            for message in _runtime_log_messages(log_stream)
         )
     finally:
         runtime_logging.close()

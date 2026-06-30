@@ -237,37 +237,8 @@ class OverlayPresenter(OverlaySink):
         *,
         publish_kind: str,
     ) -> bool:
-        def build_message() -> str:
-            rendered_primary_source, rendered_secondary_source = self._rendered_text_sources(
-                entry,
-                block,
-            )
-            parts = [
-                "[OverlayPresenter][PairState]",
-                f"entry={self._format_entry_key(key)}",
-                f"channel={entry.channel}",
-                f"block_variant={block.block_variant}",
-                f"publish_kind={publish_kind}",
-                f"update_id={block.update_id}",
-                f"origin_wall_clock_ms={block.origin_wall_clock_ms}",
-                f"source_text_hash={block.source_text_hash}",
-                f"source_text_len={block.source_text_len}",
-                f"original_seq={entry.original_seq}",
-                f"translation_seq={entry.translation_seq}",
-                "rendered_pair_state="
-                f"{self._rendered_pair_state(rendered_primary_source, rendered_secondary_source)}",
-                f"rendered_primary_source={rendered_primary_source}",
-                f"rendered_secondary_source={rendered_secondary_source}",
-                f"appearance_seq={block.appearance_seq}",
-                f"primary_len={len(block.primary_text)}",
-                f"secondary_len={len(block.secondary_text) if block.secondary_enabled else 0}",
-            ]
-            elapsed_ms = self._elapsed_from_origin_wall_clock_ms(block.origin_wall_clock_ms)
-            if elapsed_ms is not None:
-                parts.append(f"elapsed_ms={elapsed_ms}")
-            return " ".join(parts)
-
-        return self._emit_detailed_lazy(build_message)
+        _ = (key, entry, block, publish_kind)
+        return False
 
     def _emit_skip_disposition(
         self,
@@ -831,13 +802,16 @@ class OverlayPresenter(OverlaySink):
             }
             for block in next_blocks
         ]
+        compact_update_ids = [block.update_id for block in next_blocks if block.update_id]
+        compact_scopes = [block.session_scope for block in next_blocks if block.session_scope]
         self._emit_detailed_lazy(
-            lambda: "[OverlayPresenter] Snapshot publish: revision=%s block_count=%s bridge_attached=%s blocks=%s"
+            lambda: "[OverlayPresenter] Snapshot publish: revision=%s block_count=%s bridge_attached=%s update_ids=%s scopes=%s"
             % (
                 snapshot.revision,
                 len(next_blocks),
                 self.bridge is not None,
-                blocks_summary,
+                compact_update_ids,
+                compact_scopes,
             )
         )
         if self.diagnostics is not None:
