@@ -49,6 +49,7 @@ from puripuly_heart.core.managed_openrouter_release import (
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
+from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
@@ -258,6 +259,49 @@ def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
 
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, DeepSeekLLMProvider)
+    assert provider.inner.runtime_logging is runtime_logging
+
+
+def test_create_llm_provider_cerebras_uses_secret_and_model() -> None:
+    settings = AppSettings(
+        provider=ProviderSettings(llm=LLMProviderName.CEREBRAS),
+        llm=LLMSettings(concurrency_limit=4),
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("cerebras_api_key", "cb-key")
+
+    provider = create_llm_provider(settings, secrets=secrets)
+
+    assert isinstance(provider, SemaphoreLLMProvider)
+    assert isinstance(provider.inner, CerebrasLLMProvider)
+    assert provider.inner.api_key == "cb-key"
+    assert provider.inner.model == "gemma-4-31b"
+    assert provider.inner.base_url == "https://api.cerebras.ai/v1"
+    assert provider.semaphore._value == 4  # type: ignore[attr-defined]
+
+
+def test_create_llm_provider_cerebras_uses_env_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.CEREBRAS))
+    secrets = InMemorySecretStore()
+    monkeypatch.setenv("CEREBRAS_API_KEY", "env-cb-key")
+
+    provider = create_llm_provider(settings, secrets=secrets)
+
+    assert isinstance(provider, SemaphoreLLMProvider)
+    assert isinstance(provider.inner, CerebrasLLMProvider)
+    assert provider.inner.api_key == "env-cb-key"
+
+
+def test_create_llm_provider_cerebras_passes_runtime_logging() -> None:
+    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.CEREBRAS))
+    secrets = InMemorySecretStore()
+    secrets.set("cerebras_api_key", "cb-key")
+    runtime_logging = object()
+
+    provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
+
+    assert isinstance(provider, SemaphoreLLMProvider)
+    assert isinstance(provider.inner, CerebrasLLMProvider)
     assert provider.inner.runtime_logging is runtime_logging
 
 

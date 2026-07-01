@@ -107,6 +107,7 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.GEMINI_31_FLASH_LITE: "provider.gemini31_flash_lite",
     TranslationModel.QWEN_35_PLUS: "provider.qwen35_plus",
     TranslationModel.LOCAL_LLM: "provider.local_llms",
+    TranslationModel.GEMMA4_31B_CEREBRAS: "provider.gemma4_31b_cerebras",
 }
 _TRANSLATION_CONNECTION_LABEL_KEYS = {
     TranslationConnection.MANAGED: "settings.translation_connection.managed",
@@ -851,6 +852,16 @@ class SettingsView(ft.Column):
                 self.show_snackbar(msg, bg) if self.show_snackbar else None
             ),
         )
+        self._cerebras_key = ApiKeyField(
+            "settings.cerebras_api_key",
+            "cerebras_api_key",
+            "cerebras",
+            on_verify=self._verify_key,
+            on_save=self._on_secret_change,
+            show_snackbar=lambda msg, bg: (
+                self.show_snackbar(msg, bg) if self.show_snackbar else None
+            ),
+        )
         self._openrouter_pkce_button = self._build_action_button(
             t("settings.openrouter_authenticate"),
             self._on_openrouter_pkce_click,
@@ -971,6 +982,7 @@ class SettingsView(ft.Column):
                 self._openrouter_key,
                 self._openrouter_pkce_button_row,
                 self._deepseek_key,
+                self._cerebras_key,
                 self._alibaba_key_beijing,
                 self._alibaba_key_singapore,
             ],
@@ -2104,6 +2116,8 @@ class SettingsView(ft.Column):
             return "deepseek"
         if settings.provider.llm == LLMProviderName.LOCAL_LLM:
             return "local_llm"
+        if settings.provider.llm == LLMProviderName.CEREBRAS:
+            return "cerebras"
         return "qwen"
 
     def _active_prompt_key(self) -> str:
@@ -2785,6 +2799,7 @@ class SettingsView(ft.Column):
         else:
             self._openrouter_key.value = store.get("openrouter_api_key") or ""
             self._deepseek_key.value = store.get("deepseek_api_key") or ""
+            self._cerebras_key.value = store.get("cerebras_api_key") or ""
             self._restore_api_key_icons(settings)
 
         if self.page:
@@ -2801,6 +2816,7 @@ class SettingsView(ft.Column):
         self._google_key.value = store.get("google_api_key") or ""
         self._openrouter_key.value = store.get("openrouter_api_key") or ""
         self._deepseek_key.value = store.get("deepseek_api_key") or ""
+        self._cerebras_key.value = store.get("cerebras_api_key") or ""
         self._deepgram_key.value = store.get("deepgram_api_key") or ""
         self._soniox_key.value = store.get("soniox_api_key") or ""
         self._local_llm_api_key.value = store.get("local_llm_api_key") or ""
@@ -2830,6 +2846,7 @@ class SettingsView(ft.Column):
             (self._google_key, self._google_key.value, verified.google),
             (self._openrouter_key, self._openrouter_key.value, verified.openrouter),
             (self._deepseek_key, self._deepseek_key.value, verified.deepseek),
+            (self._cerebras_key, self._cerebras_key.value, verified.cerebras),
             (self._alibaba_key_beijing, self._alibaba_key_beijing.value, verified.alibaba_beijing),
             (
                 self._alibaba_key_singapore,
@@ -2913,6 +2930,7 @@ class SettingsView(ft.Column):
         )
         self._openrouter_pkce_button_row.visible = openrouter_byok_selected
         self._deepseek_key.visible = llm == LLMProviderName.DEEPSEEK
+        self._cerebras_key.visible = llm == LLMProviderName.CEREBRAS
         self._sync_openrouter_pkce_button_state(settings)
         self._translation_connection_row.visible = True
         self._local_llm_connection_card.visible = llm == LLMProviderName.LOCAL_LLM
@@ -3065,6 +3083,7 @@ class SettingsView(ft.Column):
                 TranslationModel.GEMINI_31_FLASH_LITE,
                 TranslationModel.QWEN_35_PLUS,
                 TranslationModel.LOCAL_LLM,
+                TranslationModel.GEMMA4_31B_CEREBRAS,
             )
         ]
         display_settings = self._build_settings_with_provider_draft()
@@ -4770,6 +4789,7 @@ class SettingsView(ft.Column):
         self._managed_trial_usage_bar.apply_locale()
         self._openrouter_key.apply_locale()
         self._deepseek_key.apply_locale()
+        self._cerebras_key.apply_locale()
         self._alibaba_key_beijing.apply_locale()
         self._alibaba_key_singapore.apply_locale()
         self._audio_settings.apply_locale()

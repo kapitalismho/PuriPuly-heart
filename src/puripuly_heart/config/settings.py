@@ -34,7 +34,7 @@ from puripuly_heart.config.llm_profiles import (
 )
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 
-SETTINGS_SCHEMA_VERSION = 24
+SETTINGS_SCHEMA_VERSION = 25
 STT_INTERNAL_SAMPLE_RATE_HZ = 16000
 DEFAULT_DESKTOP_AUDIO_VAD_HANGOVER_MS = 500
 MAX_CUSTOM_VOCAB_TERMS = 100
@@ -129,6 +129,7 @@ class LLMProviderName(str, Enum):
     QWEN = "qwen"
     DEEPSEEK = "deepseek"
     LOCAL_LLM = "local_llm"
+    CEREBRAS = "cerebras"
 
 
 class SecretsBackend(str, Enum):
@@ -154,6 +155,10 @@ class QwenLLMModel(str, Enum):
 class DeepSeekLLMModel(str, Enum):
     DEEPSEEK_V4_FLASH = "deepseek-v4-flash"
     DEEPSEEK_V4_PRO = "deepseek-v4-pro"
+
+
+class CerebrasLLMModel(str, Enum):
+    GEMMA_4_31B = "gemma-4-31b"
 
 
 class LocalLLMBackend(str, Enum):
@@ -207,6 +212,7 @@ class TranslationModel(str, Enum):
     GEMINI_31_FLASH_LITE = "gemini31_flash_lite"
     QWEN_35_PLUS = "qwen35_plus"
     LOCAL_LLM = "local_llm"
+    GEMMA4_31B_CEREBRAS = "gemma4_31b_cerebras"
 
 
 class TranslationConnection(str, Enum):
@@ -260,6 +266,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnec
     TranslationModel.GEMINI_31_FLASH_LITE: (TranslationConnection.OFFICIAL_BYOK,),
     TranslationModel.QWEN_35_PLUS: (TranslationConnection.OFFICIAL_BYOK,),
     TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
+    TranslationModel.GEMMA4_31B_CEREBRAS: (TranslationConnection.OFFICIAL_BYOK,),
 }
 TRANSLATION_CONNECTION_PRIORITY: tuple[TranslationConnection, ...] = (
     TranslationConnection.MANAGED,
@@ -677,6 +684,15 @@ class DeepSeekSettings:
 
 
 @dataclass(slots=True)
+class CerebrasSettings:
+    llm_model: CerebrasLLMModel = CerebrasLLMModel.GEMMA_4_31B
+
+    def validate(self) -> None:
+        if not isinstance(self.llm_model, CerebrasLLMModel):
+            raise ValueError("invalid cerebras llm model")
+
+
+@dataclass(slots=True)
 class LocalLLMSettings:
     backend: LocalLLMBackend = LocalLLMBackend.OLLAMA
     base_url: str = "http://127.0.0.1:11434/v1"
@@ -928,6 +944,7 @@ class ApiKeyVerificationSettings:
     deepseek: bool = False
     alibaba_beijing: bool = False
     alibaba_singapore: bool = False
+    cerebras: bool = False
 
     def validate(self) -> None:
         pass  # No validation needed
@@ -997,6 +1014,7 @@ class AppSettings:
     openrouter: OpenRouterSettings = field(default_factory=OpenRouterSettings)
     qwen: QwenSettings = field(default_factory=QwenSettings)
     deepseek: DeepSeekSettings = field(default_factory=DeepSeekSettings)
+    cerebras: CerebrasSettings = field(default_factory=CerebrasSettings)
     local_llm: LocalLLMSettings = field(default_factory=LocalLLMSettings)
     llm: LLMSettings = field(default_factory=LLMSettings)
     osc: OSCSettings = field(default_factory=OSCSettings)
@@ -1034,6 +1052,7 @@ class AppSettings:
         self.openrouter.validate()
         self.qwen.validate()
         self.deepseek.validate()
+        self.cerebras.validate()
         self.local_llm.validate()
         self.llm.validate()
         self.osc.validate()
@@ -1403,6 +1422,9 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
         "deepseek": {
             "llm_model": settings.deepseek.llm_model.value,
         },
+        "cerebras": {
+            "llm_model": settings.cerebras.llm_model.value,
+        },
         "local_llm": {
             "backend": settings.local_llm.backend.value,
             "base_url": _parse_local_llm_base_url(settings.local_llm.base_url),
@@ -1452,6 +1474,7 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
             "deepseek": settings.api_key_verified.deepseek,
             "alibaba_beijing": settings.api_key_verified.alibaba_beijing,
             "alibaba_singapore": settings.api_key_verified.alibaba_singapore,
+            "cerebras": settings.api_key_verified.cerebras,
         },
         "managed_identity": {
             "installation_id": settings.managed_identity.installation_id,
@@ -1535,6 +1558,16 @@ def _parse_deepseek_llm_model(value: object) -> DeepSeekLLMModel:
         except ValueError:
             pass
     return DeepSeekLLMModel.DEEPSEEK_V4_FLASH
+
+
+def _parse_cerebras_llm_model(value: object) -> CerebrasLLMModel:
+    if isinstance(value, str):
+        normalized = value.strip()
+        try:
+            return CerebrasLLMModel(normalized)
+        except ValueError:
+            pass
+    return CerebrasLLMModel.GEMMA_4_31B
 
 
 def _parse_openrouter_llm_model(value: object) -> OpenRouterLLMModel:
@@ -1870,6 +1903,7 @@ def _derive_translation_settings_from_runtime_values(
     gemini_model: GeminiLLMModel,
     qwen_model: QwenLLMModel,
     deepseek_model: DeepSeekLLMModel,
+    cerebras_model: CerebrasLLMModel,
     history: object = None,
 ) -> TranslationSettings:
     normalized_history = _parse_translation_connection_history(history)
@@ -1909,6 +1943,13 @@ def _derive_translation_settings_from_runtime_values(
         return _normalize_translation_settings(
             model=TranslationModel.LOCAL_LLM,
             connection=TranslationConnection.OLLAMA,
+            history=normalized_history,
+        )
+
+    if provider_llm == LLMProviderName.CEREBRAS:
+        return _normalize_translation_settings(
+            model=TranslationModel.GEMMA4_31B_CEREBRAS,
+            connection=TranslationConnection.OFFICIAL_BYOK,
             history=normalized_history,
         )
 
@@ -1966,6 +2007,7 @@ def _derive_translation_settings_from_runtime(
         gemini_model=settings.gemini.llm_model,
         qwen_model=settings.qwen.llm_model,
         deepseek_model=settings.deepseek.llm_model,
+        cerebras_model=settings.cerebras.llm_model,
         history=history,
     )
 
@@ -2041,6 +2083,12 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
         return settings
 
+    if model == TranslationModel.GEMMA4_31B_CEREBRAS:
+        settings.provider.llm = LLMProviderName.CEREBRAS
+        settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
+        settings.cerebras.llm_model = CerebrasLLMModel.GEMMA_4_31B
+        return settings
+
     settings.provider.llm = LLMProviderName.QWEN
     settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
     settings.qwen.llm_model = QwenLLMModel.QWEN_35_PLUS
@@ -2075,6 +2123,8 @@ def _apply_materialized_translation_to_data(
     qwen_data, block_changed = _ensure_mapping_block(data, "qwen")
     changed = changed or block_changed
     deepseek_data, block_changed = _ensure_mapping_block(data, "deepseek")
+    changed = changed or block_changed
+    cerebras_data, block_changed = _ensure_mapping_block(data, "cerebras")
     changed = changed or block_changed
 
     translation = _normalize_translation_settings(
@@ -2198,6 +2248,20 @@ def _apply_materialized_translation_to_data(
         changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.LOCAL_LLM.value)
         return changed
 
+    if translation.model == TranslationModel.GEMMA4_31B_CEREBRAS:
+        changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.CEREBRAS.value)
+        changed |= _set_mapping_value(
+            openrouter_data,
+            "provider_routing",
+            OpenRouterProviderRouting.DEFAULT.value,
+        )
+        changed |= _set_mapping_value(
+            cerebras_data,
+            "llm_model",
+            CerebrasLLMModel.GEMMA_4_31B.value,
+        )
+        return changed
+
     changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.QWEN.value)
     changed |= _set_mapping_value(
         openrouter_data,
@@ -2297,6 +2361,7 @@ def _apply_china_managed_first_run_defaults(settings: AppSettings) -> None:
         gemini_model=settings.gemini.llm_model,
         qwen_model=settings.qwen.llm_model,
         deepseek_model=settings.deepseek.llm_model,
+        cerebras_model=settings.cerebras.llm_model,
         history=settings.translation.connection_history,
     )
 
@@ -2791,6 +2856,30 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         changed = True
         version = 24
 
+    if version < 25:
+        cerebras_data = data.get("cerebras")
+        if not isinstance(cerebras_data, dict):
+            cerebras_data = {}
+            data["cerebras"] = cerebras_data
+            changed = True
+
+        raw_cerebras_model = cerebras_data.get("llm_model")
+        normalized_cerebras_model = _parse_cerebras_llm_model(raw_cerebras_model).value
+        if raw_cerebras_model != normalized_cerebras_model:
+            cerebras_data["llm_model"] = normalized_cerebras_model
+            changed = True
+
+        api_key_verified_data_v25 = data.get("api_key_verified")
+        if not isinstance(api_key_verified_data_v25, dict):
+            api_key_verified_data_v25 = {}
+            data["api_key_verified"] = api_key_verified_data_v25
+            changed = True
+        if "cerebras" not in api_key_verified_data_v25:
+            api_key_verified_data_v25["cerebras"] = False
+            changed = True
+
+        version = 25
+
     if _normalize_local_llm_data(data):
         changed = True
 
@@ -2985,6 +3074,18 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         deepseek_data["llm_model"] = normalized_deepseek_model
         changed = True
 
+    cerebras_data = data.get("cerebras")
+    if not isinstance(cerebras_data, dict):
+        cerebras_data = {}
+        data["cerebras"] = cerebras_data
+        changed = True
+
+    raw_cerebras_model = cerebras_data.get("llm_model")
+    normalized_cerebras_model = _parse_cerebras_llm_model(raw_cerebras_model).value
+    if raw_cerebras_model != normalized_cerebras_model:
+        cerebras_data["llm_model"] = normalized_cerebras_model
+        changed = True
+
     translation_data = data.get("translation") if isinstance(data.get("translation"), dict) else {}
     translation_history = _parse_translation_connection_history(
         translation_data.get("connection_history") if isinstance(translation_data, dict) else None
@@ -3011,6 +3112,7 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
             gemini_model=_parse_gemini_llm_model(gemini_data.get("llm_model")),
             qwen_model=_parse_qwen_llm_model(qwen_data.get("llm_model")),
             deepseek_model=_parse_deepseek_llm_model(deepseek_data.get("llm_model")),
+            cerebras_model=_parse_cerebras_llm_model(cerebras_data.get("llm_model")),
             history=translation_history,
         )
     normalized_translation_data = _translation_settings_to_dict(normalized_translation_settings)
@@ -3027,6 +3129,9 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         changed = True
     if "deepseek" not in api_key_verified_data:
         api_key_verified_data["deepseek"] = False
+        changed = True
+    if "cerebras" not in api_key_verified_data:
+        api_key_verified_data["cerebras"] = False
         changed = True
 
     overlay_data = data.get("overlay")
@@ -3328,6 +3433,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
 
     qwen_raw = data.get("qwen") if isinstance(data.get("qwen"), dict) else {}
     deepseek_raw = data.get("deepseek") if isinstance(data.get("deepseek"), dict) else {}
+    cerebras_raw = data.get("cerebras") if isinstance(data.get("cerebras"), dict) else {}
     local_llm_raw = data.get("local_llm") if isinstance(data.get("local_llm"), dict) else {}
     qwen_asr_raw = data.get("qwen_asr_stt") if isinstance(data.get("qwen_asr_stt"), dict) else {}
     openrouter_raw = data.get("openrouter") if isinstance(data.get("openrouter"), dict) else {}
@@ -3514,6 +3620,11 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
                 deepseek_raw.get("llm_model", DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value)
             ),
         ),
+        cerebras=CerebrasSettings(
+            llm_model=_parse_cerebras_llm_model(
+                cerebras_raw.get("llm_model", CerebrasLLMModel.GEMMA_4_31B.value)
+            ),
+        ),
         local_llm=LocalLLMSettings(
             backend=_parse_local_llm_backend(local_llm_raw.get("backend")),
             base_url=_parse_local_llm_base_url(local_llm_raw.get("base_url")),
@@ -3575,6 +3686,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             alibaba_singapore=bool(
                 data.get("api_key_verified", {}).get("alibaba_singapore", False)
             ),
+            cerebras=bool(data.get("api_key_verified", {}).get("cerebras", False)),
         ),
         managed_identity=ManagedIdentitySettings(
             installation_id=_parse_optional_str(managed_identity_data.get("installation_id")) or "",
@@ -3626,12 +3738,18 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
 
 
 def load_settings(path: Path) -> AppSettings:
-    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw_text = path.read_text(encoding="utf-8")
+    raw = json.loads(raw_text)
     if not isinstance(raw, dict):
         raise ValueError("settings file must contain a JSON object")
+    raw_version = _coerce_int(raw.get("settings_version"), 1)
+    if raw_version < 1:
+        raw_version = 1
     migrated, changed = _migrate_settings_dict(raw)
     settings = from_dict(migrated)
     if changed:
+        if raw_version < SETTINGS_SCHEMA_VERSION:
+            _write_settings_migration_backup(path, raw_text, raw_version)
         save_settings(path, settings)
     return settings
 
@@ -3644,6 +3762,17 @@ def save_settings(path: Path, settings: AppSettings) -> None:
         json.dumps(to_dict(settings), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+
+
+def _write_settings_migration_backup(path: Path, content: str, source_version: int) -> Path:
+    backup_stem = f"{path.name}.v{source_version}.pre-v{SETTINGS_SCHEMA_VERSION}.bak"
+    backup_path = path.with_name(backup_stem)
+    index = 1
+    while backup_path.exists():
+        backup_path = path.with_name(f"{backup_stem}.{index}")
+        index += 1
+    _atomic_write_text(backup_path, content, encoding="utf-8")
+    return backup_path
 
 
 def _atomic_write_text(path: Path, content: str, *, encoding: str) -> None:

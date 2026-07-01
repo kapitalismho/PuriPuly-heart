@@ -17,6 +17,7 @@ from puripuly_heart.config.settings import (
     STTProviderName,
 )
 from puripuly_heart.core.local_stt_assets import LocalSTTInstallState
+from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.llm.qwen import QwenLLMProvider
@@ -441,6 +442,90 @@ async def test_verify_and_update_status_uses_deepseek_env_key(monkeypatch) -> No
         return True
 
     monkeypatch.setattr(DeepSeekLLMProvider, "verify_api_key", staticmethod(fake_verify))
+
+    await controller._verify_and_update_status()
+
+    assert seen == ["env-secret"]
+    assert app.view_dashboard.translation_needs_key is False
+
+
+@pytest.mark.asyncio
+async def test_verify_api_key_uses_cerebras_verifier(monkeypatch) -> None:
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=SimpleNamespace(view_dashboard=DummyDashboard()),
+        config_path=Path("settings.json"),
+    )
+
+    seen: list[str] = []
+
+    async def fake_verify(api_key: str) -> bool:
+        seen.append(api_key)
+        return True
+
+    monkeypatch.setattr(CerebrasLLMProvider, "verify_api_key", staticmethod(fake_verify))
+
+    ok, message = await controller.verify_api_key("cerebras", "secret")
+
+    assert ok is True
+    assert message == "Verification successful"
+    assert seen == ["secret"]
+
+
+@pytest.mark.asyncio
+async def test_verify_and_update_status_uses_cerebras_verifier(monkeypatch) -> None:
+    settings = AppSettings()
+    settings.provider.llm = LLMProviderName.CEREBRAS
+    app = SimpleNamespace(view_dashboard=DummyDashboard())
+
+    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller.settings = settings
+    controller.hub = DummyHub()
+
+    monkeypatch.setattr(
+        controller_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets({"cerebras_api_key": "secret"}),
+    )
+
+    seen: list[str] = []
+
+    async def fake_verify(api_key: str) -> bool:
+        seen.append(api_key)
+        return True
+
+    monkeypatch.setattr(CerebrasLLMProvider, "verify_api_key", staticmethod(fake_verify))
+
+    await controller._verify_and_update_status()
+
+    assert seen == ["secret"]
+    assert app.view_dashboard.translation_needs_key is False
+
+
+@pytest.mark.asyncio
+async def test_verify_and_update_status_uses_cerebras_env_key(monkeypatch) -> None:
+    settings = AppSettings()
+    settings.provider.llm = LLMProviderName.CEREBRAS
+    app = SimpleNamespace(view_dashboard=DummyDashboard())
+
+    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller.settings = settings
+    controller.hub = DummyHub()
+
+    monkeypatch.setattr(
+        controller_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets({}),
+    )
+    monkeypatch.setenv("CEREBRAS_API_KEY", "env-secret")
+
+    seen: list[str] = []
+
+    async def fake_verify(api_key: str) -> bool:
+        seen.append(api_key)
+        return True
+
+    monkeypatch.setattr(CerebrasLLMProvider, "verify_api_key", staticmethod(fake_verify))
 
     await controller._verify_and_update_status()
 

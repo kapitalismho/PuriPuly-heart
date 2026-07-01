@@ -3624,7 +3624,7 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
 
     async def fake_verify(provider: str, key: str):
         _ = key
-        return provider in {"deepgram", "deepseek"}, "ok"
+        return provider in {"deepgram", "deepseek", "cerebras"}, "ok"
 
     settings = SimpleNamespace(
         api_key_verified=SimpleNamespace(
@@ -3633,6 +3633,7 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
             google=False,
             openrouter=False,
             deepseek=False,
+            cerebras=False,
             alibaba_beijing=False,
             alibaba_singapore=False,
         )
@@ -3650,18 +3651,21 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
     google_result = await app._on_verify_api_key("google", "k")
     openrouter_result = await app._on_verify_api_key("openrouter", "k")
     deepseek_result = await app._on_verify_api_key("deepseek", "k")
+    cerebras_result = await app._on_verify_api_key("cerebras", "k")
 
     assert deepgram_result == (True, "ok")
     assert google_result == (False, "ok")
     assert openrouter_result == (False, "ok")
     assert deepseek_result == (True, "ok")
+    assert cerebras_result == (True, "ok")
     assert settings.api_key_verified.deepgram is True
     assert settings.api_key_verified.google is False
     assert settings.api_key_verified.openrouter is False
     assert settings.api_key_verified.deepseek is True
+    assert settings.api_key_verified.cerebras is True
     assert app.view_dashboard.stt_calls[-1] == (False, False)
     assert app.view_dashboard.trans_calls[-1] == (False, False)
-    assert len(saves) == 4
+    assert len(saves) == 5
 
 
 @pytest.mark.asyncio
@@ -3703,6 +3707,50 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
 
     assert result == (True, "ok")
     assert settings.api_key_verified.google is False
+    assert saves == []
+    assert app.view_dashboard.stt_calls == []
+    assert app.view_dashboard.trans_calls == []
+
+
+@pytest.mark.asyncio
+async def test_on_verify_api_key_skips_persistence_for_stale_cerebras_field_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.view_settings = SimpleNamespace(_cerebras_key=SimpleNamespace(value="new-key"))
+    app.view_dashboard = SimpleNamespace(
+        stt_calls=[],
+        trans_calls=[],
+        set_stt_needs_key=lambda value, update_ui=False: app.view_dashboard.stt_calls.append(
+            (value, update_ui)
+        ),
+        set_translation_needs_key=lambda value, update_ui=False: app.view_dashboard.trans_calls.append(
+            (value, update_ui)
+        ),
+    )
+
+    async def fake_verify(provider: str, key: str):
+        assert (provider, key) == ("cerebras", "old-key")
+        return True, "ok"
+
+    settings = SimpleNamespace(
+        api_key_verified=SimpleNamespace(
+            cerebras=False,
+        )
+    )
+    app.controller = SimpleNamespace(
+        verify_api_key=fake_verify,
+        settings=settings,
+        config_path="settings.json",
+    )
+
+    saves: list[tuple[object, object]] = []
+    monkeypatch.setattr(app_module, "save_settings", lambda path, cfg: saves.append((path, cfg)))
+
+    result = await app._on_verify_api_key("cerebras", "old-key")
+
+    assert result == (True, "ok")
+    assert settings.api_key_verified.cerebras is False
     assert saves == []
     assert app.view_dashboard.stt_calls == []
     assert app.view_dashboard.trans_calls == []

@@ -338,9 +338,11 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         TranslationModel.GEMINI_31_FLASH_LITE.value,
         TranslationModel.QWEN_35_PLUS.value,
         TranslationModel.LOCAL_LLM.value,
+        TranslationModel.GEMMA4_31B_CEREBRAS.value,
     ]
     assert TranslationModel.QWEN_35_PLUS.value in values
     assert TranslationModel.LOCAL_LLM.value in values
+    assert TranslationModel.GEMMA4_31B_CEREBRAS.value in values
     assert all("qwen35_flash" not in value for value in values)
 
 

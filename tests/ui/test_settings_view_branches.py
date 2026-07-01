@@ -159,6 +159,7 @@ def _make_llm_selection_view(
     view._google_key = SimpleNamespace(visible=False)
     view._openrouter_key = SimpleNamespace(visible=False)
     view._deepseek_key = SimpleNamespace(visible=False)
+    view._cerebras_key = SimpleNamespace(visible=False)
     view._openrouter_pkce_button_row = SimpleNamespace(visible=False, update=lambda: None)
     view._openrouter_pkce_button = SimpleNamespace(text="", style=None, update=lambda: None)
     view._alibaba_key_beijing = SimpleNamespace(visible=False)
@@ -3132,6 +3133,7 @@ def test_llm_modal_lists_logical_translation_models_once(
         TranslationModel.GEMINI_31_FLASH_LITE.value,
         TranslationModel.QWEN_35_PLUS.value,
         TranslationModel.LOCAL_LLM.value,
+        TranslationModel.GEMMA4_31B_CEREBRAS.value,
     ]
     assert captured["current"] == TranslationModel.GEMINI_3_FLASH.value
     assert OpenRouterSelectionAlias.GEMMA4_MANAGED.value not in option_by_value
@@ -3150,6 +3152,9 @@ def test_llm_modal_lists_logical_translation_models_once(
         "provider.deepseek_v4_pro"
     )
     assert option_by_value[TranslationModel.LOCAL_LLM.value].label == t("provider.local_llms")
+    assert option_by_value[TranslationModel.GEMMA4_31B_CEREBRAS.value].label == t(
+        "provider.gemma4_31b_cerebras"
+    )
 
 
 def test_translation_connection_modal_lists_supported_connections(

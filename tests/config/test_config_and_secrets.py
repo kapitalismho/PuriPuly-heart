@@ -26,6 +26,7 @@ from puripuly_heart.config.settings import (
     SETTINGS_SCHEMA_VERSION,
     AppSettings,
     AudioSettings,
+    CerebrasLLMModel,
     DeepSeekLLMModel,
     DeepSeekSettings,
     GeminiLLMModel,
@@ -304,7 +305,7 @@ def test_migrate_v17_normalizes_directsound_host_api_and_preserves_device() -> N
 
 
 def test_migrate_v18_preserves_directsound_when_removing_legacy_osc_rate_limits() -> None:
-    assert SETTINGS_SCHEMA_VERSION == 24
+    assert SETTINGS_SCHEMA_VERSION == 25
 
     raw = to_dict(AppSettings())
     raw["settings_version"] = 17
@@ -348,7 +349,7 @@ def test_load_settings_persists_v17_directsound_preservation(tmp_path) -> None:
 
 
 def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None:
-    assert SETTINGS_SCHEMA_VERSION == 24
+    assert SETTINGS_SCHEMA_VERSION == 25
 
     path = tmp_path / "settings.json"
     raw = to_dict(AppSettings())
@@ -412,6 +413,7 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("GEMINI_31_FLASH_LITE", "gemini31_flash_lite"),
         ("QWEN_35_PLUS", "qwen35_plus"),
         ("LOCAL_LLM", "local_llm"),
+        ("GEMMA4_31B_CEREBRAS", "gemma4_31b_cerebras"),
     )
 
 
@@ -518,6 +520,9 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     assert supported_translation_connections(TranslationModel.LOCAL_LLM) == (
         TranslationConnection.OLLAMA,
     )
+    assert supported_translation_connections(TranslationModel.GEMMA4_31B_CEREBRAS) == (
+        TranslationConnection.OFFICIAL_BYOK,
+    )
     assert default_translation_connection(TranslationModel.GEMMA4) == TranslationConnection.MANAGED
     assert (
         default_translation_connection(TranslationModel.GEMINI_3_FLASH)
@@ -525,6 +530,10 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     )
     assert (
         default_translation_connection(TranslationModel.LOCAL_LLM) == TranslationConnection.OLLAMA
+    )
+    assert (
+        default_translation_connection(TranslationModel.GEMMA4_31B_CEREBRAS)
+        == TranslationConnection.OFFICIAL_BYOK
     )
 
 
@@ -987,6 +996,104 @@ def test_from_dict_backfills_missing_deepseek_settings_and_verification() -> Non
     persisted = to_dict(loaded)
     assert persisted["deepseek"] == {"llm_model": DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value}
     assert persisted["api_key_verified"]["deepseek"] is False
+
+
+def test_cerebras_settings_default_and_roundtrip() -> None:
+    settings = AppSettings()
+
+    assert settings.cerebras.llm_model == CerebrasLLMModel.GEMMA_4_31B
+    assert settings.api_key_verified.cerebras is False
+
+    persisted = to_dict(settings)
+    assert persisted["cerebras"] == {"llm_model": "gemma-4-31b"}
+    assert persisted["api_key_verified"]["cerebras"] is False
+
+    loaded = from_dict(persisted)
+    assert loaded.cerebras.llm_model == CerebrasLLMModel.GEMMA_4_31B
+    assert loaded.api_key_verified.cerebras is False
+
+
+def test_cerebras_api_key_is_not_serialized_in_settings() -> None:
+    settings = AppSettings()
+    persisted = to_dict(settings)
+
+    assert "cerebras_api_key" not in persisted
+    assert "api_key" not in persisted.get("cerebras", {})
+
+
+def test_materialize_translation_settings_maps_cerebras_model() -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMMA4_31B_CEREBRAS,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+        connection_history={
+            TranslationModel.GEMMA4_31B_CEREBRAS.value: TranslationConnection.OFFICIAL_BYOK,
+        },
+    )
+
+    returned = materialize_translation_settings(settings)
+
+    assert returned is settings
+    assert settings.provider.llm == LLMProviderName.CEREBRAS
+    assert settings.cerebras.llm_model == CerebrasLLMModel.GEMMA_4_31B
+    assert settings.openrouter.provider_routing == OpenRouterProviderRouting.DEFAULT
+
+
+def test_from_dict_cerebras_provider_infers_translation_settings() -> None:
+    data = to_dict(AppSettings())
+    data.pop("translation", None)
+    data["provider"]["llm"] = LLMProviderName.CEREBRAS.value
+    data["cerebras"] = {"llm_model": CerebrasLLMModel.GEMMA_4_31B.value}
+
+    loaded = from_dict(data)
+
+    assert loaded.translation.model == TranslationModel.GEMMA4_31B_CEREBRAS
+    assert loaded.translation.connection == TranslationConnection.OFFICIAL_BYOK
+    assert loaded.provider.llm == LLMProviderName.CEREBRAS
+    assert loaded.cerebras.llm_model == CerebrasLLMModel.GEMMA_4_31B
+
+
+def test_from_dict_preserves_cerebras_llm_provider_model_and_verification() -> None:
+    data = to_dict(AppSettings())
+    data.pop("translation", None)
+    data["provider"]["llm"] = LLMProviderName.CEREBRAS.value
+    data["cerebras"] = {"llm_model": CerebrasLLMModel.GEMMA_4_31B.value}
+    data["api_key_verified"]["cerebras"] = True
+
+    loaded = from_dict(data)
+
+    assert loaded.provider.llm == LLMProviderName.CEREBRAS
+    assert loaded.cerebras.llm_model == CerebrasLLMModel.GEMMA_4_31B
+    assert loaded.api_key_verified.cerebras is True
+    persisted = to_dict(loaded)
+    assert persisted["provider"]["llm"] == LLMProviderName.CEREBRAS.value
+    assert persisted["cerebras"]["llm_model"] == CerebrasLLMModel.GEMMA_4_31B.value
+    assert persisted["api_key_verified"]["cerebras"] is True
+
+
+def test_from_dict_backfills_missing_cerebras_settings_and_verification() -> None:
+    data = to_dict(AppSettings())
+    data.pop("cerebras", None)
+    data["api_key_verified"].pop("cerebras", None)
+
+    loaded = from_dict(data)
+
+    assert loaded.cerebras.llm_model == CerebrasLLMModel.GEMMA_4_31B
+    assert loaded.api_key_verified.cerebras is False
+    persisted = to_dict(loaded)
+    assert persisted["cerebras"] == {"llm_model": CerebrasLLMModel.GEMMA_4_31B.value}
+    assert persisted["api_key_verified"]["cerebras"] is False
+
+
+def test_cerebras_stray_api_key_settings_are_ignored_on_roundtrip() -> None:
+    raw = to_dict(AppSettings())
+    raw["cerebras"]["api_key"] = "do-not-persist"
+    raw["api_key_verified"]["cerebras"] = True
+
+    loaded = from_dict(raw)
+    persisted = to_dict(loaded)
+
+    assert "api_key" not in persisted["cerebras"]
 
 
 def test_openrouter_fallback_aliases_include_curated_openrouter_models() -> None:
@@ -1456,11 +1563,35 @@ def test_load_settings_rewrites_migrated_8khz_audio_via_normal_save_path(
     loaded = load_settings(path)
 
     assert loaded.audio.internal_sample_rate_hz == 16000
-    assert replace_calls == [("settings.json.tmp", "settings.json")]
+    backup_name = f"settings.json.v{SETTINGS_SCHEMA_VERSION - 1}.pre-v{SETTINGS_SCHEMA_VERSION}.bak"
+    assert replace_calls == [
+        (f"{backup_name}.tmp", backup_name),
+        ("settings.json.tmp", "settings.json"),
+    ]
 
     persisted = json.loads(path.read_text(encoding="utf-8"))
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
     assert persisted["audio"]["internal_sample_rate_hz"] == 16000
+
+
+def test_load_settings_schema_migration_writes_pre_migration_backup(tmp_path) -> None:
+    path = tmp_path / "settings.json"
+    legacy = to_dict(AppSettings())
+    legacy["settings_version"] = SETTINGS_SCHEMA_VERSION - 1
+    legacy["cerebras"] = {"llm_model": "unknown-cerebras-model"}
+    original_text = json.dumps(legacy, ensure_ascii=False, indent=2)
+    path.write_text(original_text, encoding="utf-8")
+
+    loaded = load_settings(path)
+
+    assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
+    backup_path = path.with_name(
+        f"settings.json.v{SETTINGS_SCHEMA_VERSION - 1}.pre-v{SETTINGS_SCHEMA_VERSION}.bak"
+    )
+    assert backup_path.read_text(encoding="utf-8") == original_text
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
+    assert persisted["cerebras"]["llm_model"] == CerebrasLLMModel.GEMMA_4_31B.value
 
 
 def test_load_settings_migration_preserves_custom_concurrency_limit(tmp_path):

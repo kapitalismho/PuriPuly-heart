@@ -1689,6 +1689,7 @@ class TranslatorApp:
             "google": "_google_key",
             "openrouter": "_openrouter_key",
             "deepseek": "_deepseek_key",
+            "cerebras": "_cerebras_key",
             "alibaba_beijing": "_alibaba_key_beijing",
             "alibaba_singapore": "_alibaba_key_singapore",
         }
@@ -1723,6 +1724,7 @@ class TranslatorApp:
             "google",
             "openrouter",
             "deepseek",
+            "cerebras",
             "alibaba_beijing",
             "alibaba_singapore",
         ):
@@ -1739,6 +1741,7 @@ class TranslatorApp:
             "google_api_key": "google",
             "openrouter_api_key": "openrouter",
             "deepseek_api_key": "deepseek",
+            "cerebras_api_key": "cerebras",
             "alibaba_api_key": "alibaba_beijing",  # Use beijing as default
             "alibaba_api_key_beijing": "alibaba_beijing",
             "alibaba_api_key_singapore": "alibaba_singapore",
@@ -1755,6 +1758,7 @@ class TranslatorApp:
                 "google",
                 "openrouter",
                 "deepseek",
+                "cerebras",
                 "alibaba_beijing",
                 "alibaba_singapore",
             ):

@@ -131,6 +131,7 @@ from puripuly_heart.core.stt.custom_vocab import get_effective_custom_terms
 from puripuly_heart.core.vad.bundled import SILERO_VAD_VERSION, ensure_silero_vad_onnx
 from puripuly_heart.core.vad.gating import VadGating, create_peer_vad_gating
 from puripuly_heart.core.vad.silero import SileroVadOnnx
+from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata, OpenRouterLLMProvider
@@ -724,6 +725,7 @@ class GuiController:
             LLMProviderName.OPENROUTER,
             LLMProviderName.QWEN,
             LLMProviderName.DEEPSEEK,
+            LLMProviderName.CEREBRAS,
         )
 
     def _selected_stt_provider(self) -> STTProviderName | None:
@@ -2012,6 +2014,11 @@ class GuiController:
             (
                 settings.deepseek.llm_model
                 if settings.provider.llm == LLMProviderName.DEEPSEEK
+                else None
+            ),
+            (
+                settings.cerebras.llm_model
+                if settings.provider.llm == LLMProviderName.CEREBRAS
                 else None
             ),
             (
@@ -4172,6 +4179,8 @@ class GuiController:
                 success = await OpenRouterLLMProvider.verify_api_key(key)
             elif provider == "deepseek":
                 success = await DeepSeekLLMProvider.verify_api_key(key)
+            elif provider == "cerebras":
+                success = await CerebrasLLMProvider.verify_api_key(key)
             elif provider == "alibaba_beijing":
                 return await self._verify_qwen_key_with_model_fallback(
                     key,
@@ -6112,6 +6121,13 @@ class GuiController:
                         or ""
                     )
                     llm_valid = bool(key) and await DeepSeekLLMProvider.verify_api_key(key)
+                elif provider_name == LLMProviderName.CEREBRAS:
+                    key = (
+                        (secrets.get("cerebras_api_key") if secrets is not None else None)
+                        or os.getenv("CEREBRAS_API_KEY")
+                        or ""
+                    )
+                    llm_valid = bool(key) and await CerebrasLLMProvider.verify_api_key(key)
                 elif provider_name == "qwen":
                     llm_valid = await _verify_alibaba_selected()
                 elif provider_name == LLMProviderName.LOCAL_LLM:

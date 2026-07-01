@@ -44,6 +44,7 @@ from puripuly_heart.core.storage.secrets import (
 from puripuly_heart.core.stt.backend import STTBackend
 from puripuly_heart.core.stt.custom_vocab import get_effective_custom_terms
 from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
@@ -522,6 +523,17 @@ def create_llm_provider(
         base = DeepSeekLLMProvider(
             api_key=api_key,
             model=settings.deepseek.llm_model.value,
+            runtime_logging=runtime_logging,
+        )
+    elif settings.provider.llm == LLMProviderName.CEREBRAS:
+        api_key = require_secret(
+            secrets,
+            key="cerebras_api_key",
+            env_var="CEREBRAS_API_KEY",
+        )
+        base = CerebrasLLMProvider(
+            api_key=api_key,
+            model=settings.cerebras.llm_model.value,
             runtime_logging=runtime_logging,
         )
     elif settings.provider.llm == LLMProviderName.LOCAL_LLM:
