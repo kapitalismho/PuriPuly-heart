@@ -236,8 +236,10 @@ async def test_desktop_loopback_callback_tracks_status_and_drops_without_logging
         frame = await source.frames().__anext__()
 
         np.testing.assert_allclose(frame.samples, np.ones(4, dtype=np.float32))
-        assert any("callback status" in message and "count=1" in message for message in warnings)
-        assert any("queue drop" in message and "count=1" in message for message in warnings)
+        assert any("[AudioDiag][Drop][peer]" in message for message in warnings)
+        assert any("source=desktop_loopback" in message for message in warnings)
+        assert any("callback_status_total=1" in message for message in warnings)
+        assert any("queue_drop_total=1" in message for message in warnings)
     finally:
         await source.close()
 
@@ -318,10 +320,10 @@ async def test_desktop_loopback_callback_warning_reporting_is_rate_limited(monke
         trigger_status_and_drop()
         await source.frames().__anext__()
         assert len(warnings) == 1
-        assert "callback status count=2" in warnings[0]
-        assert "callback status new=2" in warnings[0]
-        assert "queue drop count=1" in warnings[0]
-        assert "queue drop new=1" in warnings[0]
+        assert "callback_status_total=2" in warnings[0]
+        assert "callback_status_new=2" in warnings[0]
+        assert "queue_drop_total=1" in warnings[0]
+        assert "queue_drop_new=1" in warnings[0]
 
         trigger_status_and_drop()
         await source.frames().__anext__()
@@ -332,10 +334,10 @@ async def test_desktop_loopback_callback_warning_reporting_is_rate_limited(monke
         await source.frames().__anext__()
 
         assert len(warnings) == 2
-        assert "callback status count=6" in warnings[1]
-        assert "callback status new=4" in warnings[1]
-        assert "queue drop count=3" in warnings[1]
-        assert "queue drop new=2" in warnings[1]
+        assert "callback_status_total=6" in warnings[1]
+        assert "callback_status_new=4" in warnings[1]
+        assert "queue_drop_total=3" in warnings[1]
+        assert "queue_drop_new=2" in warnings[1]
     finally:
         await source.close()
 
