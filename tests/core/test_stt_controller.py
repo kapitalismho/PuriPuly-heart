@@ -1081,6 +1081,48 @@ async def test_managed_stt_provider_multiple_pending_finals_resolve_fifo() -> No
         await stt.close()
 
 
+async def test_managed_stt_provider_empty_final_ack_pops_pending_without_output() -> None:
+    backend = Float32Backend()
+    stt = ManagedSTTProvider(backend=backend, sample_rate_hz=16000, reset_deadline_s=90.0)
+
+    first_utterance_id = uuid4()
+    second_utterance_id = uuid4()
+    stream = stt.events()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                first_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(first_utterance_id))
+        await backend.sessions[0]._queue.put(STTBackendTranscriptEvent(text="", is_final=True))
+        await asyncio.sleep(0)
+
+        await stt.handle_vad_event(
+            SpeechStart(
+                second_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await stt.handle_vad_event(SpeechEnd(second_utterance_id))
+        await backend.sessions[0]._queue.put(
+            STTBackendTranscriptEvent(text="second final", is_final=True)
+        )
+
+        event = await _next_typed_event(stream, STTFinalEvent)
+
+        assert event.utterance_id == second_utterance_id
+        assert event.transcript.utterance_id == second_utterance_id
+        assert event.transcript.text == "second final"
+    finally:
+        await stt.close()
+
+
 async def test_managed_stt_provider_logs_delayed_pending_finalization_lag() -> None:
     backend = Float32Backend()
     clock = FakeClock(10.0)

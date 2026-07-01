@@ -167,6 +167,22 @@ async def test_soniox_session_on_speech_end_none_injects_configured_trailing_sil
 
 
 @pytest.mark.asyncio
+async def test_soniox_session_empty_finalize_boundary_emits_empty_final_ack() -> None:
+    session = _make_session()
+
+    await session.on_speech_end(trailing_silence_ms=0)
+    finalize = await session._audio_q.get()
+    assert isinstance(finalize, _FinalizeRequest)
+
+    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+
+    event = session._events.get_nowait()
+    assert isinstance(event, STTBackendTranscriptEvent)
+    assert event.is_final is True
+    assert event.text == ""
+
+
+@pytest.mark.asyncio
 async def test_soniox_session_repeated_finalize_boundaries_clear_each_final_segment() -> None:
     session = _make_session()
 

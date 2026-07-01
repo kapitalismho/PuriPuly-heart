@@ -302,18 +302,22 @@ class _SonioxSession(STTBackendSession):
         if not self._pending_tokens:
             if self._consume_pending_finalize_request():
                 self._final_tokens.clear()
+                self._emit_empty_final_ack()
             return
         updated = self._merge_pending_tokens()
         self._pending_tokens.clear()
         self._pending_last_end_ms = None
         if not updated:
             if self._consume_pending_finalize_request():
-                self._emit_final_text()
+                if not self._emit_final_text():
+                    self._emit_empty_final_ack()
                 self._final_tokens.clear()
             return
-        self._emit_final_text()
+        emitted = self._emit_final_text()
         if self._consume_pending_finalize_request():
             self._final_tokens.clear()
+            if not emitted:
+                self._emit_empty_final_ack()
 
     def _consume_pending_finalize_request(self) -> bool:
         if self._pending_finalize_requests <= 0:
@@ -367,17 +371,17 @@ class _SonioxSession(STTBackendSession):
             self._final_tokens = self._final_tokens[:cut_idx] + list(new_tokens)
         return True
 
-    def _emit_final_text(self) -> None:
+    def _emit_final_text(self) -> bool:
         if not self._final_tokens:
-            return
+            return False
         text = "".join(token.text for token in self._final_tokens).strip()
         if not text:
-            return
+            return False
         # 문두 문장부호+공백 패턴 제거 (이전 발화의 잔여 문장부호 방어)
         # 예: ". 안녕" -> "안녕", "? 다음" -> "다음"
         text = re.sub(r"^[.,:;!?。，；：！？]+\s+", "", text)
         if not text:
-            return
+            return False
         logger.info("[STT] Transcript: '%s' (final)", text)
         logger.debug(
             "[STT] Soniox final flush tokens=%s text_len=%s",
@@ -385,6 +389,11 @@ class _SonioxSession(STTBackendSession):
             len(text),
         )
         self._put_event(STTBackendTranscriptEvent(text=text, is_final=True))
+        return True
+
+    def _emit_empty_final_ack(self) -> None:
+        logger.debug("[STT] Soniox empty finalize ack")
+        self._put_event(STTBackendTranscriptEvent(text="", is_final=True))
 
     def _min_end_ms(self, tokens: Sequence[_FinalToken]) -> int | None:
         values = [token.end_ms for token in tokens if token.end_ms is not None]

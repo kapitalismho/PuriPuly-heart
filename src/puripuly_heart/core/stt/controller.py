@@ -759,6 +759,8 @@ class ManagedSTTProvider:
                     )
                 if utterance_id is None:
                     continue
+                if ev.is_final and not ev.text.strip():
+                    continue
                 if ev.is_final and self._should_suppress_final_transcript(ev.text):
                     await self._handle_suppressed_final_transcript(
                         utterance_id=utterance_id,
