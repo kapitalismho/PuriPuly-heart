@@ -52,6 +52,7 @@ from puripuly_heart.config.settings import (
     normalize_owned_referral_id,
     save_settings,
 )
+from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.audio.desktop_pipeline import DesktopPeerPipeline
 from puripuly_heart.core.audio.desktop_source import DesktopLoopbackAudioSource
 from puripuly_heart.core.audio.diagnostics import compute_audio_frame_metrics
@@ -4078,7 +4079,7 @@ class GuiController:
             self.hub.hangover_s = (
                 settings.stt.low_latency_vad_hangover_ms / 1000.0
                 if settings.stt.low_latency_mode
-                else 1.1
+                else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
             )
             self.hub.peer_hangover_s = settings.desktop_audio.vad_hangover_ms / 1000.0
             self.hub.chatbox_include_source = settings.osc.chatbox_include_source
@@ -4281,7 +4282,7 @@ class GuiController:
             self.hub.hangover_s = (
                 next_settings.stt.low_latency_vad_hangover_ms / 1000.0
                 if next_settings.stt.low_latency_mode
-                else 1.1
+                else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
             )
             self.hub.peer_hangover_s = next_settings.desktop_audio.vad_hangover_ms / 1000.0
             self.hub.chatbox_include_source = next_settings.osc.chatbox_include_source
@@ -4780,7 +4781,7 @@ class GuiController:
             hangover_s=(
                 self.settings.stt.low_latency_vad_hangover_ms / 1000.0
                 if self.settings.stt.low_latency_mode
-                else 1.1
+                else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
             ),
             peer_hangover_s=self.settings.desktop_audio.vad_hangover_ms / 1000.0,
         )
@@ -5336,7 +5337,7 @@ class GuiController:
                 hangover_ms=(
                     self.settings.stt.low_latency_vad_hangover_ms
                     if self.settings.stt.low_latency_mode
-                    else 1100
+                    else DEFAULT_STABLE_VAD_HANGOVER_MS
                 ),
                 diagnostic_event_callback=lambda message: self.log_detailed(message),
                 diagnostics_enabled=self._detailed_audio_diag_enabled,

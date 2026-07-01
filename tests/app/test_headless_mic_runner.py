@@ -17,6 +17,10 @@ from puripuly_heart.config.settings import (
     ProviderSettings,
     STTProviderName,
 )
+from puripuly_heart.config.vad_defaults import (
+    DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS,
+    DEFAULT_STABLE_VAD_HANGOVER_MS,
+)
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 
 
@@ -699,11 +703,22 @@ async def test_headless_mic_runner_isolates_peer_loop_runtime_failures(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("low_latency_mode", "expected_self_hangover_ms", "expected_hub_hangover_s"),
+    [
+        (True, DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS, 0.5),
+        (False, DEFAULT_STABLE_VAD_HANGOVER_MS, 1.0),
+    ],
+)
 async def test_headless_mic_runner_uses_shared_peer_vad_policy_helper(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
+    low_latency_mode: bool,
+    expected_self_hangover_ms: int,
+    expected_hub_hangover_s: float,
 ) -> None:
     settings = AppSettings()
+    settings.stt.low_latency_mode = low_latency_mode
     settings.ui.peer_translation_enabled = True
     settings.desktop_audio.output_device = "Headphones (Loopback)"
     settings.desktop_audio.vad_speech_threshold = 0.72
@@ -715,6 +730,7 @@ async def test_headless_mic_runner_uses_shared_peer_vad_policy_helper(
 
     helper_calls: list[dict[str, object]] = []
     self_vad_calls: list[dict[str, object]] = []
+    hub_calls: list[dict[str, object]] = []
     engine = object()
 
     class FakeSender:
@@ -723,6 +739,7 @@ async def test_headless_mic_runner_uses_shared_peer_vad_policy_helper(
 
     class FakeHub:
         def __init__(self, *args, **kwargs):
+            hub_calls.append(dict(kwargs))
             self.peer_stt = kwargs.get("peer_stt")
 
         async def start(self, *args, **kwargs):
@@ -796,6 +813,8 @@ async def test_headless_mic_runner_uses_shared_peer_vad_policy_helper(
 
     assert result == 0
     assert self_vad_calls[0].get("max_segment_ms") is None
+    assert self_vad_calls[0]["hangover_ms"] == expected_self_hangover_ms
+    assert hub_calls[0]["hangover_s"] == expected_hub_hangover_s
     assert helper_calls == [
         {
             "engine": engine,

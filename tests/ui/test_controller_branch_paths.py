@@ -44,6 +44,10 @@ from puripuly_heart.config.settings import (
     TranslationSettings,
     to_dict,
 )
+from puripuly_heart.config.vad_defaults import (
+    DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS,
+    DEFAULT_STABLE_VAD_HANGOVER_MS,
+)
 from puripuly_heart.core.audio.format import AudioFrameF32
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.audio.source import (
@@ -264,7 +268,7 @@ class DummyHub:
         self.low_latency_mode = False
         self.low_latency_merge_gap_ms = 600
         self.low_latency_spec_retry_max = 10
-        self.hangover_s = 1.1
+        self.hangover_s = DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
         self.peer_hangover_s = 0.6
         self.clear_context_calls = 0
         self.promo_calls = 0
@@ -3950,6 +3954,34 @@ async def test_apply_settings_copies_self_and_peer_vad_hangovers_to_hub(
     await controller.apply_settings(settings)
 
     assert controller.hub.hangover_s == 0.65
+    assert controller.hub.peer_hangover_s == 0.95
+
+
+@pytest.mark.asyncio
+async def test_apply_settings_uses_stable_self_vad_hangover_when_low_latency_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _make_controller(app=SimpleNamespace())
+    settings = AppSettings()
+    settings.stt.low_latency_mode = False
+    settings.desktop_audio.vad_hangover_ms = 950
+    controller.settings = settings
+    controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
+    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+        settings
+    )
+    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
+        settings
+    )
+    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
+    )
+    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", lambda self: asyncio.sleep(0))
+
+    await controller.apply_settings(settings)
+
+    assert controller.hub.hangover_s == DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
     assert controller.hub.peer_hangover_s == 0.95
 
 
@@ -8590,12 +8622,22 @@ async def test_start_mic_loop_retries_retained_source_close_before_opening_new_s
     assert controller._mic_task is not None
 
 
+@pytest.mark.parametrize(
+    ("low_latency_mode", "expected_hangover_ms"),
+    [
+        (True, DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS),
+        (False, DEFAULT_STABLE_VAD_HANGOVER_MS),
+    ],
+)
 @pytest.mark.asyncio
-async def test_start_mic_loop_wires_self_vad_diagnostics(
+async def test_start_mic_loop_wires_self_vad_diagnostics_and_mode_hangover(
     monkeypatch: pytest.MonkeyPatch,
+    low_latency_mode: bool,
+    expected_hangover_ms: int,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
+    controller.settings.stt.low_latency_mode = low_latency_mode
     controller.settings.audio.input_host_api = WINDOWS_WASAPI_COMPATIBILITY_HOST_API
     controller.settings.audio.input_device = "Compat Mic"
     controller.hub = DummyHub()
@@ -8638,6 +8680,7 @@ async def test_start_mic_loop_wires_self_vad_diagnostics(
     await asyncio.sleep(0)
 
     assert vad_calls[0].get("max_segment_ms") is None
+    assert vad_calls[0]["hangover_ms"] == expected_hangover_ms
     assert vad_calls[0]["diagnostic_label"] == "self"
     diagnostics_enabled = vad_calls[0]["diagnostics_enabled"]
     assert callable(diagnostics_enabled)
@@ -11539,7 +11582,7 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
     controller.hub.low_latency_mode = False
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-    controller.hub.hangover_s = 1.1
+    controller.hub.hangover_s = DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
     controller._last_stt_runtime_signature = ("old",)
     controller._mic_task = object()
     controller._stt_desired = True
@@ -11614,7 +11657,7 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     controller.hub.low_latency_mode = settings.stt.low_latency_mode
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-    controller.hub.hangover_s = 1.1
+    controller.hub.hangover_s = DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
     controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
     controller._stt_desired = False
     controller._mic_task = None
@@ -11673,7 +11716,7 @@ async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabular
     controller.hub.low_latency_mode = settings.stt.low_latency_mode
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-    controller.hub.hangover_s = 1.1
+    controller.hub.hangover_s = DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
     controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
     controller._stt_desired = True
     controller._mic_task = object()
@@ -11732,7 +11775,7 @@ async def test_apply_settings_does_not_restart_stt_for_qwen_custom_vocabulary_ch
     controller.hub.low_latency_mode = settings.stt.low_latency_mode
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-    controller.hub.hangover_s = 1.1
+    controller.hub.hangover_s = DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
     controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
     controller._stt_desired = True
     controller._mic_task = object()
@@ -11781,7 +11824,7 @@ async def test_apply_settings_restarts_stt_for_local_qwen_custom_vocabulary_chan
     controller.hub.low_latency_mode = settings.stt.low_latency_mode
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-    controller.hub.hangover_s = 1.1
+    controller.hub.hangover_s = DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
     controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
     controller._stt_desired = True
     controller._mic_task = object()
@@ -11831,7 +11874,7 @@ async def test_apply_settings_skips_vrc_sync_when_setting_is_unchanged(
         low_latency_mode=settings.stt.low_latency_mode,
         low_latency_merge_gap_ms=settings.stt.low_latency_merge_gap_ms,
         low_latency_spec_retry_max=settings.stt.low_latency_spec_retry_max,
-        hangover_s=1.1,
+        hangover_s=DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0,
         peer_stt=None,
     )
     controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)

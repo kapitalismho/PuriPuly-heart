@@ -18,6 +18,7 @@ from puripuly_heart.app.wiring import (
 from puripuly_heart.config.audio_host_api import normalize_input_host_api
 from puripuly_heart.config.paths import default_vad_model_path
 from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.audio.desktop_pipeline import DesktopPeerPipeline
 from puripuly_heart.core.audio.desktop_source import DesktopLoopbackAudioSource
 from puripuly_heart.core.audio.diagnostics import compute_audio_frame_metrics
@@ -157,7 +158,7 @@ class HeadlessMicRunner:
             hangover_s=(
                 self.settings.stt.low_latency_vad_hangover_ms / 1000.0
                 if self.settings.stt.low_latency_mode
-                else 1.1
+                else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
             ),
         )
 
@@ -180,7 +181,7 @@ class HeadlessMicRunner:
             hangover_ms=(
                 self.settings.stt.low_latency_vad_hangover_ms
                 if self.settings.stt.low_latency_mode
-                else 1100
+                else DEFAULT_STABLE_VAD_HANGOVER_MS
             ),
         )
 

@@ -32,9 +32,13 @@ from puripuly_heart.config.llm_profiles import (
     normalize_openrouter_fallback_selection_alias,
     openrouter_alias_for_fields,
 )
+from puripuly_heart.config.vad_defaults import (
+    DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS,
+    LEGACY_LOW_LATENCY_VAD_HANGOVER_MS,
+)
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 
-SETTINGS_SCHEMA_VERSION = 25
+SETTINGS_SCHEMA_VERSION = 26
 STT_INTERNAL_SAMPLE_RATE_HZ = 16000
 DEFAULT_DESKTOP_AUDIO_VAD_HANGOVER_MS = 500
 MAX_CUSTOM_VOCAB_TERMS = 100
@@ -485,7 +489,7 @@ class STTSettings:
     drain_timeout_s: float = 2.0
     vad_speech_threshold: float = 0.5
     low_latency_mode: bool = True
-    low_latency_vad_hangover_ms: int = 600
+    low_latency_vad_hangover_ms: int = DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS
     low_latency_merge_gap_ms: int = 600
     low_latency_spec_retry_max: int = 10
     custom_vocabulary_enabled: bool = True
@@ -2880,6 +2884,18 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
 
         version = 25
 
+    if version < 26:
+        stt_data = data.get("stt")
+        if not isinstance(stt_data, dict):
+            stt_data = {}
+            data["stt"] = stt_data
+            changed = True
+        if stt_data.get("low_latency_vad_hangover_ms") == LEGACY_LOW_LATENCY_VAD_HANGOVER_MS:
+            stt_data["low_latency_vad_hangover_ms"] = DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS
+            changed = True
+
+        version = 26
+
     if _normalize_local_llm_data(data):
         changed = True
 
@@ -3548,7 +3564,12 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             drain_timeout_s=float(stt_data.get("drain_timeout_s", 2.0)),
             vad_speech_threshold=float(vad_threshold_raw) if vad_threshold_raw is not None else 0.5,
             low_latency_mode=bool(stt_data.get("low_latency_mode", False)),
-            low_latency_vad_hangover_ms=int(stt_data.get("low_latency_vad_hangover_ms", 600)),
+            low_latency_vad_hangover_ms=int(
+                stt_data.get(
+                    "low_latency_vad_hangover_ms",
+                    DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS,
+                )
+            ),
             low_latency_merge_gap_ms=int(stt_data.get("low_latency_merge_gap_ms", 600)),
             low_latency_spec_retry_max=int(stt_data.get("low_latency_spec_retry_max", 10)),
             custom_vocabulary_enabled=custom_vocabulary_enabled,

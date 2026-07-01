@@ -57,6 +57,10 @@ from puripuly_heart.config.settings import (
     supported_translation_connections,
     to_dict,
 )
+from puripuly_heart.config.vad_defaults import (
+    DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS,
+    LEGACY_LOW_LATENCY_VAD_HANGOVER_MS,
+)
 from puripuly_heart.core.storage.secrets import (
     EncryptedFileSecretStore,
     KeyringSecretStore,
@@ -80,11 +84,11 @@ def test_settings_roundtrip(tmp_path):
     assert loaded == expected
 
 
-def test_peer_vad_hangover_default_is_500_ms_and_self_default_stays_600_ms() -> None:
+def test_peer_and_self_vad_hangover_defaults_are_500_ms() -> None:
     settings = AppSettings()
 
     assert settings.desktop_audio.vad_hangover_ms == 500
-    assert settings.stt.low_latency_vad_hangover_ms == 600
+    assert settings.stt.low_latency_vad_hangover_ms == DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS
     assert (
         from_dict(
             {"settings_version": SETTINGS_SCHEMA_VERSION, "desktop_audio": {}}
@@ -108,9 +112,35 @@ def test_schema21_migration_forces_existing_peer_vad_hangover_to_500_ms(
 
     assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
     assert loaded.desktop_audio.vad_hangover_ms == 500
-    assert loaded.stt.low_latency_vad_hangover_ms == 600
+    assert loaded.stt.low_latency_vad_hangover_ms == DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
     assert persisted["desktop_audio"]["vad_hangover_ms"] == 500
+
+
+@pytest.mark.parametrize(
+    ("stored_hangover_ms", "expected_hangover_ms"),
+    [
+        (LEGACY_LOW_LATENCY_VAD_HANGOVER_MS, DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS),
+        (650, 650),
+        (1000, 1000),
+    ],
+)
+def test_schema26_migrates_only_legacy_self_vad_hangover_default(
+    tmp_path, stored_hangover_ms: int, expected_hangover_ms: int
+) -> None:
+    path = tmp_path / "settings.json"
+    legacy = to_dict(AppSettings())
+    legacy["settings_version"] = 25
+    legacy["stt"]["low_latency_vad_hangover_ms"] = stored_hangover_ms
+    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    loaded = load_settings(path)
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+
+    assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
+    assert loaded.stt.low_latency_vad_hangover_ms == expected_hangover_ms
+    assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
+    assert persisted["stt"]["low_latency_vad_hangover_ms"] == expected_hangover_ms
 
 
 def test_new_user_defaults_peer_voice_to_english_to_korean_local_qwen() -> None:
@@ -1428,8 +1458,10 @@ def test_load_settings_backfills_v4_peer_blocks_from_schema3_fixture(tmp_path) -
     assert loaded.peer_soniox_stt.endpoint is None
     assert loaded.peer_soniox_stt.keepalive_interval_s is None
     assert loaded.peer_soniox_stt.trailing_silence_ms is None
+    assert loaded.stt.low_latency_vad_hangover_ms == DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
     assert persisted["provider"]["peer_stt"] == STTProviderName.DEEPGRAM.value
+    assert persisted["stt"]["low_latency_vad_hangover_ms"] == DEFAULT_LOW_LATENCY_VAD_HANGOVER_MS
     assert "peer_deepgram_stt" not in persisted
     assert "peer_qwen_asr_stt" not in persisted
     assert "peer_soniox_stt" not in persisted

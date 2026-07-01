@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 logger = logging.getLogger(__name__)
 
 from puripuly_heart.config.prompts import render_translation_prompt_template, warm_prompt_cache
+from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.language import get_llm_language_name
 from puripuly_heart.core.llm.provider import LLMProvider
@@ -126,7 +127,8 @@ class ClientHub:
     translation_enabled: bool = True
     peer_translation_enabled: bool = False
     integrated_context_enabled: bool = False
-    hangover_s: float = 1.1  # Self VAD hangover in seconds for user-facing E2E latency.
+    # Self VAD hangover in seconds for user-facing E2E latency.
+    hangover_s: float = DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
     peer_hangover_s: float = 0.6  # Peer VAD hangover in seconds for user-facing E2E latency.
 
     # Context memory settings
