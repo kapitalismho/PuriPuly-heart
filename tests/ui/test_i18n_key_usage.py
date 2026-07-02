@@ -610,11 +610,12 @@ def test_qq_auth_body_copy_describes_group_credential_and_free_usage() -> None:
     english_body = bundles["en"]["qq_auth.body"]
 
     assert "free usage for new users" in english_body
-    assert "600-700" in english_body
+    assert "700+" in english_body
+    assert "verify easily through QQ" in english_body
     assert "issued right away" in english_body
     assert "Join QQ group number 647594597" in english_body
     assert "activation credential" in english_body
-    assert "Verify!" in english_body
+    assert "Verify!" not in english_body
     for forbidden in FORBIDDEN_EN_QQ_PRIVACY_PROMISES:
         assert forbidden not in english_body
 
