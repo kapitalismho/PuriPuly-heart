@@ -246,71 +246,53 @@ def test_telemetry_consent_and_settings_keys_are_localized() -> None:
             assert bundle[key].strip()
             assert bundle[key] != key
     assert bundles["ko"]["settings.telemetry.title"] == "익명 사용 통계 보내기"
+    assert bundles["ko"]["telemetry.consent.allow"] == "동의"
 
 
-def test_telemetry_consent_excludes_contract_forbidden_categories() -> None:
+def test_telemetry_consent_copy_explains_minimal_anonymous_success_signal() -> None:
     bundles = _load_bundles()
     required_terms = {
         "en": (
-            "audio",
-            "Transcript",
-            "Translation text",
-            "prompts",
-            "Context Memory content",
-            "language pair",
-            "model",
-            "API keys",
-            "account identity",
-            "hardware fingerprint",
-            "output route",
-            "provider payloads",
+            "translation succeeded",
+            "Sensitive data",
+            "translation text",
+            "anonymously",
+            "once per day",
+            "MAU",
         ),
         "ko": (
-            "오디오",
-            "대화록",
+            "번역 성공 여부",
+            "민감 데이터",
             "번역문",
-            "프롬프트",
-            "컨텍스트 메모리 내용",
-            "언어쌍",
-            "모델",
-            "API 키",
-            "계정 정보",
-            "하드웨어 지문",
-            "출력 경로",
-            "제공자 응답",
+            "익명",
+            "하루에 한번",
+            "MAU",
         ),
         "zh-CN": (
-            "音频",
-            "转写文本",
+            "翻译是否成功",
+            "敏感数据",
             "翻译文本",
-            "提示词",
-            "上下文记忆内容",
-            "语言对",
-            "模型",
-            "API 密钥",
-            "账号身份",
-            "硬件指纹",
-            "输出路径",
-            "提供商响应",
+            "匿名",
+            "每天最多发送一次",
+            "MAU",
         ),
         "ja": (
-            "音声",
-            "文字起こし",
+            "翻訳が成功したかどうか",
+            "機密データ",
             "翻訳文",
-            "プロンプト",
-            "コンテキストメモリの内容",
-            "言語ペア",
-            "モデル",
-            "APIキー",
-            "アカウント情報",
-            "ハードウェア指紋",
-            "出力先",
-            "プロバイダー応答",
+            "匿名",
+            "1日に1回",
+            "MAU",
         ),
     }
 
     for locale, terms in required_terms.items():
-        copy = bundles[locale]["telemetry.consent.excludes"]
+        copy = "\n".join(
+            (
+                bundles[locale]["telemetry.consent.body"],
+                bundles[locale]["telemetry.consent.excludes"],
+            )
+        )
         missing = [term for term in terms if term not in copy]
         assert missing == [], locale
 
