@@ -541,6 +541,10 @@ class TranslatorApp:
                 else:
                     updated.telemetry.decline()
                 await self.controller.apply_settings(updated)
+                view_settings = getattr(self, "view_settings", None)
+                sync_telemetry = getattr(view_settings, "sync_telemetry_consent", None)
+                if callable(sync_telemetry) and self.controller.settings is not None:
+                    sync_telemetry(self.controller.settings)
 
             self._queue_settings_mutation_task(_task)
 

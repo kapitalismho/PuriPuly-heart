@@ -4566,6 +4566,14 @@ class SettingsView(ft.Column):
             self._clipboard_auto_translate_text.update()
         self._emit_settings_changed()
 
+    def sync_telemetry_consent(self, settings: AppSettings) -> None:
+        """텔레메트리 동의를 외부 설정(예: 동의 모달)과 동기화합니다."""
+        if self._settings is not None:
+            self._settings.telemetry = copy.deepcopy(settings.telemetry)
+        self._sync_telemetry_card(settings)
+        if self.page:
+            self._telemetry_text.update()
+
     def _sync_telemetry_card(self, settings: AppSettings | None = None) -> None:
         settings = settings or self._settings
         if not settings:

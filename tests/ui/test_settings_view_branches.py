@@ -626,6 +626,64 @@ def test_telemetry_first_run_dialog_requires_explicit_choice(
     assert applied[-1].telemetry.identifier
 
 
+def test_telemetry_first_run_dialog_syncs_view_settings_after_choice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    applied: list[AppSettings] = []
+    opened: list[object] = []
+
+    class FakeTelemetryConsentDialog:
+        def __init__(self, page, *, on_allow, on_decline):
+            self.on_allow = on_allow
+            self.on_decline = on_decline
+
+        def open(self) -> None:
+            opened.append(self)
+
+    async def apply_settings(updated: AppSettings) -> None:
+        applied.append(updated)
+        controller.settings = updated
+
+    view, _store = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    app = app_module.TranslatorApp.__new__(app_module.TranslatorApp)
+    app.page = SimpleNamespace()
+    controller = SimpleNamespace(settings=settings, apply_settings=apply_settings)
+    app.controller = controller
+    app.view_settings = view
+    app._queue_settings_mutation_task = lambda task_factory: asyncio.run(task_factory())
+    monkeypatch.setattr(app_module, "TelemetryConsentDialog", FakeTelemetryConsentDialog)
+
+    assert view._settings.telemetry.consent == TelemetryConsent.UNKNOWN
+    assert view._telemetry_text.content.value == t("settings.telemetry.state_off")
+
+    app.show_telemetry_consent_dialog()
+    assert len(opened) == 1
+
+    opened[0].on_allow()
+    assert applied[-1].telemetry.consent == TelemetryConsent.ALLOW
+    assert controller.settings.telemetry.consent == TelemetryConsent.ALLOW
+    assert view._settings.telemetry.consent == TelemetryConsent.ALLOW
+    assert view._settings.telemetry.identifier
+    assert view._telemetry_text.content.value == t("settings.telemetry.state_on")
+
+    controller.settings.telemetry.consent = TelemetryConsent.UNKNOWN
+    controller.settings.telemetry.identifier = None
+    view._settings.telemetry.consent = TelemetryConsent.UNKNOWN
+    view._settings.telemetry.identifier = None
+    view._telemetry_text.content.value = t("settings.telemetry.state_off")
+
+    opened.clear()
+    applied.clear()
+    app.show_telemetry_consent_dialog()
+    opened[-1].on_decline()
+    assert applied[-1].telemetry.consent == TelemetryConsent.DECLINE
+    assert view._settings.telemetry.consent == TelemetryConsent.DECLINE
+    assert view._telemetry_text.content.value == t("settings.telemetry.state_off")
+
+
 def test_load_from_settings_uses_system_prompt_when_provider_prompt_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
