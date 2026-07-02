@@ -43,7 +43,7 @@ from puripuly_heart.config.vad_defaults import (
 )
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 
-SETTINGS_SCHEMA_VERSION = 28
+SETTINGS_SCHEMA_VERSION = 29
 MANAGED_AUTH_CLAIM_SOURCE_DISCORD = "discord"
 MANAGED_AUTH_CLAIM_SOURCE_QQ = "qq"
 MANAGED_AUTH_CLAIM_SOURCES = (
@@ -241,6 +241,14 @@ class OpenRouterFallbackSelectionAlias(str, Enum):
     DEEPSEEK_V4_FLASH_CHINA = OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA
 
 
+class TranslationFallbackSelectionAlias(str, Enum):
+    NONE = "none"
+    DEEPSEEK_V4_FLASH_OFFICIAL = "deepseek_v4_flash_official"
+    OPENROUTER_DEEPSEEK_V4_FLASH = "openrouter_deepseek_v4_flash"
+    CEREBRAS_GEMMA4_31B = "cerebras_gemma4_31b"
+    OPENROUTER_GEMMA4_26B_A4B = "openrouter_gemma4_26b_a4b"
+
+
 class TranslationModel(str, Enum):
     GEMMA4 = "gemma4"
     DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
@@ -370,6 +378,9 @@ def telemetry_settings_from_dict(value: object) -> TelemetrySettings:
 class TranslationSettings:
     model: TranslationModel = TranslationModel.GEMMA4
     connection: TranslationConnection = TranslationConnection.MANAGED
+    fallback_selection_alias: TranslationFallbackSelectionAlias = (
+        TranslationFallbackSelectionAlias.NONE
+    )
     connection_history: dict[str, TranslationConnection] = field(
         default_factory=lambda: _default_translation_connection_history()
     )
@@ -379,6 +390,8 @@ class TranslationSettings:
             raise ValueError("invalid translation model")
         if not isinstance(self.connection, TranslationConnection):
             raise ValueError("invalid translation connection")
+        if not isinstance(self.fallback_selection_alias, TranslationFallbackSelectionAlias):
+            raise ValueError("invalid translation fallback selection")
         if self.connection not in _supported_translation_connections(self.model):
             raise ValueError("translation connection is not supported for model")
         if not isinstance(self.connection_history, dict):
@@ -478,6 +491,20 @@ def _parse_translation_connection(value: object) -> TranslationConnection | None
     return None
 
 
+def _parse_translation_fallback_selection_alias(
+    value: object,
+) -> TranslationFallbackSelectionAlias:
+    if isinstance(value, TranslationFallbackSelectionAlias):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip()
+        try:
+            return TranslationFallbackSelectionAlias(normalized)
+        except ValueError:
+            pass
+    return TranslationFallbackSelectionAlias.NONE
+
+
 def _parse_translation_connection_history(value: object) -> dict[str, TranslationConnection]:
     if not isinstance(value, dict):
         return {}
@@ -498,6 +525,7 @@ def _normalize_translation_settings(
     *,
     model: TranslationModel | None,
     connection: TranslationConnection | None,
+    fallback_selection_alias: object = None,
     history: object = None,
 ) -> TranslationSettings:
     normalized_model = model or TranslationModel.GEMMA4
@@ -508,6 +536,9 @@ def _normalize_translation_settings(
     return TranslationSettings(
         model=normalized_model,
         connection=connection,
+        fallback_selection_alias=_parse_translation_fallback_selection_alias(
+            fallback_selection_alias
+        ),
         connection_history=normalized_history,
     )
 
@@ -548,6 +579,7 @@ def _translation_settings_to_dict(settings: TranslationSettings) -> dict[str, An
     return {
         "model": settings.model.value,
         "connection": settings.connection.value,
+        "fallback_selection_alias": settings.fallback_selection_alias.value,
         "connection_history": {
             model: connection.value for model, connection in settings.connection_history.items()
         },
@@ -558,6 +590,7 @@ def _default_translation_settings_dict() -> dict[str, Any]:
     return {
         "model": TranslationModel.GEMMA4.value,
         "connection": TranslationConnection.MANAGED.value,
+        "fallback_selection_alias": TranslationFallbackSelectionAlias.NONE.value,
         "connection_history": {
             TranslationModel.GEMMA4.value: TranslationConnection.MANAGED.value,
         },
@@ -2199,6 +2232,7 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
     settings.translation = _normalize_translation_settings(
         model=_parse_translation_model(settings.translation.model),
         connection=_parse_translation_connection(settings.translation.connection),
+        fallback_selection_alias=settings.translation.fallback_selection_alias,
         history=settings.translation.connection_history,
     )
     model = settings.translation.model
@@ -2333,6 +2367,7 @@ def _apply_materialized_translation_to_data(
     translation = _normalize_translation_settings(
         model=_parse_translation_model(translation.model),
         connection=_parse_translation_connection(translation.connection),
+        fallback_selection_alias=translation.fallback_selection_alias,
         history=translation.connection_history,
     )
 
@@ -3156,6 +3191,18 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
             changed = True
         version = 28
 
+    if version < 29:
+        translation_data = data.get("translation")
+        if (
+            isinstance(translation_data, dict)
+            and "fallback_selection_alias" not in translation_data
+        ):
+            translation_data["fallback_selection_alias"] = (
+                TranslationFallbackSelectionAlias.NONE.value
+            )
+            changed = True
+        version = 29
+
     if _normalize_local_llm_data(data):
         changed = True
 
@@ -3370,6 +3417,7 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         normalized_translation_settings = _normalize_translation_settings(
             model=_parse_translation_model(translation_data.get("model")),
             connection=_parse_translation_connection(translation_data.get("connection")),
+            fallback_selection_alias=translation_data.get("fallback_selection_alias"),
             history=translation_history,
         )
     else:
@@ -4030,6 +4078,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
         settings.translation = _normalize_translation_settings(
             model=_parse_translation_model(translation_data.get("model")),
             connection=_parse_translation_connection(translation_data.get("connection")),
+            fallback_selection_alias=translation_data.get("fallback_selection_alias"),
             history=translation_history,
         )
     else:

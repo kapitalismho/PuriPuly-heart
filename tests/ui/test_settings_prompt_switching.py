@@ -11,11 +11,11 @@ from puripuly_heart.config.settings import (
     AppSettings,
     GeminiLLMModel,
     LLMProviderName,
-    OpenRouterFallbackSelectionAlias,
     OpenRouterSelectionAlias,
     QwenLLMModel,
     STTProviderName,
     TranslationConnection,
+    TranslationFallbackSelectionAlias,
     TranslationModel,
     TranslationSettings,
 )
@@ -146,7 +146,9 @@ def test_deepseek_managed_and_fallback_keep_single_prompt(monkeypatch) -> None:
     assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
     assert pending.system_prompt == "GEMINI CUSTOM"
 
-    view._on_openrouter_fallback_selected(OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value)
+    view._on_openrouter_fallback_selected(
+        TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH.value
+    )
     pending = view.build_provider_apply_settings()
 
     assert view._prompt_editor.value == "GEMINI CUSTOM"
@@ -156,7 +158,8 @@ def test_deepseek_managed_and_fallback_keep_single_prompt(monkeypatch) -> None:
     )
     assert pending is not None
     assert (
-        pending.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.QWEN35_FLASH
+        pending.translation.fallback_selection_alias
+        == TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH
     )
     assert pending.system_prompt == "GEMINI CUSTOM"
 

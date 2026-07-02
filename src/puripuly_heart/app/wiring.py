@@ -17,6 +17,8 @@ from puripuly_heart.config.llm_profiles import (
 from puripuly_heart.config.settings import (
     STT_INTERNAL_SAMPLE_RATE_HZ,
     AppSettings,
+    CerebrasLLMModel,
+    DeepSeekLLMModel,
     LLMProviderName,
     OpenRouterCredentialSource,
     OpenRouterFallbackSelectionAlias,
@@ -27,6 +29,7 @@ from puripuly_heart.config.settings import (
     SecretsBackend,
     SecretsSettings,
     STTProviderName,
+    TranslationFallbackSelectionAlias,
 )
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
@@ -316,6 +319,165 @@ def _create_openrouter_fallback_provider(
     )
 
 
+def _translation_fallback_openrouter_source(settings: AppSettings) -> OpenRouterCredentialSource:
+    if settings.provider.llm == LLMProviderName.OPENROUTER:
+        if settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED:
+            return OpenRouterCredentialSource.MANAGED
+        return OpenRouterCredentialSource.BYOK
+    return OpenRouterCredentialSource.BYOK
+
+
+def _openrouter_settings_for_translation_fallback(
+    settings: AppSettings,
+    *,
+    model: OpenRouterLLMModel,
+) -> AppSettings:
+    resolved_settings = _settings_for_openrouter_fallback_model(
+        settings,
+        fallback_model=model.value,
+        provider_routing=OpenRouterProviderRouting.DEFAULT,
+    )
+    resolved_settings.openrouter.selected_source = _translation_fallback_openrouter_source(settings)
+    resolved_settings.openrouter.selection_alias = None
+    return resolved_settings
+
+
+def _create_openrouter_translation_fallback_provider(
+    *,
+    settings: AppSettings,
+    secrets: SecretStore,
+    model: OpenRouterLLMModel,
+    managed_release_service: object | None,
+    managed_delegate_ready: Callable[[], object] | None,
+    runtime_logging: SessionRuntimeLoggingService | None,
+) -> LLMProvider:
+    resolved_settings = _openrouter_settings_for_translation_fallback(settings, model=model)
+    if resolved_settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED:
+        if managed_release_service is None:
+            raise ValueError(MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR)
+
+        from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
+
+        fallback_managed_release_service = _managed_release_service_for_alias(
+            managed_release_service,
+            alias_settings=resolved_settings,
+        )
+        return ManagedOpenRouterLLMProvider(
+            release_service=fallback_managed_release_service,
+            delegate_factory=lambda api_key: OpenRouterLLMProvider(
+                api_key=api_key,
+                user_identifier=load_managed_openrouter_user_identifier(
+                    resolved_settings,
+                    secrets=secrets,
+                ),
+                model=resolved_settings.openrouter.llm_model.value,
+                routing_mode=resolved_settings.openrouter.routing_mode,
+                provider_routing=resolved_settings.openrouter.provider_routing,
+                runtime_logging=runtime_logging,
+            ),
+            on_delegate_ready=managed_delegate_ready,
+        )
+
+    api_key = require_openrouter_execution_api_key(resolved_settings, secrets=secrets)
+    return OpenRouterLLMProvider(
+        api_key=api_key,
+        model=resolved_settings.openrouter.llm_model.value,
+        routing_mode=resolved_settings.openrouter.routing_mode,
+        provider_routing=resolved_settings.openrouter.provider_routing,
+        runtime_logging=runtime_logging,
+    )
+
+
+def _create_translation_fallback_provider(
+    *,
+    settings: AppSettings,
+    secrets: SecretStore,
+    alias: TranslationFallbackSelectionAlias,
+    managed_release_service: object | None,
+    managed_delegate_ready: Callable[[], object] | None,
+    runtime_logging: SessionRuntimeLoggingService | None,
+) -> LLMProvider:
+    if alias == TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL:
+        return DeepSeekLLMProvider(
+            api_key=require_secret(
+                secrets,
+                key="deepseek_api_key",
+                env_var="DEEPSEEK_API_KEY",
+            ),
+            model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value,
+            runtime_logging=runtime_logging,
+        )
+    if alias == TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B:
+        return CerebrasLLMProvider(
+            api_key=require_secret(
+                secrets,
+                key="cerebras_api_key",
+                env_var="CEREBRAS_API_KEY",
+            ),
+            model=CerebrasLLMModel.GEMMA_4_31B.value,
+            runtime_logging=runtime_logging,
+        )
+    if alias == TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH:
+        return _create_openrouter_translation_fallback_provider(
+            settings=settings,
+            secrets=secrets,
+            model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH,
+            managed_release_service=managed_release_service,
+            managed_delegate_ready=managed_delegate_ready,
+            runtime_logging=runtime_logging,
+        )
+    if alias == TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B:
+        return _create_openrouter_translation_fallback_provider(
+            settings=settings,
+            secrets=secrets,
+            model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
+            managed_release_service=managed_release_service,
+            managed_delegate_ready=managed_delegate_ready,
+            runtime_logging=runtime_logging,
+        )
+    raise ValueError(f"Unsupported translation fallback selection: {alias}")
+
+
+def _translation_fallback_matches_primary(
+    settings: AppSettings,
+    alias: TranslationFallbackSelectionAlias,
+) -> bool:
+    if alias == TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL:
+        return (
+            settings.provider.llm == LLMProviderName.DEEPSEEK
+            and settings.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH
+        )
+    if alias == TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B:
+        return (
+            settings.provider.llm == LLMProviderName.CEREBRAS
+            and settings.cerebras.llm_model == CerebrasLLMModel.GEMMA_4_31B
+        )
+    if alias == TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH:
+        return (
+            settings.provider.llm == LLMProviderName.OPENROUTER
+            and settings.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
+        )
+    if alias == TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B:
+        return (
+            settings.provider.llm == LLMProviderName.OPENROUTER
+            and settings.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+        )
+    return False
+
+
+def _emit_translation_fallback_noop(
+    *,
+    runtime_logging: SessionRuntimeLoggingService | None,
+    alias: TranslationFallbackSelectionAlias,
+) -> None:
+    if runtime_logging is None:
+        return
+    emit = getattr(runtime_logging, "emit_basic", None)
+    if callable(emit):
+        with contextlib.suppress(Exception):
+            emit(f"[Fallback] Skipped matching fallback target: {alias.value}")
+
+
 def _shared_managed_release_service_for_fallback(
     primary: LLMProvider,
     managed_release_service: object | None,
@@ -457,27 +619,6 @@ def create_llm_provider(
             managed_delegate_ready=managed_delegate_ready,
             runtime_logging=runtime_logging,
         )
-        if (
-            settings.openrouter.fallback_selection_alias != OpenRouterFallbackSelectionAlias.NONE
-            and settings.openrouter.provider_routing != OpenRouterProviderRouting.DEEPSEEK_ONLY
-        ):
-            fallback_managed_release_service = _shared_managed_release_service_for_fallback(
-                base,
-                managed_release_service,
-            )
-            base = FallbackRacingLLMProvider(
-                primary=base,
-                fallback=_LazyFactoryLLMProvider(
-                    factory=lambda: _create_openrouter_fallback_provider(
-                        settings=settings,
-                        secrets=secrets,
-                        managed_release_service=fallback_managed_release_service,
-                        managed_delegate_ready=managed_delegate_ready,
-                        runtime_logging=runtime_logging,
-                    )
-                ),
-                runtime_logging=runtime_logging,
-            )
     elif settings.provider.llm == LLMProviderName.QWEN:
         from puripuly_heart.config.settings import QwenRegion
 
@@ -547,6 +688,55 @@ def create_llm_provider(
         )
     else:
         raise ValueError(f"Unsupported LLM provider: {settings.provider.llm}")
+
+    translation_fallback_alias = settings.translation.fallback_selection_alias
+    if translation_fallback_alias != TranslationFallbackSelectionAlias.NONE:
+        if _translation_fallback_matches_primary(settings, translation_fallback_alias):
+            _emit_translation_fallback_noop(
+                runtime_logging=runtime_logging,
+                alias=translation_fallback_alias,
+            )
+        else:
+            fallback_managed_release_service = _shared_managed_release_service_for_fallback(
+                base,
+                managed_release_service,
+            )
+            base = FallbackRacingLLMProvider(
+                primary=base,
+                fallback=_LazyFactoryLLMProvider(
+                    factory=lambda: _create_translation_fallback_provider(
+                        settings=settings,
+                        secrets=secrets,
+                        alias=translation_fallback_alias,
+                        managed_release_service=fallback_managed_release_service,
+                        managed_delegate_ready=managed_delegate_ready,
+                        runtime_logging=runtime_logging,
+                    )
+                ),
+                runtime_logging=runtime_logging,
+            )
+    elif (
+        settings.provider.llm == LLMProviderName.OPENROUTER
+        and settings.openrouter.fallback_selection_alias != OpenRouterFallbackSelectionAlias.NONE
+        and settings.openrouter.provider_routing != OpenRouterProviderRouting.DEEPSEEK_ONLY
+    ):
+        fallback_managed_release_service = _shared_managed_release_service_for_fallback(
+            base,
+            managed_release_service,
+        )
+        base = FallbackRacingLLMProvider(
+            primary=base,
+            fallback=_LazyFactoryLLMProvider(
+                factory=lambda: _create_openrouter_fallback_provider(
+                    settings=settings,
+                    secrets=secrets,
+                    managed_release_service=fallback_managed_release_service,
+                    managed_delegate_ready=managed_delegate_ready,
+                    runtime_logging=runtime_logging,
+                )
+            ),
+            runtime_logging=runtime_logging,
+        )
 
     return SemaphoreLLMProvider(
         inner=base,

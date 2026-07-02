@@ -13,6 +13,7 @@ from puripuly_heart.app.wiring import (
 )
 from puripuly_heart.config.settings import (
     AppSettings,
+    CerebrasLLMModel,
     DeepgramSTTSettings,
     DeepSeekLLMModel,
     GeminiLLMModel,
@@ -34,6 +35,10 @@ from puripuly_heart.config.settings import (
     SonioxSTTSettings,
     STTProviderName,
     STTSettings,
+    TranslationConnection,
+    TranslationFallbackSelectionAlias,
+    TranslationModel,
+    TranslationSettings,
 )
 from puripuly_heart.core.language import (
     get_deepgram_language,
@@ -573,6 +578,82 @@ def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_deepseek_on
     assert isinstance(fallback_provider, OpenRouterLLMProvider)
     assert fallback_provider.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
     assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+
+
+def test_create_llm_provider_openrouter_byok_uses_explicit_cerebras_fallback() -> None:
+    settings = AppSettings(
+        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
+        translation=TranslationSettings(
+            model=TranslationModel.GEMMA4,
+            connection=TranslationConnection.OPENROUTER,
+            fallback_selection_alias=TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B,
+        ),
+        openrouter=OpenRouterSettings(
+            llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
+            selected_source=OpenRouterCredentialSource.BYOK,
+            selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
+            fallback_selection_alias=OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH,
+        ),
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("openrouter_api_key", "or-key")
+    secrets.set("cerebras_api_key", "cerebras-key")
+
+    provider = create_llm_provider(settings, secrets=secrets)
+
+    assert isinstance(provider, SemaphoreLLMProvider)
+    assert isinstance(provider.inner, FallbackRacingLLMProvider)
+    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
+    assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
+
+    fallback_provider = provider.inner.fallback.factory()
+
+    assert isinstance(fallback_provider, CerebrasLLMProvider)
+    assert fallback_provider.model == CerebrasLLMModel.GEMMA_4_31B.value
+
+
+def test_create_llm_provider_cerebras_uses_deepseek_official_fallback() -> None:
+    settings = AppSettings(
+        provider=ProviderSettings(llm=LLMProviderName.CEREBRAS),
+        translation=TranslationSettings(
+            model=TranslationModel.GEMMA4_31B_CEREBRAS,
+            connection=TranslationConnection.OFFICIAL_BYOK,
+            fallback_selection_alias=TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL,
+        ),
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("cerebras_api_key", "cerebras-key")
+    secrets.set("deepseek_api_key", "deepseek-key")
+
+    provider = create_llm_provider(settings, secrets=secrets)
+
+    assert isinstance(provider, SemaphoreLLMProvider)
+    assert isinstance(provider.inner, FallbackRacingLLMProvider)
+    assert isinstance(provider.inner.primary, CerebrasLLMProvider)
+    assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
+
+    fallback_provider = provider.inner.fallback.factory()
+
+    assert isinstance(fallback_provider, DeepSeekLLMProvider)
+    assert fallback_provider.model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
+
+
+def test_create_llm_provider_matching_cerebras_fallback_is_noop() -> None:
+    settings = AppSettings(
+        provider=ProviderSettings(llm=LLMProviderName.CEREBRAS),
+        translation=TranslationSettings(
+            model=TranslationModel.GEMMA4_31B_CEREBRAS,
+            connection=TranslationConnection.OFFICIAL_BYOK,
+            fallback_selection_alias=TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B,
+        ),
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("cerebras_api_key", "cerebras-key")
+
+    provider = create_llm_provider(settings, secrets=secrets)
+
+    assert isinstance(provider, SemaphoreLLMProvider)
+    assert isinstance(provider.inner, CerebrasLLMProvider)
 
 
 def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_user_identifier(

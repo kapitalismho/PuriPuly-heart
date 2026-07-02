@@ -15,7 +15,6 @@ import flet as ft
 
 from puripuly_heart.app.wiring import create_secret_store
 from puripuly_heart.config.llm_profiles import (
-    OPENROUTER_FALLBACK_SELECTION_ALIASES,
     fallback_profile_for_alias,
     profile_for_alias,
 )
@@ -39,6 +38,7 @@ from puripuly_heart.config.settings import (
     STTProviderName,
     TelemetryConsent,
     TranslationConnection,
+    TranslationFallbackSelectionAlias,
     TranslationModel,
     _normalize_local_llm_base_url,
     default_translation_connection,
@@ -125,6 +125,27 @@ _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
     TranslationConnection.OLLAMA: "settings.translation_connection.ollama.description",
 }
 _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
+_TRANSLATION_FALLBACK_SELECTION_ORDER = (
+    TranslationFallbackSelectionAlias.NONE,
+    TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL,
+    TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH,
+    TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B,
+    TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B,
+)
+_TRANSLATION_FALLBACK_LABEL_KEYS = {
+    TranslationFallbackSelectionAlias.NONE: "settings.fallback.none",
+    TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL: "settings.fallback.deepseek_v4_flash_official",
+    TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH: "settings.fallback.openrouter_deepseek_v4_flash",
+    TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B: "settings.fallback.cerebras_gemma4_31b",
+    TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B: "settings.fallback.openrouter_gemma4_26b_a4b",
+}
+_TRANSLATION_FALLBACK_DESCRIPTION_KEYS = {
+    TranslationFallbackSelectionAlias.NONE: "settings.fallback.none.description",
+    TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL: "settings.fallback.deepseek_v4_flash_official.description",
+    TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH: "settings.fallback.openrouter_deepseek_v4_flash.description",
+    TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B: "settings.fallback.cerebras_gemma4_31b.description",
+    TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B: "settings.fallback.openrouter_gemma4_26b_a4b.description",
+}
 
 
 def _make_text_button(label: str, **kwargs) -> ft.TextButton:
@@ -1731,7 +1752,7 @@ class SettingsView(ft.Column):
             value=self._translation_connection_text,
         )
         self._openrouter_fallback_title = ft.Text(
-            t("settings.openrouter_fallback"),
+            t("settings.fallback"),
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_NEUTRAL,
@@ -1741,7 +1762,7 @@ class SettingsView(ft.Column):
             self._on_openrouter_fallback_click,
         )
         self._openrouter_fallback_helper_text = ft.Text(
-            t("settings.openrouter_fallback.inactive_helper"),
+            t("settings.fallback.inactive_helper"),
             size=16,
             color=COLOR_NEUTRAL,
         )
@@ -2069,11 +2090,64 @@ class SettingsView(ft.Column):
         except KeyError:
             return None
 
+    def _legacy_openrouter_fallback_display_active(self, settings: AppSettings | None) -> bool:
+        if settings is None:
+            return False
+        return (
+            settings.translation.fallback_selection_alias == TranslationFallbackSelectionAlias.NONE
+            and settings.provider.llm == LLMProviderName.OPENROUTER
+            and settings.openrouter.fallback_selection_alias
+            != OpenRouterFallbackSelectionAlias.NONE
+        )
+
+    def _translation_fallback_display_label(
+        self,
+        alias: TranslationFallbackSelectionAlias,
+    ) -> str:
+        return t(_TRANSLATION_FALLBACK_LABEL_KEYS[alias])
+
+    def _translation_fallback_display_description(
+        self,
+        alias: TranslationFallbackSelectionAlias,
+    ) -> str:
+        return t(_TRANSLATION_FALLBACK_DESCRIPTION_KEYS[alias], default="")
+
+    def _effective_translation_fallback_modal_value(
+        self,
+        settings: AppSettings | None,
+    ) -> str:
+        if settings is None:
+            return TranslationFallbackSelectionAlias.NONE.value
+        if settings.translation.fallback_selection_alias != TranslationFallbackSelectionAlias.NONE:
+            return settings.translation.fallback_selection_alias.value
+        if settings.provider.llm == LLMProviderName.OPENROUTER:
+            if (
+                settings.openrouter.fallback_selection_alias
+                == OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH
+            ):
+                return TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH.value
+            if (
+                settings.openrouter.fallback_selection_alias
+                == OpenRouterFallbackSelectionAlias.NONE
+            ):
+                return TranslationFallbackSelectionAlias.NONE.value
+        return TranslationFallbackSelectionAlias.NONE.value
+
     def _openrouter_fallback_source(
         self, settings: AppSettings | None
     ) -> OpenRouterCredentialSource:
         if settings is None:
             return OpenRouterCredentialSource.NONE
+        if settings.translation.fallback_selection_alias in (
+            TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH,
+            TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B,
+        ):
+            if (
+                settings.provider.llm == LLMProviderName.OPENROUTER
+                and settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
+            ):
+                return OpenRouterCredentialSource.MANAGED
+            return OpenRouterCredentialSource.BYOK
         if settings.provider.llm != LLMProviderName.OPENROUTER:
             return OpenRouterCredentialSource.NONE
         if settings.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE:
@@ -2095,19 +2169,31 @@ class SettingsView(ft.Column):
         return self._translation_connection_display_label(settings.translation.connection)
 
     def _get_openrouter_fallback_display_label(self, settings: AppSettings | None) -> str:
+        if (
+            settings is not None
+            and settings.translation.fallback_selection_alias
+            != TranslationFallbackSelectionAlias.NONE
+        ):
+            return self._translation_fallback_display_label(
+                settings.translation.fallback_selection_alias
+            )
         profile = self._openrouter_fallback_profile(settings)
-        if profile is None or profile.openrouter_model is None:
-            return t("settings.openrouter_fallback.none")
+        if (
+            profile is None
+            or profile.openrouter_model is None
+            or not self._legacy_openrouter_fallback_display_active(settings)
+        ):
+            return t("settings.fallback.none")
         return t(profile.label_key)
 
     def _get_openrouter_fallback_helper_text(self, settings: AppSettings | None) -> str:
         if settings is None:
-            return t("settings.openrouter_fallback.inactive_helper")
-        if settings.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE:
-            return t("settings.openrouter_fallback.none.description")
-        if settings.provider.llm != LLMProviderName.OPENROUTER:
-            return t("settings.openrouter_fallback.inactive_helper")
-        return t("settings.openrouter_fallback.active_helper")
+            return t("settings.fallback.inactive_helper")
+        if settings.translation.fallback_selection_alias != TranslationFallbackSelectionAlias.NONE:
+            return t("settings.fallback.active_helper")
+        if self._legacy_openrouter_fallback_display_active(settings):
+            return t("settings.fallback.legacy_openrouter_helper")
+        return t("settings.fallback.none.description")
 
     def _set_openrouter_fallback_text(self, text: str) -> None:
         text_control = self._openrouter_fallback_text.content
@@ -2932,6 +3018,7 @@ class SettingsView(ft.Column):
         stt = settings.provider.stt
         llm = settings.provider.llm
         peer_stt = self._effective_peer_stt_provider(settings)
+        fallback_alias = settings.translation.fallback_selection_alias
         fallback_source = self._openrouter_fallback_source(settings)
         active_stt_providers = {stt, peer_stt}
         self._deepgram_key.visible = STTProviderName.DEEPGRAM in active_stt_providers
@@ -2947,8 +3034,14 @@ class SettingsView(ft.Column):
             openrouter_byok_selected or fallback_source == OpenRouterCredentialSource.BYOK
         )
         self._openrouter_pkce_button_row.visible = openrouter_byok_selected
-        self._deepseek_key.visible = llm == LLMProviderName.DEEPSEEK
-        self._cerebras_key.visible = llm == LLMProviderName.CEREBRAS
+        self._deepseek_key.visible = bool(
+            llm == LLMProviderName.DEEPSEEK
+            or fallback_alias == TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL
+        )
+        self._cerebras_key.visible = bool(
+            llm == LLMProviderName.CEREBRAS
+            or fallback_alias == TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B
+        )
         self._sync_openrouter_pkce_button_state(settings)
         self._translation_connection_row.visible = True
         self._local_llm_connection_card.visible = llm == LLMProviderName.LOCAL_LLM
@@ -3284,34 +3377,51 @@ class SettingsView(ft.Column):
     def _on_openrouter_fallback_click(self, e) -> None:
         if not self.page:
             return
-        options: list[OptionItem] = []
-        for alias in OPENROUTER_FALLBACK_SELECTION_ALIASES:
-            if alias == OpenRouterFallbackSelectionAlias.NONE.value:
-                options.append(
-                    OptionItem(
-                        value=alias,
-                        label=t("settings.openrouter_fallback.none"),
-                        description=t("settings.openrouter_fallback.none.description", default=""),
-                    )
-                )
-                continue
-            profile = fallback_profile_for_alias(alias)
+        options: list[OptionItem] = [
+            OptionItem(
+                value=alias.value,
+                label=self._translation_fallback_display_label(alias),
+                description=self._translation_fallback_display_description(alias),
+            )
+            for alias in _TRANSLATION_FALLBACK_SELECTION_ORDER
+        ]
+        display_settings = self._build_settings_with_provider_draft()
+        if (
+            display_settings is not None
+            and self._legacy_openrouter_fallback_display_active(display_settings)
+            and display_settings.openrouter.fallback_selection_alias
+            not in (
+                OpenRouterFallbackSelectionAlias.NONE,
+                OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH,
+            )
+        ):
+            profile = self._openrouter_fallback_profile(display_settings)
+            legacy_value = f"legacy:{display_settings.openrouter.fallback_selection_alias.value}"
             options.append(
                 OptionItem(
-                    value=alias,
-                    label=self._openrouter_profile_display_label(profile),
-                    description=self._openrouter_profile_display_description(profile),
+                    value=legacy_value,
+                    label=(
+                        self._openrouter_profile_display_label(profile)
+                        if profile is not None
+                        else display_settings.openrouter.fallback_selection_alias.value
+                    ),
+                    description=t("settings.fallback.legacy_option.description", default=""),
                 )
             )
-        display_settings = self._build_settings_with_provider_draft()
-        current = (
-            display_settings.openrouter.fallback_selection_alias.value
-            if display_settings is not None
-            else OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH.value
-        )
+        current = self._effective_translation_fallback_modal_value(display_settings)
+        if (
+            display_settings is not None
+            and self._legacy_openrouter_fallback_display_active(display_settings)
+            and display_settings.openrouter.fallback_selection_alias
+            not in (
+                OpenRouterFallbackSelectionAlias.NONE,
+                OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH,
+            )
+        ):
+            current = f"legacy:{display_settings.openrouter.fallback_selection_alias.value}"
         modal = SettingsModal(
             self.page,
-            t("settings.openrouter_fallback"),
+            t("settings.fallback"),
             options,
             self._on_openrouter_fallback_selected,
             show_description=True,
@@ -3324,21 +3434,30 @@ class SettingsView(ft.Column):
 
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
+        if value.startswith("legacy:"):
+            return
         try:
-            new_value = OpenRouterFallbackSelectionAlias(value)
+            new_value = TranslationFallbackSelectionAlias(value)
         except ValueError:
-            new_value = OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH
+            new_value = TranslationFallbackSelectionAlias.NONE
 
-        old_value = current_settings.openrouter.fallback_selection_alias
-        if old_value == new_value:
+        old_value = current_settings.translation.fallback_selection_alias
+        should_clear_legacy_fallback = (
+            new_value == TranslationFallbackSelectionAlias.NONE
+            and current_settings.openrouter.fallback_selection_alias
+            != OpenRouterFallbackSelectionAlias.NONE
+        )
+        if old_value == new_value and not should_clear_legacy_fallback:
             return
 
         self._emit_runtime_detailed(
-            "[Settings] OpenRouter fallback selection changed: "
-            f"{old_value.value}->{new_value.value}"
+            "[Settings] Fallback selection changed: " f"{old_value.value}->{new_value.value}"
         )
         draft = self._ensure_provider_settings_draft()
-        draft.openrouter.fallback_selection_alias = new_value
+        draft.translation = copy.deepcopy(current_settings.translation)
+        draft.translation.fallback_selection_alias = new_value
+        if new_value == TranslationFallbackSelectionAlias.NONE:
+            draft.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
         self.has_provider_changes = True
         self._update_api_visibility()
 
@@ -4683,7 +4802,7 @@ class SettingsView(ft.Column):
         self._peer_pre_roll_field.label = t("settings.vad.peer_pre_roll_ms")
         self._low_latency_title.value = t("settings.low_latency_mode")
         self._translation_connection_title.value = t("settings.translation_connection")
-        self._openrouter_fallback_title.value = t("settings.openrouter_fallback")
+        self._openrouter_fallback_title.value = t("settings.fallback")
         self._local_llm_connection_title.value = t("settings.local_llm.connection")
         self._local_llm_base_url.label = t("settings.local_llm.base_url")
         self._local_llm_model.label = t("settings.local_llm.model")

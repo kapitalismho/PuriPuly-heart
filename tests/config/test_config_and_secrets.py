@@ -47,6 +47,7 @@ from puripuly_heart.config.settings import (
     STTProviderName,
     TelemetryConsent,
     TranslationConnection,
+    TranslationFallbackSelectionAlias,
     TranslationModel,
     TranslationSettings,
     _migrate_settings_dict,
@@ -336,7 +337,7 @@ def test_migrate_v17_normalizes_directsound_host_api_and_preserves_device() -> N
 
 
 def test_migrate_v18_preserves_directsound_when_removing_legacy_osc_rate_limits() -> None:
-    assert SETTINGS_SCHEMA_VERSION == 28
+    assert SETTINGS_SCHEMA_VERSION == 29
 
     raw = to_dict(AppSettings())
     raw["settings_version"] = 17
@@ -380,7 +381,7 @@ def test_load_settings_persists_v17_directsound_preservation(tmp_path) -> None:
 
 
 def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None:
-    assert SETTINGS_SCHEMA_VERSION == 28
+    assert SETTINGS_SCHEMA_VERSION == 29
 
     path = tmp_path / "settings.json"
     raw = to_dict(AppSettings())
@@ -516,16 +517,44 @@ def test_translation_settings_defaults_to_gemma_managed_with_only_gemma_history(
 
     assert settings.model == TranslationModel.GEMMA4
     assert settings.connection == TranslationConnection.MANAGED
+    assert settings.fallback_selection_alias == TranslationFallbackSelectionAlias.NONE
     assert settings.connection_history == {
         TranslationModel.GEMMA4.value: TranslationConnection.MANAGED
     }
     assert to_dict(AppSettings())["translation"] == {
         "model": TranslationModel.GEMMA4.value,
         "connection": TranslationConnection.MANAGED.value,
+        "fallback_selection_alias": TranslationFallbackSelectionAlias.NONE.value,
         "connection_history": {
             TranslationModel.GEMMA4.value: TranslationConnection.MANAGED.value,
         },
     }
+
+
+def test_translation_fallback_selection_roundtrip() -> None:
+    settings = AppSettings(
+        translation=TranslationSettings(
+            fallback_selection_alias=TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B
+        )
+    )
+
+    persisted = to_dict(settings)
+    loaded = from_dict(persisted)
+
+    assert persisted["translation"]["fallback_selection_alias"] == "cerebras_gemma4_31b"
+    assert (
+        loaded.translation.fallback_selection_alias
+        == TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B
+    )
+
+
+def test_invalid_translation_fallback_selection_defaults_to_none() -> None:
+    raw = to_dict(AppSettings())
+    raw["translation"]["fallback_selection_alias"] = "broken"
+
+    loaded = from_dict(raw)
+
+    assert loaded.translation.fallback_selection_alias == TranslationFallbackSelectionAlias.NONE
 
 
 def test_public_translation_connection_helpers_match_model_matrix() -> None:
@@ -2113,6 +2142,7 @@ def test_translation_settings_roundtrip_materializes_deepseek_openrouter_byok(tm
     assert persisted["translation"] == {
         "model": "deepseek_v4_flash",
         "connection": "openrouter",
+        "fallback_selection_alias": TranslationFallbackSelectionAlias.NONE.value,
         "connection_history": {"deepseek_v4_flash": "openrouter"},
     }
     assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
@@ -2537,6 +2567,7 @@ def test_load_settings_persists_default_translation_for_malformed_non_dict_secti
     assert persisted["translation"] == {
         "model": TranslationModel.GEMMA4.value,
         "connection": TranslationConnection.MANAGED.value,
+        "fallback_selection_alias": TranslationFallbackSelectionAlias.NONE.value,
         "connection_history": {
             TranslationModel.GEMMA4.value: TranslationConnection.MANAGED.value,
         },
@@ -2574,6 +2605,7 @@ def test_invalid_translation_connection_falls_back_to_model_default() -> None:
     assert persisted["translation"] == {
         "model": TranslationModel.GEMINI_3_FLASH.value,
         "connection": TranslationConnection.OFFICIAL_BYOK.value,
+        "fallback_selection_alias": TranslationFallbackSelectionAlias.NONE.value,
         "connection_history": {
             TranslationModel.GEMINI_3_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
         },
@@ -2600,6 +2632,7 @@ def test_load_settings_persists_normalized_translation_section(tmp_path) -> None
     assert persisted["translation"] == {
         "model": TranslationModel.GEMINI_31_FLASH_LITE.value,
         "connection": TranslationConnection.OFFICIAL_BYOK.value,
+        "fallback_selection_alias": TranslationFallbackSelectionAlias.NONE.value,
         "connection_history": {
             TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.OFFICIAL_BYOK.value,
         },

@@ -32,6 +32,7 @@ from puripuly_heart.config.settings import (
     STTProviderName,
     TelemetryConsent,
     TranslationConnection,
+    TranslationFallbackSelectionAlias,
     TranslationModel,
     TranslationSettings,
     to_dict,
@@ -1384,9 +1385,7 @@ def test_update_api_visibility_keeps_openrouter_cards_visible_for_inactive_fallb
     view._update_api_visibility()
 
     assert view._translation_connection_row.visible is True
-    assert view._openrouter_fallback_helper_text.value == t(
-        "settings.openrouter_fallback.inactive_helper"
-    )
+    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
 
 
 def test_update_api_visibility_treats_peer_local_qwen_as_local_provider(
@@ -1988,9 +1987,7 @@ def test_official_api_connection_hides_openrouter_key_even_with_saved_fallback(
     )
     assert view._openrouter_key.visible is False
     assert view._deepseek_key.visible is True
-    assert view._openrouter_fallback_helper_text.value == t(
-        "settings.openrouter_fallback.inactive_helper"
-    )
+    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
 
 
 def test_on_stt_selected_updates_provider_and_pipeline_flags(
@@ -2800,24 +2797,25 @@ def test_on_openrouter_fallback_selected_updates_draft_and_helper_copy(
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    view._on_openrouter_fallback_selected(OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value)
+    view._on_openrouter_fallback_selected(
+        TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B.value
+    )
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
     assert (
-        pending.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.QWEN35_FLASH
+        pending.translation.fallback_selection_alias
+        == TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B
     )
-    assert view._openrouter_fallback_text.content.value == t("provider.qwen35_flash_fallback")
-    assert view._openrouter_fallback_helper_text.value == t(
-        "settings.openrouter_fallback.inactive_helper"
+    assert view._openrouter_fallback_text.content.value == t(
+        "settings.fallback.cerebras_gemma4_31b"
     )
+    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.active_helper")
 
     view._on_llm_selected(TranslationModel.GEMMA4.value)
 
-    assert view._openrouter_fallback_helper_text.value == t(
-        "settings.openrouter_fallback.active_helper"
-    )
+    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.active_helper")
 
 
 def test_on_openrouter_fallback_selected_defaults_invalid_value_to_deepseek(
@@ -2833,11 +2831,26 @@ def test_on_openrouter_fallback_selected_defaults_invalid_value_to_deepseek(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert (
-        pending.openrouter.fallback_selection_alias
-        == OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH
-    )
-    assert view._openrouter_fallback_text.content.value == t("provider.deepseek_v4_flash_fallback")
+    assert pending.translation.fallback_selection_alias == TranslationFallbackSelectionAlias.NONE
+    assert view._openrouter_fallback_text.content.value == t("settings.fallback.none")
+
+
+def test_on_openrouter_fallback_selected_off_clears_legacy_openrouter_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.QWEN35_FLASH
+
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    view._on_openrouter_fallback_selected(TranslationFallbackSelectionAlias.NONE.value)
+    pending = view.build_provider_apply_settings()
+
+    assert pending is not None
+    assert pending.translation.fallback_selection_alias == TranslationFallbackSelectionAlias.NONE
+    assert pending.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
+    assert view._openrouter_fallback_text.content.value == t("settings.fallback.none")
 
 
 def test_openrouter_fallback_card_initializes_with_deepseek_default(
@@ -2858,7 +2871,7 @@ def test_fallback_card_stays_visible_when_non_openrouter_active(
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert view._translation_connection_row.visible is True
-    assert t("settings.openrouter_fallback") in _api_tab_card_titles(view)
+    assert t("settings.fallback") in _api_tab_card_titles(view)
 
 
 def test_update_api_visibility_keeps_openrouter_key_for_openrouter_deepseek_fallback(
@@ -3149,24 +3162,19 @@ def test_openrouter_fallback_modal_lists_curated_openrouter_fallbacks(
 
     assert captured["show_description"] is True
     options = captured["options"]
-    deepseek_fallback = getattr(OpenRouterFallbackSelectionAlias, "DEEPSEEK_V4_FLASH", None)
-    deepseek_china_fallback = getattr(
-        OpenRouterFallbackSelectionAlias, "DEEPSEEK_V4_FLASH_CHINA", None
-    )
-    assert deepseek_fallback is not None
-    assert deepseek_china_fallback is not None
-
     assert [option.value for option in options] == [
-        OpenRouterFallbackSelectionAlias.NONE.value,
-        OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value,
-        deepseek_fallback.value,
-        deepseek_china_fallback.value,
+        TranslationFallbackSelectionAlias.NONE.value,
+        TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL.value,
+        TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH.value,
+        TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B.value,
+        TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B.value,
     ]
     assert [option.label for option in options] == [
-        t("settings.openrouter_fallback.none"),
-        t("provider.qwen35_flash_fallback"),
-        t("provider.deepseek_v4_flash_fallback"),
-        t("provider.deepseek_v4_flash_china_fallback"),
+        t("settings.fallback.none"),
+        t("settings.fallback.deepseek_v4_flash_official"),
+        t("settings.fallback.openrouter_deepseek_v4_flash"),
+        t("settings.fallback.cerebras_gemma4_31b"),
+        t("settings.fallback.openrouter_gemma4_26b_a4b"),
     ]
 
 
@@ -3345,15 +3353,13 @@ def test_openrouter_fallback_modal_hides_provider_descriptions_for_active_option
     view._on_openrouter_fallback_click(None)
 
     options = {option.value: option for option in captured["options"]}
-    deepseek_fallback = getattr(OpenRouterFallbackSelectionAlias, "DEEPSEEK_V4_FLASH", None)
-    assert deepseek_fallback is not None
-
     assert captured["show_description"] is True
-    assert options[OpenRouterFallbackSelectionAlias.NONE.value].description == t(
-        "settings.openrouter_fallback.none.description"
+    assert options[TranslationFallbackSelectionAlias.NONE.value].description == t(
+        "settings.fallback.none.description"
     )
-    assert options[OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value].description == ""
-    assert options[deepseek_fallback.value].description == ""
+    assert options[
+        TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH.value
+    ].description == t("settings.fallback.openrouter_deepseek_v4_flash.description")
 
 
 def test_openrouter_fallback_off_does_not_show_active_helper_copy(
@@ -3366,9 +3372,7 @@ def test_openrouter_fallback_off_does_not_show_active_helper_copy(
     view = _make_llm_selection_view(monkeypatch, settings)
     view._update_api_visibility()
 
-    assert view._openrouter_fallback_helper_text.value == t(
-        "settings.openrouter_fallback.none.description"
-    )
+    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
 
 
 def test_openrouter_fallback_off_shows_off_description_when_main_provider_is_inactive(
@@ -3381,9 +3385,7 @@ def test_openrouter_fallback_off_shows_off_description_when_main_provider_is_ina
     view = _make_llm_selection_view(monkeypatch, settings)
     view._update_api_visibility()
 
-    assert view._openrouter_fallback_helper_text.value == t(
-        "settings.openrouter_fallback.none.description"
-    )
+    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
 
 
 def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -5195,7 +5197,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     assert _row_card_titles(api_controls[1]) == [
         t("settings.low_latency_mode"),
         t("settings.translation_connection"),
-        t("settings.openrouter_fallback"),
+        t("settings.fallback"),
     ]
     assert _row_card_titles(api_controls[2]) == [t("settings.local_llm.connection")]
     assert api_controls[2] is view._local_llm_connection_card
@@ -5247,16 +5249,17 @@ def test_api_tab_single_value_cards_do_not_render_helper_copy(
             "settings.dashboard_language_redirect"
         )
         assert view._openrouter_fallback_helper_text.value in {
-            t("settings.openrouter_fallback.inactive_helper"),
-            t("settings.openrouter_fallback.active_helper"),
-            t("settings.openrouter_fallback.none.description"),
+            t("settings.fallback.inactive_helper"),
+            t("settings.fallback.active_helper"),
+            t("settings.fallback.none.description"),
+            t("settings.fallback.legacy_openrouter_helper"),
         }
         assert t("settings.self_stt_provider") not in api_labels
         assert t("settings.shared_translation_provider") not in api_labels
         assert t("settings.peer_stt_provider") not in api_labels
         assert t("settings.dashboard_language_redirect") not in api_labels
-        assert t("settings.openrouter_fallback.inactive_helper") not in api_labels
-        assert t("settings.openrouter_fallback.active_helper") not in api_labels
+        assert t("settings.fallback.inactive_helper") not in api_labels
+        assert t("settings.fallback.active_helper") not in api_labels
     finally:
         i18n_module.set_locale(old_locale)
 
