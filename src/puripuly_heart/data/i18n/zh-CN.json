@@ -81,7 +81,7 @@
     "settings.translation_model.gemini31_flash_lite.description": "翻译速度可能不稳定",
     "settings.translation_model.qwen35_plus.description": "DeepSeek 的不错替代选择",
     "settings.translation_model.local_llm.description": "可以使用 OpenAI 兼容 API",
-    "settings.translation_model.gemma4_31b_cerebras.description": "通过 Cerebras 官方 API 提供的快速 Gemma 4 31B 模型。目前处于 Public Preview，可用性可能变化。",
+    "settings.translation_model.gemma4_31b_cerebras.description": "非常非常快 非常贵",
     "settings.local_llm.connection": "OpenAI 兼容 LLM 服务器",
     "settings.local_llm.base_url": "Base URL",
     "settings.local_llm.base_url.invalid": "请输入有效的 http:// 或 https:// 地址，且不要包含用户名、密码、查询或片段。",

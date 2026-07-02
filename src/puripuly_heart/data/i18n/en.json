@@ -81,7 +81,7 @@
   "settings.translation_model.gemini31_flash_lite.description": "Translation speed may be unstable",
   "settings.translation_model.qwen35_plus.description": "A strong alternative to DeepSeek",
   "settings.translation_model.local_llm.description": "You can use an OpenAI-compatible API",
-  "settings.translation_model.gemma4_31b_cerebras.description": "Fast Gemma 4 31B via Cerebras official API. Currently in Public Preview, so availability may change.",
+  "settings.translation_model.gemma4_31b_cerebras.description": "Very very fast Very expensive",
   "settings.local_llm.connection": "OpenAI-compatible LLM server",
   "settings.local_llm.base_url": "Base URL",
   "settings.local_llm.base_url.invalid": "Enter a valid http:// or https:// URL without username, password, query, or fragment.",

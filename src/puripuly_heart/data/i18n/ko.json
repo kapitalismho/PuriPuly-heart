@@ -81,7 +81,7 @@
   "settings.translation_model.gemini31_flash_lite.description": "번역 속도가 불안정할 수 있어요",
   "settings.translation_model.qwen35_plus.description": "딥시크의 좋은 대안이에요",
   "settings.translation_model.local_llm.description": "OpenAI 호환 API를 사용할 수 있어요",
-  "settings.translation_model.gemma4_31b_cerebras.description": "Cerebras 공식 API로 제공되는 빠른 Gemma 4 31B 모델이에요. 현재 Public Preview 상태라 안정성이 변할 수 있어요.",
+  "settings.translation_model.gemma4_31b_cerebras.description": "매우매우 빨라요 매우 비싸요",
   "settings.local_llm.connection": "OpenAI 호환 LLM 서버",
   "settings.local_llm.base_url": "Base URL",
   "settings.local_llm.base_url.invalid": "사용자 이름, 비밀번호, 쿼리, 조각이 없는 올바른 http:// 또는 https:// 주소를 입력해 주세요.",
