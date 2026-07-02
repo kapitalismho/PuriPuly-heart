@@ -3218,7 +3218,7 @@ def test_openrouter_fallback_modal_lists_curated_openrouter_fallbacks(
 
     view._on_openrouter_fallback_click(None)
 
-    assert captured["show_description"] is False
+    assert captured["show_description"] is True
     options = captured["options"]
     assert [option.value for option in options] == [
         TranslationFallbackSelectionAlias.NONE.value,
@@ -3234,6 +3234,44 @@ def test_openrouter_fallback_modal_lists_curated_openrouter_fallbacks(
         t("settings.fallback.openrouter_gemma4_26b_a4b"),
         t("settings.fallback.cerebras_gemma4_31b"),
     ]
+    option_by_value = {option.value: option for option in options}
+    assert option_by_value[
+        TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B.value
+    ].description == t("settings.fallback.cerebras_gemma4_31b.description")
+
+
+def test_openrouter_fallback_modal_hides_legacy_deepseek_china_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.provider.llm = LLMProviderName.OPENROUTER
+    settings.openrouter.fallback_selection_alias = (
+        OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH_CHINA
+    )
+
+    view = _make_settings_view(monkeypatch)[0]
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    attach_dummy_page(monkeypatch, view)
+
+    captured: dict[str, object] = {}
+
+    class DummyModal:
+        def __init__(self, _page, _title, options, _on_select, *, show_description=False):
+            captured["options"] = options
+
+        def open(self, current: str) -> None:
+            captured["current"] = current
+
+    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
+
+    view._on_openrouter_fallback_click(None)
+
+    options = captured["options"]
+    assert all(
+        OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH_CHINA.value not in option.value
+        for option in options
+    )
+    assert captured["current"] == TranslationFallbackSelectionAlias.NONE.value
 
 
 def test_llm_modal_lists_logical_translation_models_once(
@@ -3392,7 +3430,7 @@ def test_translation_connection_modal_opens_for_single_connection_model_without_
     assert options[0].description == ""
 
 
-def test_openrouter_fallback_modal_options_have_no_description(
+def test_openrouter_fallback_modal_only_cerebras_has_description(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
@@ -3416,9 +3454,14 @@ def test_openrouter_fallback_modal_options_have_no_description(
 
     view._on_openrouter_fallback_click(None)
 
-    assert captured["show_description"] is False
+    assert captured["show_description"] is True
     for option in captured["options"]:
-        assert option.description == ""
+        expected = (
+            t("settings.fallback.cerebras_gemma4_31b.description")
+            if option.value == TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B.value
+            else ""
+        )
+        assert option.description == expected
 
 
 def test_openrouter_fallback_off_does_not_show_active_helper_copy(

@@ -139,6 +139,9 @@ _TRANSLATION_FALLBACK_LABEL_KEYS = {
     TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B: "settings.fallback.openrouter_gemma4_26b_a4b",
     TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B: "settings.fallback.cerebras_gemma4_31b",
 }
+_TRANSLATION_FALLBACK_DESCRIPTION_KEYS = {
+    TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B: "settings.fallback.cerebras_gemma4_31b.description",
+}
 
 
 def _make_text_button(label: str, **kwargs) -> ft.TextButton:
@@ -3372,6 +3375,14 @@ class SettingsView(ft.Column):
             OptionItem(
                 value=alias.value,
                 label=self._translation_fallback_display_label(alias),
+                description=(
+                    t(
+                        _TRANSLATION_FALLBACK_DESCRIPTION_KEYS[alias],
+                        default="",
+                    )
+                    if alias in _TRANSLATION_FALLBACK_DESCRIPTION_KEYS
+                    else ""
+                ),
             )
             for alias in _TRANSLATION_FALLBACK_SELECTION_ORDER
         ]
@@ -3383,6 +3394,7 @@ class SettingsView(ft.Column):
             not in (
                 OpenRouterFallbackSelectionAlias.NONE,
                 OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH,
+                OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH_CHINA,
             )
         ):
             profile = self._openrouter_fallback_profile(display_settings)
@@ -3405,6 +3417,7 @@ class SettingsView(ft.Column):
             not in (
                 OpenRouterFallbackSelectionAlias.NONE,
                 OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH,
+                OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH_CHINA,
             )
         ):
             current = f"legacy:{display_settings.openrouter.fallback_selection_alias.value}"
@@ -3413,7 +3426,7 @@ class SettingsView(ft.Column):
             t("settings.fallback.modal_title"),
             options,
             self._on_openrouter_fallback_selected,
-            show_description=False,
+            show_description=True,
         )
         modal.open(current)
 
