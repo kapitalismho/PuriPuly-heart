@@ -194,6 +194,28 @@ class Float32Backend:
         return session
 
 
+@dataclass(slots=True)
+class SlowOpenBackend:
+    sessions: list[Float32Session]
+    open_started: asyncio.Event
+    release_open: asyncio.Event
+    open_calls: int
+
+    def __init__(self) -> None:
+        self.sessions = []
+        self.open_started = asyncio.Event()
+        self.release_open = asyncio.Event()
+        self.open_calls = 0
+
+    async def open_session(self) -> Float32Session:
+        self.open_calls += 1
+        self.open_started.set()
+        await self.release_open.wait()
+        session = Float32Session()
+        self.sessions.append(session)
+        return session
+
+
 class StopFinalizingSession(Float32Session):
     __slots__ = ("stop_final_text",)
 
@@ -376,6 +398,34 @@ async def test_stt_controller_connects_on_speech_start():
     assert first.state == STTSessionState.STREAMING
 
     await stt.close()
+
+
+async def test_stt_controller_serializes_concurrent_session_open() -> None:
+    backend = SlowOpenBackend()
+    stt = ManagedSTTProvider(backend=backend, sample_rate_hz=16000, reset_deadline_s=90.0)
+
+    first = asyncio.create_task(stt._ensure_session())
+    second: asyncio.Task[bool] | None = None
+
+    try:
+        await asyncio.wait_for(backend.open_started.wait(), timeout=0.2)
+        second = asyncio.create_task(stt._ensure_session())
+        await asyncio.sleep(0)
+
+        assert backend.open_calls == 1
+
+        backend.release_open.set()
+        results = await asyncio.gather(first, second)
+
+        assert results == [True, True]
+        assert backend.open_calls == 1
+        assert len(backend.sessions) == 1
+    finally:
+        backend.release_open.set()
+        tasks = [task for task in (first, second) if task is not None and not task.done()]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        await stt.close()
 
 
 async def test_stt_controller_prefers_float32_session_audio_path() -> None:

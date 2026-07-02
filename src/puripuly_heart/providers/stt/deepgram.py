@@ -110,7 +110,7 @@ class _DeepgramSDKSession(STTBackendSession):
     _connect_started_at: float | None = field(init=False, default=None, repr=False)
     _error_reported: bool = field(init=False, default=False, repr=False)
     _emitted_finals: int = field(init=False, default=0, repr=False)
-    _empty_final_drops: int = field(init=False, default=0, repr=False)
+    _empty_final_acks: int = field(init=False, default=0, repr=False)
     _summary_logged: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -141,13 +141,13 @@ class _DeepgramSDKSession(STTBackendSession):
             return None
         if not transcript:
             if self.stream_label == "peer":
-                self._empty_final_drops += 1
+                self._empty_final_acks += 1
                 logger.info(
-                    "[STT][peer] Empty final transcript dropped (is_final=%s, speech_final=%s)",
+                    "[STT][peer] Empty final transcript acknowledged (is_final=%s, speech_final=%s)",
                     is_final,
                     speech_final,
                 )
-            return None
+            return STTBackendTranscriptEvent(text="", is_final=True)
         if self.stream_label == "peer":
             self._emitted_finals += 1
 
@@ -399,12 +399,12 @@ class _DeepgramSDKSession(STTBackendSession):
         if self.stream_label != "peer" or self._summary_logged:
             return
         self._summary_logged = True
-        total_finals_seen = self._emitted_finals + self._empty_final_drops
-        empty_ratio = self._empty_final_drops / total_finals_seen if total_finals_seen > 0 else 0.0
+        total_finals_seen = self._emitted_finals + self._empty_final_acks
+        empty_ratio = self._empty_final_acks / total_finals_seen if total_finals_seen > 0 else 0.0
         logger.info(
-            "[STT][peer] Session summary: emitted_finals=%s empty_final_drops=%s total_finals_seen=%s empty_ratio=%.3f",
+            "[STT][peer] Session summary: emitted_finals=%s empty_final_acks=%s total_finals_seen=%s empty_ratio=%.3f",
             self._emitted_finals,
-            self._empty_final_drops,
+            self._empty_final_acks,
             total_finals_seen,
             empty_ratio,
         )

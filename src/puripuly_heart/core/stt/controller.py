@@ -81,6 +81,7 @@ class ManagedSTTProvider:
     _pending_final_utterance_ids: deque[UUID] = field(default_factory=deque)
     _pending_final_utterance_times: dict[UUID, float] = field(default_factory=dict)
     _audio_ring: RingBufferF32 | None = None
+    _session_open_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
     _reset_timer: asyncio.Task[None] | None = None
     _last_speech_end_time: float | None = None
     _diagnostic_chunk_count: int = 0
@@ -377,6 +378,12 @@ class ManagedSTTProvider:
         if self._active_session is not None:
             return True
 
+        async with self._session_open_lock:
+            if self._active_session is not None:
+                return True
+            return await self._open_session_locked()
+
+    async def _open_session_locked(self) -> bool:
         await self._set_state(STTSessionState.CONNECTING)
         last_exc: Exception | None = None
 

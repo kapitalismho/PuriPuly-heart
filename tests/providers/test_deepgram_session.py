@@ -89,7 +89,22 @@ async def test_deepgram_session_emits_test_final() -> None:
     assert event.is_final is True
 
 
-def test_deepgram_peer_session_drops_empty_final_with_dedicated_log(
+def test_deepgram_session_empty_final_emits_empty_final_ack() -> None:
+    session = _make_session()
+    result = types.SimpleNamespace(
+        channel=types.SimpleNamespace(alternatives=[types.SimpleNamespace(transcript="")]),
+        is_final=True,
+        speech_final=False,
+    )
+
+    event = session._build_transcript_event(result)
+
+    assert isinstance(event, STTBackendTranscriptEvent)
+    assert event.is_final is True
+    assert event.text == ""
+
+
+def test_deepgram_peer_session_acknowledges_empty_final_with_dedicated_log(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     session = _make_session(stream_label="peer")
@@ -102,10 +117,11 @@ def test_deepgram_peer_session_drops_empty_final_with_dedicated_log(
     with caplog.at_level(logging.INFO, logger=deepgram_module.logger.name):
         event = session._build_transcript_event(result)
 
-    assert event is None
-    assert session._empty_final_drops == 1
+    assert isinstance(event, STTBackendTranscriptEvent)
+    assert event.text == ""
+    assert session._empty_final_acks == 1
     assert any(
-        "[STT][peer] Empty final transcript dropped" in message for message in caplog.messages
+        "[STT][peer] Empty final transcript acknowledged" in message for message in caplog.messages
     )
 
 
@@ -154,7 +170,7 @@ async def test_deepgram_peer_session_logs_summary_once_on_shutdown(
     ]
     assert len(summary_messages) == 1
     assert "emitted_finals=1" in summary_messages[0]
-    assert "empty_final_drops=1" in summary_messages[0]
+    assert "empty_final_acks=1" in summary_messages[0]
     assert "total_finals_seen=2" in summary_messages[0]
 
 
