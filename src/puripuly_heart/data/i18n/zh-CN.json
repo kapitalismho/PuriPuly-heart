@@ -298,7 +298,7 @@
     "discord_auth.error.expired": "Discord 验证链接已过期。请重新开始。",
     "discord_auth.error.loopback_unavailable": "PuriPuly 无法打开本地验证回调。请重试，或使用自己的 API 密钥。",
     "discord_auth.error.retry": "Discord 认证失败。请重试。",
-    "qq_auth.body": "QQ 认证\n\n1. 加入 QQ 群 647594597。\n2. 从群机器人获取激活凭证。\n3. 在下方输入 QQ 号和凭证，即可开启 TRANS。\n\nPuriPuly 不会在应用中保存原始 QQ 号或凭证。",
+    "qq_auth.body": "PuriPuly 为新用户提供免费用量。\n大约可以翻译 600～700 次。\n\n按照下面的步骤操作后即可立即发放。\n1. 加入 QQ 群 647594597。\n2. 从群机器人获取激活凭证。\n3. 在下方输入 QQ 号和凭证。\n4. 认证！",
     "qq_auth.submit": "开始 QQ 认证",
     "qq_auth.close": "取消",
     "qq_auth.cancel": "取消",

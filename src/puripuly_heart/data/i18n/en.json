@@ -298,7 +298,7 @@
   "discord_auth.error.expired": "The Discord verification link expired. Please start again.",
   "discord_auth.error.loopback_unavailable": "PuriPuly could not open the local verification callback. Please try again or use your own API key.",
   "discord_auth.error.retry": "Discord verification failed. Please try again.",
-  "qq_auth.body": "QQ verification\n\n1. Join QQ group number 647594597.\n2. Get an activation credential from the group bot.\n3. Enter your QQ number and credential below to turn on TRANS.\n\nPuriPuly does not store your raw QQ number or credential in the app.",
+  "qq_auth.body": "PuriPuly provides free usage for new users.\nYou can translate about 600-700 times.\n\nFollow these steps to get it issued right away.\n1. Join QQ group number 647594597.\n2. Get an activation credential from the group bot.\n3. Enter your QQ number and credential below.\n4. Verify!",
   "qq_auth.submit": "Verify QQ",
   "qq_auth.close": "Cancel",
   "qq_auth.cancel": "Cancel",

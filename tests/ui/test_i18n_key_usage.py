@@ -66,16 +66,6 @@ EXPECTED_LOCALIZED_QQ_GROUP_NUMBER_COPY = {
     "ja": "QQグループ番号 647594597",
     "ko": "QQ 그룹 번호 647594597",
 }
-FORBIDDEN_QQ_IMMEDIATE_PROMISE_FRAGMENTS = {
-    "en": (
-        "receive it right after QQ verification",
-        "right after QQ verification",
-        "immediately after QQ verification",
-    ),
-    "ja": ("QQ認証後、すぐに付与", "すぐに付与されます", "即時発行"),
-    "ko": ("QQ 인증 후 바로 발급", "바로 발급돼요", "즉시 발급"),
-    "zh-CN": ("完成 QQ 认证后会立即发放", "立即发放", "马上发放"),
-}
 FORBIDDEN_EN_QQ_PRIVACY_PROMISES = (
     "We don't keep personal information",
     "We do not keep personal information",
@@ -526,29 +516,18 @@ def test_qq_runtime_completion_keys_are_used_and_not_allowlisted() -> None:
     )
 
 
-def test_qq_auth_body_copy_distinguishes_verification_from_key_issuance() -> None:
+def test_qq_auth_body_copy_describes_group_credential_and_free_usage() -> None:
     bundles = _load_bundles()
     english_body = bundles["en"]["qq_auth.body"]
 
+    assert "free usage for new users" in english_body
+    assert "600-700" in english_body
+    assert "issued right away" in english_body
     assert "Join QQ group number 647594597" in english_body
     assert "activation credential" in english_body
-    assert "turn on TRANS" in english_body
-    assert "does not store your raw QQ" in english_body
+    assert "Verify!" in english_body
     for forbidden in FORBIDDEN_EN_QQ_PRIVACY_PROMISES:
         assert forbidden not in english_body
-
-    for locale, fragments in FORBIDDEN_QQ_IMMEDIATE_PROMISE_FRAGMENTS.items():
-        qq_copy = "\n".join(
-            bundles[locale][key]
-            for key in (
-                "qq_auth.body",
-                "qq_auth.waiting_body",
-                "qq_auth.success",
-                "qq_auth.error.key_unavailable",
-            )
-        )
-        for fragment in fragments:
-            assert fragment not in qq_copy, (locale, fragment)
 
 
 def test_non_chinese_qq_auth_copy_localizes_group_number_reference() -> None:

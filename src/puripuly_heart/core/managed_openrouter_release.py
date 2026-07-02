@@ -543,7 +543,10 @@ class ManagedOpenRouterReleaseService:
             self._clear_retry_after()
             return _managed_china_key_unavailable_result()
 
-        return self._persist_qq_managed_issue_success(normalized_qq_api_key)
+        return self._persist_qq_managed_issue_success(
+            qq_assert_response.issue,
+            api_key=normalized_qq_api_key,
+        )
 
     async def ensure_key_for_llm_start(self) -> ManagedOpenRouterReleaseResult:
         resolution = resolve_openrouter_credentials(self.settings, secrets=self.secrets)
@@ -975,6 +978,8 @@ class ManagedOpenRouterReleaseService:
 
     def _persist_qq_managed_issue_success(
         self,
+        issue_response: ManagedOpenRouterIssueSuccess,
+        *,
         api_key: str,
     ) -> ManagedOpenRouterReleaseResult:
         try:
@@ -990,6 +995,12 @@ class ManagedOpenRouterReleaseService:
                 message_key="managed_release.stop",
             )
 
+        store_managed_entitlement_snapshot(
+            self.settings,
+            managed_credential_ref=issue_response.managed_credential_ref,
+            expires_at=issue_response.expires_at,
+        )
+        self.persist_settings(self.settings)
         self._clear_retry_after()
         return ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,

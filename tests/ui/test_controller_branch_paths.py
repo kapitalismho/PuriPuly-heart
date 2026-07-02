@@ -10819,6 +10819,52 @@ async def test_refresh_managed_trial_usage_state_auto_shows_founder_letter_once(
 
 
 @pytest.mark.asyncio
+async def test_refresh_managed_trial_usage_state_auto_shows_founder_letter_once_for_managed_china(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shown: list[str] = []
+    dash = DummyDashboard()
+    settings_view = DummySettingsView()
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=dash,
+            view_settings=settings_view,
+            show_founder_letter_dialog=lambda: shown.append("shown"),
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.OPENROUTER
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    controller.hub = DummyHub(llm=object())
+    controller.settings.managed_identity.active_managed_credential_ref = "qq_hash_123"
+    monkeypatch.setattr(
+        controller_module,
+        "create_secret_store",
+        lambda *_a, **_k: DummySecrets({"openrouter_managed_qq_api_key": "managed-qq-key"}),
+    )
+
+    async def fake_fetch_key_metadata(api_key: str):
+        assert api_key == "managed-qq-key"
+        return controller_module.OpenRouterKeyMetadata(
+            limit_usd=0.07,
+            remaining_usd=0.0007,
+            usage_usd=0.0693,
+        )
+
+    monkeypatch.setattr(
+        OpenRouterLLMProvider,
+        "fetch_key_metadata",
+        staticmethod(fake_fetch_key_metadata),
+    )
+
+    await controller._refresh_managed_trial_usage_state()
+    await controller._refresh_managed_trial_usage_state()
+
+    assert shown == ["shown"]
+
+
+@pytest.mark.asyncio
 async def test_set_translation_enabled_reopens_founder_letter_on_exhausted_managed_trans(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

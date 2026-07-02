@@ -298,7 +298,7 @@
   "discord_auth.error.expired": "Discord 인증 링크가 만료됐어요. 다시 시작해주세요.",
   "discord_auth.error.loopback_unavailable": "로컬 인증 콜백을 열지 못했어요. 다시 시도하거나 내 API 키를 사용해주세요.",
   "discord_auth.error.retry": "Discord 인증에 실패했어요. 다시 시도해주세요.",
-  "qq_auth.body": "QQ 인증\n\n1. QQ 그룹 번호 647594597에 참여해 주세요.\n2. 그룹 봇에게 활성화 인증서를 받아 주세요.\n3. 아래에 QQ 번호와 인증서를 입력하면 TRANS를 켤 수 있어요.\n\nPuriPuly는 원본 QQ 번호와 인증서를 앱에 저장하지 않아요.",
+  "qq_auth.body": "PuriPuly는 신규 사용자에게 무료 사용량을 제공해요.\n약 600~700회를 번역할 수 있어요.\n\n아래와 같은 절차를 따르면 바로 발급이 되어요.\n1. QQ 그룹 번호 647594597에 참여해 주세요.\n2. 그룹 봇에게 활성화 인증서를 받아 주세요.\n3. 아래에 QQ 번호와 인증서를 입력해주세요.\n4. 인증!",
   "qq_auth.submit": "QQ 인증하기",
   "qq_auth.close": "취소",
   "qq_auth.cancel": "취소",

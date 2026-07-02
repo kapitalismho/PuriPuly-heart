@@ -435,6 +435,7 @@ async def test_prepare_from_qq_assertion_persists_issued_wrapper_to_qq_secret_an
     assert result.local_key_available is True
     assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) == "qq-managed-key"
     assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "discord-managed-key"
+    assert settings.managed_identity.active_managed_credential_ref == "qq-managed-ref"
     assert [name for name, _payload in client.calls] == ["qq_assert"]
 
 
@@ -476,7 +477,7 @@ async def test_prepare_from_qq_assertion_persistence_guard_blocks_stale_issued_k
 
 
 @pytest.mark.asyncio
-async def test_prepare_from_qq_assertion_persists_only_qq_key_without_shared_metadata_mutation() -> (
+async def test_prepare_from_qq_assertion_persists_qq_key_and_entitlement_snapshot_without_discord_secret_mutation() -> (
     None
 ):
     settings = AppSettings()
@@ -497,7 +498,7 @@ async def test_prepare_from_qq_assertion_persists_only_qq_key_without_shared_met
     secrets.set(OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET, "discord-installation-id")
     issue = ManagedOpenRouterIssueSuccess(
         openrouter_api_key=" qq-managed-key ",
-        managed_credential_ref="qq-managed-ref-should-not-persist",
+        managed_credential_ref="qq-managed-ref",
         expires_at="2026-04-08T08:00:00.000Z",
         openrouter_user_id="qq-user-id-should-not-persist",
         referral_id="4J7K2M",
@@ -535,11 +536,11 @@ async def test_prepare_from_qq_assertion_persists_only_qq_key_without_shared_met
     assert settings.managed_identity.release_token_expires_at == "2026-04-08T06:15:00.000Z"
     assert settings.managed_identity.verified_hardware_hash == "verified-hardware-hash-unchanged"
     assert settings.managed_identity.verified_hardware_hash_salt_version == 7
-    assert settings.managed_identity.active_managed_credential_ref == "discord-active-ref"
-    assert settings.managed_identity.active_managed_expires_at == "2026-04-08T07:00:00.000Z"
-    assert settings.managed_identity.founder_letter_seen_credential_ref == "discord-active-ref"
+    assert settings.managed_identity.active_managed_credential_ref == "qq-managed-ref"
+    assert settings.managed_identity.active_managed_expires_at == "2026-04-08T08:00:00.000Z"
+    assert settings.managed_identity.founder_letter_seen_credential_ref is None
     assert settings.managed_identity.referral_id == "8H3J4N"
-    assert persist_calls == []
+    assert persist_calls == [("qq-installation-unchanged", "release-token-unchanged")]
     assert [name for name, _payload in client.calls] == ["qq_assert"]
 
 
