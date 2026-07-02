@@ -1,4 +1,5 @@
 import type { BrokerAsnKind } from './abuse-controls';
+import type { TelemetryUsageDailyMetrics } from './telemetry';
 
 const DAILY_HEARTBEAT_COLOR_OK = 0x5865f2;
 const DAILY_HEARTBEAT_COLOR_ACTIVE = 0xfee75c;
@@ -45,6 +46,7 @@ export interface DailyReportPayload {
     }>;
     cloud_asn_share_24h: number;
     manual_revocations_24h: number;
+    translation_usage: TelemetryUsageDailyMetrics;
   };
 }
 
@@ -111,6 +113,12 @@ export async function sendDailyReport(
             return `AS${entry.asn}${displayName}: ${entry.count} (${entry.share}%)`;
           })
           .join('\n');
+  const translationUsage = packet.summary.translation_usage;
+  const retentionSummary = [
+    `D1=${formatRetentionSignal(translationUsage.retention.d1)}`,
+    `D7=${formatRetentionSignal(translationUsage.retention.d7)}`,
+    `D30=${formatRetentionSignal(translationUsage.retention.d30)}`,
+  ].join('\n');
 
   await sendDiscordEmbed(
     webhookUrl,
@@ -145,10 +153,32 @@ export async function sendDailyReport(
             topAsnSummary,
           ].join('\n'),
         },
+        {
+          name: 'Translation usage',
+          value: [
+            `active_24h=${translationUsage.active_users_24h}`,
+            `active_7d=${translationUsage.active_users_7d}`,
+            `active_30d=${translationUsage.active_users_30d}`,
+            `dau_mau_stickiness=${formatNullablePct(translationUsage.dau_mau_stickiness_pct)}`,
+            `first_active_24h=${translationUsage.first_active_users_24h}`,
+            `returning_active_24h=${translationUsage.returning_active_users_24h}`,
+            retentionSummary,
+          ].join('\n'),
+        },
       ],
     },
     fetchImpl,
   );
+}
+
+function formatRetentionSignal(
+  signal: TelemetryUsageDailyMetrics['retention']['d1'],
+): string {
+  return `${signal.retained_users}/${signal.eligible_users} (${formatNullablePct(signal.retention_pct)}) cohort=${signal.cohort_date_utc}`;
+}
+
+function formatNullablePct(value: number | null): string {
+  return value === null ? 'n/a' : `${value}%`;
 }
 
 function buildDiscordWebhookPayload(input: DiscordEmbedInput): DiscordWebhookPayload {

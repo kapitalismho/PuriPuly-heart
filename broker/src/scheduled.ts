@@ -23,6 +23,10 @@ import {
   applyReferralRewardRetention,
   reconcileStaleReferralRewards,
 } from './referral';
+import {
+  applyTelemetryActiveDayRetention,
+  getTelemetryUsageDailyMetrics,
+} from './telemetry';
 
 type AlertLevel = 'warn1' | 'warn2' | 'warn3' | 'critical';
 
@@ -79,10 +83,12 @@ export async function handleScheduled(
   const runtimeState = await getBrokerAbuseRuntimeState(env.BROKER_DB);
 
   if (!shouldSendDailyReport(runtimeState, controls.dailyReport, now)) {
+    await applyTelemetryActiveDayRetention(env.BROKER_DB, now);
     return;
   }
 
   await runDailyReport(env, now, controls);
+  await applyTelemetryActiveDayRetention(env.BROKER_DB, now);
 }
 
 export function shouldSendDailyReport(
@@ -145,6 +151,7 @@ export async function buildDailyHeartbeatPacket(
     issueSeverityResult,
     auditResult,
     manualRevocationCountRow,
+    translationUsage,
   ] =
     await Promise.all([
       db
@@ -211,6 +218,7 @@ export async function buildDailyHeartbeatPacket(
         )
         .bind(windowStart24h, nowIso)
         .first<CountRow>(),
+      getTelemetryUsageDailyMetrics(db, now),
     ]);
 
   const issueSuccess24h = Number(issueCountRow?.count ?? 0);
@@ -266,6 +274,7 @@ export async function buildDailyHeartbeatPacket(
       cloud_asn_share_24h:
         issueSuccess24h === 0 ? 0 : Math.round((cloudAsnIssueCount / issueSuccess24h) * 100),
       manual_revocations_24h: Number(manualRevocationCountRow?.count ?? 0),
+      translation_usage: translationUsage,
     },
   };
 }

@@ -28,6 +28,43 @@ interface TelemetryActiveDayRecordInput {
   receivedAt: string;
 }
 
+export interface TelemetryActiveDayRetentionResult {
+  deleted: number;
+  cutoffDateUtc: string;
+}
+
+export interface TelemetryUsageRetentionSignal {
+  cohort_date_utc: string;
+  eligible_users: number;
+  retained_users: number;
+  retention_pct: number | null;
+}
+
+export interface TelemetryUsageDailyMetrics {
+  active_users_24h: number;
+  active_users_7d: number;
+  active_users_30d: number;
+  dau_mau_stickiness_pct: number | null;
+  first_active_users_24h: number;
+  returning_active_users_24h: number;
+  retention: {
+    d1: TelemetryUsageRetentionSignal;
+    d7: TelemetryUsageRetentionSignal;
+    d30: TelemetryUsageRetentionSignal;
+  };
+}
+
+interface TelemetryFirstActiveRow {
+  subject_ref: string;
+  first_active_date_utc: string;
+}
+
+interface CountRow {
+  count: number;
+}
+
+const TELEMETRY_ACTIVE_DAY_RETENTION_DAYS = 400;
+
 export async function handleTelemetryTranslationSuccessDay(
   c: Context<BrokerEnv>,
 ): Promise<Response> {
@@ -101,6 +138,69 @@ export async function recordTelemetryActiveDay(
       input.receivedAt,
     )
     .run();
+}
+
+export async function applyTelemetryActiveDayRetention(
+  db: D1Database,
+  now: Date,
+): Promise<TelemetryActiveDayRetentionResult> {
+  const cutoffDateUtc = toUtcDateString(addUtcDays(startOfUtcDate(now), -TELEMETRY_ACTIVE_DAY_RETENTION_DAYS));
+  const result = await db
+    .prepare(
+      `DELETE FROM telemetry_active_days
+        WHERE active_date_utc < ?`,
+    )
+    .bind(cutoffDateUtc)
+    .run();
+
+  return {
+    deleted: result.meta?.changes ?? 0,
+    cutoffDateUtc,
+  };
+}
+
+export async function getTelemetryUsageDailyMetrics(
+  db: D1Database,
+  now: Date,
+): Promise<TelemetryUsageDailyMetrics> {
+  const reportDateUtc = toUtcDateString(now);
+  const sevenDayStartUtc = toUtcDateString(addUtcDays(startOfUtcDate(now), -6));
+  const thirtyDayStartUtc = toUtcDateString(addUtcDays(startOfUtcDate(now), -29));
+
+  const [active24hRow, active7dRow, active30dRow, firstActiveRowsResult] = await Promise.all([
+    countDistinctActiveSubjects(db, reportDateUtc, reportDateUtc),
+    countDistinctActiveSubjects(db, sevenDayStartUtc, reportDateUtc),
+    countDistinctActiveSubjects(db, thirtyDayStartUtc, reportDateUtc),
+    db
+      .prepare(
+        `SELECT subject_ref, MIN(active_date_utc) AS first_active_date_utc
+           FROM telemetry_active_days
+          GROUP BY subject_ref`,
+      )
+      .all<TelemetryFirstActiveRow>(),
+  ]);
+
+  const firstActiveBySubject = new Map(
+    firstActiveRowsResult.results.map((row) => [row.subject_ref, row.first_active_date_utc]),
+  );
+  const activeSubjects24h = await getDistinctActiveSubjects(db, reportDateUtc, reportDateUtc);
+  const firstActiveUsers24h = activeSubjects24h.filter(
+    (subjectRef) => firstActiveBySubject.get(subjectRef) === reportDateUtc,
+  ).length;
+
+  return {
+    active_users_24h: active24hRow,
+    active_users_7d: active7dRow,
+    active_users_30d: active30dRow,
+    dau_mau_stickiness_pct: active30dRow === 0 ? null : Math.round((active24hRow / active30dRow) * 100),
+    first_active_users_24h: firstActiveUsers24h,
+    returning_active_users_24h: activeSubjects24h.length - firstActiveUsers24h,
+    retention: {
+      d1: await getTelemetryRetentionSignal(db, now, 1),
+      d7: await getTelemetryRetentionSignal(db, now, 7),
+      d30: await getTelemetryRetentionSignal(db, now, 30),
+    },
+  };
 }
 
 export async function deriveTelemetrySubjectRef(
@@ -206,6 +306,90 @@ function isValidUtcDate(value: string): boolean {
     date.getUTCMonth() === month - 1 &&
     date.getUTCDate() === day
   );
+}
+
+async function countDistinctActiveSubjects(
+  db: D1Database,
+  startDateUtc: string,
+  endDateUtc: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(DISTINCT subject_ref) AS count
+         FROM telemetry_active_days
+        WHERE active_date_utc >= ?
+          AND active_date_utc <= ?`,
+    )
+    .bind(startDateUtc, endDateUtc)
+    .first<CountRow>();
+
+  return Number(row?.count ?? 0);
+}
+
+async function getDistinctActiveSubjects(
+  db: D1Database,
+  startDateUtc: string,
+  endDateUtc: string,
+): Promise<string[]> {
+  const result = await db
+    .prepare(
+      `SELECT DISTINCT subject_ref
+         FROM telemetry_active_days
+        WHERE active_date_utc >= ?
+          AND active_date_utc <= ?`,
+    )
+    .bind(startDateUtc, endDateUtc)
+    .all<{ subject_ref: string }>();
+
+  return result.results.map((row) => row.subject_ref);
+}
+
+async function getTelemetryRetentionSignal(
+  db: D1Database,
+  now: Date,
+  intervalDays: 1 | 7 | 30,
+): Promise<TelemetryUsageRetentionSignal> {
+  const cohortDateUtc = toUtcDateString(addUtcDays(startOfUtcDate(now), -intervalDays));
+  const returnDateUtc = toUtcDateString(now);
+  const row = await db
+    .prepare(
+      `WITH first_active AS (
+         SELECT subject_ref, MIN(active_date_utc) AS first_active_date_utc
+           FROM telemetry_active_days
+          GROUP BY subject_ref
+       )
+       SELECT
+         COUNT(first_active.subject_ref) AS eligible_users,
+         COUNT(return_day.subject_ref) AS retained_users
+       FROM first_active
+       LEFT JOIN telemetry_active_days AS return_day
+         ON return_day.subject_ref = first_active.subject_ref
+        AND return_day.active_date_utc = ?
+       WHERE first_active.first_active_date_utc = ?`,
+    )
+    .bind(returnDateUtc, cohortDateUtc)
+    .first<{ eligible_users: number; retained_users: number }>();
+  const eligibleUsers = Number(row?.eligible_users ?? 0);
+  const retainedUsers = Number(row?.retained_users ?? 0);
+
+  return {
+    cohort_date_utc: cohortDateUtc,
+    eligible_users: eligibleUsers,
+    retained_users: retainedUsers,
+    retention_pct: eligibleUsers === 0 ? null : Math.round((retainedUsers / eligibleUsers) * 100),
+  };
+}
+
+function startOfUtcDate(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function addUtcDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60_000);
+}
+
+function toUtcDateString(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
 function toHex(buffer: ArrayBuffer): string {
