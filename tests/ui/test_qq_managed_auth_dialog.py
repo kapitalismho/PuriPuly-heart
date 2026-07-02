@@ -68,6 +68,10 @@ def _body_column(dialog: QqManagedAuthDialog):
     return dialog._dialog_result.body_column
 
 
+def _modal_content(page: DummyPage):
+    return page.dialog.content
+
+
 def test_qq_managed_auth_dialog_declares_initial_and_waiting_action_labels() -> None:
     page = DummyPage()
     dialog = _dialog(page)
@@ -96,6 +100,9 @@ def test_qq_managed_auth_dialog_renders_initial_fields_and_actions(
     assert dialog._close_button is not None
     assert dialog._submit_button is not None
     assert dialog._actions is not None
+    modal_content = _modal_content(page)
+    assert modal_content.width == 720
+    assert modal_content.height is None
     assert [button.text for button in dialog._actions.controls] == [
         t("qq_auth.close"),
         t("qq_auth.submit"),

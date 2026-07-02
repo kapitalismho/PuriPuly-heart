@@ -269,6 +269,7 @@ class TranslatorApp:
             on_founder_letter=self._preview_founder_letter,
             on_pkce_failure=self._preview_pkce_failure,
             on_discord_auth=self._preview_discord_auth,
+            on_qq_auth=self._preview_qq_auth,
             on_discord_callback_page=self._preview_discord_callback_page,
             on_peer_translation_eula=self._preview_peer_translation_eula,
             on_local_qwen_hallucination_modal=self._preview_local_qwen_hallucination_modal,
@@ -459,6 +460,9 @@ class TranslatorApp:
 
     def _preview_discord_auth(self) -> None:
         self.show_discord_managed_auth_dialog(preview=True)
+
+    def _preview_qq_auth(self) -> None:
+        self.show_qq_managed_auth_dialog(preview=True)
 
     def _preview_discord_callback_page(self) -> None:
         webbrowser.open(_write_discord_callback_preview_page(get_locale()))
@@ -1040,14 +1044,6 @@ class TranslatorApp:
                 await self.controller.apply_providers()
             else:
                 await self.controller.apply_providers(pending_settings)
-
-            # Check if China mode needs QQ auth
-            if (
-                self._is_managed_china_connection()
-                and not self._managed_openrouter_local_key_available()
-            ):
-                logger.info("[QQAuth] Settings apply: China mode without QQ key, showing dialog")
-                self.show_qq_managed_auth_dialog(preview=False)
 
         self._queue_settings_mutation_task(_task)
 

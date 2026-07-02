@@ -437,6 +437,7 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_founder_letter",
         "on_pkce_failure",
         "on_discord_auth",
+        "on_qq_auth",
         "on_discord_callback_page",
         "on_peer_translation_eula",
         "on_local_qwen_hallucination_modal",
@@ -474,6 +475,17 @@ def test_translator_app_mounts_debug_preview_when_enabled(
     )
     discord_callback()
     assert preview_calls == [True]
+    qq_preview_calls: list[bool] = []
+    monkeypatch.setattr(
+        app,
+        "show_qq_managed_auth_dialog",
+        lambda *, preview=False: qq_preview_calls.append(preview),
+    )
+    qq_callback = seen["callbacks"]["on_qq_auth"]
+    assert getattr(qq_callback, "__self__", None) is app
+    assert getattr(qq_callback, "__func__", None) is TranslatorApp._preview_qq_auth
+    qq_callback()
+    assert qq_preview_calls == [True]
     root = page.added[0]
     assert isinstance(root.content, ft.Stack)
     assert root.content.controls[-1] is app.debug_preview_panel
@@ -3432,7 +3444,7 @@ async def test_submit_toggle_and_settings_wrappers_schedule_controller_tasks() -
 
 
 @pytest.mark.asyncio
-async def test_providers_changed_managed_china_uses_normalized_key_gate_for_qq_prompt() -> None:
+async def test_providers_changed_managed_china_does_not_prompt_for_qq_auth() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
     app.view_settings = SimpleNamespace(has_provider_changes=False)
@@ -3449,7 +3461,7 @@ async def test_providers_changed_managed_china_uses_normalized_key_gate_for_qq_p
         _is_managed_china_connection=lambda: True,
         _managed_openrouter_local_key_available=lambda: False,
         _managed_qq_key_available=lambda: pytest.fail(
-            "settings apply should use normalized managed key resolution"
+            "settings apply should not evaluate QQ key availability"
         ),
     )
     app.show_qq_managed_auth_dialog = lambda preview=False: prompts.append(preview)
@@ -3458,7 +3470,7 @@ async def test_providers_changed_managed_china_uses_normalized_key_gate_for_qq_p
 
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
-    assert prompts == [False]
+    assert prompts == []
 
 
 @pytest.mark.asyncio

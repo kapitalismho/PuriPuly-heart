@@ -824,6 +824,7 @@ def test_debug_preview_panel_includes_github_star_snackbar_action() -> None:
         on_founder_letter=noop,
         on_pkce_failure=noop,
         on_discord_auth=noop,
+        on_qq_auth=noop,
         on_discord_callback_page=noop,
         on_peer_translation_eula=noop,
         on_local_qwen_hallucination_modal=noop,
