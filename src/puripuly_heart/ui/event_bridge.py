@@ -147,6 +147,16 @@ class UIEventBridge:
         with contextlib.suppress(Exception):
             scheduler()
 
+    def _schedule_translation_success_telemetry(self, translation: Translation) -> None:
+        if not translation.text.strip():
+            return
+        controller = getattr(self.app, "controller", None)
+        scheduler = getattr(controller, "schedule_translation_success_telemetry", None)
+        if not callable(scheduler):
+            return
+        with contextlib.suppress(Exception):
+            scheduler()
+
     def report_overlay_state(
         self,
         state: str,
@@ -267,6 +277,7 @@ class UIEventBridge:
             if add_history is not None:
                 add_history(source, translation.text, translated=True, language_code=target_lang)
             self._schedule_github_star_prompt_translation_success(translation)
+            self._schedule_translation_success_telemetry(translation)
             return
 
         if event.type == UIEventType.OSC_SENT:

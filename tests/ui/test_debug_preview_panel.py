@@ -138,6 +138,13 @@ def test_debug_preview_panel_invokes_each_callback_without_auto_collapsing() -> 
     assert panel._popover.visible is True
 
 
+def test_debug_preview_panel_has_no_telemetry_broker_send_action() -> None:
+    panel = DebugPreviewPanel(**_callbacks([]))
+
+    assert "telemetry" not in panel._action_buttons
+    assert "translation_success_day" not in panel._action_buttons
+
+
 def test_debug_preview_panel_apply_locale_refreshes_labels(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

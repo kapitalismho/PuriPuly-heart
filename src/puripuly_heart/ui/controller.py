@@ -129,6 +129,7 @@ from puripuly_heart.core.stt.controller import (
     ManagedSTTProvider,
 )
 from puripuly_heart.core.stt.custom_vocab import get_effective_custom_terms
+from puripuly_heart.core.telemetry import TranslationSuccessTelemetryService
 from puripuly_heart.core.vad.bundled import SILERO_VAD_VERSION, ensure_silero_vad_onnx
 from puripuly_heart.core.vad.gating import VadGating, create_peer_vad_gating
 from puripuly_heart.core.vad.silero import SileroVadOnnx
@@ -513,6 +514,16 @@ class GuiController:
         default=None,
         repr=False,
     )
+    _telemetry_translation_success_task: asyncio.Task[bool] | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _translation_success_telemetry_service: TranslationSuccessTelemetryService | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _github_star_prompt_persistence_lock: asyncio.Lock | None = field(
         init=False,
         default=None,
@@ -647,6 +658,10 @@ class GuiController:
             runtime_logging.attach_realtime_sink(logs_view)
 
         await self._init_pipeline()
+        self._translation_success_telemetry_service = TranslationSuccessTelemetryService(
+            read_settings=lambda: self.settings,
+            persist_settings=self._persist_telemetry_settings,
+        )
         self._refresh_local_stt_runtime_state()
 
         assert self.hub is not None
@@ -1574,6 +1589,65 @@ class GuiController:
         await asyncio.gather(task, return_exceptions=True)
         if self._github_star_prompt_translation_success_task is task:
             self._github_star_prompt_translation_success_task = None
+
+    async def _persist_telemetry_settings(self, settings: AppSettings) -> None:
+        await asyncio.to_thread(save_settings, self.config_path, settings)
+
+    async def record_translation_success_for_telemetry(self) -> bool:
+        service = self._translation_success_telemetry_service
+        if service is None:
+            return False
+        return await service.record_translation_success()
+
+    async def _run_translation_success_telemetry_task(self) -> bool:
+        try:
+            return await self.record_translation_success_for_telemetry()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self.log_basic(
+                f"[Telemetry] Translation success-day delivery skipped: {exc}",
+                level=logging.INFO,
+            )
+            return False
+
+    def schedule_translation_success_telemetry(self) -> bool:
+        service = self._translation_success_telemetry_service
+        if service is None:
+            return False
+        existing_task = self._telemetry_translation_success_task
+        if existing_task is not None and not existing_task.done():
+            return False
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return False
+
+        task = loop.create_task(self._run_translation_success_telemetry_task())
+        self._telemetry_translation_success_task = task
+
+        def _clear_completed_task(completed_task: asyncio.Task[bool]) -> None:
+            if self._telemetry_translation_success_task is completed_task:
+                self._telemetry_translation_success_task = None
+
+        task.add_done_callback(_clear_completed_task)
+        return True
+
+    async def _cancel_telemetry_translation_success_task(self) -> None:
+        task = self._telemetry_translation_success_task
+        self._telemetry_translation_success_task = None
+        if task is not None and not task.done():
+            task.cancel()
+        if task is not None:
+            await asyncio.gather(task, return_exceptions=True)
+
+    async def _close_translation_success_telemetry_service(self) -> None:
+        await self._cancel_telemetry_translation_success_task()
+        service = self._translation_success_telemetry_service
+        self._translation_success_telemetry_service = None
+        if service is not None:
+            with contextlib.suppress(Exception):
+                await service.close()
 
     async def _preserve_github_star_prompt_observation_before_settings_replace(
         self,
@@ -2783,6 +2857,7 @@ class GuiController:
 
     async def stop(self) -> None:
         await self._drain_github_star_prompt_translation_success_task()
+        await self._close_translation_success_telemetry_service()
         await self._stop_clipboard_watcher()
         await self._cancel_local_stt_download()
         await self.stop_microphone_test()
