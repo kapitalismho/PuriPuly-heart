@@ -1103,7 +1103,7 @@ def test_to_dict_roundtrips_deepseek_managed_china_provider_routing(tmp_path) ->
     )
 
 
-def test_app_settings_defaults_to_managed_openrouter_gemma_with_deepseek_fallback() -> None:
+def test_app_settings_defaults_to_managed_openrouter_gemma_without_legacy_fallback() -> None:
     settings = AppSettings()
 
     assert settings.translation.model == TranslationModel.GEMMA4
@@ -1112,10 +1112,7 @@ def test_app_settings_defaults_to_managed_openrouter_gemma_with_deepseek_fallbac
     assert settings.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
     assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
     assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
-    assert (
-        settings.openrouter.fallback_selection_alias
-        == OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH
-    )
+    assert settings.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
 
 
 def test_app_settings_accepts_deepseek_llm_provider_defaults() -> None:

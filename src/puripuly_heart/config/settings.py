@@ -921,7 +921,7 @@ class OpenRouterSettings:
     selected_source: OpenRouterCredentialSource = OpenRouterCredentialSource.MANAGED
     selection_alias: OpenRouterSelectionAlias | None = None
     fallback_selection_alias: OpenRouterFallbackSelectionAlias = (
-        OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH
+        OpenRouterFallbackSelectionAlias.NONE
     )
     broker_base_url: str = DEFAULT_OPENROUTER_BROKER_BASE_URL
 
@@ -2100,6 +2100,7 @@ def _derive_translation_settings_from_runtime_values(
     qwen_model: QwenLLMModel,
     deepseek_model: DeepSeekLLMModel,
     cerebras_model: CerebrasLLMModel,
+    fallback_selection_alias: object = None,
     history: object = None,
 ) -> TranslationSettings:
     normalized_history = _parse_translation_connection_history(history)
@@ -2113,6 +2114,7 @@ def _derive_translation_settings_from_runtime_values(
                     model=TranslationModel.GEMMA4,
                     provider_routing=openrouter_provider_routing,
                 ),
+                fallback_selection_alias=fallback_selection_alias,
                 history=normalized_history,
             )
         if openrouter_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH:
@@ -2123,6 +2125,7 @@ def _derive_translation_settings_from_runtime_values(
                     model=TranslationModel.DEEPSEEK_V4_FLASH,
                     provider_routing=openrouter_provider_routing,
                 ),
+                fallback_selection_alias=fallback_selection_alias,
                 history=normalized_history,
             )
         if openrouter_model == OpenRouterLLMModel.GEMINI_3_FLASH:
@@ -2133,6 +2136,7 @@ def _derive_translation_settings_from_runtime_values(
                     model=TranslationModel.GEMINI_3_FLASH,
                     provider_routing=openrouter_provider_routing,
                 ),
+                fallback_selection_alias=fallback_selection_alias,
                 history=normalized_history,
             )
         if openrouter_model == OpenRouterLLMModel.GEMINI_31_FLASH_LITE:
@@ -2143,6 +2147,7 @@ def _derive_translation_settings_from_runtime_values(
                     model=TranslationModel.GEMINI_31_FLASH_LITE,
                     provider_routing=openrouter_provider_routing,
                 ),
+                fallback_selection_alias=fallback_selection_alias,
                 history=normalized_history,
             )
     if openrouter_model == OpenRouterLLMModel.QWEN_35_FLASH_02_23:
@@ -2152,6 +2157,7 @@ def _derive_translation_settings_from_runtime_values(
                 TranslationModel.DEEPSEEK_V4_FLASH,
                 normalized_history,
             ),
+            fallback_selection_alias=fallback_selection_alias,
             history=normalized_history,
         )
 
@@ -2159,6 +2165,7 @@ def _derive_translation_settings_from_runtime_values(
         return _normalize_translation_settings(
             model=TranslationModel.LOCAL_LLM,
             connection=TranslationConnection.OLLAMA,
+            fallback_selection_alias=fallback_selection_alias,
             history=normalized_history,
         )
 
@@ -2166,6 +2173,7 @@ def _derive_translation_settings_from_runtime_values(
         return _normalize_translation_settings(
             model=TranslationModel.GEMMA4_31B_CEREBRAS,
             connection=TranslationConnection.OFFICIAL_BYOK,
+            fallback_selection_alias=fallback_selection_alias,
             history=normalized_history,
         )
 
@@ -2174,11 +2182,13 @@ def _derive_translation_settings_from_runtime_values(
             return _normalize_translation_settings(
                 model=TranslationModel.DEEPSEEK_V4_PRO,
                 connection=TranslationConnection.OFFICIAL_BYOK,
+                fallback_selection_alias=fallback_selection_alias,
                 history=normalized_history,
             )
         return _normalize_translation_settings(
             model=TranslationModel.DEEPSEEK_V4_FLASH,
             connection=TranslationConnection.OFFICIAL_BYOK,
+            fallback_selection_alias=fallback_selection_alias,
             history=normalized_history,
         )
 
@@ -2190,11 +2200,13 @@ def _derive_translation_settings_from_runtime_values(
                     TranslationModel.DEEPSEEK_V4_FLASH,
                     normalized_history,
                 ),
+                fallback_selection_alias=fallback_selection_alias,
                 history=normalized_history,
             )
         return _normalize_translation_settings(
             model=TranslationModel.QWEN_35_PLUS,
             connection=TranslationConnection.OFFICIAL_BYOK,
+            fallback_selection_alias=fallback_selection_alias,
             history=normalized_history,
         )
 
@@ -2202,11 +2214,13 @@ def _derive_translation_settings_from_runtime_values(
         return _normalize_translation_settings(
             model=TranslationModel.GEMINI_3_FLASH,
             connection=TranslationConnection.OFFICIAL_BYOK,
+            fallback_selection_alias=fallback_selection_alias,
             history=normalized_history,
         )
     return _normalize_translation_settings(
         model=TranslationModel.GEMINI_31_FLASH_LITE,
         connection=TranslationConnection.OFFICIAL_BYOK,
+        fallback_selection_alias=fallback_selection_alias,
         history=normalized_history,
     )
 
@@ -2224,6 +2238,7 @@ def _derive_translation_settings_from_runtime(
         qwen_model=settings.qwen.llm_model,
         deepseek_model=settings.deepseek.llm_model,
         cerebras_model=settings.cerebras.llm_model,
+        fallback_selection_alias=settings.translation.fallback_selection_alias,
         history=history,
     )
 
@@ -2635,7 +2650,7 @@ def _apply_china_managed_first_run_defaults(settings: AppSettings) -> None:
         settings.openrouter,
         selection_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED,
         provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY,
-        fallback_selection_alias=OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH_CHINA,
+        fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
     )
     settings.translation = _derive_translation_settings_from_runtime_values(
         provider_llm=settings.provider.llm,
@@ -2646,6 +2661,7 @@ def _apply_china_managed_first_run_defaults(settings: AppSettings) -> None:
         qwen_model=settings.qwen.llm_model,
         deepseek_model=settings.deepseek.llm_model,
         cerebras_model=settings.cerebras.llm_model,
+        fallback_selection_alias=TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B,
         history=settings.translation.connection_history,
     )
 
@@ -2654,6 +2670,10 @@ def new_settings_for_first_run(system_locale: str | None = None) -> AppSettings:
     if system_locale is None:
         system_locale = detect_system_locale()
     settings = AppSettings()
+    settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
+    settings.translation.fallback_selection_alias = (
+        TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH
+    )
     settings.ui.locale = resolve_first_run_ui_locale(system_locale)
     if _is_china_first_run_locale(system_locale):
         _apply_china_managed_first_run_defaults(settings)

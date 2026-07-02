@@ -16,6 +16,7 @@ from puripuly_heart.config.settings import (
     OpenRouterSelectionAlias,
     STTProviderName,
     TranslationConnection,
+    TranslationFallbackSelectionAlias,
     TranslationModel,
     from_dict,
     load_settings,
@@ -137,6 +138,11 @@ def test_first_run_settings_preserve_provider_defaults() -> None:
     assert settings.provider.stt == STTProviderName.LOCAL_QWEN
     assert settings.provider.llm == LLMProviderName.OPENROUTER
     assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
+    assert settings.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
+    assert (
+        settings.translation.fallback_selection_alias
+        == TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B
+    )
 
 
 def test_first_run_settings_roundtrip_through_dict_serialization() -> None:
@@ -189,6 +195,11 @@ def test_main_first_run_uses_detected_system_locale(
     assert loaded.translation.connection == TranslationConnection.MANAGED_CHINA
     assert loaded.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
     assert loaded.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
+    assert loaded.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
+    assert (
+        loaded.translation.fallback_selection_alias
+        == TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B
+    )
     assert not path.exists()
 
 
@@ -219,9 +230,10 @@ def test_first_run_china_locale_selects_managed_china_defaults(
     assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
     assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
     assert settings.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert settings.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
     assert (
-        settings.openrouter.fallback_selection_alias
-        == OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH_CHINA
+        settings.translation.fallback_selection_alias
+        == TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B
     )
     assert (
         settings.translation.connection_history.get(TranslationModel.DEEPSEEK_V4_FLASH.value)
@@ -240,6 +252,11 @@ def test_first_run_non_china_locale_preserves_default_managed_connection(
     assert settings.openrouter.provider_routing == OpenRouterProviderRouting.DEFAULT
     assert settings.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
     assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
+    assert settings.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
+    assert (
+        settings.translation.fallback_selection_alias
+        == TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH
+    )
 
 
 def test_first_run_china_locale_managed_china_roundtrip_through_dict() -> None:
@@ -253,9 +270,10 @@ def test_first_run_china_locale_managed_china_roundtrip_through_dict() -> None:
     assert restored.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
     assert restored.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
     assert restored.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
+    assert restored.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
     assert (
-        restored.openrouter.fallback_selection_alias
-        == OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH_CHINA
+        restored.translation.fallback_selection_alias
+        == TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B
     )
 
 
@@ -273,6 +291,11 @@ def test_first_run_china_locale_saved_and_loaded_preserves_managed_china(
     assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
     assert loaded.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
     assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
+    assert loaded.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
+    assert (
+        loaded.translation.fallback_selection_alias
+        == TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B
+    )
 
 
 def test_first_run_china_locale_controller_persists_managed_china(
@@ -292,7 +315,15 @@ def test_first_run_china_locale_controller_persists_managed_china(
     assert persisted["ui"]["locale"] == "zh-CN"
     assert persisted["translation"]["connection"] == TranslationConnection.MANAGED_CHINA.value
     assert (
+        persisted["translation"]["fallback_selection_alias"]
+        == TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B.value
+    )
+    assert (
         persisted["openrouter"]["provider_routing"] == OpenRouterProviderRouting.DEEPSEEK_ONLY.value
+    )
+    assert (
+        persisted["openrouter"]["fallback_selection_alias"]
+        == OpenRouterFallbackSelectionAlias.NONE.value
     )
 
 
