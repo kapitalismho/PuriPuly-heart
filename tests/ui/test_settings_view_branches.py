@@ -3278,13 +3278,19 @@ def test_llm_modal_lists_logical_translation_models_once(
     assert [option.value for option in options] == [
         TranslationModel.GEMMA4.value,
         TranslationModel.DEEPSEEK_V4_FLASH.value,
+        TranslationModel.GEMMA4_31B_CEREBRAS.value,
+        TranslationModel.LOCAL_LLM.value,
         TranslationModel.DEEPSEEK_V4_PRO.value,
         TranslationModel.GEMINI_3_FLASH.value,
         TranslationModel.GEMINI_31_FLASH_LITE.value,
         TranslationModel.QWEN_35_PLUS.value,
-        TranslationModel.LOCAL_LLM.value,
-        TranslationModel.GEMMA4_31B_CEREBRAS.value,
     ]
+    recommended_section = t("settings.translation_model.section.recommended")
+    others_section = t("settings.translation_model.section.others")
+    assert option_by_value[TranslationModel.GEMMA4.value].section == recommended_section
+    assert option_by_value[TranslationModel.DEEPSEEK_V4_FLASH.value].section == recommended_section
+    assert option_by_value[TranslationModel.GEMMA4_31B_CEREBRAS.value].section == others_section
+    assert option_by_value[TranslationModel.LOCAL_LLM.value].section == others_section
     assert captured["current"] == TranslationModel.GEMINI_3_FLASH.value
     assert OpenRouterSelectionAlias.GEMMA4_MANAGED.value not in option_by_value
     assert OpenRouterSelectionAlias.GEMMA4_BYOK.value not in option_by_value

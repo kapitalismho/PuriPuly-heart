@@ -3167,22 +3167,26 @@ class SettingsView(ft.Column):
         """Open LLM provider selection modal."""
         if not self.page:
             return
+        recommended_section = t("settings.translation_model.section.recommended")
+        others_section = t("settings.translation_model.section.others")
+        model_sections = (
+            (TranslationModel.GEMMA4, recommended_section),
+            (TranslationModel.DEEPSEEK_V4_FLASH, recommended_section),
+            (TranslationModel.GEMMA4_31B_CEREBRAS, others_section),
+            (TranslationModel.LOCAL_LLM, others_section),
+            (TranslationModel.DEEPSEEK_V4_PRO, others_section),
+            (TranslationModel.GEMINI_3_FLASH, others_section),
+            (TranslationModel.GEMINI_31_FLASH_LITE, others_section),
+            (TranslationModel.QWEN_35_PLUS, others_section),
+        )
         options = [
             OptionItem(
                 value=model.value,
                 label=self._translation_model_display_label(model),
                 description=t(f"settings.translation_model.{model.value}.description", default=""),
+                section=section,
             )
-            for model in (
-                TranslationModel.GEMMA4,
-                TranslationModel.DEEPSEEK_V4_FLASH,
-                TranslationModel.DEEPSEEK_V4_PRO,
-                TranslationModel.GEMINI_3_FLASH,
-                TranslationModel.GEMINI_31_FLASH_LITE,
-                TranslationModel.QWEN_35_PLUS,
-                TranslationModel.LOCAL_LLM,
-                TranslationModel.GEMMA4_31B_CEREBRAS,
-            )
+            for model, section in model_sections
         ]
         display_settings = self._build_settings_with_provider_draft()
         current = (

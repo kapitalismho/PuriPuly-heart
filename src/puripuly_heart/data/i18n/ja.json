@@ -82,6 +82,8 @@
   "settings.translation_model.qwen35_plus.description": "DeepSeekの良い代替手段です",
   "settings.translation_model.local_llm.description": "OpenAI互換APIを使用できます",
   "settings.translation_model.gemma4_31b_cerebras.description": "とてもとても速いです とても高いです",
+  "settings.translation_model.section.recommended": "おすすめ",
+  "settings.translation_model.section.others": "その他",
   "settings.local_llm.connection": "OpenAI互換LLMサーバー",
   "settings.local_llm.base_url": "Base URL",
   "settings.local_llm.base_url.invalid": "ユーザー名、パスワード、クエリ、フラグメントを含まない有効な http:// または https:// URLを入力してください。",

@@ -82,6 +82,8 @@
   "settings.translation_model.qwen35_plus.description": "A strong alternative to DeepSeek",
   "settings.translation_model.local_llm.description": "You can use an OpenAI-compatible API",
   "settings.translation_model.gemma4_31b_cerebras.description": "Very very fast Very expensive",
+  "settings.translation_model.section.recommended": "Recommended",
+  "settings.translation_model.section.others": "Others",
   "settings.local_llm.connection": "OpenAI-compatible LLM server",
   "settings.local_llm.base_url": "Base URL",
   "settings.local_llm.base_url.invalid": "Enter a valid http:// or https:// URL without username, password, query, or fragment.",
