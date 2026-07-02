@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "puripuly-heart"
-version = "2.1.2"
+version = "2.2.0"
 description = "LLM-based real-time translator for VRChat"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
