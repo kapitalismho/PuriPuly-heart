@@ -288,6 +288,7 @@
   "debug_preview.capture_fault_snackbar": "キャプチャ障害: {profile}",
   "debug_preview.stt_fault_snackbar": "STT障害: {profile}",
   "debug_preview.local_qwen_hallucination_modal": "Local Qwen 警告",
+  "debug_preview.telemetry_consent_modal": "テレメトリー同意",
   "local_qwen_hallucination.body": "ローカル音声認識モデルが現在動作していません。\nクラウド音声認識サービスに切り替えてください。\n\nサービスは Deepgram をおすすめします。ウェルカムクレジットで無料で利用できます。\nGitHub のガイドを見て、設定手順に従ってください。",
   "local_qwen_hallucination.open_guide": "ガイドを開く",
   "local_qwen_hallucination.close": "閉じる",

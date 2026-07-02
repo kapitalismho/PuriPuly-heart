@@ -20,6 +20,7 @@ from puripuly_heart.config.settings import (
     OpenRouterSelectionAlias,
     ProviderSettings,
     STTProviderName,
+    TelemetryConsent,
     TranslationConnection,
     TranslationModel,
     TranslationSettings,
@@ -441,6 +442,7 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_discord_callback_page",
         "on_peer_translation_eula",
         "on_local_qwen_hallucination_modal",
+        "on_telemetry_consent_modal",
         "on_talk_together_pass_invite_progress",
         "on_capture_fault_cycle",
         "on_stt_fault_cycle",
@@ -546,6 +548,58 @@ def test_debug_preview_local_qwen_modal_opens_production_dialog_without_state_or
     assert app._local_qwen_hallucination_dialog.__class__ is FakeLocalQwenHallucinationDialog
     assert app.controller._local_qwen_hallucination_detection_count == 1
     assert app.controller._local_qwen_hallucination_modal_shown is False
+    assert app.page.tasks == []
+
+
+def test_debug_preview_telemetry_consent_modal_opens_without_state_or_side_effects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    settings = AppSettings()
+    settings.telemetry.consent = TelemetryConsent.UNKNOWN
+    settings.telemetry.identifier = None
+    app.controller = SimpleNamespace(
+        settings=settings,
+        apply_settings=lambda *_args, **_kwargs: pytest.fail(
+            "debug modal preview must not apply settings"
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    class FakeTelemetryConsentDialog:
+        def __init__(self, page, *, on_allow, on_decline):
+            captured["page"] = page
+            captured["on_allow"] = on_allow
+            captured["on_decline"] = on_decline
+
+        def open(self) -> None:
+            captured["opened"] = True
+
+    monkeypatch.setattr(
+        app_module,
+        "TelemetryConsentDialog",
+        FakeTelemetryConsentDialog,
+    )
+    monkeypatch.setattr(
+        app_module,
+        "save_settings",
+        lambda *_args, **_kwargs: pytest.fail("debug modal preview must not save settings"),
+    )
+
+    app._preview_telemetry_consent_modal()
+
+    assert captured["page"] is app.page
+    assert captured["opened"] is True
+    assert app._telemetry_consent_dialog.__class__ is FakeTelemetryConsentDialog
+
+    captured["on_allow"]()
+    assert settings.telemetry.consent == TelemetryConsent.UNKNOWN
+    assert settings.telemetry.identifier is None
+
+    captured["on_decline"]()
+    assert settings.telemetry.consent == TelemetryConsent.UNKNOWN
+    assert settings.telemetry.identifier is None
     assert app.page.tasks == []
 
 

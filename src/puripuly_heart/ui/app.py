@@ -276,6 +276,7 @@ class TranslatorApp:
             on_discord_callback_page=self._preview_discord_callback_page,
             on_peer_translation_eula=self._preview_peer_translation_eula,
             on_local_qwen_hallucination_modal=self._preview_local_qwen_hallucination_modal,
+            on_telemetry_consent_modal=self._preview_telemetry_consent_modal,
             on_talk_together_pass_invite_progress=(
                 self._preview_talk_together_pass_invite_progress
             ),
@@ -475,6 +476,15 @@ class TranslatorApp:
 
     def _preview_local_qwen_hallucination_modal(self) -> None:
         self.show_local_qwen_hallucination_dialog()
+
+    def _preview_telemetry_consent_modal(self) -> None:
+        dialog = TelemetryConsentDialog(
+            self.page,
+            on_allow=self._debug_preview_noop,
+            on_decline=self._debug_preview_noop,
+        )
+        self._telemetry_consent_dialog = dialog
+        dialog.open()
 
     def _preview_talk_together_pass_invite_progress(self) -> None:
         set_managed_key_state = getattr(self.view_settings, "set_managed_key_state", None)

@@ -828,6 +828,7 @@ def test_debug_preview_panel_includes_github_star_snackbar_action() -> None:
         on_discord_callback_page=noop,
         on_peer_translation_eula=noop,
         on_local_qwen_hallucination_modal=noop,
+        on_telemetry_consent_modal=noop,
         on_talk_together_pass_invite_progress=noop,
         on_capture_fault_cycle=noop,
         on_stt_fault_cycle=noop,

@@ -288,6 +288,7 @@
     "debug_preview.capture_fault_snackbar": "采集故障：{profile}",
     "debug_preview.stt_fault_snackbar": "STT 故障：{profile}",
     "debug_preview.local_qwen_hallucination_modal": "Local Qwen 警告",
+    "debug_preview.telemetry_consent_modal": "遥测同意",
     "local_qwen_hallucination.body": "本地语音识别模型现在无法正常工作。\n请切换到云端语音识别服务。\n\n推荐使用 Qwen ASR (Cloud)。\n请查看 GitHub 指南，并按照设置步骤操作。",
     "local_qwen_hallucination.open_guide": "打开指南",
     "local_qwen_hallucination.close": "关闭",

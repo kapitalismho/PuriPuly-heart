@@ -288,6 +288,7 @@
   "debug_preview.capture_fault_snackbar": "Capture fault: {profile}",
   "debug_preview.stt_fault_snackbar": "STT fault: {profile}",
   "debug_preview.local_qwen_hallucination_modal": "Local Qwen warning",
+  "debug_preview.telemetry_consent_modal": "Telemetry consent",
   "local_qwen_hallucination.body": "The local speech recognition model isn't working right now.\nPlease switch to a cloud speech recognition service.\n\nWe recommend Deepgram. You can use it for free with welcome credits.\nOpen the GitHub guide and follow the setup instructions.",
   "local_qwen_hallucination.open_guide": "Open guide",
   "local_qwen_hallucination.close": "Close",

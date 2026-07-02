@@ -54,6 +54,7 @@ class DebugPreviewPanel(ft.Container):
         on_discord_callback_page: Callable[[], None],
         on_peer_translation_eula: Callable[[], None],
         on_local_qwen_hallucination_modal: Callable[[], None],
+        on_telemetry_consent_modal: Callable[[], None],
         on_talk_together_pass_invite_progress: Callable[[], None],
         on_capture_fault_cycle: Callable[[], None],
         on_stt_fault_cycle: Callable[[], None],
@@ -86,6 +87,11 @@ class DebugPreviewPanel(ft.Container):
                 "local_qwen_hallucination_modal",
                 "debug_preview.local_qwen_hallucination_modal",
                 on_local_qwen_hallucination_modal,
+            ),
+            _PreviewAction(
+                "telemetry_consent_modal",
+                "debug_preview.telemetry_consent_modal",
+                on_telemetry_consent_modal,
             ),
             _PreviewAction(
                 "talk_together_pass_invite_progress",

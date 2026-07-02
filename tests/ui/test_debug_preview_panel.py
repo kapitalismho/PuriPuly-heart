@@ -29,6 +29,7 @@ DEBUG_PREVIEW_I18N_KEYS = {
     "debug_preview.discord_callback_page",
     "debug_preview.peer_translation_eula",
     "debug_preview.local_qwen_hallucination_modal",
+    "debug_preview.telemetry_consent_modal",
     "debug_preview.talk_together_pass_invite_progress",
     "debug_preview.capture_fault_cycle",
     "debug_preview.stt_fault_cycle",
@@ -52,6 +53,7 @@ ACTION_KEYS = [
     "discord_callback_page",
     "peer_translation_eula",
     "local_qwen_hallucination_modal",
+    "telemetry_consent_modal",
     "talk_together_pass_invite_progress",
     "capture_fault_cycle",
     "stt_fault_cycle",
@@ -71,6 +73,7 @@ def _callbacks(seen: list[str]):
         "on_discord_callback_page": lambda: seen.append("discord_callback_page"),
         "on_peer_translation_eula": lambda: seen.append("peer_translation_eula"),
         "on_local_qwen_hallucination_modal": lambda: seen.append("local_qwen_hallucination_modal"),
+        "on_telemetry_consent_modal": lambda: seen.append("telemetry_consent_modal"),
         "on_talk_together_pass_invite_progress": lambda: seen.append(
             "talk_together_pass_invite_progress"
         ),
@@ -208,6 +211,7 @@ def test_debug_preview_panel_uses_text_button_label_api_when_available(
         "Discord callback page",
         "Peer translation EULA",
         "Local Qwen warning",
+        "Telemetry consent",
         "Invite 1/5",
         "Cycle capture fault",
         "Cycle STT fault",
@@ -232,6 +236,10 @@ def test_debug_preview_panel_uses_text_button_label_api_when_available(
     assert (
         panel._action_buttons["local_qwen_hallucination_modal"].text
         == "label:debug_preview.local_qwen_hallucination_modal"
+    )
+    assert (
+        panel._action_buttons["telemetry_consent_modal"].text
+        == "label:debug_preview.telemetry_consent_modal"
     )
     assert (
         panel._action_buttons["talk_together_pass_invite_progress"].text
