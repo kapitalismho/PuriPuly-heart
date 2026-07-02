@@ -226,6 +226,95 @@ def test_clipboard_source_and_setting_keys_are_localized() -> None:
         i18n_module.set_locale(previous_locale)
 
 
+def test_telemetry_consent_and_settings_keys_are_localized() -> None:
+    bundles = _load_bundles()
+    required_keys = {
+        "settings.telemetry.title",
+        "settings.telemetry.state_on",
+        "settings.telemetry.state_off",
+        "telemetry.consent.title",
+        "telemetry.consent.body",
+        "telemetry.consent.excludes",
+        "telemetry.consent.allow",
+        "telemetry.consent.decline",
+    }
+
+    for locale, bundle in bundles.items():
+        missing = sorted(required_keys - set(bundle))
+        assert missing == [], locale
+        for key in required_keys:
+            assert bundle[key].strip()
+            assert bundle[key] != key
+    assert bundles["ko"]["settings.telemetry.title"] == "익명 사용 통계 보내기"
+
+
+def test_telemetry_consent_excludes_contract_forbidden_categories() -> None:
+    bundles = _load_bundles()
+    required_terms = {
+        "en": (
+            "audio",
+            "Transcript",
+            "Translation text",
+            "prompts",
+            "Context Memory content",
+            "language pair",
+            "model",
+            "API keys",
+            "account identity",
+            "hardware fingerprint",
+            "output route",
+            "provider payloads",
+        ),
+        "ko": (
+            "오디오",
+            "대화록",
+            "번역문",
+            "프롬프트",
+            "컨텍스트 메모리 내용",
+            "언어쌍",
+            "모델",
+            "API 키",
+            "계정 정보",
+            "하드웨어 지문",
+            "출력 경로",
+            "제공자 응답",
+        ),
+        "zh-CN": (
+            "音频",
+            "转写文本",
+            "翻译文本",
+            "提示词",
+            "上下文记忆内容",
+            "语言对",
+            "模型",
+            "API 密钥",
+            "账号身份",
+            "硬件指纹",
+            "输出路径",
+            "提供商响应",
+        ),
+        "ja": (
+            "音声",
+            "文字起こし",
+            "翻訳文",
+            "プロンプト",
+            "コンテキストメモリの内容",
+            "言語ペア",
+            "モデル",
+            "APIキー",
+            "アカウント情報",
+            "ハードウェア指紋",
+            "出力先",
+            "プロバイダー応答",
+        ),
+    }
+
+    for locale, terms in required_terms.items():
+        copy = bundles[locale]["telemetry.consent.excludes"]
+        missing = [term for term in terms if term not in copy]
+        assert missing == [], locale
+
+
 def test_logs_conversation_keys_are_localized() -> None:
     bundles = _load_bundles()
     required_keys = {

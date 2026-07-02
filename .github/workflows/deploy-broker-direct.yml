@@ -40,6 +40,7 @@ jobs:
           OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION }}
           OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION }}
           QQ_AUTH_HMAC_PSK_PRODUCTION: ${{ secrets.QQ_AUTH_HMAC_PSK_PRODUCTION }}
+          TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION: ${{ secrets.TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION }}
           DISCORD_CLIENT_ID_PRODUCTION: ${{ secrets.DISCORD_CLIENT_ID_PRODUCTION }}
           DISCORD_CLIENT_SECRET_PRODUCTION: ${{ secrets.DISCORD_CLIENT_SECRET_PRODUCTION }}
           DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION: ${{ secrets.DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION }}
@@ -103,6 +104,11 @@ jobs:
 
           if [[ -z "${QQ_AUTH_HMAC_PSK_PRODUCTION//[[:space:]]/}" ]]; then
             echo 'QQ_AUTH_HMAC_PSK_PRODUCTION is required and must not be blank.' >&2
+            exit 1
+          fi
+
+          if [[ -z "${TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION//[[:space:]]/}" ]]; then
+            echo 'TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION is required and must not be blank.' >&2
             exit 1
           fi
 
@@ -432,7 +438,7 @@ jobs:
                   raise SystemExit(f'{label} enforce_zdr must be false')
           PY
 
-      - name: Sync worker secrets for managed issuance, QQ production issuance, and Discord OAuth operations
+      - name: Sync worker secrets for managed issuance, QQ production issuance, telemetry ingest, and Discord OAuth operations
         shell: bash
         working-directory: broker
         env:
@@ -443,6 +449,7 @@ jobs:
           OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION }}
           OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION }}
           QQ_AUTH_HMAC_PSK_PRODUCTION: ${{ secrets.QQ_AUTH_HMAC_PSK_PRODUCTION }}
+          TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION: ${{ secrets.TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION }}
           DISCORD_CLIENT_ID_PRODUCTION: ${{ secrets.DISCORD_CLIENT_ID_PRODUCTION }}
           DISCORD_CLIENT_SECRET_PRODUCTION: ${{ secrets.DISCORD_CLIENT_SECRET_PRODUCTION }}
           DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION: ${{ secrets.DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION }}
@@ -467,6 +474,10 @@ jobs:
           # management key and guardrail id present, the route performs QQ production issuance.
           printf '%s' "$QQ_AUTH_HMAC_PSK_PRODUCTION" \
             | pnpm exec wrangler secret put QQ_AUTH_HMAC_PSK --config "${{ steps.render.outputs.config_path }}"
+          # TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION derives pseudonymous telemetry subject_ref values;
+          # raw telemetry identifiers are not persisted by the worker.
+          printf '%s' "$TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION" \
+            | pnpm exec wrangler secret put TELEMETRY_SUBJECT_HMAC_SECRET --config "${{ steps.render.outputs.config_path }}"
           # Discord OAuth runtime secrets are required for the GUI-managed onboarding flow.
           printf '%s' "$DISCORD_CLIENT_ID_PRODUCTION" \
             | pnpm exec wrangler secret put DISCORD_CLIENT_ID --config "${{ steps.render.outputs.config_path }}"

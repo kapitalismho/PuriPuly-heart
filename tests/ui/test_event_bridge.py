@@ -174,6 +174,7 @@ class DummyApp:
         self.snackbar_calls: list[tuple[str, object]] = []
         self.clear_managed_auth_pending_calls = 0
         self.history: list[tuple[str, str, bool, str | None]] = []
+        self.telemetry_translation_success_calls = 0
         self.overlay_state = "off"
         self.overlay_failure_reason: str | None = None
         self.controller = SimpleNamespace(
@@ -186,11 +187,16 @@ class DummyApp:
             ),
             managed_auth_pending=False,
             clear_managed_auth_pending_state=lambda: self._record_clear_managed_auth_pending(),
+            schedule_translation_success_telemetry=lambda: self._record_telemetry_translation_success(),
         )
 
     def _record_clear_managed_auth_pending(self) -> None:
         self.clear_managed_auth_pending_calls += 1
         self.controller.managed_auth_pending = False
+
+    def _record_telemetry_translation_success(self) -> bool:
+        self.telemetry_translation_success_calls += 1
+        return True
 
     def _show_snackbar(self, message: str, bgcolor, duration: int = 4000) -> None:
         _ = duration
@@ -335,6 +341,31 @@ async def test_event_bridge_routes_translation_and_osc_history_by_language_mode(
     assert ("Mic", "translated", True, "en") in app.history
     assert ("VRChat", "hello", False, "en") in app.history
     assert ("VRChat", "bye", False, "ko") in app.history
+    assert app.telemetry_translation_success_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_event_bridge_schedules_telemetry_from_high_level_translation_success() -> None:
+    app = DummyApp()
+    bridge = UIEventBridge(app=app, event_queue=asyncio.Queue())
+
+    await bridge._handle_event(
+        UIEvent(
+            type=UIEventType.TRANSLATION_DONE,
+            payload=Translation(utterance_id=uuid4(), text="translated"),
+            source="Mic",
+        )
+    )
+    await bridge._handle_event(
+        UIEvent(
+            type=UIEventType.TRANSLATION_DONE,
+            payload=Translation(utterance_id=uuid4(), text="   "),
+            source="Mic",
+        )
+    )
+    await bridge._handle_event(UIEvent(type=UIEventType.ERROR, payload="launch-only"))
+
+    assert app.telemetry_translation_success_calls == 1
 
 
 @pytest.mark.asyncio

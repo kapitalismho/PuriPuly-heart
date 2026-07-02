@@ -689,6 +689,7 @@ describe('broker migration behavior', () => {
         discordOpenrouterIssueInstallation: _discordOpenrouterIssueInstallation,
         pendingDiscordOAuthSessions: _pendingDiscordOAuthSessions,
         qqAuthAssertIp: _qqAuthAssertIp,
+        telemetryTranslationSuccessDayIp: _telemetryTranslationSuccessDayIp,
         referralAttempts: _referralAttempts,
         retention: defaultRetention,
         ...defaultsThrough0003
@@ -703,6 +704,50 @@ describe('broker migration behavior', () => {
         ...defaultsThrough0003,
         retention: retentionThrough0003,
         ...tunedLegacyControls,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds telemetry active-day storage and preserves tuned abuse controls in a forward migration', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, {
+        through: '0010_source_aware_issue_success_events.sql',
+      });
+
+      const rowBefore = db
+        .prepare('SELECT value FROM broker_config WHERE key = ?')
+        .get('abuse_controls') as { value: string };
+      const tunedControls = JSON.parse(rowBefore.value) as typeof TEST_DEFAULT_ABUSE_CONTROLS;
+      tunedControls.trialChallenge.maxRequests = 14;
+      tunedControls.qqAuthAssertIp.maxRequests = 9;
+
+      db.prepare('UPDATE broker_config SET value = ?, updated_at = ? WHERE key = ?').run(
+        JSON.stringify(tunedControls),
+        '2026-07-02T00:00:00.000Z',
+        'abuse_controls',
+      );
+
+      applyBrokerMigrations(db, {
+        after: '0010_source_aware_issue_success_events.sql',
+        through: '0011_add_telemetry_active_days.sql',
+      });
+
+      const table = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get('telemetry_active_days') as { name: string };
+      expect(table.name).toBe('telemetry_active_days');
+
+      const migratedRow = db
+        .prepare('SELECT value FROM broker_config WHERE key = ?')
+        .get('abuse_controls') as { value: string };
+      expect(JSON.parse(migratedRow.value)).toEqual({
+        ...tunedControls,
+        telemetryTranslationSuccessDayIp:
+          TEST_DEFAULT_ABUSE_CONTROLS.telemetryTranslationSuccessDayIp,
       });
     } finally {
       db.close();

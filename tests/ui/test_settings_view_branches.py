@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -29,12 +30,14 @@ from puripuly_heart.config.settings import (
     QwenLLMModel,
     QwenRegion,
     STTProviderName,
+    TelemetryConsent,
     TranslationConnection,
     TranslationModel,
     TranslationSettings,
     to_dict,
 )
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
+from puripuly_heart.ui import app as app_module
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.components import subtab_shell as subtab_shell_module
 from puripuly_heart.ui.components.bottom_nav import BottomNavBar
@@ -539,6 +542,87 @@ def test_clipboard_auto_translate_click_toggles_immediately_without_modal(
         "settings.clipboard_auto_translate.off"
     )
     assert emitted[-1].ui.clipboard_auto_translate_enabled is False
+
+
+def test_general_tab_contains_telemetry_card_in_empty_slot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, _store = _make_settings_view(monkeypatch)
+
+    assert t("settings.telemetry.title") in _general_tab_card_titles(view)
+    telemetry_card = _general_tab_card(view, t("settings.telemetry.title"))
+    assert _card_value_text(telemetry_card) == t("settings.telemetry.state_off")
+
+
+def test_telemetry_card_toggle_routes_through_identifier_lifecycle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, _store = _make_settings_view(monkeypatch)
+    settings = AppSettings()
+    emitted: list[AppSettings] = []
+    view.on_settings_changed = emitted.append
+
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view._on_telemetry_click(None)
+    first_identifier = settings.telemetry.identifier
+
+    assert settings.telemetry.consent == TelemetryConsent.ALLOW
+    assert first_identifier
+    assert view._telemetry_text.content.value == t("settings.telemetry.state_on")
+    assert emitted[-1].telemetry.identifier == first_identifier
+
+    settings.telemetry.sent_utc_dates = ["2026-07-02"]
+    view._on_telemetry_click(None)
+    assert settings.telemetry.consent == TelemetryConsent.DECLINE
+    assert settings.telemetry.identifier is None
+    assert settings.telemetry.sent_utc_dates == []
+    assert view._telemetry_text.content.value == t("settings.telemetry.state_off")
+
+    view._on_telemetry_click(None)
+    assert settings.telemetry.identifier
+    assert settings.telemetry.identifier != first_identifier
+
+
+def test_telemetry_first_run_dialog_requires_explicit_choice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    applied: list[AppSettings] = []
+    opened: list[object] = []
+
+    class FakeTelemetryConsentDialog:
+        def __init__(self, page, *, on_allow, on_decline):
+            self.on_allow = on_allow
+            self.on_decline = on_decline
+
+        def open(self) -> None:
+            opened.append(self)
+
+    async def apply_settings(updated: AppSettings) -> None:
+        applied.append(updated)
+
+    app = app_module.TranslatorApp.__new__(app_module.TranslatorApp)
+    app.page = SimpleNamespace()
+    app.controller = SimpleNamespace(settings=settings, apply_settings=apply_settings)
+    app._queue_settings_mutation_task = lambda task_factory: asyncio.run(task_factory())
+    monkeypatch.setattr(app_module, "TelemetryConsentDialog", FakeTelemetryConsentDialog)
+
+    app.show_telemetry_consent_dialog()
+
+    assert len(opened) == 1
+    assert settings.telemetry.consent == TelemetryConsent.UNKNOWN
+    assert settings.telemetry.identifier is None
+
+    opened[0].on_decline()
+    assert applied[-1].telemetry.consent == TelemetryConsent.DECLINE
+    assert applied[-1].telemetry.identifier is None
+
+    applied.clear()
+    settings.telemetry.consent = TelemetryConsent.UNKNOWN
+    app.show_telemetry_consent_dialog()
+    opened[-1].on_allow()
+    assert applied[-1].telemetry.consent == TelemetryConsent.ALLOW
+    assert applied[-1].telemetry.identifier
 
 
 def test_load_from_settings_uses_system_prompt_when_provider_prompt_missing(
@@ -4987,6 +5071,7 @@ def test_general_tab_places_microphone_test_and_displaced_cards(
     assert _row_card_titles(general_controls[3]) == [
         t("settings.clipboard_auto_translate"),
         t("settings.vrc_mic_intercept"),
+        t("settings.telemetry.title"),
     ]
 
 

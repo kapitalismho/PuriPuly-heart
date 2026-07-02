@@ -113,6 +113,7 @@ export const REQUIRED_BINDINGS = {
     'DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL',
     'DISCORD_DAILY_REPORT_WEBHOOK_URL',
     'QQ_AUTH_HMAC_PSK',
+    'TELEMETRY_SUBJECT_HMAC_SECRET',
   ],
 } as const;
 
@@ -129,6 +130,7 @@ export interface BrokerBindings {
   DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL: string;
   DISCORD_DAILY_REPORT_WEBHOOK_URL: string;
   QQ_AUTH_HMAC_PSK: string;
+  TELEMETRY_SUBJECT_HMAC_SECRET: string;
 }
 
 export type BrokerEnv = {

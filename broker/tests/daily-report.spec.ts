@@ -11,6 +11,7 @@ import {
   updateAbuseControls,
 } from './test-support/abuse-controls';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
+import { recordTelemetryActiveDay } from '../src/telemetry';
 
 describe('broker daily heartbeat', () => {
   afterEach(() => {
@@ -66,6 +67,37 @@ describe('broker daily heartbeat', () => {
     expect(body.embeds[0]?.fields.map((field) => field.name)).not.toContain(
       'Budget summary',
     );
+    expect(body.embeds[0]?.fields.map((field) => field.name)).toContain(
+      'Translation usage',
+    );
+    expect(sent.payload.summary.translation_usage).toEqual({
+      active_users_24h: 0,
+      active_users_7d: 0,
+      active_users_30d: 0,
+      dau_mau_stickiness_pct: null,
+      first_active_users_24h: 0,
+      returning_active_users_24h: 0,
+      retention: {
+        d1: {
+          cohort_date_utc: '2026-04-18',
+          eligible_users: 0,
+          retained_users: 0,
+          retention_pct: null,
+        },
+        d7: {
+          cohort_date_utc: '2026-04-12',
+          eligible_users: 0,
+          retained_users: 0,
+          retention_pct: null,
+        },
+        d30: {
+          cohort_date_utc: '2026-03-20',
+          eligible_users: 0,
+          retained_users: 0,
+          retention_pct: null,
+        },
+      },
+    });
     expect(readAbuseRuntimeState(env).dailyReport).toEqual({
       lastDeliveredAt: '2026-04-19T00:00:00.000Z',
       lastDeliveredDateUtc: '2026-04-19',
@@ -225,6 +257,75 @@ describe('broker daily heartbeat', () => {
     );
     expect(JSON.stringify(packet)).not.toContain('qq_identity');
     expect(JSON.stringify(packet)).not.toContain('credential');
+  });
+
+  it('adds aggregate Translation usage metrics without subject_ref disclosure', async () => {
+    const env = createTestBrokerEnv();
+
+    insertTelemetryActiveDay(env, 'subject-new-today', '2026-04-19');
+    await recordTelemetryActiveDay(env.BROKER_DB, {
+      subjectRef: validTelemetrySubjectRef('subject-new-today'),
+      activeDateUtc: '2026-04-19',
+      receivedAt: '2026-04-19T12:00:00.000Z',
+    });
+    insertTelemetryActiveDay(env, 'subject-returning-today', '2026-04-01');
+    insertTelemetryActiveDay(env, 'subject-returning-today', '2026-04-19');
+    insertTelemetryActiveDay(env, 'subject-week-only', '2026-04-15');
+    insertTelemetryActiveDay(env, 'subject-month-only', '2026-03-25');
+    insertTelemetryActiveDay(env, 'subject-outside-month', '2026-03-19');
+    insertTelemetryActiveDay(env, 'subject-d1-retained', '2026-04-18');
+    insertTelemetryActiveDay(env, 'subject-d1-retained', '2026-04-19');
+    insertTelemetryActiveDay(env, 'subject-d1-missed', '2026-04-18');
+    insertTelemetryActiveDay(env, 'subject-d7-retained', '2026-04-12');
+    insertTelemetryActiveDay(env, 'subject-d7-retained', '2026-04-19');
+    insertTelemetryActiveDay(env, 'subject-d7-missed', '2026-04-12');
+    insertTelemetryActiveDay(env, 'subject-d30-retained', '2026-03-20');
+    insertTelemetryActiveDay(env, 'subject-d30-retained', '2026-04-19');
+    insertTelemetryActiveDay(env, 'subject-d30-missed', '2026-03-20');
+
+    const packet = await buildDailyHeartbeatPacket(
+      env.BROKER_DB,
+      new Date('2026-04-19T22:00:00.000Z'),
+    );
+
+    expect(packet.summary.translation_usage).toEqual({
+      active_users_24h: 5,
+      active_users_7d: 7,
+      active_users_30d: 9,
+      dau_mau_stickiness_pct: 56,
+      first_active_users_24h: 1,
+      returning_active_users_24h: 4,
+      retention: {
+        d1: {
+          cohort_date_utc: '2026-04-18',
+          eligible_users: 2,
+          retained_users: 1,
+          retention_pct: 50,
+        },
+        d7: {
+          cohort_date_utc: '2026-04-12',
+          eligible_users: 2,
+          retained_users: 1,
+          retention_pct: 50,
+        },
+        d30: {
+          cohort_date_utc: '2026-03-20',
+          eligible_users: 2,
+          retained_users: 1,
+          retention_pct: 50,
+        },
+      },
+    });
+    expect(packet.summary.challenge_24h).toBe(0);
+    expect(packet.summary.verify_24h).toBe(0);
+    expect(packet.summary.issue_success_24h).toBe(0);
+    expect(packet.summary.highest_alert_level_24h).toBeNull();
+    expect(packet.summary.brake_triggered_24h).toBe(false);
+    expect(packet.summary.top_asns).toEqual([]);
+    expect(packet.summary.cloud_asn_share_24h).toBe(0);
+    expect(packet.summary.manual_revocations_24h).toBe(0);
+    expect(JSON.stringify(packet)).not.toContain('subject-new-today');
+    expect(JSON.stringify(packet)).not.toContain('subject_ref');
   });
 
   it('omits monthly budget exposure from daily heartbeat payloads after retention cleanup', async () => {
@@ -420,4 +521,35 @@ function insertIssueSuccessEvent(
       'low',
       input.observedAt,
     );
+}
+
+function insertTelemetryActiveDay(
+  env: ReturnType<typeof createTestBrokerEnv>,
+  subjectRef: string,
+  activeDateUtc: string,
+): void {
+  env.__db
+    .prepare(
+      `INSERT INTO telemetry_active_days (
+          subject_ref,
+          active_date_utc,
+          first_received_at,
+          last_received_at
+        ) VALUES (?, ?, ?, ?)`,
+    )
+    .run(
+      validTelemetrySubjectRef(subjectRef),
+      activeDateUtc,
+      `${activeDateUtc}T00:00:00.000Z`,
+      `${activeDateUtc}T00:00:00.000Z`,
+    );
+}
+
+function validTelemetrySubjectRef(label: string): string {
+  let hash = 0;
+  for (const character of label) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  }
+
+  return `ph-telemetry-subject-v1_${hash.toString(16).padStart(64, '0')}`;
 }

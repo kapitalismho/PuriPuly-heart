@@ -4,6 +4,7 @@ import copy
 import json
 import locale
 import math
+import secrets
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
@@ -42,7 +43,8 @@ from puripuly_heart.config.vad_defaults import (
 )
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 
-SETTINGS_SCHEMA_VERSION = 26
+SETTINGS_SCHEMA_VERSION = 27
+TELEMETRY_IDENTIFIER_BYTES = 24
 STT_INTERNAL_SAMPLE_RATE_HZ = 16000
 DEFAULT_DESKTOP_AUDIO_VAD_HANGOVER_MS = 500
 MAX_CUSTOM_VOCAB_TERMS = 100
@@ -234,6 +236,112 @@ class TranslationConnection(str, Enum):
     OPENROUTER = "openrouter"
     OFFICIAL_BYOK = "official_byok"
     OLLAMA = "ollama"
+
+
+class TelemetryConsent(str, Enum):
+    UNKNOWN = "unknown"
+    ALLOW = "allow"
+    DECLINE = "decline"
+
+
+def _new_telemetry_identifier() -> str:
+    return secrets.token_urlsafe(TELEMETRY_IDENTIFIER_BYTES)
+
+
+def _parse_telemetry_consent(value: object) -> TelemetryConsent:
+    if isinstance(value, TelemetryConsent):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"enabled", "true", "yes", "on"}:
+            return TelemetryConsent.ALLOW
+        if normalized in {"disabled", "false", "no", "off"}:
+            return TelemetryConsent.DECLINE
+        try:
+            return TelemetryConsent(normalized)
+        except ValueError:
+            pass
+    if value is True:
+        return TelemetryConsent.ALLOW
+    if value is False:
+        return TelemetryConsent.DECLINE
+    return TelemetryConsent.UNKNOWN
+
+
+def _parse_telemetry_identifier(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if len(normalized) < 16 or len(normalized) > 256:
+        return None
+    return normalized
+
+
+def _parse_telemetry_sent_dates(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    dates: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        normalized = item.strip()
+        try:
+            datetime.strptime(normalized, "%Y-%m-%d")
+        except ValueError:
+            continue
+        dates.append(normalized)
+    return sorted(dict.fromkeys(dates))
+
+
+@dataclass(slots=True)
+class TelemetrySettings:
+    consent: TelemetryConsent = TelemetryConsent.UNKNOWN
+    identifier: str | None = None
+    sent_utc_dates: list[str] = field(default_factory=list)
+
+    @property
+    def is_send_eligible(self) -> bool:
+        return self.consent == TelemetryConsent.ALLOW and self.identifier is not None
+
+    def allow(self) -> None:
+        self.consent = TelemetryConsent.ALLOW
+        if self.identifier is None:
+            self.identifier = _new_telemetry_identifier()
+
+    def decline(self) -> None:
+        self.consent = TelemetryConsent.DECLINE
+        self.identifier = None
+        self.sent_utc_dates = []
+
+    def validate(self) -> None:
+        self.consent = _parse_telemetry_consent(self.consent)
+        self.sent_utc_dates = _parse_telemetry_sent_dates(self.sent_utc_dates)
+        if self.consent != TelemetryConsent.ALLOW:
+            self.identifier = None
+            self.sent_utc_dates = []
+            return
+        self.identifier = _parse_telemetry_identifier(self.identifier)
+
+
+def telemetry_settings_to_dict(settings: TelemetrySettings) -> dict[str, Any]:
+    settings = copy.deepcopy(settings)
+    settings.validate()
+    return {
+        "consent": settings.consent.value,
+        "identifier": settings.identifier,
+        "sent_utc_dates": settings.sent_utc_dates,
+    }
+
+
+def telemetry_settings_from_dict(value: object) -> TelemetrySettings:
+    data = value if isinstance(value, dict) else {}
+    settings = TelemetrySettings(
+        consent=_parse_telemetry_consent(data.get("consent")),
+        identifier=_parse_telemetry_identifier(data.get("identifier")),
+        sent_utc_dates=_parse_telemetry_sent_dates(data.get("sent_utc_dates")),
+    )
+    settings.validate()
+    return settings
 
 
 @dataclass(slots=True)
@@ -1043,6 +1151,7 @@ class AppSettings:
     ui: UiSettings = field(default_factory=UiSettings)
     api_key_verified: ApiKeyVerificationSettings = field(default_factory=ApiKeyVerificationSettings)
     managed_identity: ManagedIdentitySettings = field(default_factory=ManagedIdentitySettings)
+    telemetry: TelemetrySettings = field(default_factory=TelemetrySettings)
     system_prompt: str = ""
     system_prompts: dict[str, str] = field(default_factory=dict)
 
@@ -1081,6 +1190,7 @@ class AppSettings:
         self.ui.validate()
         self.api_key_verified.validate()
         self.managed_identity.validate()
+        self.telemetry.validate()
         for key, value in self.system_prompts.items():
             if not isinstance(key, str):
                 raise ValueError("system_prompts keys must be strings")
@@ -1514,6 +1624,7 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
             ),
             "referral_id": normalize_owned_referral_id(settings.managed_identity.referral_id),
         },
+        "telemetry": telemetry_settings_to_dict(settings.telemetry),
         "system_prompt": settings.system_prompt,
     }
     return _enum_to_value(data)  # type: ignore[return-value]
@@ -2999,6 +3110,10 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
 
         version = 26
 
+    if version < 27:
+        version = 27
+        changed = True
+
     if _normalize_local_llm_data(data):
         changed = True
 
@@ -3490,6 +3605,14 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         data.pop("system_prompts", None)
         changed = True
 
+    raw_telemetry_data = data.get("telemetry")
+    normalized_telemetry_data = telemetry_settings_to_dict(
+        telemetry_settings_from_dict(raw_telemetry_data)
+    )
+    if raw_telemetry_data != normalized_telemetry_data:
+        data["telemetry"] = normalized_telemetry_data
+        changed = True
+
     if data.get("settings_version") != version:
         data["settings_version"] = version
         changed = True
@@ -3515,6 +3638,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     managed_identity_data = (
         data.get("managed_identity") if isinstance(data.get("managed_identity"), dict) else {}
     )
+    telemetry_data = data.get("telemetry") if isinstance(data.get("telemetry"), dict) else {}
     peer_qwen_raw = (
         data.get("peer_qwen_asr_stt") if isinstance(data.get("peer_qwen_asr_stt"), dict) else {}
     )
@@ -3835,6 +3959,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             ),
             referral_id=normalize_owned_referral_id(managed_identity_data.get("referral_id")),
         ),
+        telemetry=telemetry_settings_from_dict(telemetry_data),
         system_prompt=legacy_system_prompt,
         system_prompts={},
     )

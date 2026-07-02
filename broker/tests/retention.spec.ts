@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { applyAbuseMonitoringRetention } from '../src/abuse-monitoring';
+import { applyTelemetryActiveDayRetention } from '../src/telemetry';
 import { updateAbuseControls } from './test-support/abuse-controls';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
@@ -216,4 +217,71 @@ describe('broker persistence retention model', () => {
         .get() as { count: number },
     ).toEqual({ count: 1 });
   });
+
+  it('deletes telemetry active-day rows older than 400 days and keeps rows at the cutoff or newer', async () => {
+    const env = createTestBrokerEnv();
+
+    insertTelemetryActiveDay(env, 'subject-old', '2025-03-13');
+    insertTelemetryActiveDay(env, 'subject-cutoff', '2025-03-14');
+    insertTelemetryActiveDay(env, 'subject-new', '2026-04-18');
+
+    const result = await applyTelemetryActiveDayRetention(
+      env.BROKER_DB,
+      new Date('2026-04-18T22:00:00.000Z'),
+    );
+
+    expect(result).toEqual({
+      deleted: 1,
+      cutoffDateUtc: '2025-03-14',
+    });
+    expect(readTelemetryActiveDays(env)).toEqual([
+      { subject_ref: validTelemetrySubjectRef('subject-cutoff'), active_date_utc: '2025-03-14' },
+      { subject_ref: validTelemetrySubjectRef('subject-new'), active_date_utc: '2026-04-18' },
+    ]);
+    expect(JSON.stringify(result)).not.toContain('subject-old');
+  });
 });
+
+function insertTelemetryActiveDay(
+  env: ReturnType<typeof createTestBrokerEnv>,
+  subjectRef: string,
+  activeDateUtc: string,
+): void {
+  env.__db
+    .prepare(
+      `INSERT INTO telemetry_active_days (
+          subject_ref,
+          active_date_utc,
+          first_received_at,
+          last_received_at
+        ) VALUES (?, ?, ?, ?)`,
+    )
+    .run(
+      validTelemetrySubjectRef(subjectRef),
+      activeDateUtc,
+      `${activeDateUtc}T00:00:00.000Z`,
+      `${activeDateUtc}T00:00:00.000Z`,
+    );
+}
+
+function readTelemetryActiveDays(env: ReturnType<typeof createTestBrokerEnv>): Array<{
+  subject_ref: string;
+  active_date_utc: string;
+}> {
+  return env.__db
+    .prepare(
+      `SELECT subject_ref, active_date_utc
+         FROM telemetry_active_days
+        ORDER BY active_date_utc ASC, subject_ref ASC`,
+    )
+    .all() as Array<{ subject_ref: string; active_date_utc: string }>;
+}
+
+function validTelemetrySubjectRef(label: string): string {
+  let hash = 0;
+  for (const character of label) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  }
+
+  return `ph-telemetry-subject-v1_${hash.toString(16).padStart(64, '0')}`;
+}

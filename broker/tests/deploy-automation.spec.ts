@@ -197,6 +197,7 @@ describe('broker direct deploy automation', () => {
       'OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION',
       'OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION',
       'QQ_AUTH_HMAC_PSK_PRODUCTION',
+      'TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION',
       'DISCORD_CLIENT_ID_PRODUCTION',
       'DISCORD_CLIENT_SECRET_PRODUCTION',
       'DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION',
@@ -257,6 +258,12 @@ describe('broker direct deploy automation', () => {
     const qqAuthHmacPskSyncIndex = workflow.indexOf(
       'wrangler secret put QQ_AUTH_HMAC_PSK',
     );
+    const telemetrySubjectHmacSecretBlankCheckIndex = workflow.indexOf(
+      'TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION is required and must not be blank.',
+    );
+    const telemetrySubjectHmacSecretSyncIndex = workflow.indexOf(
+      'wrangler secret put TELEMETRY_SUBJECT_HMAC_SECRET',
+    );
 
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).not.toContain('\npush:');
@@ -284,6 +291,8 @@ describe('broker direct deploy automation', () => {
     expect(workflow).toContain('OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION');
     expect(workflow).toContain('QQ_AUTH_HMAC_PSK_PRODUCTION');
     expect(workflow).toContain('QQ_AUTH_HMAC_PSK');
+    expect(workflow).toContain('TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION');
+    expect(workflow).toContain('TELEMETRY_SUBJECT_HMAC_SECRET');
     expect(workflow).toContain('DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION');
     expect(workflow).toContain('BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION');
     expect(workflow).toContain('BROKER_CANONICAL_WORKERS_DEV_URL');
@@ -332,6 +341,9 @@ describe('broker direct deploy automation', () => {
     );
     expect(workflow).toMatch(/wrangler secret put QQ_AUTH_HMAC_PSK --config/u);
     expect(workflow).toMatch(
+      /wrangler secret put TELEMETRY_SUBJECT_HMAC_SECRET --config/u,
+    );
+    expect(workflow).toMatch(
       /wrangler secret put DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL --config/u,
     );
     expect(workflow).toMatch(
@@ -360,6 +372,12 @@ describe('broker direct deploy automation', () => {
     expect(qqAuthHmacPskBlankCheckIndex).toBeLessThan(remoteD1MigrationIndex);
     expect(qqAuthHmacPskSyncIndex).toBeGreaterThanOrEqual(0);
     expect(qqAuthHmacPskBlankCheckIndex).toBeLessThan(qqAuthHmacPskSyncIndex);
+    expect(telemetrySubjectHmacSecretBlankCheckIndex).toBeGreaterThanOrEqual(0);
+    expect(telemetrySubjectHmacSecretBlankCheckIndex).toBeLessThan(remoteD1MigrationIndex);
+    expect(telemetrySubjectHmacSecretSyncIndex).toBeGreaterThanOrEqual(0);
+    expect(telemetrySubjectHmacSecretBlankCheckIndex).toBeLessThan(
+      telemetrySubjectHmacSecretSyncIndex,
+    );
     expect(discordImmediateWebhookSyncIndex).toBeGreaterThanOrEqual(0);
     expect(discordDailyWebhookSyncIndex).toBeGreaterThanOrEqual(0);
     expect(discordWebhookBlankCheckIndex).toBeLessThan(discordImmediateWebhookSyncIndex);
@@ -380,6 +398,7 @@ describe('broker direct deploy automation', () => {
     expect(workflow).toContain('transitional runtime compatibility');
     expect(workflow).toContain('managed child-key creation and cleanup');
     expect(workflow).toContain('QQ production issuance');
+    expect(workflow).toContain('telemetry ingest');
     expect(workflow).toContain('assign the canonical production guardrail');
     expect(workflow).toContain('positive Qwen/DeepSeek/Gemini routing');
     expect(smokeSpec).not.toContain("process.env.CI === 'true'");
@@ -428,7 +447,10 @@ describe('broker direct deploy automation', () => {
     expect(readme).toContain('OPENROUTER_MANAGED_USER_HMAC_SECRET');
     expect(readme).toContain('QQ_AUTH_HMAC_PSK_PRODUCTION');
     expect(readme).toContain('QQ_AUTH_HMAC_PSK');
+    expect(readme).toContain('TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION');
+    expect(readme).toContain('TELEMETRY_SUBJECT_HMAC_SECRET');
     expect(readme).toContain('POST /v1/auth/qq/assert');
+    expect(readme).toContain('POST /v1/telemetry/translation-success-day');
     expect(readme).toContain('production issuance-capable when runtime issuance configuration is present');
     expect(readme).toContain('issuance-disabled verification-only behavior');
     expect(readme).toContain('bounded retryable/internal error envelope');
@@ -464,6 +486,8 @@ describe('broker direct deploy automation', () => {
     expect(checklist).toContain('OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION');
     expect(checklist).toContain('QQ_AUTH_HMAC_PSK_PRODUCTION');
     expect(checklist).toContain('QQ_AUTH_HMAC_PSK');
+    expect(checklist).toContain('TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION');
+    expect(checklist).toContain('TELEMETRY_SUBJECT_HMAC_SECRET');
     expect(checklist).toContain('POST /v1/auth/qq/assert');
     expect(checklist).toContain('returns `issued`');
     expect(checklist).toContain('one-time `openrouter_api_key`');

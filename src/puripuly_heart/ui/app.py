@@ -20,6 +20,7 @@ from puripuly_heart.config.settings import (
     OpenRouterLLMModel,
     OpenRouterProviderRouting,
     OpenRouterSelectionAlias,
+    TelemetryConsent,
     TranslationConnection,
     save_settings,
 )
@@ -39,6 +40,7 @@ from puripuly_heart.ui.components.local_qwen_hallucination_dialog import (
 from puripuly_heart.ui.components.microphone_test_dialog import MicrophoneTestDialog
 from puripuly_heart.ui.components.peer_translation_eula_dialog import PeerTranslationEulaDialog
 from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog
+from puripuly_heart.ui.components.telemetry_consent_dialog import TelemetryConsentDialog
 from puripuly_heart.ui.components.title_bar import TitleBar
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.fonts import font_for_language, register_fonts
@@ -141,6 +143,7 @@ class TranslatorApp:
         self._launch_high_priority_snackbar = None
         self._github_star_prompt_shown_this_launch = False
         self._microphone_test_dialog: MicrophoneTestDialog | None = None
+        self._telemetry_consent_dialog: TelemetryConsentDialog | None = None
         self._setup_page()
         self._build_layout()
 
@@ -521,6 +524,32 @@ class TranslatorApp:
             on_open_guide=self._open_local_qwen_guide,
         )
         self._local_qwen_hallucination_dialog = dialog
+        dialog.open()
+
+    def show_telemetry_consent_dialog(self) -> None:
+        settings = getattr(self.controller, "settings", None)
+        if settings is None or settings.telemetry.consent != TelemetryConsent.UNKNOWN:
+            return
+
+        def _persist(allow: bool) -> None:
+            async def _task() -> None:
+                updated = copy.deepcopy(self.controller.settings)
+                if updated is None:
+                    return
+                if allow:
+                    updated.telemetry.allow()
+                else:
+                    updated.telemetry.decline()
+                await self.controller.apply_settings(updated)
+
+            self._queue_settings_mutation_task(_task)
+
+        dialog = TelemetryConsentDialog(
+            self.page,
+            on_allow=lambda: _persist(True),
+            on_decline=lambda: _persist(False),
+        )
+        self._telemetry_consent_dialog = dialog
         dialog.open()
 
     def _open_local_qwen_guide(self) -> None:
