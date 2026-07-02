@@ -93,6 +93,7 @@ export interface BrokerAbuseControlsConfigValue {
   discordOpenrouterIssueIp: BrokerEndpointRateLimitConfig;
   discordOpenrouterIssueInstallation: BrokerEndpointRateLimitConfig;
   qqAuthAssertIp: BrokerEndpointRateLimitConfig;
+  telemetryTranslationSuccessDayIp: BrokerEndpointRateLimitConfig;
   pendingDiscordOAuthSessions: BrokerPendingDiscordOAuthSessionsConfig;
   newActiveEntitlementsPerDay: BrokerDailyIssuanceCapConfig;
   immediateAlerts: BrokerImmediateAlertsConfig;
@@ -156,6 +157,12 @@ export const DEFAULT_BROKER_ABUSE_CONTROLS: BrokerAbuseControlsConfigValue = {
     endpoint: 'POST /v1/auth/qq/assert',
     scope: 'ip',
     maxRequests: 20,
+    windowMinutes: 15,
+  },
+  telemetryTranslationSuccessDayIp: {
+    endpoint: 'POST /v1/telemetry/translation-success-day',
+    scope: 'ip',
+    maxRequests: 60,
     windowMinutes: 15,
   },
   pendingDiscordOAuthSessions: {
@@ -488,6 +495,13 @@ export interface BrokerRequestEventRecord {
   ip: string | null;
   installation_id: string | null;
   observed_at: string;
+}
+
+export interface TelemetryActiveDayRecord {
+  subject_ref: string;
+  active_date_utc: string;
+  first_received_at: string;
+  last_received_at: string;
 }
 
 export interface QqAuthAssertionRecord {

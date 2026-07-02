@@ -558,6 +558,7 @@ describe('broker persistent state model', () => {
       '0008_add_qq_auth_assertions.sql',
       '0009_add_qq_managed_entitlements.sql',
       '0010_source_aware_issue_success_events.sql',
+      '0011_add_telemetry_active_days.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);
@@ -598,6 +599,9 @@ describe('broker persistent state model', () => {
     );
     const sourceAwareIssueSuccessMigration = readBrokerMigrationSql(
       '0010_source_aware_issue_success_events.sql',
+    );
+    const telemetryActiveDaysMigration = readBrokerMigrationSql(
+      '0011_add_telemetry_active_days.sql',
     );
 
     expect(migration).toContain('CREATE TABLE broker_config');
@@ -775,6 +779,14 @@ describe('broker persistent state model', () => {
     expect(sourceAwareIssueSuccessMigration).not.toContain('qq_identity');
     expect(sourceAwareIssueSuccessMigration).not.toContain('credential TEXT');
     expect(sourceAwareIssueSuccessMigration).not.toContain('openrouter_api_key');
+    expect(telemetryActiveDaysMigration).toContain('CREATE TABLE telemetry_active_days');
+    expect(telemetryActiveDaysMigration).toContain('subject_ref TEXT NOT NULL');
+    expect(telemetryActiveDaysMigration).toContain('active_date_utc TEXT NOT NULL');
+    expect(telemetryActiveDaysMigration).toContain('PRIMARY KEY (subject_ref, active_date_utc)');
+    expect(telemetryActiveDaysMigration).toContain('$.telemetryTranslationSuccessDayIp');
+    expect(telemetryActiveDaysMigration).toContain('POST /v1/telemetry/translation-success-day');
+    expect(telemetryActiveDaysMigration).not.toContain('telemetry_identifier');
+    expect(telemetryActiveDaysMigration).not.toContain('translation_text');
   });
 
   it('inserts the QQ auth assertion abuse-control default without replacing tuned JSON', () => {
