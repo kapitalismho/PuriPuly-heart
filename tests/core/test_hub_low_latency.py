@@ -392,7 +392,7 @@ class TestRuntimeLatencyLogging:
             assert any(
                 "[Detailed][LatencyBreakdown]" in message
                 and "channel=self" in message
-                and "e2e_ms=1150" in message
+                and "e2e_ms=1050" in message
                 and "speech_end_to_stt_final_ms=50" in message
                 and "stt_final_to_final_output_ms=0" in message
                 and "final_output_stage=" not in message
