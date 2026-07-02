@@ -43,7 +43,13 @@ from puripuly_heart.config.vad_defaults import (
 )
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 
-SETTINGS_SCHEMA_VERSION = 27
+SETTINGS_SCHEMA_VERSION = 28
+MANAGED_AUTH_CLAIM_SOURCE_DISCORD = "discord"
+MANAGED_AUTH_CLAIM_SOURCE_QQ = "qq"
+MANAGED_AUTH_CLAIM_SOURCES = (
+    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+    MANAGED_AUTH_CLAIM_SOURCE_QQ,
+)
 TELEMETRY_IDENTIFIER_BYTES = 24
 STT_INTERNAL_SAMPLE_RATE_HZ = 16000
 DEFAULT_DESKTOP_AUDIO_VAD_HANGOVER_MS = 500
@@ -124,6 +130,22 @@ def normalize_owned_referral_id(value: object) -> str | None:
     if any(char not in REFERRAL_ID_ALPHABET for char in normalized):
         return None
     return normalized
+
+
+def normalize_managed_claim_sources(value: object) -> tuple[str, ...]:
+    if isinstance(value, str):
+        candidates: tuple[object, ...] = (value,)
+    elif isinstance(value, (list, tuple, set, frozenset)):
+        candidates = tuple(value)
+    else:
+        candidates = ()
+
+    normalized = {
+        item.strip().lower()
+        for item in candidates
+        if isinstance(item, str) and item.strip().lower() in MANAGED_AUTH_CLAIM_SOURCES
+    }
+    return tuple(source for source in MANAGED_AUTH_CLAIM_SOURCES if source in normalized)
 
 
 class STTProviderName(str, Enum):
@@ -1090,6 +1112,7 @@ class ManagedIdentitySettings:
     active_managed_expires_at: str | None = None
     founder_letter_seen_credential_ref: str | None = None
     referral_id: str | None = None
+    local_managed_claim_sources: tuple[str, ...] = field(default_factory=tuple)
 
     def validate(self) -> None:
         if not isinstance(self.installation_id, str):
@@ -1122,6 +1145,9 @@ class ManagedIdentitySettings:
         ):
             raise ValueError("managed founder_letter_seen_credential_ref must be a string or None")
         self.referral_id = normalize_owned_referral_id(self.referral_id)
+        self.local_managed_claim_sources = normalize_managed_claim_sources(
+            self.local_managed_claim_sources
+        )
 
 
 @dataclass(slots=True)
@@ -1623,6 +1649,11 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
                 settings.managed_identity.founder_letter_seen_credential_ref
             ),
             "referral_id": normalize_owned_referral_id(settings.managed_identity.referral_id),
+            "local_managed_claim_sources": list(
+                normalize_managed_claim_sources(
+                    settings.managed_identity.local_managed_claim_sources
+                )
+            ),
         },
         "telemetry": telemetry_settings_to_dict(settings.telemetry),
         "system_prompt": settings.system_prompt,
@@ -3114,6 +3145,17 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         version = 27
         changed = True
 
+    if version < 28:
+        managed_identity_data = data.get("managed_identity")
+        if not isinstance(managed_identity_data, dict):
+            managed_identity_data = {}
+            data["managed_identity"] = managed_identity_data
+            changed = True
+        if "local_managed_claim_sources" not in managed_identity_data:
+            managed_identity_data["local_managed_claim_sources"] = []
+            changed = True
+        version = 28
+
     if _normalize_local_llm_data(data):
         changed = True
 
@@ -3601,6 +3643,19 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         managed_identity_data["referral_id"] = normalized_referral_id
         changed = True
 
+    raw_local_managed_claim_sources = managed_identity_data.get("local_managed_claim_sources")
+    normalized_local_managed_claim_sources = list(
+        normalize_managed_claim_sources(raw_local_managed_claim_sources)
+    )
+    if (
+        "local_managed_claim_sources" not in managed_identity_data
+        or raw_local_managed_claim_sources != normalized_local_managed_claim_sources
+    ):
+        managed_identity_data["local_managed_claim_sources"] = (
+            normalized_local_managed_claim_sources
+        )
+        changed = True
+
     if "system_prompts" in data:
         data.pop("system_prompts", None)
         changed = True
@@ -3958,6 +4013,9 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
                 managed_identity_data.get("founder_letter_seen_credential_ref")
             ),
             referral_id=normalize_owned_referral_id(managed_identity_data.get("referral_id")),
+            local_managed_claim_sources=normalize_managed_claim_sources(
+                managed_identity_data.get("local_managed_claim_sources")
+            ),
         ),
         telemetry=telemetry_settings_from_dict(telemetry_data),
         system_prompt=legacy_system_prompt,

@@ -3467,6 +3467,90 @@ def test_managed_china_dashboard_key_gate_uses_normalized_qq_resolution(
 
 
 @pytest.mark.asyncio
+async def test_discord_managed_auth_backfills_qq_claim_and_blocks_cross_source_auth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snackbar_calls: list[tuple[str, str]] = []
+    save_calls: list[tuple[str, ...]] = []
+    controller = _make_controller(
+        app=SimpleNamespace(
+            view_dashboard=DummyDashboard(),
+            _show_snackbar=lambda message, color: snackbar_calls.append((message, color)),
+        )
+    )
+    controller.settings = AppSettings()
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    monkeypatch.setattr(
+        controller_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets({"openrouter_managed_qq_api_key": "qq-key"}),
+    )
+    monkeypatch.setattr(
+        controller_module,
+        "save_settings",
+        lambda _path, settings: save_calls.append(
+            settings.managed_identity.local_managed_claim_sources
+        ),
+    )
+    monkeypatch.setattr(controller_module, "t", lambda key, **_kwargs: key)
+
+    class NoDiscordService:
+        async def prepare_for_translation(self, **_kwargs):
+            raise AssertionError("Discord auth should be blocked before service start")
+
+    controller._managed_openrouter_release_service = NoDiscordService()  # type: ignore[assignment]
+
+    result = await controller.start_discord_managed_auth_from_dialog()
+
+    assert result is False
+    assert controller.settings.managed_identity.local_managed_claim_sources == ("qq",)
+    assert save_calls == [("qq",)]
+    assert snackbar_calls == [("discord_auth.error.already_claimed_qq", ft.Colors.ORANGE_700)]
+
+
+@pytest.mark.asyncio
+async def test_qq_managed_auth_backfills_discord_claim_and_blocks_cross_source_auth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    save_calls: list[tuple[str, ...]] = []
+    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
+    controller.settings = AppSettings()
+    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    controller.settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    monkeypatch.setattr(
+        controller_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets({"openrouter_managed_api_key": "discord-key"}),
+    )
+    monkeypatch.setattr(
+        controller_module,
+        "save_settings",
+        lambda _path, settings: save_calls.append(
+            settings.managed_identity.local_managed_claim_sources
+        ),
+    )
+
+    class NoQqService:
+        async def prepare_from_qq_assertion(self, **_kwargs):
+            raise AssertionError("QQ auth should be blocked before service start")
+
+    controller._managed_openrouter_release_service = NoQqService()  # type: ignore[assignment]
+
+    result = await controller.start_qq_managed_auth_from_dialog(
+        qq_identity="qq-user",
+        credential="credential",
+    )
+
+    assert isinstance(result, ManagedOpenRouterReleaseResult)
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert result.message_key == "qq_auth.error.already_claimed_discord"
+    assert controller.settings.managed_identity.local_managed_claim_sources == ("discord",)
+    assert save_calls == [("discord",)]
+    assert controller._qq_managed_auth_in_progress is False
+    assert controller.managed_auth_pending is False
+
+
+@pytest.mark.asyncio
 async def test_managed_china_no_key_translation_enable_does_not_prepare_discord_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

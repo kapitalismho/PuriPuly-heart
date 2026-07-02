@@ -6,6 +6,8 @@ import pytest
 
 from puripuly_heart.config.settings import (
     DEFAULT_OPENROUTER_BROKER_BASE_URL,
+    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+    MANAGED_AUTH_CLAIM_SOURCE_QQ,
     SETTINGS_SCHEMA_VERSION,
     AppSettings,
     OpenRouterCredentialSource,
@@ -118,7 +120,7 @@ def test_load_settings_migrates_v22_referral_id_values(tmp_path, persisted_value
     loaded = load_settings(path)
     persisted = json.loads(path.read_text(encoding="utf-8"))
 
-    assert SETTINGS_SCHEMA_VERSION == 27
+    assert SETTINGS_SCHEMA_VERSION == 28
     assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
     assert loaded.managed_identity.referral_id == expected
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
@@ -169,7 +171,43 @@ def test_load_settings_backfills_managed_identity_defaults(tmp_path) -> None:
         "active_managed_expires_at": None,
         "founder_letter_seen_credential_ref": None,
         "referral_id": None,
+        "local_managed_claim_sources": [],
     }
+
+
+def test_managed_identity_local_managed_claim_sources_round_trip_and_normalize() -> None:
+    settings = AppSettings()
+    settings.managed_identity.local_managed_claim_sources = (
+        MANAGED_AUTH_CLAIM_SOURCE_QQ,
+        "unknown",
+        MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+        MANAGED_AUTH_CLAIM_SOURCE_QQ,
+    )
+
+    restored = from_dict(to_dict(settings))
+
+    assert restored.managed_identity.local_managed_claim_sources == (
+        MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+        MANAGED_AUTH_CLAIM_SOURCE_QQ,
+    )
+    assert to_dict(restored)["managed_identity"]["local_managed_claim_sources"] == [
+        MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+        MANAGED_AUTH_CLAIM_SOURCE_QQ,
+    ]
+
+
+def test_load_settings_backfills_local_managed_claim_sources_default(tmp_path) -> None:
+    path = tmp_path / "settings.json"
+    legacy = to_dict(AppSettings())
+    legacy["settings_version"] = SETTINGS_SCHEMA_VERSION - 1
+    legacy["managed_identity"].pop("local_managed_claim_sources", None)
+    path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    loaded = load_settings(path)
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+
+    assert loaded.managed_identity.local_managed_claim_sources == ()
+    assert persisted["managed_identity"]["local_managed_claim_sources"] == []
 
 
 def test_load_settings_backfills_openrouter_defaults(tmp_path) -> None:

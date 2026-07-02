@@ -84,6 +84,7 @@ def test_ensure_managed_identity_bundle_generates_uuid7_and_keeps_secret_boundar
         "active_managed_expires_at": None,
         "founder_letter_seen_credential_ref": None,
         "installation_id": bundle.installation_id,
+        "local_managed_claim_sources": [],
         "referral_id": None,
         "release_token": None,
         "release_token_expires_at": None,

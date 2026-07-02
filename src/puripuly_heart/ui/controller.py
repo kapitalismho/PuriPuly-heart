@@ -35,6 +35,8 @@ from puripuly_heart.config.settings import (
     DESKTOP_FLET_MIN_HEIGHT,
     DESKTOP_FLET_MIN_WIDTH,
     DESKTOP_FLET_SIZE_PRESETS,
+    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+    MANAGED_AUTH_CLAIM_SOURCE_QQ,
     OVERLAY_TARGET_DESKTOP,
     OVERLAY_TARGET_STEAMVR,
     AppSettings,
@@ -81,6 +83,10 @@ from puripuly_heart.core.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallError,
     RuntimeLocalSTTStatusUpdate,
     ensure_local_stt_installed,
+)
+from puripuly_heart.core.managed_auth_claims import (
+    backfill_local_managed_claim_sources,
+    local_managed_auth_blocking_source,
 )
 from puripuly_heart.core.managed_openrouter_broker_client import (
     HttpManagedOpenRouterBrokerClient,
@@ -634,6 +640,7 @@ class GuiController:
 
     async def start(self) -> None:
         self.settings = self._load_or_init_settings(self.config_path)
+        self._backfill_local_managed_claim_sources()
         self.settings.ui.overlay_enabled = False
         self.settings.ui.peer_translation_enabled = False
         self._sync_overlay_calibration_cache(self.settings)
@@ -910,6 +917,26 @@ class GuiController:
             and self.settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
         )
 
+    def _backfill_local_managed_claim_sources(self) -> tuple[str, ...]:
+        if self.settings is None:
+            return ()
+        try:
+            secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
+            return backfill_local_managed_claim_sources(
+                self.settings,
+                secrets,
+                persist_settings=lambda updated: save_settings(self.config_path, updated),
+            )
+        except Exception as exc:
+            logger.warning("[ManagedAuth] local managed claim backfill failed: %s", exc)
+            return self.settings.managed_identity.local_managed_claim_sources
+
+    def _local_managed_auth_blocking_source(self, requested_source: str) -> str | None:
+        if self.settings is None:
+            return None
+        self._backfill_local_managed_claim_sources()
+        return local_managed_auth_blocking_source(self.settings, requested_source)
+
     def _managed_openrouter_local_key_available(self) -> bool:
         if self.settings is None:
             return False
@@ -992,6 +1019,14 @@ class GuiController:
         referral_id: str | None = None,
     ) -> bool:
         self.last_discord_managed_auth_referral_bonus_applied = False
+        if (
+            self._local_managed_auth_blocking_source(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
+            == MANAGED_AUTH_CLAIM_SOURCE_QQ
+        ):
+            self._discord_managed_auth_in_progress = False
+            self._set_managed_trial_pending_auth(False)
+            self._show_short_message("discord_auth.error.already_claimed_qq")
+            return False
         service = self._managed_openrouter_release_service
         if service is None:
             self._discord_managed_auth_in_progress = False
@@ -1107,6 +1142,20 @@ class GuiController:
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.RETRY,
                 message_key="qq_auth.error.invalid_input",
+            )
+
+        if (
+            self._local_managed_auth_blocking_source(MANAGED_AUTH_CLAIM_SOURCE_QQ)
+            == MANAGED_AUTH_CLAIM_SOURCE_DISCORD
+        ):
+            logger.info("[QQAuth] start_qq_managed_auth_from_dialog: blocked by Discord claim")
+            if current_task is not None and self._qq_managed_auth_task_handle is current_task:
+                self._qq_managed_auth_task_handle = None
+            self._qq_managed_auth_in_progress = False
+            self._set_managed_trial_pending_auth(False)
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="qq_auth.error.already_claimed_discord",
             )
 
         self._qq_managed_auth_in_progress = True

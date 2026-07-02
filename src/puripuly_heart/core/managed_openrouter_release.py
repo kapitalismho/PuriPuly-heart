@@ -17,6 +17,8 @@ from puripuly_heart.config.llm_profiles import (
     openrouter_alias_for_fields,
 )
 from puripuly_heart.config.settings import (
+    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+    MANAGED_AUTH_CLAIM_SOURCE_QQ,
     AppSettings,
     OpenRouterCredentialSource,
     TranslationConnection,
@@ -31,6 +33,7 @@ from puripuly_heart.core.discord_oauth_loopback import (
 )
 from puripuly_heart.core.hardware_fingerprint import compute_hardware_hash
 from puripuly_heart.core.llm.provider import LLMProvider
+from puripuly_heart.core.managed_auth_claims import record_local_managed_claim_source
 from puripuly_heart.core.managed_identity import (
     ensure_managed_identity_bundle,
     load_existing_managed_identity_bundle,
@@ -956,6 +959,7 @@ class ManagedOpenRouterReleaseService:
             managed_credential_ref=issue_response.managed_credential_ref,
             expires_at=issue_response.expires_at,
         )
+        record_local_managed_claim_source(self.settings, MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
         returned_referral_id = normalize_owned_referral_id(issue_response.referral_id)
         if returned_referral_id is not None:
             self.settings.managed_identity.referral_id = returned_referral_id
@@ -1000,6 +1004,7 @@ class ManagedOpenRouterReleaseService:
             managed_credential_ref=issue_response.managed_credential_ref,
             expires_at=issue_response.expires_at,
         )
+        record_local_managed_claim_source(self.settings, MANAGED_AUTH_CLAIM_SOURCE_QQ)
         self.persist_settings(self.settings)
         self._clear_retry_after()
         return ManagedOpenRouterReleaseResult(
