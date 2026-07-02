@@ -74,7 +74,7 @@ class LanguageModal:
         content_controls.append(
             ft.Text(
                 t("language_modal.recent"),
-                size=12,
+                size=18,
                 weight=ft.FontWeight.BOLD,
                 color=COLOR_NEUTRAL,
             )
@@ -89,7 +89,7 @@ class LanguageModal:
         content_controls.append(
             ft.Text(
                 t("language_modal.all_languages"),
-                size=12,
+                size=18,
                 weight=ft.FontWeight.BOLD,
                 color=COLOR_NEUTRAL,
             )
