@@ -13,6 +13,8 @@ OPENROUTER_CREDENTIAL_SOURCE_BYOK = "byok"
 OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT = "google/gemma-4-26b-a4b-it"
 OPENROUTER_MODEL_QWEN_35_FLASH_02_23 = "qwen/qwen3.5-flash-02-23"
 OPENROUTER_MODEL_DEEPSEEK_V4_FLASH = "deepseek/deepseek-v4-flash"
+OPENROUTER_MODEL_GEMINI_3_FLASH = "google/gemini-3-flash-preview"
+OPENROUTER_MODEL_GEMINI_31_FLASH_LITE = "google/gemini-3.1-flash-lite"
 
 OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED = "gemma4_managed"
 OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK = "gemma4_byok"
@@ -20,6 +22,8 @@ OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED = "qwen35_flash_managed"
 OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK = "qwen35_flash_byok"
 OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED = "deepseek_v4_flash_managed"
 OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK = "deepseek_v4_flash_byok"
+OPENROUTER_SELECTION_ALIAS_GEMINI3_FLASH_BYOK = "gemini3_flash_byok"
+OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK = "gemini31_flash_lite_byok"
 
 OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE = "none"
 OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH = "qwen35_flash"
@@ -113,6 +117,22 @@ PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
         label_key="provider.deepseek_v4_flash_openrouter",
         description_key="provider.deepseek_v4_flash_openrouter.description",
         openrouter_model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+        openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
+    ),
+    OPENROUTER_SELECTION_ALIAS_GEMINI3_FLASH_BYOK: LLMSelectionProfile(
+        alias=OPENROUTER_SELECTION_ALIAS_GEMINI3_FLASH_BYOK,
+        provider=LLM_PROVIDER_OPENROUTER,
+        label_key="provider.gemini3_flash_openrouter",
+        description_key="provider.gemini3_flash_openrouter.description",
+        openrouter_model=OPENROUTER_MODEL_GEMINI_3_FLASH,
+        openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
+    ),
+    OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK: LLMSelectionProfile(
+        alias=OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
+        provider=LLM_PROVIDER_OPENROUTER,
+        label_key="provider.gemini31_flash_lite_openrouter",
+        description_key="provider.gemini31_flash_lite_openrouter.description",
+        openrouter_model=OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
 }
@@ -210,6 +230,8 @@ OPENROUTER_MAIN_SELECTION_ALIASES: tuple[str, ...] = (
     OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK,
     OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK,
+    OPENROUTER_SELECTION_ALIAS_GEMINI3_FLASH_BYOK,
+    OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
 )
 
 OPENROUTER_FALLBACK_SELECTION_ALIASES: tuple[str, ...] = (
@@ -271,6 +293,14 @@ def openrouter_alias_for_fields(*, model: str, source: str) -> str | None:
         if source == OPENROUTER_CREDENTIAL_SOURCE_MANAGED:
             return OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED
         return OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK
+    if model == OPENROUTER_MODEL_GEMINI_3_FLASH:
+        if source == OPENROUTER_CREDENTIAL_SOURCE_MANAGED:
+            return None
+        return OPENROUTER_SELECTION_ALIAS_GEMINI3_FLASH_BYOK
+    if model == OPENROUTER_MODEL_GEMINI_31_FLASH_LITE:
+        if source == OPENROUTER_CREDENTIAL_SOURCE_MANAGED:
+            return None
+        return OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK
     return None
 
 

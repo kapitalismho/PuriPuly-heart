@@ -156,6 +156,13 @@ def _build_provider_preferences(
             "only": ["deepseek", "baidu"],
             "allow_fallbacks": True,
         }
+    if provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY:
+        return {
+            "sort": "latency",
+            "only": ["google-vertex", "google-ai-studio"],
+            "allow_fallbacks": True,
+            "data_collection": "deny",
+        }
     if routing_mode == OpenRouterRoutingMode.PARASAIL_FIRST:
         return {"order": ["Parasail", "Novita"], "allow_fallbacks": True}
     if routing_mode == OpenRouterRoutingMode.NOVITA_FIRST:

@@ -3207,7 +3207,7 @@ def test_translation_connection_modal_opens_for_single_connection_model_without_
 ) -> None:
     settings = AppSettings()
     settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
+        model=TranslationModel.DEEPSEEK_V4_PRO,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
 
@@ -3931,7 +3931,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
         "settings.translation_model.gemma4.description",
         "settings.translation_model.deepseek_v4_flash.description",
         "settings.translation_model.gemini3_flash.description",
-        "settings.translation_model.gemini31_flash_lite.description",
+        "settings.translation_model.deepseek_v4_pro.description",
         "settings.translation_model.qwen35_plus.description",
         "settings.translation_model.local_llm.description",
     ):
@@ -3969,7 +3969,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
             "settings.translation_model.gemma4.description": "Good for most situations We recommend using this model",
             "settings.translation_model.deepseek_v4_flash.description": "An option for people using PuriPuly in mainland China",
             "settings.translation_model.gemini3_flash.description": "Translation speed may be unstable",
-            "settings.translation_model.gemini31_flash_lite.description": "Translation speed may be unstable",
+            "settings.translation_model.deepseek_v4_pro.description": "Translation speed may be unstable",
             "settings.translation_model.qwen35_plus.description": "A strong alternative to DeepSeek",
             "settings.translation_model.local_llm.description": "You can use an OpenAI-compatible API",
         },
@@ -3977,7 +3977,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
             "settings.translation_model.gemma4.description": "대부분의 상황에서 좋아요 이 모델을 사용하는 걸 권장해요",
             "settings.translation_model.deepseek_v4_flash.description": "중국 대륙에서 사용하고 있는 사람들을 위한 선택이에요",
             "settings.translation_model.gemini3_flash.description": "번역 속도가 불안정할 수 있어요",
-            "settings.translation_model.gemini31_flash_lite.description": "번역 속도가 불안정할 수 있어요",
+            "settings.translation_model.deepseek_v4_pro.description": "번역 속도가 불안정할 수 있어요",
             "settings.translation_model.qwen35_plus.description": "딥시크의 좋은 대안이에요",
             "settings.translation_model.local_llm.description": "OpenAI 호환 API를 사용할 수 있어요",
         },
@@ -3985,7 +3985,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
             "settings.translation_model.gemma4.description": "适合大多数情况 建议使用此模型",
             "settings.translation_model.deepseek_v4_flash.description": "适合在中国大陆使用 PuriPuly 的用户",
             "settings.translation_model.gemini3_flash.description": "翻译速度可能不稳定",
-            "settings.translation_model.gemini31_flash_lite.description": "翻译速度可能不稳定",
+            "settings.translation_model.deepseek_v4_pro.description": "翻译速度可能不稳定",
             "settings.translation_model.qwen35_plus.description": "DeepSeek 的不错替代选择",
             "settings.translation_model.local_llm.description": "可以使用 OpenAI 兼容 API",
         },

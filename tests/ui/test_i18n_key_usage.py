@@ -363,7 +363,7 @@ def test_local_llm_keys_are_localized() -> None:
         "ja": "OpenAI互換APIを使用できます",
         "zh-CN": "可以使用 OpenAI 兼容 API",
     }
-    expected_gemini31_flash_lite_descriptions = {
+    expected_deepseek_v4_pro_descriptions = {
         "en": "Translation speed may be unstable",
         "ko": "번역 속도가 불안정할 수 있어요",
         "ja": "翻訳速度が不安定になることがあります",
@@ -371,11 +371,10 @@ def test_local_llm_keys_are_localized() -> None:
     }
     for locale, expected in expected_local_llm_descriptions.items():
         assert bundles[locale]["settings.translation_model.local_llm.description"] == expected
-    for locale, expected in expected_gemini31_flash_lite_descriptions.items():
-        assert (
-            bundles[locale]["settings.translation_model.gemini31_flash_lite.description"]
-            == expected
-        )
+    for locale, expected in expected_deepseek_v4_pro_descriptions.items():
+        assert bundles[locale]["settings.translation_model.deepseek_v4_pro.description"] == expected
+    for locale in ("en", "ko", "ja", "zh-CN"):
+        assert bundles[locale]["settings.translation_model.gemini31_flash_lite.description"] == ""
     assert bundles["ko"]["settings.local_llm.connection"] == "OpenAI 호환 LLM 서버"
     assert bundles["ko"]["settings.local_llm.base_url"] == "Base URL"
     expected_model_copy = {
@@ -413,7 +412,7 @@ def test_zh_cn_qwen_labels_use_qwen_brand_name() -> None:
         assert "通义千问" not in value
 
 
-def test_deepseek_v4_pro_keys_are_localized_with_blank_descriptions() -> None:
+def test_deepseek_v4_pro_keys_are_localized_with_blank_provider_description() -> None:
     bundles = _load_bundles()
     required_keys = {
         "provider.deepseek_v4_pro",
@@ -425,6 +424,13 @@ def test_deepseek_v4_pro_keys_are_localized_with_blank_descriptions() -> None:
         "provider.deepseek_v4_pro_openrouter.description",
     }
 
+    expected_translation_model_descriptions = {
+        "en": "Translation speed may be unstable",
+        "ko": "번역 속도가 불안정할 수 있어요",
+        "ja": "翻訳速度が不安定になることがあります",
+        "zh-CN": "翻译速度可能不稳定",
+    }
+
     for locale, bundle in bundles.items():
         missing = sorted(required_keys - set(bundle))
         assert missing == [], locale
@@ -433,7 +439,10 @@ def test_deepseek_v4_pro_keys_are_localized_with_blank_descriptions() -> None:
         assert bundle["provider.deepseek_v4_pro"].strip()
         assert bundle["provider.deepseek_v4_pro"] != "provider.deepseek_v4_pro"
         assert bundle["provider.deepseek_v4_pro.description"] == ""
-        assert bundle["settings.translation_model.deepseek_v4_pro.description"] == ""
+        assert (
+            bundle["settings.translation_model.deepseek_v4_pro.description"]
+            == expected_translation_model_descriptions[locale]
+        )
 
 
 def test_managed_key_card_keys_are_localized() -> None:
@@ -521,12 +530,10 @@ def test_qq_auth_body_copy_distinguishes_verification_from_key_issuance() -> Non
     bundles = _load_bundles()
     english_body = bundles["en"]["qq_auth.body"]
 
-    assert "PuriPuly Broker" in english_body
-    assert "verify eligibility" in english_body
-    assert "when available" in english_body
-    assert "issue a Managed key" in english_body
-    assert "does not persist the raw QQ" in english_body
-    assert "stores only the Managed key" in english_body
+    assert "Join QQ group number 647594597" in english_body
+    assert "activation credential" in english_body
+    assert "turn on TRANS" in english_body
+    assert "does not store your raw QQ" in english_body
     for forbidden in FORBIDDEN_EN_QQ_PRIVACY_PROMISES:
         assert forbidden not in english_body
 

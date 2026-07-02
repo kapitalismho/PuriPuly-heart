@@ -21,8 +21,12 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+    OPENROUTER_MODEL_GEMINI_3_FLASH,
+    OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED,
+    OPENROUTER_SELECTION_ALIAS_GEMINI3_FLASH_BYOK,
+    OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED,
     OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK,
@@ -173,6 +177,8 @@ class OpenRouterLLMModel(str, Enum):
     GEMMA_4_26B_A4B_IT = "google/gemma-4-26b-a4b-it"
     QWEN_35_FLASH_02_23 = "qwen/qwen3.5-flash-02-23"
     DEEPSEEK_V4_FLASH = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+    GEMINI_3_FLASH = OPENROUTER_MODEL_GEMINI_3_FLASH
+    GEMINI_31_FLASH_LITE = OPENROUTER_MODEL_GEMINI_31_FLASH_LITE
 
 
 class OpenRouterRoutingMode(str, Enum):
@@ -184,6 +190,7 @@ class OpenRouterRoutingMode(str, Enum):
 class OpenRouterProviderRouting(str, Enum):
     DEFAULT = "default"
     DEEPSEEK_ONLY = "deepseek_only"
+    GOOGLE_GEMINI_LATENCY = "google_gemini_latency"
 
 
 class OpenRouterCredentialSource(str, Enum):
@@ -199,6 +206,8 @@ class OpenRouterSelectionAlias(str, Enum):
     QWEN35_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK
     DEEPSEEK_V4_FLASH_MANAGED = OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED
     DEEPSEEK_V4_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK
+    GEMINI3_FLASH_BYOK = OPENROUTER_SELECTION_ALIAS_GEMINI3_FLASH_BYOK
+    GEMINI31_FLASH_LITE_BYOK = OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK
 
 
 class OpenRouterFallbackSelectionAlias(str, Enum):
@@ -266,8 +275,14 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnec
         TranslationConnection.OFFICIAL_BYOK,
     ),
     TranslationModel.DEEPSEEK_V4_PRO: (TranslationConnection.OFFICIAL_BYOK,),
-    TranslationModel.GEMINI_3_FLASH: (TranslationConnection.OFFICIAL_BYOK,),
-    TranslationModel.GEMINI_31_FLASH_LITE: (TranslationConnection.OFFICIAL_BYOK,),
+    TranslationModel.GEMINI_3_FLASH: (
+        TranslationConnection.OFFICIAL_BYOK,
+        TranslationConnection.OPENROUTER,
+    ),
+    TranslationModel.GEMINI_31_FLASH_LITE: (
+        TranslationConnection.OFFICIAL_BYOK,
+        TranslationConnection.OPENROUTER,
+    ),
     TranslationModel.QWEN_35_PLUS: (TranslationConnection.OFFICIAL_BYOK,),
     TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
     TranslationModel.GEMMA4_31B_CEREBRAS: (TranslationConnection.OFFICIAL_BYOK,),
@@ -286,6 +301,8 @@ def supported_translation_connections(
 
 
 def default_translation_connection(model: TranslationModel) -> TranslationConnection:
+    if model in (TranslationModel.GEMINI_3_FLASH, TranslationModel.GEMINI_31_FLASH_LITE):
+        return TranslationConnection.OFFICIAL_BYOK
     supported_connections = supported_translation_connections(model)
     for connection in TRANSLATION_CONNECTION_PRIORITY:
         if connection in supported_connections:
@@ -1933,15 +1950,35 @@ def _derive_translation_settings_from_runtime_values(
                 ),
                 history=normalized_history,
             )
-        if openrouter_model == OpenRouterLLMModel.QWEN_35_FLASH_02_23:
+        if openrouter_model == OpenRouterLLMModel.GEMINI_3_FLASH:
             return _normalize_translation_settings(
-                model=TranslationModel.DEEPSEEK_V4_FLASH,
-                connection=_history_connection_or_default(
-                    TranslationModel.DEEPSEEK_V4_FLASH,
-                    normalized_history,
+                model=TranslationModel.GEMINI_3_FLASH,
+                connection=_translation_connection_from_openrouter_source(
+                    openrouter_selected_source,
+                    model=TranslationModel.GEMINI_3_FLASH,
+                    provider_routing=openrouter_provider_routing,
                 ),
                 history=normalized_history,
             )
+        if openrouter_model == OpenRouterLLMModel.GEMINI_31_FLASH_LITE:
+            return _normalize_translation_settings(
+                model=TranslationModel.GEMINI_31_FLASH_LITE,
+                connection=_translation_connection_from_openrouter_source(
+                    openrouter_selected_source,
+                    model=TranslationModel.GEMINI_31_FLASH_LITE,
+                    provider_routing=openrouter_provider_routing,
+                ),
+                history=normalized_history,
+            )
+    if openrouter_model == OpenRouterLLMModel.QWEN_35_FLASH_02_23:
+        return _normalize_translation_settings(
+            model=TranslationModel.DEEPSEEK_V4_FLASH,
+            connection=_history_connection_or_default(
+                TranslationModel.DEEPSEEK_V4_FLASH,
+                normalized_history,
+            ),
+            history=normalized_history,
+        )
 
     if provider_llm == LLMProviderName.LOCAL_LLM:
         return _normalize_translation_settings(
@@ -2071,12 +2108,32 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         return settings
 
     if model == TranslationModel.GEMINI_3_FLASH:
+        if connection == TranslationConnection.OPENROUTER:
+            settings.provider.llm = LLMProviderName.OPENROUTER
+            settings.openrouter.llm_model = OpenRouterLLMModel.GEMINI_3_FLASH
+            settings.openrouter.provider_routing = OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
+            settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
+            settings.openrouter.selection_alias = _derive_openrouter_selection_alias(
+                settings.openrouter.llm_model,
+                settings.openrouter.selected_source,
+            )
+            return settings
         settings.provider.llm = LLMProviderName.GEMINI
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
         settings.gemini.llm_model = GeminiLLMModel.GEMINI_3_FLASH
         return settings
 
     if model == TranslationModel.GEMINI_31_FLASH_LITE:
+        if connection == TranslationConnection.OPENROUTER:
+            settings.provider.llm = LLMProviderName.OPENROUTER
+            settings.openrouter.llm_model = OpenRouterLLMModel.GEMINI_31_FLASH_LITE
+            settings.openrouter.provider_routing = OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
+            settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
+            settings.openrouter.selection_alias = _derive_openrouter_selection_alias(
+                settings.openrouter.llm_model,
+                settings.openrouter.selected_source,
+            )
+            return settings
         settings.provider.llm = LLMProviderName.GEMINI
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
         settings.gemini.llm_model = GeminiLLMModel.GEMINI_31_FLASH_LITE
@@ -2221,6 +2278,29 @@ def _apply_materialized_translation_to_data(
         return changed
 
     if translation.model == TranslationModel.GEMINI_3_FLASH:
+        if translation.connection == TranslationConnection.OPENROUTER:
+            selection_alias = _derive_openrouter_selection_alias(
+                OpenRouterLLMModel.GEMINI_3_FLASH,
+                OpenRouterCredentialSource.BYOK,
+            )
+            changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.OPENROUTER.value)
+            changed |= _set_mapping_value(
+                openrouter_data,
+                "llm_model",
+                OpenRouterLLMModel.GEMINI_3_FLASH.value,
+            )
+            changed |= _set_mapping_value(
+                openrouter_data,
+                "provider_routing",
+                OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY.value,
+            )
+            changed |= _set_mapping_value(
+                openrouter_data,
+                "selected_source",
+                OpenRouterCredentialSource.BYOK.value,
+            )
+            changed |= _set_mapping_value(openrouter_data, "selection_alias", selection_alias.value)
+            return changed
         changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.GEMINI.value)
         changed |= _set_mapping_value(
             openrouter_data,
@@ -2235,6 +2315,29 @@ def _apply_materialized_translation_to_data(
         return changed
 
     if translation.model == TranslationModel.GEMINI_31_FLASH_LITE:
+        if translation.connection == TranslationConnection.OPENROUTER:
+            selection_alias = _derive_openrouter_selection_alias(
+                OpenRouterLLMModel.GEMINI_31_FLASH_LITE,
+                OpenRouterCredentialSource.BYOK,
+            )
+            changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.OPENROUTER.value)
+            changed |= _set_mapping_value(
+                openrouter_data,
+                "llm_model",
+                OpenRouterLLMModel.GEMINI_31_FLASH_LITE.value,
+            )
+            changed |= _set_mapping_value(
+                openrouter_data,
+                "provider_routing",
+                OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY.value,
+            )
+            changed |= _set_mapping_value(
+                openrouter_data,
+                "selected_source",
+                OpenRouterCredentialSource.BYOK.value,
+            )
+            changed |= _set_mapping_value(openrouter_data, "selection_alias", selection_alias.value)
+            return changed
         changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.GEMINI.value)
         changed |= _set_mapping_value(
             openrouter_data,

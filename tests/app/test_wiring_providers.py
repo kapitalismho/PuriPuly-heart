@@ -490,6 +490,55 @@ def test_create_llm_provider_openrouter_deepseek_only_skips_openrouter_fallback_
     assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
 
 
+def test_create_llm_provider_openrouter_gemini3_flash_byok_uses_google_gemini_latency_routing() -> (
+    None
+):
+    settings = AppSettings(
+        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
+        openrouter=OpenRouterSettings(
+            llm_model=OpenRouterLLMModel.GEMINI_3_FLASH,
+            selected_source=OpenRouterCredentialSource.BYOK,
+            selection_alias=OpenRouterSelectionAlias.GEMINI3_FLASH_BYOK,
+            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
+            provider_routing=OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY,
+        ),
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("openrouter_api_key", "or-key")
+
+    provider = create_llm_provider(settings, secrets=secrets)
+
+    assert isinstance(provider, SemaphoreLLMProvider)
+    assert isinstance(provider.inner, OpenRouterLLMProvider)
+    assert provider.inner.model == "google/gemini-3-flash-preview"
+    assert provider.inner.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
+    assert provider.inner.api_key == "or-key"
+
+
+def test_create_llm_provider_openrouter_gemini31_flash_lite_byok_uses_google_gemini_latency_routing() -> (
+    None
+):
+    settings = AppSettings(
+        provider=ProviderSettings(llm=LLMProviderName.OPENROUTER),
+        openrouter=OpenRouterSettings(
+            llm_model=OpenRouterLLMModel.GEMINI_31_FLASH_LITE,
+            selected_source=OpenRouterCredentialSource.BYOK,
+            selection_alias=OpenRouterSelectionAlias.GEMINI31_FLASH_LITE_BYOK,
+            fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
+            provider_routing=OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY,
+        ),
+    )
+    secrets = InMemorySecretStore()
+    secrets.set("openrouter_api_key", "or-key")
+
+    provider = create_llm_provider(settings, secrets=secrets)
+
+    assert isinstance(provider, SemaphoreLLMProvider)
+    assert isinstance(provider.inner, OpenRouterLLMProvider)
+    assert provider.inner.model == "google/gemini-3.1-flash-lite"
+    assert provider.inner.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
+
+
 def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_deepseek_only_routing() -> (
     None
 ):

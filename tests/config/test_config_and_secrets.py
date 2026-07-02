@@ -540,9 +540,11 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     )
     assert supported_translation_connections(TranslationModel.GEMINI_3_FLASH) == (
         TranslationConnection.OFFICIAL_BYOK,
+        TranslationConnection.OPENROUTER,
     )
     assert supported_translation_connections(TranslationModel.GEMINI_31_FLASH_LITE) == (
         TranslationConnection.OFFICIAL_BYOK,
+        TranslationConnection.OPENROUTER,
     )
     assert supported_translation_connections(TranslationModel.QWEN_35_PLUS) == (
         TranslationConnection.OFFICIAL_BYOK,
@@ -811,6 +813,113 @@ def test_materialize_translation_settings_returns_mutated_settings() -> None:
     assert returned is settings
     assert settings.provider.llm == LLMProviderName.DEEPSEEK
     assert settings.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH
+
+
+def test_materialize_translation_settings_maps_gemini_3_flash_openrouter() -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_3_FLASH,
+        connection=TranslationConnection.OPENROUTER,
+    )
+
+    returned = materialize_translation_settings(settings)
+
+    assert returned is settings
+    assert settings.provider.llm == LLMProviderName.OPENROUTER
+    assert settings.openrouter.llm_model == OpenRouterLLMModel.GEMINI_3_FLASH
+    assert settings.openrouter.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
+    assert settings.openrouter.selected_source == OpenRouterCredentialSource.BYOK
+    assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMINI3_FLASH_BYOK
+
+
+def test_materialize_translation_settings_maps_gemini_3_flash_official_byok() -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_3_FLASH,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+    )
+
+    returned = materialize_translation_settings(settings)
+
+    assert returned is settings
+    assert settings.provider.llm == LLMProviderName.GEMINI
+    assert settings.gemini.llm_model == GeminiLLMModel.GEMINI_3_FLASH
+    assert settings.openrouter.provider_routing == OpenRouterProviderRouting.DEFAULT
+
+
+def test_materialize_translation_settings_maps_gemini_31_flash_lite_openrouter() -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_31_FLASH_LITE,
+        connection=TranslationConnection.OPENROUTER,
+    )
+
+    returned = materialize_translation_settings(settings)
+
+    assert returned is settings
+    assert settings.provider.llm == LLMProviderName.OPENROUTER
+    assert settings.openrouter.llm_model == OpenRouterLLMModel.GEMINI_31_FLASH_LITE
+    assert settings.openrouter.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
+    assert settings.openrouter.selected_source == OpenRouterCredentialSource.BYOK
+    assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMINI31_FLASH_LITE_BYOK
+
+
+def test_materialize_translation_settings_maps_gemini_31_flash_lite_official_byok() -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_31_FLASH_LITE,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+    )
+
+    returned = materialize_translation_settings(settings)
+
+    assert returned is settings
+    assert settings.provider.llm == LLMProviderName.GEMINI
+    assert settings.gemini.llm_model == GeminiLLMModel.GEMINI_31_FLASH_LITE
+    assert settings.openrouter.provider_routing == OpenRouterProviderRouting.DEFAULT
+
+
+def test_to_dict_roundtrips_gemini_3_flash_openrouter() -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMINI_3_FLASH,
+        connection=TranslationConnection.OPENROUTER,
+        connection_history={
+            TranslationModel.GEMINI_3_FLASH.value: TranslationConnection.OPENROUTER,
+        },
+    )
+    materialize_translation_settings(settings)
+
+    data = to_dict(settings)
+
+    loaded = from_dict(data)
+
+    assert loaded.translation.model == TranslationModel.GEMINI_3_FLASH
+    assert loaded.translation.connection == TranslationConnection.OPENROUTER
+    assert loaded.provider.llm == LLMProviderName.OPENROUTER
+    assert loaded.openrouter.llm_model == OpenRouterLLMModel.GEMINI_3_FLASH
+    assert loaded.openrouter.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
+    assert loaded.openrouter.selected_source == OpenRouterCredentialSource.BYOK
+    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMINI3_FLASH_BYOK
+
+
+def test_from_dict_gemini_provider_with_stale_openrouter_gemini_fields_keeps_official_byok() -> (
+    None
+):
+    data = to_dict(AppSettings())
+    data["provider"]["llm"] = LLMProviderName.GEMINI.value
+    data["gemini"]["llm_model"] = GeminiLLMModel.GEMINI_3_FLASH.value
+    data["openrouter"]["llm_model"] = OpenRouterLLMModel.GEMINI_3_FLASH.value
+    data["openrouter"]["selected_source"] = OpenRouterCredentialSource.BYOK.value
+    data["openrouter"]["selection_alias"] = OpenRouterSelectionAlias.GEMINI3_FLASH_BYOK.value
+    data["openrouter"]["provider_routing"] = OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY.value
+    data.pop("translation", None)
+
+    loaded = from_dict(data)
+
+    assert loaded.provider.llm == LLMProviderName.GEMINI
+    assert loaded.translation.model == TranslationModel.GEMINI_3_FLASH
+    assert loaded.translation.connection == TranslationConnection.OFFICIAL_BYOK
 
 
 def test_deepseek_v4_pro_translation_supports_official_byok_only() -> None:
@@ -2475,7 +2584,7 @@ def test_load_settings_persists_normalized_translation_section(tmp_path) -> None
     raw = to_dict(AppSettings())
     raw["translation"] = {
         "model": TranslationModel.GEMINI_31_FLASH_LITE.value,
-        "connection": TranslationConnection.OPENROUTER.value,
+        "connection": TranslationConnection.MANAGED.value,
         "connection_history": {
             TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.MANAGED.value,
         },

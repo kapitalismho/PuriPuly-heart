@@ -375,6 +375,61 @@ async def test_httpx_openrouter_client_deepseek_china_routing_prefers_deepseek_t
 
 
 @pytest.mark.asyncio
+async def test_httpx_openrouter_client_google_gemini_latency_routing_uses_google_providers_only(
+    monkeypatch,
+) -> None:
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
+
+    client = HttpxOpenRouterClient(
+        api_key="test-key",
+        model="google/gemini-3-flash-preview",
+        base_url="https://example",
+        provider_routing=OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY,
+    )
+    await client.translate(
+        text="hello",
+        system_prompt="SYSTEM",
+        source_language="ko-KR",
+        target_language="en",
+    )
+
+    body = fake_client.last_request["json"]
+    provider = body["provider"]
+    assert provider["sort"] == "latency"
+    assert provider["only"] == ["google-vertex", "google-ai-studio"]
+    assert provider["allow_fallbacks"] is True
+    assert provider["data_collection"] == "deny"
+    assert "ignore" not in provider
+
+
+@pytest.mark.asyncio
+async def test_httpx_openrouter_client_google_gemini_latency_routing_does_not_ignore_vertex(
+    monkeypatch,
+) -> None:
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
+
+    client = HttpxOpenRouterClient(
+        api_key="test-key",
+        model="google/gemini-3.1-flash-lite",
+        base_url="https://example",
+        provider_routing=OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY,
+    )
+    await client.translate(
+        text="hello",
+        system_prompt="SYSTEM",
+        source_language="ko-KR",
+        target_language="en",
+    )
+
+    body = fake_client.last_request["json"]
+    provider = body["provider"]
+    assert "google-vertex" not in provider.get("ignore", [])
+    assert provider["only"] == ["google-vertex", "google-ai-studio"]
+
+
+@pytest.mark.asyncio
 async def test_httpx_openrouter_client_builds_ordered_request_for_parasail_first(
     monkeypatch,
 ) -> None:
