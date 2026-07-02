@@ -8,12 +8,16 @@ import flet as ft  # noqa: E402
 
 import puripuly_heart.ui.components.founder_letter_dialog as founder_module  # noqa: E402
 import puripuly_heart.ui.components.peer_translation_eula_dialog as eula_module  # noqa: E402
+import puripuly_heart.ui.components.telemetry_consent_dialog as telemetry_module  # noqa: E402
 import puripuly_heart.ui.components.warm_document_dialog as warm_dialog_module  # noqa: E402
 from puripuly_heart.ui.components.founder_letter_dialog import (  # noqa: E402
     FounderLetterDialog,
 )
 from puripuly_heart.ui.components.peer_translation_eula_dialog import (  # noqa: E402
     PeerTranslationEulaDialog,
+)
+from puripuly_heart.ui.components.telemetry_consent_dialog import (  # noqa: E402
+    TelemetryConsentDialog,
 )
 from puripuly_heart.ui.components.warm_document_dialog import (  # noqa: E402
     WarmDocumentDialogAction,
@@ -74,6 +78,21 @@ def _open_eula(monkeypatch: pytest.MonkeyPatch) -> tuple[FakePage, list[str]]:
     return page, requested_keys
 
 
+def _open_telemetry(monkeypatch: pytest.MonkeyPatch) -> tuple[FakePage, list[str]]:
+    requested_keys: list[str] = []
+
+    def fake_t(key: str) -> str:
+        requested_keys.append(key)
+        return f"value:{key}"
+
+    monkeypatch.setattr(telemetry_module, "t", fake_t)
+    monkeypatch.setattr(telemetry_module, "create_glow_stack", lambda content: content)
+
+    page = FakePage()
+    TelemetryConsentDialog(page, on_allow=lambda: None, on_decline=lambda: None).open()
+    return page, requested_keys
+
+
 def _modal_content(page: FakePage):
     return page.dialog.content
 
@@ -103,7 +122,7 @@ def _button_color(button, state: ft.ControlState) -> str:
     return button.style.color[state]
 
 
-@pytest.mark.parametrize("dialog_opener", [_open_founder_letter, _open_eula])
+@pytest.mark.parametrize("dialog_opener", [_open_founder_letter, _open_eula, _open_telemetry])
 def test_document_dialogs_use_large_vr_readable_body_type(
     monkeypatch: pytest.MonkeyPatch,
     dialog_opener,
@@ -119,7 +138,7 @@ def test_document_dialogs_use_large_vr_readable_body_type(
     assert [control.size for control in body_column.controls] == [24]
 
 
-@pytest.mark.parametrize("dialog_opener", [_open_founder_letter, _open_eula])
+@pytest.mark.parametrize("dialog_opener", [_open_founder_letter, _open_eula, _open_telemetry])
 def test_document_dialog_content_is_vertically_centered(
     monkeypatch: pytest.MonkeyPatch,
     dialog_opener,
@@ -131,7 +150,7 @@ def test_document_dialog_content_is_vertically_centered(
     assert content_column.alignment.name == "CENTER"
 
 
-@pytest.mark.parametrize("dialog_opener", [_open_founder_letter, _open_eula])
+@pytest.mark.parametrize("dialog_opener", [_open_founder_letter, _open_eula, _open_telemetry])
 def test_document_dialog_body_text_is_selectable(
     monkeypatch: pytest.MonkeyPatch,
     dialog_opener,
@@ -172,7 +191,22 @@ def test_document_dialogs_do_not_render_title_or_status_labels(
     assert "peer_translation_eula.title" not in eula_keys
 
 
-@pytest.mark.parametrize("dialog_opener", [_open_founder_letter, _open_eula])
+def test_telemetry_consent_body_text_is_one_selectable_text_control(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page, _requested_keys = _open_telemetry(monkeypatch)
+
+    body_column = _first_nested_column(page)
+
+    assert len(body_column.controls) == 1
+    assert body_column.controls[0].value == (
+        "value:telemetry.consent.title\n\n"
+        "value:telemetry.consent.body\n\n"
+        "value:telemetry.consent.excludes"
+    )
+
+
+@pytest.mark.parametrize("dialog_opener", [_open_founder_letter, _open_eula, _open_telemetry])
 def test_document_dialogs_use_large_standalone_action_buttons(
     monkeypatch: pytest.MonkeyPatch,
     dialog_opener,
