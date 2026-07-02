@@ -94,6 +94,7 @@ So I built one that can.
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
 | **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **Gemma 4 31B (Cerebras)** | 920 | 730 | 770 | 540 |
 | **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
 | **DeepSeek V4 Pro** | 6,400 | 2,330 | 2,810 | 1,070 |
 | **Gemini 3 Flash** | 1,710 | 1,170 | 1,280 | 740 |
@@ -106,6 +107,7 @@ So I built one that can.
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
 | **Gemma 4 26B A4B** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
+| **Gemma 4 31B (Cerebras)** | ~$0.0011 | ~$0.0014 | ~$0.0013 | ~$0.0019 |
 | **DeepSeek V4 Flash** | ~$0.00005 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
 | **DeepSeek V4 Pro** | ~$0.0002 | ~$0.0004 | ~$0.0004 | ~$0.0009 |
 | **Gemini 3 Flash** | ~$0.0006 | ~$0.0009 | ~$0.0008 | ~$0.0014 |
@@ -117,6 +119,7 @@ So I built one that can.
 *   *Uses per Dollar is derived from the un-rounded values in the Cost per Utterance table.*
 *   *All costs and usage counts are approximate.*
 *   *DeepSeek assumes a 70% cache hit rate.*
+*   *Gemma 4 31B (Cerebras) assumes $0.99 / 1M input tokens and $1.49 / 1M output tokens.*
 *   *Qwen API costs are based on the Beijing region.*
 *   *Pricing as of May 25, 2026 / Fast Response mode active.*
 
