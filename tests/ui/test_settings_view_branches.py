@@ -3218,21 +3218,21 @@ def test_openrouter_fallback_modal_lists_curated_openrouter_fallbacks(
 
     view._on_openrouter_fallback_click(None)
 
-    assert captured["show_description"] is True
+    assert captured["show_description"] is False
     options = captured["options"]
     assert [option.value for option in options] == [
         TranslationFallbackSelectionAlias.NONE.value,
         TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL.value,
         TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH.value,
-        TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B.value,
         TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B.value,
+        TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B.value,
     ]
     assert [option.label for option in options] == [
         t("settings.fallback.none"),
         t("settings.fallback.deepseek_v4_flash_official"),
         t("settings.fallback.openrouter_deepseek_v4_flash"),
-        t("settings.fallback.cerebras_gemma4_31b"),
         t("settings.fallback.openrouter_gemma4_26b_a4b"),
+        t("settings.fallback.cerebras_gemma4_31b"),
     ]
 
 
@@ -3386,7 +3386,7 @@ def test_translation_connection_modal_opens_for_single_connection_model_without_
     assert options[0].description == ""
 
 
-def test_openrouter_fallback_modal_hides_provider_descriptions_for_active_options(
+def test_openrouter_fallback_modal_options_have_no_description(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
@@ -3410,14 +3410,9 @@ def test_openrouter_fallback_modal_hides_provider_descriptions_for_active_option
 
     view._on_openrouter_fallback_click(None)
 
-    options = {option.value: option for option in captured["options"]}
-    assert captured["show_description"] is True
-    assert options[TranslationFallbackSelectionAlias.NONE.value].description == t(
-        "settings.fallback.none.description"
-    )
-    assert options[
-        TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH.value
-    ].description == t("settings.fallback.openrouter_deepseek_v4_flash.description")
+    assert captured["show_description"] is False
+    for option in captured["options"]:
+        assert option.description == ""
 
 
 def test_openrouter_fallback_off_does_not_show_active_helper_copy(

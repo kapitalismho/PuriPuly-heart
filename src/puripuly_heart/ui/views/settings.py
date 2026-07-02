@@ -129,22 +129,15 @@ _TRANSLATION_FALLBACK_SELECTION_ORDER = (
     TranslationFallbackSelectionAlias.NONE,
     TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL,
     TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH,
-    TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B,
     TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B,
+    TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B,
 )
 _TRANSLATION_FALLBACK_LABEL_KEYS = {
     TranslationFallbackSelectionAlias.NONE: "settings.fallback.none",
     TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL: "settings.fallback.deepseek_v4_flash_official",
     TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH: "settings.fallback.openrouter_deepseek_v4_flash",
-    TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B: "settings.fallback.cerebras_gemma4_31b",
     TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B: "settings.fallback.openrouter_gemma4_26b_a4b",
-}
-_TRANSLATION_FALLBACK_DESCRIPTION_KEYS = {
-    TranslationFallbackSelectionAlias.NONE: "settings.fallback.none.description",
-    TranslationFallbackSelectionAlias.DEEPSEEK_V4_FLASH_OFFICIAL: "settings.fallback.deepseek_v4_flash_official.description",
-    TranslationFallbackSelectionAlias.OPENROUTER_DEEPSEEK_V4_FLASH: "settings.fallback.openrouter_deepseek_v4_flash.description",
-    TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B: "settings.fallback.cerebras_gemma4_31b.description",
-    TranslationFallbackSelectionAlias.OPENROUTER_GEMMA4_26B_A4B: "settings.fallback.openrouter_gemma4_26b_a4b.description",
+    TranslationFallbackSelectionAlias.CEREBRAS_GEMMA4_31B: "settings.fallback.cerebras_gemma4_31b",
 }
 
 
@@ -2106,12 +2099,6 @@ class SettingsView(ft.Column):
     ) -> str:
         return t(_TRANSLATION_FALLBACK_LABEL_KEYS[alias])
 
-    def _translation_fallback_display_description(
-        self,
-        alias: TranslationFallbackSelectionAlias,
-    ) -> str:
-        return t(_TRANSLATION_FALLBACK_DESCRIPTION_KEYS[alias], default="")
-
     def _effective_translation_fallback_modal_value(
         self,
         settings: AppSettings | None,
@@ -3381,7 +3368,6 @@ class SettingsView(ft.Column):
             OptionItem(
                 value=alias.value,
                 label=self._translation_fallback_display_label(alias),
-                description=self._translation_fallback_display_description(alias),
             )
             for alias in _TRANSLATION_FALLBACK_SELECTION_ORDER
         ]
@@ -3405,7 +3391,6 @@ class SettingsView(ft.Column):
                         if profile is not None
                         else display_settings.openrouter.fallback_selection_alias.value
                     ),
-                    description=t("settings.fallback.legacy_option.description", default=""),
                 )
             )
         current = self._effective_translation_fallback_modal_value(display_settings)
@@ -3421,10 +3406,10 @@ class SettingsView(ft.Column):
             current = f"legacy:{display_settings.openrouter.fallback_selection_alias.value}"
         modal = SettingsModal(
             self.page,
-            t("settings.fallback"),
+            t("settings.fallback.modal_title"),
             options,
             self._on_openrouter_fallback_selected,
-            show_description=True,
+            show_description=False,
         )
         modal.open(current)
 
