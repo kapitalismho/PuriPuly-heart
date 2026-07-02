@@ -74,7 +74,7 @@ So I built one that can.
 → If you're using local Qwen ASR, we recommend switching to a cloud STT service. If you're on Intel, configure PuriPuly so it's pinned to P-cores only.
 
 - **How are voice and conversation contents handled?**
-→ Only your own transcripts and translation results are stored locally. Other people's voices, transcripts, and translation results are never recorded. That said, the STT service and translation provider may process the data.
+→ Voice and conversation contents are stored locally and are not sent to Puripuly servers. Other people's voices, transcripts, and translation results are never recorded. That said, the STT service and translation provider may process the data.
 
 ### [📥 Download](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 

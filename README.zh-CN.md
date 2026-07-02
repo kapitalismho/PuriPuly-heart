@@ -74,7 +74,7 @@
 → 如果您正在使用本地 Qwen ASR，建议改用云端 STT 服务。如果您是 Intel 用户，请将 PuriPuly 设置为仅固定分配到 P-core。
 
 - **语音和对话内容如何处理？**
-→ 仅将自己的转写与翻译结果保存在本地。不会记录他人的语音、转写或翻译结果。但 STT 服务和翻译提供商可能会处理数据。
+→ 语音和对话内容会保存在本地，不会发送到 Puripuly 服务器。此外，不会记录他人的语音、转写或翻译结果。但 STT 服务和翻译提供商可能会处理数据。
 
 ### [📥 下载](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
