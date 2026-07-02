@@ -633,6 +633,10 @@ class GuiController:
             apply_locale = getattr(self.app, "apply_locale", None)
             if callable(apply_locale):
                 apply_locale()
+        with contextlib.suppress(Exception):
+            show_telemetry_consent_dialog = getattr(self.app, "show_telemetry_consent_dialog", None)
+            if callable(show_telemetry_consent_dialog):
+                show_telemetry_consent_dialog()
 
         runtime_logging = self.runtime_logging
         runtime_logging.set_mode(SessionLoggingMode.BASIC)

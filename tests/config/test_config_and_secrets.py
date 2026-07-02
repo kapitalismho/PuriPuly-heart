@@ -45,6 +45,7 @@ from puripuly_heart.config.settings import (
     QwenLLMModel,
     QwenRegion,
     STTProviderName,
+    TelemetryConsent,
     TranslationConnection,
     TranslationModel,
     TranslationSettings,
@@ -335,7 +336,7 @@ def test_migrate_v17_normalizes_directsound_host_api_and_preserves_device() -> N
 
 
 def test_migrate_v18_preserves_directsound_when_removing_legacy_osc_rate_limits() -> None:
-    assert SETTINGS_SCHEMA_VERSION == 25
+    assert SETTINGS_SCHEMA_VERSION == 27
 
     raw = to_dict(AppSettings())
     raw["settings_version"] = 17
@@ -379,7 +380,7 @@ def test_load_settings_persists_v17_directsound_preservation(tmp_path) -> None:
 
 
 def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None:
-    assert SETTINGS_SCHEMA_VERSION == 25
+    assert SETTINGS_SCHEMA_VERSION == 27
 
     path = tmp_path / "settings.json"
     raw = to_dict(AppSettings())
@@ -3119,6 +3120,64 @@ def test_load_settings_schema_migration_resets_all_prompt_values(tmp_path) -> No
     assert persisted["system_prompt"] == shared_prompt
     assert loaded.system_prompts == {}
     assert "system_prompts" not in persisted
+
+
+def test_telemetry_defaults_are_unknown_and_not_send_eligible() -> None:
+    settings = from_dict({})
+
+    assert settings.telemetry.consent == TelemetryConsent.UNKNOWN
+    assert settings.telemetry.identifier is None
+    assert settings.telemetry.sent_utc_dates == []
+    assert settings.telemetry.is_send_eligible is False
+    assert to_dict(settings)["telemetry"] == {
+        "consent": "unknown",
+        "identifier": None,
+        "sent_utc_dates": [],
+    }
+
+
+def test_telemetry_allow_disable_and_reenable_identifier_lifecycle() -> None:
+    settings = AppSettings()
+
+    settings.telemetry.allow()
+    first_identifier = settings.telemetry.identifier
+    assert settings.telemetry.consent == TelemetryConsent.ALLOW
+    assert first_identifier
+    settings.telemetry.sent_utc_dates = ["2026-07-02"]
+
+    settings.telemetry.decline()
+    assert settings.telemetry.consent == TelemetryConsent.DECLINE
+    assert settings.telemetry.identifier is None
+    assert settings.telemetry.sent_utc_dates == []
+
+    settings.telemetry.allow()
+    assert settings.telemetry.identifier
+    assert settings.telemetry.identifier != first_identifier
+
+
+def test_telemetry_roundtrip_and_malformed_values_repair() -> None:
+    settings = AppSettings()
+    settings.telemetry.allow()
+    settings.telemetry.sent_utc_dates = ["2026-07-02", "bad", "2026-07-02", "2026-07-03"]
+
+    loaded = from_dict(to_dict(settings))
+
+    assert loaded.telemetry.consent == TelemetryConsent.ALLOW
+    assert loaded.telemetry.identifier == settings.telemetry.identifier
+    assert loaded.telemetry.sent_utc_dates == ["2026-07-02", "2026-07-03"]
+
+    malformed = from_dict(
+        {
+            "telemetry": {
+                "consent": "maybe",
+                "identifier": "short",
+                "sent_utc_dates": ["not-a-date"],
+            }
+        }
+    )
+    assert malformed.telemetry.consent == TelemetryConsent.UNKNOWN
+    assert malformed.telemetry.identifier is None
+    assert malformed.telemetry.sent_utc_dates == []
 
 
 def test_from_dict_initializes_empty_prompt_fields_to_shared_default() -> None:

@@ -37,6 +37,7 @@ from puripuly_heart.config.settings import (
     OpenRouterSelectionAlias,
     QwenRegion,
     STTProviderName,
+    TelemetryConsent,
     TranslationConnection,
     TranslationModel,
     _normalize_local_llm_base_url,
@@ -376,6 +377,7 @@ class SettingsView(ft.Column):
             self._ui_text,
             self._chatbox_source_text,
             self._clipboard_auto_translate_text,
+            self._telemetry_text,
             self._microphone_test_text,
             self._vrc_mic_text,
             self._mic_audio_text,
@@ -1065,6 +1067,21 @@ class SettingsView(ft.Column):
             value=self._clipboard_auto_translate_text,
         )
 
+        self._telemetry_text = self._build_clickable_text(
+            t("settings.telemetry.state_off"),
+            self._on_telemetry_click,
+        )
+        self._telemetry_title = ft.Text(
+            t("settings.telemetry.title"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_NEUTRAL,
+        )
+        telemetry_card = self._wrap_unit_card(
+            title=self._telemetry_title,
+            value=self._telemetry_text,
+        )
+
         self._vrc_mic_text = self._build_clickable_text(
             t("settings.vrc_mic.on"),
             self._on_vrc_mic_click,
@@ -1250,7 +1267,7 @@ class SettingsView(ft.Column):
                 [
                     clipboard_auto_translate_card,
                     vrc_mic_card,
-                    self._wrap_empty_unit_card(),
+                    telemetry_card,
                 ],
                 spacing=16,
                 expand=True,
@@ -2729,6 +2746,7 @@ class SettingsView(ft.Column):
             if settings.ui.clipboard_auto_translate_enabled
             else "settings.clipboard_auto_translate.off"
         )
+        self._sync_telemetry_card(settings)
         # Prompt
         provider_name = self._active_prompt_key()
         self._prompt_editor.set_provider(provider_name)
@@ -4429,6 +4447,28 @@ class SettingsView(ft.Column):
             self._clipboard_auto_translate_text.update()
         self._emit_settings_changed()
 
+    def _sync_telemetry_card(self, settings: AppSettings | None = None) -> None:
+        settings = settings or self._settings
+        if not settings:
+            return
+        self._telemetry_text.content.value = t(
+            "settings.telemetry.state_on"
+            if settings.telemetry.consent == TelemetryConsent.ALLOW
+            else "settings.telemetry.state_off"
+        )
+
+    def _on_telemetry_click(self, e) -> None:
+        if not self._settings:
+            return
+        if self._settings.telemetry.consent == TelemetryConsent.ALLOW:
+            self._settings.telemetry.decline()
+        else:
+            self._settings.telemetry.allow()
+        self._sync_telemetry_card(self._settings)
+        if self.page:
+            self._telemetry_text.update()
+        self._emit_settings_changed()
+
     def _on_low_latency_click(self, e) -> None:
         """Open low latency mode selection modal."""
         if not self.page:
@@ -4669,6 +4709,7 @@ class SettingsView(ft.Column):
         self._vrc_mic_title.value = t("settings.vrc_mic_intercept")
         self._chatbox_source_title.value = t("settings.chatbox_include_source")
         self._clipboard_auto_translate_title.value = t("settings.clipboard_auto_translate")
+        self._telemetry_title.value = t("settings.telemetry.title")
         self._peer_provider_title.value = t("settings.section.peer_stt")
         self._dashboard_language_redirect_text.value = t("settings.dashboard_language_redirect")
         self._peer_stt_label.value = t("settings.peer_stt_provider")
@@ -4767,6 +4808,7 @@ class SettingsView(ft.Column):
                 if display_settings.ui.clipboard_auto_translate_enabled
                 else "settings.clipboard_auto_translate.off"
             )
+            self._sync_telemetry_card(display_settings)
             self._set_unit_card_value_text(
                 self._microphone_test_text,
                 t("settings.microphone_test.action"),
