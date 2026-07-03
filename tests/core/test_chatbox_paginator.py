@@ -283,6 +283,33 @@ def test_typing_indicator_is_forwarded_and_failure_is_basic_log() -> None:
     ]
 
 
+def test_typing_reasons_send_only_on_aggregate_state_changes() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(sender=sender, clock=clock)
+
+    paginator.set_typing_reason("manual_input", True)
+    paginator.set_typing_reason("manual_input", True)
+    paginator.set_typing_reason("self_speech_pending", True)
+    paginator.set_typing_reason("manual_input", False)
+    paginator.set_typing_reason("self_speech_pending", False)
+
+    assert sender.typing == [True, False]
+
+
+def test_clear_typing_reasons_turns_visible_indicator_off_once() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(sender=sender, clock=clock)
+
+    paginator.set_typing_reason("manual_input", True)
+    paginator.set_typing_reason("self_speech_pending", True)
+    paginator.clear_typing_reasons()
+    paginator.clear_typing_reasons()
+
+    assert sender.typing == [True, False]
+
+
 def test_send_immediate_trims_and_does_not_delay_pagination() -> None:
     clock = FakeClock()
     sender = FakeSender()

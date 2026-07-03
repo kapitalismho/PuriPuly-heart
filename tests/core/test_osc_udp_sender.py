@@ -80,3 +80,26 @@ def test_vrchat_udp_sender_preserves_chatbox_send_false_bool():
     assert text == "draft"
 
     assert offset == len(packet)
+
+
+def test_vrchat_udp_sender_sends_typing_bool_packet():
+    server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server.bind(("127.0.0.1", 0))
+    server.settimeout(1.0)
+    host, port = server.getsockname()
+    assert host == "127.0.0.1"
+
+    sender = VrchatOscUdpSender(host="127.0.0.1", port=port)
+    try:
+        sender.send_typing(True)
+        packet, _addr = server.recvfrom(65535)
+    finally:
+        sender.close()
+        server.close()
+
+    address, offset = _read_osc_string(packet, 0)
+    assert address == "/chatbox/typing"
+
+    tags, offset = _read_osc_string(packet, offset)
+    assert tags == ",T"
+    assert offset == len(packet)

@@ -60,9 +60,11 @@ class DisplayCard(ft.Container):
         self,
         on_submit: Callable[[str], None],
         on_input_focus_change: Callable[[bool], None] | None = None,
+        on_input_activity: Callable[[bool], None] | None = None,
     ):
         self._on_submit = on_submit
         self._on_input_focus_change = on_input_focus_change
+        self._on_input_activity = on_input_activity
         self._status = "disconnected"
         self._showing_status = True
         self._primary_value = _status_label(self._status)
@@ -118,6 +120,7 @@ class DisplayCard(ft.Container):
             color=COLOR_NEUTRAL_DARK,
             hint_style=ft.TextStyle(color=COLOR_SECONDARY, italic=True),
             expand=True,
+            on_change=self._handle_input_change,
             on_submit=self._handle_submit,
             on_focus=self._handle_input_focus,
             on_blur=self._handle_input_blur,
@@ -204,6 +207,12 @@ class DisplayCard(ft.Container):
 
     def _handle_input_blur(self, _e) -> None:
         self._set_input_focus(False)
+
+    def _handle_input_change(self, e) -> None:
+        if self._on_input_activity is None:
+            return
+        value = getattr(e.control, "value", "") or ""
+        self._on_input_activity(bool(value.strip()))
 
     def _set_input_focus(self, focused: bool) -> None:
         self.input_is_focused = bool(focused)

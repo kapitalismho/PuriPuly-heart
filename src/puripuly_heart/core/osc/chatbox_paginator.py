@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.osc.sender import OscSender
@@ -21,7 +21,9 @@ class ChatboxPaginator:
     runtime_logging: SessionRuntimeLoggingService | None = None
     _pending_pages: list[str] | None = None
     _pending_messages: list[OSCMessage] | None = None
+    _typing_reasons: set[str] = field(init=False, default_factory=set)
     _next_page_at: float = 0.0
+    _typing_visible: bool = False
 
     def __post_init__(self) -> None:
         if self.max_chars <= 0:
@@ -65,13 +67,40 @@ class ChatboxPaginator:
         return self._send_page(mode="immediate", text=text, remaining_parts=0)
 
     def send_typing(self, is_typing: bool) -> None:
-        """Forward typing indicator to the OSC sender."""
+        if self._send_typing_state(is_typing):
+            self._typing_visible = is_typing
+
+    def set_typing_reason(self, reason: str, active: bool) -> None:
+        reason = reason.strip()
+        if not reason:
+            raise ValueError("reason must be non-empty")
+
+        if active:
+            self._typing_reasons.add(reason)
+        else:
+            self._typing_reasons.discard(reason)
+        self._sync_typing_visibility()
+
+    def clear_typing_reasons(self) -> None:
+        self._typing_reasons.clear()
+        self._sync_typing_visibility()
+
+    def _sync_typing_visibility(self) -> None:
+        visible = bool(self._typing_reasons)
+        if visible == self._typing_visible:
+            return
+        if self._send_typing_state(visible):
+            self._typing_visible = visible
+
+    def _send_typing_state(self, is_typing: bool) -> bool:
         try:
             self.sender.send_typing(is_typing)
         except OSError as exc:
             self._emit_basic(
                 f"[Basic][OSC] typing status=failed error={exc}", level=logging.WARNING
             )
+            return False
+        return True
 
     def _is_paginating(self) -> bool:
         return bool(self._pending_pages)

@@ -107,6 +107,17 @@ def test_display_card_tracks_input_focus_and_can_refocus(
     assert focus_calls == ["focus"]
 
 
+def test_display_card_reports_input_activity_without_exposing_text() -> None:
+    activity: list[bool] = []
+    card = DisplayCard(on_submit=lambda _text: None, on_input_activity=activity.append)
+
+    card._handle_input_change(SimpleNamespace(control=SimpleNamespace(value="hello")))
+    card._handle_input_change(SimpleNamespace(control=SimpleNamespace(value="   ")))
+    card._handle_input_change(SimpleNamespace(control=SimpleNamespace(value="")))
+
+    assert activity == [True, False, False]
+
+
 def test_display_card_input_font_locale_and_sync_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
     monkeypatch.setattr(type(card._input_field), "update", lambda self: None)

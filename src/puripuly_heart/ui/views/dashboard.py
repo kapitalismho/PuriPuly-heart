@@ -67,6 +67,7 @@ class DashboardView(ft.Column):
         self.on_toggle_peer_translation = None
         self.on_language_change = None
         self.on_recent_languages_change = None  # For persistence
+        self.on_message_input_activity = None
         self.runtime_log_detailed: Callable[..., bool | None] | None = None
 
         self._build_ui()
@@ -109,6 +110,7 @@ class DashboardView(ft.Column):
         self.display_card = DisplayCard(
             on_submit=self._on_submit,
             on_input_focus_change=self._set_message_input_focused,
+            on_input_activity=self._on_message_input_activity,
         )
         self.language_card = LanguageCard(
             on_self_source_click=self._open_source_dialog,
@@ -276,6 +278,12 @@ class DashboardView(ft.Column):
 
     def _set_message_input_focused(self, focused: bool) -> None:
         self._message_input_focused = bool(focused)
+        if not self._message_input_focused:
+            self._on_message_input_activity(False)
+
+    def _on_message_input_activity(self, has_text: bool) -> None:
+        if self.on_message_input_activity:
+            self.on_message_input_activity(bool(has_text))
 
     def handle_message_input_tab_key(self) -> bool:
         if not self._message_input_focused:

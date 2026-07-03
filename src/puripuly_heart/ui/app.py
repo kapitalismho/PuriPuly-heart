@@ -154,6 +154,7 @@ class TranslatorApp:
         self.view_dashboard.on_toggle_overlay = self._on_overlay_toggle
         self.view_dashboard.on_toggle_peer_translation = self._on_peer_translation_toggle
         self.view_dashboard.on_language_change = self._on_language_change
+        self.view_dashboard.on_message_input_activity = self._on_manual_input_activity
 
         self.view_settings.on_settings_changed = self._on_settings_changed
         self.view_settings.on_prompt_apply_settings = self._on_prompt_apply_settings
@@ -803,6 +804,11 @@ class TranslatorApp:
             await self.controller.submit_text(text)
 
         self.page.run_task(_task)
+
+    def _on_manual_input_activity(self, has_text: bool) -> None:
+        handler = getattr(self.controller, "note_manual_input_activity", None)
+        if callable(handler):
+            handler(bool(has_text))
 
     def _on_keyboard_event(self, event) -> None:
         if getattr(event, "key", None) != "Tab":

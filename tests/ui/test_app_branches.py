@@ -142,6 +142,10 @@ class ConstructionDummyController:
         self.runtime_logging_mode = "detailed"
         self.basic_messages: list[str] = []
         self.detailed_messages: list[str] = []
+        self.manual_input_activity: list[bool] = []
+
+    def note_manual_input_activity(self, has_text: bool) -> None:
+        self.manual_input_activity.append(has_text)
 
     def set_runtime_logging_mode(self, mode: str) -> None:
         self.runtime_logging_mode = mode
@@ -175,6 +179,7 @@ class ConstructionDummyDashboardView(ft.Container):
         self.on_toggle_overlay = None
         self.on_toggle_peer_translation = None
         self.on_language_change = None
+        self.on_message_input_activity = None
         self.overlay_peer_contract = None
         self.runtime_log_detailed = None
 
@@ -279,6 +284,7 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert page.window.height >= page.window.min_height
     assert page.added
     assert app.view_dashboard.on_send_message == app._on_manual_submit
+    assert app.view_dashboard.on_message_input_activity == app._on_manual_input_activity
     assert app.view_dashboard.on_toggle_overlay == app._on_overlay_toggle
     assert app.view_dashboard.on_toggle_peer_translation == app._on_peer_translation_toggle
     assert app.view_settings.on_verify_api_key == app._on_verify_api_key
@@ -299,6 +305,21 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_settings.runtime_log_detailed == app.controller.log_detailed
     assert app.view_logs.on_mode_change == app._on_runtime_logging_mode_change
     assert app.view_logs.runtime_logging_mode == "detailed"
+
+
+def test_manual_input_activity_is_forwarded_without_task_scheduling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_app_construction(monkeypatch)
+
+    page = DummyPage()
+    app = TranslatorApp(page, config_path=Path("settings.json"))
+
+    app._on_manual_input_activity(True)
+    app._on_manual_input_activity(False)
+
+    assert app.controller.manual_input_activity == [True, False]
+    assert page.tasks == []
 
 
 @pytest.mark.asyncio

@@ -96,6 +96,7 @@ _LATENCY_TRACE_ORDER = (
     "peer_overlay_first_render",
 )
 _LATENCY_SUMMARY_OUTPUT_STAGES = {"self_chatbox_enqueue", "peer_overlay_first_emit"}
+_SELF_SPEECH_TYPING_REASON = "self_speech_pending"
 
 
 @dataclass(slots=True)
@@ -717,8 +718,10 @@ class ClientHub:
 
     async def stop(self) -> None:
         if not self._running:
+            self._clear_osc_typing_reasons()
             return
         self._running = False
+        self._clear_osc_typing_reasons()
 
         if self._osc_flush_task:
             self._osc_flush_task.cancel()
@@ -863,7 +866,7 @@ class ClientHub:
         # Record start time for E2E latency tracking (from speech end)
         if isinstance(event, SpeechEnd):
             speech_end_at = self.clock.now()
-            self.osc.send_typing(True)
+            self._set_osc_typing_reason(_SELF_SPEECH_TYPING_REASON, True)
             self._utterance_start_times[event.utterance_id] = speech_end_at
             self._speech_ended_ids.add(event.utterance_id)
             self._record_latency_stage(
@@ -3006,8 +3009,8 @@ class ClientHub:
 
         self.osc.enqueue(msg)
 
-        # Stop typing indicator after message is sent
-        self.osc.send_typing(False)
+        if runtime.channel == "self":
+            self._set_osc_typing_reason(_SELF_SPEECH_TYPING_REASON, False)
 
         await self.ui_events.put(
             UIEvent(
@@ -3028,6 +3031,20 @@ class ClientHub:
             fallback_level=logging.INFO,
         )
         self.osc.enqueue(msg)
+
+    def _set_osc_typing_reason(self, reason: str, active: bool) -> None:
+        set_reason = getattr(self.osc, "set_typing_reason", None)
+        if callable(set_reason):
+            set_reason(reason, active)
+            return
+        self.osc.send_typing(active)
+
+    def _clear_osc_typing_reasons(self) -> None:
+        clear_reasons = getattr(self.osc, "clear_typing_reasons", None)
+        if callable(clear_reasons):
+            clear_reasons()
+            return
+        self.osc.send_typing(False)
 
     async def _run_osc_flush_loop(self) -> None:
         try:
