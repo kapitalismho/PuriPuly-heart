@@ -564,7 +564,34 @@ def test_telemetry_card_toggle_routes_through_identifier_lifecycle(
     view.on_settings_changed = emitted.append
 
     view.load_from_settings(settings, config_path=Path("settings.json"))
+    view.page = object()
+    monkeypatch.setattr(type(view._telemetry_text), "update", lambda self: None)
+
+    captured: dict[str, object] = {}
+
+    class DummyModal:
+        def __init__(self, _page, _title, options, on_select, *, show_description=False):
+            captured["options"] = options
+            captured["on_select"] = on_select
+            captured["show_description"] = show_description
+
+        def open(self, current: str) -> None:
+            captured["current"] = current
+
+    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
+
     view._on_telemetry_click(None)
+    assert captured["current"] == "off"
+    assert captured["show_description"] is True
+    options = captured["options"]
+    on_option = next(option for option in options if option.value == "on")
+    off_option = next(option for option in options if option.value == "off")
+    assert on_option.label == t("settings.telemetry.state_on")
+    assert on_option.description == t("settings.telemetry.on.description")
+    assert off_option.label == t("settings.telemetry.state_off")
+    assert off_option.description == ""
+
+    captured["on_select"]("on")
     first_identifier = settings.telemetry.identifier
 
     assert settings.telemetry.consent == TelemetryConsent.ALLOW
@@ -574,12 +601,16 @@ def test_telemetry_card_toggle_routes_through_identifier_lifecycle(
 
     settings.telemetry.sent_utc_dates = ["2026-07-02"]
     view._on_telemetry_click(None)
+    assert captured["current"] == "on"
+    captured["on_select"]("off")
     assert settings.telemetry.consent == TelemetryConsent.DECLINE
     assert settings.telemetry.identifier is None
     assert settings.telemetry.sent_utc_dates == []
     assert view._telemetry_text.content.value == t("settings.telemetry.state_off")
 
     view._on_telemetry_click(None)
+    assert captured["current"] == "off"
+    captured["on_select"]("on")
     assert settings.telemetry.identifier
     assert settings.telemetry.identifier != first_identifier
 

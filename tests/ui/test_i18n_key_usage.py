@@ -232,6 +232,7 @@ def test_telemetry_consent_and_settings_keys_are_localized() -> None:
         "settings.telemetry.title",
         "settings.telemetry.state_on",
         "settings.telemetry.state_off",
+        "settings.telemetry.on.description",
         "telemetry.consent.title",
         "telemetry.consent.body",
         "telemetry.consent.excludes",
@@ -245,7 +246,7 @@ def test_telemetry_consent_and_settings_keys_are_localized() -> None:
         for key in required_keys:
             assert bundle[key].strip()
             assert bundle[key] != key
-    assert bundles["ko"]["settings.telemetry.title"] == "익명 사용 통계 보내기"
+    assert bundles["ko"]["settings.telemetry.title"] == "활성 데이터 전송"
     assert bundles["ko"]["telemetry.consent.allow"] == "동의"
 
 

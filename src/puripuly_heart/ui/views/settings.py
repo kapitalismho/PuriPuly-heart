@@ -4587,15 +4587,48 @@ class SettingsView(ft.Column):
         )
 
     def _on_telemetry_click(self, e) -> None:
+        if not self.page:
+            return
         if not self._settings:
             return
-        if self._settings.telemetry.consent == TelemetryConsent.ALLOW:
-            self._settings.telemetry.decline()
-        else:
+        options = [
+            OptionItem(
+                value="on",
+                label=t("settings.telemetry.state_on"),
+                description=t("settings.telemetry.on.description", default=""),
+            ),
+            OptionItem(
+                value="off",
+                label=t("settings.telemetry.state_off"),
+            ),
+        ]
+        current = "on" if self._settings.telemetry.consent == TelemetryConsent.ALLOW else "off"
+        modal = SettingsModal(
+            self.page,
+            t("settings.telemetry.title"),
+            options,
+            self._on_telemetry_selected,
+            show_description=True,
+        )
+        modal.open(current)
+
+    def _on_telemetry_selected(self, value: str) -> None:
+        if not self._settings:
+            return
+        allow = value == "on"
+        previous_consent = self._settings.telemetry.consent
+        if allow:
             self._settings.telemetry.allow()
+        else:
+            self._settings.telemetry.decline()
         self._sync_telemetry_card(self._settings)
         if self.page:
             self._telemetry_text.update()
+        if previous_consent != self._settings.telemetry.consent:
+            self._emit_runtime_detailed(
+                f"[Settings] Telemetry consent changed: "
+                f"{previous_consent.value} -> {self._settings.telemetry.consent.value}"
+            )
         self._emit_settings_changed()
 
     def _on_low_latency_click(self, e) -> None:
