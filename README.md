@@ -91,11 +91,18 @@ So I built one that can.
 
 ### Uses per Dollar
 
+#### Recommended Models
+
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
 | **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
-| **Gemma 4 31B (Cerebras)** | 920 | 730 | 770 | 540 |
 | **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+#### Other Models
+
+| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 31B (Cerebras)** | 920 | 730 | 770 | 540 |
 | **DeepSeek V4 Pro** | 6,400 | 2,330 | 2,810 | 1,070 |
 | **Gemini 3 Flash** | 1,710 | 1,170 | 1,280 | 740 |
 | **Gemini 3.1 Flash-Lite** | 3,430 | 1,770 | 2,030 | 940 |
@@ -104,11 +111,18 @@ So I built one that can.
 
 ### Cost per Utterance
 
+#### Recommended Models
+
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
 | **Gemma 4 26B A4B** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
-| **Gemma 4 31B (Cerebras)** | ~$0.0011 | ~$0.0014 | ~$0.0013 | ~$0.0019 |
 | **DeepSeek V4 Flash** | ~$0.00005 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
+
+#### Other Models
+
+| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 31B (Cerebras)** | ~$0.0011 | ~$0.0014 | ~$0.0013 | ~$0.0019 |
 | **DeepSeek V4 Pro** | ~$0.0002 | ~$0.0004 | ~$0.0004 | ~$0.0009 |
 | **Gemini 3 Flash** | ~$0.0006 | ~$0.0009 | ~$0.0008 | ~$0.0014 |
 | **Gemini 3.1 Flash-Lite** | ~$0.0003 | ~$0.0006 | ~$0.0005 | ~$0.0011 |
@@ -119,7 +133,6 @@ So I built one that can.
 *   *Uses per Dollar is derived from the un-rounded values in the Cost per Utterance table.*
 *   *All costs and usage counts are approximate.*
 *   *DeepSeek assumes a 70% cache hit rate.*
-*   *Gemma 4 31B (Cerebras) assumes $0.99 / 1M input tokens and $1.49 / 1M output tokens.*
 *   *Qwen API costs are based on the Beijing region.*
 *   *Pricing as of May 25, 2026 / Fast Response mode active.*
 
@@ -131,6 +144,7 @@ So I built one that can.
 | **Google AI Studio** | $10 | 1 year | Monthly for Gemini subscribers |
 | **Alibaba Cloud** | 1M tokens per model | 90 days | Singapore region |
 | **Alibaba Cloud** | ¥300 | 1 year | Students in China |
+| **Cerebras** | 1M tokens daily | None | 5 calls per minute limit |
 
 ---
 
@@ -142,9 +156,6 @@ So I built one that can.
 2. Install PuriPuly.
 3. Click the **STT** button.
 4. Click the **TRANS** button, then authenticate via Discord.
-
-   > Discord authentication is only available when the translation model is Gemma 4 or DeepSeek and the connection mode is Managed.
-
 5. Click the **Subtitles** button to turn on VR subtitles.
 6. (Optional) Click the **Peer** button to enable translation of the other person's voice.
 
@@ -159,8 +170,6 @@ If audio capture does not work, open **Settings > General** and follow these ste
 2. Select the correct microphone.
 3. Restart the app.
 
-If it still does not work, report it by Twitter DM or in [issue #10](https://github.com/kapitalismho/PuriPuly-heart/issues/10).
-
 ---
 
 ### Note for Users in China
@@ -168,9 +177,9 @@ If it still does not work, report it by Twitter DM or in [issue #10](https://git
 If Soniox/Gemini/Deepgram are blocked in your region, please use the following combination:
 
 - STT: **Qwen ASR**
-- LLM: **DeepSeek V4 Flash** or **DeepSeek V4 Pro**
+- LLM: **DeepSeek V4 Flash**
 
-   > When using the managed connection mode, choose **Managed (China)** instead of **Managed**.
+   > You can authenticate through QQ instead of Discord.
 
 ---
 
@@ -357,6 +366,37 @@ The tier transition may take a moment.
 
 6. Copy the generated key and paste it into PuriPuly settings.
    ![step6](docs/images/soniox/6.png)
+
+</details>
+
+<details>
+<summary><h3>Cerebras</h3></summary>
+
+1. Go to [Cerebras](https://www.cerebras.ai/) and click **Get started**.
+   ![step1](docs/images/cerebras/1.png)
+
+2. Log in.
+   ![step2](docs/images/cerebras/2.png)
+
+3. Choose the plan you want. We recommend starting with the free tier.
+   ![step3](docs/images/cerebras/3.png)
+
+4. Copy the API key and paste it into PuriPuly.
+   ![step4](docs/images/cerebras/4.png)
+
+<details>
+<summary><h3>To switch to the paid tier</h3></summary>
+
+5. Go to the **Billing** tab.
+   ![step5](docs/images/cerebras/5.png)
+
+6. Enter your name.
+   ![step6](docs/images/cerebras/6.png)
+
+7. Add as much credit as you need.
+   ![step7](docs/images/cerebras/7.png)
+
+</details>
 
 </details>
 

@@ -91,11 +91,18 @@
 
 ### 每 1 美元可用次数
 
+#### 推荐模型
+
 | LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
 |---|---|---|---|---|
 | **Gemma 4 26B A4B** | 14,380 次 | 2,920 次 | 3,710 次 | 1,180 次 |
-| **Gemma 4 31B (Cerebras)** | 920 次 | 730 次 | 770 次 | 540 次 |
 | **DeepSeek V4 Flash** | 19,410 次 | 3,080 次 | 3,980 次 | 1,210 次 |
+
+#### 其他模型
+
+| LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 31B (Cerebras)** | 920 次 | 730 次 | 770 次 | 540 次 |
 | **DeepSeek V4 Pro** | 6,400 次 | 2,330 次 | 2,810 次 | 1,070 次 |
 | **Gemini 3 Flash** | 1,710 次 | 1,170 次 | 1,280 次 | 740 次 |
 | **Gemini 3.1 Flash-Lite** | 3,430 次 | 1,770 次 | 2,030 次 | 940 次 |
@@ -104,11 +111,18 @@
 
 ### 每次发言成本
 
+#### 推荐模型
+
 | LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
 |---|---|---|---|---|
 | **Gemma 4 26B A4B** | ~0.0005 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
-| **Gemma 4 31B (Cerebras)** | ~0.008 元 | ~0.010 元 | ~0.009 元 | ~0.013 元 |
 | **DeepSeek V4 Flash** | ~0.0004 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
+
+#### 其他模型
+
+| LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 31B (Cerebras)** | ~0.008 元 | ~0.010 元 | ~0.009 元 | ~0.013 元 |
 | **DeepSeek V4 Pro** | ~0.001 元 | ~0.003 元 | ~0.003 元 | ~0.007 元 |
 | **Gemini 3 Flash** | ~0.004 元 | ~0.006 元 | ~0.006 元 | ~0.010 元 |
 | **Gemini 3.1 Flash-Lite** | ~0.002 元 | ~0.004 元 | ~0.004 元 | ~0.008 元 |
@@ -119,7 +133,6 @@
 *   *每 1 美元可用次数以「每次发言成本」表中四舍五入前的计算值为准*
 *   *所有费用与可用次数均为近似计算*
 *   *DeepSeek 假设缓存命中率为 70%*
-*   *Gemma 4 31B (Cerebras) 按输入 $0.99 / 100 万 token、输出 $1.49 / 100 万 token 计算*
 *   *Qwen API 计费以北京区域为准*
 *   *资费标准截至：2026 年 5 月 25 日 / 启用快速响应模式*
 *   *1 美元 ≈ 7.2 元人民币*
@@ -132,6 +145,7 @@
 | **Google AI Studio** | $10 | 1 年 | 面向 Gemini 订阅者每月发放 |
 | **阿里云** | 每个模型 100 万 token | 90 天 | 新加坡区域为准 |
 | **阿里云** | ¥300 | 1 年 | 面向中国境内学生 |
+| **Cerebras** | 每天 100 万 token | 无限制 | 每分钟调用限制 5 次 |
 
 ---
 
@@ -143,9 +157,6 @@
 2. 安装 PuriPuly
 3. 点击 **STT** 按钮
 4. 点击 **TRANS** 按钮后通过 Discord 验证
-
-   > 仅当翻译模型为 Gemma 4 或 DeepSeek 且连接方式为托管时，才能进行 Discord 验证。
-
 5. 点击 **Subtitles** 按钮开启 VR 字幕
 6. （可选）点击 **Peer** 按钮开启对方语音翻译
 
@@ -160,8 +171,6 @@
 2. 选择正确的麦克风
 3. 重启应用
 
-如果仍未解决，请通过 Twitter DM 或 [issue #10](https://github.com/kapitalismho/PuriPuly-heart/issues/10) 报告。
-
 ---
 
 ### 中国大陆用户指南
@@ -169,9 +178,9 @@
 如果您所在地区无法访问 Soniox / Gemini / Deepgram，请使用以下组合。
 
 - STT：**Qwen ASR**
-- LLM：**DeepSeek V4 Flash** 或 **DeepSeek V4 Pro**
+- LLM：**DeepSeek V4 Flash**
 
-   > 使用托管连接方式时，请选择 **托管（中国）**，而不是 **托管**。
+   > 可以通过 QQ 认证，而不是 Discord。
 
 ---
 
@@ -184,6 +193,9 @@
 如果方便的话，既然要设置，何不顺便把 ASR 也一起配置好呢？
 PuriPuly 与云端 STT 结合时能提供最佳体验。
 例如即使同样是 Qwen ASR，本地与云端的语音识别性能也有相当差距。
+
+建议先从 Deepgram 开始。
+只要注册，就能获得 $200 的免费额度。
 
 <details>
 <summary><h3>OpenRouter</h3></summary>
@@ -355,6 +367,37 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 
 6. 复制生成的密钥并粘贴到 PuriPuly 设置中。
    ![step6](docs/images/soniox/6.png)
+
+</details>
+
+<details>
+<summary><h3>Cerebras</h3></summary>
+
+1. 访问 [Cerebras](https://www.cerebras.ai/) 并点击 **Get started** 按钮。
+   ![step1](docs/images/cerebras/1.png)
+
+2. 登录。
+   ![step2](docs/images/cerebras/2.png)
+
+3. 选择想要的方案。首次使用建议选择免费层级。
+   ![step3](docs/images/cerebras/3.png)
+
+4. 复制 API 密钥并粘贴到 PuriPuly。
+   ![step4](docs/images/cerebras/4.png)
+
+<details>
+<summary><h3>切换到付费层级</h3></summary>
+
+5. 前往 **Billing** 标签。
+   ![step5](docs/images/cerebras/5.png)
+
+6. 填写您的姓名。
+   ![step6](docs/images/cerebras/6.png)
+
+7. 按需充值额度。
+   ![step7](docs/images/cerebras/7.png)
+
+</details>
 
 </details>
 

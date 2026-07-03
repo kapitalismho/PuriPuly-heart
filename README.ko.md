@@ -90,11 +90,18 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 
 ### 1달러 당 사용 가능 횟수
 
+#### 권장 모델
+
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
 | **Gemma 4 26B A4B** | 14,380회 | 2,920회 | 3,710회 | 1,180회 |
-| **Gemma 4 31B (Cerebras)** | 920회 | 730회 | 770회 | 540회 |
 | **DeepSeek V4 Flash** | 19,410회 | 3,080회 | 3,980회 | 1,210회 |
+
+#### 기타 모델
+
+| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 31B (Cerebras)** | 920회 | 730회 | 770회 | 540회 |
 | **DeepSeek V4 Pro** | 6,400회 | 2,330회 | 2,810회 | 1,070회 |
 | **Gemini 3 Flash** | 1,710회 | 1,170회 | 1,280회 | 740회 |
 | **Gemini 3.1 Flash-Lite** | 3,430회 | 1,770회 | 2,030회 | 940회 |
@@ -103,11 +110,18 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 
 ### 발화당 비용
 
+#### 권장 모델
+
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
 | **Gemma 4 26B A4B** | ~0.1원 | ~0.5원 | ~0.4원 | ~1.3원 |
-| **Gemma 4 31B (Cerebras)** | ~1.6원 | ~2.0원 | ~1.9원 | ~2.8원 |
 | **DeepSeek V4 Flash** | ~0.08원 | ~0.5원 | ~0.4원 | ~1.2원 |
+
+#### 기타 모델
+
+| LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 31B (Cerebras)** | ~1.6원 | ~2.0원 | ~1.9원 | ~2.8원 |
 | **DeepSeek V4 Pro** | ~0.2원 | ~0.6원 | ~0.5원 | ~1.4원 |
 | **Gemini 3 Flash** | ~0.9원 | ~1.3원 | ~1.2원 | ~2.0원 |
 | **Gemini 3.1 Flash-Lite** | ~0.4원 | ~0.8원 | ~0.7원 | ~1.6원 |
@@ -118,7 +132,6 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 *   *1달러 당 사용 가능 횟수는 발화당 비용 테이블의 반올림 전 계산값 기준*
 *   *모든 비용과 사용 가능 횟수는 근사치 계산*
 *   *DeepSeek의 경우 캐시 히트율 70% 가정*
-*   *Gemma 4 31B (Cerebras)는 입력 $0.99 / 100만 토큰, 출력 $1.49 / 100만 토큰 기준*
 *   *Qwen API 비용은 베이징 리전 기준*
 *   *요금표 기준: 2026년 5월 25일 / 빠른 응답 모드 활성화*
 *   *1 달러 = 1500원*
@@ -131,6 +144,7 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 | **Google AI Studio** | $10 | 1년 | Gemini 구독자에게 매월 지급 |
 | **Alibaba Cloud** | 모델당 100만 토큰 | 90일 | 싱가포르 리전 기준|
 | **Alibaba Cloud** | ¥300 | 1년 | 중국 내 학생 대상 |
+| **Cerebras** | 매일 100만 토큰 | 없음 | 분당 호출 제한 5회 |
 
 ---
 
@@ -142,9 +156,6 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 2. PuriPuly 설치
 3. **STT** 버튼 클릭
 4. **TRANS** 버튼 클릭 후 디스코드 인증 
-
-   > 번역 모델이 Gemma 4 혹은 Deepseek이면서 연결 방식이 관리형이어야 디스코드 인증이 가능해요.
-
 5. **Subtitles** 버튼을 눌러 VR 자막 켜기 
 6. (선택) **Peer** 버튼을 눌러 상대 음성 번역 켜기
 
@@ -159,8 +170,6 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 2. 알맞은 마이크 선택
 3. 앱 재시작
 
-그래도 해결되지 않는다면 트위터 DM 혹은 [issue #10](https://github.com/kapitalismho/PuriPuly-heart/issues/10)에 보고해주세요.
-
 ---
 
 ### 중국 사용자를 위한 안내
@@ -168,9 +177,9 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 Soniox/Gemini/Deepgram이 차단된 지역이라면 아래와 같은 조합으로 사용해주세요.
 
 - STT: **Qwen ASR**
-- LLM: **DeepSeek V4 Flash** 혹은 **DeepSeek V4 Pro**
+- LLM: **DeepSeek V4 Flash**
 
-   > 관리형 연결방식을 사용시 '관리형' 옵션 대신 '관리형 (중국)'을 사용해주세요.
+   > 디스코드 대신 QQ를 통해 인증할 수 있어요.
 
 ---
 
@@ -357,6 +366,37 @@ Authorize 버튼을 눌렀는데도 인증이 안되어 있다면 재시도 하�
 
 6. 생성된 키를 복사하여 PuriPuly 설정에 붙여넣으세요.
    ![step6](docs/images/soniox/6.png)
+
+</details>
+
+<details>
+<summary><h3>Cerebras</h3></summary>
+
+1. [Cerebras](https://www.cerebras.ai/)에 접속하여 'Get started' 버튼 눌러주세요.
+   ![step1](docs/images/cerebras/1.png)
+
+2. 로그인을 해주세요.
+   ![step2](docs/images/cerebras/2.png)
+
+3. 원하는 플랜을 선택해주세요. 처음은 무료 티어를 추천해요.
+   ![step3](docs/images/cerebras/3.png)
+
+4. API 키를 복사하여 PuriPuly에 붙여넣으세요.
+   ![step4](docs/images/cerebras/4.png)
+
+<details>
+<summary><h3>유료 티어로 전환하려면</h3></summary>
+
+5. 'Billing' 탭으로 이동하세요.
+   ![step5](docs/images/cerebras/5.png)
+
+6. 자신의 이름을 적어주세요.
+   ![step6](docs/images/cerebras/6.png)
+
+7. 필요한만큼 크레딧을 충전하세요.
+   ![step7](docs/images/cerebras/7.png)
+
+</details>
 
 </details>
 
