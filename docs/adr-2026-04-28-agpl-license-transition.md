@@ -22,7 +22,7 @@ Use SPDX identifier `AGPL-3.0-or-later` in package metadata where supported.
 
 Do not relicense third-party dependencies or bundled assets. Preserve their original licenses and notices in `src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt` and release compliance materials.
 
-Broker AGPL §13 endpoint/header implementation is intentionally out of scope for this transition plan. Public AGPL broker deployment/release remains gated on a separate source-offer decision or implementation.
+Broker AGPL §13 source-offer handling is satisfied for the public broker by exposing the repository source URL through an API `Link` response header and `GET /source`.
 
 ## Consequences
 
@@ -31,4 +31,4 @@ Broker AGPL §13 endpoint/header implementation is intentionally out of scope fo
 - Binary releases must continue to include AGPL license text plus third-party notices.
 - LGPL soxr compliance materials must continue to be packaged.
 - Contributor consent evidence must be retained.
-- Broker release/deploy readiness must be checked separately for AGPL §13 source-offer compliance.
+- Broker release/deploy readiness must preserve the AGPL §13 source-offer header and endpoint.

@@ -89,6 +89,15 @@ export type { ManagedTrialLifecycle } from './trial-policy';
 
 export const BROKER_SERVICE_NAME = 'puripuly-heart-broker';
 
+export const BROKER_SOURCE_URL = 'https://github.com/kapitalismho/PuriPuly-heart';
+export const BROKER_SOURCE_OFFER_LINK_HEADER = `<${BROKER_SOURCE_URL}>; rel="source"`;
+export const BROKER_SOURCE_OFFER = {
+  service: BROKER_SERVICE_NAME,
+  license: 'AGPL-3.0-or-later',
+  source: BROKER_SOURCE_URL,
+  correspondingSource: BROKER_SOURCE_URL,
+} as const;
+
 export const BROKER_RUNTIME_STACK = {
   language: 'TypeScript',
   framework: 'Hono',

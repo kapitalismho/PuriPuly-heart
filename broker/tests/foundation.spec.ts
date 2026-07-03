@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import app from '../src/index';
 import {
   BROKER_SERVICE_NAME,
+  BROKER_SOURCE_OFFER,
+  BROKER_SOURCE_OFFER_LINK_HEADER,
   MANAGED_TRIAL_BUDGET_POLICY,
   MANAGED_TRIAL_COST_ACCOUNTING_POLICY,
   MANAGED_TRIAL_ENTITLEMENT_POLICY,
@@ -98,9 +100,25 @@ describe('broker foundation', () => {
     const response = await app.request('http://broker.test/healthz');
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Link')).toBe(BROKER_SOURCE_OFFER_LINK_HEADER);
     await expect(response.json()).resolves.toEqual({
       ok: true,
       service: BROKER_SERVICE_NAME,
     });
+  });
+
+  it('offers corresponding source for network users', async () => {
+    const response = await app.request('http://broker.test/source');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Link')).toBe(BROKER_SOURCE_OFFER_LINK_HEADER);
+    await expect(response.json()).resolves.toEqual(BROKER_SOURCE_OFFER);
+  });
+
+  it('keeps the source offer visible on broker error responses', async () => {
+    const response = await app.request('http://broker.test/v1/trial/status');
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('Link')).toBe(BROKER_SOURCE_OFFER_LINK_HEADER);
   });
 });

@@ -38,4 +38,4 @@ This record does not relicense third-party dependencies, bundled assets, fonts, 
 - This record is an internal project compliance note, not legal advice.
 - Previously published MIT versions remain available under MIT; this consent record supports changing the repository license from the transition point forward.
 - If additional copyright holders are identified later, their relicensing status should be reviewed before relying on this record for release compliance.
-- Public AGPL broker deployment or release remains gated on a separate AGPL §13 source-offer decision or implementation.
+- Public AGPL broker deployment or release must preserve the broker source-offer response header and endpoint recorded in the license transition ADR.

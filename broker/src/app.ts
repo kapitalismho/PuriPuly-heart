@@ -3,6 +3,8 @@ import { Hono, type Context } from 'hono';
 import { internalErrorResponse } from './broker-error';
 import {
   BROKER_SERVICE_NAME,
+  BROKER_SOURCE_OFFER,
+  BROKER_SOURCE_OFFER_LINK_HEADER,
   FOUNDATION_RESPONSE,
   type BrokerEnv,
 } from './contract';
@@ -21,7 +23,13 @@ import { handleTelemetryTranslationSuccessDay } from './telemetry';
 
 export const app = new Hono<BrokerEnv>();
 
+app.use('*', async (c: Context<BrokerEnv>, next) => {
+  await next();
+  c.header('Link', BROKER_SOURCE_OFFER_LINK_HEADER);
+});
+
 app.onError((_error: Error, c: Context<BrokerEnv>) => {
+  c.header('Link', BROKER_SOURCE_OFFER_LINK_HEADER);
   return internalErrorResponse(c);
 });
 
@@ -30,6 +38,10 @@ app.get('/healthz', (c: Context<BrokerEnv>) => {
     ok: true,
     service: BROKER_SERVICE_NAME,
   });
+});
+
+app.get('/source', (c: Context<BrokerEnv>) => {
+  return c.json(BROKER_SOURCE_OFFER);
 });
 
 app.get('/v1/foundation', (c: Context<BrokerEnv>) => {
