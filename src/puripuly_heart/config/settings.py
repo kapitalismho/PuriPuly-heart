@@ -207,8 +207,6 @@ class OpenRouterLLMModel(str, Enum):
 
 class OpenRouterRoutingMode(str, Enum):
     LATENCY = "latency"
-    PARASAIL_FIRST = "parasail_first"
-    NOVITA_FIRST = "novita_first"
 
 
 class OpenRouterProviderRouting(str, Enum):

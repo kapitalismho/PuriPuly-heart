@@ -367,7 +367,7 @@ def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
         llm=LLMSettings(concurrency_limit=4),
         openrouter=OpenRouterSettings(
             llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
-            routing_mode=OpenRouterRoutingMode.PARASAIL_FIRST,
+            routing_mode=OpenRouterRoutingMode.LATENCY,
             fallback_selection_alias=OpenRouterFallbackSelectionAlias.NONE,
             selected_source=OpenRouterCredentialSource.BYOK,
         ),
@@ -382,7 +382,7 @@ def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
     assert provider.inner.api_key == "or-key"
     assert provider.inner.model == "google/gemma-4-26b-a4b-it"
     assert provider.inner.base_url == "https://openrouter.ai/api/v1"
-    assert provider.inner.routing_mode == OpenRouterRoutingMode.PARASAIL_FIRST
+    assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.semaphore._value == 4  # type: ignore[attr-defined]
 
 
@@ -801,7 +801,7 @@ def test_create_llm_provider_openrouter_wraps_primary_with_source_locked_openrou
         openrouter=OpenRouterSettings(
             llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
             selected_source=OpenRouterCredentialSource.BYOK,
-            routing_mode=OpenRouterRoutingMode.PARASAIL_FIRST,
+            routing_mode=OpenRouterRoutingMode.LATENCY,
             selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
             fallback_selection_alias=OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH,
         ),
@@ -821,7 +821,7 @@ def test_create_llm_provider_openrouter_wraps_primary_with_source_locked_openrou
     assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
     assert provider.inner.primary.api_key == "or-key"
     assert provider.inner.primary.model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
-    assert provider.inner.primary.routing_mode == OpenRouterRoutingMode.PARASAIL_FIRST
+    assert provider.inner.primary.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.inner.primary.runtime_logging is runtime_logging
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
     assert provider.inner.fallback._delegate is None
@@ -831,7 +831,7 @@ def test_create_llm_provider_openrouter_wraps_primary_with_source_locked_openrou
     assert isinstance(fallback_delegate, OpenRouterLLMProvider)
     assert fallback_delegate.api_key == "or-key"
     assert fallback_delegate.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert fallback_delegate.routing_mode == OpenRouterRoutingMode.PARASAIL_FIRST
+    assert fallback_delegate.routing_mode == OpenRouterRoutingMode.LATENCY
     assert fallback_delegate.runtime_logging is runtime_logging
 
 
@@ -843,7 +843,7 @@ def test_create_llm_provider_openrouter_byok_paths_omit_managed_user_identifier(
         openrouter=OpenRouterSettings(
             llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
             selected_source=OpenRouterCredentialSource.BYOK,
-            routing_mode=OpenRouterRoutingMode.PARASAIL_FIRST,
+            routing_mode=OpenRouterRoutingMode.LATENCY,
             selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
             fallback_selection_alias=OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH,
         ),
@@ -888,7 +888,7 @@ def test_create_llm_provider_openrouter_managed_qwen_fallback_uses_fallback_spec
         openrouter=OpenRouterSettings(
             llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
             selected_source=OpenRouterCredentialSource.MANAGED,
-            routing_mode=OpenRouterRoutingMode.PARASAIL_FIRST,
+            routing_mode=OpenRouterRoutingMode.LATENCY,
             selection_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED,
             fallback_selection_alias=OpenRouterFallbackSelectionAlias.QWEN35_FLASH,
         ),
@@ -939,7 +939,7 @@ def test_create_llm_provider_openrouter_managed_qwen_fallback_uses_fallback_spec
 
     assert isinstance(fallback_openrouter_delegate, OpenRouterLLMProvider)
     assert fallback_openrouter_delegate.model == OpenRouterLLMModel.QWEN_35_FLASH_02_23.value
-    assert fallback_openrouter_delegate.routing_mode == OpenRouterRoutingMode.PARASAIL_FIRST
+    assert fallback_openrouter_delegate.routing_mode == OpenRouterRoutingMode.LATENCY
 
 
 def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_specific_release_service() -> (
@@ -956,7 +956,7 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_
         openrouter=OpenRouterSettings(
             llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
             selected_source=OpenRouterCredentialSource.MANAGED,
-            routing_mode=OpenRouterRoutingMode.PARASAIL_FIRST,
+            routing_mode=OpenRouterRoutingMode.LATENCY,
             selection_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED,
             fallback_selection_alias=deepseek_fallback,
         ),
@@ -1003,7 +1003,7 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_uses_fallback_
 
     assert isinstance(fallback_openrouter_delegate, OpenRouterLLMProvider)
     assert fallback_openrouter_delegate.model == deepseek_model.value
-    assert fallback_openrouter_delegate.routing_mode == OpenRouterRoutingMode.PARASAIL_FIRST
+    assert fallback_openrouter_delegate.routing_mode == OpenRouterRoutingMode.LATENCY
 
 
 def test_create_llm_provider_openrouter_managed_fallback_delegate_factory_loads_user_identifier_lazily(
@@ -1069,7 +1069,7 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_clears_primary
         openrouter=OpenRouterSettings(
             llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
             selected_source=OpenRouterCredentialSource.MANAGED,
-            routing_mode=OpenRouterRoutingMode.PARASAIL_FIRST,
+            routing_mode=OpenRouterRoutingMode.LATENCY,
             selection_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED,
             fallback_selection_alias=OpenRouterFallbackSelectionAlias.DEEPSEEK_V4_FLASH,
         ),
@@ -1115,7 +1115,7 @@ def test_create_llm_provider_openrouter_managed_deepseek_fallback_clears_primary
 
     assert isinstance(fallback_openrouter_delegate, OpenRouterLLMProvider)
     assert fallback_openrouter_delegate.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert fallback_openrouter_delegate.routing_mode == OpenRouterRoutingMode.PARASAIL_FIRST
+    assert fallback_openrouter_delegate.routing_mode == OpenRouterRoutingMode.LATENCY
 
 
 def test_create_llm_provider_openrouter_rejects_none_selected_source_even_with_keys() -> None:

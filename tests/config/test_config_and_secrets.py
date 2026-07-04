@@ -2103,7 +2103,7 @@ def test_openrouter_settings_roundtrip(tmp_path):
         ),
         openrouter=OpenRouterSettings(
             llm_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
-            routing_mode=OpenRouterRoutingMode.PARASAIL_FIRST,
+            routing_mode=OpenRouterRoutingMode.LATENCY,
             selected_source=OpenRouterCredentialSource.BYOK,
             selection_alias=OpenRouterSelectionAlias.GEMMA4_BYOK,
         ),
@@ -2116,7 +2116,7 @@ def test_openrouter_settings_roundtrip(tmp_path):
     assert loaded.translation.model == TranslationModel.GEMMA4
     assert loaded.translation.connection == TranslationConnection.OPENROUTER
     assert loaded.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    assert loaded.openrouter.routing_mode == OpenRouterRoutingMode.PARASAIL_FIRST
+    assert loaded.openrouter.routing_mode == OpenRouterRoutingMode.LATENCY
     assert loaded.openrouter.selected_source == OpenRouterCredentialSource.BYOK
     assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
 
@@ -2298,13 +2298,13 @@ def test_from_dict_infers_legacy_gemma_managed_translation_selection() -> None:
     data["openrouter"]["llm_model"] = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
     data["openrouter"]["selected_source"] = OpenRouterCredentialSource.MANAGED.value
     data["openrouter"]["selection_alias"] = OpenRouterSelectionAlias.GEMMA4_MANAGED.value
-    data["openrouter"]["routing_mode"] = OpenRouterRoutingMode.NOVITA_FIRST.value
+    data["openrouter"]["routing_mode"] = "novita_first"
 
     loaded = from_dict(data)
 
     assert loaded.translation.model == TranslationModel.GEMMA4
     assert loaded.translation.connection == TranslationConnection.MANAGED
-    assert loaded.openrouter.routing_mode == OpenRouterRoutingMode.NOVITA_FIRST
+    assert loaded.openrouter.routing_mode == OpenRouterRoutingMode.LATENCY
 
 
 def test_from_dict_migrates_direct_qwen_flash_main_to_deepseek_managed() -> None:
@@ -2350,7 +2350,7 @@ def test_from_dict_migrates_openrouter_qwen_flash_main_preserving_routing_and_fa
     data["openrouter"]["llm_model"] = OpenRouterLLMModel.QWEN_35_FLASH_02_23.value
     data["openrouter"]["selected_source"] = OpenRouterCredentialSource.BYOK.value
     data["openrouter"]["selection_alias"] = OpenRouterSelectionAlias.QWEN35_FLASH_BYOK.value
-    data["openrouter"]["routing_mode"] = OpenRouterRoutingMode.NOVITA_FIRST.value
+    data["openrouter"]["routing_mode"] = "novita_first"
     data["openrouter"][
         "fallback_selection_alias"
     ] = OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value
@@ -2360,14 +2360,14 @@ def test_from_dict_migrates_openrouter_qwen_flash_main_preserving_routing_and_fa
 
     assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
     assert loaded.translation.connection == TranslationConnection.MANAGED
-    assert loaded.openrouter.routing_mode == OpenRouterRoutingMode.NOVITA_FIRST
+    assert loaded.openrouter.routing_mode == OpenRouterRoutingMode.LATENCY
     assert (
         loaded.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.QWEN35_FLASH
     )
     assert loaded.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
     assert loaded.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
     assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-    assert persisted["openrouter"]["routing_mode"] == OpenRouterRoutingMode.NOVITA_FIRST.value
+    assert persisted["openrouter"]["routing_mode"] == OpenRouterRoutingMode.LATENCY.value
     assert (
         persisted["openrouter"]["fallback_selection_alias"]
         == OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value
@@ -2653,7 +2653,7 @@ def test_load_settings_persists_materialized_runtime_fields_for_current_translat
     raw["openrouter"]["llm_model"] = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
     raw["openrouter"]["selected_source"] = OpenRouterCredentialSource.MANAGED.value
     raw["openrouter"]["selection_alias"] = OpenRouterSelectionAlias.GEMMA4_MANAGED.value
-    raw["openrouter"]["routing_mode"] = OpenRouterRoutingMode.PARASAIL_FIRST.value
+    raw["openrouter"]["routing_mode"] = "parasail_first"
     raw["openrouter"][
         "fallback_selection_alias"
     ] = OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value
@@ -2667,7 +2667,7 @@ def test_load_settings_persists_materialized_runtime_fields_for_current_translat
     assert loaded.provider.llm == LLMProviderName.DEEPSEEK
     assert persisted["provider"]["llm"] == LLMProviderName.DEEPSEEK.value
     assert persisted["deepseek"]["llm_model"] == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
-    assert persisted["openrouter"]["routing_mode"] == OpenRouterRoutingMode.PARASAIL_FIRST.value
+    assert persisted["openrouter"]["routing_mode"] == OpenRouterRoutingMode.LATENCY.value
     assert (
         persisted["openrouter"]["fallback_selection_alias"]
         == OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value

@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from puripuly_heart.config.settings import OpenRouterProviderRouting, OpenRouterRoutingMode
+from puripuly_heart.config.settings import OpenRouterProviderRouting
 from puripuly_heart.providers.llm.openrouter import (
     HttpxOpenRouterClient,
     OpenRouterClient,
@@ -252,7 +252,7 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
     assert body["reasoning"] == {"effort": "none"}
     assert body["user"] == "managed-user-123"
     assert body["provider"] == {
-        "order": ["cloudflare", "parasail/bf16", "wafer/fp8"],
+        "sort": "latency",
         "only": ["cloudflare", "parasail", "wafer"],
         "allow_fallbacks": True,
     }
@@ -285,7 +285,7 @@ async def test_httpx_openrouter_client_gemma_latency_routing_prefers_cloudflare_
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "order": ["cloudflare", "parasail/bf16", "wafer/fp8"],
+        "sort": "latency",
         "only": ["cloudflare", "parasail", "wafer"],
         "allow_fallbacks": True,
     }
@@ -339,8 +339,8 @@ async def test_httpx_openrouter_client_deepseek_default_routing_prefers_cloudfla
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "order": ["cloudflare", "deepseek", "parasail/fp8"],
-        "only": ["cloudflare", "deepseek", "parasail"],
+        "sort": "latency",
+        "only": ["deepseek", "parasail", "Fireworks", "Baidu Qianfan"],
         "allow_fallbacks": True,
     }
 
@@ -356,7 +356,6 @@ async def test_httpx_openrouter_client_deepseek_china_routing_prefers_deepseek_t
         api_key="test-key",
         model="deepseek/deepseek-v4-flash",
         base_url="https://example",
-        routing_mode=OpenRouterRoutingMode.PARASAIL_FIRST,
         provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY,
     )
     await client.translate(
@@ -368,7 +367,7 @@ async def test_httpx_openrouter_client_deepseek_china_routing_prefers_deepseek_t
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "order": ["deepseek", "baidu/fp8"],
+        "sort": "latency",
         "only": ["deepseek", "baidu"],
         "allow_fallbacks": True,
     }
@@ -430,7 +429,7 @@ async def test_httpx_openrouter_client_google_gemini_latency_routing_does_not_ig
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_builds_ordered_request_for_parasail_first(
+async def test_httpx_openrouter_client_latency_routing_sorts_gemma_providers(
     monkeypatch,
 ) -> None:
     fake_client = FakeAsyncClient()
@@ -440,7 +439,6 @@ async def test_httpx_openrouter_client_builds_ordered_request_for_parasail_first
         api_key="test-key",
         model="google/gemma-4-26b-a4b-it",
         base_url="https://example",
-        routing_mode=OpenRouterRoutingMode.PARASAIL_FIRST,
     )
     result = await client.translate(
         text="hello",
@@ -451,7 +449,11 @@ async def test_httpx_openrouter_client_builds_ordered_request_for_parasail_first
 
     assert result == "OK"
     body = fake_client.last_request["json"]
-    assert body["provider"] == {"order": ["Parasail", "Novita"], "allow_fallbacks": True}
+    assert body["provider"] == {
+        "sort": "latency",
+        "only": ["cloudflare", "parasail", "wafer"],
+        "allow_fallbacks": True,
+    }
 
 
 @pytest.mark.asyncio

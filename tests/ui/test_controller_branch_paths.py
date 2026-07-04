@@ -2311,7 +2311,7 @@ async def test_apply_providers_staying_on_managed_does_not_prepare_managed_trans
     controller._managed_openrouter_release_service = initial_service
 
     updated = copy.deepcopy(controller.settings)
-    updated.openrouter.routing_mode = OpenRouterRoutingMode.PARASAIL_FIRST
+    updated.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
 
     async def fake_refresh_managed_usage(self) -> None:
         return None
@@ -12494,7 +12494,7 @@ def test_merge_settings_tab_apply_with_current_languages_preserves_all_language_
     pending.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     pending.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
     pending.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.QWEN35_FLASH
-    pending.openrouter.routing_mode = OpenRouterRoutingMode.NOVITA_FIRST
+    pending.openrouter.routing_mode = OpenRouterRoutingMode.LATENCY
     pending.qwen.llm_model = QwenLLMModel.QWEN_35_FLASH
     pending.qwen.region = QwenRegion.SINGAPORE
     pending.managed_identity.verified_hardware_hash = "pending-hash"
@@ -12520,7 +12520,7 @@ def test_merge_settings_tab_apply_with_current_languages_preserves_all_language_
     assert (
         merged.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.QWEN35_FLASH
     )
-    assert merged.openrouter.routing_mode == OpenRouterRoutingMode.NOVITA_FIRST
+    assert merged.openrouter.routing_mode == OpenRouterRoutingMode.LATENCY
     assert merged.qwen.llm_model == QwenLLMModel.QWEN_35_FLASH
     assert merged.qwen.region == QwenRegion.SINGAPORE
     assert merged.managed_identity.verified_hardware_hash == "pending-hash"
@@ -12576,7 +12576,7 @@ async def test_apply_providers_preserves_current_languages_while_applying_provid
     pending.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     pending.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
     pending.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.QWEN35_FLASH
-    pending.openrouter.routing_mode = OpenRouterRoutingMode.NOVITA_FIRST
+    pending.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
     pending.managed_identity.verified_hardware_hash = "pending-hash"
     pending.managed_identity.verified_hardware_hash_salt_version = 5
     pending.system_prompt = "draft prompt"
@@ -12621,7 +12621,9 @@ async def test_apply_providers_preserves_current_languages_while_applying_provid
         controller.settings.openrouter.fallback_selection_alias
         == OpenRouterFallbackSelectionAlias.QWEN35_FLASH
     )
-    assert controller.settings.openrouter.routing_mode == OpenRouterRoutingMode.NOVITA_FIRST
+    assert (
+        controller.settings.openrouter.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    )
     assert controller.settings.managed_identity.verified_hardware_hash == "pending-hash"
     assert controller.settings.managed_identity.verified_hardware_hash_salt_version == 5
     assert controller.settings.system_prompt == "draft prompt"
@@ -12966,7 +12968,7 @@ async def test_apply_providers_rebuilds_only_llm_for_openrouter_routing_change(
 
     updated = AppSettings()
     updated.provider.llm = LLMProviderName.OPENROUTER
-    updated.openrouter.routing_mode = OpenRouterRoutingMode.PARASAIL_FIRST
+    updated.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
 
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
 
