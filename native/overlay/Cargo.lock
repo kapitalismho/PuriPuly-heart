@@ -347,7 +347,7 @@ dependencies = [
 
 [[package]]
 name = "puripuly-heart-overlay"
-version = "2.2.0"
+version = "2.2.1"
 dependencies = [
  "futures-util",
  "openvr_sys",
