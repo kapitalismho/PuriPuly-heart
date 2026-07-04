@@ -29,6 +29,7 @@ interface QqAuthAssertRequestBody {
   qq_identity?: unknown;
   credential?: unknown;
   asserted_at?: unknown;
+  delivery_ack_supported?: unknown;
 }
 
 interface QqAuthAssertInput {
@@ -118,6 +119,7 @@ export async function handleQqAuthAssert(
   return issueQqManagedEntitlement(c, {
     qqSubjectRef,
     now,
+    deliveryAckSupported: body.value.delivery_ack_supported === true,
   });
 }
 

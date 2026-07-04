@@ -21,6 +21,10 @@ import {
   getManagedIssuanceSourcePolicy,
 } from './managed-issuance';
 import {
+  createPendingManagedKeyDelivery,
+  type PendingManagedKeyDelivery,
+} from './managed-key-delivery';
+import {
   assignManagedGuardrail,
   cleanupManagedChildKey,
   createManagedChildKey,
@@ -41,6 +45,7 @@ const ISSUE_SOURCE = 'qq' as const;
 interface QqManagedIssueInput {
   qqSubjectRef: string;
   now: Date;
+  deliveryAckSupported: boolean;
 }
 
 type QqReservationResult =
@@ -71,6 +76,17 @@ export async function issueQqManagedEntitlement(
     );
     if (isLifetimeBlockingQqEntitlement(currentEntitlement)) {
       return qqLifetimeUsedResponse(c);
+    }
+    if (currentEntitlement?.status === 'delivery_pending') {
+      return qqReservationErrorResponse(c, {
+        ok: false,
+        reason: 'already_issuing',
+        retryAfterMs: await retryAfterDeliveryPendingTtl(
+          c.env.BROKER_DB,
+          currentEntitlement,
+          input.now,
+        ),
+      });
     }
 
     const brakeDecision = await checkActiveIssuanceBrake(
@@ -145,6 +161,42 @@ export async function issueQqManagedEntitlement(
       keyHash: childKey.hash,
     });
 
+    const openRouterUserId = await deriveOptionalOpenRouterUserId({
+      subjectRef: input.qqSubjectRef,
+      secret: c.env.OPENROUTER_MANAGED_USER_HMAC_SECRET,
+    });
+
+    if (input.deliveryAckSupported) {
+      const markedPending = await markQqReservationDeliveryPending(c.env.BROKER_DB, {
+        qqSubjectRef: input.qqSubjectRef,
+        issueRef: issueMetadata.issueRef,
+        managedCredentialRef: childKey.hash,
+        budgetUsd: sourcePolicy.budget_usd,
+        issuedAt,
+        expiresAt,
+      });
+      if (!markedPending) {
+        throw new Error('QQ managed entitlement delivery-pending transition failed');
+      }
+
+      const delivery = await createPendingManagedKeyDelivery(c.env.BROKER_DB, {
+        issueSource: ISSUE_SOURCE,
+        subjectRef: input.qqSubjectRef,
+        installationId: null,
+        managedCredentialRef: childKey.hash,
+        now: input.now,
+      });
+
+      return qqIssueDeliveryPendingResponse(c, {
+        qqSubjectRef: input.qqSubjectRef,
+        rawKey: childKey.rawKey,
+        managedCredentialRef: childKey.hash,
+        expiresAt,
+        openRouterUserId,
+        delivery,
+      });
+    }
+
     const activated = await activateQqReservation(c.env.BROKER_DB, {
       qqSubjectRef: input.qqSubjectRef,
       issueRef: issueMetadata.issueRef,
@@ -163,11 +215,6 @@ export async function issueQqManagedEntitlement(
       managedCredentialRef: childKey.hash,
       observedAt: issuedAt,
       now: input.now,
-    });
-
-    const openRouterUserId = await deriveOptionalOpenRouterUserId({
-      subjectRef: input.qqSubjectRef,
-      secret: c.env.OPENROUTER_MANAGED_USER_HMAC_SECRET,
     });
 
     return c.json({
@@ -257,6 +304,13 @@ async function reserveQqManagedEntitlement(
   if (isLifetimeBlockingQqEntitlement(current)) {
     return { ok: false, reason: 'lifetime_used' };
   }
+  if (current.status === 'delivery_pending') {
+    return {
+      ok: false,
+      reason: 'already_issuing',
+      retryAfterMs: await retryAfterDeliveryPendingTtl(db, current, input.now),
+    };
+  }
   if (current.status !== 'issuing') {
     return { ok: false, reason: 'reservation_failed' };
   }
@@ -333,6 +387,36 @@ function isLifetimeBlockingQqEntitlement(
     entitlement?.status === 'cleanup_required' ||
     entitlement?.status === 'revoked'
   );
+}
+
+async function retryAfterDeliveryPendingTtl(
+  db: D1Database,
+  entitlement: QqManagedEntitlementRecord,
+  now: Date,
+): Promise<number | null> {
+  if (!entitlement.managed_credential_ref) {
+    return null;
+  }
+
+  const row = await db
+    .prepare(
+      `SELECT expires_at
+         FROM managed_key_deliveries
+        WHERE issue_source = 'qq'
+          AND subject_ref = ?
+          AND managed_credential_ref = ?
+          AND status = 'pending'
+        ORDER BY expires_at ASC
+        LIMIT 1`,
+    )
+    .bind(entitlement.qq_subject_ref, entitlement.managed_credential_ref)
+    .first<{ expires_at: string }>();
+  const expiresAtMs = Date.parse(row?.expires_at ?? '');
+  if (!Number.isFinite(expiresAtMs)) {
+    return null;
+  }
+
+  return Math.max(expiresAtMs - now.getTime(), 0);
 }
 
 function isStaleQqIssuingReservation(
@@ -436,6 +520,47 @@ async function activateQqReservation(
   return Number(result.meta.changes ?? 0) === 1;
 }
 
+async function markQqReservationDeliveryPending(
+  db: D1Database,
+  input: {
+    qqSubjectRef: string;
+    issueRef: string;
+    managedCredentialRef: string;
+    budgetUsd: number;
+    issuedAt: string;
+    expiresAt: string;
+  },
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE qq_managed_entitlements
+          SET status = 'delivery_pending',
+              managed_credential_ref = ?,
+              budget_usd = ?,
+              issued_at = ?,
+              expires_at = ?,
+              delivered_at = NULL,
+              updated_at = ?
+        WHERE qq_subject_ref = ?
+          AND issue_ref = ?
+          AND status = 'issuing'
+          AND managed_credential_ref = ?`,
+    )
+    .bind(
+      input.managedCredentialRef,
+      input.budgetUsd,
+      input.issuedAt,
+      input.expiresAt,
+      input.issuedAt,
+      input.qqSubjectRef,
+      input.issueRef,
+      input.managedCredentialRef,
+    )
+    .run();
+
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
 async function releaseQqReservationBeforeChildKey(
   db: D1Database,
   input: {
@@ -482,7 +607,7 @@ async function releaseQqReservationAfterManagedCleanup(
       `DELETE FROM qq_managed_entitlements
         WHERE qq_subject_ref = ?
           AND issue_ref = ?
-          AND status IN ('issuing', 'active')
+          AND status IN ('issuing', 'delivery_pending', 'active')
           AND managed_credential_ref = ?`,
     )
     .bind(input.qqSubjectRef, input.issueRef, input.managedCredentialRef)
@@ -509,7 +634,7 @@ async function markQqCleanupRequired(
               updated_at = ?
         WHERE qq_subject_ref = ?
           AND issue_ref = ?
-          AND status IN ('issuing', 'active')
+          AND status IN ('issuing', 'delivery_pending', 'active')
           AND managed_credential_ref = ?`,
     )
     .bind(
@@ -779,6 +904,32 @@ async function deriveOptionalOpenRouterUserId(input: {
   } catch {
     return null;
   }
+}
+
+function qqIssueDeliveryPendingResponse(
+  c: Context<BrokerEnv>,
+  input: {
+    qqSubjectRef: string;
+    rawKey: string;
+    managedCredentialRef: string;
+    expiresAt: string;
+    openRouterUserId: string | null;
+    delivery: PendingManagedKeyDelivery;
+  },
+): Response {
+  return c.json({
+    ok: true,
+    status: 'issued',
+    qq_subject_ref: input.qqSubjectRef,
+    openrouter_api_key: input.rawKey,
+    managed_credential_ref: input.managedCredentialRef,
+    expires_at: input.expiresAt,
+    ...(input.openRouterUserId ? { openrouter_user_id: input.openRouterUserId } : {}),
+    delivery_ack_required: true,
+    delivery_id: input.delivery.delivery_id,
+    delivery_ack_token: input.delivery.delivery_ack_token,
+    delivery_ack_expires_at: input.delivery.delivery_ack_expires_at,
+  });
 }
 
 function abuseDecisionResponse(c: Context<BrokerEnv>, decision: AbuseDecision): Response {

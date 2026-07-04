@@ -337,7 +337,7 @@ def test_migrate_v17_normalizes_directsound_host_api_and_preserves_device() -> N
 
 
 def test_migrate_v18_preserves_directsound_when_removing_legacy_osc_rate_limits() -> None:
-    assert SETTINGS_SCHEMA_VERSION == 29
+    assert SETTINGS_SCHEMA_VERSION == 30
 
     raw = to_dict(AppSettings())
     raw["settings_version"] = 17
@@ -381,7 +381,7 @@ def test_load_settings_persists_v17_directsound_preservation(tmp_path) -> None:
 
 
 def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None:
-    assert SETTINGS_SCHEMA_VERSION == 29
+    assert SETTINGS_SCHEMA_VERSION == 30
 
     path = tmp_path / "settings.json"
     raw = to_dict(AppSettings())

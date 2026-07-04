@@ -471,6 +471,72 @@ describe('Discord managed issue referral reservation', () => {
     ]);
   });
 
+  it('keeps ACK-supported referred issues at base budget until delivery ACK', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+
+    const env = createTestBrokerEnv();
+    insertActiveReferrer(env);
+    const referredDiscordId = discordSnowflakeForAgeDays(31);
+    const referredDiscordRef = await deriveExpectedDiscordUserRef(
+      env.DISCORD_USER_REF_SECRET,
+      referredDiscordId,
+    );
+    const started = await startDiscordSession({
+      env,
+      installationId: 'install-issue-referral-delivery-pending',
+      referralId: '7kq9m2',
+    });
+    const discordApi = mockDiscordApi({
+      user: {
+        id: referredDiscordId,
+        verified: true,
+      },
+    });
+    const signed = await signedIssueRequest(started, {
+      code: 'discord-oauth-code-referral-delivery-pending',
+      hardware_hash: 'hardware-hash-issue-referral-delivery-pending',
+    });
+
+    const response = await postDiscordIssue(env, {
+      ...signed,
+      delivery_ack_supported: true,
+    });
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as Record<string, unknown>;
+    expect(payload).toEqual(
+      expect.objectContaining({
+        budget_usd: 0.07,
+        managed_credential_ref: 'hash_discord_managed_child_test_1',
+        delivery_ack_required: true,
+      }),
+    );
+    expect(payload).not.toHaveProperty('referral_bonus_applied');
+    expect(JSON.parse(String(discordApi.openRouterCreateCalls[0]?.init?.body))).toEqual(
+      expect.objectContaining({ limit: 0.07 }),
+    );
+    expect(discordApi.openRouterReferrerReadCalls).toHaveLength(0);
+    expect(discordApi.openRouterReferrerPatchCalls).toHaveLength(0);
+    await expect(readEntitlementBudget(env, started.installationId)).resolves.toEqual({
+      status: 'pending_release',
+      budget_usd: 0.07,
+      managed_credential_ref: 'hash_discord_managed_child_test_1',
+      discord_issue_status: 'delivery_pending',
+    });
+    expect(readReferralRewards(env)).toEqual([
+      expect.objectContaining({
+        referral_id: REFERRAL_ID,
+        referrer_discord_user_ref: REFERRER_DISCORD_REF,
+        referred_discord_user_ref: referredDiscordRef,
+        referred_installation_id: started.installationId,
+        referred_bonus_status: 'reserved',
+        referrer_bonus_status: 'pending',
+        referred_managed_credential_ref: null,
+      }),
+    ]);
+  });
+
   it('skips referrer credit without failing issue when the referrer has no active managed key', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW_ISO));
@@ -1627,7 +1693,7 @@ function insertDiscordIdentity(
   input: {
     discordUserRef: string;
     installationId: string;
-    status: 'issuing' | 'active' | 'failed' | 'cleanup_required';
+    status: 'issuing' | 'delivery_pending' | 'active' | 'failed' | 'cleanup_required';
   },
 ): void {
   env.__db

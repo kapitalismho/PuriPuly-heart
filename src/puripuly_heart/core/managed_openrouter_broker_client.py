@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 from puripuly_heart.config.settings import normalize_owned_referral_id
 from puripuly_heart.core.managed_openrouter_release import (
+    ManagedKeyDeliveryAck,
+    ManagedKeyDeliveryAckResult,
     ManagedOpenRouterChallengeSuccess,
     ManagedOpenRouterDiscordStartSuccess,
     ManagedOpenRouterFingerprintSalt,
@@ -149,9 +151,11 @@ class HttpManagedOpenRouterBrokerClient:
             raise _retryable_error("verify", f"broker returned malformed payload: {exc}") from exc
 
     async def issue(self, request: dict[str, object]) -> ManagedOpenRouterIssueSuccess:
+        request_body = dict(request)
+        request_body["delivery_ack_supported"] = True
         payload = await self._post_json(
             path="/v1/providers/openrouter/issue",
-            request_body=request,
+            request_body=request_body,
             operation="issue",
         )
         try:
@@ -162,6 +166,7 @@ class HttpManagedOpenRouterBrokerClient:
                 openrouter_user_id=normalize_managed_openrouter_user_identifier(
                     payload.get("openrouter_user_id")
                 ),
+                delivery_ack=_parse_delivery_ack(payload, issue_source="discord"),
             )
         except ValueError as exc:
             raise _retryable_error("issue", f"broker returned malformed payload: {exc}") from exc
@@ -170,9 +175,11 @@ class HttpManagedOpenRouterBrokerClient:
         self,
         request: dict[str, object],
     ) -> ManagedOpenRouterIssueSuccess:
+        request_body = dict(request)
+        request_body["delivery_ack_supported"] = True
         payload = await self._post_json(
             path="/v1/providers/openrouter/discord/issue",
-            request_body=request,
+            request_body=request_body,
             operation="discord_issue",
         )
         try:
@@ -186,6 +193,7 @@ class HttpManagedOpenRouterBrokerClient:
                 referral_bonus_applied=_parse_referral_bonus_applied(payload),
                 referral_id=_parse_owned_referral_id(payload),
                 pass_status=_parse_talk_together_pass_status(payload),
+                delivery_ack=_parse_delivery_ack(payload, issue_source="discord"),
             )
         except ValueError as exc:
             raise _retryable_error(
@@ -206,6 +214,7 @@ class HttpManagedOpenRouterBrokerClient:
                 "qq_identity": qq_identity,
                 "credential": credential,
                 "asserted_at": asserted_at,
+                "delivery_ack_supported": True,
             },
             operation="qq_assert",
         )
@@ -221,6 +230,36 @@ class HttpManagedOpenRouterBrokerClient:
             logger.warning("[QQAuth] assert_qq_credential: malformed broker payload")
             raise _retryable_error(
                 "qq_assert", "broker returned malformed QQ assertion payload"
+            ) from exc
+
+    async def acknowledge_managed_key_delivery(
+        self,
+        delivery_ack: ManagedKeyDeliveryAck,
+    ) -> ManagedKeyDeliveryAckResult:
+        payload = await self._post_json(
+            path="/v1/providers/openrouter/managed-key-delivery/ack",
+            request_body={
+                "delivery_id": delivery_ack.delivery_id,
+                "managed_credential_ref": delivery_ack.managed_credential_ref,
+                "delivery_ack_token": delivery_ack.ack_token,
+            },
+            operation="delivery_ack",
+        )
+        try:
+            if payload.get("ok") is not True:
+                raise ValueError("ok must be true")
+            status = _require_text(payload, "status")
+            if status not in {"acknowledged", "already_acknowledged"}:
+                raise ValueError("status must be acknowledged or already_acknowledged")
+            return ManagedKeyDeliveryAckResult(
+                status=status,
+                referral_bonus_applied=_parse_referral_bonus_applied(payload),
+                referral_id=_parse_owned_referral_id(payload),
+                pass_status=_parse_talk_together_pass_status(payload),
+            )
+        except ValueError as exc:
+            raise _retryable_error(
+                "delivery_ack", f"broker returned malformed ACK payload: {exc}"
             ) from exc
 
     async def get_trial_status(
@@ -364,6 +403,22 @@ def _parse_talk_together_pass_status(
     )
 
 
+def _parse_delivery_ack(
+    payload: Mapping[str, object],
+    *,
+    issue_source: str,
+) -> ManagedKeyDeliveryAck | None:
+    if payload.get("delivery_ack_required") is not True:
+        return None
+    return ManagedKeyDeliveryAck(
+        issue_source=issue_source,
+        delivery_id=_require_text(payload, "delivery_id"),
+        managed_credential_ref=_require_text(payload, "managed_credential_ref"),
+        ack_token=_require_text(payload, "delivery_ack_token"),
+        expires_at=_require_text(payload, "delivery_ack_expires_at"),
+    )
+
+
 def _parse_json_int(value: object) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
@@ -408,6 +463,7 @@ def _parse_qq_assert_success(payload: Mapping[str, object]) -> ManagedOpenRouter
             referral_bonus_applied=_parse_referral_bonus_applied(payload),
             referral_id=_parse_owned_referral_id(payload),
             pass_status=_parse_talk_together_pass_status(payload),
+            delivery_ack=_parse_delivery_ack(payload, issue_source="qq"),
         ),
     )
 

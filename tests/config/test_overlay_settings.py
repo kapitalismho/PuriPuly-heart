@@ -14,7 +14,7 @@ from puripuly_heart.config.settings import (
 def test_overlay_settings_desktop_flet_defaults_serialize_canonical_shape() -> None:
     settings = from_dict({})
 
-    assert SETTINGS_SCHEMA_VERSION == 29
+    assert SETTINGS_SCHEMA_VERSION == 30
     assert settings.settings_version == SETTINGS_SCHEMA_VERSION
     assert settings.overlay.target == "steamvr"
     assert settings.overlay.desktop_flet.size_preset == "medium"

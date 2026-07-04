@@ -28,7 +28,7 @@ function insertDiscordIdentity(input: {
   env: ReturnType<typeof createTestBrokerEnv>;
   discordUserRef: string;
   installationId: string;
-  status: 'issuing' | 'active' | 'failed' | 'cleanup_required';
+  status: 'issuing' | 'delivery_pending' | 'active' | 'failed' | 'cleanup_required';
 }): void {
   input.env.__db
     .prepare(

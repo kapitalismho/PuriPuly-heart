@@ -28,7 +28,7 @@ interface QqAuthAssertionRow {
 
 interface QqManagedEntitlementRow {
   qq_subject_ref: string;
-  status: 'issuing' | 'active' | 'cleanup_required' | 'revoked';
+  status: 'issuing' | 'delivery_pending' | 'active' | 'cleanup_required' | 'revoked';
   issue_ref: string;
   managed_credential_ref: string | null;
   budget_usd: number;
@@ -491,6 +491,51 @@ describe('QQ auth assertion route', () => {
         class: 'retryable',
         subcode: 'qq_already_issuing',
         retryAfterMs: 600000,
+        message: 'QQ managed issuance is already in progress',
+      }),
+    );
+    expect(openRouter.openRouterCreateCalls).toHaveLength(0);
+  });
+
+  it('returns qq_already_issuing retry_after from delivery ACK expiry for delivery_pending rows', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+
+    const env = createTestBrokerEnv();
+    const qqIdentity = 'qq-openid-delivery-pending-user';
+    const credential = await signQqCredential(env.QQ_AUTH_HMAC_PSK, qqIdentity);
+    const qqSubjectRef = await deriveExpectedQqSubjectRef(env.QQ_AUTH_HMAC_PSK, qqIdentity);
+    insertQqManagedEntitlement(env, {
+      qq_subject_ref: qqSubjectRef,
+      status: 'delivery_pending',
+      issue_ref: 'qq-issue-v1_delivery-pending',
+      managed_credential_ref: 'hash_qq_delivery_pending_retry_after',
+      reserved_at: NOW_ISO,
+      issued_at: NOW_ISO,
+      expires_at: EXPECTED_QQ_EXPIRES_AT,
+      delivered_at: null,
+    });
+    insertQqManagedDelivery(env, {
+      delivery_id: 'mkd_v1_qq_retry_after',
+      qq_subject_ref: qqSubjectRef,
+      managed_credential_ref: 'hash_qq_delivery_pending_retry_after',
+      expires_at: '2026-06-05T12:12:00.000Z',
+    });
+    const openRouter = mockOpenRouterManagementApi();
+
+    const response = await postQqAssertion(env, {
+      qq_identity: qqIdentity,
+      credential,
+      asserted_at: '2026-06-05T12:03:00Z',
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual(
+      normalizedErrorEnvelope({
+        code: 'trial_not_eligible',
+        class: 'retryable',
+        subcode: 'qq_already_issuing',
+        retryAfterMs: 720000,
         message: 'QQ managed issuance is already in progress',
       }),
     );
@@ -1544,6 +1589,39 @@ function insertQqManagedEntitlement(
       input.delivered_at ?? null,
       input.reserved_at,
       input.reserved_at,
+    );
+}
+
+function insertQqManagedDelivery(
+  env: TestBrokerEnv,
+  input: {
+    delivery_id: string;
+    qq_subject_ref: string;
+    managed_credential_ref: string;
+    expires_at: string;
+  },
+): void {
+  env.__db
+    .prepare(
+      `INSERT INTO managed_key_deliveries (
+          delivery_id,
+          issue_source,
+          subject_ref,
+          installation_id,
+          managed_credential_ref,
+          ack_token_hash,
+          status,
+          created_at,
+          expires_at
+        ) VALUES (?, 'qq', ?, NULL, ?, ?, 'pending', ?, ?)`,
+    )
+    .run(
+      input.delivery_id,
+      input.qq_subject_ref,
+      input.managed_credential_ref,
+      'sha256-base64url-v1_retry-after-test',
+      NOW_ISO,
+      input.expires_at,
     );
 }
 

@@ -353,8 +353,19 @@ describe('broker persistent state model', () => {
           lifecycleDecisionSource: 'qq_managed_entitlements, not qq_auth_assertions',
           rowCardinality: 'zero-or-one-row-per-qq_subject_ref',
           absenceRepresents: 'no production issuance has been reserved or used',
-          storedStatuses: ['issuing', 'active', 'cleanup_required', 'revoked'],
-          automaticReissueBlockedStatuses: ['active', 'cleanup_required', 'revoked'],
+          storedStatuses: [
+            'issuing',
+            'delivery_pending',
+            'active',
+            'cleanup_required',
+            'revoked',
+          ],
+          automaticReissueBlockedStatuses: [
+            'delivery_pending',
+            'active',
+            'cleanup_required',
+            'revoked',
+          ],
           columns: [
             'qq_subject_ref',
             'status',
@@ -380,6 +391,8 @@ describe('broker persistent state model', () => {
           stateInvariants: {
             active:
               'requires managed_credential_ref, issued_at, expires_at, and delivered_at',
+            delivery_pending:
+              'requires managed_credential_ref, issued_at, and expires_at; delivered_at remains NULL until client ACK',
             cleanup_required: 'requires managed_credential_ref',
             issuing:
               'may be stale-reclaimed only when managed_credential_ref is NULL; issuing with a credential ref requires cleanup/remediation',
@@ -401,6 +414,35 @@ describe('broker persistent state model', () => {
           rawIdentityStorage: false,
           rawCredentialStorage: false,
           rawOpenRouterKeyStorage: false,
+        },
+        managedKeyDeliveries: {
+          name: 'managed_key_deliveries',
+          purpose:
+            'pending managed OpenRouter child-key delivery acknowledgements; stores token hashes only',
+          primaryKey: 'delivery_id',
+          issueSources: ['discord', 'qq'],
+          storedStatuses: ['pending', 'acknowledged', 'expired', 'cleanup_required'],
+          columns: [
+            'delivery_id',
+            'issue_source',
+            'subject_ref',
+            'installation_id',
+            'managed_credential_ref',
+            'ack_token_hash',
+            'status',
+            'created_at',
+            'expires_at',
+            'acknowledged_at',
+            'failed_at',
+            'failure_reason',
+          ],
+          indexed: [
+            'status + expires_at',
+            'managed_credential_ref',
+            'issue_source + created_at',
+          ],
+          rawOpenRouterKeyStorage: false,
+          rawAckTokenStorage: false,
         },
         brokerRequestEvents: {
           name: 'broker_request_events',
@@ -559,6 +601,7 @@ describe('broker persistent state model', () => {
       '0009_add_qq_managed_entitlements.sql',
       '0010_source_aware_issue_success_events.sql',
       '0011_add_telemetry_active_days.sql',
+      '0012_add_managed_key_delivery_ack.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);
@@ -602,6 +645,9 @@ describe('broker persistent state model', () => {
     );
     const telemetryActiveDaysMigration = readBrokerMigrationSql(
       '0011_add_telemetry_active_days.sql',
+    );
+    const managedKeyDeliveryAckMigration = readBrokerMigrationSql(
+      '0012_add_managed_key_delivery_ack.sql',
     );
 
     expect(migration).toContain('CREATE TABLE broker_config');
@@ -787,6 +833,37 @@ describe('broker persistent state model', () => {
     expect(telemetryActiveDaysMigration).toContain('POST /v1/telemetry/translation-success-day');
     expect(telemetryActiveDaysMigration).not.toContain('telemetry_identifier');
     expect(telemetryActiveDaysMigration).not.toContain('translation_text');
+    expect(managedKeyDeliveryAckMigration).toContain('PRAGMA defer_foreign_keys = on');
+    expect(managedKeyDeliveryAckMigration).toContain(
+      'CREATE TABLE openrouter_entitlements_delivery_ack_v2',
+    );
+    expect(managedKeyDeliveryAckMigration).toContain(
+      "discord_issue_status TEXT CHECK(discord_issue_status IS NULL OR discord_issue_status IN ('issuing', 'delivery_pending', 'active', 'failed', 'cleanup_required'))",
+    );
+    expect(managedKeyDeliveryAckMigration).toContain(
+      'CREATE TABLE qq_managed_entitlements_delivery_ack_v2',
+    );
+    expect(managedKeyDeliveryAckMigration).toContain(
+      "status TEXT NOT NULL CHECK(status IN ('issuing', 'delivery_pending', 'active', 'cleanup_required', 'revoked'))",
+    );
+    expect(managedKeyDeliveryAckMigration).toContain(
+      'CREATE TABLE managed_key_deliveries',
+    );
+    expect(managedKeyDeliveryAckMigration).toContain('ack_token_hash TEXT NOT NULL');
+    expect(managedKeyDeliveryAckMigration).toContain(
+      "status TEXT NOT NULL CHECK (status IN ('pending', 'acknowledged', 'expired', 'cleanup_required'))",
+    );
+    expect(managedKeyDeliveryAckMigration).toContain(
+      'CREATE INDEX idx_managed_key_deliveries_status_expires_at',
+    );
+    expect(managedKeyDeliveryAckMigration).toContain(
+      'CREATE INDEX idx_managed_key_deliveries_managed_credential_ref',
+    );
+    expect(managedKeyDeliveryAckMigration).toContain(
+      'CREATE INDEX idx_managed_key_deliveries_issue_source_created_at',
+    );
+    expect(managedKeyDeliveryAckMigration).not.toContain('openrouter_api_key');
+    expect(managedKeyDeliveryAckMigration).not.toContain('delivery_ack_token TEXT');
   });
 
   it('inserts the QQ auth assertion abuse-control default without replacing tuned JSON', () => {

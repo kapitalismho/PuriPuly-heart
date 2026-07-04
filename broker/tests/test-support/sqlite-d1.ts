@@ -181,7 +181,13 @@ export function insertEntitlement(
     verified_hardware_hash?: string | null;
     verified_hardware_hash_salt_version?: number | null;
     discord_user_ref?: string | null;
-    discord_issue_status?: 'issuing' | 'active' | 'failed' | 'cleanup_required' | null;
+    discord_issue_status?:
+      | 'issuing'
+      | 'delivery_pending'
+      | 'active'
+      | 'failed'
+      | 'cleanup_required'
+      | null;
     discord_issue_reserved_at?: string | null;
     discord_issue_delivered_at?: string | null;
   },
