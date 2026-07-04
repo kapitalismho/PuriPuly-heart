@@ -2233,7 +2233,7 @@ function insertDiscordIdentity(
   input: {
     discordUserRef: string;
     installationId: string;
-    status: 'issuing' | 'active' | 'failed' | 'cleanup_required';
+    status: 'issuing' | 'delivery_pending' | 'active' | 'failed' | 'cleanup_required';
   },
 ): void {
   env.__db

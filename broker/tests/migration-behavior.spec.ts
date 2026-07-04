@@ -754,6 +754,107 @@ describe('broker migration behavior', () => {
     }
   });
 
+  it('adds managed key delivery ACK storage and delivery-pending entitlement states', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, {
+        through: '0012_add_managed_key_delivery_ack.sql',
+      });
+
+      const deliveryTable = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get('managed_key_deliveries') as { name: string };
+      expect(deliveryTable.name).toBe('managed_key_deliveries');
+
+      db.prepare(
+        `INSERT INTO installations (
+          installation_id,
+          device_public_key,
+          app_version
+        ) VALUES (?, ?, ?)`,
+      ).run('install-delivery-pending', 'device-public-key-delivery-pending', '1.0.0');
+      db.prepare(
+        `INSERT INTO discord_identities (
+          discord_user_ref,
+          entitlement_installation_id,
+          status
+        ) VALUES (?, ?, 'issuing')`,
+      ).run('ph-discord-user-v1_delivery', 'install-delivery-pending');
+      db.prepare(
+        `INSERT INTO openrouter_entitlements (
+          installation_id,
+          status,
+          budget_usd,
+          managed_credential_ref,
+          issued_at,
+          expires_at,
+          discord_user_ref,
+          discord_issue_status,
+          discord_issue_reserved_at,
+          discord_issue_delivered_at
+        ) VALUES (?, 'pending_release', ?, ?, ?, ?, ?, 'delivery_pending', ?, NULL)`,
+      ).run(
+        'install-delivery-pending',
+        0.07,
+        'hash_discord_delivery_pending',
+        '2026-07-04T12:00:00.000Z',
+        '2026-10-04T12:00:00.000Z',
+        'ph-discord-user-v1_delivery',
+        '2026-07-04T12:00:00.000Z',
+      );
+      db.prepare(
+        `INSERT INTO qq_managed_entitlements (
+          qq_subject_ref,
+          status,
+          issue_ref,
+          managed_credential_ref,
+          budget_usd,
+          reserved_at,
+          issued_at,
+          expires_at,
+          delivered_at
+        ) VALUES (?, 'delivery_pending', ?, ?, ?, ?, ?, ?, NULL)`,
+      ).run(
+        'ph-qq-subject-v1_delivery',
+        'qq-issue-v1_delivery',
+        'hash_qq_delivery_pending',
+        0.07,
+        '2026-07-04T12:00:00.000Z',
+        '2026-07-04T12:00:00.000Z',
+        '2026-10-04T12:00:00.000Z',
+      );
+      db.prepare(
+        `INSERT INTO managed_key_deliveries (
+          delivery_id,
+          issue_source,
+          subject_ref,
+          installation_id,
+          managed_credential_ref,
+          ack_token_hash,
+          status,
+          created_at,
+          expires_at
+        ) VALUES (?, 'discord', ?, ?, ?, ?, 'pending', ?, ?)`,
+      ).run(
+        'mkd_v1_delivery',
+        'ph-discord-user-v1_delivery',
+        'install-delivery-pending',
+        'hash_discord_delivery_pending',
+        'sha256-base64url-v1_hash',
+        '2026-07-04T12:00:00.000Z',
+        '2026-07-04T12:15:00.000Z',
+      );
+
+      const delivery = db
+        .prepare('SELECT status FROM managed_key_deliveries WHERE delivery_id = ?')
+        .get('mkd_v1_delivery') as { status: string };
+      expect(delivery.status).toBe('pending');
+    } finally {
+      db.close();
+    }
+  });
+
   it('preserves a tuned daily issuance cap when 0004 adds Discord OAuth controls', () => {
     const db = new DatabaseSync(':memory:');
 

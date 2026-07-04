@@ -43,7 +43,7 @@ from puripuly_heart.config.vad_defaults import (
 )
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 
-SETTINGS_SCHEMA_VERSION = 29
+SETTINGS_SCHEMA_VERSION = 30
 MANAGED_AUTH_CLAIM_SOURCE_DISCORD = "discord"
 MANAGED_AUTH_CLAIM_SOURCE_QQ = "qq"
 MANAGED_AUTH_CLAIM_SOURCES = (
@@ -1146,6 +1146,10 @@ class ManagedIdentitySettings:
     founder_letter_seen_credential_ref: str | None = None
     referral_id: str | None = None
     local_managed_claim_sources: tuple[str, ...] = field(default_factory=tuple)
+    pending_delivery_ack_source: str | None = None
+    pending_delivery_ack_id: str | None = None
+    pending_delivery_ack_managed_credential_ref: str | None = None
+    pending_delivery_ack_expires_at: str | None = None
 
     def validate(self) -> None:
         if not isinstance(self.installation_id, str):
@@ -1181,6 +1185,22 @@ class ManagedIdentitySettings:
         self.local_managed_claim_sources = normalize_managed_claim_sources(
             self.local_managed_claim_sources
         )
+        if self.pending_delivery_ack_source not in (None, "discord", "qq"):
+            raise ValueError("managed pending_delivery_ack_source must be discord, qq, or None")
+        if self.pending_delivery_ack_id is not None and not isinstance(
+            self.pending_delivery_ack_id, str
+        ):
+            raise ValueError("managed pending_delivery_ack_id must be a string or None")
+        if self.pending_delivery_ack_managed_credential_ref is not None and not isinstance(
+            self.pending_delivery_ack_managed_credential_ref, str
+        ):
+            raise ValueError(
+                "managed pending_delivery_ack_managed_credential_ref must be a string or None"
+            )
+        if self.pending_delivery_ack_expires_at is not None and not isinstance(
+            self.pending_delivery_ack_expires_at, str
+        ):
+            raise ValueError("managed pending_delivery_ack_expires_at must be a string or None")
 
 
 @dataclass(slots=True)
@@ -1686,6 +1706,14 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
                 normalize_managed_claim_sources(
                     settings.managed_identity.local_managed_claim_sources
                 )
+            ),
+            "pending_delivery_ack_source": settings.managed_identity.pending_delivery_ack_source,
+            "pending_delivery_ack_id": settings.managed_identity.pending_delivery_ack_id,
+            "pending_delivery_ack_managed_credential_ref": (
+                settings.managed_identity.pending_delivery_ack_managed_credential_ref
+            ),
+            "pending_delivery_ack_expires_at": (
+                settings.managed_identity.pending_delivery_ack_expires_at
             ),
         },
         "telemetry": telemetry_settings_to_dict(settings.telemetry),
@@ -3223,6 +3251,23 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
             changed = True
         version = 29
 
+    if version < 30:
+        managed_identity_data = data.get("managed_identity")
+        if not isinstance(managed_identity_data, dict):
+            managed_identity_data = {}
+            data["managed_identity"] = managed_identity_data
+            changed = True
+        for key in (
+            "pending_delivery_ack_source",
+            "pending_delivery_ack_id",
+            "pending_delivery_ack_managed_credential_ref",
+            "pending_delivery_ack_expires_at",
+        ):
+            if key not in managed_identity_data:
+                managed_identity_data[key] = None
+                changed = True
+        version = 30
+
     if _normalize_local_llm_data(data):
         changed = True
 
@@ -3724,6 +3769,32 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         )
         changed = True
 
+    raw_pending_delivery_ack_source = managed_identity_data.get("pending_delivery_ack_source")
+    normalized_pending_delivery_ack_source = (
+        raw_pending_delivery_ack_source
+        if raw_pending_delivery_ack_source in ("discord", "qq")
+        else None
+    )
+    if (
+        "pending_delivery_ack_source" not in managed_identity_data
+        or raw_pending_delivery_ack_source != normalized_pending_delivery_ack_source
+    ):
+        managed_identity_data["pending_delivery_ack_source"] = (
+            normalized_pending_delivery_ack_source
+        )
+        changed = True
+
+    for key in (
+        "pending_delivery_ack_id",
+        "pending_delivery_ack_managed_credential_ref",
+        "pending_delivery_ack_expires_at",
+    ):
+        raw_value = managed_identity_data.get(key)
+        normalized_value = _parse_optional_str(raw_value)
+        if key not in managed_identity_data or raw_value != normalized_value:
+            managed_identity_data[key] = normalized_value
+            changed = True
+
     if "system_prompts" in data:
         data.pop("system_prompts", None)
         changed = True
@@ -4083,6 +4154,20 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             referral_id=normalize_owned_referral_id(managed_identity_data.get("referral_id")),
             local_managed_claim_sources=normalize_managed_claim_sources(
                 managed_identity_data.get("local_managed_claim_sources")
+            ),
+            pending_delivery_ack_source=(
+                managed_identity_data.get("pending_delivery_ack_source")
+                if managed_identity_data.get("pending_delivery_ack_source") in ("discord", "qq")
+                else None
+            ),
+            pending_delivery_ack_id=_parse_optional_str(
+                managed_identity_data.get("pending_delivery_ack_id")
+            ),
+            pending_delivery_ack_managed_credential_ref=_parse_optional_str(
+                managed_identity_data.get("pending_delivery_ack_managed_credential_ref")
+            ),
+            pending_delivery_ack_expires_at=_parse_optional_str(
+                managed_identity_data.get("pending_delivery_ack_expires_at")
             ),
         ),
         telemetry=telemetry_settings_from_dict(telemetry_data),

@@ -600,7 +600,7 @@ function insertQqManagedEntitlement(
   env: ReturnType<typeof createTestBrokerEnv>,
   input: {
     qqSubjectRef: string;
-    status: 'issuing' | 'active' | 'cleanup_required';
+    status: 'issuing' | 'delivery_pending' | 'active' | 'cleanup_required';
     issueRef: string;
     reservedAt: string;
     issuedAt?: string | null;

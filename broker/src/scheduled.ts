@@ -27,6 +27,7 @@ import {
   applyTelemetryActiveDayRetention,
   getTelemetryUsageDailyMetrics,
 } from './telemetry';
+import { reconcileStaleManagedKeyDeliveries } from './managed-key-delivery';
 
 type AlertLevel = 'warn1' | 'warn2' | 'warn3' | 'critical';
 
@@ -70,12 +71,16 @@ interface ExecutionContextLike {
 
 export async function handleScheduled(
   controller: ScheduledControllerLike,
-  env: Pick<BrokerBindings, 'BROKER_DB' | 'DISCORD_DAILY_REPORT_WEBHOOK_URL'>,
+  env: Pick<
+    BrokerBindings,
+    'BROKER_DB' | 'DISCORD_DAILY_REPORT_WEBHOOK_URL' | 'OPENROUTER_MANAGEMENT_API_KEY'
+  >,
   _ctx: ExecutionContextLike,
 ): Promise<void> {
   const now = new Date(controller.scheduledTime);
 
   await applyAbuseMonitoringRetention(env.BROKER_DB, now);
+  await reconcileStaleManagedKeyDeliveries(env, { now });
   await reconcileStaleReferralRewards(env.BROKER_DB, { nowIso: now.toISOString() });
   await applyReferralRewardRetention(env.BROKER_DB, now);
 

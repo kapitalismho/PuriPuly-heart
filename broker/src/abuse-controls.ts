@@ -566,7 +566,7 @@ async function countManagedDailyIssuances(
                AND capped.issued_at < ?
              )
              OR (
-               capped.discord_issue_status = 'issuing'
+                capped.discord_issue_status IN ('issuing', 'delivery_pending')
                AND capped.discord_issue_reserved_at >= ?
                AND capped.discord_issue_reserved_at < ?
              )
@@ -577,7 +577,7 @@ async function countManagedDailyIssuances(
             FROM qq_managed_entitlements qq_capped
            WHERE (
              (
-               qq_capped.status IN ('issuing', 'cleanup_required')
+                qq_capped.status IN ('issuing', 'delivery_pending', 'cleanup_required')
                AND qq_capped.reserved_at >= ?
                AND qq_capped.reserved_at < ?
              )

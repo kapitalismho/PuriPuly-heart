@@ -22,6 +22,8 @@ from puripuly_heart.config.settings import (
 from puripuly_heart.core.discord_oauth_loopback import DiscordOAuthCallbackError
 from puripuly_heart.core.managed_identity import ensure_managed_identity_bundle
 from puripuly_heart.core.managed_openrouter_release import (
+    ManagedKeyDeliveryAck,
+    ManagedKeyDeliveryAckResult,
     ManagedOpenRouterDiscordStartSuccess,
     ManagedOpenRouterFingerprintSalt,
     ManagedOpenRouterIssueSuccess,
@@ -37,10 +39,13 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterUserFacingError,
     TalkTogetherPassStatus,
     UnavailableManagedOpenRouterReleaseClient,
+    format_managed_openrouter_diagnostics,
 )
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_DELIVERY_ACK_TOKEN_SECRET,
     OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_DELIVERY_ACK_TOKEN_SECRET,
     OPENROUTER_MANAGED_USER_ID_SECRET,
     OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
     load_managed_openrouter_user_identifier,
@@ -57,6 +62,7 @@ class FakeManagedReleaseClient:
     discord_start_result: object | None = None
     discord_issue_result: object | None = None
     qq_assert_result: object | None = None
+    delivery_ack_result: object | None = None
     trial_status_result: object | None = None
     challenge_gate: asyncio.Event | None = None
     discord_start_gate: asyncio.Event | None = None
@@ -174,6 +180,23 @@ class FakeManagedReleaseClient:
             raise result
         return result
 
+    async def acknowledge_managed_key_delivery(self, delivery_ack):
+        self.calls.append(
+            (
+                "delivery_ack",
+                {
+                    "issue_source": delivery_ack.issue_source,
+                    "delivery_id": delivery_ack.delivery_id,
+                    "managed_credential_ref": delivery_ack.managed_credential_ref,
+                    "ack_token": delivery_ack.ack_token,
+                },
+            )
+        )
+        result = self.delivery_ack_result
+        if isinstance(result, Exception):
+            raise result
+        return result
+
     async def get_trial_status(
         self,
         *,
@@ -277,6 +300,16 @@ def _make_service(
 
 def _make_fingerprint_salt() -> ManagedOpenRouterFingerprintSalt:
     return ManagedOpenRouterFingerprintSalt(version=7, salt="fingerprint-salt-test")
+
+
+def _make_delivery_ack(source: str = "discord") -> ManagedKeyDeliveryAck:
+    return ManagedKeyDeliveryAck(
+        issue_source=source,
+        delivery_id=f"mkd_v1_{source}",
+        managed_credential_ref=f"managed-ref-{source}",
+        ack_token=f"ack-token-{source}",
+        expires_at="2026-04-08T06:15:45.000Z",
+    )
 
 
 @dataclass
@@ -399,6 +432,287 @@ def _managed_identity_release_state(settings: AppSettings) -> tuple[object, ...]
         settings.managed_identity.founder_letter_seen_credential_ref,
         settings.managed_identity.referral_id,
     )
+
+
+@pytest.mark.asyncio
+async def test_discord_issue_delivery_ack_runs_after_local_secret_and_settings_persist() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    secrets = InMemorySecretStore()
+    client = FakeManagedReleaseClient(
+        delivery_ack_result=ManagedKeyDeliveryAckResult(
+            status="acknowledged",
+            referral_bonus_applied=True,
+            referral_id="7KQ9M2",
+            pass_status=TalkTogetherPassStatus(
+                pass_id="7KQ9M2",
+                invite_count=1,
+                invite_limit=5,
+                bonus_translations_per_friend=200,
+            ),
+        )
+    )
+    persist_snapshots: list[tuple[str | None, str | None, str | None]] = []
+
+    def persist(updated: AppSettings) -> None:
+        persist_snapshots.append(
+            (
+                secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET),
+                updated.managed_identity.pending_delivery_ack_id,
+                secrets.get(OPENROUTER_MANAGED_DELIVERY_ACK_TOKEN_SECRET),
+            )
+        )
+
+    service = ManagedOpenRouterReleaseService(
+        settings=settings,
+        secrets=secrets,
+        client=client,
+        persist_settings=persist,
+        app_version="2.0.0",
+    )
+
+    result = await service._persist_managed_issue_success(
+        ManagedOpenRouterIssueSuccess(
+            openrouter_api_key="managed-key",
+            managed_credential_ref="managed-ref-discord",
+            expires_at="2026-07-08T06:15:45.000Z",
+            delivery_ack=_make_delivery_ack("discord"),
+        )
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.READY
+    assert result.referral_bonus_applied is True
+    assert result.referral_id == "7KQ9M2"
+    assert persist_snapshots[0] == (
+        "managed-key",
+        "mkd_v1_discord",
+        "ack-token-discord",
+    )
+    assert client.calls == [
+        (
+            "delivery_ack",
+            {
+                "issue_source": "discord",
+                "delivery_id": "mkd_v1_discord",
+                "managed_credential_ref": "managed-ref-discord",
+                "ack_token": "ack-token-discord",
+            },
+        )
+    ]
+    assert settings.managed_identity.pending_delivery_ack_id is None
+    assert secrets.get(OPENROUTER_MANAGED_DELIVERY_ACK_TOKEN_SECRET) is None
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "managed-key"
+
+
+@pytest.mark.asyncio
+async def test_discord_issue_delivery_ack_failure_keeps_pending_retry_state() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    secrets = InMemorySecretStore()
+    client = FakeManagedReleaseClient(
+        delivery_ack_result=ManagedOpenRouterReleaseError(
+            code="trial_unavailable",
+            error_class="retryable",
+            message="temporary ACK failure",
+            operation="delivery_ack",
+        )
+    )
+    persist_calls = 0
+
+    def persist(_updated: AppSettings) -> None:
+        nonlocal persist_calls
+        persist_calls += 1
+
+    service = ManagedOpenRouterReleaseService(
+        settings=settings,
+        secrets=secrets,
+        client=client,
+        persist_settings=persist,
+        app_version="2.0.0",
+    )
+
+    result = await service._persist_managed_issue_success(
+        ManagedOpenRouterIssueSuccess(
+            openrouter_api_key="managed-key",
+            managed_credential_ref="managed-ref-discord",
+            expires_at="2026-07-08T06:15:45.000Z",
+            delivery_ack=_make_delivery_ack("discord"),
+        )
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+    assert result.pending_issue is True
+    assert result.local_key_available is True
+    assert settings.managed_identity.pending_delivery_ack_id == "mkd_v1_discord"
+    assert secrets.get(OPENROUTER_MANAGED_DELIVERY_ACK_TOKEN_SECRET) == "ack-token-discord"
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "managed-key"
+    assert persist_calls == 1
+    assert "ack-token-discord" not in format_managed_openrouter_diagnostics(result.diagnostics)
+
+
+@pytest.mark.asyncio
+async def test_discord_issue_delivery_ack_initial_settings_persist_failure_deletes_local_state() -> (
+    None
+):
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    secrets = InMemorySecretStore()
+    client = FakeManagedReleaseClient(
+        delivery_ack_result=ManagedKeyDeliveryAckResult(status="acknowledged")
+    )
+
+    def persist(_updated: AppSettings) -> None:
+        raise RuntimeError("settings persist failed")
+
+    service = ManagedOpenRouterReleaseService(
+        settings=settings,
+        secrets=secrets,
+        client=client,
+        persist_settings=persist,
+        app_version="2.0.0",
+    )
+
+    result = await service._persist_managed_issue_success(
+        ManagedOpenRouterIssueSuccess(
+            openrouter_api_key="managed-key",
+            managed_credential_ref="managed-ref-discord",
+            expires_at="2026-07-08T06:15:45.000Z",
+            delivery_ack=_make_delivery_ack("discord"),
+        )
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+    assert client.calls == []
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) is None
+    assert secrets.get(OPENROUTER_MANAGED_DELIVERY_ACK_TOKEN_SECRET) is None
+    assert settings.managed_identity.pending_delivery_ack_id is None
+
+
+@pytest.mark.asyncio
+async def test_discord_issue_delivery_ack_clear_persist_failure_keeps_retryable_token() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    secrets = InMemorySecretStore()
+    client = FakeManagedReleaseClient(
+        delivery_ack_result=ManagedKeyDeliveryAckResult(status="acknowledged")
+    )
+    persist_calls = 0
+
+    def persist(_updated: AppSettings) -> None:
+        nonlocal persist_calls
+        persist_calls += 1
+        if persist_calls == 2:
+            raise RuntimeError("settings clear persist failed")
+
+    service = ManagedOpenRouterReleaseService(
+        settings=settings,
+        secrets=secrets,
+        client=client,
+        persist_settings=persist,
+        app_version="2.0.0",
+    )
+
+    result = await service._persist_managed_issue_success(
+        ManagedOpenRouterIssueSuccess(
+            openrouter_api_key="managed-key",
+            managed_credential_ref="managed-ref-discord",
+            expires_at="2026-07-08T06:15:45.000Z",
+            delivery_ack=_make_delivery_ack("discord"),
+        )
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+    assert result.pending_issue is True
+    assert result.local_key_available is True
+    assert result.diagnostics is not None
+    assert result.diagnostics.code == "delivery_ack_clear_pending_failed"
+    assert settings.managed_identity.pending_delivery_ack_id == "mkd_v1_discord"
+    assert secrets.get(OPENROUTER_MANAGED_DELIVERY_ACK_TOKEN_SECRET) == "ack-token-discord"
+    assert secrets.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "managed-key"
+    assert client.calls[0][0] == "delivery_ack"
+    assert persist_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_ensure_key_for_llm_start_retries_pending_delivery_ack_before_ready() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.managed_identity.pending_delivery_ack_source = "discord"
+    settings.managed_identity.pending_delivery_ack_id = "mkd_v1_discord"
+    settings.managed_identity.pending_delivery_ack_managed_credential_ref = "managed-ref-discord"
+    settings.managed_identity.pending_delivery_ack_expires_at = "2026-04-08T06:15:45.000Z"
+    secrets = InMemorySecretStore()
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "managed-key")
+    secrets.set(OPENROUTER_MANAGED_DELIVERY_ACK_TOKEN_SECRET, "ack-token-discord")
+    client = FakeManagedReleaseClient(
+        delivery_ack_result=ManagedKeyDeliveryAckResult(status="already_acknowledged")
+    )
+    persist_calls = 0
+
+    def persist(_updated: AppSettings) -> None:
+        nonlocal persist_calls
+        persist_calls += 1
+
+    service = ManagedOpenRouterReleaseService(
+        settings=settings,
+        secrets=secrets,
+        client=client,
+        persist_settings=persist,
+        app_version="2.0.0",
+    )
+
+    result = await service.ensure_key_for_llm_start()
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.READY
+    assert result.api_key == "managed-key"
+    assert client.calls[0][0] == "delivery_ack"
+    assert settings.managed_identity.pending_delivery_ack_id is None
+    assert secrets.get(OPENROUTER_MANAGED_DELIVERY_ACK_TOKEN_SECRET) is None
+    assert persist_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_qq_issue_delivery_ack_uses_qq_ack_token_secret() -> None:
+    settings = AppSettings()
+    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
+    settings.translation.connection = TranslationConnection.MANAGED_CHINA
+    secrets = InMemorySecretStore()
+    client = FakeManagedReleaseClient(
+        delivery_ack_result=ManagedKeyDeliveryAckResult(status="acknowledged")
+    )
+    persist_snapshots: list[tuple[str | None, str | None]] = []
+
+    def persist(updated: AppSettings) -> None:
+        persist_snapshots.append(
+            (
+                updated.managed_identity.pending_delivery_ack_id,
+                secrets.get(OPENROUTER_MANAGED_QQ_DELIVERY_ACK_TOKEN_SECRET),
+            )
+        )
+
+    service = ManagedOpenRouterReleaseService(
+        settings=settings,
+        secrets=secrets,
+        client=client,
+        persist_settings=persist,
+        app_version="2.0.0",
+    )
+
+    result = await service._persist_qq_managed_issue_success(
+        ManagedOpenRouterIssueSuccess(
+            openrouter_api_key="qq-managed-key",
+            managed_credential_ref="managed-ref-qq",
+            expires_at="2026-09-08T06:15:45.000Z",
+            delivery_ack=_make_delivery_ack("qq"),
+        ),
+        api_key="qq-managed-key",
+    )
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.READY
+    assert persist_snapshots[0] == ("mkd_v1_qq", "ack-token-qq")
+    assert secrets.get(OPENROUTER_MANAGED_QQ_API_KEY_SECRET) == "qq-managed-key"
+    assert secrets.get(OPENROUTER_MANAGED_QQ_DELIVERY_ACK_TOKEN_SECRET) is None
+    assert client.calls[0][0] == "delivery_ack"
 
 
 @pytest.mark.asyncio

@@ -47,6 +47,23 @@ def test_managed_identity_settings_round_trip_includes_handoff_fields() -> None:
     assert restored.managed_identity.founder_letter_seen_credential_ref == "hash_123"
 
 
+def test_managed_identity_settings_round_trip_includes_pending_delivery_ack_metadata() -> None:
+    settings = AppSettings()
+    settings.managed_identity.pending_delivery_ack_source = "discord"
+    settings.managed_identity.pending_delivery_ack_id = "mkd_v1_delivery"
+    settings.managed_identity.pending_delivery_ack_managed_credential_ref = "hash_123"
+    settings.managed_identity.pending_delivery_ack_expires_at = "2026-07-04T12:15:00Z"
+
+    serialized = to_dict(settings)
+    restored = from_dict(serialized)
+
+    assert restored.managed_identity.pending_delivery_ack_source == "discord"
+    assert restored.managed_identity.pending_delivery_ack_id == "mkd_v1_delivery"
+    assert restored.managed_identity.pending_delivery_ack_managed_credential_ref == "hash_123"
+    assert restored.managed_identity.pending_delivery_ack_expires_at == "2026-07-04T12:15:00Z"
+    assert "delivery_ack_token" not in serialized["managed_identity"]
+
+
 def test_managed_identity_referral_id_defaults_to_none_and_round_trips_uppercase() -> None:
     settings = AppSettings()
 
@@ -120,7 +137,7 @@ def test_load_settings_migrates_v22_referral_id_values(tmp_path, persisted_value
     loaded = load_settings(path)
     persisted = json.loads(path.read_text(encoding="utf-8"))
 
-    assert SETTINGS_SCHEMA_VERSION == 29
+    assert SETTINGS_SCHEMA_VERSION == 30
     assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
     assert loaded.managed_identity.referral_id == expected
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
@@ -172,6 +189,10 @@ def test_load_settings_backfills_managed_identity_defaults(tmp_path) -> None:
         "founder_letter_seen_credential_ref": None,
         "referral_id": None,
         "local_managed_claim_sources": [],
+        "pending_delivery_ack_source": None,
+        "pending_delivery_ack_id": None,
+        "pending_delivery_ack_managed_credential_ref": None,
+        "pending_delivery_ack_expires_at": None,
     }
 
 

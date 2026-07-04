@@ -9,6 +9,8 @@ import httpx
 import pytest
 
 from puripuly_heart.core.managed_openrouter_release import (
+    ManagedKeyDeliveryAck,
+    ManagedKeyDeliveryAckResult,
     ManagedOpenRouterChallengeSuccess,
     ManagedOpenRouterDiscordStartSuccess,
     ManagedOpenRouterFingerprintSalt,
@@ -300,6 +302,7 @@ async def test_issue_parses_success_payload() -> None:
             "model": "google/gemma-4-26b-a4b-it",
             "signed_at": "2026-04-10T06:00:45.000Z",
             "signature": "signature-123",
+            "delivery_ack_supported": True,
         }
         return httpx.Response(
             200,
@@ -363,7 +366,10 @@ async def test_issue_discord_managed_key_posts_signed_payload_and_parses_success
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         assert request.url.path == "/v1/providers/openrouter/discord/issue"
-        assert json.loads(request.content) == request_body
+        assert json.loads(request.content) == {
+            **request_body,
+            "delivery_ack_supported": True,
+        }
         return httpx.Response(
             200,
             json={
@@ -390,6 +396,37 @@ async def test_issue_discord_managed_key_posts_signed_payload_and_parses_success
         expires_at="2026-07-30T06:00:00.000Z",
         openrouter_user_id="user-123",
     )
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_issue_discord_managed_key_parses_delivery_ack_fields() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "openrouter_api_key": "managed-openrouter-api-key",
+                "managed_credential_ref": "managed-credential-ref-123",
+                "expires_at": "2026-07-30T06:00:00.000Z",
+                "delivery_ack_required": True,
+                "delivery_id": "mkd_v1_discord",
+                "delivery_ack_token": "ack-token-discord",
+                "delivery_ack_expires_at": "2026-04-30T06:15:00.000Z",
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.issue_discord_managed_key({"code": "discord-oauth-code-123"})
+
+    assert result.delivery_ack == ManagedKeyDeliveryAck(
+        issue_source="discord",
+        delivery_id="mkd_v1_discord",
+        managed_credential_ref="managed-credential-ref-123",
+        ack_token="ack-token-discord",
+        expires_at="2026-04-30T06:15:00.000Z",
+    )
+    assert "ack-token-discord" not in repr(result)
     await client.close()
 
 
@@ -472,6 +509,7 @@ async def test_assert_qq_credential_parses_verified_only_success_without_issue(
             "qq_identity": qq_identity,
             "credential": credential,
             "asserted_at": asserted_at,
+            "delivery_ack_supported": True,
         }
         return httpx.Response(
             200,
@@ -518,6 +556,7 @@ async def test_assert_qq_credential_parses_top_level_key_bearing_success_as_issu
             "qq_identity": qq_identity,
             "credential": credential,
             "asserted_at": asserted_at,
+            "delivery_ack_supported": True,
         }
         return httpx.Response(
             200,
@@ -558,6 +597,98 @@ async def test_assert_qq_credential_parses_top_level_key_bearing_success_as_issu
     assert subject_ref not in repr(result)
     for sensitive in (qq_identity, credential, subject_ref, openrouter_key):
         assert sensitive not in caplog.text
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_assert_qq_credential_parses_delivery_ack_fields() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "status": "issued",
+                "qq_subject_ref": "ph-qq-subject-v1_key-subject-sentinel",
+                "openrouter_api_key": "managed-openrouter-api-key-qq",
+                "managed_credential_ref": "managed-credential-ref-qq",
+                "expires_at": "2026-09-09T06:00:00.000Z",
+                "delivery_ack_required": True,
+                "delivery_id": "mkd_v1_qq",
+                "delivery_ack_token": "ack-token-qq",
+                "delivery_ack_expires_at": "2026-06-09T06:15:00.000Z",
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.assert_qq_credential(
+        qq_identity="qq-key-identity-sentinel",
+        credential="b" * 64,
+        asserted_at="2026-06-09T06:00:45.000Z",
+    )
+
+    assert result.issue is not None
+    assert result.issue.delivery_ack == ManagedKeyDeliveryAck(
+        issue_source="qq",
+        delivery_id="mkd_v1_qq",
+        managed_credential_ref="managed-credential-ref-qq",
+        ack_token="ack-token-qq",
+        expires_at="2026-06-09T06:15:00.000Z",
+    )
+    assert "ack-token-qq" not in repr(result.issue)
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_acknowledge_managed_key_delivery_posts_token_and_parses_success() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/v1/providers/openrouter/managed-key-delivery/ack"
+        assert json.loads(request.content) == {
+            "delivery_id": "mkd_v1_discord",
+            "managed_credential_ref": "managed-credential-ref-123",
+            "delivery_ack_token": "ack-token-discord",
+        }
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "status": "acknowledged",
+                "referral_bonus_applied": True,
+                "referral_id": "7KQ9M2",
+                "talk_together_pass": {
+                    "pass_id": "7KQ9M2",
+                    "invite_count": 1,
+                    "invite_limit": 5,
+                    "bonus_translations_per_friend": 200,
+                },
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.acknowledge_managed_key_delivery(
+        ManagedKeyDeliveryAck(
+            issue_source="discord",
+            delivery_id="mkd_v1_discord",
+            managed_credential_ref="managed-credential-ref-123",
+            ack_token="ack-token-discord",
+            expires_at="2026-04-30T06:15:00.000Z",
+        )
+    )
+
+    assert result == ManagedKeyDeliveryAckResult(
+        status="acknowledged",
+        referral_bonus_applied=True,
+        referral_id="7KQ9M2",
+        pass_status=TalkTogetherPassStatus(
+            pass_id="7KQ9M2",
+            invite_count=1,
+            invite_limit=5,
+            bonus_translations_per_friend=200,
+        ),
+    )
+    assert "ack-token-discord" not in repr(result)
     await client.close()
 
 

@@ -344,15 +344,24 @@ export const OPENROUTER_ENTITLEMENT_STATUS_VALUES = [
 
 export const QQ_MANAGED_ENTITLEMENT_STATUS_VALUES = [
   'issuing',
+  'delivery_pending',
   'active',
   'cleanup_required',
   'revoked',
 ] as const;
 
 export const QQ_MANAGED_ENTITLEMENT_AUTOMATIC_REISSUE_BLOCKING_STATUS_VALUES = [
+  'delivery_pending',
   'active',
   'cleanup_required',
   'revoked',
+] as const;
+
+export const MANAGED_KEY_DELIVERY_STATUS_VALUES = [
+  'pending',
+  'acknowledged',
+  'expired',
+  'cleanup_required',
 ] as const;
 
 export const QQ_MANAGED_ENTITLEMENT_STALE_ISSUING_POLICY = {
@@ -406,6 +415,9 @@ export type BrokerIssueSuccessSource = 'discord' | 'qq';
 
 export type QqManagedEntitlementStatus =
   (typeof QQ_MANAGED_ENTITLEMENT_STATUS_VALUES)[number];
+
+export type ManagedKeyDeliveryStatus =
+  (typeof MANAGED_KEY_DELIVERY_STATUS_VALUES)[number];
 
 export type DiscordOAuthSessionStatus =
   (typeof DISCORD_OAUTH_SESSION_STATUS_VALUES)[number];
@@ -484,7 +496,13 @@ export interface OpenRouterEntitlementRecord {
   verified_hardware_hash: string | null;
   verified_hardware_hash_salt_version: number | null;
   discord_user_ref: string | null;
-  discord_issue_status: 'issuing' | 'active' | 'failed' | 'cleanup_required' | null;
+  discord_issue_status:
+    | 'issuing'
+    | 'delivery_pending'
+    | 'active'
+    | 'failed'
+    | 'cleanup_required'
+    | null;
   discord_issue_reserved_at: string | null;
   discord_issue_delivered_at: string | null;
 }
@@ -524,6 +542,21 @@ export interface QqManagedEntitlementRecord {
   delivered_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ManagedKeyDeliveryRecord {
+  delivery_id: string;
+  issue_source: BrokerIssueSuccessSource;
+  subject_ref: string | null;
+  installation_id: string | null;
+  managed_credential_ref: string;
+  ack_token_hash: string;
+  status: ManagedKeyDeliveryStatus;
+  created_at: string;
+  expires_at: string;
+  acknowledged_at: string | null;
+  failed_at: string | null;
+  failure_reason: string | null;
 }
 
 export interface BrokerIssueSuccessEventRecord {
@@ -876,6 +909,8 @@ export const BROKER_PERSISTENCE_MODEL = {
       stateInvariants: {
         active:
           'requires managed_credential_ref, issued_at, expires_at, and delivered_at',
+        delivery_pending:
+          'requires managed_credential_ref, issued_at, and expires_at; delivered_at remains NULL until client ACK',
         cleanup_required: 'requires managed_credential_ref',
         issuing:
           'may be stale-reclaimed only when managed_credential_ref is NULL; issuing with a credential ref requires cleanup/remediation',
@@ -886,6 +921,35 @@ export const BROKER_PERSISTENCE_MODEL = {
       rawIdentityStorage: false,
       rawCredentialStorage: false,
       rawOpenRouterKeyStorage: false,
+    },
+    managedKeyDeliveries: {
+      name: 'managed_key_deliveries',
+      purpose:
+        'pending managed OpenRouter child-key delivery acknowledgements; stores token hashes only',
+      primaryKey: 'delivery_id',
+      issueSources: ['discord', 'qq'],
+      storedStatuses: MANAGED_KEY_DELIVERY_STATUS_VALUES,
+      columns: [
+        'delivery_id',
+        'issue_source',
+        'subject_ref',
+        'installation_id',
+        'managed_credential_ref',
+        'ack_token_hash',
+        'status',
+        'created_at',
+        'expires_at',
+        'acknowledged_at',
+        'failed_at',
+        'failure_reason',
+      ],
+      indexed: [
+        'status + expires_at',
+        'managed_credential_ref',
+        'issue_source + created_at',
+      ],
+      rawOpenRouterKeyStorage: false,
+      rawAckTokenStorage: false,
     },
     brokerRequestEvents: {
       name: 'broker_request_events',
