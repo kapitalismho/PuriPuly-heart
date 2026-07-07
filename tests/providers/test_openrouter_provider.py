@@ -252,8 +252,7 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
     assert body["reasoning"] == {"effort": "none"}
     assert body["user"] == "managed-user-123"
     assert body["provider"] == {
-        "sort": "latency",
-        "only": ["cloudflare", "parasail", "wafer"],
+        "order": ["wafer", "deepinfra", "parasail"],
         "allow_fallbacks": True,
     }
     assert body["messages"][0] == {"role": "system", "content": "SYSTEM"}
@@ -265,7 +264,7 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_gemma_latency_routing_prefers_cloudflare_then_parasail_then_wafer(
+async def test_httpx_openrouter_client_gemma_order_routing_prefers_wafer_then_deepinfra_then_parasail(
     monkeypatch,
 ) -> None:
     fake_client = FakeAsyncClient()
@@ -285,8 +284,7 @@ async def test_httpx_openrouter_client_gemma_latency_routing_prefers_cloudflare_
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "sort": "latency",
-        "only": ["cloudflare", "parasail", "wafer"],
+        "order": ["wafer", "deepinfra", "parasail"],
         "allow_fallbacks": True,
     }
 
@@ -429,7 +427,7 @@ async def test_httpx_openrouter_client_google_gemini_latency_routing_does_not_ig
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_latency_routing_sorts_gemma_providers(
+async def test_httpx_openrouter_client_order_routing_chains_gemma_providers(
     monkeypatch,
 ) -> None:
     fake_client = FakeAsyncClient()
@@ -450,8 +448,7 @@ async def test_httpx_openrouter_client_latency_routing_sorts_gemma_providers(
     assert result == "OK"
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "sort": "latency",
-        "only": ["cloudflare", "parasail", "wafer"],
+        "order": ["wafer", "deepinfra", "parasail"],
         "allow_fallbacks": True,
     }
 

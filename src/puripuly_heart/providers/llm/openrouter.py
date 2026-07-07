@@ -164,8 +164,7 @@ def _build_provider_preferences(
         }
     if model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value:
         return {
-            "sort": "latency",
-            "only": ["cloudflare", "parasail", "wafer"],
+            "order": ["wafer", "deepinfra", "parasail"],
             "allow_fallbacks": True,
         }
     if model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value:
