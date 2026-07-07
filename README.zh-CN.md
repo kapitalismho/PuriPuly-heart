@@ -194,9 +194,6 @@
 PuriPuly 与云端 STT 结合时能提供最佳体验。
 例如即使同样是 Qwen ASR，本地与云端的语音识别性能也有相当差距。
 
-建议先从 Deepgram 开始。
-只要注册，就能获得 $200 的免费额度。
-
 <details>
 <summary><h3>OpenRouter</h3></summary>
 
