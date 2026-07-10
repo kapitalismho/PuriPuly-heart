@@ -251,3 +251,10 @@ opencode.json
 .skills/
 .opencode/
 .impeccable.md
+
+# Portable runtime (not committed — use release ZIP)
+python/
+data/
+start.exe
+start-debug.exe
+.github-token

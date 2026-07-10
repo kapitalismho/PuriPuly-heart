@@ -169,6 +169,15 @@ class SecretsBackend(str, Enum):
     ENCRYPTED_FILE = "encrypted_file"
 
 
+def _default_secrets_backend() -> SecretsBackend:
+    """Return the default secrets backend — ENCRYPTED_FILE in portable mode."""
+    from puripuly_heart.config.paths import is_portable
+
+    if is_portable():
+        return SecretsBackend.ENCRYPTED_FILE
+    return SecretsBackend.KEYRING
+
+
 class QwenRegion(str, Enum):
     BEIJING = "beijing"
     SINGAPORE = "singapore"
@@ -4084,7 +4093,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
         ),
         secrets=SecretsSettings(
             backend=SecretsBackend(
-                data.get("secrets", {}).get("backend", SecretsBackend.KEYRING.value)
+                data.get("secrets", {}).get("backend", _default_secrets_backend().value)
             ),
             encrypted_file_path=data.get("secrets", {}).get("encrypted_file_path", "secrets.json"),
         ),

@@ -504,13 +504,36 @@ class ResolvedPeerSTTConfig:
     soniox_trailing_silence_ms: int | None = None
 
 
+def _portable_passphrase() -> str:
+    """Generate or load a passphrase for the portable encrypted-file secret store."""
+    from puripuly_heart.config.paths import portable_data_dir
+
+    key_file = portable_data_dir() / ".secret_key"
+    if key_file.exists():
+        return key_file.read_text(encoding="utf-8").strip()
+
+    import secrets as _secrets
+
+    passphrase = _secrets.token_urlsafe(32)
+    key_file.parent.mkdir(parents=True, exist_ok=True)
+    key_file.write_text(passphrase, encoding="utf-8")
+    return passphrase
+
+
 def create_secret_store(
     settings: SecretsSettings,
     *,
     config_path: Path,
     passphrase: str | None = None,
 ) -> SecretStore:
+    from puripuly_heart.config.paths import is_portable, portable_data_dir
+
     passphrase = passphrase or os.getenv(SECRETS_PASSPHRASE_ENV)
+
+    if is_portable() and settings.backend == SecretsBackend.KEYRING:
+        passphrase = passphrase or _portable_passphrase()
+        path = portable_data_dir() / "secrets.json"
+        return EncryptedFileSecretStore(path=path, passphrase=passphrase)
 
     if settings.backend == SecretsBackend.KEYRING:
         return KeyringSecretStore()
