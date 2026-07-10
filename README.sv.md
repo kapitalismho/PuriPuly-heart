@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
-<p align="center">LLM-based two-way translator for VRChat</p>
+<p align="center">Tvåvägs översättare för VRChat driven av LLM</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -55,10 +55,120 @@
 
 ---
 
-> 📖 **Full documentation in English:** [README.md](README.md)
+## Demo
+
+![Jämförelse av översättningsresultat mellan PuriPuly och VRCT.](docs/images/demo/ko-en_screenshot.png)
 
 ---
 
-## License
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
+Fler exempel på verklig kommunikation genom PuriPuly:
+- [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## Äntligen, prata som riktiga vänner.
+
+Du har varit i den situationen.
+Ville trösta en vän,
+men lyckades bara: "Mår du bra?"
+
+Du vet redan att en "översättare" inte kan förmedla det du har i hjärtat.
+Därför byggde jag en som kan det.
+
+- **LLM-driven lokalisering** — slang, talspråk, formellt och informellt tal — allt återgivet naturligt.
+- **Kontextminne** — samtalet flyter naturligt med medvetenhet om tidigare kontext.
+- **Tvåvägs röstöversättning** — översätter också den andra personens röst, med VR-undertextstöd.
+- **Start via Discord** — börja direkt utan komplicerad inställning.
+
+## Vanliga frågor
+
+- **Hur bra är översättningskvaliteten?**
+→ Med Gemma 4 är resultatet 6x bättre än DeepL.
+
+- **Hur lång tid tar det?**
+→ Med Gemma 4 och moln-STT är fördröjningen cirka en och en halv sekund.
+
+- **Kostar det?**
+→ Ja, men inte direkt. Nya användare får gratis kredit. Därefter är priserna väldigt låga — tusentals meningar för 1$.
+
+- **Behöver jag en API-nyckel?**
+→ Ja, men inte direkt. Installera och autentisera via Discord.
+
+- **Hur fungerar översättning av den andres röst?**
+→ Fungerar bäst i en-till-en-samtal i lugn miljö. I VRChat använd Earmuff.
+
+- **Röstigenkänning är dålig/långsam.**
+→ Använd moln-STT. På Intel, använd bara prestandakärnor.
+
+- **Hur hanteras data?**
+→ Röst och samtalsinnehåll lagras lokalt och skickas inte till servrar.
+
+### [📥 Ladda ner](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## Översättningsjämförelse
+![Diagram för översättningskvalitet via Gemba MQM.](docs/images/performance/1.png)
+
+- Experiment med Microsoft Gemba MQM.
+- Fleromgångsmiljö för mer realistiskt samtal.
+- Fullständiga resultat [här](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
+
+## Kostnad
+
+### Användningar per dollar
+
+| LLM \ ASR | Qwen ASR (lokal) | Qwen ASR (moln) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+### Gratis krediter
+
+| Tjänst | Gratis kredit | Varighet | Notering |
+|--------|------------|------|------|
+| **Deepgram** | $200 | Obegränsat | - |
+| **Google AI Studio** | $10 | 1 år | Månadsvis för Gemini-prenumeranter |
+| **Alibaba Cloud** | 1M tokens per modell | 90 dagar | Singapore-region |
+| **Cerebras** | 1M tokens dagligen | Obegränsat | 5 samtal/min gräns |
+
+---
+
+## Användning
+
+1. Ladda ner från [nedladdningssidan](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
+2. Installera PuriPuly.
+3. Tryck **STT**.
+4. Tryck **TRANS** och autentisera via Discord.
+5. Tryck **Subtitles** för VR-undertexter.
+6. Tryck **Peer** för översättning av den andres röst.
+7. Aktivera OSC i VRChat: Meny ← Inställningar ← OSC ← Aktivera.
+
+---
+
+## Utveckling
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e '.[dev]'
+python -m puripuly_heart.main run-gui
+```
+
+```bash
+black src tests
+ruff check src tests
+python -m pytest
+```
+
+---
+
+## Utvecklare
+[salee](https://github.com/kapitalismho)
+
+## Licens
 [AGPL-3.0-or-later](LICENSE)
