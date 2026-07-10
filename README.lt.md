@@ -1,4 +1,4 @@
-<p align="center">
+﻿<p align="center">
   <img src="src/puripuly_heart/data/icons/icon.png" alt="PuriPuly <3" width="128" />
 </p>
 
@@ -17,7 +17,7 @@
   <a href="README.md">🇺🇸 English</a> ·
   <a href="README.ar.md">🇸🇦 العربية</a> ·
   <a href="README.bg.md">🇧🇬 Български</a> ·
-  <a href="README.ca.md">🏴 Català</a> ·
+  <a href="README.ca.md">CA Català</a> ·
   <a href="README.cs.md">🇨🇿 Čeština</a> ·
   <a href="README.da.md">🇩🇰 Dansk</a> ·
   <a href="README.de.md">🇩🇪 Deutsch</a> ·
@@ -26,7 +26,7 @@
   <a href="README.et.md">🇪🇪 Eesti</a> ·
   <a href="README.fi.md">🇫🇮 Suomi</a> ·
   <a href="README.fr.md">🇫🇷 Français</a> ·
-  <a href="README.hi.md">🇮🇮 हिन्दी</a> ·
+  <a href="README.hi.md">🇮🇳 हिन्दी</a> ·
   <a href="README.hu.md">🇭🇺 Magyar</a> ·
   <a href="README.id.md">🇮🇩 Bahasa Indonesia</a> ·
   <a href="README.it.md">🇮🇹 Italiano</a> ·
