@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
-<p align="center">LLM-based two-way translator for VRChat</p>
+<p align="center">Traducător bidirecțional pentru VRChat alimentat de LLM</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -55,10 +55,120 @@
 
 ---
 
-> 📖 **Full documentation in English:** [README.md](README.md)
+## Demo
+
+![Comparația rezultatelor traducerii între PuriPuly și VRCT.](docs/images/demo/ko-en_screenshot.png)
 
 ---
 
-## License
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
+Mai multe exemple de comunicare reală prin PuriPuly:
+- [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## În sfârșit, vorbește ca prieteni adevărați.
+
+Ai fost în acea situație.
+Voiai să consoli un prieten,
+dar ai reușit doar: "Ești bine?"
+
+Știi deja că un "traducător" nu poate transmite ce ai în inimă.
+De aceea am creat unul care poate.
+
+- **Traducere cu LLM** — argou, expresii colocviale, discurs formal și informal — totul transmis natural.
+- **Memorie de context** — conversația curge natural cu conștientizarea contextului anterior.
+- **Traducere vocală bidirecțională** — traduce și vocea celeilalte persoane, cu suport pentru subtitrări VR.
+- **Pornire via Discord** — începe imediat fără configurare complexă.
+
+## Întrebări frecvente
+
+- **Cât de bună este calitatea traducerii?**
+→ Cu Gemma 4, rezultatul este de 6x mai bun decât DeepL.
+
+- **Cât durează?**
+→ Cu Gemma 4 și STT cloud, latența este de aproximativ o secundă și jumătate.
+
+- **Costă?**
+→ Da, dar nu imediat. Utilizatorii noi primesc credit gratuit. După aceea, prețurile sunt foarte mici — mii de propoziții pentru 1$.
+
+- **Am nevoie de o cheie API?**
+→ Da, dar nu imediat. Doar instalează și autentifică-te prin Discord.
+
+- **Cum funcționează traducerea vocii celeilalte persoane?**
+→ Funcționează cel mai bine în conversații unu-la-unu în medii liniștite. În VRChat folosește Earmuff.
+
+- **Recunoașterea vocală este slabă/lentă.**
+→ Folosește STT cloud. Pe Intel, folosește doar nucleele de performanță.
+
+- **Cum sunt gestionate datele?**
+→ Vocea și conținutul conversației sunt stocate local și nu sunt trimise la servere.
+
+### [📥 Descarcă](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## Comparație traducere
+![Grafic de calitate a traducerii via Gemba MQM.](docs/images/performance/1.png)
+
+- Experiment cu Microsoft Gemba MQM.
+- Mediu multi-tură pentru conversație mai realistă.
+- Rezultate complete [aici](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
+
+## Cost
+
+### Utilizări pe dolar
+
+| LLM \ ASR | Qwen ASR (local) | Qwen ASR (cloud) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+### Credite gratuite
+
+| Serviciu | Credit gratuit | Durată | Notă |
+|--------|------------|------|------|
+| **Deepgram** | $200 | Nelimitat | - |
+| **Google AI Studio** | $10 | 1 an | Lunar pentru abonații Gemini |
+| **Alibaba Cloud** | 1M tokeni per model | 90 zile | Regiunea Singapore |
+| **Cerebras** | 1M tokeni zilnic | Nelimitat | Limită 5 apeluri/min |
+
+---
+
+## Utilizare
+
+1. Descarcă de pe [pagina de descărcare](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
+2. Instalează PuriPuly.
+3. Apasă **STT**.
+4. Apasă **TRANS** și autentifică-te prin Discord.
+5. Apasă **Subtitles** pentru subtitrări VR.
+6. Apasă **Peer** pentru traducerea vocii celeilalte persoane.
+7. Activează OSC în VRChat: Meniu ← Setări ← OSC ← Activare.
+
+---
+
+## Dezvoltare
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e '.[dev]'
+python -m puripuly_heart.main run-gui
+```
+
+```bash
+black src tests
+ruff check src tests
+python -m pytest
+```
+
+---
+
+## Dezvoltator
+[salee](https://github.com/kapitalismho)
+
+## Licență
 [AGPL-3.0-or-later](LICENSE)
