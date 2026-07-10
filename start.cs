@@ -1,7 +1,10 @@
 using System;
 using System.Collections;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
+using System.Threading;
+using System.Windows.Forms;
 
 class Launcher
 {
@@ -15,22 +18,36 @@ class Launcher
 
         if (!File.Exists(pythonExe))
         {
-            Console.Error.WriteLine("python.exe not found in: " + Path.Combine(root, "python"));
+            MessageBox.Show("python.exe not found in:\n" + Path.Combine(root, "python"),
+                "PuriPuly Heart", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
 
         if (!File.Exists(mainPy))
         {
-            Console.Error.WriteLine("main.py not found in: " + Path.Combine(appSrc, "puripuly_heart"));
+            MessageBox.Show("main.py not found in:\n" + Path.Combine(appSrc, "puripuly_heart"),
+                "PuriPuly Heart", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
 
         Directory.CreateDirectory(dataDir);
 
+        string exeName = Path.GetFileNameWithoutExtension(System.Reflection.Assembly.GetExecutingAssembly().Location);
+        bool isDebug = exeName.ToLowerInvariant().Contains("debug");
+
+        Form splash = null;
+        if (!isDebug)
+        {
+            splash = CreateSplash();
+            splash.Show();
+            Application.DoEvents();
+        }
+
         var psi = new ProcessStartInfo
         {
             FileName = pythonExe,
             UseShellExecute = false,
+            CreateNoWindow = !isDebug,
             WorkingDirectory = root,
         };
 
@@ -51,14 +68,63 @@ class Launcher
         {
             using (var proc = Process.Start(psi))
             {
+                if (splash != null)
+                {
+                    Thread.Sleep(2000);
+                    splash.Close();
+                    splash.Dispose();
+                }
                 proc.WaitForExit();
                 return proc.ExitCode;
             }
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine("Failed to start: " + ex.Message);
+            if (splash != null) { splash.Close(); splash.Dispose(); }
+            MessageBox.Show("Failed to start:\n" + ex.Message,
+                "PuriPuly Heart", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
+    }
+
+    static Form CreateSplash()
+    {
+        var form = new Form
+        {
+            Text = "PuriPuly Heart",
+            FormBorderStyle = FormBorderStyle.None,
+            StartPosition = FormStartPosition.CenterScreen,
+            Size = new Size(320, 160),
+            BackColor = Color.FromArgb(30, 30, 30),
+            TopMost = true,
+            ShowInTaskbar = false,
+        };
+
+        var titleLabel = new Label
+        {
+            Text = "PuriPuly Heart",
+            Font = new Font("Segoe UI", 16, FontStyle.Bold),
+            ForeColor = Color.FromArgb(240, 128, 180),
+            AutoSize = false,
+            Size = new Size(320, 40),
+            Location = new Point(0, 30),
+            TextAlign = ContentAlignment.MiddleCenter,
+        };
+
+        var statusLabel = new Label
+        {
+            Text = "Loading...",
+            Font = new Font("Segoe UI", 10),
+            ForeColor = Color.FromArgb(180, 180, 180),
+            AutoSize = false,
+            Size = new Size(320, 25),
+            Location = new Point(0, 85),
+            TextAlign = ContentAlignment.MiddleCenter,
+        };
+
+        form.Controls.Add(titleLabel);
+        form.Controls.Add(statusLabel);
+
+        return form;
     }
 }

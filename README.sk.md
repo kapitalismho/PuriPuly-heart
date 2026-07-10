@@ -31,7 +31,7 @@
   <a href="README.id.md">🇮🇩 Bahasa Indonesia</a> ·
   <a href="README.it.md">🇮🇹 Italiano</a> ·
   <a href="README.ja.md">🇯🇵 日本語</a> ·
-  🇰🇷 한국어 ·
+  <a href="README.ko.md">🇰🇷 한국어</a> ·
   <a href="README.lt.md">🇱🇹 Lietuvių</a> ·
   <a href="README.lv.md">🇱🇻 Latviešu</a> ·
   <a href="README.ms.md">🇲🇾 Bahasa Melayu</a> ·
@@ -41,7 +41,7 @@
   <a href="README.pt.md">🇵🇹 Português</a> ·
   <a href="README.ro.md">🇷🇴 Română</a> ·
   <a href="README.ru.md">🇷🇺 Русский</a> ·
-  <a href="README.sk.md">🇸🇰 Slovenčina</a> ·
+  🇸🇰 Slovenčina ·
   <a href="README.sv.md">🇸🇪 Svenska</a> ·
   <a href="README.th.md">🇹🇭 ไทย</a> ·
   <a href="README.tr.md">🇹🇷 Türkçe</a> ·
@@ -51,7 +51,7 @@
   <a href="README.zh-TW.md">🇹🇼 繁體中文</a>
 </h2>
 
-> ⚠️ **이것은 이식 가능한 포크입니다** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart). 간편한 배포 및 수정을 위해 수정되었습니다. [포터블 빌드 다운로드 ←](../../releases)
+> ⚠️ **Toto je prenosný fork** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart). Upravené pre jednoduchú distribúciu a úpravy. [Stiahnuť prenosnú verziu ←](../../releases)
 
 ---
 
