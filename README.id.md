@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
-<p align="center">LLM-based two-way translator for VRChat</p>
+<p align="center">Penerjemah dua arah untuk VRChat dengan LLM</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -55,10 +55,120 @@
 
 ---
 
-> 📖 **Full documentation in English:** [README.md](README.md)
+## Demo
+
+![Perbandingan hasil terjemahan antara PuriPuly dan VRCT.](docs/images/demo/ko-en_screenshot.png)
 
 ---
 
-## License
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
+Contoh komunikasi nyata melalui PuriPuly:
+- [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## Akhirnya, bicaralah seperti teman sejati.
+
+Kamu pernah di situasi itu.
+Ingin menghibur teman,
+tapi hanya bisa: "Kamu baik-baik saja?"
+
+Kamu tahu "penerjemah" tidak bisa menyampaikan apa yang ada di hatimu.
+Makanya aku buat yang bisa.
+
+- **Terjemahan dengan LLM** — slang, bahasa sehari-hari, formal dan informal — semua tersampaikan secara alami.
+- **Memori konteks** — percakapan mengalir alami dengan kesadaran konteks sebelumnya.
+- **Terjemahan suara dua arah** — juga menerjemahkan suara orang lain, dengan dukungan subtitle VR.
+- **Mulai via Discord** — langsung mulai tanpa pengaturan rumit.
+
+## Pertanyaan umum
+
+- **Bagaimana kualitas terjemahannya?**
+→ Dengan Gemma 4, hasilnya 6x lebih baik dari DeepL.
+
+- **Berapa lama waktunya?**
+→ Dengan Gemma 4 dan cloud STT, latensi sekitar satu setengah detik.
+
+- **Apakah berbayar?**
+→ Ya, tapi tidak langsung. Pengguna baru mendapat kredit gratis. Setelah itu, harga sangat murah — ribuan kalimat seharga $1.
+
+- **Apakah butuh API key?**
+→ Ya, tapi tidak langsung. Cukup instal dan autentikasi via Discord.
+
+- **Bagaimana terjemahan suara orang lain bekerja?**
+→ Paling baik dalam percakapan satu lawan satu di lingkungan tenang. Di VRChat gunakan Earmuff.
+
+- **Pengenalan suara buruk/lambat.**
+→ Gunakan cloud STT. Di Intel, gunakan hanya inti performa.
+
+- **Bagaimana data dikelola?**
+→ Suara dan isi percakapan disimpan secara lokal dan tidak dikirim ke server.
+
+### [📥 Unduh](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## Perbandingan terjemahan
+![Grafik kualitas terjemahan via Gemba MQM.](docs/images/performance/1.png)
+
+- Eksperimen dengan Microsoft Gemba MQM.
+- Lingkungan multi-putaran untuk percakapan lebih realistis.
+- Hasil lengkap [di sini](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
+
+## Biaya
+
+### Penggunaan per dolar
+
+| LLM \ ASR | Qwen ASR (lokal) | Qwen ASR (cloud) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+### Kredit gratis
+
+| Layanan | Kredit gratis | Durasi | Catatan |
+|--------|------------|------|------|
+| **Deepgram** | $200 | Tanpa batas | - |
+| **Google AI Studio** | $10 | 1 tahun | Bulanan untuk pelanggan Gemini |
+| **Alibaba Cloud** | 1M token per model | 90 hari | Wilayah Singapura |
+| **Cerebras** | 1M token harian | Tanpa batas | Batas 5 panggilan/menit |
+
+---
+
+## Penggunaan
+
+1. Unduh dari [halaman unduh](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
+2. Instal PuriPuly.
+3. Tekan **STT**.
+4. Tekan **TRANS** dan autentikasi via Discord.
+5. Tekan **Subtitles** untuk subtitle VR.
+6. Tekan **Peer** untuk terjemahan suara orang lain.
+7. Aktifkan OSC di VRChat: Menu ← Pengaturan ← OSC ← Aktifkan.
+
+---
+
+## Pengembangan
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e '.[dev]'
+python -m puripuly_heart.main run-gui
+```
+
+```bash
+black src tests
+ruff check src tests
+python -m pytest
+```
+
+---
+
+## Pengembang
+[salee](https://github.com/kapitalismho)
+
+## Lisensi
 [AGPL-3.0-or-later](LICENSE)
