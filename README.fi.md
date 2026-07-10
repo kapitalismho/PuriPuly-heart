@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
-<p align="center">LLM-based two-way translator for VRChat</p>
+<p align="center">Kaksisuuntainen kääntäjä VRChatille, LLM-pohjainen</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -55,10 +55,120 @@
 
 ---
 
-> 📖 **Full documentation in English:** [README.md](README.md)
+## Demo
+
+![Käännöstulosten vertailu PuriPulyn ja VRCT:n välillä.](docs/images/demo/ko-en_screenshot.png)
 
 ---
 
-## License
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
+Lisää esimerkkejä todellisesta viestinnästä PuriPulyn kautta:
+- [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## Vihdoin puhu kuin oikeat ystävät.
+
+Olet ollut tässä tilanteessa.
+Haluat lohduttaa ystävää,
+mutta onnistut vain: "Oletko kunnossa?"
+
+Tiedät jo, että "kääntäjä" ei voi välittää sydämessäsi olevaa.
+Siksi loin sellaisen, joka voi.
+
+- **LLM-pohjainen lokalisointi** — slangit, puhekieli, virallinen ja epävirallinen puhe — kaikki välitetään luonnollisesti.
+- **Kontekstimuisti** — keskustelu virtaa luonnollisesti edellisen kontekstin kanssa.
+- **Kaksisuuntainen äänikäännös** — kääntää myös toisen henkilön äänen, VR-tekstityksen tuella.
+- **Aloitus Discordin kautta** — aloita heti ilman monimutkaista asennusta.
+
+## Usein kysytyt kysymykset
+
+- **Minkälaista on käännöksen laatu?**
+→ Gemma 4:lla tulos on 6x parempi kuin DeepL.
+
+- **Kauanko se kestää?**
+→ Gemma 4:n ja pilvi-STT:n kanssa viive on noin puolitoista sekuntia.
+
+- **Maksaako se?**
+→ Kyllä, mutta ei heti. Uudet käyttäjät saavat ilmaisen luoton. Sen jälkeen hinnat ovat hyvin matalat — tuhansia lauseita $1:lla.
+
+- **Tarvitseeko API-avaimen?**
+→ Kyllä, mutta ei heti. Asenna ja todennusta Discordin kautta.
+
+- **Miten toisen äänen kääntäminen toimii?**
+→ Toimii parhaiten kahdenkeskisissä keskusteluissa hiljaisessa ympäristössä. VRChatissa käytä Earmuff.
+
+- **Äänentunnistus on huono/hidas.**
+→ Käytä pilvi-STT:tä. Intelillä käytä vain suorituskykyisiä ytimiä.
+
+- **Miten dataa käsitellään?**
+→ Ääni ja keskustelun sisältö tallennetaan paikallisesti eikä lähetetä palvelimille.
+
+### [📥 Lataa](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## Käännösvertailu
+![Käännöslaadun kaavio Gemba MQM:n kautta.](docs/images/performance/1.png)
+
+- Koe tehty Microsoft Gemba MQM:llä.
+- Monivaiheinen ympäristö realistisempaa keskustelua varten.
+- Täydelliset tulokset [täällä](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
+
+## Hinta
+
+### Käyttökertoja dollaria kohti
+
+| LLM \ ASR | Qwen ASR (paikallinen) | Qwen ASR (pilvi) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+### Ilmaiset kreditit
+
+| Palvelu | Ilmainen krediitti | Kesto | Huomautus |
+|--------|------------|------|------|
+| **Deepgram** | $200 | Rajoittamaton | - |
+| **Google AI Studio** | $10 | 1 vuosi | Kuukausittain Gemini-tilaajille |
+| **Alibaba Cloud** | 1M tokenia mallia kohti | 90 päivää | Singaporen alue |
+| **Cerebras** | 1M tokenia päivässä | Rajoittamaton | 5 puhelua/min raja |
+
+---
+
+## Käyttö
+
+1. Lataa uusin versio [lataussivulta](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
+2. Asenna PuriPuly.
+3. Paina **STT**.
+4. Paina **TRANS** ja todennusta Discordin kautta.
+5. Paina **Subtitles** VR-tekstityksille.
+6. Paina **Peer** toisen äänen kääntämiseksi.
+7. Ota OSC käyttöön VRChatissa: Valikko ← Asetukset ← OSC ← Ota käyttöön.
+
+---
+
+## Kehitys
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e '.[dev]'
+python -m puripuly_heart.main run-gui
+```
+
+```bash
+black src tests
+ruff check src tests
+python -m pytest
+```
+
+---
+
+## Kehittäjä
+[salee](https://github.com/kapitalismho)
+
+## Lisenssi
 [AGPL-3.0-or-later](LICENSE)
