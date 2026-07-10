@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
-<p align="center">LLM-based two-way translator for VRChat</p>
+<p align="center">Oboustranný překladač pro VRChat poháněný LLM</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -51,14 +51,124 @@
   <a href="README.zh-TW.md">🇹🇼 繁體中文</a>
 </h2>
 
-> ⚠️ **Toto je přenosný fork** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart). Upraveno pro snadnou distribuci a úpravy. [Stáhnout přenosnou verzi ←](../../releases)
+> ⚠️ **Toto je přenosný fork** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart). Upraven pro snadnou distribuci a úpravy. [Stáhnout přenosnou verzi ←](../../releases)
 
 ---
 
-> 📖 **Full documentation in English:** [README.md](README.md)
+## Demo
+
+![Srovnání výsledků překladu mezi PuriPuly a VRCT.](docs/images/demo/ko-en_screenshot.png)
 
 ---
 
-## License
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
+Více příkladů reálné komunikace přes PuriPuly:
+- [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## Konečně mluvte jako skuteční přátelé.
+
+Byli jste v té situaci.
+Chtěli jste utěšit přítele,
+ale zvládli jste jen: "Jsi v pořádku?"
+
+Víte, že "překladač" nedokáže přenést to, co máte v srdci.
+Proto jsem vytvořil takový, který to dokáže.
+
+- **Překlad poháněný LLM** — slang, hovorové výrazy, formální i neformální řeč — vše se přirozeně přenáší.
+- **Paměť kontextu** — konverzace plynule plyne s ohledem na předchozí kontext.
+- **Oboustranný hlasový překlad** — překládá i hlas druhé osoby, s podporou VR titulků.
+- **Spuštění přes Discord** — začněte ihned bez složitého nastavení.
+
+## Často kladené otázky
+
+- **Jaká je kvalita překladu?**
+→ S Gemma 4 je výsledek 6x lepší než DeepL.
+
+- **Jak dlouho trvá od mluvení po překlad?**
+→ S Gemma 4 a cloudovým STT je latence přibližně sekundu a půl.
+
+- **Stojí to peníze?**
+→ Ano, ale ne hned. Noví uživatelé získají zdarma kredit. Poté jsou ceny velmi nízké — tisíce frází za $1.
+
+- **Potřebuji API klíč?**
+→ Ano, ale ne hned. Stačí nainstalovat a ověřit přes Discord.
+
+- **Jak funguje překlad hlasu druhé osoby?**
+→ Nejlépe funguje v rozhovorech jeden na jednoho v tichém prostředí. Ve VRChat použijte Earmuff.
+
+- **Rozpoznávání hlasu je špatné/pomalé.**
+→ Použijte cloudové STT. Na Intel procesorech používejte pouze výkonná jádra.
+
+- **Jak se zachází s daty?**
+→ Hlas a obsah konverzace se ukládají lokálně a neodesílají se na servery.
+
+### [📥 Stáhnout](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## Srovnání překladu
+![Graf kvality překladu pomocí Gemba MQM.](docs/images/performance/1.png)
+
+- Experiment proveden s Microsoft Gemba MQM.
+- Vícekolové prostředí pro realističtější konverzaci.
+- Plné výsledky [zde](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
+
+## Cena
+
+### Použití za dolar
+
+| LLM \ ASR | Qwen ASR (lokální) | Qwen ASR (cloud) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+### Bezplatné kredity
+
+| Služba | Bezplatný kredit | Doba | Poznámka |
+|--------|------------|------|------|
+| **Deepgram** | $200 | Bez omezení | - |
+| **Google AI Studio** | $10 | 1 rok | Měsíčně pro předplatitele Gemini |
+| **Alibaba Cloud** | 1M tokenů na model | 90 dní | Region Singapur |
+| **Cerebras** | 1M tokenů denně | Bez omezení | Limit 5 volání/min |
+
+---
+
+## Použití
+
+1. Stáhněte nejnovější verzi ze [stránky ke stažení](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
+2. Nainstalujte PuriPuly.
+3. Stiskněte **STT**.
+4. Stiskněte **TRANS** a ověřte přes Discord.
+5. Stiskněte **Subtitles** pro VR titulky.
+6. Stiskněte **Peer** pro překlad hlasu druhé osoby.
+7. Povolte OSC ve VRChat: Menu ← Nastavení ← OSC ← Povolit.
+
+---
+
+## Vývoj
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e '.[dev]'
+python -m puripuly_heart.main run-gui
+```
+
+```bash
+black src tests
+ruff check src tests
+python -m pytest
+```
+
+---
+
+## Vývojář
+[salee](https://github.com/kapitalismho)
+
+## Licence
 [AGPL-3.0-or-later](LICENSE)
