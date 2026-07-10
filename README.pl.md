@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
-<p align="center">LLM-based two-way translator for VRChat</p>
+<p align="center">Dwukierunkowy tłumacz dla VRChat napędzany LLM</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -55,10 +55,120 @@
 
 ---
 
-> 📖 **Full documentation in English:** [README.md](README.md)
+## Demo
+
+![Porównanie wyników tłumaczenia między PuriPuly a VRCT.](docs/images/demo/ko-en_screenshot.png)
 
 ---
 
-## License
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
+Więcej przykładów prawdziwej komunikacji przez PuriPuly:
+- [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## W końcu, mów jak prawdziwi przyjaciele.
+
+Byłeś w tej sytuacji.
+Chciałeś pocieszyć przyjaciela,
+ale udało ci się tylko: "Wszystko dobrze?"
+
+Już wiesz, że "tłumacz" nie może przekazać tego, co masz w sercu.
+Dlatego stworzyłem taki, który może.
+
+- **Tłumaczenie napędzane LLM** — slang, potoczne wyrażenia, mowa formalna i nieformalna — wszystko przekazane naturalnie.
+- **Pamięć kontekstu** — rozmowa płynie naturalnie ze świadomością wcześniejszego kontekstu.
+- **Dwukierunkowe tłumaczenie głosu** — tłumaczy też głos drugiej osoby, z obsługą napisów VR.
+- **Start przez Discord** — zacznij od razu bez skomplikowanej konfiguracji.
+
+## Najczęściej zadawane pytania
+
+- **Jak dobra jest jakość tłumaczenia?**
+→ Z Gemma 4 wynik jest 6x lepszy niż DeepL.
+
+- **Jak długo to trwa?**
+→ Z Gemma 4 i chmurowym STT opóźnienie wynosi około półtorej sekundy.
+
+- **Czy to kosztuje?**
+→ Tak, ale nie od razu. Nowi użytkownicy otrzymują darmowy kredyt. Potem ceny są bardzo niskie — tysiące zdań za 1$.
+
+- **Czy potrzebuję klucza API?**
+→ Tak, ale nie od razu. Po prostu zainstaluj i uwierzytelnij przez Discord.
+
+- **Jak działa tłumaczenie głosu drugiej osoby?**
+→ Najlepiej działa w rozmowach jeden na jeden w cichym otoczeniu. W VRChat użyj Earmuff.
+
+- **Rozpoznawanie mowy jest słabe/wolne.**
+→ Użyj chmurowego STT. Na Intelu używaj tylko wydajnych rdzeni.
+
+- **Jak obsługiwane są dane?**
+→ Głos i treść rozmowy są przechowywane lokalnie i nie wysyłane na serwery.
+
+### [📥 Pobierz](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## Porównanie tłumaczeń
+![Wykres jakości tłumaczenia via Gemba MQM.](docs/images/performance/1.png)
+
+- Eksperyment z Microsoft Gemba MQM.
+- Środowisko wieloturowe dla bardziej realistycznej rozmowy.
+- Pełne wyniki [tutaj](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
+
+## Koszt
+
+### Użyć na dolara
+
+| LLM \ ASR | Qwen ASR (lokalny) | Qwen ASR (chmura) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+### Darmowe kredyty
+
+| Usługa | Darmowy kredyt | Czas trwania | Uwaga |
+|--------|------------|------|------|
+| **Deepgram** | $200 | Bez limitu | - |
+| **Google AI Studio** | $10 | 1 rok | Co miesiąc dla subskrybentów Gemini |
+| **Alibaba Cloud** | 1M tokenów na model | 90 dni | Region Singapur |
+| **Cerebras** | 1M tokenów dziennie | Bez limitu | Limit 5 połączeń/min |
+
+---
+
+## Użycie
+
+1. Pobierz ze [strony pobierania](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
+2. Zainstaluj PuriPuly.
+3. Naciśnij **STT**.
+4. Naciśnij **TRANS** i uwierzytelnij przez Discord.
+5. Naciśnij **Subtitles** dla napisów VR.
+6. Naciśnij **Peer** dla tłumaczenia głosu drugiej osoby.
+7. Włącz OSC w VRChat: Menu ← Ustawienia ← OSC ← Włącz.
+
+---
+
+## Rozwój
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e '.[dev]'
+python -m puripuly_heart.main run-gui
+```
+
+```bash
+black src tests
+ruff check src tests
+python -m pytest
+```
+
+---
+
+## Deweloper
+[salee](https://github.com/kapitalismho)
+
+## Licencja
 [AGPL-3.0-or-later](LICENSE)
