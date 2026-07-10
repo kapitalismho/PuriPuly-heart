@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
-<p align="center">LLM-based two-way translator for VRChat</p>
+<p align="center">Αμφίδρομος μεταφραστής για VRChat με LLM</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -51,14 +51,124 @@
   <a href="README.zh-TW.md">🇹🇼 繁體中文</a>
 </h2>
 
-> ⚠️ **Αυτό είναι ένα φορητό fork του** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart). Τροποποιημένο για εύκολη διανομή και τροποποίηση. [Λήψη φορητής έκδοσης ←](../../releases)
+> ⚠️ **Αυτό είναι ένα φορητό fork του** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart). Τροποποιημένο για εύκολη διανομή και τροποποίηση. [Λήφη φορητής έκδοσης ←](../../releases)
 
 ---
 
-> 📖 **Full documentation in English:** [README.md](README.md)
+## Demo
+
+![Σύγκριση αποτελεσμάτων μετάφρασης μεταξύ PuriPuly και VRCT.](docs/images/demo/ko-en_screenshot.png)
 
 ---
 
-## License
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
+Περισσότερα παραδείγματα επικοινωνίας μέσω PuriPuly:
+- [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## Τέλος, μιλήστε σαν αληθινοί φίλοι.
+
+Έχετε βρεθεί σε αυτή την κατάσταση.
+Θέλατε να παρηγορήσετε έναν φίλο,
+αλλά καταφέρατε μόνο: "Είσαι καλά;"
+
+Ξέρετε ότι ένας "μεταφραστής" δεν μπορεί να μεταφέρει αυτό που έχετε στην καρδιά σας.
+Γι' αυτό φτιάξαμε έναν που μπορεί.
+
+- **Μετάφραση με LLM** — αργκό, εκφράσεις, τυπική και ανεπίσημη ομιλία — όλα μεταφέρονται φυσικά.
+- **Μνήμη πλαισίου** — η συζήτηση ρέει φυσικά με γνώση του προηγούμενου πλαισίου.
+- **Αμφίδρομη μετάφραση φωνής** — μεταφράζει και τη φωνή του άλλου, με υποστήριξη VR υποτίτλων.
+- **Εκκίνηση μέσω Discord** — ξεκινήστε αμέσως χωρίς πολύπλοκη ρύθμιση.
+
+## Συχνές ερωτήσεις
+
+- **Πόσο καλή είναι η ποιότητα μετάφρασης;**
+→ Με Gemma 4, το αποτέλεσμα είναι 6x καλύτερο από DeepL.
+
+- **Πόσο χρόνο παίρνει;**
+→ Με Gemma 4 και cloud STT, η καθυστέρηση είναι περίπου ενάμισι δευτερόλεπτα.
+
+- **Κοστίζει;**
+→ Ναι, αλλά όχι αμέσως. Νέοι χρήστες παίρνουν δωρεάν πίστωση. Μετά, οι τιμές είναι πολύ χαμηλές — χιλιάδες φράσεις για $1.
+
+- **Χρειάζομαι API κλειδί;**
+→ Ναι, αλλά όχι αμέσως. Απλά εγκαταστήστε και πιστοποιηθείτε μέσω Discord.
+
+- **Πώς λειτουργεί η μετάφραση φωνής του άλλου;**
+→ Λειτουργεί καλύτερα σε συζητήσεις ένας-προς-έναν σε ήσυχο περιβάλλον. Στο VRChat χρησιμοποιήστε Earmuff.
+
+- **Η αναγνώριση φωνής είναι κακή/αργή.**
+→ Χρησιμοποιήστε cloud STT. Σε Intel, χρησιμοποιήστε μόνο πυρήνες απόδοσης.
+
+- **Πώς γίνεται η διαχείριση δεδομένων;**
+→ Η φωνή και το περιεχόμενο συζήτησης αποθηκεύονται τοπικά και δεν στέλνονται σε servers.
+
+### [📥 Λήφη](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## Σύγκριση μετάφρασης
+![Γράφημα ποιότητας μετάφρασης μέσω Gemba MQM.](docs/images/performance/1.png)
+
+- Πείραμα με Microsoft Gemba MQM.
+- Περιβάλλον πολλαπλών γύρων για πιο ρεαλιστική συζήτηση.
+- Πλήρη αποτελέσματα [εδώ](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
+
+## Κόστος
+
+### Χρήσεις ανά δολάριο
+
+| LLM \ ASR | Qwen ASR (τοπικό) | Qwen ASR (cloud) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+### Δωρεάν πιστώσεις
+
+| Υπηρεσία | Δωρεάν πίστωση | Διάρκεια | Σημείωση |
+|--------|------------|------|------|
+| **Deepgram** | $200 | Απεριόριστα | - |
+| **Google AI Studio** | $10 | 1 έτος | Μηνιαία για συνδρομητές Gemini |
+| **Alibaba Cloud** | 1M tokens ανά μοντέλο | 90 ημέρες | Περιοχή Σιγκαπούρη |
+| **Cerebras** | 1M tokens ημερησίως | Απεριόριστα | Όριο 5 κλήσεις/λεπτό |
+
+---
+
+## Χρήση
+
+1. Κατεβάστε από τη [σελίδα λήψης](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
+2. Εγκαταστήστε PuriPuly.
+3. Πατήστε **STT**.
+4. Πατήστε **TRANS** και πιστοποιηθείτε μέσω Discord.
+5. Πατήστε **Subtitles** για VR υποτίτλους.
+6. Πατήστε **Peer** για μετάφραση φωνής του άλλου.
+7. Ενεργοποιήστε OSC στο VRChat: Μενού ← Ρυθμίσεις ← OSC ← Ενεργοποίηση.
+
+---
+
+## Ανάπτυξη
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e '.[dev]'
+python -m puripuly_heart.main run-gui
+```
+
+```bash
+black src tests
+ruff check src tests
+python -m pytest
+```
+
+---
+
+## Προγραμματιστής
+[salee](https://github.com/kapitalismho)
+
+## Άδεια
 [AGPL-3.0-or-later](LICENSE)
