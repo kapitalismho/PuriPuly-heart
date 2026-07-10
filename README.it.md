@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
-<p align="center">LLM-based two-way translator for VRChat</p>
+<p align="center">Traduttore bidirezionale per VRChat basato su LLM</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -55,10 +55,120 @@
 
 ---
 
-> 📖 **Full documentation in English:** [README.md](README.md)
+## Demo
+
+![Confronto dei risultati di traduzione tra PuriPuly e VRCT.](docs/images/demo/ko-en_screenshot.png)
 
 ---
 
-## License
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
+Altri esempi di comunicazione reale tramite PuriPuly:
+- [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## Finalmente, parla come veri amici.
+
+Sei stato in quella situazione.
+Volevi consolare un amico,
+ma sei riuscito solo a dire: "Stai bene?"
+
+Sai già che un "traduttore" non può trasmettere ciò che hai nel cuore.
+Per questo ne ho creato uno che può.
+
+- **Traduzione basata su LLM** — gergo, espressioni colloquiali, discorso formale e informale — tutto reso naturalmente.
+- **Memoria del contesto** — la conversazione scorre naturalmente con consapevolezza del contesto precedente.
+- **Traduzione vocale bidirezionale** — traduce anche la voce dell'altra persona, con supporto sottotitoli VR.
+- **Avvio via Discord** — inizia subito senza configurazione complessa.
+
+## Domande frequenti
+
+- **Com'è la qualità della traduzione?**
+→ Con Gemma 4, il risultato è 6x migliore di DeepL.
+
+- **Quanto tempo ci vuole?**
+→ Con Gemma 4 e STT cloud, la latenza è di circa un secondo e mezzo.
+
+- **Costa?**
+→ Sì, ma non subito. I nuovi utenti ottengono credito gratuito. Dopo, i prezzi sono bassissimi — migliaia di frasi per 1$.
+
+- **Ho bisogno di una chiave API?**
+→ Sì, ma non subito. Basta installare e autenticarsi via Discord.
+
+- **Come funziona la traduzione della voce dell'altro?**
+→ Funziona meglio in conversazioni uno-a-uno in ambienti silenziosi. In VRChat usa Earmuff.
+
+- **Il riconoscimento vocale è scarso/lento.**
+→ Usa STT cloud. Su Intel, usa solo i core ad alte prestazioni.
+
+- **Come vengono gestiti i dati?**
+→ La voce e il contenuto della conversazione sono archiviati localmente e non inviati a server.
+
+### [📥 Scarica](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## Confronto traduzione
+![Grafico qualità traduzione via Gemba MQM.](docs/images/performance/1.png)
+
+- Esperimento con Microsoft Gemba MQM.
+- Ambiente multi-turno per una conversazione più realistica.
+- Risultati completi [qui](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
+
+## Costo
+
+### Utilizzi per dollaro
+
+| LLM \ ASR | Qwen ASR (locale) | Qwen ASR (cloud) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+### Crediti gratuiti
+
+| Servizio | Credito gratuito | Durata | Nota |
+|--------|------------|------|------|
+| **Deepgram** | $200 | Illimitato | - |
+| **Google AI Studio** | $10 | 1 anno | Mensile per abbonati Gemini |
+| **Alibaba Cloud** | 1M token per modello | 90 giorni | Regione Singapore |
+| **Cerebras** | 1M token giornalieri | Illimitato | Limite 5 chiamate/min |
+
+---
+
+## Utilizzo
+
+1. Scarica dalla [pagina download](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
+2. Installa PuriPuly.
+3. Premi **STT**.
+4. Premi **TRANS** e autenticati via Discord.
+5. Premi **Subtitles** per i sottotitoli VR.
+6. Premi **Peer** per la traduzione della voce dell'altro.
+7. Abilita OSC in VRChat: Menu ← Impostazioni ← OSC ← Abilita.
+
+---
+
+## Sviluppo
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e '.[dev]'
+python -m puripuly_heart.main run-gui
+```
+
+```bash
+black src tests
+ruff check src tests
+python -m pytest
+```
+
+---
+
+## Sviluppatore
+[salee](https://github.com/kapitalismho)
+
+## Licenza
 [AGPL-3.0-or-later](LICENSE)
