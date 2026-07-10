@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
-<p align="center">LLM-based two-way translator for VRChat</p>
+<p align="center">Tovejs oversætter til VRChat drevet af LLM</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -55,10 +55,120 @@
 
 ---
 
-> 📖 **Full documentation in English:** [README.md](README.md)
+## Demo
+
+![Sammenligning af oversættelsesresultater mellem PuriPuly og VRCT.](docs/images/demo/ko-en_screenshot.png)
 
 ---
 
-## License
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
+Flere eksempler på reel kommunikation gennem PuriPuly:
+- [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## Endelig, tal som rigtige venner.
+
+Du har været i den situation.
+Ville trøste en ven,
+men kunne kun sige: "Er du okay?"
+
+Du ved allerede, at en "oversætter" ikke kan bære det, der er i dit hjerte.
+Derfor byggede en, der kan.
+
+- **LLM-drevet lokalisering** — slang, talemåde, formel og uformel tale — alt gengives naturligt.
+- **Konteksthukommelse** — samtalen flyder naturligt med bevidsthed om tidligere kontekst.
+- **Tovejs stemmeoversættelse** — oversætter også den anden persons stemme, med VR undertekst support.
+- **Start via Discord** — kom i gang med det samme uden kompleks opsætning.
+
+## Ofte stillede spørgsmål
+
+- **Hvor god er oversættelseskvaliteten?**
+→ Med Gemma 4 er resultatet 6x bedre end DeepL.
+
+- **Hvor lang tid tager det?**
+→ Med Gemma 4 og cloud STT er ventetiden omkring halvandet sekund.
+
+- **Koster det penge?**
+→ Ja, men ikke med det samme. Nye brugere får gratis kredit. Derefter er priserne meget lave — tusindvis af sætninger for $1.
+
+- **Har jeg brug for en API nøgle?**
+→ Ja, men ikke med det samme. Bare installer og autentificer via Discord.
+
+- **Hvordan fungerer oversættelse af den andens stemme?**
+→ Fungerer bedst i en-til-en samtaler i stille miljøer. I VRChat brug Earmuff.
+
+- **Stemmegenkendelse er dårlig/langsom.**
+→ Brug cloud STT. På Intel, brug kun ydelseskerner.
+
+- **Hvordan håndteres data?**
+→ Stemme og samtaleindhold gemmes lokalt og sendes ikke til servere.
+
+### [📥 Download](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## Oversættelsessammenligning
+![Graf for oversættelseskvalitet via Gemba MQM.](docs/images/performance/1.png)
+
+- Eksperiment udført med Microsoft Gemba MQM.
+- Multi-turn miljø for mere realistisk samtale.
+- Fuld resultater [her](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
+
+## Pris
+
+### Anvendelser pr. dollar
+
+| LLM \ ASR | Qwen ASR (lokal) | Qwen ASR (cloud) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+### Gratis kreditter
+
+| Tjeneste | Gratis kredit | Varighed | Bemærkning |
+|--------|------------|------|------|
+| **Deepgram** | $200 | Ingen begrænsning | - |
+| **Google AI Studio** | $10 | 1 år | Månedligt for Gemini abonnenter |
+| **Alibaba Cloud** | 1M tokens pr. model | 90 dage | Singapore region |
+| **Cerebras** | 1M tokens dagligt | Ingen begrænsning | 5 opkald/minut grænse |
+
+---
+
+## Brug
+
+1. Download den nyeste version fra [downloadsiden](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
+2. Installer PuriPuly.
+3. Tryk **STT**.
+4. Tryk **TRANS** og autentificer via Discord.
+5. Tryk **Subtitles** for VR undertekster.
+6. Tryk **Peer** for oversættelse af den andens stemme.
+7. Aktiver OSC i VRChat: Menu ← Indstillinger ← OSC ← Aktiver.
+
+---
+
+## Udvikling
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e '.[dev]'
+python -m puripuly_heart.main run-gui
+```
+
+```bash
+black src tests
+ruff check src tests
+python -m pytest
+```
+
+---
+
+## Udvikler
+[salee](https://github.com/kapitalismho)
+
+## Licens
 [AGPL-3.0-or-later](LICENSE)
