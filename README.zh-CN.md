@@ -20,6 +20,8 @@
   🇨🇳 简体中文
 </h2>
 
+> ⚠️ **这是一个便携式分支** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart)。为便于分发和修改而进行了调整。[下载便携版 →](../../releases)
+
 ---
 
 ## Demo

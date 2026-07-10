@@ -20,6 +20,8 @@
   <a href="README.zh-CN.md">🇨🇳 简体中文</a>
 </h2>
 
+> ⚠️ **これはポータブルフォークです** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart)。簡単な配布と修正のために変更されています。[ポータブルビルドをダウンロード →](../../releases)
+
 ---
 
 ## Demo

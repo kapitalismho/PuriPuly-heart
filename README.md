@@ -20,6 +20,8 @@
   <a href="README.zh-CN.md">🇨🇳 简体中文</a>
 </h2>
 
+> ⚠️ **This is a portable fork** of [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart). Modified for easy distribution and modification. [Download portable build →](../../releases)
+
 ---
 
 ## Demo

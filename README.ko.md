@@ -20,6 +20,8 @@
   <a href="README.zh-CN.md">🇨🇳 简体中文</a>
 </h2>
 
+> ⚠️ **이것은 이식 가능한 포크입니다** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart). 간편한 배포 및 수정을 위해 수정되었습니다. [포터블 빌드 다운로드 →](../../releases)
+
 ---
 
 ## Demo
