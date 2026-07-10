@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
 </p>
 
-<p align="center">LLM-based two-way translator for VRChat</p>
+<p align="center">Dvikryptis vertėjas VRChat, varomas LLM</p>
 
 <h2 align="center">
   <a href="README.md">🇺🇸 English</a> ·
@@ -51,14 +51,124 @@
   <a href="README.zh-TW.md">🇹🇼 繁體中文</a>
 </h2>
 
-> ⚠️ **Tai yra nešiojamas fork iš** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart). Modifikuotas lengvam platinimui ir modifikavimui. [Atsisiųsti nešiojamą versiją ←](../../releases)
+> ⚠️ **Tai nešiojamas fork iš** [kapitalismho/PuriPuly-heart](https://github.com/kapitalismho/PuriPuly-heart). Modifikuotas lengvam platinimui ir modifikavimui. [Atsisiųsti nešiojamą versiją ←](../../releases)
 
 ---
 
-> 📖 **Full documentation in English:** [README.md](README.md)
+## Demonstracija
+
+![Vertimo rezultatų palyginimas tarp PuriPuly ir VRCT.](docs/images/demo/ko-en_screenshot.png)
 
 ---
 
-## License
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
+Daugiau tikro bendravimo pavyzdžių per PuriPuly:
+- [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
+- [Demo 2](https://youtu.be/DoX36Y7J_lc?si=YjbeVTS8v3jGQB1w)
+- [Demo 3](https://www.youtube.com/watch?v=D0npvp68xNY)
+
+---
+
+## Pagaliau kalbėk kaip tikri draugai.
+
+Tu buvai toje situacijoje.
+Nuraminti draugą,
+bet pavyko tik: "Ar tau viskas gerai?"
+
+Tu jau žinai, kad "vertėjas" negali perduoti to, kas tavo širdyje.
+Todėl sukūriau tokį, kuris gali.
+
+- **LLM varomas vertimas** — žargonas, šnekamoji kalba, formalus ir neformalus kalbėjimas — viskas perteikta natūraliai.
+- **Konteksto atmintis** — pokalbis teka natūraliai su ankstesnio konteksto žinojimu.
+- **Dvikryptis balso vertimas** — taip pat verčia kito asmens balsą, su VR subtitrų palaikymu.
+- **Pradžia per Discord** — pradėk iš karto be sudėtingo nustatymo.
+
+## Dažnai užduodami klausimai
+
+- **Kokia vertimo kokybė?**
+→ Su Gemma 4 rezultatas 6x geresnis nei DeepL.
+
+- **Kiek laiko užtrunka?**
+→ Su Gemma 4 ir debesies STT, delsimas apie pusantros sekundės.
+
+- **Ar tai kainuoja?**
+→ Taip, bet ne iš karto. Nauji vartotojai gauna nemokamą kreditą. Po to kainos labai mažos — tūkstančiai sakinių už 1$.
+
+- **Ar reikia API rakto?**
+→ Taip, bet ne iš karto. Tiesiog įdiek ir autentifikuok per Discord.
+
+- **Kaip veikia kito balso vertimas?**
+→ Geriausiai veikia pokalbiuose vienas su vienas tylioje aplinkoje. VRChat naudok Earmuff.
+
+- **Balso atpažinimas prastas/lėtas.**
+→ Naudok debesies STT. Ant Intel naudok tik našumo branduolius.
+
+- **Kaip tvarkomi duomenys?**
+→ Balsas ir pokalbio turinys saugomi lokaliai ir nesiunčiami į serverius.
+
+### [📥 Atsisiųsti](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
+
+---
+
+## Vertimo palyginimas
+![Vertimo kokybės grafikas per Gemba MQM.](docs/images/performance/1.png)
+
+- Eksperimentas su Microsoft Gemba MQM.
+- Daugiau turų aplinka realesniam pokalbiui.
+- Pilni rezultatai [čia](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
+
+## Kaina
+
+### Naudojimai už dolerį
+
+| LLM \ ASR | Qwen ASR (vietinis) | Qwen ASR (debesis) | Soniox | Deepgram |
+|---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
+
+### Nemokami kreditai
+
+| Paslauga | Nemokamas kreditas | Trukmė | Pastaba |
+|--------|------------|------|------|
+| **Deepgram** | $200 | Neribota | - |
+| **Google AI Studio** | $10 | 1 metai | Kas mėnesį Gemini prenumeratoriams |
+| **Alibaba Cloud** | 1M tokenų modeliui | 90 dienų | Singapūro regionas |
+| **Cerebras** | 1M tokenų kasdien | Neribota | 5 skambučiai/min riba |
+
+---
+
+## Naudojimas
+
+1. Atsisiųsk iš [atsisiuntimo puslapio](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
+2. Įdiek PuriPuly.
+3. Paspausk **STT**.
+4. Paspausk **TRANS** ir autentifikuok per Discord.
+5. Paspausk **Subtitles** VR subtitrams.
+6. Paspausk **Peer** kito balso vertimui.
+7. Įjunk OSC VRChat: Meniu ← Nustatymai ← OSC ← Įjungti.
+
+---
+
+## Vystymas
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e '.[dev]'
+python -m puripuly_heart.main run-gui
+```
+
+```bash
+black src tests
+ruff check src tests
+python -m pytest
+```
+
+---
+
+## Vystytojas
+[salee](https://github.com/kapitalismho)
+
+## Licencija
 [AGPL-3.0-or-later](LICENSE)
