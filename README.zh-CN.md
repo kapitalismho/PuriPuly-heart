@@ -17,7 +17,8 @@
   <a href="README.md">🇺🇸 English</a> ·
   <a href="README.ko.md">🇰🇷 한국어</a> ·
   <a href="README.ja.md">🇯🇵 日本語</a> ·
-  🇨🇳 简体中文
+  🇨🇳 简体中文 ·
+  <a href="README.ru.md">🇷🇺 Русский</a>
 </h2>
 
 ---
