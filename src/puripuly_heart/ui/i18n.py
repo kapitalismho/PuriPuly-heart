@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 _I18N_DIR = "data/i18n"
 _DEFAULT_LOCALE = "en"
 _FALLBACK_LOCALE = "en"
-_LOCALE_DISPLAY_ORDER = ("en", "ko", "zh-CN", "ja")
+_LOCALE_DISPLAY_ORDER = ("en", "ko", "zh-CN", "ja", "ru")
 _LOCALE_DISPLAY_RANK = {code: index for index, code in enumerate(_LOCALE_DISPLAY_ORDER)}
 
 _current_locale = _DEFAULT_LOCALE
