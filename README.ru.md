@@ -177,7 +177,7 @@
 
 ### Пользователям из Китая
 
-Если Soniox / Gemini / Deepgram у вас заблокированы, попробуйте так связку:
+Если Soniox / Gemini / Deepgram у вас заблокированы, попробуйте такую связку:
 
 - STT: **Qwen ASR**
 - LLM: **DeepSeek V4 Flash**
@@ -305,6 +305,7 @@ PuriPuly работает лучше всего с облачным STT.
    ![step6](docs/images/gemini/6.png)
 
 7. *(Рекомендуется)* Нажмите жёлтую кнопку **Set Up Billing** для перехода на платный тариф.
+   Переход на платный тариф может занять некоторое время.
    ![step7](docs/images/gemini/7.png)
 
 <details>
@@ -359,7 +360,7 @@ PuriPuly работает лучше всего с облачным STT.
 3. Нажмите **Add Funds** для привязки оплаты.
    ![step3](docs/images/soniox/3.png)
 
-4. После пополнения перейдите в **API Keys**.
+4. Soniox требует предоплаты. После пополнения перейдите в **API Keys**.
    ![step4](docs/images/soniox/4.png)
 
 5. Создайте новый API Key.

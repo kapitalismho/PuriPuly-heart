@@ -192,7 +192,7 @@ def test_i18n_bundles_share_the_same_keys() -> None:
 
 
 def test_available_locales_use_product_display_order() -> None:
-    assert available_locales() == ("en", "ko", "zh-CN", "ja")
+    assert available_locales() == ("en", "ko", "zh-CN", "ja", "ru")
 
 
 def test_clipboard_source_and_setting_keys_are_localized() -> None:
@@ -461,6 +461,7 @@ def test_deepseek_v4_pro_keys_are_localized_with_blank_provider_description() ->
         "ko": "번역 속도가 불안정할 수 있어요",
         "ja": "翻訳速度が不安定になることがあります",
         "zh-CN": "翻译速度可能不稳定",
+        "ru": "Скорость перевода может быть нестабильной",
     }
 
     for locale, bundle in bundles.items():
