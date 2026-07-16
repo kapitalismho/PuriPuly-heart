@@ -307,7 +307,13 @@ class ManagedSTTProvider:
                 fallback_level=logging.INFO,
             )
             self._emit_stt_input_diagnostics(event.utterance_id, finalize=True)
-            await self._active_session.on_speech_end(trailing_silence_ms=event.trailing_silence_ms)
+            audio_f32 = self._active_session.drain_buffer_f32()
+            asyncio.create_task(
+                self._active_session.on_speech_end(
+                    trailing_silence_ms=event.trailing_silence_ms,
+                    audio_f32=audio_f32,
+                )
+            )
 
     async def _send_audio(self, samples_f32: np.ndarray) -> None:
         samples_f32 = np.asarray(samples_f32, dtype=np.float32).reshape(-1)

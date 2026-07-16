@@ -1002,7 +1002,10 @@ async def test_peer_dormant_retirement_discards_close_generated_events_before_re
         async def send_audio(self, audio) -> None:
             _ = audio
 
-        async def on_speech_end(self, *, trailing_silence_ms=None) -> None:
+        def drain_buffer_f32(self):
+            return None
+
+        async def on_speech_end(self, *, trailing_silence_ms=None, audio_f32=None) -> None:
             _ = trailing_silence_ms
 
         async def stop(self) -> None:

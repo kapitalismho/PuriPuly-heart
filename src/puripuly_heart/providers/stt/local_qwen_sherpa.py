@@ -262,13 +262,29 @@ class _LocalQwenSherpaSession(STTBackendSession):
             return
         self._buffer_f32.append(samples.copy())
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
+    def drain_buffer_f32(self) -> np.ndarray | None:
+        if not self._buffer_f32:
+            return None
+        snapshot = list(self._buffer_f32)
+        self._buffer_f32.clear()
+        return np.concatenate(snapshot)
+
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        audio_f32: np.ndarray | None = None,
+    ) -> None:
         _ = trailing_silence_ms
-        if self._closed or not self._buffer_f32:
+        if self._closed:
             return
 
-        samples_f32 = np.concatenate(self._buffer_f32)
-        self._buffer_f32.clear()
+        if audio_f32 is None:
+            audio_f32 = self.drain_buffer_f32()
+        if audio_f32 is None or audio_f32.size == 0:
+            return
+
+        samples_f32 = audio_f32
         audio_ms = _sample_count_duration_ms(samples_f32.size, self.backend.sample_rate_hz)
         diag_enabled = self._diagnostics_enabled()
         if diag_enabled:

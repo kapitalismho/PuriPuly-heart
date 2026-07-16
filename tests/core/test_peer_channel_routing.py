@@ -27,7 +27,10 @@ class FakePeerSession:
         if any(byte != 0 for byte in pcm16le):
             self._seen_speech = True
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
+    def drain_buffer_f32(self):
+        return None
+
+    async def on_speech_end(self, *, trailing_silence_ms: int | None = None, audio_f32=None) -> None:
         _ = trailing_silence_ms
         if self._seen_speech:
             self._seen_speech = False
@@ -69,7 +72,10 @@ class LabelledPeerSession:
         if any(byte != 0 for byte in pcm16le):
             self._seen_speech = True
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
+    def drain_buffer_f32(self):
+        return None
+
+    async def on_speech_end(self, *, trailing_silence_ms: int | None = None, audio_f32=None) -> None:
         _ = trailing_silence_ms
         if self._seen_speech:
             self._seen_speech = False

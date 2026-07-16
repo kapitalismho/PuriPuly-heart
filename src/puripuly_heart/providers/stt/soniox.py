@@ -469,7 +469,15 @@ class _SonioxSession(STTBackendSession):
             return
         await self._audio_q.put(pcm16le)
 
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
+    def drain_buffer_f32(self) -> None:
+        return None
+
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        audio_f32: np.ndarray | None = None,
+    ) -> None:
         if self._stopped:
             return
 
