@@ -2735,6 +2735,10 @@ class FletDesktopRendererWindow:
         locked = self._interaction_mode == _DESKTOP_INTERACTION_MODE_PASS_THROUGH
         window = page.window
         window.ignore_mouse_events = locked
+        # Re-assert topmost after locking to prevent fullscreen windowed games
+        # (e.g. VRChat) from stealing z-order. See: #12
+        if locked:
+            window.always_on_top = True
 
     def _reveal_window_if_supported(self) -> None:
         page = self._page

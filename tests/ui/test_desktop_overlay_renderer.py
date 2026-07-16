@@ -2039,6 +2039,7 @@ async def test_desktop_overlay_preview_post_start_updates_retain_caption_surface
         await window.dispatch_runtime_control(
             {"command": "set_interaction_mode", "mode": "pass_through"}
         )
+        protected_writes = len(app.page.window.protected_writes)
         window._on_preview_keyboard_event(type("PreviewKeyEvent", (), {"key": "e"})())
         await asyncio.gather(*app.page.tasks)
 
@@ -3155,6 +3156,7 @@ async def test_desktop_overlay_post_start_paths_update_retained_controls_in_plac
 
         assert app.page.window.ignore_mouse_events is True
         assert model.caption_surface.visible is False
+        protected_writes = len(app.page.window.protected_writes)
         await window.dispatch_runtime_control({"command": "set_interaction_mode", "mode": "edit"})
         assert app.page.window.ignore_mouse_events is False
         assert identities == (
