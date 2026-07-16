@@ -16,6 +16,7 @@ from puripuly_heart.core.local_stt_assets import (
     LocalSTTManifestInvalidError,
     LocalSTTModelMissingError,
 )
+from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.providers.stt import local_qwen_sherpa as local_qwen_module
 from puripuly_heart.providers.stt.local_qwen_sherpa import (
     LocalQwenSherpaInferenceError,
@@ -344,6 +345,7 @@ async def test_local_qwen_backend_redacts_known_hallucination_text_in_transcript
     with caplog.at_level(logging.INFO, logger=local_qwen_module.__name__):
         await session.send_audio(b"\x00\x00\xff\x7f")
         await session.on_speech_end()
+        await session.stop()
 
     gen = session.events()
     event = await gen.__anext__()
@@ -396,6 +398,7 @@ async def test_local_qwen_backend_logs_non_matching_transcript_metadata_without_
     with caplog.at_level(logging.INFO, logger=local_qwen_module.__name__):
         await session.send_audio(b"\x00\x00\xff\x7f")
         await session.on_speech_end()
+        await session.stop()
 
     gen = session.events()
     event = await gen.__anext__()
@@ -446,6 +449,7 @@ async def test_local_qwen_session_send_audio_f32_preserves_float32_samples(
 
     await session.send_audio_f32(original)
     await session.on_speech_end()
+    await session.stop()
 
     stream = recognizer_state["stream"]
     assert isinstance(stream, FakeStream)
@@ -551,6 +555,7 @@ async def test_local_qwen_session_clips_float32_before_accept_waveform(
 
     await session.send_audio_f32(original)
     await session.on_speech_end()
+    await session.stop()
 
     stream = recognizer_state["stream"]
     assert isinstance(stream, FakeStream)
@@ -604,6 +609,7 @@ async def test_local_qwen_backend_sets_stream_language_hint_and_hotwords(
     session = await backend.open_session()
     await session.send_audio(b"\x00\x00")
     await session.on_speech_end()
+    await session.stop()
 
     stream = recognizer_state["stream"]
     assert isinstance(stream, FakeStream)
@@ -649,6 +655,7 @@ async def test_local_qwen_backend_keeps_16000_input_without_resampling(
     session = await backend.open_session()
     await session.send_audio(b"\x00\x00\xff\x7f")
     await session.on_speech_end()
+    await session.stop()
 
     stream = recognizer_state["stream"]
     assert isinstance(stream, FakeStream)
@@ -833,6 +840,9 @@ async def test_local_qwen_session_surfaces_inference_error(
     await session.on_speech_end()
 
     gen = session.events()
+    boundary = await gen.__anext__()
+    assert boundary.text == ""
+    assert boundary.is_final is True
     with pytest.raises(LocalQwenSherpaInferenceError, match="decode failed"):
         await gen.__anext__()
 
@@ -913,7 +923,7 @@ async def test_local_qwen_session_logs_inference_metrics_and_summary(
         await session.on_speech_end()
         await session.send_audio(b"\x00\x00" * 8000)
         await session.on_speech_end()
-        await session.close()
+        await session.stop()
 
     messages = [record.getMessage() for record in caplog.records]
     final_messages = [message for message in messages if "Transcript final" in message]
@@ -971,6 +981,7 @@ async def test_local_qwen_logs_decode_diagnostics_when_enabled(
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.stt.local_qwen_sherpa"):
         await session.send_audio_f32(np.ones(16000, dtype=np.float32))
         await session.on_speech_end()
+        await session.stop()
 
     messages = [record.getMessage() for record in caplog.records]
     assert any("[AudioDiag][local_qwen][self] decode_start" in message for message in messages)
@@ -1017,6 +1028,7 @@ async def test_local_qwen_logs_empty_decode_diagnostics_when_enabled(
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.stt.local_qwen_sherpa"):
         await session.send_audio_f32(np.zeros(16000, dtype=np.float32))
         await session.on_speech_end()
+        await session.stop()
 
     messages = [record.getMessage() for record in caplog.records]
     assert any("[AudioDiag][local_qwen][peer] decode_done" in message for message in messages)
@@ -1203,3 +1215,269 @@ async def test_local_qwen_decode_continues_when_diagnostic_logging_fails(
     gen = session.events()
     event = await gen.__anext__()
     assert event.text == "hello local qwen"
+
+
+@pytest.mark.asyncio
+async def test_local_qwen_speech_end_queues_fifo_decode_without_blocking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    decoded: list[np.ndarray] = []
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        decoded.append(samples_f32.copy())
+        started.set()
+        await release.wait()
+        return str(len(decoded))
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    session = await backend.open_session()
+    first = np.ones(160, dtype=np.float32)
+    second = np.full(320, 0.5, dtype=np.float32)
+
+    await session.send_audio_f32(first)
+    await asyncio.wait_for(session.on_speech_end(), timeout=0.1)
+    await asyncio.wait_for(started.wait(), timeout=0.1)
+    await session.send_audio_f32(second)
+    await asyncio.wait_for(session.on_speech_end(), timeout=0.1)
+
+    assert len(decoded) == 1
+    stop_task = asyncio.create_task(session.stop())
+    await asyncio.sleep(0)
+    assert not stop_task.done()
+
+    release.set()
+    await asyncio.wait_for(stop_task, timeout=1.0)
+
+    events = session.events()
+    first_event = await events.__anext__()
+    second_event = await events.__anext__()
+    with pytest.raises(StopAsyncIteration):
+        await events.__anext__()
+
+    assert [first_event.text, second_event.text] == ["1", "2"]
+    np.testing.assert_array_equal(decoded[0], first)
+    np.testing.assert_array_equal(decoded[1], second)
+
+
+@pytest.mark.asyncio
+async def test_local_qwen_sessions_handoff_finals_before_next_session_decodes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    decoded: list[np.ndarray] = []
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        decoded.append(samples_f32.copy())
+        sequence = len(decoded)
+        if sequence == 1:
+            first_started.set()
+            await release_first.wait()
+        return f"final-{sequence}"
+
+    async def collect_events(session) -> list[STTBackendTranscriptEvent]:
+        return [event async for event in session.events()]
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    old_session = await backend.open_session()
+    old_events_task = asyncio.create_task(collect_events(old_session))
+
+    await old_session.send_audio_f32(np.full(160, 1.0, dtype=np.float32))
+    await old_session.on_speech_end()
+    await asyncio.wait_for(first_started.wait(), timeout=0.1)
+    await old_session.send_audio_f32(np.full(160, 2.0, dtype=np.float32))
+    await old_session.on_speech_end()
+
+    new_session = await backend.open_session()
+    new_events_task = asyncio.create_task(collect_events(new_session))
+    await new_session.send_audio_f32(np.full(160, 3.0, dtype=np.float32))
+    await asyncio.wait_for(new_session.on_speech_end(), timeout=0.1)
+    await asyncio.sleep(0)
+
+    assert len(decoded) == 1
+
+    stop_old_task = asyncio.create_task(old_session.stop())
+    stop_new_task = asyncio.create_task(new_session.stop())
+    release_first.set()
+    await asyncio.wait_for(
+        asyncio.gather(stop_old_task, stop_new_task),
+        timeout=1.0,
+    )
+    old_events, new_events = await asyncio.wait_for(
+        asyncio.gather(old_events_task, new_events_task),
+        timeout=1.0,
+    )
+
+    assert [event.text for event in old_events] == ["final-1", "final-2"]
+    assert [event.text for event in new_events] == ["final-3"]
+    assert [int(samples[0]) for samples in decoded] == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+async def test_local_qwen_close_cancels_and_awaits_decode_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        _ = samples_f32
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+        return ""
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    session = await backend.open_session()
+    await session.send_audio_f32(np.ones(160, dtype=np.float32))
+    await session.on_speech_end()
+    await asyncio.wait_for(started.wait(), timeout=0.1)
+
+    await asyncio.wait_for(session.close(), timeout=0.1)
+
+    assert cancelled.is_set()
+    events = session.events()
+    with pytest.raises(StopAsyncIteration):
+        await events.__anext__()
+
+
+@pytest.mark.asyncio
+async def test_local_qwen_empty_decode_preserves_next_final_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    results = iter(["", "second final"])
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        _ = samples_f32
+        return next(results)
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    session = await backend.open_session()
+    await session.send_audio_f32(np.ones(160, dtype=np.float32))
+    await session.on_speech_end()
+    await session.send_audio_f32(np.full(160, 0.5, dtype=np.float32))
+    await session.on_speech_end()
+    await session.stop()
+
+    events = session.events()
+    first_event = await events.__anext__()
+    second_event = await events.__anext__()
+    with pytest.raises(StopAsyncIteration):
+        await events.__anext__()
+
+    assert first_event.text == ""
+    assert first_event.is_final is True
+    assert second_event.text == "second final"
+    assert second_event.is_final is True
+
+
+@pytest.mark.asyncio
+async def test_local_qwen_speech_end_without_audio_emits_empty_final_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    decode_calls = 0
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        nonlocal decode_calls
+        decode_calls += 1
+        _ = samples_f32
+        return "unexpected"
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    session = await backend.open_session()
+    await session.on_speech_end()
+    await session.stop()
+
+    events = session.events()
+    event = await events.__anext__()
+    with pytest.raises(StopAsyncIteration):
+        await events.__anext__()
+
+    assert decode_calls == 0
+    assert event.text == ""
+    assert event.is_final is True
+
+
+@pytest.mark.asyncio
+async def test_local_qwen_logs_backlog_warning_once_with_stream_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        _ = samples_f32
+        started.set()
+        await release.wait()
+        return ""
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(
+        model_dir=Path("/models/qwen"),
+        stream_label="peer",
+    )
+    session = await backend.open_session()
+
+    with caplog.at_level(logging.WARNING, logger=local_qwen_module.__name__):
+        await session.send_audio_f32(np.ones(160, dtype=np.float32))
+        await session.on_speech_end()
+        await asyncio.wait_for(started.wait(), timeout=0.1)
+        for _ in range(9):
+            await session.send_audio_f32(np.ones(160, dtype=np.float32))
+            await session.on_speech_end()
+
+    warnings = [message for message in caplog.messages if "Decode backlog" in message]
+    assert len(warnings) == 1
+    assert "[STT][local_qwen][peer]" in warnings[0]
+    assert "pending_jobs=9" in warnings[0]
+    assert "buffered_audio_ms=90.0" in warnings[0]
+    assert "threshold=8" in warnings[0]
+
+    release.set()
+    await session.stop()

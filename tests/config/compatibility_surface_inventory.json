@@ -1003,6 +1003,14 @@
       "rationale": "Provider error-detail helpers redact and extract safe diagnostic fragments for LLM adapters. They are internal implementation contracts, not external public compatibility facades."
     },
     {
+      "surface": "provider STT local decode coordinator",
+      "classification": "internal_provider_implementation_modules",
+      "modules": [
+        "puripuly_heart.providers.stt.local_decode"
+      ],
+      "rationale": "The local decode coordinator owns provider-internal FIFO inference scheduling and lifecycle behavior. It is shared implementation infrastructure for local STT adapters, not an external public compatibility facade."
+    },
+    {
       "surface": "puripuly_heart.core.output implementation and port modules",
       "classification": "internal_output_message_contract_modules",
       "module_prefixes": [

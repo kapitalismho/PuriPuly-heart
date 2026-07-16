@@ -182,37 +182,118 @@ class ManagedSTTProvider:
 
     async def close(self) -> None:
         self._closing = True
-        await self._set_state(
-            STTSessionState.DRAINING if self._active_session else STTSessionState.DISCONNECTED
-        )
+        try:
+            await self._set_state(
+                STTSessionState.DRAINING if self._active_session else STTSessionState.DISCONNECTED
+            )
 
+            if self._reset_timer:
+                self._reset_timer.cancel()
+
+            if self._active_session and self._consumer_task:
+                await self._drain_and_close(
+                    self._active_session, self._consumer_task, allow_finalize=True
+                )
+            elif self._consumer_task:
+                self._consumer_task.cancel()
+                try:
+                    await self._consumer_task
+                except asyncio.CancelledError:
+                    current_task = asyncio.current_task()
+                    if current_task is not None and current_task.cancelling():
+                        raise
+                except Exception:
+                    pass
+            elif self._active_session:
+                await self._close_session_for_cleanup(self._active_session)
+        finally:
+            await self._complete_close_cleanup()
+
+    async def _complete_close_cleanup(self) -> None:
+        current_task = asyncio.current_task()
+        cleanup_cancelled = False
+        while True:
+            try:
+                await self._complete_close_cleanup_once()
+                break
+            except asyncio.CancelledError:
+                if current_task is None or not current_task.cancelling():
+                    raise
+                cleanup_cancelled = True
+
+        if cleanup_cancelled:
+            raise asyncio.CancelledError
+
+    async def _close_session_for_cleanup(self, session: STTBackendSession) -> None:
+        try:
+            await session.close()
+        except asyncio.CancelledError:
+            current_task = asyncio.current_task()
+            if current_task is not None and current_task.cancelling():
+                raise
+        except Exception:
+            pass
+
+    async def _complete_close_cleanup_once(self) -> None:
         if self._reset_timer:
-            self._reset_timer.cancel()
+            reset_timer = self._reset_timer
+            reset_timer.cancel()
+            try:
+                await reset_timer
+            except asyncio.CancelledError:
+                current_task = asyncio.current_task()
+                if current_task is not None and current_task.cancelling():
+                    raise
+            except Exception:
+                pass
             self._reset_timer = None
 
-        if self._active_session and self._consumer_task:
-            await self._drain_and_close(
-                self._active_session, self._consumer_task, allow_finalize=True
-            )
-        elif self._consumer_task:
+        if self._active_session:
+            await self._close_session_for_cleanup(self._active_session)
+        if self._consumer_task and not self._consumer_task.done():
+            try:
+                await asyncio.wait_for(
+                    asyncio.shield(self._consumer_task),
+                    timeout=self.drain_timeout_s,
+                )
+            except asyncio.TimeoutError:
+                pass
+            except asyncio.CancelledError:
+                current_task = asyncio.current_task()
+                if current_task is not None and current_task.cancelling():
+                    raise
+            except Exception:
+                pass
+        if self._consumer_task and not self._consumer_task.done():
             self._consumer_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, Exception):
+            try:
                 await self._consumer_task
-        elif self._active_session:
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await self._active_session.close()
-
+            except asyncio.CancelledError:
+                current_task = asyncio.current_task()
+                if current_task is not None and current_task.cancelling():
+                    raise
+            except Exception:
+                pass
         self._consumer_task = None
         self._active_session = None
 
         if self._draining:
-            for task in list(self._draining):
-                task.cancel()
-            await asyncio.gather(*self._draining, return_exceptions=True)
-            self._draining.clear()
+            draining = tuple(self._draining)
+            for task in draining:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*draining, return_exceptions=True)
+            self._draining.difference_update(draining)
 
         self._session_started_at = None
+        self._active_utterance_id = None
+        self._pending_final_utterance_ids.clear()
+        self._pending_final_utterance_times.clear()
+        self._last_speech_end_time = None
+        if self._audio_ring is not None:
+            self._audio_ring.clear()
         await self._set_state(STTSessionState.DISCONNECTED)
+        self._closing = False
 
     async def close_backend(self) -> None:
         """Close active STT session and backend-level resources once.
@@ -307,13 +388,7 @@ class ManagedSTTProvider:
                 fallback_level=logging.INFO,
             )
             self._emit_stt_input_diagnostics(event.utterance_id, finalize=True)
-            audio_f32 = self._active_session.drain_buffer_f32()
-            asyncio.create_task(
-                self._active_session.on_speech_end(
-                    trailing_silence_ms=event.trailing_silence_ms,
-                    audio_f32=audio_f32,
-                )
-            )
+            await self._active_session.on_speech_end(trailing_silence_ms=event.trailing_silence_ms)
 
     async def _send_audio(self, samples_f32: np.ndarray) -> None:
         samples_f32 = np.asarray(samples_f32, dtype=np.float32).reshape(-1)
@@ -633,29 +708,61 @@ class ManagedSTTProvider:
             f"[STT] DRAIN: Starting drain (timeout={self.drain_timeout_s}s)...",
             fallback_level=logging.DEBUG,
         )
-        if allow_finalize and self._should_finalize_before_stop():
-            await self._finalize_before_stop(session)
-        with contextlib.suppress(Exception):
-            await session.stop()
-
+        stop_timed_out = False
         try:
-            await asyncio.wait_for(consumer_task, timeout=self.drain_timeout_s)
-            self._emit_detailed(
-                "[STT] DRAIN: Consumer task completed normally",
-                fallback_level=logging.DEBUG,
-            )
-        except asyncio.TimeoutError:
-            self._emit_detailed(
-                f"[STT] DRAIN: Timeout after {self.drain_timeout_s}s, cancelling consumer task",
-                level=logging.WARNING,
-                fallback_level=logging.WARNING,
-            )
-            consumer_task.cancel()
-            with contextlib.suppress(Exception):
-                await consumer_task
+            if allow_finalize and self._should_finalize_before_stop():
+                await self._finalize_before_stop(session)
+            try:
+                await asyncio.wait_for(session.stop(), timeout=self.drain_timeout_s)
+            except asyncio.TimeoutError:
+                stop_timed_out = True
+                self._emit_detailed(
+                    f"[STT] DRAIN: Stop timeout after {self.drain_timeout_s}s",
+                    level=logging.WARNING,
+                    fallback_level=logging.WARNING,
+                )
+            except asyncio.CancelledError:
+                current_task = asyncio.current_task()
+                if current_task is not None and current_task.cancelling():
+                    raise
+            except Exception:
+                pass
 
-        with contextlib.suppress(Exception):
-            await session.close()
+            if stop_timed_out:
+                await self._close_session_for_cleanup(session)
+
+            if not consumer_task.done():
+                try:
+                    await asyncio.wait_for(consumer_task, timeout=self.drain_timeout_s)
+                    self._emit_detailed(
+                        "[STT] DRAIN: Consumer task completed normally",
+                        fallback_level=logging.DEBUG,
+                    )
+                except asyncio.TimeoutError:
+                    self._emit_detailed(
+                        f"[STT] DRAIN: Timeout after {self.drain_timeout_s}s, cancelling consumer task",
+                        level=logging.WARNING,
+                        fallback_level=logging.WARNING,
+                    )
+                    consumer_task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                        await consumer_task
+                except asyncio.CancelledError:
+                    current_task = asyncio.current_task()
+                    if current_task is not None and current_task.cancelling():
+                        raise
+        finally:
+            await self._close_session_for_cleanup(session)
+            if not consumer_task.done():
+                with contextlib.suppress(asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                    await asyncio.wait_for(
+                        asyncio.shield(consumer_task),
+                        timeout=self.drain_timeout_s,
+                    )
+            if not consumer_task.done():
+                consumer_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await consumer_task
         self._emit_detailed("[STT] DRAIN: Session closed", fallback_level=logging.DEBUG)
 
     def _should_finalize_before_stop(self) -> bool:

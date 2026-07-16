@@ -26,7 +26,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
             "src/puripuly_heart/core/local_stt_runtime_installer.py",
             ASYNCIO_CREATE_TASK,
         ): 1,
-        ("src/puripuly_heart/core/stt/controller.py", ASYNCIO_CREATE_TASK): 7,
+        ("src/puripuly_heart/core/stt/controller.py", ASYNCIO_CREATE_TASK): 6,
         ("src/puripuly_heart/core/orchestrator/hub.py", ASYNCIO_CREATE_TASK): 5,
         ("src/puripuly_heart/core/overlay/bridge.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/overlay/presenter.py", ASYNCIO_CREATE_TASK): 1,

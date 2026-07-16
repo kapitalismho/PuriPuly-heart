@@ -345,15 +345,7 @@ class _DeepgramSDKSession(STTBackendSession):
             return
         self._audio_q.put_nowait(pcm16le)
 
-    def drain_buffer_f32(self) -> None:
-        return None
-
-    async def on_speech_end(
-        self,
-        *,
-        trailing_silence_ms: int | None = None,
-        audio_f32: np.ndarray | None = None,
-    ) -> None:
+    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
         """Handle end of speech: top up trailing silence if needed, then finalize."""
         if self._stopped:
             return

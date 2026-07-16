@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import numpy as np
 
@@ -12,6 +13,7 @@ from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
 from puripuly_heart.core.vad.gating import VadGating
 from puripuly_heart.domain.events import STTSessionState
+from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from tests.helpers.audio import FakeAudioSource, make_frames
 from tests.helpers.fakes import FakeSender, SpeechAwareFakeBackend, SpeechAwareFakeSession
 from tests.helpers.vad import SequenceVadEngine
@@ -55,6 +57,61 @@ async def test_audio_vad_loop_pipeline_smoke():
 
     assert "FINAL" in sender.sent
     await hub.stop()
+
+
+async def test_audio_vad_loop_ingests_next_utterance_while_local_decode_is_blocked(
+    monkeypatch,
+) -> None:
+    decode_started = asyncio.Event()
+    release_decode = asyncio.Event()
+    decode_calls: list[np.ndarray] = []
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        decode_calls.append(samples_f32.copy())
+        if len(decode_calls) == 1:
+            decode_started.set()
+            await release_decode.wait()
+        return f"final-{len(decode_calls)}"
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    stt = ManagedSTTProvider(backend=backend, sample_rate_hz=16000)
+    vad = VadGating(
+        SequenceVadEngine(probs=[0.9, 0.0, 0.9, 0.0]),
+        sample_rate_hz=16000,
+        ring_buffer_ms=32,
+        hangover_ms=0,
+    )
+    audio = np.concatenate(
+        [
+            np.ones(512, dtype=np.float32),
+            np.zeros(512, dtype=np.float32),
+            np.full(512, 0.5, dtype=np.float32),
+            np.zeros(512, dtype=np.float32),
+        ]
+    )
+    source = FakeAudioSource(make_frames(audio, sample_rate_hz=16000, splits=[512] * 4))
+
+    loop_task = asyncio.create_task(
+        run_audio_vad_loop(
+            source=source,
+            vad=vad,
+            sink=stt,
+            target_sample_rate_hz=16000,
+        )
+    )
+    await asyncio.wait_for(decode_started.wait(), timeout=0.5)
+    await asyncio.wait_for(asyncio.shield(loop_task), timeout=0.5)
+    release_decode.set()
+    await stt.close()
+
+    assert len(decode_calls) == 2
 
 
 async def test_run_audio_vad_loop_applies_audio_gate_before_forwarding_to_sink():

@@ -29,6 +29,12 @@ from puripuly_heart.core.stt.backend import (
 from puripuly_heart.core.stt.local_qwen_hallucination import (
     is_known_local_qwen_hallucination,
 )
+from puripuly_heart.providers.stt.local_decode import (
+    LocalDecodeBacklog,
+    LocalDecodeCompletion,
+    LocalDecodeCoordinator,
+    LocalDecodeFailure,
+)
 
 DEFAULT_SHERPA_NUM_THREADS = 3
 LOCAL_QWEN_RECOGNIZER_SAMPLE_RATE_HZ = 16000
@@ -154,6 +160,7 @@ class LocalQwenSherpaSTTBackend(STTBackend):
     _recognizer: object | None = field(init=False, default=None, repr=False)
     _load_lock: asyncio.Lock = field(init=False, repr=False)
     _decode_lock: asyncio.Lock = field(init=False, repr=False)
+    _session_handoff_tail: asyncio.Event | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
         if self.sample_rate_hz != LOCAL_QWEN_RECOGNIZER_SAMPLE_RATE_HZ:
@@ -165,10 +172,16 @@ class LocalQwenSherpaSTTBackend(STTBackend):
 
     async def open_session(self) -> STTBackendSession:
         await self._ensure_recognizer()
-        return _LocalQwenSherpaSession(backend=self)
+        session = _LocalQwenSherpaSession(
+            backend=self,
+            decode_start_after=self._session_handoff_tail,
+        )
+        self._session_handoff_tail = session.handoff_complete_event
+        return session
 
     async def close(self) -> None:
         self._recognizer = None
+        self._session_handoff_tail = None
 
     async def _ensure_recognizer(self) -> object:
         if self._recognizer is not None:
@@ -232,79 +245,89 @@ class LocalQwenSherpaSTTBackend(STTBackend):
 @dataclass(slots=True)
 class _LocalQwenSherpaSession(STTBackendSession):
     backend: LocalQwenSherpaSTTBackend
+    decode_start_after: asyncio.Event | None = field(default=None, repr=False)
     _buffer_f32: list[np.ndarray] = field(init=False, repr=False)
     _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
         init=False,
         repr=False,
     )
     _closed: bool = field(init=False, default=False, repr=False)
+    _stopping: bool = field(init=False, default=False, repr=False)
     _closed_event_enqueued: bool = field(init=False, default=False, repr=False)
     _utterances: int = field(init=False, default=0, repr=False)
     _total_audio_ms: float = field(init=False, default=0.0, repr=False)
     _total_inference_ms: float = field(init=False, default=0.0, repr=False)
     _total_rtf: float = field(init=False, default=0.0, repr=False)
     _summary_logged: bool = field(init=False, default=False, repr=False)
+    _decode_coordinator: LocalDecodeCoordinator = field(init=False, repr=False)
+    _events_started: bool = field(init=False, default=False, repr=False)
+    _failure_handoff_safe: bool = field(init=False, default=False, repr=False)
+    _handoff_complete: asyncio.Event = field(init=False, repr=False)
+    _close_complete: asyncio.Event = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._buffer_f32 = []
         self._events = asyncio.Queue()
+        self._handoff_complete = asyncio.Event()
+        self._close_complete = asyncio.Event()
+        self._decode_coordinator = LocalDecodeCoordinator(
+            owner_name="local-qwen-session",
+            sample_rate_hz=self.backend.sample_rate_hz,
+            decode=self._decode_samples,
+            on_completion=self._handle_decode_completion,
+            on_failure=self._handle_decode_failure,
+            on_backlog_warning=self._log_decode_backlog_warning,
+            start_after=self.decode_start_after,
+            clock=time.perf_counter,
+        )
+
+    @property
+    def handoff_complete_event(self) -> asyncio.Event:
+        return self._handoff_complete
 
     async def send_audio(self, pcm16le: bytes) -> None:
-        if self._closed:
+        if self._closed or self._stopping or not self._decode_coordinator.accepting:
             return
         await self.send_audio_f32(pcm16le_bytes_to_float32(pcm16le))
 
     async def send_audio_f32(self, samples_f32: np.ndarray) -> None:
-        if self._closed:
+        if self._closed or self._stopping or not self._decode_coordinator.accepting:
             return
         samples = np.asarray(samples_f32, dtype=np.float32).reshape(-1)
         if samples.size == 0:
             return
         self._buffer_f32.append(samples.copy())
 
-    def drain_buffer_f32(self) -> np.ndarray | None:
-        if not self._buffer_f32:
-            return None
-        snapshot = list(self._buffer_f32)
-        self._buffer_f32.clear()
-        return np.concatenate(snapshot)
-
-    async def on_speech_end(
-        self,
-        *,
-        trailing_silence_ms: int | None = None,
-        audio_f32: np.ndarray | None = None,
-    ) -> None:
+    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
         _ = trailing_silence_ms
-        if self._closed:
+        if self._closed or self._stopping or not self._decode_coordinator.accepting:
             return
 
-        if audio_f32 is None:
-            audio_f32 = self.drain_buffer_f32()
-        if audio_f32 is None or audio_f32.size == 0:
-            return
+        samples_f32 = (
+            np.concatenate(self._buffer_f32)
+            if self._buffer_f32
+            else np.empty((0,), dtype=np.float32)
+        )
+        self._buffer_f32.clear()
+        self._decode_coordinator.enqueue(samples_f32)
 
-        samples_f32 = audio_f32
-        audio_ms = _sample_count_duration_ms(samples_f32.size, self.backend.sample_rate_hz)
-        diag_enabled = self._diagnostics_enabled()
-        if diag_enabled:
+    async def _decode_samples(self, samples_f32: np.ndarray) -> str:
+        if self._diagnostics_enabled():
             self._log_decode_start_diagnostics(samples_f32)
+        return await self.backend.decode_f32(samples_f32)
 
-        try:
-            started_at = time.perf_counter()
-            text = await self.backend.decode_f32(samples_f32)
-            inference_ms = (time.perf_counter() - started_at) * 1000.0
-        except Exception as exc:
-            await self._events.put(exc)
-            return
-
+    async def _handle_decode_completion(self, completion: LocalDecodeCompletion) -> None:
+        text = completion.text
+        audio_ms = completion.job.audio_ms
+        inference_ms = completion.inference_ms
         rtf = inference_ms / audio_ms if audio_ms > 0 else 0.0
-        self._utterances += 1
-        self._total_audio_ms += audio_ms
-        self._total_inference_ms += inference_ms
-        self._total_rtf += rtf
+        if audio_ms > 0:
+            self._utterances += 1
+            self._total_audio_ms += audio_ms
+            self._total_inference_ms += inference_ms
+            self._total_rtf += rtf
 
-        if diag_enabled:
+        if audio_ms > 0 and self._diagnostics_enabled():
             self._log_decode_done_diagnostics(
                 audio_ms=audio_ms,
                 inference_ms=inference_ms,
@@ -322,27 +345,64 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 inference_ms,
                 rtf,
             )
-            await self._events.put(STTBackendTranscriptEvent(text=text, is_final=True))
+        await self._events.put(STTBackendTranscriptEvent(text=text, is_final=True))
+
+    async def _handle_decode_failure(self, failure: LocalDecodeFailure) -> None:
+        retired_jobs = (failure.job, *failure.discarded_jobs)
+        for _ in retired_jobs:
+            await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
+        self._failure_handoff_safe = True
+        await self._events.put(failure.error)
+
+    def _log_decode_backlog_warning(self, backlog: LocalDecodeBacklog) -> None:
+        logger.warning(
+            "%s Decode backlog is unexpectedly high: pending_jobs=%s buffered_audio_ms=%.1f threshold=%s",
+            _log_prefix(self.backend.stream_label),
+            backlog.pending_jobs,
+            backlog.buffered_audio_ms,
+            backlog.warning_threshold,
+        )
 
     async def stop(self) -> None:
+        self._stopping = True
+        await self._decode_coordinator.stop()
         self._log_summary_once()
         await self.close()
 
     async def close(self) -> None:
-        self._log_summary_once()
+        if self._closed:
+            await asyncio.shield(self._close_complete.wait())
+            return
         self._closed = True
         self._buffer_f32.clear()
-        if self._closed_event_enqueued:
-            return
-        self._closed_event_enqueued = True
-        await self._events.put(None)
+        try:
+            if self._decode_coordinator.pending_jobs:
+                logger.info(
+                    "%s Decode cancellation requested: pending_jobs=%s buffered_audio_ms=%.1f",
+                    _log_prefix(self.backend.stream_label),
+                    self._decode_coordinator.pending_jobs,
+                    self._decode_coordinator.buffered_audio_ms,
+                )
+            await self._decode_coordinator.close()
+        finally:
+            self._log_summary_once()
+            if not self._closed_event_enqueued:
+                self._closed_event_enqueued = True
+                self._events.put_nowait(None)
+            if not self._events_started:
+                self._handoff_complete.set()
+            self._close_complete.set()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
+        self._events_started = True
         while True:
             event = await self._events.get()
             if event is None:
+                self._handoff_complete.set()
                 break
             if isinstance(event, BaseException):
+                if self._failure_handoff_safe:
+                    self._handoff_complete.set()
                 raise event
             yield event
 

@@ -4,6 +4,7 @@ import asyncio
 import io
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from uuid import uuid4
 
 import numpy as np
@@ -25,6 +26,7 @@ from puripuly_heart.domain.events import (
     STTSessionStateEvent,
 )
 from puripuly_heart.domain.models import FinalLanguageRun
+from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from tests.helpers.fakes import samples
 
 
@@ -114,10 +116,7 @@ class FakeSession:
         await self._queue.put(STTBackendTranscriptEvent(text="final", is_final=True))
         await self._queue.put(None)  # sentinel
 
-    def drain_buffer_f32(self):
-        return None
-
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None, audio_f32=None) -> None:
+    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
         _ = trailing_silence_ms
         self.calls.append("on_speech_end")
 
@@ -179,10 +178,7 @@ class Float32Session:
         self.calls.append("stop")
         await self._queue.put(None)
 
-    def drain_buffer_f32(self):
-        return None
-
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None, audio_f32=None) -> None:
+    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
         _ = trailing_silence_ms
         self.calls.append("on_speech_end")
 
@@ -251,10 +247,7 @@ class EventOnlySession:
     async def send_audio(self, pcm16le: bytes) -> None:
         _ = pcm16le
 
-    def drain_buffer_f32(self):
-        return None
-
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None, audio_f32=None) -> None:
+    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
         _ = trailing_silence_ms
 
     async def stop(self) -> None:
@@ -288,10 +281,7 @@ class FailingSession:
     async def send_audio(self, pcm16le: bytes) -> None:
         self.audio.append(pcm16le)
 
-    def drain_buffer_f32(self):
-        return None
-
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None, audio_f32=None) -> None:
+    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
         _ = trailing_silence_ms
 
     async def stop(self) -> None:
@@ -357,10 +347,7 @@ class TerminalFailureSession:
     async def send_audio(self, pcm16le: bytes) -> None:
         _ = pcm16le
 
-    def drain_buffer_f32(self):
-        return None
-
-    async def on_speech_end(self, *, trailing_silence_ms: int | None = None, audio_f32=None) -> None:
+    async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
         _ = trailing_silence_ms
 
     async def stop(self) -> None:
@@ -601,7 +588,6 @@ async def test_stt_input_diagnostic_log_failure_does_not_skip_speech_end() -> No
             )
         )
         await stt.handle_vad_event(SpeechEnd(uid, trailing_silence_ms=64))
-        await asyncio.sleep(0)  # let create_task on_speech_end run
 
         session = backend.sessions[0]
         assert "on_speech_end" in session.calls
@@ -681,7 +667,6 @@ async def test_stt_input_metric_emit_failure_does_not_skip_speech_end(
         monkeypatch.setattr(stt_controller_module.np, "sqrt", fail_sqrt)
         await stt.handle_vad_event(SpeechEnd(uid, trailing_silence_ms=64))
         monkeypatch.setattr(stt_controller_module.np, "sqrt", original_sqrt)
-        await asyncio.sleep(0)  # let create_task on_speech_end run
 
         session = backend.sessions[0]
         assert "on_speech_end" in session.calls
@@ -1055,8 +1040,7 @@ async def test_stt_controller_reconnect_failure_uses_safe_runtime_log() -> None:
         assert raw_detail not in runtime_log
         assert "stt-reconnect-secret-456" not in runtime_log
         assert (
-            "[STT] Reconnect failed; closing until next speech: "
-            "category=network code=stt.network"
+            "[STT] Reconnect failed; closing until next speech: category=network code=stt.network"
         ) in runtime_log
     finally:
         await stt.close()
@@ -1468,6 +1452,593 @@ async def test_managed_stt_provider_empty_final_boundary_consumes_pending_id_bef
         await stt.close()
 
 
+async def test_local_qwen_empty_decode_keeps_next_final_on_next_utterance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    results = iter(["", "next final"])
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        _ = samples_f32
+        return next(results)
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        stt_provider_name=STTProviderName.LOCAL_QWEN,
+        reset_deadline_s=90.0,
+    )
+    empty_utterance_id = uuid4()
+    next_utterance_id = uuid4()
+    stream = stt.events()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                empty_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(empty_utterance_id))
+        await stt.handle_vad_event(
+            SpeechStart(
+                next_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await stt.handle_vad_event(SpeechEnd(next_utterance_id))
+
+        event = await _next_typed_event(stream, STTFinalEvent)
+
+        assert event.utterance_id == next_utterance_id
+        assert event.transcript.utterance_id == next_utterance_id
+        assert event.transcript.text == "next final"
+    finally:
+        await stt.close()
+
+
+async def test_local_qwen_bridging_reset_preserves_final_id_fifo_across_sessions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    decode_count = 0
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        nonlocal decode_count
+        _ = samples_f32
+        decode_count += 1
+        sequence = decode_count
+        if sequence == 1:
+            first_started.set()
+            await release_first.wait()
+        return f"final-{sequence}"
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        stt_provider_name=STTProviderName.LOCAL_QWEN,
+        reset_deadline_s=90.0,
+        drain_timeout_s=1.0,
+        bridging_ms=64,
+        finalize_grace_s=0.0,
+    )
+    utterance_ids = [uuid4(), uuid4(), uuid4()]
+    stream = stt.events()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                utterance_ids[0],
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(utterance_ids[0]))
+        await asyncio.wait_for(first_started.wait(), timeout=0.1)
+
+        await stt.handle_vad_event(
+            SpeechStart(
+                utterance_ids[1],
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await stt.handle_vad_event(SpeechEnd(utterance_ids[1]))
+        await stt.handle_vad_event(
+            SpeechStart(
+                utterance_ids[2],
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.25),
+            )
+        )
+
+        await stt._reset_with_bridging()
+        await stt.handle_vad_event(SpeechEnd(utterance_ids[2]))
+        await asyncio.sleep(0)
+
+        assert decode_count == 1
+
+        release_first.set()
+        final_events = [
+            await _next_typed_event(stream, STTFinalEvent),
+            await _next_typed_event(stream, STTFinalEvent),
+            await _next_typed_event(stream, STTFinalEvent),
+        ]
+
+        assert [event.utterance_id for event in final_events] == utterance_ids
+        assert [event.transcript.text for event in final_events] == [
+            "final-1",
+            "final-2",
+            "final-3",
+        ]
+    finally:
+        release_first.set()
+        await stt.close()
+
+
+async def test_local_qwen_bridging_reset_retires_failed_old_session_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    decode_count = 0
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        nonlocal decode_count
+        _ = samples_f32
+        decode_count += 1
+        if decode_count == 1:
+            first_started.set()
+            await release_first.wait()
+            raise RuntimeError("old decode failed")
+        return "new final"
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        stt_provider_name=STTProviderName.LOCAL_QWEN,
+        reset_deadline_s=90.0,
+        drain_timeout_s=1.0,
+        bridging_ms=64,
+        finalize_grace_s=0.0,
+    )
+    utterance_ids = [uuid4(), uuid4(), uuid4()]
+    stream = stt.events()
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                utterance_ids[0],
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(1.0),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(utterance_ids[0]))
+        await asyncio.wait_for(first_started.wait(), timeout=0.1)
+
+        await stt.handle_vad_event(
+            SpeechStart(
+                utterance_ids[1],
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await stt.handle_vad_event(SpeechEnd(utterance_ids[1]))
+        await stt.handle_vad_event(
+            SpeechStart(
+                utterance_ids[2],
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.25),
+            )
+        )
+
+        await stt._reset_with_bridging()
+        await stt.handle_vad_event(SpeechEnd(utterance_ids[2]))
+        release_first.set()
+
+        event = await _next_typed_event(stream, STTFinalEvent)
+
+        assert decode_count == 2
+        assert event.utterance_id == utterance_ids[2]
+        assert event.transcript.utterance_id == utterance_ids[2]
+        assert event.transcript.text == "new final"
+    finally:
+        release_first.set()
+        await stt.close()
+
+
+async def test_local_qwen_provider_close_bounds_decode_and_reopen_maps_new_final(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+    decode_count = 0
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        nonlocal decode_count
+        _ = samples_f32
+        decode_count += 1
+        if decode_count == 1:
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+        return "new final"
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    stt = ManagedSTTProvider(
+        backend=LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen")),
+        sample_rate_hz=16000,
+        stt_provider_name=STTProviderName.LOCAL_QWEN,
+        reset_deadline_s=90.0,
+        drain_timeout_s=0.02,
+        finalize_grace_s=0.0,
+    )
+    canceled_utterance_id = uuid4()
+    new_utterance_id = uuid4()
+    stream = stt.events()
+
+    await stt.handle_vad_event(
+        SpeechStart(
+            canceled_utterance_id,
+            pre_roll=np.zeros(0, dtype=np.float32),
+            chunk=samples(1.0),
+        )
+    )
+    await _next_state(stream, STTSessionState.STREAMING)
+    await stt.handle_vad_event(SpeechEnd(canceled_utterance_id))
+    await asyncio.wait_for(started.wait(), timeout=0.1)
+
+    await asyncio.wait_for(stt.close(), timeout=0.5)
+
+    assert cancelled.is_set()
+    assert stt.state == STTSessionState.DISCONNECTED
+    assert stt._active_utterance_id is None
+    assert list(stt._pending_final_utterance_ids) == []
+    assert stt._pending_final_utterance_times == {}
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                new_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(new_utterance_id))
+
+        event = await _next_typed_event(stream, STTFinalEvent)
+
+        assert event.utterance_id == new_utterance_id
+        assert event.transcript.utterance_id == new_utterance_id
+        assert event.transcript.text == "new final"
+    finally:
+        await stt.close()
+
+
+async def test_local_qwen_cancelled_close_is_retryable_and_reopens_cleanly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+    decode_count = 0
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        nonlocal decode_count
+        _ = samples_f32
+        decode_count += 1
+        if decode_count == 1:
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+        return "new final"
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    stt = ManagedSTTProvider(
+        backend=LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen")),
+        sample_rate_hz=16000,
+        stt_provider_name=STTProviderName.LOCAL_QWEN,
+        reset_deadline_s=90.0,
+        drain_timeout_s=1.0,
+        finalize_grace_s=0.0,
+    )
+    canceled_utterance_id = uuid4()
+    new_utterance_id = uuid4()
+    stream = stt.events()
+
+    await stt.handle_vad_event(
+        SpeechStart(
+            canceled_utterance_id,
+            pre_roll=np.zeros(0, dtype=np.float32),
+            chunk=samples(1.0),
+        )
+    )
+    await _next_state(stream, STTSessionState.STREAMING)
+    await stt.handle_vad_event(SpeechEnd(canceled_utterance_id))
+    await asyncio.wait_for(started.wait(), timeout=0.1)
+    session = stt._active_session
+    assert session is not None
+
+    close_task = asyncio.create_task(stt.close())
+    for _ in range(100):
+        if not session._decode_coordinator.accepting:
+            break
+        await asyncio.sleep(0)
+    assert session._decode_coordinator.accepting is False
+    close_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await close_task
+
+    assert cancelled.is_set()
+    assert stt._active_session is None
+    assert stt._consumer_task is None
+    assert stt._active_utterance_id is None
+    assert list(stt._pending_final_utterance_ids) == []
+    assert stt._pending_final_utterance_times == {}
+    assert stt._closing is False
+    assert session._decode_coordinator._worker_task is not None
+    assert session._decode_coordinator._worker_task.done()
+
+    await asyncio.wait_for(stt.close(), timeout=0.2)
+
+    try:
+        await stt.handle_vad_event(
+            SpeechStart(
+                new_utterance_id,
+                pre_roll=np.zeros(0, dtype=np.float32),
+                chunk=samples(0.5),
+            )
+        )
+        await _next_state(stream, STTSessionState.STREAMING)
+        await stt.handle_vad_event(SpeechEnd(new_utterance_id))
+
+        event = await _next_typed_event(stream, STTFinalEvent)
+
+        assert event.utterance_id == new_utterance_id
+        assert event.transcript.utterance_id == new_utterance_id
+        assert event.transcript.text == "new final"
+    finally:
+        await stt.close()
+
+
+async def test_managed_stt_repeated_close_cancellation_completes_owned_cleanup() -> None:
+    cleanup_started = asyncio.Event()
+    release_cleanup = asyncio.Event()
+
+    async def slow_draining_cleanup() -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cleanup_started.set()
+            while not release_cleanup.is_set():
+                try:
+                    await release_cleanup.wait()
+                except asyncio.CancelledError:
+                    continue
+
+    stt = ManagedSTTProvider(
+        backend=FakeBackend(),
+        sample_rate_hz=16000,
+        reset_deadline_s=90.0,
+    )
+    stale_utterance_id = uuid4()
+    stt._active_utterance_id = stale_utterance_id
+    stt._pending_final_utterance_ids.append(stale_utterance_id)
+    stt._pending_final_utterance_times[stale_utterance_id] = 1.0
+    draining_task = asyncio.create_task(slow_draining_cleanup())
+    stt._draining.add(draining_task)
+
+    close_task = asyncio.create_task(stt.close())
+    await asyncio.wait_for(cleanup_started.wait(), timeout=0.1)
+    close_task.cancel()
+    await asyncio.sleep(0)
+    close_task.cancel()
+    release_cleanup.set()
+
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(close_task, timeout=0.5)
+
+    assert draining_task.done()
+    assert close_task.cancelling() == 2
+    assert stt._draining == set()
+    assert stt._active_session is None
+    assert stt._consumer_task is None
+    assert stt._active_utterance_id is None
+    assert list(stt._pending_final_utterance_ids) == []
+    assert stt._pending_final_utterance_times == {}
+    assert stt._closing is False
+
+
+async def test_managed_stt_contains_provider_originated_close_cancellation() -> None:
+    class CancelCloseSession:
+        def __init__(self) -> None:
+            self.close_calls = 0
+
+        async def close(self) -> None:
+            self.close_calls += 1
+            raise asyncio.CancelledError
+
+    stt = ManagedSTTProvider(
+        backend=FakeBackend(),
+        sample_rate_hz=16000,
+        reset_deadline_s=90.0,
+    )
+    session = CancelCloseSession()
+    stt._active_session = session
+
+    await asyncio.wait_for(stt.close(), timeout=0.2)
+
+    assert session.close_calls == 2
+    assert stt._active_session is None
+    assert stt._closing is False
+    assert stt.state == STTSessionState.DISCONNECTED
+
+
+async def test_managed_stt_propagates_caller_cancellation_during_session_close() -> None:
+    class BlockingCloseSession:
+        def __init__(self) -> None:
+            self.close_calls = 0
+            self.close_started = asyncio.Event()
+            self.events_queue: asyncio.Queue[STTBackendTranscriptEvent | None] = asyncio.Queue()
+
+        async def stop(self) -> None:
+            await self.events_queue.put(None)
+
+        async def close(self) -> None:
+            self.close_calls += 1
+            if self.close_calls == 1:
+                self.close_started.set()
+                await asyncio.Event().wait()
+
+        async def events(self):
+            while True:
+                event = await self.events_queue.get()
+                if event is None:
+                    return
+                yield event
+
+    stt = ManagedSTTProvider(
+        backend=FakeBackend(),
+        sample_rate_hz=16000,
+        reset_deadline_s=90.0,
+    )
+    session = BlockingCloseSession()
+    consumer_task = asyncio.create_task(stt._consume_session_events(session))
+    stt._active_session = session
+    stt._consumer_task = consumer_task
+
+    close_task = asyncio.create_task(stt.close())
+    await asyncio.wait_for(session.close_started.wait(), timeout=0.1)
+    close_task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(close_task, timeout=0.5)
+
+    assert close_task.cancelling() == 1
+    assert session.close_calls == 2
+    assert consumer_task.done()
+    assert stt._active_session is None
+    assert stt._consumer_task is None
+    assert stt._closing is False
+    assert stt.state == STTSessionState.DISCONNECTED
+
+
+async def test_local_qwen_provider_close_cancels_handoff_waiting_successor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_started = asyncio.Event()
+    first_cancelled = asyncio.Event()
+
+    async def ensure_recognizer(self) -> object:
+        self._recognizer = object()
+        return self._recognizer
+
+    async def decode_f32(self, samples_f32: np.ndarray) -> str:
+        _ = samples_f32
+        first_started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            first_cancelled.set()
+        return ""
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode_f32)
+
+    backend = LocalQwenSherpaSTTBackend(model_dir=Path("/models/qwen"))
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        stt_provider_name=STTProviderName.LOCAL_QWEN,
+        reset_deadline_s=90.0,
+        drain_timeout_s=0.02,
+        bridging_ms=64,
+        finalize_grace_s=0.0,
+    )
+    old_utterance_id = uuid4()
+    new_utterance_id = uuid4()
+    stream = stt.events()
+
+    await stt.handle_vad_event(
+        SpeechStart(
+            old_utterance_id,
+            pre_roll=np.zeros(0, dtype=np.float32),
+            chunk=samples(1.0),
+        )
+    )
+    await _next_state(stream, STTSessionState.STREAMING)
+    await stt.handle_vad_event(SpeechEnd(old_utterance_id))
+    await asyncio.wait_for(first_started.wait(), timeout=0.1)
+    old_session = stt._active_session
+    await stt.handle_vad_event(
+        SpeechStart(
+            new_utterance_id,
+            pre_roll=np.zeros(0, dtype=np.float32),
+            chunk=samples(0.5),
+        )
+    )
+    await stt._reset_with_bridging()
+    await stt.handle_vad_event(SpeechEnd(new_utterance_id))
+    await asyncio.sleep(0)
+
+    active_session = stt._active_session
+
+    await asyncio.wait_for(stt.close(), timeout=0.5)
+
+    assert first_cancelled.is_set()
+    assert active_session is not None
+    assert active_session._decode_coordinator._worker_task is not None
+    assert active_session._decode_coordinator._worker_task.done()
+    assert old_session is not None
+    assert old_session._decode_coordinator._worker_task is not None
+    assert old_session._decode_coordinator._worker_task.done()
+
+
 async def test_managed_stt_provider_drops_stale_pending_final_before_later_final() -> None:
     backend = Float32Backend()
     clock = FakeClock(10.0)
@@ -1556,7 +2127,6 @@ async def test_managed_stt_provider_repeated_forced_boundaries_reuse_session_and
         await stt.handle_vad_event(
             SpeechEnd(second_utterance_id, trailing_silence_ms=0, reason="max_duration")
         )
-        await asyncio.sleep(0)  # let create_task on_speech_end run
 
         assert len(backend.sessions) == 1
         session = backend.sessions[0]
@@ -2067,220 +2637,3 @@ async def test_stt_emits_error_event_when_not_closing() -> None:
     while not stt._events.empty():
         events.append(stt._events.get_nowait())
     assert any(isinstance(e, STTErrorEvent) for e in events)
-
-
-async def test_consecutive_utterances_preserve_fifo_order_with_deferred_decode() -> None:
-    """Transcripts for consecutive utterances must arrive in FIFO order even
-    when on_speech_end is deferred via create_task (audio-starvation fix)."""
-
-    class SlowDecodeSession:
-        """Simulates a backend where on_speech_end takes time (like sherpa decode)."""
-
-        def __init__(self) -> None:
-            self._queue: asyncio.Queue[STTBackendTranscriptEvent | None] = asyncio.Queue()
-            self.calls: list[str] = []
-            self._decode_barrier = asyncio.Event()
-
-        async def send_audio(self, pcm16le: bytes) -> None:
-            pass
-
-        async def send_audio_f32(self, samples_f32: np.ndarray) -> None:
-            pass
-
-        def drain_buffer_f32(self):
-            return None
-
-        async def on_speech_end(self, *, trailing_silence_ms: int | None = None, audio_f32=None) -> None:
-            self.calls.append("on_speech_end")
-            # Simulate slow decode: wait until barrier is released
-            await self._decode_barrier.wait()
-
-        async def stop(self) -> None:
-            self.calls.append("stop")
-            await self._queue.put(None)
-
-        async def close(self) -> None:
-            self.calls.append("close")
-
-        async def events(self):
-            while True:
-                item = await self._queue.get()
-                if item is None:
-                    return
-                yield item
-
-    class SlowDecodeBackend:
-        def __init__(self) -> None:
-            self.sessions: list[SlowDecodeSession] = []
-
-        async def open_session(self) -> SlowDecodeSession:
-            s = SlowDecodeSession()
-            self.sessions.append(s)
-            return s
-
-    backend = SlowDecodeBackend()
-    stt = ManagedSTTProvider(
-        backend=backend,
-        sample_rate_hz=16000,
-        reset_deadline_s=90.0,
-    )
-
-    first_id = uuid4()
-    second_id = uuid4()
-    stream = stt.events()
-
-    try:
-        # First utterance
-        await stt.handle_vad_event(
-            SpeechStart(first_id, pre_roll=samples(0.0), chunk=samples(1.0))
-        )
-        await _next_state(stream, STTSessionState.STREAMING)
-        await stt.handle_vad_event(SpeechEnd(first_id))
-
-        # Second utterance immediately after (VAD detects new speech quickly)
-        await stt.handle_vad_event(
-            SpeechStart(second_id, pre_roll=samples(0.0), chunk=samples(1.0))
-        )
-        await stt.handle_vad_event(SpeechEnd(second_id))
-        await asyncio.sleep(0)  # let both create_task on_speech_end start
-
-        session = backend.sessions[0]
-        # Both on_speech_end should have been called
-        assert session.calls.count("on_speech_end") == 2
-
-        # Pending final queue must be FIFO: [first_id, second_id]
-        assert list(stt._pending_final_utterance_ids) == [first_id, second_id]
-
-        # Now release the decode barrier and emit transcripts in order
-        session._decode_barrier.set()
-        await asyncio.sleep(0.05)  # let tasks complete
-
-        # Simulate backend emitting transcripts for each utterance in order
-        await session._queue.put(STTBackendTranscriptEvent(text="first", is_final=True))
-        await session._queue.put(STTBackendTranscriptEvent(text="second", is_final=True))
-
-        first_event = await _next_typed_event(stream, STTFinalEvent)
-        second_event = await _next_typed_event(stream, STTFinalEvent)
-
-        # FIFO ordering must be preserved
-        assert first_event.utterance_id == first_id
-        assert first_event.transcript.text == "first"
-        assert second_event.utterance_id == second_id
-        assert second_event.transcript.text == "second"
-    finally:
-        await stt.close()
-
-
-async def test_on_speech_end_buffer_snapshot_prevents_audio_mixing() -> None:
-    """The buffer snapshot in on_speech_end must prevent audio from the next
-    utterance from being mixed into the current decode."""
-
-    decoded_buffers: list[np.ndarray] = []
-
-    class TrackingSession:
-        """Tracks what audio is passed to on_speech_end decode."""
-
-        def __init__(self) -> None:
-            self._queue: asyncio.Queue[STTBackendTranscriptEvent | None] = asyncio.Queue()
-            self.calls: list[str] = []
-            self._buffer_f32: list[np.ndarray] = []
-            self._decode_lock = asyncio.Lock()
-            self._decode_delay = asyncio.Event()
-
-        async def send_audio_f32(self, samples_f32: np.ndarray) -> None:
-            self._buffer_f32.append(np.asarray(samples_f32, dtype=np.float32).reshape(-1).copy())
-
-        def drain_buffer_f32(self):
-            if not self._buffer_f32:
-                return None
-            snapshot = list(self._buffer_f32)
-            self._buffer_f32.clear()
-            return np.concatenate(snapshot)
-
-        async def on_speech_end(self, *, trailing_silence_ms: int | None = None, audio_f32=None) -> None:
-            _ = trailing_silence_ms
-            self.calls.append("on_speech_end")
-            if audio_f32 is None:
-                audio_f32 = self.drain_buffer_f32()
-            if audio_f32 is None or audio_f32.size == 0:
-                return
-            decoded_buffers.append(audio_f32)
-            # Simulate slow decode
-            await self._decode_delay.wait()
-            await self._queue.put(STTBackendTranscriptEvent(text="ok", is_final=True))
-
-        async def stop(self) -> None:
-            self.calls.append("stop")
-            await self._queue.put(None)
-
-        async def close(self) -> None:
-            self.calls.append("close")
-
-        async def events(self):
-            while True:
-                item = await self._queue.get()
-                if item is None:
-                    return
-                yield item
-
-    class TrackingBackend:
-        def __init__(self) -> None:
-            self.sessions: list[TrackingSession] = []
-
-        async def open_session(self) -> TrackingSession:
-            s = TrackingSession()
-            self.sessions.append(s)
-            return s
-
-    backend = TrackingBackend()
-    stt = ManagedSTTProvider(
-        backend=backend,
-        sample_rate_hz=16000,
-        reset_deadline_s=90.0,
-    )
-
-    first_id = uuid4()
-    second_id = uuid4()
-    stream = stt.events()
-
-    try:
-        # First utterance: 100 samples
-        first_audio = np.ones(100, dtype=np.float32)
-        await stt.handle_vad_event(
-            SpeechStart(first_id, pre_roll=np.zeros(0, dtype=np.float32), chunk=first_audio)
-        )
-        await _next_state(stream, STTSessionState.STREAMING)
-        await stt.handle_vad_event(SpeechEnd(first_id))
-        await asyncio.sleep(0)  # let create_task start on_speech_end
-
-        # Second utterance: 200 samples (different length to detect mixing)
-        second_audio = np.ones(200, dtype=np.float32) * 0.5
-        await stt.handle_vad_event(
-            SpeechStart(second_id, pre_roll=np.zeros(0, dtype=np.float32), chunk=second_audio)
-        )
-        await stt.handle_vad_event(SpeechEnd(second_id))
-        await asyncio.sleep(0)  # let second create_task start
-
-        session = backend.sessions[0]
-
-        # Release both decodes
-        session._decode_delay.set()
-        await asyncio.sleep(0.05)
-
-        # First decoded buffer should contain only first utterance's audio
-        assert len(decoded_buffers) == 2
-        assert decoded_buffers[0].shape == (100,), (
-            f"First utterance audio should be 100 samples, got {decoded_buffers[0].shape}"
-        )
-        assert np.all(decoded_buffers[0] == 1.0), (
-            "First utterance audio should only contain its own samples"
-        )
-        # Second decoded buffer should contain only second utterance's audio
-        assert decoded_buffers[1].shape == (200,), (
-            f"Second utterance audio should be 200 samples, got {decoded_buffers[1].shape}"
-        )
-        assert np.all(decoded_buffers[1] == 0.5), (
-            "Second utterance audio should only contain its own samples"
-        )
-    finally:
-        await stt.close()
