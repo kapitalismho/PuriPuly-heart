@@ -55,6 +55,11 @@ from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationBlock,
     OverlayPresentationSnapshot,
 )
+from puripuly_heart.ui.desktop_window_zorder import (
+    NoopWindowZOrderPort,
+    WindowZOrderPort,
+    create_window_z_order_port,
+)
 from puripuly_heart.ui.fonts import assets_dir
 from puripuly_heart.ui.i18n import t_for_locale
 
@@ -2220,12 +2225,18 @@ class StdoutLifecycleSink:
 type FletAppRunner = Callable[[Callable[[Any], object]], Awaitable[None]]
 type OverlayEventSink = Callable[[dict[str, object]], Awaitable[None]]
 type PreviewAppRunner = Callable[[Callable[[Any], object]], object]
+type FletProcessInfoProvider = Callable[[], tuple[int, str | None] | None]
+type ScheduledCallbackTask = asyncio.Future[Any] | ConcurrentFuture[Any]
 
 
-async def _default_flet_app_runner(target: Callable[[Any], object]) -> None:
+async def _default_flet_app_runner(
+    target: Callable[[Any], object],
+    *,
+    on_process_started: Callable[[int, str | None], None] | None = None,
+) -> None:
     import flet as ft
 
-    with _patch_flet_view_hidden_launcher():
+    with _patch_flet_view_hidden_launcher(on_process_started=on_process_started):
         await ft.app_async(
             target=target,
             view=ft.AppView.FLET_APP_HIDDEN,
@@ -2234,11 +2245,28 @@ async def _default_flet_app_runner(target: Callable[[Any], object]) -> None:
 
 
 @contextlib.contextmanager
-def _patch_flet_view_hidden_launcher():
+def _patch_flet_view_hidden_launcher(
+    *,
+    on_process_started: Callable[[int, str | None], None] | None = None,
+):
     import flet_desktop
 
+    async def launch(
+        page_url: str,
+        assets_dir: str | None,
+        hidden: bool,
+    ) -> tuple[asyncio.subprocess.Process, str | None]:
+        process, pid_file = await _open_flet_view_hidden_without_startup_flash(
+            page_url,
+            assets_dir,
+            hidden,
+        )
+        if on_process_started is not None and process.pid is not None:
+            on_process_started(int(process.pid), pid_file)
+        return process, pid_file
+
     original = flet_desktop.open_flet_view_async
-    flet_desktop.open_flet_view_async = _open_flet_view_hidden_without_startup_flash
+    flet_desktop.open_flet_view_async = launch
     try:
         yield
     finally:
@@ -2298,8 +2326,39 @@ class FletDesktopRendererWindow:
         bounds_debounce_s: float = 0.15,
         startup_timeout_s: float = 5.0,
         preview_catalog: DesktopOverlayPreviewCatalog | None = None,
+        window_z_order_port: WindowZOrderPort | None = None,
+        window_process_info_provider: FletProcessInfoProvider | None = None,
     ) -> None:
-        self._app_runner = app_runner or _default_flet_app_runner
+        if (
+            app_runner is not None
+            and window_z_order_port is not None
+            and window_process_info_provider is None
+        ):
+            raise ValueError(
+                "window_process_info_provider is required with a custom app_runner "
+                "and window_z_order_port"
+            )
+        if window_z_order_port is not None:
+            self._window_z_order_port = window_z_order_port
+        elif app_runner is None and preview_catalog is None:
+            self._window_z_order_port = create_window_z_order_port()
+        else:
+            self._window_z_order_port = NoopWindowZOrderPort()
+        self._window_z_order_required = window_z_order_port is not None or (
+            app_runner is None and preview_catalog is None and os.name == "nt"
+        )
+        if app_runner is None:
+
+            async def run_default_app(target: Callable[[Any], object]) -> None:
+                await _default_flet_app_runner(
+                    target,
+                    on_process_started=self._record_flet_process,
+                )
+
+            self._app_runner = run_default_app
+        else:
+            self._app_runner = app_runner
+        self._window_process_info_provider = window_process_info_provider
         self._event_sink = event_sink
         self._locale = locale
         self._logging_mode = normalize_overlay_logging_mode(logging_mode)
@@ -2321,8 +2380,13 @@ class FletDesktopRendererWindow:
         self._closed = asyncio.Event()
         self._app_task: asyncio.Task[None] | None = None
         self._page_start_error: BaseException | None = None
+        self._flet_process_pid: int | None = None
+        self._flet_pid_file: str | None = None
+        self._interaction_mode_lock = asyncio.Lock()
+        self._interaction_generation = 0
+        self._window_z_order_task: ScheduledCallbackTask | None = None
         self._bounds_sample_task: asyncio.Task[None] | None = None
-        self._scheduled_callback_tasks: set[asyncio.Future[Any] | ConcurrentFuture[Any]] = set()
+        self._scheduled_callback_tasks: set[ScheduledCallbackTask] = set()
         self._programmatic_bounds_echo_suppression: _ProgrammaticBoundsEchoSuppression | None = None
         self._last_reported_bounds: tuple[float, float, float, float] | None = None
         self._caption_card_width_floor_by_block: dict[tuple[str, str, int], float] = {}
@@ -2424,6 +2488,9 @@ class FletDesktopRendererWindow:
 
     async def close(self) -> None:
         self._closed.set()
+        async with self._interaction_mode_lock:
+            self._interaction_generation += 1
+            await self._cancel_window_z_order_task()
         page = self._page
         if page is not None:
             page.window.on_event = None
@@ -2459,6 +2526,7 @@ class FletDesktopRendererWindow:
                 raise
             except Exception:
                 pass
+        self._window_z_order_port.close()
 
     async def dispatch_snapshot(self, snapshot: OverlayPresentationSnapshot) -> None:
         if snapshot.revision <= self._last_snapshot_revision:
@@ -2574,8 +2642,20 @@ class FletDesktopRendererWindow:
         logger.warning("[DesktopOverlay] Ignoring unsupported desktop runtime control: %r", command)
 
     def _handle_page(self, page: Any) -> None:
+        if self._closed.is_set():
+            window = page.window
+            try:
+                window.close()
+            except Exception:
+                destroy = getattr(window, "destroy", None)
+                if callable(destroy):
+                    with contextlib.suppress(Exception):
+                        destroy()
+            self._page_ready.set()
+            return
         self._page = page
         try:
+            self._bind_window_z_order_process()
             self._configure_base_window(page)
             self._render_page()
             self._page_ready.set()
@@ -2583,6 +2663,32 @@ class FletDesktopRendererWindow:
             self._page_start_error = exc
             self._page_ready.set()
             raise
+
+    def _record_flet_process(self, pid: int, pid_file: str | None) -> None:
+        if self._closed.is_set():
+            return
+        self._flet_process_pid = int(pid) if int(pid) > 0 else None
+        self._flet_pid_file = pid_file
+
+    def _bind_window_z_order_process(self) -> None:
+        provider = self._window_process_info_provider
+        if provider is not None:
+            process_info = provider()
+            if process_info is not None:
+                self._record_flet_process(*process_info)
+        pid = self._flet_process_pid
+        source = "launcher"
+        pid_file = self._flet_pid_file
+        if pid_file:
+            with contextlib.suppress(Exception):
+                recorded_pid = int(Path(pid_file).read_text(encoding="utf-8").strip())
+                if recorded_pid > 0:
+                    pid = recorded_pid
+                    source = "pid_file"
+        if pid is None:
+            return
+        self._window_z_order_port.bind_process(pid)
+        self._emit_detailed_log(f"window_process_bound source={source} pid={pid}")
 
     def _configure_base_window(self, page: Any) -> None:
         import flet as ft
@@ -2735,10 +2841,6 @@ class FletDesktopRendererWindow:
         locked = self._interaction_mode == _DESKTOP_INTERACTION_MODE_PASS_THROUGH
         window = page.window
         window.ignore_mouse_events = locked
-        # Re-assert topmost after locking to prevent fullscreen windowed games
-        # (e.g. VRChat) from stealing z-order. See: #12
-        if locked:
-            window.always_on_top = True
 
     def _reveal_window_if_supported(self) -> None:
         page = self._page
@@ -3158,17 +3260,89 @@ class FletDesktopRendererWindow:
         await self._set_interaction_mode(_DESKTOP_INTERACTION_MODE_EDIT, emit_event=True)
 
     async def _set_interaction_mode(self, mode: str, *, emit_event: bool) -> None:
-        if mode not in _DESKTOP_INTERACTION_MODES:
+        async with self._interaction_mode_lock:
+            if self._closed.is_set():
+                return
+            if mode not in _DESKTOP_INTERACTION_MODES:
+                return
+            if mode == self._interaction_mode:
+                return
+            previous_mode = self._interaction_mode
+            self._interaction_mode = mode
+            self._interaction_generation += 1
+            generation = self._interaction_generation
+            await self._cancel_window_z_order_task()
+            if self._closed.is_set():
+                return
+            self._emit_detailed_log(f"interaction_mode {previous_mode}->{mode}")
+            self._apply_interaction_window_chrome()
+            self._render_page()
+            if mode == _DESKTOP_INTERACTION_MODE_PASS_THROUGH:
+
+                async def reassert_window_z_order() -> None:
+                    await self._reassert_window_z_order(generation)
+
+                task = self._run_page_task(reassert_window_z_order)
+                self._window_z_order_task = task
+                if task is not None:
+                    task.add_done_callback(self._clear_window_z_order_task)
+            if emit_event:
+                await self._emit_overlay_event({"event": "interaction_mode_changed", "mode": mode})
+
+    async def _reassert_window_z_order(self, generation: int) -> None:
+        try:
+            result = await self._window_z_order_port.reassert_topmost_after_click_through()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if not self._window_z_order_result_is_current(generation):
+                return
+            self._emit_detailed_log(
+                f"topmost_reassert reason=port_error exception_type={type(exc).__name__}"
+            )
+            if self._window_z_order_required:
+                logger.warning(
+                    "[DesktopOverlay] Topmost z-order re-assertion failed: "
+                    "reason=port_error exception_type=%s",
+                    type(exc).__name__,
+                )
+        else:
+            if not self._window_z_order_result_is_current(generation):
+                return
+            self._emit_detailed_log(
+                "topmost_reassert "
+                f"reason={result.reason} applied={result.applied} "
+                f"click_through_confirmed={result.click_through_confirmed} "
+                f"topmost_style_present={result.topmost_style_present} "
+                f"win32_error={result.win32_error}"
+            )
+            if self._window_z_order_required and not result.applied:
+                logger.warning(
+                    "[DesktopOverlay] Topmost z-order re-assertion failed: "
+                    "reason=%s win32_error=%s",
+                    result.reason,
+                    result.win32_error,
+                )
+
+    def _window_z_order_result_is_current(self, generation: int) -> bool:
+        return (
+            not self._closed.is_set()
+            and self._interaction_mode == _DESKTOP_INTERACTION_MODE_PASS_THROUGH
+            and self._interaction_generation == generation
+        )
+
+    def _clear_window_z_order_task(self, task: object) -> None:
+        if self._window_z_order_task is task:
+            self._window_z_order_task = None
+
+    async def _cancel_window_z_order_task(self) -> None:
+        task = self._window_z_order_task
+        self._window_z_order_task = None
+        if task is None or task.done():
             return
-        if mode == self._interaction_mode:
-            return
-        previous_mode = self._interaction_mode
-        self._interaction_mode = mode
-        self._emit_detailed_log(f"interaction_mode {previous_mode}->{mode}")
-        self._apply_interaction_window_chrome()
-        self._render_page()
-        if emit_event:
-            await self._emit_overlay_event({"event": "interaction_mode_changed", "mode": mode})
+        task.cancel()
+        awaitable = task if isinstance(task, asyncio.Future) else asyncio.wrap_future(task)
+        await asyncio.gather(awaitable, return_exceptions=True)
 
     def _apply_window_bounds(self, bounds: dict[str, int | float]) -> None:
         page = self._page
@@ -3283,16 +3457,19 @@ class FletDesktopRendererWindow:
             }
         )
 
-    def _run_page_task(self, func: Callable[[], Awaitable[None]]) -> None:
+    def _run_page_task(self, func: Callable[[], Awaitable[None]]) -> ScheduledCallbackTask | None:
         if self._closed.is_set():
-            return
+            return None
         page = self._page
         if page is not None:
             run_task = getattr(page, "run_task", None)
             if callable(run_task):
-                self._track_scheduled_callback_task(run_task(func))
-                return
-        self._track_scheduled_callback_task(asyncio.create_task(func()))
+                task = run_task(func)
+                self._track_scheduled_callback_task(task)
+                return task if isinstance(task, (asyncio.Future, ConcurrentFuture)) else None
+        task = asyncio.create_task(func())
+        self._track_scheduled_callback_task(task)
+        return task
 
     async def _emit_overlay_event(self, payload: dict[str, object]) -> None:
         if self._closed.is_set():

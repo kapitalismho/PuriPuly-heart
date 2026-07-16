@@ -23,7 +23,7 @@ from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationCalibration,
     OverlayPresentationSnapshot,
 )
-from puripuly_heart.ui import desktop_overlay
+from puripuly_heart.ui import desktop_overlay, desktop_window_zorder
 from puripuly_heart.ui.fonts import assets_dir
 
 
@@ -1165,6 +1165,43 @@ class RecordingLifecycleSink:
         self.events.append(dict(event))
 
 
+class RecordingWindowZOrderPort:
+    def __init__(
+        self,
+        *,
+        on_reassert: Any | None = None,
+        result: desktop_window_zorder.WindowZOrderResult | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.on_reassert = on_reassert
+        self.result = result or desktop_window_zorder.WindowZOrderResult(
+            applied=True,
+            reason="applied",
+            click_through_confirmed=True,
+            topmost_style_present=True,
+        )
+        self.error = error
+        self.bound_pids: list[int] = []
+        self.reassert_calls = 0
+        self.close_calls = 0
+
+    def bind_process(self, pid: int) -> None:
+        self.bound_pids.append(pid)
+
+    async def reassert_topmost_after_click_through(
+        self,
+    ) -> desktop_window_zorder.WindowZOrderResult:
+        self.reassert_calls += 1
+        if self.on_reassert is not None:
+            self.on_reassert()
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+    def close(self) -> None:
+        self.close_calls += 1
+
+
 class RecordingWebSocket:
     def __init__(self) -> None:
         self.sent_messages: list[dict[str, object]] = []
@@ -1276,6 +1313,7 @@ class FakeFletPage:
         )
 
     def run_task(self, func: Any, *args: object, **kwargs: object) -> asyncio.Task[object]:
+        assert asyncio.iscoroutinefunction(func)
         self.run_task_calls += 1
         result = func(*args, **kwargs)
         if inspect.isawaitable(result):
@@ -2039,7 +2077,6 @@ async def test_desktop_overlay_preview_post_start_updates_retain_caption_surface
         await window.dispatch_runtime_control(
             {"command": "set_interaction_mode", "mode": "pass_through"}
         )
-        protected_writes = len(app.page.window.protected_writes)
         window._on_preview_keyboard_event(type("PreviewKeyEvent", (), {"key": "e"})())
         await asyncio.gather(*app.page.tasks)
 
@@ -2152,6 +2189,67 @@ async def test_default_flet_app_runner_starts_hidden_to_prevent_startup_flash(
 
 
 @pytest.mark.asyncio
+async def test_flet_launcher_patch_reports_started_process_pid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import flet_desktop
+
+    started_processes: list[tuple[int, str | None]] = []
+    fake_process = type("FakeProcess", (), {"pid": 4321})()
+
+    async def fake_hidden_launcher(
+        page_url: str,
+        assets_dir: str | None,
+        hidden: bool,
+    ) -> tuple[object, str]:
+        assert (page_url, assets_dir, hidden) == ("flet://desktop-overlay", "assets", True)
+        return fake_process, "pid-file"
+
+    monkeypatch.setattr(
+        desktop_overlay,
+        "_open_flet_view_hidden_without_startup_flash",
+        fake_hidden_launcher,
+    )
+
+    with desktop_overlay._patch_flet_view_hidden_launcher(
+        on_process_started=lambda pid, pid_file: started_processes.append((pid, pid_file))
+    ):
+        process, pid_file = await flet_desktop.open_flet_view_async(
+            "flet://desktop-overlay",
+            "assets",
+            True,
+        )
+
+    assert process is fake_process
+    assert pid_file == "pid-file"
+    assert started_processes == [(4321, "pid-file")]
+
+
+def test_desktop_overlay_prefers_flet_pid_file_for_window_binding(tmp_path: Path) -> None:
+    pid_file = tmp_path / "flet.pid"
+    pid_file.write_text("5678", encoding="utf-8")
+    port = RecordingWindowZOrderPort()
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=FakeFletApp().run,
+        window_z_order_port=port,
+        window_process_info_provider=lambda: None,
+    )
+
+    window._record_flet_process(4321, str(pid_file))
+    window._bind_window_z_order_process()
+
+    assert port.bound_pids == [5678]
+
+
+def test_desktop_overlay_requires_process_provider_for_custom_runner_and_zorder() -> None:
+    with pytest.raises(ValueError, match="window_process_info_provider"):
+        desktop_overlay.FletDesktopRendererWindow(
+            app_runner=FakeFletApp().run,
+            window_z_order_port=RecordingWindowZOrderPort(),
+        )
+
+
+@pytest.mark.asyncio
 async def test_hidden_flet_view_launcher_uses_windows_startup_hide_before_flet_env_hide(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2249,6 +2347,196 @@ async def test_desktop_overlay_reveals_first_window_update_after_chrome_bounds_a
         }
     finally:
         await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_reasserts_topmost_after_locked_render_update() -> None:
+    app = FakeFletApp()
+    observations: list[tuple[bool | None, int, dict[str, object]]] = []
+    port = RecordingWindowZOrderPort(
+        on_reassert=lambda: observations.append(
+            (
+                app.page.window.ignore_mouse_events,
+                app.page.update_calls,
+                dict(app.page.render_snapshots[-1]),
+            )
+        )
+    )
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+
+    try:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+        updates_before_lock = app.page.update_calls
+
+        await window.dispatch_runtime_control(
+            {"command": "set_interaction_mode", "mode": "pass_through"}
+        )
+        z_order_task = window._window_z_order_task
+        if z_order_task is not None:
+            await z_order_task
+        await window.dispatch_runtime_control(
+            {"command": "set_interaction_mode", "mode": "pass_through"}
+        )
+        await window.dispatch_runtime_control({"command": "set_interaction_mode", "mode": "edit"})
+
+        assert observations == [
+            (
+                True,
+                updates_before_lock + 1,
+                {
+                    "ignore_mouse_events": True,
+                    "texts": set(),
+                    "has_drag_area": True,
+                    "card_count": 0,
+                },
+            )
+        ]
+        assert port.reassert_calls == 1
+    finally:
+        await window.close()
+
+    assert port.close_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_keeps_locked_state_when_zorder_port_fails(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    app = FakeFletApp()
+    sink = RecordingLifecycleSink()
+    port = RecordingWindowZOrderPort(error=RuntimeError("z-order failed"))
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=sink.emit,
+        locale="en",
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+
+    try:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+
+        with caplog.at_level(logging.WARNING):
+            await window.dispatch_runtime_control(
+                {"command": "set_interaction_mode", "mode": "pass_through"}
+            )
+            z_order_task = window._window_z_order_task
+            if z_order_task is not None:
+                await z_order_task
+
+        assert app.page.window.ignore_mouse_events is True
+        assert sink.events[-1] == {
+            "type": "overlay_event",
+            "payload": {"event": "interaction_mode_changed", "mode": "pass_through"},
+        }
+        assert "reason=port_error exception_type=RuntimeError" in caplog.text
+    finally:
+        await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_cancels_stale_zorder_before_edit_event() -> None:
+    class BlockingWindowZOrderPort(RecordingWindowZOrderPort):
+        def __init__(self) -> None:
+            super().__init__()
+            self.started = asyncio.Event()
+            self.cancelled = asyncio.Event()
+
+        async def reassert_topmost_after_click_through(
+            self,
+        ) -> desktop_window_zorder.WindowZOrderResult:
+            self.reassert_calls += 1
+            self.started.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                self.cancelled.set()
+                raise
+
+    app = FakeFletApp()
+    sink = RecordingLifecycleSink()
+    port = BlockingWindowZOrderPort()
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=sink.emit,
+        locale="en",
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+
+    try:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+        await window.dispatch_runtime_control(
+            {"command": "set_interaction_mode", "mode": "pass_through"}
+        )
+        await port.started.wait()
+        await window.dispatch_runtime_control({"command": "set_interaction_mode", "mode": "edit"})
+
+        assert port.cancelled.is_set()
+        assert window._window_z_order_task is None
+        assert app.page.window.ignore_mouse_events is False
+        assert [event["payload"]["mode"] for event in sink.events] == [
+            "pass_through",
+            "edit",
+        ]
+    finally:
+        await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_rejects_late_page_after_close() -> None:
+    app = FakeFletApp()
+    port = RecordingWindowZOrderPort()
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+
+    await window.close()
+    window._handle_page(app.page)
+
+    assert window._page is None
+    assert app.page.window.close_calls == 1
+    assert port.bound_pids == []
+    assert port.close_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_drops_mode_transition_queued_before_close() -> None:
+    app = FakeFletApp()
+    sink = RecordingLifecycleSink()
+    port = RecordingWindowZOrderPort()
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=sink.emit,
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+    await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+    updates_before_close = app.page.update_calls
+
+    await window._interaction_mode_lock.acquire()
+    transition_task = asyncio.create_task(
+        window.dispatch_runtime_control({"command": "set_interaction_mode", "mode": "pass_through"})
+    )
+    await asyncio.sleep(0)
+    close_task = asyncio.create_task(window.close())
+    await asyncio.sleep(0)
+    window._interaction_mode_lock.release()
+    await asyncio.gather(transition_task, close_task)
+
+    assert app.page.update_calls == updates_before_close
+    assert sink.events == []
+    assert window._window_z_order_task is None
+    assert port.reassert_calls == 0
+    assert port.close_calls == 1
 
 
 @pytest.mark.asyncio
@@ -3156,7 +3444,6 @@ async def test_desktop_overlay_post_start_paths_update_retained_controls_in_plac
 
         assert app.page.window.ignore_mouse_events is True
         assert model.caption_surface.visible is False
-        protected_writes = len(app.page.window.protected_writes)
         await window.dispatch_runtime_control({"command": "set_interaction_mode", "mode": "edit"})
         assert app.page.window.ignore_mouse_events is False
         assert identities == (
