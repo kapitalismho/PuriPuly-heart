@@ -996,6 +996,15 @@
       "rationale": "These modules expose internal core contracts for lifecycle, diagnostics, safe error/message shaping, telemetry ports/services, and OpenRouter metadata. They are not external public compatibility facades."
     },
     {
+      "surface": "Local STT download port and Hugging Face Xet adapter modules",
+      "classification": "internal_local_stt_download_boundary",
+      "modules": [
+        "puripuly_heart.core.local_stt_download_port",
+        "puripuly_heart.core.local_stt_huggingface_xet_adapter"
+      ],
+      "rationale": "These modules define the internal Local STT download port and its subprocess-backed Hugging Face Xet adapter. Their explicit exports are stable production wiring contracts, but they are not external package compatibility facades."
+    },
+    {
       "surface": "provider LLM internal error-detail helpers",
       "classification": "internal_provider_implementation_modules",
       "modules": [
