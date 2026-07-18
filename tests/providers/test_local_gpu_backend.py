@@ -11,6 +11,7 @@ from puripuly_heart.app.ports.gpu_worker import (
     GpuWorkerDevice,
     GpuWorkerTranscription,
 )
+from puripuly_heart.core.runtime.gpu_asr import GpuASRDecodeDropped
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 
 pytestmark = pytest.mark.asyncio
@@ -24,6 +25,7 @@ class FakeSharedGpuRuntime:
         self.deactivations: list[str] = []
         self.deactivation_failures = 0
         self.detected_language: str | None = "en"
+        self.submit_failures: list[BaseException] = []
 
     async def activate_channel(
         self,
@@ -58,6 +60,8 @@ class FakeSharedGpuRuntime:
         language_hint: str | None = None,
     ) -> GpuWorkerTranscription:
         self.submissions.append((channel, samples_f32.copy(), speech_end_at, language_hint))
+        if self.submit_failures:
+            raise self.submit_failures.pop(0)
         return GpuWorkerTranscription(
             text="hello",
             detected_language=self.detected_language,
@@ -89,7 +93,14 @@ async def test_backend_is_lazy_and_deactivates_only_its_channel(tmp_path: Path) 
     session = await backend.open_session()
     assert runtime.activations == [("self", tmp_path / "model.gguf", "gpu-model", "vk:0")]
 
+    second_session = await backend.open_session()
+    assert runtime.activations == [
+        ("self", tmp_path / "model.gguf", "gpu-model", "vk:0"),
+        ("self", tmp_path / "model.gguf", "gpu-model", "vk:0"),
+    ]
+
     await session.close()
+    await second_session.close()
     assert runtime.deactivations == []
     await backend.close()
     assert runtime.deactivations == ["self"]
@@ -140,6 +151,37 @@ async def test_session_submits_float_audio_at_speech_end_without_blocking() -> N
     assert speech_end_at == 12.5
     assert language_hint is None
 
+    await session.close()
+    await backend.close()
+
+
+async def test_decode_drop_emits_empty_final_and_keeps_session_for_new_utterance() -> None:
+    runtime = FakeSharedGpuRuntime()
+    runtime.submit_failures.append(GpuASRDecodeDropped("decode_failure"))
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="peer",
+        model_path=Path("model.gguf"),
+        model_id="gpu-model",
+        device_id="auto",
+    )
+    session = await backend.open_session()
+    events = session.events()
+
+    await session.send_audio_f32(np.zeros(120_000, dtype=np.float32))
+    await session.on_speech_end()
+    dropped = await asyncio.wait_for(anext(events), timeout=0.5)
+    await session.send_audio_f32(np.ones(1600, dtype=np.float32))
+    await session.on_speech_end()
+    recovered = await asyncio.wait_for(anext(events), timeout=0.5)
+
+    assert dropped.text == ""
+    assert dropped.is_final is True
+    assert recovered.text == "hello"
+    assert recovered.is_final is True
+    assert len(runtime.submissions) == 2
+    assert runtime.submissions[0][1].size == 120_000
+    assert runtime.submissions[1][1].size == 1600
     await session.close()
     await backend.close()
 

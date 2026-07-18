@@ -9,7 +9,11 @@ from pathlib import Path
 import numpy as np
 
 from puripuly_heart.core.audio.format import pcm16le_bytes_to_float32
-from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel, SharedGpuASRRuntime
+from puripuly_heart.core.runtime.gpu_asr import (
+    GpuASRChannel,
+    GpuASRDecodeDropped,
+    SharedGpuASRRuntime,
+)
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.stt.backend import STTBackend, STTBackendSession, STTBackendTranscriptEvent
 from puripuly_heart.domain.models import FinalLanguageRun
@@ -39,14 +43,13 @@ class LocalGpuSTTBackend(STTBackend):
         async with self._lock:
             if self._closed:
                 raise RuntimeError("Local GPU STT backend is closed")
-            if not self._active:
-                await self.runtime.activate_channel(
-                    self.channel,
-                    model_path=self.model_path,
-                    model_id=self.model_id,
-                    device_id=self.device_id,
-                )
-                self._active = True
+            await self.runtime.activate_channel(
+                self.channel,
+                model_path=self.model_path,
+                model_id=self.model_id,
+                device_id=self.device_id,
+            )
+            self._active = True
         return _LocalGpuSTTSession(backend=self)
 
     async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None:
@@ -113,6 +116,9 @@ class _LocalGpuSTTSession(STTBackendSession):
             )
         except asyncio.CancelledError:
             raise
+        except GpuASRDecodeDropped:
+            await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
+            return
         except BaseException as exc:
             await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
             await self._events.put(exc)

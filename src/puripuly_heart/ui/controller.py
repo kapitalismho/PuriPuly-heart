@@ -1664,6 +1664,17 @@ class GuiController:
                 f"failure_code={failure_code}{suffix}",
                 level=logging.ERROR,
             )
+        elif diagnostic.kind == "worker_recovery_started":
+            failure_code = str(diagnostic.fields.get("failure") or "decode_failure")
+            self.log_basic(
+                "[LocalASR][Worker] backend=Vulkan outcome=restarting "
+                f"failure_code={failure_code} utterance_retry=false",
+                level=logging.WARNING,
+            )
+        elif diagnostic.kind == "worker_recovery_ready":
+            self.log_basic(
+                "[LocalASR][Worker] backend=Vulkan outcome=recovered " "utterance_retry=false"
+            )
         elif diagnostic.kind == "decode_attempt":
             audio_seconds = diagnostic.fields.get("audio_seconds")
             decode_seconds = diagnostic.fields.get("decode_seconds")

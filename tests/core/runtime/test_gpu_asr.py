@@ -20,6 +20,7 @@ from puripuly_heart.app.ports.gpu_worker import (
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.runtime.gpu_asr import (
     GpuASRChannel,
+    GpuASRDecodeDropped,
     GpuASRManualRetryRequired,
     GpuASRRuntimeError,
     GpuASRRuntimeState,
@@ -752,16 +753,17 @@ async def test_started_native_failure_retains_worker_decode_only_timing() -> Non
         attempt_started=True,
     )
     diagnostics = []
+    recovered = FakeGpuWorkerClient()
     runtime = SharedGpuASRRuntime(
         process_factory=FakeGpuWorkerFactory(
-            [FakeGpuWorkerClient(transcribe_error=native_failure)]
+            [FakeGpuWorkerClient(transcribe_error=native_failure), recovered]
         ),
         clock=FakeClock(_now=10.0),
         diagnostic_sink=diagnostics.append,
     )
     await _activate(runtime)
 
-    with pytest.raises(GpuWorkerRequestError, match="decode_failure"):
+    with pytest.raises(GpuASRDecodeDropped, match="decode_failure"):
         await runtime.submit(
             "self",
             np.zeros(1600, dtype=np.float32),
@@ -779,7 +781,192 @@ async def test_started_native_failure_retains_worker_decode_only_timing() -> Non
         "decode_seconds": 0.04,
         "rtf": 0.4,
     }
+    await asyncio.wait_for(recovered.activation_started.wait(), timeout=0.5)
     await runtime.close()
+
+
+async def test_decode_failure_restarts_once_without_replaying_failed_utterance() -> None:
+    native_failure = GpuWorkerRequestError(
+        "decode_failure",
+        {
+            "audio_seconds": 7.5,
+            "decode_seconds": 2.9,
+            "rtf": 0.386,
+        },
+        attempt_started=True,
+    )
+    activation_gate = asyncio.Event()
+    failed = FakeGpuWorkerClient(transcribe_error=native_failure)
+    recovered = FakeGpuWorkerClient(activation_gate=activation_gate)
+    factory = FakeGpuWorkerFactory([failed, recovered])
+    diagnostics = []
+    runtime = SharedGpuASRRuntime(
+        process_factory=factory,
+        clock=FakeClock(_now=10.0),
+        diagnostic_sink=diagnostics.append,
+    )
+    await _activate(runtime, "peer")
+
+    with pytest.raises(GpuASRDecodeDropped, match="decode_failure"):
+        await runtime.submit(
+            "peer",
+            np.zeros(120_000, dtype=np.float32),
+            speech_end_at=10.0,
+        )
+
+    await asyncio.wait_for(recovered.activation_started.wait(), timeout=0.5)
+    next_utterance = asyncio.create_task(
+        runtime.submit(
+            "peer",
+            np.ones(1600, dtype=np.float32),
+            speech_end_at=10.0,
+        )
+    )
+    await asyncio.sleep(0)
+    assert len(failed.transcribe_calls) == 1
+    assert recovered.transcribe_calls == []
+    assert runtime.pending_count == 1
+
+    activation_gate.set()
+    result = await asyncio.wait_for(next_utterance, timeout=0.5)
+
+    assert result.text == "peer-1"
+    assert len(failed.transcribe_calls) == 1
+    assert len(recovered.transcribe_calls) == 1
+    assert failed.transcribe_calls[0][0] != recovered.transcribe_calls[0][0]
+    assert factory.modes == ["persistent", "persistent"]
+    assert [item.kind for item in diagnostics].count("worker_recovery_started") == 1
+    assert [item.kind for item in diagnostics].count("worker_recovery_ready") == 1
+    recovery = next(item for item in diagnostics if item.kind == "worker_recovery_started")
+    assert recovery.fields["utterance_retry"] is False
+    await runtime.close()
+
+
+async def test_second_decode_failure_before_success_requires_manual_retry() -> None:
+    failure = GpuWorkerRequestError("decode_failure", attempt_started=True)
+    first = FakeGpuWorkerClient(transcribe_error=failure)
+    second = FakeGpuWorkerClient(transcribe_error=failure)
+    factory = FakeGpuWorkerFactory([first, second])
+    runtime = SharedGpuASRRuntime(
+        process_factory=factory,
+        clock=FakeClock(_now=10.0),
+    )
+    await _activate(runtime)
+
+    with pytest.raises(GpuASRDecodeDropped):
+        await runtime.submit(
+            "self",
+            np.zeros(1600, dtype=np.float32),
+            speech_end_at=10.0,
+        )
+    await asyncio.wait_for(second.activation_started.wait(), timeout=0.5)
+    while runtime.state != GpuASRRuntimeState.READY:
+        await asyncio.sleep(0)
+
+    with pytest.raises(GpuWorkerRequestError, match="decode_failure"):
+        await runtime.submit(
+            "self",
+            np.ones(1600, dtype=np.float32),
+            speech_end_at=10.0,
+        )
+
+    assert runtime.state == GpuASRRuntimeState.FAILED
+    assert factory.modes == ["persistent", "persistent"]
+    with pytest.raises(GpuASRManualRetryRequired, match="decode_failure"):
+        await _activate(runtime)
+    await runtime.close()
+
+
+async def test_started_out_of_memory_failure_does_not_auto_restart() -> None:
+    failure = GpuWorkerRequestError("out_of_memory", attempt_started=True)
+    factory = FakeGpuWorkerFactory(
+        [FakeGpuWorkerClient(transcribe_error=failure), FakeGpuWorkerClient()]
+    )
+    runtime = SharedGpuASRRuntime(
+        process_factory=factory,
+        clock=FakeClock(_now=10.0),
+    )
+    await _activate(runtime)
+
+    with pytest.raises(GpuWorkerRequestError, match="out_of_memory"):
+        await runtime.submit(
+            "self",
+            np.zeros(1600, dtype=np.float32),
+            speech_end_at=10.0,
+        )
+
+    assert runtime.state == GpuASRRuntimeState.FAILED
+    assert factory.modes == ["persistent"]
+    await runtime.close()
+
+
+async def test_recovery_activation_failure_discards_new_pending_work() -> None:
+    decode_failure = GpuWorkerRequestError("decode_failure", attempt_started=True)
+    activation_gate = asyncio.Event()
+    failed = FakeGpuWorkerClient(transcribe_error=decode_failure)
+    replacement = FakeGpuWorkerClient(
+        activation_gate=activation_gate,
+        activation_error=GpuWorkerRequestError("out_of_memory"),
+    )
+    diagnostics = []
+    runtime = SharedGpuASRRuntime(
+        process_factory=FakeGpuWorkerFactory([failed, replacement]),
+        clock=FakeClock(_now=10.0),
+        diagnostic_sink=diagnostics.append,
+    )
+    await _activate(runtime)
+
+    with pytest.raises(GpuASRDecodeDropped):
+        await runtime.submit(
+            "self",
+            np.zeros(1600, dtype=np.float32),
+            speech_end_at=10.0,
+        )
+    await asyncio.wait_for(replacement.activation_started.wait(), timeout=0.5)
+    pending = asyncio.create_task(
+        runtime.submit(
+            "self",
+            np.ones(1600, dtype=np.float32),
+            speech_end_at=10.0,
+        )
+    )
+    await asyncio.sleep(0)
+    activation_gate.set()
+
+    with pytest.raises(GpuASRWorkDiscarded, match="worker_recovery_failed"):
+        await asyncio.wait_for(pending, timeout=0.5)
+    assert runtime.state == GpuASRRuntimeState.FAILED
+    assert runtime.last_failure_code == "out_of_memory"
+    terminal = [item for item in diagnostics if item.kind == "worker_failed"]
+    assert terminal[-1].fields["failure"] == "out_of_memory"
+    assert terminal[-1].fields["retry"] == "manual"
+    await runtime.close()
+
+
+async def test_close_cancels_and_awaits_decode_recovery_activation() -> None:
+    decode_failure = GpuWorkerRequestError("decode_failure", attempt_started=True)
+    activation_gate = asyncio.Event()
+    failed = FakeGpuWorkerClient(transcribe_error=decode_failure)
+    replacement = FakeGpuWorkerClient(activation_gate=activation_gate)
+    runtime = SharedGpuASRRuntime(
+        process_factory=FakeGpuWorkerFactory([failed, replacement]),
+        clock=FakeClock(_now=10.0),
+    )
+    await _activate(runtime)
+
+    with pytest.raises(GpuASRDecodeDropped):
+        await runtime.submit(
+            "self",
+            np.zeros(1600, dtype=np.float32),
+            speech_end_at=10.0,
+        )
+    await asyncio.wait_for(replacement.activation_started.wait(), timeout=0.5)
+
+    await asyncio.wait_for(runtime.close(), timeout=0.5)
+
+    assert runtime.state == GpuASRRuntimeState.CLOSED
+    assert failed.close_calls >= 1
+    assert replacement.close_calls >= 1
 
 
 async def test_gpu_failure_requires_manual_retry_and_never_starts_fallback() -> None:

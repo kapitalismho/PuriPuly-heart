@@ -265,3 +265,36 @@ async def test_gpu_decode_attempt_logs_rtf_in_basic_mode(
             logging.INFO,
         )
     ]
+
+
+@pytest.mark.asyncio
+async def test_gpu_worker_recovery_logs_restart_without_utterance_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller, basic, detailed = _controller_with_logs(monkeypatch)
+
+    await controller._on_gpu_asr_diagnostic(
+        GpuASRDiagnostic(
+            kind="worker_recovery_started",
+            fields={"failure": "decode_failure", "utterance_retry": False},
+        )
+    )
+    await controller._on_gpu_asr_diagnostic(
+        GpuASRDiagnostic(
+            kind="worker_recovery_ready",
+            fields={"utterance_retry": False},
+        )
+    )
+
+    assert len(detailed) == 2
+    assert basic == [
+        (
+            "[LocalASR][Worker] backend=Vulkan outcome=restarting "
+            "failure_code=decode_failure utterance_retry=false",
+            logging.WARNING,
+        ),
+        (
+            "[LocalASR][Worker] backend=Vulkan outcome=recovered utterance_retry=false",
+            logging.INFO,
+        ),
+    ]
