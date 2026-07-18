@@ -1490,6 +1490,7 @@ async def test_peer_overlay_translation_denies_chatbox_and_cleans_bookkeeping() 
             ),
         )
     )
+    await hub.peer_final_runs.wait_for_idle()
     results = await asyncio.gather(
         *hub.peer_runtime.translation_tasks.values(),
         return_exceptions=True,
@@ -1878,6 +1879,7 @@ async def test_peer_translation_disabled_finalizes_source_only_turn() -> None:
             ),
         )
     )
+    await hub.peer_final_runs.wait_for_idle()
 
     assert [event.type for event in sink.events] == [
         "peer_transcript_final",
@@ -2504,6 +2506,7 @@ async def test_peer_translation_cancellation_closes_line_as_incomplete() -> None
     await asyncio.wait_for(llm.started.wait(), timeout=0.5)
     assert ("peer", utterance_id) in hub._latency_timelines
     await hub.peer_runtime.reset_runtime_state()
+    await hub.peer_final_runs.wait_for_idle()
 
     assert [event.type for event in sink.events] == [
         "peer_transcript_final",
@@ -2534,6 +2537,7 @@ async def test_peer_translation_cancellation_hard_denies_active_peer_chatbox_wit
     utterance_id = await hub.handle_peer_transcript_final_for_test(text="secret cancel line")
     await asyncio.wait_for(llm.started.wait(), timeout=0.5)
     await hub.peer_runtime.reset_runtime_state()
+    await hub.peer_final_runs.wait_for_idle()
     events = [hub.ui_events.get_nowait() for _ in range(hub.ui_events.qsize())]
 
     assert osc.messages == []

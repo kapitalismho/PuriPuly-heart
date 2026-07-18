@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping
 from typing import Protocol
 from uuid import UUID
 
+from puripuly_heart.core.overlay.sink import OverlayEventUnion
 from puripuly_heart.domain.models import ChannelId, OSCMessage, Transcript
 
 
@@ -25,14 +26,15 @@ class HubRuntimeLoggingPort(Protocol):
 
 class HubChatboxPort(Protocol):
     def enqueue(self, message: OSCMessage) -> None: ...
+    def send_immediate(self, text: str) -> bool: ...
     def send_typing(self, is_typing: bool) -> None: ...
     def set_typing_reason(self, reason: str, active: bool) -> None: ...
+    def clear_typing_reasons(self) -> None: ...
     def process_due(self) -> None: ...
-    def send_immediate(self, text: str) -> bool: ...
 
 
 class HubOverlaySinkPort(Protocol):
-    async def emit(self, event: object) -> None: ...
+    async def emit(self, event: OverlayEventUnion) -> None: ...
     def active_self_overlay_metadata(self) -> object | None: ...
 
 
@@ -43,7 +45,7 @@ class HubOverlayEventFactoryPort(Protocol):
         *,
         source_language: str,
         target_language: str,
-    ) -> object: ...
+    ) -> OverlayEventUnion: ...
 
     def translation_final(
         self,
@@ -62,7 +64,7 @@ class HubOverlayEventFactoryPort(Protocol):
         source_text_hash: str | None = ...,
         source_text_len: int | None = ...,
         logical_turn_key: str | None = ...,
-    ) -> object: ...
+    ) -> OverlayEventUnion: ...
 
     def utterance_closed(
         self,
@@ -70,7 +72,7 @@ class HubOverlayEventFactoryPort(Protocol):
         utterance_id: UUID,
         channel: ChannelId,
         is_final: bool,
-    ) -> object: ...
+    ) -> OverlayEventUnion: ...
 
     def self_active_update(
         self,
@@ -88,7 +90,7 @@ class HubOverlayEventFactoryPort(Protocol):
         source_text_hash: str | None = ...,
         source_text_len: int | None = ...,
         logical_turn_key: str | None = ...,
-    ) -> object: ...
+    ) -> OverlayEventUnion: ...
 
 
 def runtime_logging_mode_is_detailed(mode: object) -> bool:

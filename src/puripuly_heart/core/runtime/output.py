@@ -45,8 +45,10 @@ SELF_SPEECH_TYPING_REASON = "self_speech_pending"
 
 class ChatboxQueue(Protocol):
     def enqueue(self, message: OSCMessage) -> None: ...
+    def send_immediate(self, text: str) -> bool: ...
     def send_typing(self, is_typing: bool) -> None: ...
     def set_typing_reason(self, reason: str, active: bool) -> None: ...
+    def clear_typing_reasons(self) -> None: ...
     def process_due(self) -> None: ...
 
 
@@ -68,10 +70,12 @@ class OutputRuntime:
     overlay_event_adapter: OverlayEventAdapter | None = None
     flush_interval_s: float = 0.1
     dedupe_capacity: int = 4096
+    diagnostics_capacity: int = 4096
     _state: OutputRuntimeState = "open"
     _chatbox_flush_task: asyncio.Task[None] | None = None
     _ui_event_bridge: UIEventBridgeAdapter | None = None
     _ui_event_bridge_task: asyncio.Task[Any] | None = None
+    _chatbox_typing_reasons_cleared: bool = False
     _chatbox_backlog_dropped: bool = False
     _completed_task_failures: dict[asyncio.Task[Any], Exception] = field(default_factory=dict)
     _tasks_being_collected: set[asyncio.Task[Any]] = field(default_factory=set)
@@ -79,10 +83,11 @@ class OutputRuntime:
     _delivered_publications: set[tuple[OutputRoute, str]] = field(default_factory=set)
     _delivered_publication_order: deque[tuple[OutputRoute, str]] = field(default_factory=deque)
     _publications_in_flight: set[tuple[OutputRoute, str]] = field(default_factory=set)
-    _routing_decisions: list[OutputRoutingDecision] = field(default_factory=list)
+    _routing_decisions: deque[OutputRoutingDecision] = field(init=False)
 
     resource_fields = (
         "_chatbox_flush_task",
+        "ChatboxPaginator._typing_reasons",
         "ChatboxPaginator._pending_pages",
         "ChatboxPaginator._pending_messages",
         "overlay_event_adapter",
@@ -94,6 +99,9 @@ class OutputRuntime:
     def __post_init__(self) -> None:
         if self.dedupe_capacity < 1:
             raise ValueError("dedupe_capacity must be positive")
+        if self.diagnostics_capacity < 1:
+            raise ValueError("diagnostics_capacity must be positive")
+        self._routing_decisions = deque(maxlen=self.diagnostics_capacity)
         if self.overlay_event_adapter is None:
             self.overlay_event_adapter = OverlayEventAdapter(clock=self.clock)
 
@@ -112,6 +120,7 @@ class OutputRuntime:
             or self._ui_event_bridge_task is not None
             or self._ui_event_bridge is not None
             or bool(self._active_delivery_tasks)
+            or not self._chatbox_typing_reasons_cleared
             or not self._chatbox_backlog_dropped
             or bool(self._completed_task_failures)
         )
@@ -132,12 +141,21 @@ class OutputRuntime:
     def has_overlay_destination(self) -> bool:
         return self.overlay_sink is not None
 
+    @staticmethod
+    def chatbox_is_eligible(channel: ChannelId) -> bool:
+        return channel == "self"
+
+    @staticmethod
+    def chatbox_is_denied(channel: ChannelId) -> bool:
+        return channel == "peer"
+
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
             "owner": "OutputRuntime",
             "resource_fields": self.resource_fields,
             "stop_ingress": "stop accepting output publications",
             "shutdown_policy": (
+                "chatbox: clear typing reasons on close; "
                 "chatbox: drop pending pages/messages on close; "
                 "overlay: cancel active delivery tasks; "
                 "UI bridge: cancel task and close conversation adapter; "
@@ -185,6 +203,7 @@ class OutputRuntime:
         failures: list[Exception] = []
         await self._cancel_chatbox_flush_task(failures)
         await self._cancel_active_delivery_tasks()
+        self._clear_chatbox_typing_reasons(failures)
         self._drop_chatbox_backlog(failures)
         await self._cancel_ui_event_bridge_task(failures)
         await self._close_ui_event_bridge_adapter(failures)
@@ -217,7 +236,7 @@ class OutputRuntime:
                 ),
                 metadata={"channel": channel, "state": self._state},
             )
-        if channel == "peer":
+        if self.chatbox_is_denied(channel):
             return self._observe_result(
                 status=OUTPUT_ROUTING_DECISION_DENIED,
                 route=OUTPUT_ROUTE_SELF_CHATBOX,
@@ -226,6 +245,8 @@ class OutputRuntime:
                 reason="peer_chatbox_denied",
                 metadata={"channel": "peer", "attempted_route": OUTPUT_ROUTE_SELF_CHATBOX},
             )
+        if not self.chatbox_is_eligible(channel):
+            raise ValueError("unknown chatbox publication channel")
 
         publication_key = (OUTPUT_ROUTE_SELF_CHATBOX, str(publication_id))
         duplicate = self._duplicate_publication_result(
@@ -245,9 +266,19 @@ class OutputRuntime:
             ),
             created_at=self.clock.now(),
         )
-        self.chatbox.enqueue(message)
+        try:
+            self.chatbox.enqueue(message)
+        except Exception as exc:
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SELF_CHATBOX,
+                publication_id=str(publication_id),
+                publication_kind=publication_kind,
+                reason="destination_publish_failed",
+                metadata={"channel": channel, "error_type": type(exc).__name__},
+            )
         self._remember_delivered_publication(publication_key)
-        self.chatbox.set_typing_reason(SELF_SPEECH_TYPING_REASON, False)
+        self.set_self_chatbox_typing_reason(SELF_SPEECH_TYPING_REASON, False)
         return self._observe_result(
             status=OUTPUT_ROUTING_DECISION_PUBLISHED,
             route=OUTPUT_ROUTE_SELF_CHATBOX,
@@ -256,6 +287,87 @@ class OutputRuntime:
             reason=None,
             metadata={"channel": channel},
             message=message,
+        )
+
+    def set_self_chatbox_typing_reason(
+        self,
+        reason: str,
+        active: bool,
+    ) -> OutputPublicationResult:
+        operation_uuid = uuid4()
+        if self._state != "open":
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SELF_CHATBOX,
+                publication_id=str(operation_uuid),
+                publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+                reason=(
+                    "output_runtime_closed" if self._state == "closed" else "output_runtime_closing"
+                ),
+                metadata={"channel": "self", "state": self._state, "operation": "typing_reason"},
+            )
+        try:
+            self.chatbox.set_typing_reason(reason, active)
+        except Exception as exc:
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SELF_CHATBOX,
+                publication_id=str(operation_uuid),
+                publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+                reason="destination_publish_failed",
+                metadata={
+                    "channel": "self",
+                    "operation": "typing_reason",
+                    "active": active,
+                    "error_type": type(exc).__name__,
+                },
+            )
+        return self._observe_result(
+            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+            route=OUTPUT_ROUTE_SELF_CHATBOX,
+            publication_id=str(operation_uuid),
+            publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+            reason=None,
+            metadata={"channel": "self", "operation": "typing_reason", "active": active},
+        )
+
+    def clear_self_chatbox_typing_reasons(
+        self,
+    ) -> OutputPublicationResult:
+        operation_uuid = uuid4()
+        if self._state != "open":
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SELF_CHATBOX,
+                publication_id=str(operation_uuid),
+                publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+                reason=(
+                    "output_runtime_closed" if self._state == "closed" else "output_runtime_closing"
+                ),
+                metadata={"channel": "self", "state": self._state, "operation": "typing_clear"},
+            )
+        try:
+            self.chatbox.clear_typing_reasons()
+        except Exception as exc:
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SELF_CHATBOX,
+                publication_id=str(operation_uuid),
+                publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+                reason="destination_publish_failed",
+                metadata={
+                    "channel": "self",
+                    "operation": "typing_clear",
+                    "error_type": type(exc).__name__,
+                },
+            )
+        return self._observe_result(
+            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+            route=OUTPUT_ROUTE_SELF_CHATBOX,
+            publication_id=str(operation_uuid),
+            publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+            reason=None,
+            metadata={"channel": "self", "operation": "typing_clear"},
         )
 
     def publish_system_disclosure_chatbox(
@@ -289,7 +401,17 @@ class OutputRuntime:
             text=_redact_chatbox_disclosure_text(text),
             created_at=self.clock.now(),
         )
-        self.chatbox.enqueue(message)
+        try:
+            self.chatbox.enqueue(message)
+        except Exception as exc:
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX,
+                publication_id=str(disclosure_uuid),
+                publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
+                reason="destination_publish_failed",
+                metadata={"channel": "system", "error_type": type(exc).__name__},
+            )
         self._remember_delivered_publication(publication_key)
         return self._observe_result(
             status=OUTPUT_ROUTING_DECISION_PUBLISHED,
@@ -299,6 +421,67 @@ class OutputRuntime:
             reason=None,
             metadata={"channel": "system"},
             message=message,
+        )
+
+    def publish_system_immediate_chatbox(
+        self,
+        *,
+        text: str,
+        disclosure_id: UUID | None = None,
+    ) -> OutputPublicationResult:
+        disclosure_uuid = disclosure_id or uuid4()
+        if self._state != "open":
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX,
+                publication_id=str(disclosure_uuid),
+                publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
+                reason=(
+                    "output_runtime_closed" if self._state == "closed" else "output_runtime_closing"
+                ),
+                metadata={"channel": "system", "state": self._state, "delivery": "immediate"},
+            )
+        publication_key = (OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX, str(disclosure_uuid))
+        duplicate = self._duplicate_publication_result(
+            publication_key=publication_key,
+            publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
+            channel="system",
+        )
+        if duplicate is not None:
+            return duplicate
+        safe_text = _redact_chatbox_disclosure_text(text)
+        try:
+            published = self.chatbox.send_immediate(safe_text)
+        except Exception as exc:
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX,
+                publication_id=str(disclosure_uuid),
+                publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
+                reason="destination_publish_failed",
+                metadata={
+                    "channel": "system",
+                    "delivery": "immediate",
+                    "error_type": type(exc).__name__,
+                },
+            )
+        if not published:
+            return self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX,
+                publication_id=str(disclosure_uuid),
+                publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
+                reason="destination_rejected",
+                metadata={"channel": "system", "delivery": "immediate"},
+            )
+        self._remember_delivered_publication(publication_key)
+        return self._observe_result(
+            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+            route=OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX,
+            publication_id=str(disclosure_uuid),
+            publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
+            reason=None,
+            metadata={"channel": "system", "delivery": "immediate"},
         )
 
     async def publish_overlay_event(self, event: OverlayEventUnion) -> OutputPublicationResult:
@@ -477,6 +660,20 @@ class OutputRuntime:
             failures.append(exc)
             return
         self._chatbox_backlog_dropped = True
+
+    def _clear_chatbox_typing_reasons(self, failures: list[Exception]) -> None:
+        if self._chatbox_typing_reasons_cleared:
+            return
+        clear_typing_reasons = getattr(self.chatbox, "clear_typing_reasons", None)
+        if not callable(clear_typing_reasons):
+            self._chatbox_typing_reasons_cleared = True
+            return
+        try:
+            clear_typing_reasons()
+        except Exception as exc:
+            failures.append(exc)
+            return
+        self._chatbox_typing_reasons_cleared = True
 
     async def _cancel_owned_task(
         self,

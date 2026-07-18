@@ -56,12 +56,8 @@ from puripuly_heart.core.orchestrator.ports import (
     format_translation_ready_for_output,
     runtime_logging_mode_is_detailed,
 )
-from puripuly_heart.core.output.models import (
-    OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-    PUBLICATION_KIND_PEER_SUBTITLE,
-    PUBLICATION_KIND_SELF_UTTERANCE,
-)
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
+from puripuly_heart.core.overlay.sink import OverlayEventUnion
 from puripuly_heart.core.runtime.output import (
     SELF_SPEECH_TYPING_REASON,
     OutputPublicationResult,
@@ -240,7 +236,11 @@ class ClientHub:
     _llm_provider_runtime: ProviderRuntimeHandle = field(init=False)
 
     def __post_init__(self) -> None:
-        self.output_runtime = OutputRuntime(chatbox=self.osc, clock=self.clock)
+        self.output_runtime = OutputRuntime(
+            chatbox=self.osc,
+            clock=self.clock,
+            overlay_sink=self.overlay_sink,
+        )
         assert self.output_runtime.overlay_event_adapter is not None
         self.overlay_event_adapter = self.output_runtime.overlay_event_adapter
         self.self_runtime = ChannelRuntime(
@@ -346,6 +346,13 @@ class ClientHub:
                 output_runtime = None
             if output_runtime is not None:
                 output_runtime.chatbox = value  # type: ignore[assignment]
+        if name == "overlay_sink":
+            try:
+                output_runtime = object.__getattribute__(self, "output_runtime")
+            except AttributeError:
+                output_runtime = None
+            if output_runtime is not None:
+                output_runtime.overlay_sink = value  # type: ignore[assignment]
         if name in {"stt", "peer_stt", "llm"}:
             self._attach_provider_assignment(name, value)
         runtime_field = _SELF_RUNTIME_FIELDS.get(name)
@@ -1204,7 +1211,7 @@ class ClientHub:
         # Record start time for E2E latency tracking (from speech end)
         if isinstance(event, SpeechEnd):
             speech_end_at = self.clock.now()
-            self.osc.set_typing_reason(SELF_SPEECH_TYPING_REASON, True)
+            self.set_self_chatbox_typing_reason(SELF_SPEECH_TYPING_REASON, True)
             self._utterance_start_times[event.utterance_id] = speech_end_at
             self._speech_ended_ids.add(event.utterance_id)
             self._record_latency_stage(
@@ -1278,7 +1285,11 @@ class ClientHub:
         await self._handle_transcript(transcript, is_final=True, source=source)
 
         if self.llm is None or not self.translation_enabled:
-            await self._enqueue_osc(utterance_id, transcript_text=text, translation_text=None)
+            await self._publish_chatbox_candidate(
+                utterance_id,
+                transcript_text=text,
+                translation_text=None,
+            )
         else:
             await self._ensure_translation(transcript)
 
@@ -1428,10 +1439,10 @@ class ClientHub:
                 self._log_translation_skipped(
                     stage="final",
                     runtime=runtime,
-                    publish_chatbox=self._should_publish_to_chatbox(runtime),
+                    publish_chatbox=self.output_runtime.chatbox_is_eligible(runtime.channel),
                 )
-                if self._should_publish_to_chatbox(runtime):
-                    await self._enqueue_osc(
+                if self.output_runtime.chatbox_is_eligible(runtime.channel):
+                    await self._publish_chatbox_candidate(
                         event.transcript.utterance_id,
                         transcript_text=event.transcript.text,
                         translation_text=None,
@@ -1459,8 +1470,19 @@ class ClientHub:
         if self._last_promo_time is not None:
             if now - self._last_promo_time < _PROMO_INTERVAL_SEC:
                 return
-        if self.osc.send_immediate("PuriPuly ON!"):
+        result = self.output_runtime.publish_system_immediate_chatbox(text="PuriPuly ON!")
+        if result.decision.decision == "published":
             self._last_promo_time = now
+
+    def set_self_chatbox_typing_reason(
+        self,
+        reason: str,
+        active: bool,
+    ) -> OutputPublicationResult:
+        return self.output_runtime.set_self_chatbox_typing_reason(reason, active)
+
+    def clear_self_chatbox_typing_reasons(self) -> OutputPublicationResult:
+        return self.output_runtime.clear_self_chatbox_typing_reasons()
 
     async def _handle_transcript(
         self, transcript: Transcript, *, is_final: bool, source: str | None
@@ -1479,20 +1501,20 @@ class ClientHub:
         )
         if is_final:
             if runtime.channel == "peer":
-                deny_peer_chatbox_attempt = self._should_deny_peer_chatbox_attempt(runtime)
+                deny_peer_chatbox_attempt = self.output_runtime.chatbox_is_denied(runtime.channel)
                 peer_terminal_work_will_follow = self._peer_terminal_work_will_follow(runtime)
                 if self._overlay_translation_will_follow(runtime):
                     await self._ensure_translation(transcript)
-                elif self.overlay_sink is not None:
+                elif self.output_runtime.has_overlay_destination:
                     await self._finalize_peer_source_only(
                         transcript,
                         close_is_final=True,
                         finalize_latency=not peer_terminal_work_will_follow,
                     )
                     if deny_peer_chatbox_attempt:
-                        await self._deny_peer_chatbox_attempt(transcript.utterance_id)
+                        await self._publish_peer_chatbox_candidate(transcript.utterance_id)
                 elif deny_peer_chatbox_attempt:
-                    await self._deny_peer_chatbox_attempt(transcript.utterance_id)
+                    await self._publish_peer_chatbox_candidate(transcript.utterance_id)
                 elif not peer_terminal_work_will_follow:
                     self._finalize_latency_timeline(
                         channel=transcript.channel,
@@ -1560,7 +1582,7 @@ class ClientHub:
                 finalize_latency=True,
                 preserve_parent_speech_end_time=True,
             )
-            await self._deny_peer_chatbox_attempt(child.utterance_id)
+            await self._publish_peer_chatbox_candidate(child.utterance_id)
             return "source_only"
         await self._translate_and_enqueue(
             child.utterance_id,
@@ -1593,7 +1615,7 @@ class ClientHub:
                 finalize_latency=True,
                 preserve_parent_speech_end_time=True,
             )
-            await self._deny_peer_chatbox_attempt(child.utterance_id)
+            await self._publish_peer_chatbox_candidate(child.utterance_id)
         self._complete_peer_logical_turn(
             child.utterance_id,
             preserve_parent_speech_end_time=True,
@@ -1603,10 +1625,10 @@ class ClientHub:
         self._clear_peer_parent_vad_bookkeeping(parent_utterance_id)
 
     async def _on_peer_final_run_parent_rejected(self, parent_utterance_id: UUID) -> None:
-        await self._deny_peer_chatbox_attempt(parent_utterance_id)
+        await self._publish_peer_chatbox_candidate(parent_utterance_id)
 
     async def _emit_final_transcript_to_overlay(self, transcript: Transcript) -> None:
-        if self.overlay_sink is None:
+        if not self.output_runtime.has_overlay_destination:
             return
         source_language, target_language = self._self_overlay_languages_for_utterance(
             transcript.utterance_id
@@ -1627,7 +1649,7 @@ class ClientHub:
         finalize_latency: bool,
         preserve_parent_speech_end_time: bool = False,
     ) -> None:
-        if self.overlay_sink is not None:
+        if self.output_runtime.has_overlay_destination:
             self._record_overlay_emit(
                 event_kind="peer_transcript_final",
                 utterance_id=transcript.utterance_id,
@@ -1662,7 +1684,7 @@ class ClientHub:
         is_final: bool,
         finalize_latency: bool | None = None,
     ) -> None:
-        if self.overlay_sink is None:
+        if not self.output_runtime.has_overlay_destination:
             if finalize_latency is True or (finalize_latency is None and channel == "peer"):
                 self._finalize_latency_timeline(channel=channel, utterance_id=utterance_id)
             return
@@ -1678,7 +1700,7 @@ class ClientHub:
 
     def _overlay_translation_will_follow(self, runtime: ChannelRuntime) -> bool:
         return (
-            self.overlay_sink is not None
+            self.output_runtime.has_overlay_destination
             and self.llm is not None
             and self._translation_enabled_for_runtime(runtime)
         )
@@ -1687,7 +1709,7 @@ class ClientHub:
         if runtime.channel != "peer":
             return False
         return (self.llm is not None and self._translation_enabled_for_runtime(runtime)) or (
-            self._should_deny_peer_chatbox_attempt(runtime)
+            self.output_runtime.chatbox_is_denied(runtime.channel)
         )
 
     @staticmethod
@@ -1885,7 +1907,7 @@ class ClientHub:
         translation: Translation,
         applied_context_mode: ContextMode | None,
     ) -> None:
-        if self.overlay_sink is None:
+        if not self.output_runtime.has_overlay_destination:
             return
 
         self._record_overlay_emit(
@@ -1920,7 +1942,7 @@ class ClientHub:
         runtime: ChannelRuntime,
         applied_context_mode: ContextMode | None,
     ) -> None:
-        if self.overlay_sink is None:
+        if not self.output_runtime.has_overlay_destination:
             return
 
         self._record_overlay_emit(
@@ -1955,38 +1977,23 @@ class ClientHub:
             )
         )
 
-    async def _emit_overlay_event(self, event: object) -> None:
-        if self.overlay_sink is None:
-            return
-        channel = getattr(event, "channel", None)
-        publication_kind = (
-            PUBLICATION_KIND_PEER_SUBTITLE if channel == "peer" else PUBLICATION_KIND_SELF_UTTERANCE
-        )
-        decision = self.output_runtime.reject_if_closed(
-            route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-            publication_id=str(
-                getattr(event, "utterance_id", None) or getattr(event, "event_id", "overlay")
-            ),
-            publication_kind=publication_kind,
-            channel=channel,
-        )
-        if decision is not None:
+    async def _emit_overlay_event(self, event: OverlayEventUnion) -> None:
+        if not self.output_runtime.has_overlay_destination:
             return
         detailed_mode = self.runtime_logging is not None and runtime_logging_mode_is_detailed(
             self.runtime_logging.mode
         )
         start = time.perf_counter() if detailed_mode else 0.0
-        try:
-            await self.overlay_sink.emit(event)  # type: ignore[arg-type]
-        except Exception as exc:
+        result = await self.output_runtime.publish_overlay_event(event)
+        if result.decision.reason == "destination_publish_failed":
             self.last_error_source = "overlay_sink"
-            self._emit_exception_summary(
+            self._emit_basic(
                 "[Hub] Overlay sink emit failed: %s",
-                exc,
+                result.decision.metadata.get("error_type", "Exception"),
                 level=logging.ERROR,
             )
             return
-        if detailed_mode:
+        if detailed_mode and result.decision.decision == "published":
             elapsed_ms = max(0, int((time.perf_counter() - start) * 1000))
             event_type = type(event).__name__
             channel = getattr(event, "channel", None)
@@ -2030,7 +2037,7 @@ class ClientHub:
     async def _sync_overlay_active_self(
         self, buffer: _MergeBuffer | None, *, created_at: float | None = None
     ) -> None:
-        if self.overlay_sink is None or buffer is None:
+        if not self.output_runtime.has_overlay_destination or buffer is None:
             return
 
         active_text = self._merge_text(buffer.parts)
@@ -2094,7 +2101,7 @@ class ClientHub:
     async def reset_overlay_preview(self) -> None:
         if self._current_active_self_metadata() is None:
             return
-        if self.overlay_sink is None:
+        if not self.output_runtime.has_overlay_destination:
             return
         await self._emit_self_active_overlay_event(self.overlay_event_adapter.self_active_clear())
 
@@ -2293,7 +2300,7 @@ class ClientHub:
         metadata = self._current_active_self_metadata()
         return (
             reuse_mode is None
-            and self.overlay_sink is not None
+            and self.output_runtime.has_overlay_destination
             and metadata is not None
             and getattr(metadata, "text", None) == final_text
             and str(getattr(metadata, "secondary_text", "") or "").strip() != ""
@@ -2315,7 +2322,11 @@ class ClientHub:
             utterance_id=str(utterance_id),
             channel=channel,
             secondary_len=secondary_len,
-            sink_type=type(self.overlay_sink).__name__ if self.overlay_sink is not None else None,
+            sink_type=(
+                type(self.output_runtime.overlay_sink).__name__
+                if self.output_runtime.has_overlay_destination
+                else None
+            ),
         )
 
     def _is_soft_reuse_boundary_char(self, ch: str) -> bool:
@@ -2814,7 +2825,7 @@ class ClientHub:
                 runtime=self.self_runtime,
                 publish_chatbox=True,
             )
-            await self._enqueue_osc(
+            await self._publish_chatbox_candidate(
                 buffer.merge_id, transcript_text=final_text, translation_text=None
             )
             return
@@ -2867,7 +2878,7 @@ class ClientHub:
                     channel="self",
                     is_final=True,
                 )
-                await self._enqueue_osc(
+                await self._publish_chatbox_candidate(
                     buffer.merge_id,
                     transcript_text=final_text,
                     translation_text=translation.text,
@@ -3095,12 +3106,6 @@ class ClientHub:
     def _other_runtime(self, runtime: ChannelRuntime) -> ChannelRuntime:
         return self.peer_runtime if runtime is self.self_runtime else self.self_runtime
 
-    def _should_publish_to_chatbox(self, runtime: ChannelRuntime) -> bool:
-        return runtime.channel == "self"
-
-    def _should_deny_peer_chatbox_attempt(self, runtime: ChannelRuntime) -> bool:
-        return runtime.channel == "peer"
-
     def _translation_enabled_for_runtime(self, runtime: ChannelRuntime) -> bool:
         if runtime.channel == "peer":
             return self.translation_enabled and self.peer_translation_enabled
@@ -3296,7 +3301,7 @@ class ClientHub:
         runtime: ChannelRuntime,
     ) -> None:
         if runtime.channel == "peer":
-            await self._deny_peer_chatbox_attempt(utterance_id)
+            await self._publish_peer_chatbox_candidate(utterance_id)
             self._complete_peer_logical_turn(utterance_id)
             return
         await self._emit_overlay_utterance_closed(
@@ -3333,12 +3338,14 @@ class ClientHub:
                     close_is_final=False,
                     finalize_latency=True,
                 )
-                if self._should_deny_peer_chatbox_attempt(runtime):
-                    await self._deny_peer_chatbox_attempt(utterance_id)
+                if self.output_runtime.chatbox_is_denied(runtime.channel):
+                    await self._publish_peer_chatbox_candidate(utterance_id)
                 return
             raise _UnmappedDetectedLanguage
         applied_mode: ContextMode | None = None
-        peer_overlay_active = runtime.channel == "peer" and self.overlay_sink is not None
+        peer_overlay_active = (
+            runtime.channel == "peer" and self.output_runtime.has_overlay_destination
+        )
         try:
             formatted_prompt, context_str, now, applied_mode = self._prepare_llm_request_with_mode(
                 text,
@@ -3398,7 +3405,7 @@ class ClientHub:
                     utterance_id=utterance_id,
                     channel=runtime.channel,
                     is_final=False,
-                    finalize_latency=not self._should_publish_to_chatbox(runtime),
+                    finalize_latency=not self.output_runtime.chatbox_is_eligible(runtime.channel),
                 )
             elif runtime.channel != "peer":
                 self._finalize_latency_timeline(channel=runtime.channel, utterance_id=utterance_id)
@@ -3408,9 +3415,10 @@ class ClientHub:
             return
         except Exception as exc:
             report = self._log_translation_failure(stage="final", runtime=runtime, exc=exc)
-            deny_peer_chatbox_attempt = self._should_deny_peer_chatbox_attempt(runtime)
-            fallback_to_chatbox = self.fallback_transcript_only and self._should_publish_to_chatbox(
-                runtime
+            deny_peer_chatbox_attempt = self.output_runtime.chatbox_is_denied(runtime.channel)
+            fallback_to_chatbox = (
+                self.fallback_transcript_only
+                and self.output_runtime.chatbox_is_eligible(runtime.channel)
             )
             denied_fallback_to_chatbox = self.fallback_transcript_only and deny_peer_chatbox_attempt
             payload = self._translation_error_payload(exc, report)
@@ -3430,7 +3438,8 @@ class ClientHub:
                     channel=runtime.channel,
                     is_final=False,
                     finalize_latency=not (
-                        self.fallback_transcript_only and self._should_publish_to_chatbox(runtime)
+                        self.fallback_transcript_only
+                        and self.output_runtime.chatbox_is_eligible(runtime.channel)
                     ),
                 )
             elif runtime.channel == "peer":
@@ -3446,19 +3455,19 @@ class ClientHub:
                     finalize_latency=not denied_fallback_to_chatbox,
                 )
             if fallback_to_chatbox:
-                await self._enqueue_osc(
+                await self._publish_chatbox_candidate(
                     utterance_id,
                     transcript_text=text,
                     translation_text=None,
                 )
             elif deny_peer_chatbox_attempt:
-                await self._deny_peer_chatbox_attempt(utterance_id)
+                await self._publish_peer_chatbox_candidate(utterance_id)
             elif runtime.channel != "peer":
                 self._finalize_latency_timeline(channel=runtime.channel, utterance_id=utterance_id)
             return
 
-        publish_to_chatbox = self._should_publish_to_chatbox(runtime)
-        deny_peer_chatbox_attempt = self._should_deny_peer_chatbox_attempt(runtime)
+        publish_to_chatbox = self.output_runtime.chatbox_is_eligible(runtime.channel)
+        deny_peer_chatbox_attempt = self.output_runtime.chatbox_is_denied(runtime.channel)
         bundle = self.get_or_create_bundle(utterance_id, channel=runtime.channel)
         bundle.with_translation(translation)
         self._emit_translation_ready_for_output(
@@ -3494,16 +3503,16 @@ class ClientHub:
                 utterance_id=utterance_id,
                 channel=runtime.channel,
                 is_final=True,
-                finalize_latency=not self._should_publish_to_chatbox(runtime),
+                finalize_latency=not self.output_runtime.chatbox_is_eligible(runtime.channel),
             )
         if publish_to_chatbox:
-            await self._enqueue_osc(
+            await self._publish_chatbox_candidate(
                 utterance_id,
                 transcript_text=text,
                 translation_text=translation.text,
             )
         elif deny_peer_chatbox_attempt:
-            await self._deny_peer_chatbox_attempt(utterance_id)
+            await self._publish_peer_chatbox_candidate(utterance_id)
         else:
             self._finalize_latency_timeline(channel=runtime.channel, utterance_id=utterance_id)
 
@@ -3530,6 +3539,8 @@ class ClientHub:
                 ),
             )
         )
+        if self.llm is None or not self._translation_enabled_for_runtime(self.peer_runtime):
+            await self.peer_final_runs.wait_for_idle()
         if hasattr(self.overlay_sink, "events"):
             new_events = self.overlay_sink.events[before_event_count:]  # type: ignore[attr-defined]
             for event in new_events:
@@ -3552,7 +3563,7 @@ class ClientHub:
         await self.peer_final_runs.wait_for_idle()
         return utterance_id
 
-    async def _enqueue_osc(
+    async def _publish_chatbox_candidate(
         self,
         utterance_id: UUID,
         *,
@@ -3615,7 +3626,10 @@ class ClientHub:
         self._clear_latency_timeline(channel=runtime.channel, utterance_id=utterance_id)
         return result
 
-    async def _deny_peer_chatbox_attempt(self, utterance_id: UUID) -> OutputPublicationResult:
+    async def _publish_peer_chatbox_candidate(
+        self,
+        utterance_id: UUID,
+    ) -> OutputPublicationResult:
         result = await self.output_runtime.publish_chatbox(
             publication_id=utterance_id,
             channel="peer",

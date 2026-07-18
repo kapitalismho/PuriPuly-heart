@@ -79,6 +79,8 @@ from puripuly_heart.core.managed_openrouter_release import (
     UnavailableManagedOpenRouterReleaseClient,
 )
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
+from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import (
@@ -108,6 +110,7 @@ from puripuly_heart.ui.app import TranslatorApp
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.i18n import set_locale, t
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+from tests.helpers.fakes import FakeSender
 
 PEER_DISCLOSURE_KEY = "peer_translation.disclosure"
 
@@ -4856,6 +4859,49 @@ async def test_rebuild_pipeline_closes_previous_peer_runtime_before_replacement(
 
 
 @pytest.mark.asyncio
+async def test_rebuild_pipeline_retires_old_owner_typing_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
+    sender = FakeSender()
+    chatbox = ChatboxPaginator(sender=sender, clock=FakeClock())
+    old_hub = ClientHub(stt=None, llm=None, osc=chatbox)
+    controller.hub = old_hub
+    controller.osc = chatbox
+    new_hub = DummyHub(llm=None, stt=None)
+
+    class FakeUIEventBridge:
+        def __init__(self, **kwargs) -> None:
+            self.event_queue = kwargs["event_queue"]
+
+        async def run(self) -> None:
+            return None
+
+    async def fake_init_pipeline(self: GuiController) -> None:
+        self.hub = new_hub
+
+    old_hub.set_self_chatbox_typing_reason("manual_input", True)
+    assert sender.typing == [True]
+
+    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
+    monkeypatch.setattr(
+        GuiController,
+        "_configure_vrc_mic_receiver",
+        lambda self, enabled: asyncio.sleep(0),
+    )
+    monkeypatch.setattr(controller_module, "UIEventBridge", FakeUIEventBridge)
+    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
+
+    await controller._rebuild_pipeline(rebuild_stt=True)
+
+    assert old_hub.output_runtime.state == "closed"
+    assert sender.typing == [True, False]
+    assert not chatbox._is_typing_active()
+    assert controller.hub is new_hub
+
+
+@pytest.mark.asyncio
 async def test_rebuild_pipeline_preserves_hub_when_hub_stop_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -5204,6 +5250,57 @@ async def test_init_pipeline_passes_chatbox_and_peer_language_settings_to_hub(
     assert captured["peer_source_language"] == "ja"
     assert captured["peer_target_language"] == "en"
     assert llm_create_kwargs["runtime_logging"] is controller.runtime_logging
+
+
+@pytest.mark.asyncio
+async def test_init_pipeline_constructs_production_output_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Chatbox:
+        def enqueue(self, message) -> None:
+            _ = message
+
+        def send_typing(self, is_typing: bool) -> None:
+            _ = is_typing
+
+        def set_typing_reason(self, reason: str, active: bool) -> None:
+            _ = (reason, active)
+
+        def clear_typing_reasons(self) -> None:
+            return
+
+        def process_due(self) -> None:
+            return
+
+        def send_immediate(self, text: str) -> bool:
+            _ = text
+            return True
+
+    chatbox = Chatbox()
+    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
+    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        controller_module,
+        "create_stt_backend",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("unavailable")),
+    )
+    monkeypatch.setattr(controller_module, "VrchatOscUdpSender", lambda *a, **k: object())
+    monkeypatch.setattr(controller_module, "ChatboxPaginator", lambda *a, **k: chatbox)
+    monkeypatch.setattr(
+        GuiController,
+        "_configure_vrc_mic_receiver",
+        lambda self, enabled: asyncio.sleep(0),
+    )
+
+    controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
+
+    await controller._init_pipeline()
+
+    assert type(controller.hub) is controller_module.ClientHub
+    assert controller.hub.output_runtime.chatbox is chatbox
+    assert controller.hub.output_runtime.overlay_sink is None
+    assert controller.hub.output_runtime.state == "open"
 
 
 @pytest.mark.asyncio

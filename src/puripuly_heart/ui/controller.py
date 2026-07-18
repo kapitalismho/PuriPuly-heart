@@ -7335,8 +7335,10 @@ class GuiController:
 
     async def release_manual_typing(self) -> None:
         self._cancel_manual_typing_idle_task()
-        if self.osc is not None:
-            self.osc.clear_typing_reasons()
+        hub = self.hub
+        clear_typing = getattr(hub, "clear_self_chatbox_typing_reasons", None)
+        if callable(clear_typing):
+            clear_typing()
         self.log_detailed("[ManualTyping] release status=cleared")
 
     def _begin_manual_submit_typing(self) -> str:
@@ -7377,10 +7379,12 @@ class GuiController:
         self._set_typing_reason(MANUAL_INPUT_TYPING_REASON, False)
 
     def _set_typing_reason(self, reason: str, active: bool) -> None:
-        if self.osc is None:
+        hub = self.hub
+        set_typing = getattr(hub, "set_self_chatbox_typing_reason", None)
+        if not callable(set_typing):
             return
         try:
-            self.osc.set_typing_reason(reason, active)
+            set_typing(reason, active)
         except Exception as exc:
             self._log_error(f"Manual typing output update failed: {exc}")
 

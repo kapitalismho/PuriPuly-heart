@@ -23,18 +23,35 @@ def _output_runtime_class():
 @dataclass(slots=True)
 class RecordingChatbox:
     messages: list[OSCMessage] = field(default_factory=list)
+    immediate_messages: list[str] = field(default_factory=list)
     typing: list[bool] = field(default_factory=list)
+    typing_reasons: set[str] = field(default_factory=set)
+    clear_typing_reasons_calls: int = 0
     process_due_calls: int = 0
     drop_pending_calls: int = 0
 
     def enqueue(self, message: OSCMessage) -> None:
         self.messages.append(message)
 
+    def send_immediate(self, text: str) -> bool:
+        self.immediate_messages.append(text)
+        return True
+
     def send_typing(self, is_typing: bool) -> None:
         self.typing.append(is_typing)
 
     def set_typing_reason(self, reason: str, active: bool) -> None:
         self.typing.append(active)
+        if active:
+            self.typing_reasons.add(reason)
+        else:
+            self.typing_reasons.discard(reason)
+
+    def clear_typing_reasons(self) -> None:
+        self.clear_typing_reasons_calls += 1
+        if self.typing_reasons:
+            self.typing.append(False)
+        self.typing_reasons.clear()
 
     def process_due(self) -> None:
         self.process_due_calls += 1
@@ -55,10 +72,61 @@ class DropPendingFailsOnceChatbox(RecordingChatbox):
             raise RuntimeError("drop pending failed")
 
 
+class ClearTypingFailsOnceChatbox(RecordingChatbox):
+    def __init__(self) -> None:
+        super().__init__()
+        self.fail_next_clear = True
+
+    def clear_typing_reasons(self) -> None:
+        self.clear_typing_reasons_calls += 1
+        if self.fail_next_clear:
+            self.fail_next_clear = False
+            raise RuntimeError("clear typing reasons failed")
+        if self.typing_reasons:
+            self.typing.append(False)
+        self.typing_reasons.clear()
+
+
+class CleanupFailsOnceChatbox(RecordingChatbox):
+    def __init__(self) -> None:
+        super().__init__()
+        self.fail_next_clear = True
+        self.fail_next_drop = True
+
+    def clear_typing_reasons(self) -> None:
+        self.clear_typing_reasons_calls += 1
+        if self.fail_next_clear:
+            self.fail_next_clear = False
+            raise RuntimeError("clear typing reasons failed")
+        self.typing_reasons.clear()
+
+    def drop_pending(self) -> None:
+        self.drop_pending_calls += 1
+        if self.fail_next_drop:
+            self.fail_next_drop = False
+            raise RuntimeError("drop pending failed")
+
+
 class FailingFlushChatbox(RecordingChatbox):
     def process_due(self) -> None:
         self.process_due_calls += 1
         raise RuntimeError("flush task failed")
+
+
+class FailingEnqueueChatbox(RecordingChatbox):
+    def enqueue(self, message: OSCMessage) -> None:
+        raise RuntimeError("chatbox failed with secret-publication-text")
+
+
+class FailingChatboxControls(RecordingChatbox):
+    def send_immediate(self, text: str) -> bool:
+        raise RuntimeError("immediate failed with secret-system-text")
+
+    def set_typing_reason(self, reason: str, active: bool) -> None:
+        raise RuntimeError("typing reason failed")
+
+    def clear_typing_reasons(self) -> None:
+        raise RuntimeError("typing clear failed")
 
 
 class CloseAwareBridge:
@@ -155,12 +223,14 @@ def test_output_runtime_exposes_lifecycle_inventory_and_policy() -> None:
 
     assert snapshot["owner"] == "OutputRuntime"
     assert "_chatbox_flush_task" in snapshot["resource_fields"]
+    assert "ChatboxPaginator._typing_reasons" in snapshot["resource_fields"]
     assert "overlay_event_adapter" in snapshot["resource_fields"]
     assert "overlay delivery tasks" in snapshot["resource_fields"]
     assert "UIEventBridge.run task" in snapshot["resource_fields"]
     assert "conversation adapter" in snapshot["resource_fields"]
     assert snapshot["stop_ingress"] == "stop accepting output publications"
     assert "chatbox: drop pending pages/messages on close" in snapshot["shutdown_policy"]
+    assert "chatbox: clear typing reasons on close" in snapshot["shutdown_policy"]
     assert "overlay: cancel active delivery tasks" in snapshot["shutdown_policy"]
     assert snapshot["late_callback_rule"] == (
         "output after close returns denied/skipped observer decisions without user text"
@@ -184,6 +254,7 @@ async def test_output_runtime_starts_flush_loop_and_drops_chatbox_backlog_on_clo
 
     assert task.done()
     assert owner.chatbox_flush_task is None
+    assert chatbox.clear_typing_reasons_calls == 1
     assert chatbox.drop_pending_calls == 1
     assert owner.state == "closed"
 
@@ -215,6 +286,125 @@ async def test_output_runtime_denies_peer_chatbox_without_user_text() -> None:
     assert owner.routing_decisions[-1] == result.decision
     assert "secret peer transcript" not in repr(result.decision)
     assert "secret peer translation" not in repr(result.decision)
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_isolates_chatbox_failure_with_safe_diagnostics() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=FailingEnqueueChatbox(),
+        clock=FakeClock(_now=10.0),
+    )
+
+    await owner.start()
+    self_result = await owner.publish_chatbox(
+        publication_id=uuid4(),
+        channel="self",
+        transcript_text="secret-publication-text",
+        translation_text=None,
+        include_source=True,
+    )
+    system_result = owner.publish_system_disclosure_chatbox(
+        text="secret-system-disclosure",
+    )
+
+    assert self_result.decision.reason == "destination_publish_failed"
+    assert self_result.decision.metadata["error_type"] == "RuntimeError"
+    assert "secret-publication-text" not in repr(self_result.decision)
+    assert system_result.decision.reason == "destination_publish_failed"
+    assert "secret-system-disclosure" not in repr(system_result.decision)
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_owns_typing_and_immediate_system_side_effects() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    typing_on = owner.set_self_chatbox_typing_reason("manual_input", True)
+    typing_off = owner.set_self_chatbox_typing_reason("manual_input", False)
+    owner.set_self_chatbox_typing_reason("manual_submit:1", True)
+    typing_clear = owner.clear_self_chatbox_typing_reasons()
+    disclosure_id = uuid4()
+    immediate = owner.publish_system_immediate_chatbox(
+        text="PuriPuly ON!",
+        disclosure_id=disclosure_id,
+    )
+    duplicate = owner.publish_system_immediate_chatbox(
+        text="PuriPuly ON!",
+        disclosure_id=disclosure_id,
+    )
+
+    assert typing_on.decision.decision == "published"
+    assert typing_off.decision.decision == "published"
+    assert typing_clear.decision.decision == "published"
+    assert immediate.decision.decision == "published"
+    assert duplicate.decision.reason == "duplicate_publication"
+    assert chatbox.typing_reasons == set()
+    assert chatbox.clear_typing_reasons_calls == 1
+    assert chatbox.immediate_messages == ["PuriPuly ON!"]
+    assert [decision.metadata["channel"] for decision in owner.routing_decisions] == [
+        "self",
+        "self",
+        "self",
+        "self",
+        "system",
+        "system",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_isolates_typing_and_immediate_failures() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(chatbox=FailingChatboxControls(), clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    typing = owner.set_self_chatbox_typing_reason("manual_input", True)
+    clear = owner.clear_self_chatbox_typing_reasons()
+    immediate = owner.publish_system_immediate_chatbox(text="secret-system-text")
+
+    assert typing.decision.reason == "destination_publish_failed"
+    assert clear.decision.reason == "destination_publish_failed"
+    assert immediate.decision.reason == "destination_publish_failed"
+    assert "secret-system-text" not in repr(immediate.decision)
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_rejects_typing_and_immediate_after_close() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    await owner.close()
+    typing = owner.set_self_chatbox_typing_reason("manual_input", True)
+    clear = owner.clear_self_chatbox_typing_reasons()
+    immediate = owner.publish_system_immediate_chatbox(text="PuriPuly ON!")
+
+    assert typing.decision.reason == "output_runtime_closed"
+    assert clear.decision.reason == "output_runtime_closed"
+    assert immediate.decision.reason == "output_runtime_closed"
+    assert chatbox.typing == []
+    assert chatbox.clear_typing_reasons_calls == 1
+    assert chatbox.immediate_messages == []
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_close_retires_active_typing_reason() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    owner.set_self_chatbox_typing_reason("manual_input", True)
+    await owner.close()
+
+    assert chatbox.typing == [True, False]
+    assert chatbox.typing_reasons == set()
+    assert chatbox.clear_typing_reasons_calls == 1
+    assert owner.state == "closed"
+    assert not owner.has_resources
 
 
 @pytest.mark.asyncio
@@ -419,6 +609,7 @@ async def test_output_runtime_bounds_completed_publication_identities() -> None:
         clock=FakeClock(_now=10.0),
         overlay_sink=overlay,
         dedupe_capacity=2,
+        diagnostics_capacity=2,
     )
     first = _overlay_event(event_id="first", channel="peer")
     second = _overlay_event(event_id="second", channel="peer")
@@ -432,6 +623,10 @@ async def test_output_runtime_bounds_completed_publication_identities() -> None:
 
     assert retried_after_eviction.decision.decision == "published"
     assert overlay.events == [first, second, third, first]
+    assert [decision.publication_id for decision in owner.routing_decisions] == [
+        "third",
+        "first",
+    ]
 
 
 @pytest.mark.asyncio
@@ -493,6 +688,54 @@ async def test_output_runtime_drop_pending_failure_retries_before_closed() -> No
     await owner.close()
 
     assert owner.state == "closed"
+    assert chatbox.drop_pending_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_typing_clear_failure_retries_before_closed() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = ClearTypingFailsOnceChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    owner.set_self_chatbox_typing_reason("self_speech_pending", True)
+    with pytest.raises(RuntimeError, match="clear typing reasons failed"):
+        await owner.close()
+
+    assert owner.state == "closing"
+    assert owner.has_resources
+    assert chatbox.clear_typing_reasons_calls == 1
+    assert chatbox.drop_pending_calls == 1
+
+    await owner.close()
+
+    assert owner.state == "closed"
+    assert chatbox.clear_typing_reasons_calls == 2
+    assert chatbox.drop_pending_calls == 1
+    assert chatbox.typing == [True, False]
+    assert chatbox.typing_reasons == set()
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_aggregates_typing_and_backlog_cleanup_failures() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = CleanupFailsOnceChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    with pytest.raises(ExceptionGroup) as excinfo:
+        await owner.close()
+
+    assert {str(exc) for exc in excinfo.value.exceptions} == {
+        "clear typing reasons failed",
+        "drop pending failed",
+    }
+    assert owner.state == "closing"
+
+    await owner.close()
+
+    assert owner.state == "closed"
+    assert chatbox.clear_typing_reasons_calls == 2
     assert chatbox.drop_pending_calls == 2
 
 
