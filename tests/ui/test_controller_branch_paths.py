@@ -5370,6 +5370,117 @@ async def test_init_pipeline_constructs_production_output_owner(
 
 
 @pytest.mark.asyncio
+async def test_real_controller_composition_routes_all_output_channels_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class RecordingChatbox:
+        def __init__(self) -> None:
+            self.messages: list[object] = []
+            self.typing_reasons: set[str] = set()
+
+        def enqueue(self, message: object) -> None:
+            self.messages.append(message)
+
+        def send_typing(self, is_typing: bool) -> None:
+            _ = is_typing
+
+        def set_typing_reason(self, reason: str, active: bool) -> None:
+            if active:
+                self.typing_reasons.add(reason)
+            else:
+                self.typing_reasons.discard(reason)
+
+        def clear_typing_reasons(self) -> None:
+            self.typing_reasons.clear()
+
+        def process_due(self) -> None:
+            return
+
+        def send_immediate(self, text: str) -> bool:
+            _ = text
+            return True
+
+    class RecordingOverlay:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+
+        async def emit(self, event: object) -> None:
+            self.events.append(event)
+
+        def active_self_overlay_metadata(self) -> None:
+            return None
+
+    chatbox = RecordingChatbox()
+    overlay = RecordingOverlay()
+    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
+    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        controller_module,
+        "create_stt_backend",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("unavailable")),
+    )
+    monkeypatch.setattr(controller_module, "VrchatOscUdpSender", lambda *a, **k: object())
+    monkeypatch.setattr(controller_module, "ChatboxPaginator", lambda *a, **k: chatbox)
+    monkeypatch.setattr(
+        GuiController,
+        "_configure_vrc_mic_receiver",
+        lambda self, enabled: asyncio.sleep(0),
+    )
+    controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
+
+    await controller._init_pipeline()
+    hub = controller.hub
+    assert type(hub) is controller_module.ClientHub
+    await controller._replace_hub_overlay_sink(overlay)
+    await controller.submit_text("manual self text")
+    manual_id = getattr(chatbox.messages[0], "utterance_id")
+    peer_id = await hub.handle_peer_transcript_final_for_test("peer presentation text")
+    hub.enqueue_peer_translation_disclosure("system disclosure")
+
+    chatbox_ids = [getattr(message, "utterance_id") for message in chatbox.messages]
+    assert len(chatbox_ids) == 2
+    assert chatbox_ids[0] == manual_id
+    assert chatbox_ids[1] not in {manual_id, peer_id}
+    assert [getattr(message, "text") for message in chatbox.messages] == [
+        "manual self text",
+        "system disclosure",
+    ]
+    assert [getattr(event, "channel") for event in overlay.events] == [
+        "self",
+        "self",
+        "peer",
+        "peer",
+    ]
+    assert [getattr(event, "utterance_id") for event in overlay.events] == [
+        manual_id,
+        manual_id,
+        peer_id,
+        peer_id,
+    ]
+    assert [getattr(event, "type") for event in overlay.events] == [
+        "self_transcript_final",
+        "utterance_closed",
+        "peer_transcript_final",
+        "utterance_closed",
+    ]
+    peer_denials = [
+        decision
+        for decision in hub.output_runtime.routing_decisions
+        if decision.publication_kind == "peer_subtitle" and decision.route == "self_chatbox"
+    ]
+    assert len(peer_denials) == 1
+    assert peer_denials[0].reason == "peer_chatbox_denied"
+    assert all(
+        "peer presentation text" not in getattr(message, "text") for message in chatbox.messages
+    )
+
+    await hub.stop()
+    assert hub.output_runtime.state == "closed"
+    assert not hub.output_runtime.has_resources
+
+
+@pytest.mark.asyncio
 async def test_refresh_peer_stt_runtime_returns_without_runtime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
