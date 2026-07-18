@@ -4025,3 +4025,58 @@ async def test_shutdown_is_idempotent_and_cancels_tracked_page_tasks() -> None:
     assert background_cancelled.is_set()
     assert app._tracked_page_tasks == set()
     assert app._settings_mutation_queue == []
+
+
+@pytest.mark.asyncio
+async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = DummyPage()
+    lifecycle_events: list[str] = []
+
+    class Controller:
+        async def start(self) -> None:
+            lifecycle_events.append("started")
+
+        async def stop(self) -> None:
+            lifecycle_events.append("stop_started")
+            await asyncio.sleep(0)
+            lifecycle_events.append("stop_completed")
+
+    def fake_init(
+        self,
+        incoming_page,
+        *,
+        config_path,
+        debug_ui_preview=False,
+        allow_stable_settings_import=False,
+        runtime_logging_sinks=None,
+        vrchat_osc_presence=None,
+    ) -> None:
+        _ = (
+            config_path,
+            debug_ui_preview,
+            allow_stable_settings_import,
+            runtime_logging_sinks,
+            vrchat_osc_presence,
+        )
+        self.page = incoming_page
+        self.controller = Controller()
+        self._tracked_page_tasks = set()
+        self._shutdown_lock = None
+        self._shutdown_complete = False
+        self._shutting_down = False
+        self._settings_mutation_queue = []
+        self.schedule_after_launch_tasks = lambda: None
+
+    monkeypatch.setattr(TranslatorApp, "__init__", fake_init)
+
+    await app_module.main_gui(page, config_path=Path("settings.json"))
+
+    assert asyncio.iscoroutinefunction(page.on_close)
+    assert page.on_close == page.on_disconnect
+
+    await asyncio.gather(page.on_close(None), page.on_disconnect(None))
+
+    assert lifecycle_events == ["started", "stop_started", "stop_completed"]
+    assert page.tasks == []
