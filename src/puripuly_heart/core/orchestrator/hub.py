@@ -346,13 +346,6 @@ class ClientHub:
                 output_runtime = None
             if output_runtime is not None:
                 output_runtime.chatbox = value  # type: ignore[assignment]
-        if name == "overlay_sink":
-            try:
-                output_runtime = object.__getattribute__(self, "output_runtime")
-            except AttributeError:
-                output_runtime = None
-            if output_runtime is not None:
-                output_runtime.overlay_sink = value  # type: ignore[assignment]
         if name in {"stt", "peer_stt", "llm"}:
             self._attach_provider_assignment(name, value)
         runtime_field = _SELF_RUNTIME_FIELDS.get(name)
@@ -1483,6 +1476,22 @@ class ClientHub:
 
     def clear_self_chatbox_typing_reasons(self) -> OutputPublicationResult:
         return self.output_runtime.clear_self_chatbox_typing_reasons()
+
+    async def replace_overlay_sink(
+        self,
+        overlay_sink: HubOverlaySinkPort | None,
+        *,
+        expected_current: HubOverlaySinkPort | None = None,
+        require_match: bool = False,
+    ) -> bool:
+        replaced = await self.output_runtime.replace_overlay_sink(
+            overlay_sink,
+            expected_current=expected_current,
+            require_match=require_match,
+        )
+        if replaced:
+            object.__setattr__(self, "overlay_sink", overlay_sink)
+        return replaced
 
     async def _handle_transcript(
         self, transcript: Transcript, *, is_final: bool, source: str | None

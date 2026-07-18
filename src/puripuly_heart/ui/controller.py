@@ -3991,6 +3991,30 @@ class GuiController:
             )
         )
 
+    async def _replace_hub_overlay_sink(
+        self,
+        overlay_sink: object | None,
+        *,
+        expected_current: object | None = None,
+        require_match: bool = False,
+    ) -> bool:
+        hub = self.hub
+        if hub is None:
+            return False
+        replace_overlay_sink = getattr(hub, "replace_overlay_sink", None)
+        if callable(replace_overlay_sink):
+            return bool(
+                await replace_overlay_sink(
+                    overlay_sink,
+                    expected_current=expected_current,
+                    require_match=require_match,
+                )
+            )
+        if require_match and getattr(hub, "overlay_sink", None) is not expected_current:
+            return False
+        setattr(hub, "overlay_sink", overlay_sink)
+        return True
+
     async def _close_stale_overlay_start_runtime(
         self,
         runtime: OverlayRuntimeHandle,
@@ -4011,7 +4035,11 @@ class GuiController:
             )
         if self.hub is not None:
             if getattr(self.hub, "overlay_sink", None) is stale_presenter:
-                self.hub.overlay_sink = None
+                await self._replace_hub_overlay_sink(
+                    None,
+                    expected_current=stale_presenter,
+                    require_match=True,
+                )
             if getattr(self.hub, "overlay_diagnostics", None) is stale_diagnostics:
                 self.hub.overlay_diagnostics = None
 
@@ -5289,7 +5317,7 @@ class GuiController:
             if bridge.snapshot() != latest_snapshot:
                 await bridge.replace_snapshot(latest_snapshot)
             runtime.attach_diagnostics(diagnostics)
-            self.hub.overlay_sink = presenter
+            await self._replace_hub_overlay_sink(presenter)
             self.hub.overlay_diagnostics = diagnostics
 
             renderer_events: asyncio.Queue[dict[str, object]] | None = None
@@ -10405,7 +10433,7 @@ class GuiController:
         assert self.hub is not None
         presenter = self._current_overlay_presenter_for_direct_runtime_command()
         if presenter is not None:
-            self.hub.overlay_sink = presenter
+            await self._replace_hub_overlay_sink(presenter)
 
         dash = getattr(self.app, "view_dashboard", None)
         if dash is not None:

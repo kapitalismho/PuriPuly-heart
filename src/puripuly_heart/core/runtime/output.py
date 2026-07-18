@@ -69,7 +69,6 @@ class OutputRuntime:
     overlay_sink: OverlaySink | None = None
     overlay_event_adapter: OverlayEventAdapter | None = None
     flush_interval_s: float = 0.1
-    dedupe_capacity: int = 4096
     diagnostics_capacity: int = 4096
     _state: OutputRuntimeState = "open"
     _chatbox_flush_task: asyncio.Task[None] | None = None
@@ -81,8 +80,9 @@ class OutputRuntime:
     _tasks_being_collected: set[asyncio.Task[Any]] = field(default_factory=set)
     _active_delivery_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
     _delivered_publications: set[tuple[OutputRoute, str]] = field(default_factory=set)
-    _delivered_publication_order: deque[tuple[OutputRoute, str]] = field(default_factory=deque)
     _publications_in_flight: set[tuple[OutputRoute, str]] = field(default_factory=set)
+    _overlay_delivery_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    _replacement_cancelled_delivery_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
     _routing_decisions: deque[OutputRoutingDecision] = field(init=False)
 
     resource_fields = (
@@ -97,8 +97,6 @@ class OutputRuntime:
     )
 
     def __post_init__(self) -> None:
-        if self.dedupe_capacity < 1:
-            raise ValueError("dedupe_capacity must be positive")
         if self.diagnostics_capacity < 1:
             raise ValueError("diagnostics_capacity must be positive")
         self._routing_decisions = deque(maxlen=self.diagnostics_capacity)
@@ -140,6 +138,30 @@ class OutputRuntime:
     @property
     def has_overlay_destination(self) -> bool:
         return self.overlay_sink is not None
+
+    @property
+    def has_active_overlay_deliveries(self) -> bool:
+        return bool(self._active_delivery_tasks)
+
+    async def replace_overlay_sink(
+        self,
+        overlay_sink: OverlaySink | None,
+        *,
+        expected_current: OverlaySink | None = None,
+        require_match: bool = False,
+    ) -> bool:
+        if self._state != "open":
+            raise RuntimeError("OutputRuntime is not accepting overlay destination replacement")
+        async with self._overlay_delivery_lock:
+            if self._state != "open":
+                raise RuntimeError("OutputRuntime is not accepting overlay destination replacement")
+            if require_match and self.overlay_sink is not expected_current:
+                return False
+            if self.overlay_sink is overlay_sink:
+                return True
+            await self._cancel_active_delivery_tasks_locked(replacement=True)
+            self.overlay_sink = overlay_sink
+            return True
 
     @staticmethod
     def chatbox_is_eligible(channel: ChannelId) -> bool:
@@ -496,45 +518,56 @@ class OutputRuntime:
             PUBLICATION_KIND_PEER_SUBTITLE if channel == "peer" else PUBLICATION_KIND_SELF_UTTERANCE
         )
         publication_id = event.event_id
-        if self._state != "open":
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                publication_id=publication_id,
-                publication_kind=publication_kind,
-                reason=(
-                    "output_runtime_closed" if self._state == "closed" else "output_runtime_closing"
-                ),
-                metadata={"channel": channel, "state": self._state},
-            )
-        if self.overlay_sink is None:
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                publication_id=publication_id,
-                publication_kind=publication_kind,
-                reason="destination_unconfigured",
-                metadata={"channel": channel},
-            )
-
         publication_key = (OUTPUT_ROUTE_SUBTITLE_OVERLAY, publication_id)
-        duplicate = self._duplicate_publication_result(
-            publication_key=publication_key,
-            publication_kind=publication_kind,
-            channel=channel,
-        )
-        if duplicate is not None:
-            return duplicate
-
-        self._publications_in_flight.add(publication_key)
-        task = asyncio.create_task(
-            self.overlay_sink.emit(event),
-            name=f"OutputRuntime:overlay-delivery:{publication_id}",
-        )
-        self._active_delivery_tasks.add(task)
+        async with self._overlay_delivery_lock:
+            if self._state != "open":
+                return self._observe_result(
+                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                    route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+                    publication_id=publication_id,
+                    publication_kind=publication_kind,
+                    reason=(
+                        "output_runtime_closed"
+                        if self._state == "closed"
+                        else "output_runtime_closing"
+                    ),
+                    metadata={"channel": channel, "state": self._state},
+                )
+            overlay_sink = self.overlay_sink
+            if overlay_sink is None:
+                return self._observe_result(
+                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                    route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+                    publication_id=publication_id,
+                    publication_kind=publication_kind,
+                    reason="destination_unconfigured",
+                    metadata={"channel": channel},
+                )
+            duplicate = self._duplicate_publication_result(
+                publication_key=publication_key,
+                publication_kind=publication_kind,
+                channel=channel,
+            )
+            if duplicate is not None:
+                return duplicate
+            self._publications_in_flight.add(publication_key)
+            task = asyncio.create_task(
+                overlay_sink.emit(event),
+                name=f"OutputRuntime:overlay-delivery:{publication_id}",
+            )
+            self._active_delivery_tasks.add(task)
         try:
             await task
         except asyncio.CancelledError:
+            if task in self._replacement_cancelled_delivery_tasks:
+                return self._observe_result(
+                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                    route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+                    publication_id=publication_id,
+                    publication_kind=publication_kind,
+                    reason="destination_replaced",
+                    metadata={"channel": channel},
+                )
             if self._state == "open":
                 raise
             return self._observe_result(
@@ -556,6 +589,7 @@ class OutputRuntime:
             )
         finally:
             self._active_delivery_tasks.discard(task)
+            self._replacement_cancelled_delivery_tasks.discard(task)
             self._publications_in_flight.discard(publication_key)
 
         self._remember_delivered_publication(publication_key)
@@ -620,9 +654,15 @@ class OutputRuntime:
         self._ui_event_bridge_task = None
 
     async def _cancel_active_delivery_tasks(self) -> None:
+        async with self._overlay_delivery_lock:
+            await self._cancel_active_delivery_tasks_locked(replacement=False)
+
+    async def _cancel_active_delivery_tasks_locked(self, *, replacement: bool) -> None:
         tasks = tuple(self._active_delivery_tasks)
         if not tasks:
             return
+        if replacement:
+            self._replacement_cancelled_delivery_tasks.update(tasks)
         for task in tasks:
             if not task.done():
                 task.cancel()
@@ -796,10 +836,6 @@ class OutputRuntime:
         if publication_key in self._delivered_publications:
             return
         self._delivered_publications.add(publication_key)
-        self._delivered_publication_order.append(publication_key)
-        while len(self._delivered_publication_order) > self.dedupe_capacity:
-            expired = self._delivered_publication_order.popleft()
-            self._delivered_publications.discard(expired)
 
     def _observe_decision(
         self,

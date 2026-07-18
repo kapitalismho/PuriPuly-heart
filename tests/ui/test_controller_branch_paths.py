@@ -4902,6 +4902,72 @@ async def test_rebuild_pipeline_retires_old_owner_typing_state(
 
 
 @pytest.mark.asyncio
+async def test_overlay_composition_replacement_cancels_old_owner_delivery() -> None:
+    class BlockingOverlaySink:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+            self.started = asyncio.Event()
+            self.cancelled = asyncio.Event()
+
+        async def emit(self, event: object) -> None:
+            self.events.append(event)
+            self.started.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                self.cancelled.set()
+                raise
+
+        def active_self_overlay_metadata(self) -> None:
+            return None
+
+    class RecordingOverlaySink:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+
+        async def emit(self, event: object) -> None:
+            self.events.append(event)
+
+        def active_self_overlay_metadata(self) -> None:
+            return None
+
+    controller = _make_controller(app=SimpleNamespace())
+    old_sink = BlockingOverlaySink()
+    replacement = RecordingOverlaySink()
+    hub = ClientHub(
+        stt=None,
+        llm=None,
+        osc=ChatboxPaginator(sender=FakeSender(), clock=FakeClock()),
+        overlay_sink=old_sink,
+    )
+    controller.hub = hub
+    old_event = hub.overlay_event_adapter.utterance_closed(
+        utterance_id=uuid4(),
+        channel="peer",
+        is_final=True,
+    )
+
+    await hub.start()
+    old_publication = asyncio.create_task(hub._emit_overlay_event(old_event))
+    await asyncio.wait_for(old_sink.started.wait(), timeout=0.5)
+    replaced = await controller._replace_hub_overlay_sink(replacement)
+    await old_publication
+    new_id = await hub.submit_text("replacement composition", source="You")
+
+    assert replaced is True
+    assert old_sink.cancelled.is_set()
+    assert not hub.output_runtime.has_active_overlay_deliveries
+    assert hub.overlay_sink is replacement
+    assert old_sink.events == [old_event]
+    assert [getattr(event, "utterance_id", None) for event in replacement.events] == [
+        new_id,
+        new_id,
+    ]
+
+    await hub.stop()
+
+
+@pytest.mark.asyncio
 async def test_rebuild_pipeline_preserves_hub_when_hub_stop_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -57,16 +57,18 @@ def test_hub_delegates_output_side_effects_to_output_runtime() -> None:
         assert f"self.osc.{side_effect}(" not in hub_source
         assert f"self.osc.{side_effect}(" not in controller_source
     assert "self.output_runtime.publish_overlay_event(" in hub_source
+    assert "self.output_runtime.replace_overlay_sink(" in hub_source
     assert "self.output_runtime.publish_chatbox(" in hub_source
     assert "self.output_runtime.publish_system_disclosure_chatbox(" in hub_source
     assert "self.output_runtime.publish_system_immediate_chatbox(" in hub_source
     assert "self.output_runtime.set_self_chatbox_typing_reason(" in hub_source
     assert "self.output_runtime.clear_self_chatbox_typing_reasons(" in hub_source
-    assert "self.overlay_sink.emit(" in output_source
+    assert "overlay_sink.emit(" in output_source
     assert "self.chatbox.enqueue(" in output_source
     assert "self.chatbox.send_immediate(" in output_source
     assert "self.chatbox.set_typing_reason(" in output_source
     assert "self.chatbox.clear_typing_reasons(" in output_source
+    assert "await self._replace_hub_overlay_sink(" in controller_source
 
 
 def test_flet_composition_uses_owner_without_importing_output_implementation() -> None:

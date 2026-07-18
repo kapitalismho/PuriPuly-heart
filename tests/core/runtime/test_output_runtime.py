@@ -601,32 +601,60 @@ async def test_output_runtime_suppresses_in_flight_duplicate_overlay_delivery() 
 
 
 @pytest.mark.asyncio
-async def test_output_runtime_bounds_completed_publication_identities() -> None:
+async def test_output_runtime_retains_exactly_once_identities_for_owner_lifecycle() -> None:
     OutputRuntime = _output_runtime_class()
     overlay = RecordingOverlaySink()
     owner = OutputRuntime(
         chatbox=RecordingChatbox(),
         clock=FakeClock(_now=10.0),
         overlay_sink=overlay,
-        dedupe_capacity=2,
         diagnostics_capacity=2,
     )
     first = _overlay_event(event_id="first", channel="peer")
-    second = _overlay_event(event_id="second", channel="peer")
-    third = _overlay_event(event_id="third", channel="peer")
 
     await owner.start()
     await owner.publish_overlay_event(first)
-    await owner.publish_overlay_event(second)
-    await owner.publish_overlay_event(third)
-    retried_after_eviction = await owner.publish_overlay_event(first)
+    for index in range(4097):
+        await owner.publish_overlay_event(_overlay_event(event_id=f"later-{index}", channel="peer"))
+    duplicate = await owner.publish_overlay_event(first)
 
-    assert retried_after_eviction.decision.decision == "published"
-    assert overlay.events == [first, second, third, first]
+    assert duplicate.decision.reason == "duplicate_publication"
+    assert overlay.events[0] is first
+    assert len(overlay.events) == 4098
     assert [decision.publication_id for decision in owner.routing_decisions] == [
-        "third",
+        "later-4096",
         "first",
     ]
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_replacement_cancels_old_overlay_delivery_before_cutover() -> None:
+    OutputRuntime = _output_runtime_class()
+    old_overlay = BlockingOverlaySink()
+    replacement = RecordingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=old_overlay,
+    )
+    old_event = _overlay_event(event_id="old-destination", channel="peer")
+    replacement_event = _overlay_event(event_id="new-destination", channel="peer")
+
+    await owner.start()
+    old_publication = asyncio.create_task(owner.publish_overlay_event(old_event))
+    await asyncio.wait_for(old_overlay.started.wait(), timeout=0.5)
+    replaced = await owner.replace_overlay_sink(replacement)
+    old_result = await old_publication
+    replacement_result = await owner.publish_overlay_event(replacement_event)
+
+    assert replaced is True
+    assert old_overlay.cancelled.is_set()
+    assert old_result.decision.reason == "destination_replaced"
+    assert not owner.has_active_overlay_deliveries
+    assert owner.overlay_sink is replacement
+    assert old_overlay.events == [old_event]
+    assert replacement.events == [replacement_event]
+    assert replacement_result.decision.decision == "published"
 
 
 @pytest.mark.asyncio

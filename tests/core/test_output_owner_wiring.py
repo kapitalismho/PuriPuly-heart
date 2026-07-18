@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
+from uuid import uuid4
 
 import pytest
 
@@ -39,6 +41,22 @@ class RecordingOverlay:
 
     def active_self_overlay_metadata(self) -> None:
         return None
+
+
+class BlockingOverlay(RecordingOverlay):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.cancelled = asyncio.Event()
+
+    async def emit(self, event: OverlayEventUnion) -> None:
+        self.events.append(event)
+        self.started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.cancelled.set()
+            raise
 
 
 @pytest.mark.asyncio
@@ -98,7 +116,7 @@ async def test_client_hub_overlay_replacement_updates_only_owner_destination() -
 
     assert hub.output_runtime.overlay_sink is first
     assert [event.utterance_id for event in first.events] == [first_id, first_id]
-    hub.overlay_sink = second
+    await hub.replace_overlay_sink(second)
     second_id = await hub.submit_text("second", source="You")
     second_event = hub.overlay_event_adapter.utterance_closed(
         utterance_id=second_id,
@@ -113,6 +131,45 @@ async def test_client_hub_overlay_replacement_updates_only_owner_destination() -
     assert [event.utterance_id for event in second.events[:2]] == [second_id, second_id]
     assert second.events.count(second_event) == 1
     assert hub.output_runtime.routing_decisions[-1].reason == "duplicate_publication"
+
+    await hub.stop()
+
+
+@pytest.mark.asyncio
+async def test_client_hub_overlay_replacement_awaits_old_delivery_before_new_routing() -> None:
+    old = BlockingOverlay()
+    replacement = RecordingOverlay()
+    hub = ClientHub(
+        stt=None,
+        llm=None,
+        osc=RecordingChatbox(),
+        overlay_sink=old,
+    )
+    old_event = hub.overlay_event_adapter.utterance_closed(
+        utterance_id=uuid4(),
+        channel="peer",
+        is_final=True,
+    )
+
+    await hub.start()
+    old_publication = asyncio.create_task(hub._emit_overlay_event(old_event))
+    await asyncio.wait_for(old.started.wait(), timeout=0.5)
+    await hub.replace_overlay_sink(replacement)
+    await old_publication
+    new_id = await hub.submit_text("new destination", source="You")
+
+    assert old.cancelled.is_set()
+    assert not hub.output_runtime.has_active_overlay_deliveries
+    assert hub.overlay_sink is replacement
+    assert hub.output_runtime.overlay_sink is replacement
+    assert old.events == [old_event]
+    assert [event.utterance_id for event in replacement.events] == [new_id, new_id]
+    replacement_decision = next(
+        decision
+        for decision in hub.output_runtime.routing_decisions
+        if decision.publication_id == old_event.event_id
+    )
+    assert replacement_decision.reason == "destination_replaced"
 
     await hub.stop()
 
