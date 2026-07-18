@@ -51,7 +51,7 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
         ("src/puripuly_heart/core/runtime/provider_handle.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/self_audio.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/overlay.py", ASYNCIO_CREATE_TASK): 1,
-        ("src/puripuly_heart/core/runtime/output.py", ASYNCIO_CREATE_TASK): 1,
+        ("src/puripuly_heart/core/runtime/output.py", ASYNCIO_CREATE_TASK): 2,
         ("src/puripuly_heart/core/runtime/oauth.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/clipboard.py", ASYNCIO_CREATE_TASK): 1,
         (
@@ -158,7 +158,7 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     (
         "src/puripuly_heart/core/runtime/output.py",
         ASYNCIO_CREATE_TASK,
-    ): "OutputRuntime is the named lifecycle owner for chatbox flush and UI bridge tasks",
+    ): "OutputRuntime is the named lifecycle owner for chatbox flush, overlay delivery, and UI bridge tasks",
     (
         "src/puripuly_heart/core/runtime/oauth.py",
         ASYNCIO_CREATE_TASK,
