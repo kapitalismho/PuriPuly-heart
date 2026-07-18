@@ -1440,6 +1440,10 @@ class GuiController:
             if not self._save_settings():
                 self.settings = loaded_settings
                 fallback_channels = ()
+            else:
+                loaded_settings.provider.stt = normalized_settings.provider.stt
+                loaded_settings.provider.peer_stt = normalized_settings.provider.peer_stt
+                self.settings = loaded_settings
         self.settings.ui.overlay_enabled = False
         self.settings.ui.peer_translation_enabled = False
         self._sync_overlay_calibration_cache(self.settings)
@@ -3998,6 +4002,30 @@ class GuiController:
             )
         )
 
+    async def _replace_hub_overlay_sink(
+        self,
+        overlay_sink: object | None,
+        *,
+        expected_current: object | None = None,
+        require_match: bool = False,
+    ) -> bool:
+        hub = self.hub
+        if hub is None:
+            return False
+        replace_overlay_sink = getattr(hub, "replace_overlay_sink", None)
+        if callable(replace_overlay_sink):
+            return bool(
+                await replace_overlay_sink(
+                    overlay_sink,
+                    expected_current=expected_current,
+                    require_match=require_match,
+                )
+            )
+        if require_match and getattr(hub, "overlay_sink", None) is not expected_current:
+            return False
+        setattr(hub, "overlay_sink", overlay_sink)
+        return True
+
     async def _close_stale_overlay_start_runtime(
         self,
         runtime: OverlayRuntimeHandle,
@@ -4018,7 +4046,11 @@ class GuiController:
             )
         if self.hub is not None:
             if getattr(self.hub, "overlay_sink", None) is stale_presenter:
-                self.hub.overlay_sink = None
+                await self._replace_hub_overlay_sink(
+                    None,
+                    expected_current=stale_presenter,
+                    require_match=True,
+                )
             if getattr(self.hub, "overlay_diagnostics", None) is stale_diagnostics:
                 self.hub.overlay_diagnostics = None
 
@@ -5041,7 +5073,11 @@ class GuiController:
             return
 
         enabled = bool(enabled)
-        if enabled and not self._persist_current_manual_local_asr_fallback(channel="peer"):
+        if (
+            enabled
+            and self.settings.provider.peer_stt != STTProviderName.LOCAL_CPU_AUTO
+            and not self._persist_current_manual_local_asr_fallback(channel="peer")
+        ):
             return
         self._peer_activation_generation += 1
         activation_generation = self._peer_activation_generation
@@ -5292,7 +5328,7 @@ class GuiController:
             if bridge.snapshot() != latest_snapshot:
                 await bridge.replace_snapshot(latest_snapshot)
             runtime.attach_diagnostics(diagnostics)
-            self.hub.overlay_sink = presenter
+            await self._replace_hub_overlay_sink(presenter)
             self.hub.overlay_diagnostics = diagnostics
 
             renderer_events: asyncio.Queue[dict[str, object]] | None = None
@@ -6099,6 +6135,34 @@ class GuiController:
             )
         )
         return normalized, tuple(fallback_channels), installation_fallback
+
+    def _manual_local_asr_fallback_normalization_channels(
+        self,
+        settings: AppSettings,
+    ) -> frozenset[str]:
+        current = self.settings
+        if current is None:
+            return frozenset({"self", "peer"})
+        channels: set[str] = set()
+        if (
+            current.provider.stt != settings.provider.stt
+            and settings.provider.stt.value in LOCAL_CPU_PROVIDERS
+        ) or (
+            settings.provider.stt.value in LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER
+            and settings.provider.stt != STTProviderName.LOCAL_QWEN
+            and current.languages.source_language != settings.languages.source_language
+        ):
+            channels.add("self")
+        if (
+            current.provider.peer_stt != settings.provider.peer_stt
+            and settings.provider.peer_stt.value in LOCAL_CPU_PROVIDERS
+        ) or (
+            settings.provider.peer_stt.value in LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER
+            and settings.provider.peer_stt != STTProviderName.LOCAL_QWEN
+            and current.languages.effective_peer_source != settings.languages.effective_peer_source
+        ):
+            channels.add("peer")
+        return frozenset(channels)
 
     def _notify_manual_local_asr_fallback(
         self,
@@ -7310,8 +7374,10 @@ class GuiController:
 
     async def release_manual_typing(self) -> None:
         self._cancel_manual_typing_idle_task()
-        if self.osc is not None:
-            self.osc.clear_typing_reasons()
+        hub = self.hub
+        clear_typing = getattr(hub, "clear_self_chatbox_typing_reasons", None)
+        if callable(clear_typing):
+            clear_typing()
         self.log_detailed("[ManualTyping] release status=cleared")
 
     def _begin_manual_submit_typing(self) -> str:
@@ -7352,10 +7418,12 @@ class GuiController:
         self._set_typing_reason(MANUAL_INPUT_TYPING_REASON, False)
 
     def _set_typing_reason(self, reason: str, active: bool) -> None:
-        if self.osc is None:
+        hub = self.hub
+        set_typing = getattr(hub, "set_self_chatbox_typing_reason", None)
+        if not callable(set_typing):
             return
         try:
-            self.osc.set_typing_reason(reason, active)
+            set_typing(reason, active)
         except Exception as exc:
             self._log_error(f"Manual typing output update failed: {exc}")
 
@@ -7481,16 +7549,21 @@ class GuiController:
     ) -> None:
         view_settings = getattr(self.app, "view_settings", None)
         if view_settings is None:
+            self._remember_settings_view_order22_baseline(settings)
+            self._remember_settings_view_order23_baseline(settings)
+            self._remember_settings_view_order24_baseline(settings)
             return
-        with contextlib.suppress(Exception):
+        try:
             view_settings.load_from_settings(
                 settings,
                 config_path=self.config_path,
                 preserve_custom_vocab_draft=preserve_custom_vocab_draft,
             )
-            self._remember_settings_view_order22_baseline(settings)
-            self._remember_settings_view_order23_baseline(settings)
-            self._remember_settings_view_order24_baseline(settings)
+        except Exception:
+            return
+        self._remember_settings_view_order22_baseline(settings)
+        self._remember_settings_view_order23_baseline(settings)
+        self._remember_settings_view_order24_baseline(settings)
 
     def _order22_patch_base_and_values(
         self,
@@ -7644,9 +7717,24 @@ class GuiController:
             self._sync_memory_runtime_fields_from_settings(committed_settings)
 
     async def apply_settings(self, settings: AppSettings) -> None:
-        settings, fallback_channels, installation_fallback = (
-            self._normalize_manual_local_asr_fallbacks(settings)
-        )
+        fallback_channels: tuple[str, ...] = ()
+        installation_fallback = False
+        normalization_channels = self._manual_local_asr_fallback_normalization_channels(settings)
+        if normalization_channels:
+            normalized_settings, normalized_channels, installation_fallback = (
+                self._normalize_manual_local_asr_fallbacks(settings)
+            )
+            fallback_channels = tuple(
+                channel for channel in normalized_channels if channel in normalization_channels
+            )
+            if fallback_channels:
+                scoped_settings = copy.deepcopy(settings)
+                if "self" in fallback_channels:
+                    scoped_settings.provider.stt = normalized_settings.provider.stt
+                if "peer" in fallback_channels:
+                    scoped_settings.provider.peer_stt = normalized_settings.provider.peer_stt
+                settings = scoped_settings
+            installation_fallback = bool(installation_fallback and fallback_channels)
         if settings is not self.settings:
             routed = await self._apply_order22_order23_order24_settings_via_mutation_services(
                 settings
@@ -10356,7 +10444,7 @@ class GuiController:
         assert self.hub is not None
         presenter = self._current_overlay_presenter_for_direct_runtime_command()
         if presenter is not None:
-            self.hub.overlay_sink = presenter
+            await self._replace_hub_overlay_sink(presenter)
 
         dash = getattr(self.app, "view_dashboard", None)
         if dash is not None:
@@ -11798,14 +11886,22 @@ class GuiController:
                 in {STTProviderName.SONIOX, STTProviderName.LOCAL_QWEN_GPU}
             )
 
-        with contextlib.suppress(Exception):
-            view_settings = getattr(self.app, "view_settings", None)
-            if view_settings is not None:
+        view_settings = getattr(self.app, "view_settings", None)
+        if view_settings is None:
+            self._remember_settings_view_order22_baseline(settings)
+            self._remember_settings_view_order23_baseline(settings)
+            self._remember_settings_view_order24_baseline(settings)
+        else:
+            try:
                 view_settings.load_from_settings(settings, config_path=self.config_path)
+            except Exception:
+                pass
+            else:
                 self._remember_settings_view_order22_baseline(settings)
                 self._remember_settings_view_order23_baseline(settings)
                 self._remember_settings_view_order24_baseline(settings)
-                view_settings.set_overlay_calibration(self.overlay_calibration)
+                with contextlib.suppress(Exception):
+                    view_settings.set_overlay_calibration(self.overlay_calibration)
 
         self._refresh_overlay_peer_consumers()
 

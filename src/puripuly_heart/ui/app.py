@@ -293,8 +293,8 @@ class TranslatorApp:
             await self.controller.stop()
             self._shutdown_complete = True
 
-    def _on_page_lifecycle_end(self, _event=None) -> None:
-        self._run_page_task(self.shutdown)
+    async def _on_page_lifecycle_end(self, _event=None) -> None:
+        await self.shutdown()
 
     def _setup_page(self):
         self.page.title = t("app.title")

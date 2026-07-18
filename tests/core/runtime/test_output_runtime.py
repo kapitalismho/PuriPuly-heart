@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import importlib
 from dataclasses import dataclass, field
+from typing import cast
 from uuid import uuid4
 
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.overlay.sink import OverlayEventUnion, UtteranceClosed
 from puripuly_heart.domain.models import OSCMessage
 
 
@@ -21,18 +23,35 @@ def _output_runtime_class():
 @dataclass(slots=True)
 class RecordingChatbox:
     messages: list[OSCMessage] = field(default_factory=list)
+    immediate_messages: list[str] = field(default_factory=list)
     typing: list[bool] = field(default_factory=list)
+    typing_reasons: set[str] = field(default_factory=set)
+    clear_typing_reasons_calls: int = 0
     process_due_calls: int = 0
     drop_pending_calls: int = 0
 
     def enqueue(self, message: OSCMessage) -> None:
         self.messages.append(message)
 
+    def send_immediate(self, text: str) -> bool:
+        self.immediate_messages.append(text)
+        return True
+
     def send_typing(self, is_typing: bool) -> None:
         self.typing.append(is_typing)
 
     def set_typing_reason(self, reason: str, active: bool) -> None:
         self.typing.append(active)
+        if active:
+            self.typing_reasons.add(reason)
+        else:
+            self.typing_reasons.discard(reason)
+
+    def clear_typing_reasons(self) -> None:
+        self.clear_typing_reasons_calls += 1
+        if self.typing_reasons:
+            self.typing.append(False)
+        self.typing_reasons.clear()
 
     def process_due(self) -> None:
         self.process_due_calls += 1
@@ -53,10 +72,61 @@ class DropPendingFailsOnceChatbox(RecordingChatbox):
             raise RuntimeError("drop pending failed")
 
 
+class ClearTypingFailsOnceChatbox(RecordingChatbox):
+    def __init__(self) -> None:
+        super().__init__()
+        self.fail_next_clear = True
+
+    def clear_typing_reasons(self) -> None:
+        self.clear_typing_reasons_calls += 1
+        if self.fail_next_clear:
+            self.fail_next_clear = False
+            raise RuntimeError("clear typing reasons failed")
+        if self.typing_reasons:
+            self.typing.append(False)
+        self.typing_reasons.clear()
+
+
+class CleanupFailsOnceChatbox(RecordingChatbox):
+    def __init__(self) -> None:
+        super().__init__()
+        self.fail_next_clear = True
+        self.fail_next_drop = True
+
+    def clear_typing_reasons(self) -> None:
+        self.clear_typing_reasons_calls += 1
+        if self.fail_next_clear:
+            self.fail_next_clear = False
+            raise RuntimeError("clear typing reasons failed")
+        self.typing_reasons.clear()
+
+    def drop_pending(self) -> None:
+        self.drop_pending_calls += 1
+        if self.fail_next_drop:
+            self.fail_next_drop = False
+            raise RuntimeError("drop pending failed")
+
+
 class FailingFlushChatbox(RecordingChatbox):
     def process_due(self) -> None:
         self.process_due_calls += 1
         raise RuntimeError("flush task failed")
+
+
+class FailingEnqueueChatbox(RecordingChatbox):
+    def enqueue(self, message: OSCMessage) -> None:
+        raise RuntimeError("chatbox failed with secret-publication-text")
+
+
+class FailingChatboxControls(RecordingChatbox):
+    def send_immediate(self, text: str) -> bool:
+        raise RuntimeError("immediate failed with secret-system-text")
+
+    def set_typing_reason(self, reason: str, active: bool) -> None:
+        raise RuntimeError("typing reason failed")
+
+    def clear_typing_reasons(self) -> None:
+        raise RuntimeError("typing clear failed")
 
 
 class CloseAwareBridge:
@@ -90,6 +160,61 @@ class FailingRunBridge(CloseAwareBridge):
         raise RuntimeError("bridge run failed")
 
 
+@dataclass(slots=True)
+class RecordingOverlaySink:
+    events: list[OverlayEventUnion] = field(default_factory=list)
+
+    async def emit(self, event: OverlayEventUnion) -> None:
+        self.events.append(event)
+
+
+class FailingOverlaySink(RecordingOverlaySink):
+    async def emit(self, event: OverlayEventUnion) -> None:
+        raise RuntimeError("overlay destination failed with secret-output-text")
+
+
+class BlockingOverlaySink(RecordingOverlaySink):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.cancelled = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def emit(self, event: OverlayEventUnion) -> None:
+        self.events.append(event)
+        self.started.set()
+        try:
+            await self.release.wait()
+        except asyncio.CancelledError:
+            self.cancelled.set()
+            raise
+
+
+class CloseRaceFailingOverlaySink(RecordingOverlaySink):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+
+    async def emit(self, event: OverlayEventUnion) -> None:
+        self.events.append(event)
+        self.started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError as exc:
+            raise RuntimeError("destination failure during close") from exc
+
+
+def _overlay_event(*, event_id: str, channel: str) -> UtteranceClosed:
+    return UtteranceClosed(
+        event_id=event_id,
+        seq=1,
+        utterance_id=uuid4(),
+        channel=channel,
+        created_at=10.0,
+        is_final=True,
+    )
+
+
 def test_output_runtime_exposes_lifecycle_inventory_and_policy() -> None:
     OutputRuntime = _output_runtime_class()
     owner = OutputRuntime(chatbox=RecordingChatbox(), clock=FakeClock(_now=10.0))
@@ -98,11 +223,15 @@ def test_output_runtime_exposes_lifecycle_inventory_and_policy() -> None:
 
     assert snapshot["owner"] == "OutputRuntime"
     assert "_chatbox_flush_task" in snapshot["resource_fields"]
+    assert "ChatboxPaginator._typing_reasons" in snapshot["resource_fields"]
     assert "overlay_event_adapter" in snapshot["resource_fields"]
+    assert "overlay delivery tasks" in snapshot["resource_fields"]
     assert "UIEventBridge.run task" in snapshot["resource_fields"]
     assert "conversation adapter" in snapshot["resource_fields"]
     assert snapshot["stop_ingress"] == "stop accepting output publications"
     assert "chatbox: drop pending pages/messages on close" in snapshot["shutdown_policy"]
+    assert "chatbox: clear typing reasons on close" in snapshot["shutdown_policy"]
+    assert "overlay: cancel active delivery tasks" in snapshot["shutdown_policy"]
     assert snapshot["late_callback_rule"] == (
         "output after close returns denied/skipped observer decisions without user text"
     )
@@ -125,6 +254,7 @@ async def test_output_runtime_starts_flush_loop_and_drops_chatbox_backlog_on_clo
 
     assert task.done()
     assert owner.chatbox_flush_task is None
+    assert chatbox.clear_typing_reasons_calls == 1
     assert chatbox.drop_pending_calls == 1
     assert owner.state == "closed"
 
@@ -156,6 +286,375 @@ async def test_output_runtime_denies_peer_chatbox_without_user_text() -> None:
     assert owner.routing_decisions[-1] == result.decision
     assert "secret peer transcript" not in repr(result.decision)
     assert "secret peer translation" not in repr(result.decision)
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_isolates_chatbox_failure_with_safe_diagnostics() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=FailingEnqueueChatbox(),
+        clock=FakeClock(_now=10.0),
+    )
+
+    await owner.start()
+    self_result = await owner.publish_chatbox(
+        publication_id=uuid4(),
+        channel="self",
+        transcript_text="secret-publication-text",
+        translation_text=None,
+        include_source=True,
+    )
+    system_result = owner.publish_system_disclosure_chatbox(
+        text="secret-system-disclosure",
+    )
+
+    assert self_result.decision.reason == "destination_publish_failed"
+    assert self_result.decision.metadata["error_type"] == "RuntimeError"
+    assert "secret-publication-text" not in repr(self_result.decision)
+    assert system_result.decision.reason == "destination_publish_failed"
+    assert "secret-system-disclosure" not in repr(system_result.decision)
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_owns_typing_and_immediate_system_side_effects() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    typing_on = owner.set_self_chatbox_typing_reason("manual_input", True)
+    typing_off = owner.set_self_chatbox_typing_reason("manual_input", False)
+    owner.set_self_chatbox_typing_reason("manual_submit:1", True)
+    typing_clear = owner.clear_self_chatbox_typing_reasons()
+    disclosure_id = uuid4()
+    immediate = owner.publish_system_immediate_chatbox(
+        text="PuriPuly ON!",
+        disclosure_id=disclosure_id,
+    )
+    duplicate = owner.publish_system_immediate_chatbox(
+        text="PuriPuly ON!",
+        disclosure_id=disclosure_id,
+    )
+
+    assert typing_on.decision.decision == "published"
+    assert typing_off.decision.decision == "published"
+    assert typing_clear.decision.decision == "published"
+    assert immediate.decision.decision == "published"
+    assert duplicate.decision.reason == "duplicate_publication"
+    assert chatbox.typing_reasons == set()
+    assert chatbox.clear_typing_reasons_calls == 1
+    assert chatbox.immediate_messages == ["PuriPuly ON!"]
+    assert [decision.metadata["channel"] for decision in owner.routing_decisions] == [
+        "self",
+        "self",
+        "self",
+        "self",
+        "system",
+        "system",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_isolates_typing_and_immediate_failures() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(chatbox=FailingChatboxControls(), clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    typing = owner.set_self_chatbox_typing_reason("manual_input", True)
+    clear = owner.clear_self_chatbox_typing_reasons()
+    immediate = owner.publish_system_immediate_chatbox(text="secret-system-text")
+
+    assert typing.decision.reason == "destination_publish_failed"
+    assert clear.decision.reason == "destination_publish_failed"
+    assert immediate.decision.reason == "destination_publish_failed"
+    assert "secret-system-text" not in repr(immediate.decision)
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_rejects_typing_and_immediate_after_close() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    await owner.close()
+    typing = owner.set_self_chatbox_typing_reason("manual_input", True)
+    clear = owner.clear_self_chatbox_typing_reasons()
+    immediate = owner.publish_system_immediate_chatbox(text="PuriPuly ON!")
+
+    assert typing.decision.reason == "output_runtime_closed"
+    assert clear.decision.reason == "output_runtime_closed"
+    assert immediate.decision.reason == "output_runtime_closed"
+    assert chatbox.typing == []
+    assert chatbox.clear_typing_reasons_calls == 1
+    assert chatbox.immediate_messages == []
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_close_retires_active_typing_reason() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    owner.set_self_chatbox_typing_reason("manual_input", True)
+    await owner.close()
+
+    assert chatbox.typing == [True, False]
+    assert chatbox.typing_reasons == set()
+    assert chatbox.clear_typing_reasons_calls == 1
+    assert owner.state == "closed"
+    assert not owner.has_resources
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_delivers_channel_separate_overlay_events_in_order() -> None:
+    OutputRuntime = _output_runtime_class()
+    overlay = RecordingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=overlay,
+    )
+    self_event = _overlay_event(
+        event_id="self-final",
+        channel="self",
+    )
+    peer_event = _overlay_event(
+        event_id="peer-final",
+        channel="peer",
+    )
+
+    await owner.start()
+    self_result = await owner.publish_overlay_event(self_event)
+    peer_result = await owner.publish_overlay_event(peer_event)
+
+    assert overlay.events == [self_event, peer_event]
+    assert self_result.decision.decision == "published"
+    assert self_result.decision.publication_kind == "self_utterance"
+    assert peer_result.decision.decision == "published"
+    assert peer_result.decision.publication_kind == "peer_subtitle"
+    assert [decision.publication_id for decision in owner.routing_decisions] == [
+        "self-final",
+        "peer-final",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_rejects_invalid_overlay_contract_at_ingress() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    missing_channel = UtteranceClosed(
+        event_id="missing-channel",
+        seq=1,
+        utterance_id=uuid4(),
+        channel=None,
+        created_at=10.0,
+        is_final=True,
+    )
+
+    await owner.start()
+    with pytest.raises(TypeError, match="overlay event contract"):
+        await owner.publish_overlay_event(cast(OverlayEventUnion, object()))
+    with pytest.raises(ValueError, match="product channel"):
+        await owner.publish_overlay_event(missing_channel)
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_suppresses_duplicate_chatbox_and_overlay_delivery() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = RecordingChatbox()
+    overlay = RecordingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=chatbox,
+        clock=FakeClock(_now=10.0),
+        overlay_sink=overlay,
+    )
+    utterance_id = uuid4()
+    event = _overlay_event(
+        event_id="terminal-child-final",
+        channel="peer",
+    )
+
+    await owner.start()
+    first_chatbox = await owner.publish_chatbox(
+        publication_id=utterance_id,
+        channel="self",
+        transcript_text="source",
+        translation_text="translation",
+        include_source=False,
+    )
+    duplicate_chatbox = await owner.publish_chatbox(
+        publication_id=utterance_id,
+        channel="self",
+        transcript_text="source",
+        translation_text="translation",
+        include_source=False,
+    )
+    first_overlay = await owner.publish_overlay_event(event)
+    duplicate_overlay = await owner.publish_overlay_event(event)
+
+    assert first_chatbox.decision.decision == "published"
+    assert duplicate_chatbox.decision.reason == "duplicate_publication"
+    assert len(chatbox.messages) == 1
+    assert first_overlay.decision.decision == "published"
+    assert duplicate_overlay.decision.reason == "duplicate_publication"
+    assert overlay.events == [event]
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_isolates_overlay_failure_with_safe_diagnostics() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=FailingOverlaySink(),
+    )
+    event = _overlay_event(
+        event_id="failed-peer-final",
+        channel="peer",
+    )
+
+    await owner.start()
+    result = await owner.publish_overlay_event(event)
+
+    assert result.decision.decision == "skipped"
+    assert result.decision.reason == "destination_publish_failed"
+    assert result.decision.metadata["error_type"] == "RuntimeError"
+    assert "secret-output-text" not in repr(result.decision)
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_close_cancels_active_overlay_delivery() -> None:
+    OutputRuntime = _output_runtime_class()
+    overlay = BlockingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=overlay,
+    )
+    event = _overlay_event(
+        event_id="active-peer-final",
+        channel="peer",
+    )
+
+    await owner.start()
+    publication_task = asyncio.create_task(owner.publish_overlay_event(event))
+    await asyncio.wait_for(overlay.started.wait(), timeout=0.5)
+    await owner.close()
+    result = await publication_task
+
+    assert overlay.cancelled.is_set()
+    assert result.decision.decision == "skipped"
+    assert result.decision.reason == "output_runtime_closing"
+    assert owner.state == "closed"
+    assert not owner.has_resources
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_shutdown_isolates_racing_overlay_failure() -> None:
+    OutputRuntime = _output_runtime_class()
+    overlay = CloseRaceFailingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=overlay,
+    )
+    event = _overlay_event(event_id="racing-peer-final", channel="peer")
+
+    await owner.start()
+    publication_task = asyncio.create_task(owner.publish_overlay_event(event))
+    await asyncio.wait_for(overlay.started.wait(), timeout=0.5)
+    await owner.close()
+    result = await publication_task
+
+    assert result.decision.decision == "skipped"
+    assert result.decision.reason == "destination_publish_failed"
+    assert owner.state == "closed"
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_suppresses_in_flight_duplicate_overlay_delivery() -> None:
+    OutputRuntime = _output_runtime_class()
+    overlay = BlockingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=overlay,
+    )
+    event = _overlay_event(event_id="in-flight-peer-final", channel="peer")
+
+    await owner.start()
+    publication_task = asyncio.create_task(owner.publish_overlay_event(event))
+    await asyncio.wait_for(overlay.started.wait(), timeout=0.5)
+    duplicate = await owner.publish_overlay_event(event)
+    overlay.release.set()
+    published = await publication_task
+
+    assert duplicate.decision.reason == "duplicate_publication"
+    assert published.decision.decision == "published"
+    assert overlay.events == [event]
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_retains_exactly_once_identities_for_owner_lifecycle() -> None:
+    OutputRuntime = _output_runtime_class()
+    overlay = RecordingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=overlay,
+        diagnostics_capacity=2,
+    )
+    first = _overlay_event(event_id="first", channel="peer")
+
+    await owner.start()
+    await owner.publish_overlay_event(first)
+    for index in range(4097):
+        await owner.publish_overlay_event(_overlay_event(event_id=f"later-{index}", channel="peer"))
+    duplicate = await owner.publish_overlay_event(first)
+
+    assert duplicate.decision.reason == "duplicate_publication"
+    assert overlay.events[0] is first
+    assert len(overlay.events) == 4098
+    assert [decision.publication_id for decision in owner.routing_decisions] == [
+        "later-4096",
+        "first",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_replacement_cancels_old_overlay_delivery_before_cutover() -> None:
+    OutputRuntime = _output_runtime_class()
+    old_overlay = BlockingOverlaySink()
+    replacement = RecordingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=old_overlay,
+    )
+    old_event = _overlay_event(event_id="old-destination", channel="peer")
+    replacement_event = _overlay_event(event_id="new-destination", channel="peer")
+
+    await owner.start()
+    old_publication = asyncio.create_task(owner.publish_overlay_event(old_event))
+    await asyncio.wait_for(old_overlay.started.wait(), timeout=0.5)
+    replaced = await owner.replace_overlay_sink(replacement)
+    old_result = await old_publication
+    replacement_result = await owner.publish_overlay_event(replacement_event)
+
+    assert replaced is True
+    assert old_overlay.cancelled.is_set()
+    assert old_result.decision.reason == "destination_replaced"
+    assert not owner.has_active_overlay_deliveries
+    assert owner.overlay_sink is replacement
+    assert old_overlay.events == [old_event]
+    assert replacement.events == [replacement_event]
+    assert replacement_result.decision.decision == "published"
 
 
 @pytest.mark.asyncio
@@ -217,6 +716,54 @@ async def test_output_runtime_drop_pending_failure_retries_before_closed() -> No
     await owner.close()
 
     assert owner.state == "closed"
+    assert chatbox.drop_pending_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_typing_clear_failure_retries_before_closed() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = ClearTypingFailsOnceChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    owner.set_self_chatbox_typing_reason("self_speech_pending", True)
+    with pytest.raises(RuntimeError, match="clear typing reasons failed"):
+        await owner.close()
+
+    assert owner.state == "closing"
+    assert owner.has_resources
+    assert chatbox.clear_typing_reasons_calls == 1
+    assert chatbox.drop_pending_calls == 1
+
+    await owner.close()
+
+    assert owner.state == "closed"
+    assert chatbox.clear_typing_reasons_calls == 2
+    assert chatbox.drop_pending_calls == 1
+    assert chatbox.typing == [True, False]
+    assert chatbox.typing_reasons == set()
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_aggregates_typing_and_backlog_cleanup_failures() -> None:
+    OutputRuntime = _output_runtime_class()
+    chatbox = CleanupFailsOnceChatbox()
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+
+    await owner.start()
+    with pytest.raises(ExceptionGroup) as excinfo:
+        await owner.close()
+
+    assert {str(exc) for exc in excinfo.value.exceptions} == {
+        "clear typing reasons failed",
+        "drop pending failed",
+    }
+    assert owner.state == "closing"
+
+    await owner.close()
+
+    assert owner.state == "closed"
+    assert chatbox.clear_typing_reasons_calls == 2
     assert chatbox.drop_pending_calls == 2
 
 

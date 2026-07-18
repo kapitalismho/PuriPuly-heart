@@ -831,7 +831,9 @@ async def test_handle_stt_partial_runtime_log_uses_metadata_without_transcript_t
 
 
 @pytest.mark.asyncio
-async def test_enqueue_osc_emits_metadata_preview_only_in_detailed_runtime_logs() -> None:
+async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed_runtime_logs() -> (
+    None
+):
     basic_runtime_logging, basic_stream = _make_runtime_logging_capture()
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
     detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
@@ -853,12 +855,12 @@ async def test_enqueue_osc_emits_metadata_preview_only_in_detailed_runtime_logs(
     utterance_id = uuid4()
 
     try:
-        await basic_hub._enqueue_osc(
+        await basic_hub._publish_chatbox_candidate(
             utterance_id,
             transcript_text="hello world from transcript",
             translation_text="hello world translated",
         )
-        await detailed_hub._enqueue_osc(
+        await detailed_hub._publish_chatbox_candidate(
             utterance_id,
             transcript_text="hello world from transcript",
             translation_text="hello world translated",
@@ -887,7 +889,7 @@ async def test_enqueue_osc_emits_metadata_preview_only_in_detailed_runtime_logs(
 
 
 @pytest.mark.asyncio
-async def test_enqueue_osc_after_hub_stop_skips_without_user_text() -> None:
+async def test_publish_chatbox_candidate_after_hub_stop_skips_without_user_text() -> None:
     osc = RecordingOscQueue()
     hub = ClientHub(
         stt=None,
@@ -899,7 +901,7 @@ async def test_enqueue_osc_after_hub_stop_skips_without_user_text() -> None:
 
     await hub.start(auto_flush_osc=True)
     await hub.stop()
-    await hub._enqueue_osc(
+    await hub._publish_chatbox_candidate(
         utterance_id,
         transcript_text="closed secret transcript",
         translation_text="closed secret translation",
@@ -926,7 +928,7 @@ async def test_stop_without_start_closes_output_runtime_ingress() -> None:
     utterance_id = uuid4()
 
     await hub.stop()
-    await hub._enqueue_osc(
+    await hub._publish_chatbox_candidate(
         utterance_id,
         transcript_text="never started secret transcript",
         translation_text=None,
@@ -1303,8 +1305,20 @@ async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
     )
 
     try:
-        await basic_hub._emit_overlay_event(object())
-        await detailed_hub._emit_overlay_event(object())
+        await basic_hub._emit_overlay_event(
+            basic_hub.overlay_event_adapter.utterance_closed(
+                utterance_id=uuid4(),
+                channel="self",
+                is_final=True,
+            )
+        )
+        await detailed_hub._emit_overlay_event(
+            detailed_hub.overlay_event_adapter.utterance_closed(
+                utterance_id=uuid4(),
+                channel="self",
+                is_final=True,
+            )
+        )
 
         basic_messages = _runtime_log_messages(basic_stream)
         detailed_messages = _runtime_log_messages(detailed_stream)

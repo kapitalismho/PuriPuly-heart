@@ -79,6 +79,8 @@ from puripuly_heart.core.managed_openrouter_release import (
     UnavailableManagedOpenRouterReleaseClient,
 )
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
+from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import (
@@ -108,6 +110,7 @@ from puripuly_heart.ui.app import TranslatorApp
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.i18n import set_locale, t
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+from tests.helpers.fakes import FakeSender
 
 PEER_DISCLOSURE_KEY = "peer_translation.disclosure"
 
@@ -1142,6 +1145,42 @@ def test_settings_view_change_rebases_audio_patch_without_restoring_stale_peer_l
         merged.languages.effective_peer_source,
     )
     assert decision.model_id == "parakeet-tdt-ctc-0.6b-ja-int8-sherpa"
+
+
+@pytest.mark.parametrize("reload_method", ["reload", "sync"])
+def test_failed_settings_view_reload_preserves_displayed_mutation_baseline(
+    reload_method: str,
+) -> None:
+    class FailingSettingsView:
+        def load_from_settings(self, *_args, **_kwargs) -> None:
+            raise RuntimeError("settings view reload failed")
+
+    controller = _make_controller(app=SimpleNamespace(view_settings=FailingSettingsView()))
+    displayed = AppSettings()
+    displayed.languages.source_language = "en"
+    controller._remember_settings_view_order22_baseline(displayed)
+    controller._remember_settings_view_order23_baseline(displayed)
+    controller._remember_settings_view_order24_baseline(displayed)
+
+    committed = copy.deepcopy(displayed)
+    committed.languages.source_language = "ja"
+    controller.settings = committed
+    if reload_method == "reload":
+        controller._reload_settings_view_from_settings(
+            committed,
+            preserve_custom_vocab_draft=True,
+        )
+    else:
+        controller._sync_ui_from_settings()
+
+    stale_edit = copy.deepcopy(displayed)
+    stale_edit.overlay.show_translation = False
+    change = controller.capture_settings_view_change(stale_edit)
+    merged = controller.merge_settings_view_change_with_current(change)
+
+    assert change.values_by_path == {"overlay.show_translation": False}
+    assert merged.languages.source_language == "ja"
+    assert merged.overlay.show_translation is False
 
 
 @pytest.mark.parametrize(
@@ -4820,6 +4859,115 @@ async def test_rebuild_pipeline_closes_previous_peer_runtime_before_replacement(
 
 
 @pytest.mark.asyncio
+async def test_rebuild_pipeline_retires_old_owner_typing_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
+    sender = FakeSender()
+    chatbox = ChatboxPaginator(sender=sender, clock=FakeClock())
+    old_hub = ClientHub(stt=None, llm=None, osc=chatbox)
+    controller.hub = old_hub
+    controller.osc = chatbox
+    new_hub = DummyHub(llm=None, stt=None)
+
+    class FakeUIEventBridge:
+        def __init__(self, **kwargs) -> None:
+            self.event_queue = kwargs["event_queue"]
+
+        async def run(self) -> None:
+            return None
+
+    async def fake_init_pipeline(self: GuiController) -> None:
+        self.hub = new_hub
+
+    old_hub.set_self_chatbox_typing_reason("manual_input", True)
+    assert sender.typing == [True]
+
+    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
+    monkeypatch.setattr(
+        GuiController,
+        "_configure_vrc_mic_receiver",
+        lambda self, enabled: asyncio.sleep(0),
+    )
+    monkeypatch.setattr(controller_module, "UIEventBridge", FakeUIEventBridge)
+    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
+
+    await controller._rebuild_pipeline(rebuild_stt=True)
+
+    assert old_hub.output_runtime.state == "closed"
+    assert sender.typing == [True, False]
+    assert not chatbox._is_typing_active()
+    assert controller.hub is new_hub
+
+
+@pytest.mark.asyncio
+async def test_overlay_composition_replacement_cancels_old_owner_delivery() -> None:
+    class BlockingOverlaySink:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+            self.started = asyncio.Event()
+            self.cancelled = asyncio.Event()
+
+        async def emit(self, event: object) -> None:
+            self.events.append(event)
+            self.started.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                self.cancelled.set()
+                raise
+
+        def active_self_overlay_metadata(self) -> None:
+            return None
+
+    class RecordingOverlaySink:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+
+        async def emit(self, event: object) -> None:
+            self.events.append(event)
+
+        def active_self_overlay_metadata(self) -> None:
+            return None
+
+    controller = _make_controller(app=SimpleNamespace())
+    old_sink = BlockingOverlaySink()
+    replacement = RecordingOverlaySink()
+    hub = ClientHub(
+        stt=None,
+        llm=None,
+        osc=ChatboxPaginator(sender=FakeSender(), clock=FakeClock()),
+        overlay_sink=old_sink,
+    )
+    controller.hub = hub
+    old_event = hub.overlay_event_adapter.utterance_closed(
+        utterance_id=uuid4(),
+        channel="peer",
+        is_final=True,
+    )
+
+    await hub.start()
+    old_publication = asyncio.create_task(hub._emit_overlay_event(old_event))
+    await asyncio.wait_for(old_sink.started.wait(), timeout=0.5)
+    replaced = await controller._replace_hub_overlay_sink(replacement)
+    await old_publication
+    new_id = await hub.submit_text("replacement composition", source="You")
+
+    assert replaced is True
+    assert old_sink.cancelled.is_set()
+    assert not hub.output_runtime.has_active_overlay_deliveries
+    assert hub.overlay_sink is replacement
+    assert old_sink.events == [old_event]
+    assert [getattr(event, "utterance_id", None) for event in replacement.events] == [
+        new_id,
+        new_id,
+    ]
+
+    await hub.stop()
+
+
+@pytest.mark.asyncio
 async def test_rebuild_pipeline_preserves_hub_when_hub_stop_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -5168,6 +5316,168 @@ async def test_init_pipeline_passes_chatbox_and_peer_language_settings_to_hub(
     assert captured["peer_source_language"] == "ja"
     assert captured["peer_target_language"] == "en"
     assert llm_create_kwargs["runtime_logging"] is controller.runtime_logging
+
+
+@pytest.mark.asyncio
+async def test_init_pipeline_constructs_production_output_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Chatbox:
+        def enqueue(self, message) -> None:
+            _ = message
+
+        def send_typing(self, is_typing: bool) -> None:
+            _ = is_typing
+
+        def set_typing_reason(self, reason: str, active: bool) -> None:
+            _ = (reason, active)
+
+        def clear_typing_reasons(self) -> None:
+            return
+
+        def process_due(self) -> None:
+            return
+
+        def send_immediate(self, text: str) -> bool:
+            _ = text
+            return True
+
+    chatbox = Chatbox()
+    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
+    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        controller_module,
+        "create_stt_backend",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("unavailable")),
+    )
+    monkeypatch.setattr(controller_module, "VrchatOscUdpSender", lambda *a, **k: object())
+    monkeypatch.setattr(controller_module, "ChatboxPaginator", lambda *a, **k: chatbox)
+    monkeypatch.setattr(
+        GuiController,
+        "_configure_vrc_mic_receiver",
+        lambda self, enabled: asyncio.sleep(0),
+    )
+
+    controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
+
+    await controller._init_pipeline()
+
+    assert type(controller.hub) is controller_module.ClientHub
+    assert controller.hub.output_runtime.chatbox is chatbox
+    assert controller.hub.output_runtime.overlay_sink is None
+    assert controller.hub.output_runtime.state == "open"
+
+
+@pytest.mark.asyncio
+async def test_real_controller_composition_routes_all_output_channels_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class RecordingChatbox:
+        def __init__(self) -> None:
+            self.messages: list[object] = []
+            self.typing_reasons: set[str] = set()
+
+        def enqueue(self, message: object) -> None:
+            self.messages.append(message)
+
+        def send_typing(self, is_typing: bool) -> None:
+            _ = is_typing
+
+        def set_typing_reason(self, reason: str, active: bool) -> None:
+            if active:
+                self.typing_reasons.add(reason)
+            else:
+                self.typing_reasons.discard(reason)
+
+        def clear_typing_reasons(self) -> None:
+            self.typing_reasons.clear()
+
+        def process_due(self) -> None:
+            return
+
+        def send_immediate(self, text: str) -> bool:
+            _ = text
+            return True
+
+    class RecordingOverlay:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+
+        async def emit(self, event: object) -> None:
+            self.events.append(event)
+
+        def active_self_overlay_metadata(self) -> None:
+            return None
+
+    chatbox = RecordingChatbox()
+    overlay = RecordingOverlay()
+    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
+    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        controller_module,
+        "create_stt_backend",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("unavailable")),
+    )
+    monkeypatch.setattr(controller_module, "VrchatOscUdpSender", lambda *a, **k: object())
+    monkeypatch.setattr(controller_module, "ChatboxPaginator", lambda *a, **k: chatbox)
+    monkeypatch.setattr(
+        GuiController,
+        "_configure_vrc_mic_receiver",
+        lambda self, enabled: asyncio.sleep(0),
+    )
+    controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
+
+    await controller._init_pipeline()
+    hub = controller.hub
+    assert type(hub) is controller_module.ClientHub
+    await controller._replace_hub_overlay_sink(overlay)
+    await controller.submit_text("manual self text")
+    manual_id = getattr(chatbox.messages[0], "utterance_id")
+    peer_id = await hub.handle_peer_transcript_final_for_test("peer presentation text")
+    hub.enqueue_peer_translation_disclosure("system disclosure")
+
+    chatbox_ids = [getattr(message, "utterance_id") for message in chatbox.messages]
+    assert len(chatbox_ids) == 2
+    assert chatbox_ids[0] == manual_id
+    assert chatbox_ids[1] not in {manual_id, peer_id}
+    assert [getattr(message, "text") for message in chatbox.messages] == [
+        "manual self text",
+        "system disclosure",
+    ]
+    assert [getattr(event, "channel") for event in overlay.events] == [
+        "self",
+        "self",
+        "peer",
+        "peer",
+    ]
+    assert [getattr(event, "utterance_id") for event in overlay.events] == [
+        manual_id,
+        manual_id,
+        peer_id,
+        peer_id,
+    ]
+    assert [getattr(event, "type") for event in overlay.events] == [
+        "self_transcript_final",
+        "utterance_closed",
+        "peer_transcript_final",
+        "utterance_closed",
+    ]
+    peer_denials = [
+        decision
+        for decision in hub.output_runtime.routing_decisions
+        if decision.publication_kind == "peer_subtitle" and decision.route == "self_chatbox"
+    ]
+    assert len(peer_denials) == 1
+    assert peer_denials[0].reason == "peer_chatbox_denied"
+    assert all(
+        "peer presentation text" not in getattr(message, "text") for message in chatbox.messages
+    )
+
+    await hub.stop()
+    assert hub.output_runtime.state == "closed"
+    assert not hub.output_runtime.has_resources
 
 
 @pytest.mark.asyncio

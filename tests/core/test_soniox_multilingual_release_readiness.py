@@ -379,7 +379,11 @@ async def _run_simulated_schedule(schedule: _SimulationSchedule) -> _SimulationR
             failures.append("terminal_sequence")
         if not all(hub.peer_final_runs.is_parent_closed(parent_id) for parent_id in parent_ids):
             failures.append("parent_closure")
-        decisions = hub.output_runtime.routing_decisions
+        decisions = [
+            decision
+            for decision in hub.output_runtime.routing_decisions
+            if decision.route == "self_chatbox" and decision.publication_kind == "peer_subtitle"
+        ]
         if len(decisions) != len(schedule.runs) or any(
             (decision.decision, decision.reason) != ("denied", "peer_chatbox_denied")
             for decision in decisions

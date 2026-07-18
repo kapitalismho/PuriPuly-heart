@@ -266,10 +266,14 @@ class OverlayRuntimeHandle:
                 return
             self._closing = True
             failures: list[Exception] = []
-            hub_ingress_detached = self._detach_hub_overlay_ingress(
-                hub,
-                self._presenter,
-            )
+            hub_ingress_detached = False
+            try:
+                hub_ingress_detached = await self._detach_hub_overlay_ingress(
+                    hub,
+                    self._presenter,
+                )
+            except Exception as exc:
+                failures.append(exc)
             try:
                 if emit_shutdown:
                     await self._attempt(failures, self._mark_process_shutdown_requested)
@@ -387,7 +391,7 @@ class OverlayRuntimeHandle:
         if callable(mark_shutdown_requested):
             mark_shutdown_requested()
 
-    def _detach_hub_overlay_ingress(
+    async def _detach_hub_overlay_ingress(
         self,
         hub: object | None,
         presenter: object | None,
@@ -396,7 +400,33 @@ class OverlayRuntimeHandle:
             return False
         if getattr(hub, "overlay_sink", None) is not presenter:
             return False
-        setattr(hub, "overlay_sink", None)
+        return await self._replace_hub_overlay_sink(
+            hub,
+            None,
+            expected_current=presenter,
+            require_match=True,
+        )
+
+    @staticmethod
+    async def _replace_hub_overlay_sink(
+        hub: object,
+        overlay_sink: object | None,
+        *,
+        expected_current: object | None,
+        require_match: bool,
+    ) -> bool:
+        replace_overlay_sink = getattr(hub, "replace_overlay_sink", None)
+        if callable(replace_overlay_sink):
+            return bool(
+                await replace_overlay_sink(
+                    overlay_sink,
+                    expected_current=expected_current,
+                    require_match=require_match,
+                )
+            )
+        if require_match and getattr(hub, "overlay_sink", None) is not expected_current:
+            return False
+        setattr(hub, "overlay_sink", overlay_sink)
         return True
 
     async def _cancel_owned_tasks(self, failures: list[Exception]) -> None:
@@ -460,8 +490,18 @@ class OverlayRuntimeHandle:
         hub_sink = getattr(hub, "overlay_sink", None) if hub is not None else None
         hub_sink_is_presenter = hub_sink is presenter
         if hub is not None and hub_sink_is_presenter:
-            setattr(hub, "overlay_sink", None)
-            hub_sink = None
+            try:
+                hub_sink_is_presenter = await self._replace_hub_overlay_sink(
+                    hub,
+                    None,
+                    expected_current=presenter,
+                    require_match=True,
+                )
+            except Exception as exc:
+                failures.append(exc)
+                hub_sink_is_presenter = False
+            if hub_sink_is_presenter:
+                hub_sink = None
 
         should_clear_hub_state = hub_sink_is_presenter or (
             hub_ingress_detached and hub_sink is None
