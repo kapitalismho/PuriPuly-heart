@@ -1440,6 +1440,10 @@ class GuiController:
             if not self._save_settings():
                 self.settings = loaded_settings
                 fallback_channels = ()
+            else:
+                loaded_settings.provider.stt = normalized_settings.provider.stt
+                loaded_settings.provider.peer_stt = normalized_settings.provider.peer_stt
+                self.settings = loaded_settings
         self.settings.ui.overlay_enabled = False
         self.settings.ui.peer_translation_enabled = False
         self._sync_overlay_calibration_cache(self.settings)
@@ -5030,7 +5034,11 @@ class GuiController:
             return
 
         enabled = bool(enabled)
-        if enabled and not self._persist_current_manual_local_asr_fallback(channel="peer"):
+        if (
+            enabled
+            and self.settings.provider.peer_stt != STTProviderName.LOCAL_CPU_AUTO
+            and not self._persist_current_manual_local_asr_fallback(channel="peer")
+        ):
             return
         self._peer_activation_generation += 1
         activation_generation = self._peer_activation_generation
@@ -6088,6 +6096,34 @@ class GuiController:
             )
         )
         return normalized, tuple(fallback_channels), installation_fallback
+
+    def _manual_local_asr_fallback_normalization_channels(
+        self,
+        settings: AppSettings,
+    ) -> frozenset[str]:
+        current = self.settings
+        if current is None:
+            return frozenset({"self", "peer"})
+        channels: set[str] = set()
+        if (
+            current.provider.stt != settings.provider.stt
+            and settings.provider.stt.value in LOCAL_CPU_PROVIDERS
+        ) or (
+            settings.provider.stt.value in LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER
+            and settings.provider.stt != STTProviderName.LOCAL_QWEN
+            and current.languages.source_language != settings.languages.source_language
+        ):
+            channels.add("self")
+        if (
+            current.provider.peer_stt != settings.provider.peer_stt
+            and settings.provider.peer_stt.value in LOCAL_CPU_PROVIDERS
+        ) or (
+            settings.provider.peer_stt.value in LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER
+            and settings.provider.peer_stt != STTProviderName.LOCAL_QWEN
+            and current.languages.effective_peer_source != settings.languages.effective_peer_source
+        ):
+            channels.add("peer")
+        return frozenset(channels)
 
     def _notify_manual_local_asr_fallback(
         self,
@@ -7470,16 +7506,21 @@ class GuiController:
     ) -> None:
         view_settings = getattr(self.app, "view_settings", None)
         if view_settings is None:
+            self._remember_settings_view_order22_baseline(settings)
+            self._remember_settings_view_order23_baseline(settings)
+            self._remember_settings_view_order24_baseline(settings)
             return
-        with contextlib.suppress(Exception):
+        try:
             view_settings.load_from_settings(
                 settings,
                 config_path=self.config_path,
                 preserve_custom_vocab_draft=preserve_custom_vocab_draft,
             )
-            self._remember_settings_view_order22_baseline(settings)
-            self._remember_settings_view_order23_baseline(settings)
-            self._remember_settings_view_order24_baseline(settings)
+        except Exception:
+            return
+        self._remember_settings_view_order22_baseline(settings)
+        self._remember_settings_view_order23_baseline(settings)
+        self._remember_settings_view_order24_baseline(settings)
 
     def _order22_patch_base_and_values(
         self,
@@ -7633,9 +7674,24 @@ class GuiController:
             self._sync_memory_runtime_fields_from_settings(committed_settings)
 
     async def apply_settings(self, settings: AppSettings) -> None:
-        settings, fallback_channels, installation_fallback = (
-            self._normalize_manual_local_asr_fallbacks(settings)
-        )
+        fallback_channels: tuple[str, ...] = ()
+        installation_fallback = False
+        normalization_channels = self._manual_local_asr_fallback_normalization_channels(settings)
+        if normalization_channels:
+            normalized_settings, normalized_channels, installation_fallback = (
+                self._normalize_manual_local_asr_fallbacks(settings)
+            )
+            fallback_channels = tuple(
+                channel for channel in normalized_channels if channel in normalization_channels
+            )
+            if fallback_channels:
+                scoped_settings = copy.deepcopy(settings)
+                if "self" in fallback_channels:
+                    scoped_settings.provider.stt = normalized_settings.provider.stt
+                if "peer" in fallback_channels:
+                    scoped_settings.provider.peer_stt = normalized_settings.provider.peer_stt
+                settings = scoped_settings
+            installation_fallback = bool(installation_fallback and fallback_channels)
         if settings is not self.settings:
             routed = await self._apply_order22_order23_order24_settings_via_mutation_services(
                 settings
@@ -11787,14 +11843,22 @@ class GuiController:
                 in {STTProviderName.SONIOX, STTProviderName.LOCAL_QWEN_GPU}
             )
 
-        with contextlib.suppress(Exception):
-            view_settings = getattr(self.app, "view_settings", None)
-            if view_settings is not None:
+        view_settings = getattr(self.app, "view_settings", None)
+        if view_settings is None:
+            self._remember_settings_view_order22_baseline(settings)
+            self._remember_settings_view_order23_baseline(settings)
+            self._remember_settings_view_order24_baseline(settings)
+        else:
+            try:
                 view_settings.load_from_settings(settings, config_path=self.config_path)
+            except Exception:
+                pass
+            else:
                 self._remember_settings_view_order22_baseline(settings)
                 self._remember_settings_view_order23_baseline(settings)
                 self._remember_settings_view_order24_baseline(settings)
-                view_settings.set_overlay_calibration(self.overlay_calibration)
+                with contextlib.suppress(Exception):
+                    view_settings.set_overlay_calibration(self.overlay_calibration)
 
         self._refresh_overlay_peer_consumers()
 

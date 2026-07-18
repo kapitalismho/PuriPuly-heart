@@ -1144,6 +1144,42 @@ def test_settings_view_change_rebases_audio_patch_without_restoring_stale_peer_l
     assert decision.model_id == "parakeet-tdt-ctc-0.6b-ja-int8-sherpa"
 
 
+@pytest.mark.parametrize("reload_method", ["reload", "sync"])
+def test_failed_settings_view_reload_preserves_displayed_mutation_baseline(
+    reload_method: str,
+) -> None:
+    class FailingSettingsView:
+        def load_from_settings(self, *_args, **_kwargs) -> None:
+            raise RuntimeError("settings view reload failed")
+
+    controller = _make_controller(app=SimpleNamespace(view_settings=FailingSettingsView()))
+    displayed = AppSettings()
+    displayed.languages.source_language = "en"
+    controller._remember_settings_view_order22_baseline(displayed)
+    controller._remember_settings_view_order23_baseline(displayed)
+    controller._remember_settings_view_order24_baseline(displayed)
+
+    committed = copy.deepcopy(displayed)
+    committed.languages.source_language = "ja"
+    controller.settings = committed
+    if reload_method == "reload":
+        controller._reload_settings_view_from_settings(
+            committed,
+            preserve_custom_vocab_draft=True,
+        )
+    else:
+        controller._sync_ui_from_settings()
+
+    stale_edit = copy.deepcopy(displayed)
+    stale_edit.overlay.show_translation = False
+    change = controller.capture_settings_view_change(stale_edit)
+    merged = controller.merge_settings_view_change_with_current(change)
+
+    assert change.values_by_path == {"overlay.show_translation": False}
+    assert merged.languages.source_language == "ja"
+    assert merged.overlay.show_translation is False
+
+
 @pytest.mark.parametrize(
     "failure_reason",
     [
