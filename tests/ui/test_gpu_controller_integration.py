@@ -153,6 +153,9 @@ class RecordingSelfRecoveryOwner:
         self.adopted_handlers.append(on_terminal_failure)
         return SimpleNamespace()
 
+    async def suspend_provider_consumer(self):
+        return SimpleNamespace()
+
 
 def _controller() -> tuple[GuiController, CapturingGpuSettingsView]:
     view = CapturingGpuSettingsView()
@@ -670,6 +673,91 @@ async def test_overlapping_manual_and_settings_recovery_adopt_exact_callbacks(
     assert settings_handler is not None
     assert manual_handler is not settings_handler
     assert self_owner.adopted_handlers == [manual_handler, settings_handler]
+    assert self_owner.pending_handlers == set()
+
+
+async def test_manual_and_settings_recovery_serialize_through_adoption(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller, _view = _controller()
+    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    controller._stt_desired = False
+    events = []
+    first_adoption_started = asyncio.Event()
+    release_first_adoption = asyncio.Event()
+
+    class BarrierSelfOwner(RecordingSelfRecoveryOwner):
+        async def adopt_recovered_provider(self, config, *, on_terminal_failure):
+            result = await super().adopt_recovered_provider(
+                config,
+                on_terminal_failure=on_terminal_failure,
+            )
+            adoption_number = len(self.adopted_handlers)
+            events.append(f"adopt_{adoption_number}_start")
+            if adoption_number == 1:
+                first_adoption_started.set()
+                await release_first_adoption.wait()
+            events.append(f"adopt_{adoption_number}_end")
+            return result
+
+    self_owner = BarrierSelfOwner()
+    controller._self_capture_owner = self_owner
+    monkeypatch.setattr(
+        GuiController,
+        "_on_self_capture_state_changed",
+        lambda _self, _snapshot: None,
+    )
+
+    class Owner:
+        def __init__(self) -> None:
+            self.recovery_calls = 0
+            self.snapshot = _owned_gpu_snapshot(
+                phase="ready",
+                active_channels=frozenset({"self"}),
+                attached_channels=frozenset({"self"}),
+            )
+
+        async def recover_gpu(self, _request, *, quiesce):
+            self.recovery_calls += 1
+            recovery_number = self.recovery_calls
+            events.append(f"recover_{recovery_number}_start")
+            await quiesce(("self",))
+            events.append(f"recover_{recovery_number}_end")
+            return self.snapshot
+
+    owner = Owner()
+    controller.hub = SimpleNamespace(local_asr_provider_runtime=owner)
+    plan = _ProviderRuntimeApplyPlan(
+        should_rebuild_llm=False,
+        should_refresh_peer=False,
+        should_refresh_self_stt=False,
+        coordinated_gpu_restart=True,
+    )
+
+    manual_task = asyncio.create_task(controller.retry_gpu_activation())
+    await first_adoption_started.wait()
+    settings_task = asyncio.create_task(
+        controller._apply_gpu_runtime_owner_recovery(controller.settings, plan)
+    )
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert owner.recovery_calls == 1
+    assert events == ["recover_1_start", "recover_1_end", "adopt_1_start"]
+
+    release_first_adoption.set()
+    await asyncio.wait_for(asyncio.gather(manual_task, settings_task), timeout=1.0)
+
+    assert events == [
+        "recover_1_start",
+        "recover_1_end",
+        "adopt_1_start",
+        "adopt_1_end",
+        "recover_2_start",
+        "recover_2_end",
+        "adopt_2_start",
+        "adopt_2_end",
+    ]
     assert self_owner.pending_handlers == set()
 
 

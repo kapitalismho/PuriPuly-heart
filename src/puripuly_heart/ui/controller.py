@@ -1128,6 +1128,11 @@ class GuiController:
     _gpu_discovery_failure_state: str | None = field(init=False, default=None, repr=False)
     _gpu_discovery_generation: int = field(init=False, default=0, repr=False)
     _gpu_discovery_origin: str = field(init=False, default="settings", repr=False)
+    _gpu_provider_recovery_lock: asyncio.Lock | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     # Overlay runtime internals are owned by OverlayRuntimeHandle.
     _overlay_runtime: OverlayRuntimeHandle | None = None
     _overlay_lock: asyncio.Lock | None = None
@@ -1725,6 +1730,10 @@ class GuiController:
             )
 
     async def retry_gpu_activation(self) -> None:
+        async with self._get_gpu_provider_recovery_lock():
+            await self._execute_gpu_provider_recovery_retry()
+
+    async def _execute_gpu_provider_recovery_retry(self) -> None:
         if self.settings is None:
             return
         owned_runtime = self._hub_local_asr_provider_runtime()
@@ -8482,6 +8491,14 @@ class GuiController:
         next_settings: AppSettings,
         plan: _ProviderRuntimeApplyPlan,
     ) -> None:
+        async with self._get_gpu_provider_recovery_lock():
+            await self._apply_gpu_runtime_owner_recovery_locked(next_settings, plan)
+
+    async def _apply_gpu_runtime_owner_recovery_locked(
+        self,
+        next_settings: AppSettings,
+        plan: _ProviderRuntimeApplyPlan,
+    ) -> None:
         owned_runtime = self._hub_local_asr_provider_runtime()
         if owned_runtime is None:
             raise RuntimeError("local ASR provider runtime is unavailable")
@@ -8526,6 +8543,11 @@ class GuiController:
             )
         finally:
             self._abort_self_provider_recovery(recovery)
+
+    def _get_gpu_provider_recovery_lock(self) -> asyncio.Lock:
+        if self._gpu_provider_recovery_lock is None:
+            self._gpu_provider_recovery_lock = asyncio.Lock()
+        return self._gpu_provider_recovery_lock
 
     def _desired_gpu_channels(self, settings: AppSettings) -> frozenset[GpuASRChannel]:
         owned_runtime = self._hub_local_asr_provider_runtime()
