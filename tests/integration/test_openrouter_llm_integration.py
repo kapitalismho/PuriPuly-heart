@@ -32,6 +32,7 @@ pytestmark = integration_mark()
 class FailFastManagedReleaseService:
     def __init__(self) -> None:
         self.accessed: list[str] = []
+        self.managed_state = None
 
     def __getattr__(self, name: str) -> object:
         self.accessed.append(name)
