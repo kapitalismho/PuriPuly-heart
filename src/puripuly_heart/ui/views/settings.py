@@ -413,7 +413,9 @@ class SettingsView(ft.Column):
         *,
         height: float | int | None = SettingsUnitCard.DEFAULT_HEIGHT,
     ) -> SharedCardWrapper:
-        return self._wrap_card(ft.Container(expand=True), expand=True, height=height)
+        card = self._wrap_card(ft.Container(expand=True), expand=True, height=height)
+        card.ignore_interactions = True
+        return card
 
     # --- Clickable Text Builders ---
     def _build_clickable_text(
@@ -1169,7 +1171,7 @@ class SettingsView(ft.Column):
         )
         api_keys_row = api_card
 
-        # === General Tab Row 1: UI / Include Original / Integrated Context ===
+        # === General Tab Row 1 ===
         self._ui_text = self._build_clickable_text(
             locale_label(get_locale()),
             self._on_ui_click,
@@ -1263,6 +1265,7 @@ class SettingsView(ft.Column):
                 [
                     ui_card,
                     chatbox_source_card,
+                    self._wrap_empty_unit_card(),
                 ],
                 spacing=16,
                 expand=True,
@@ -1910,6 +1913,7 @@ class SettingsView(ft.Column):
         self._translation_connection_row = ft.Container(
             content=ft.Row(
                 [
+                    self._wrap_empty_unit_card(),
                     self._translation_connection_card,
                     self._openrouter_fallback_card,
                 ],

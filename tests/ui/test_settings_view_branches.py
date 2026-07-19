@@ -5360,17 +5360,17 @@ def test_audio_change_updates_desktop_loopback_controls(monkeypatch: pytest.Monk
     assert changed[-1].desktop_audio.vad_pre_roll_ms == 420
 
 
-def test_general_tab_reflows_only_retired_context_row(
+def test_general_tab_keeps_fixed_three_slot_rows_with_empty_retired_context_shell(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
+    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
+
     view, _ = _make_settings_view(monkeypatch)
     general_controls = _subtab_controls(view, "general")
 
     assert len(general_controls) == 4
-    assert len(general_controls[0].content.controls) == 2
-    assert len(general_controls[1].content.controls) == 3
-    assert len(general_controls[2].content.controls) == 3
-    assert len(general_controls[3].content.controls) == 3
+    assert {len(control.content.controls) for control in general_controls} == {3}
     assert _row_card_titles(general_controls[0]) == [
         t("settings.section.ui"),
         t("settings.chatbox_include_source"),
@@ -5390,6 +5390,76 @@ def test_general_tab_reflows_only_retired_context_row(
         t("settings.vrc_mic_intercept"),
         t("settings.telemetry.title"),
     ]
+
+    empty_card = general_controls[0].content.controls[2]
+    empty_content = _wrapped_card_column(empty_card)
+
+    assert isinstance(empty_card, SharedCardWrapper)
+    assert not isinstance(empty_card, SettingsUnitCard)
+    assert empty_card.height == SettingsUnitCard.DEFAULT_HEIGHT
+    assert empty_card.expand is True
+    assert empty_card.ignore_interactions is True
+    assert empty_card.on_click is None
+    assert empty_card.on_hover is None
+    assert isinstance(empty_content, ft.Container)
+    assert empty_content.content is None
+
+
+def test_api_translation_connection_row_keeps_empty_fast_translation_slot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
+    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
+
+    view, _ = _make_settings_view(monkeypatch)
+    cards = _row_cards(view._translation_connection_row)
+
+    assert len(cards) == 3
+    assert _row_card_titles(view._translation_connection_row) == [
+        t("settings.translation_connection"),
+        t("settings.fallback"),
+    ]
+    assert {card.height for card in cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
+    assert all(card.expand is True for card in cards)
+
+    empty_card = cards[0]
+    empty_content = _wrapped_card_column(empty_card)
+
+    assert isinstance(empty_card, SharedCardWrapper)
+    assert not isinstance(empty_card, SettingsUnitCard)
+    assert empty_card.ignore_interactions is True
+    assert empty_card.on_click is None
+    assert empty_card.on_hover is None
+    assert isinstance(empty_content, ft.Container)
+    assert empty_content.content is None
+
+
+@pytest.mark.parametrize("locale", ["en", "ko", "ja", "ru", "zh-CN"])
+def test_retired_policy_empty_slots_are_locale_independent(
+    monkeypatch: pytest.MonkeyPatch,
+    locale: str,
+) -> None:
+    old_locale = i18n_module.get_locale()
+    try:
+        i18n_module.set_locale(locale)
+        view, _ = _make_settings_view(monkeypatch)
+        general_row = _subtab_controls(view, "general")[0]
+        api_row = view._translation_connection_row
+
+        assert len(_row_cards(general_row)) == 3
+        assert len(_row_cards(api_row)) == 3
+        assert _row_card_titles(general_row) == [
+            t("settings.section.ui"),
+            t("settings.chatbox_include_source"),
+        ]
+        assert _row_card_titles(api_row) == [
+            t("settings.translation_connection"),
+            t("settings.fallback"),
+        ]
+        assert _control_labels(_row_cards(general_row)[2]) == []
+        assert _control_labels(_row_cards(api_row)[0]) == []
+    finally:
+        i18n_module.set_locale(old_locale)
 
 
 @pytest.mark.parametrize(
