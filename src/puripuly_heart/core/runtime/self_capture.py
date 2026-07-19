@@ -102,6 +102,7 @@ class SelfCaptureSessionOwner:
         self._retired_sources: list[object] = []
         self._failure_reason: SelfCaptureFailureReason | None = None
         self._admission_reason: str | None = None
+        self._last_cleanup_exception: Exception | None = None
         self._closed = False
         self._state_lock = asyncio.Lock()
         self._activation_lock = asyncio.Lock()
@@ -136,6 +137,10 @@ class SelfCaptureSessionOwner:
         return self._source
 
     @property
+    def cleanup_source(self) -> object | None:
+        return self._retired_sources[0] if self._retired_sources else None
+
+    @property
     def vad(self) -> object | None:
         return self._vad
 
@@ -146,6 +151,10 @@ class SelfCaptureSessionOwner:
     @property
     def current_config(self) -> SelfCaptureSessionConfig | None:
         return self._config
+
+    @property
+    def last_cleanup_exception(self) -> Exception | None:
+        return self._last_cleanup_exception
 
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
@@ -171,6 +180,39 @@ class SelfCaptureSessionOwner:
             owner=self,
             generation=self._generation if generation is None else generation,
         )
+
+    def adopt_legacy_state(
+        self,
+        *,
+        config: SelfCaptureSessionConfig,
+        desired_active: bool,
+        task: asyncio.Task[None] | None,
+        source: object | None,
+        vad: object | None,
+        last_cleanup_exception: Exception | None = None,
+    ) -> None:
+        if self._source is not None or self._vad is not None or self._loop_task is not None:
+            return
+        self._generation += 1
+        generation = self._generation
+        self._config = config
+        self._provider_signature = config.provider_signature
+        self._provider_status = SelfCaptureProviderStatus.READY
+        self._desired_active = desired_active
+        self._source = source
+        self._vad = vad
+        self._loop_task = task
+        self._last_cleanup_exception = last_cleanup_exception
+        self._state = (
+            SelfCaptureSessionState.RUNNING
+            if task is not None or source is not None or vad is not None
+            else SelfCaptureSessionState.STOPPED
+        )
+        if task is not None:
+            task.add_done_callback(
+                lambda completed: self._on_loop_task_done(completed, generation=generation)
+            )
+        self._notify_state_changed()
 
     async def apply_intent(
         self,
@@ -220,6 +262,73 @@ class SelfCaptureSessionOwner:
                     self._transition_task = None
         return self.snapshot
 
+    async def prepare_provider(
+        self,
+        config: SelfCaptureSessionConfig,
+    ) -> SelfCaptureSessionSnapshot:
+        if self._desired_active or self._source is not None or self._loop_task is not None:
+            return await self.apply_intent(config, enabled=True)
+        async with self._state_lock:
+            if self._closed:
+                raise RuntimeError("SelfCaptureSessionOwner is closed")
+            self._generation += 1
+            generation = self._generation
+            self._config = config
+            self._state = SelfCaptureSessionState.STARTING
+            self._provider_status = SelfCaptureProviderStatus.PENDING
+            self._failure_reason = None
+            self._notify_state_changed()
+        async with self._activation_lock:
+            if self._is_superseded(generation):
+                return self.snapshot
+            if self._provider.is_ready(config):
+                result_status = SelfCaptureProviderMutationStatus.APPLIED
+                failure_reason = None
+            else:
+                try:
+                    result = await self._provider.replace(
+                        self._provider_request_factory(config, False),
+                        start=False,
+                        on_terminal_failure=lambda exc: self._on_prepared_provider_failure(
+                            exc,
+                            generation=generation,
+                        ),
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    result_status = SelfCaptureProviderMutationStatus.FAILED
+                    failure_reason = type(exc).__name__
+                else:
+                    result_status = result.status
+                    failure_reason = result.reason
+            if self._is_superseded(generation):
+                return self.snapshot
+            if result_status is SelfCaptureProviderMutationStatus.APPLIED:
+                self._provider_signature = config.provider_signature
+                self._provider_status = SelfCaptureProviderStatus.READY
+                self._state = SelfCaptureSessionState.STOPPED
+                self._emit(SelfCaptureDiagnosticEvent.PROVIDER_CHANGED, generation=generation)
+            elif result_status is SelfCaptureProviderMutationStatus.PENDING:
+                self._provider_status = SelfCaptureProviderStatus.PENDING
+                self._state = SelfCaptureSessionState.ADMISSION_PENDING
+                self._admission_reason = failure_reason
+            elif result_status is SelfCaptureProviderMutationStatus.SUPERSEDED:
+                self._provider_status = SelfCaptureProviderStatus.DETACHED
+                self._state = SelfCaptureSessionState.STOPPED
+            else:
+                self._provider_status = SelfCaptureProviderStatus.FAILED
+                self._state = SelfCaptureSessionState.FAULTED
+                self._failure_reason = SelfCaptureFailureReason.PROVIDER_FAILED
+                self._emit(
+                    SelfCaptureDiagnosticEvent.FAILURE,
+                    generation=generation,
+                    reason=SelfCaptureFailureReason.PROVIDER_FAILED,
+                    detail=failure_reason,
+                )
+            self._notify_state_changed()
+            return self.snapshot
+
     async def cancel(self) -> SelfCaptureSessionSnapshot:
         config = self._config
         if config is None:
@@ -238,6 +347,48 @@ class SelfCaptureSessionOwner:
 
     async def release_for_microphone_test(self) -> SelfCaptureSessionSnapshot:
         return await self.cancel()
+
+    async def suspend_provider_consumer(self) -> SelfCaptureSessionSnapshot:
+        async with self._state_lock:
+            if self._closed:
+                raise RuntimeError("SelfCaptureSessionOwner is closed")
+            self._generation += 1
+            generation = self._generation
+            transition_task = self._transition_task
+            self._transition_task = None
+            self._state = SelfCaptureSessionState.STOPPING
+            self._notify_state_changed()
+        if transition_task is not None and transition_task is not asyncio.current_task():
+            if not transition_task.done():
+                transition_task.cancel()
+            await asyncio.gather(transition_task, return_exceptions=True)
+        async with self._activation_lock:
+            await self._teardown(
+                generation=generation,
+                target_state=SelfCaptureSessionState.STOPPED,
+                release_mode="drain",
+                preserve_intent=True,
+                release_provider=False,
+            )
+        return self.snapshot
+
+    async def adopt_recovered_provider(
+        self,
+        config: SelfCaptureSessionConfig,
+    ) -> SelfCaptureSessionSnapshot:
+        if not self._provider.is_ready(config):
+            raise RuntimeError("recovered Self provider is not attached")
+        async with self._state_lock:
+            if self._closed:
+                raise RuntimeError("SelfCaptureSessionOwner is closed")
+            if self._source is not None or self._loop_task is not None:
+                raise RuntimeError("Self provider recovery requires suspended capture")
+            self._config = config
+            self._provider_signature = config.provider_signature
+            self._provider_status = SelfCaptureProviderStatus.READY
+            self._state = SelfCaptureSessionState.STOPPED
+            self._notify_state_changed()
+        return self.snapshot
 
     async def close(self) -> None:
         async with self._state_lock:
@@ -281,6 +432,8 @@ class SelfCaptureSessionOwner:
                 return
             if not enabled:
                 self._state = SelfCaptureSessionState.STOPPING
+                if self._provider_status is SelfCaptureProviderStatus.DETACHED:
+                    self._provider_status = SelfCaptureProviderStatus.READY
                 self._notify_state_changed()
                 mode, release_backend_after = self._release_plan(
                     config,
@@ -598,6 +751,26 @@ class SelfCaptureSessionOwner:
             exc,
         )
 
+    async def _on_prepared_provider_failure(
+        self,
+        exc: Exception,
+        *,
+        generation: int,
+    ) -> None:
+        async with self._activation_lock:
+            if self._is_superseded(generation):
+                return
+            self._provider_status = SelfCaptureProviderStatus.FAILED
+            self._state = SelfCaptureSessionState.FAULTED
+            self._failure_reason = SelfCaptureFailureReason.PROVIDER_FAILED
+            self._emit(
+                SelfCaptureDiagnosticEvent.FAILURE,
+                generation=generation,
+                reason=SelfCaptureFailureReason.PROVIDER_FAILED,
+                detail=type(exc).__name__,
+            )
+            self._notify_state_changed()
+
     async def _fault_generation(
         self,
         generation: int,
@@ -665,6 +838,7 @@ class SelfCaptureSessionOwner:
         release_backend_after: float | None = None,
         preserve_intent: bool = False,
         completed_task: asyncio.Task[None] | None = None,
+        release_provider: bool = True,
     ) -> None:
         if generation != self._generation:
             return
@@ -693,7 +867,7 @@ class SelfCaptureSessionOwner:
                 self._audio_gate_reset()
             except Exception as exc:
                 failures.append(exc)
-        if self._provider_status is not SelfCaptureProviderStatus.DETACHED:
+        if release_provider and self._provider_status is not SelfCaptureProviderStatus.DETACHED:
             self._provider_status = SelfCaptureProviderStatus.RELEASING
             self._notify_state_changed()
             try:
@@ -710,6 +884,7 @@ class SelfCaptureSessionOwner:
         if not preserve_intent:
             self._desired_active = False
         if failures:
+            self._last_cleanup_exception = failures[0]
             self._failure_reason = SelfCaptureFailureReason.CLEANUP_FAILED
             self._state = SelfCaptureSessionState.FAULTED
             self._emit(
@@ -720,6 +895,7 @@ class SelfCaptureSessionOwner:
             )
             self._notify_state_changed()
             raise failures[0]
+        self._last_cleanup_exception = None
         self._state = target_state
         if target_state is not SelfCaptureSessionState.FAULTED:
             self._failure_reason = None

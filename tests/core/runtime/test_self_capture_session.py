@@ -552,3 +552,68 @@ async def test_close_cancels_pending_admission_and_rejects_future_intent() -> No
     assert provider.replace_calls == []
     with pytest.raises(RuntimeError, match="closed"):
         await owner.apply_intent(session_config, enabled=True)
+
+
+@pytest.mark.asyncio
+async def test_prepare_provider_attaches_without_opening_capture_resources() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+    session_config = config(local_cpu=True)
+
+    snapshot = await owner.prepare_provider(session_config)
+
+    assert snapshot.state is SelfCaptureSessionState.STOPPED
+    assert snapshot.provider_status is SelfCaptureProviderStatus.READY
+    assert snapshot.desired_active is False
+    assert provider.replace_calls == [(("provider-one", False), False)]
+    assert sources == []
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_suspend_and_recovery_preserve_intent_without_releasing_provider() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+    session_config = config(local_gpu=True)
+
+    await owner.apply_intent(session_config, enabled=True)
+    suspended = await owner.suspend_provider_consumer()
+
+    assert suspended.state is SelfCaptureSessionState.STOPPED
+    assert suspended.desired_active is True
+    assert suspended.provider_status is SelfCaptureProviderStatus.READY
+    assert sources[0].close_calls == 1
+    assert provider.release_calls == []
+
+    recovered = await owner.adopt_recovered_provider(session_config)
+    resumed = await owner.apply_intent(session_config, enabled=True)
+
+    assert recovered.provider_status is SelfCaptureProviderStatus.READY
+    assert resumed.state is SelfCaptureSessionState.RUNNING
+    assert provider.replace_calls == [(("provider-one", True), False)]
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_adopted_legacy_resources_transfer_to_owner_teardown() -> None:
+    owner, _, provider, _, _, _ = build_owner()
+    source = RecordingSource()
+    task = asyncio.create_task(asyncio.sleep(3600))
+
+    owner.adopt_legacy_state(
+        config=config(),
+        desired_active=True,
+        task=task,
+        source=source,
+        vad=object(),
+    )
+    snapshot = await owner.apply_intent(
+        config(),
+        enabled=False,
+        explicit_toggle_off=True,
+    )
+
+    assert snapshot.state is SelfCaptureSessionState.STOPPED
+    assert task.cancelled() is True
+    assert source.close_calls == 1
+    assert provider.release_calls == [("drain", None)]

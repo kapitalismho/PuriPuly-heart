@@ -36,7 +36,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/ui/components/settings/api_key_field.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/dashboard.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/settings.py", RUN_TASK): 1,
-        ("src/puripuly_heart/ui/controller.py", ASYNCIO_CREATE_TASK): 3,
+        ("src/puripuly_heart/ui/controller.py", ASYNCIO_CREATE_TASK): 2,
         ("src/puripuly_heart/ui/controller.py", LOOP_CREATE_TASK): 5,
         ("src/puripuly_heart/ui/controller.py", BARE_RUN_TASK): 5,
         ("src/puripuly_heart/ui/desktop_overlay.py", ASYNCIO_CREATE_TASK): 11,
@@ -119,7 +119,7 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     (
         "src/puripuly_heart/ui/controller.py",
         ASYNCIO_CREATE_TASK,
-    ): "controller has exactly three bounded UI task handles for status refresh, desktop-bounds persistence, and STT switching",
+    ): "controller has exactly two bounded UI task handles for status refresh and desktop-bounds persistence",
     (
         "src/puripuly_heart/ui/controller.py",
         LOOP_CREATE_TASK,

@@ -60,6 +60,12 @@ class SelfCaptureSessionConfig:
     runtime_signature: tuple[object, ...]
     capture_signature: tuple[object, ...]
     target_sample_rate_hz: int
+    input_host_api: str = ""
+    input_device: str = ""
+    internal_channels: int = 1
+    ring_buffer_ms: int = 2000
+    vad_speech_threshold: float = 0.5
+    vad_hangover_ms: int = 1100
     session_options: object | None = None
     local_cpu: bool = False
     local_gpu: bool = False

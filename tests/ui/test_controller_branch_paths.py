@@ -107,6 +107,11 @@ from puripuly_heart.core.runtime_logging import (
     SessionLoggingMode,
     SessionRuntimeLoggingService,
 )
+from puripuly_heart.core.self_capture import (
+    SelfCaptureProviderStatus,
+    SelfCaptureSessionSnapshot,
+    SelfCaptureSessionState,
+)
 from puripuly_heart.core.stt.controller import FinalTranscriptSuppressedNotification
 from puripuly_heart.domain.models import Transcript
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
@@ -1337,11 +1342,16 @@ def _patch_init_pipeline_dependencies(monkeypatch: pytest.MonkeyPatch) -> dict[s
         def has_stt_provider(channel: str) -> bool:
             return hub.stt is not None if channel == "self" else hub.peer_stt is not None
 
-        async def replace_stt_provider_request(request, *, start):
-            _ = start
+        async def replace_stt_provider_request(
+            request,
+            *,
+            start,
+            on_terminal_failure,
+        ):
+            _ = start, on_terminal_failure
             created["stt_request"] = request
             hub.stt = "owned-stt"
-            return SimpleNamespace(status="applied")
+            return SimpleNamespace(status="applied", failure_type=None)
 
         hub.has_stt_provider = has_stt_provider
         hub.replace_stt_provider_request = replace_stt_provider_request
@@ -1369,6 +1379,14 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
     app = SimpleNamespace(debug_ui_preview=True)
     controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
     controller.settings = AppSettings()
+    prior_owner_closed: list[str] = []
+
+    class PriorOwner:
+        async def close(self) -> None:
+            prior_owner_closed.append("closed")
+
+    prior_owner = PriorOwner()
+    controller._self_capture_owner = prior_owner
     monkeypatch.setattr(
         controller_module,
         "ManagedSTTProviderFactory",
@@ -1384,6 +1402,8 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
     await controller._init_pipeline()
 
     provider = stt_calls[0]["fault_profile_provider"]
+    assert prior_owner_closed == ["closed"]
+    assert controller._self_capture_owner is not prior_owner
     assert created["stt_request"].provider_id == controller.settings.provider.stt.value
     assert controller._hub_has_stt_provider("self")
     assert callable(stt_calls[0]["on_final_transcript_suppressed"])
@@ -1401,23 +1421,48 @@ async def test_rebuild_stt_provider_delegates_immutable_owner_request() -> None:
     controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
     controller._runtime_logging = RuntimeLoggingSpy()
     controller.settings = AppSettings()
-    requests: list[tuple[object, bool]] = []
+    configs: list[object] = []
 
-    async def replace_stt_provider_request(request: object, *, start: bool):
-        requests.append((request, start))
-        return SimpleNamespace(status="applied")
+    class FakeOwner:
+        loop_task = None
+        source = None
+        cleanup_source = None
+        vad = None
+        last_cleanup_exception = None
 
-    controller.hub = SimpleNamespace(
-        replace_stt_provider_request=replace_stt_provider_request,
-    )
+        async def prepare_provider(self, config):
+            configs.append(config)
+            return SelfCaptureSessionSnapshot(
+                state=SelfCaptureSessionState.STOPPED,
+                provider_status=SelfCaptureProviderStatus.READY,
+                desired_active=False,
+                effective_active=False,
+                generation=1,
+                provider_id=config.provider_id,
+                runtime_signature=config.runtime_signature,
+                failure_reason=None,
+                admission_reason=None,
+                has_source=False,
+                has_vad=False,
+                has_loop_task=False,
+                cleanup_debt=0,
+                closed=False,
+            )
+
+    controller.hub = SimpleNamespace()
+    controller._self_capture_owner = FakeOwner()
     controller._debug_stt_fault_profile = "stt_input_low_snr_vad_pass"
 
     await controller._rebuild_stt_provider()
 
-    request, start = requests[0]
+    config = configs[0]
+    request = controller._self_capture_provider_request(config, False)
     assert request.provider_id == controller.settings.provider.stt.value
     assert request.config.source_language == controller.settings.languages.source_language
-    assert start is False
+    assert (
+        config.provider_signature
+        == controller._build_self_capture_session_config(controller.settings).provider_signature
+    )
 
 
 def test_peer_stt_provider_request_preserves_resolved_runtime_config() -> None:
@@ -14622,7 +14667,7 @@ async def test_local_stt_button_stays_starting_until_activation_completes(
 
 
 @pytest.mark.asyncio
-async def test_ensure_stt_switch_creates_task_when_missing(
+async def test_ensure_stt_switch_delegates_without_controller_task(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -14637,8 +14682,7 @@ async def test_ensure_stt_switch_creates_task_when_missing(
     await controller._ensure_stt_switch()
 
     assert run_calls == ["run"]
-    assert controller._stt_switch_task is not None
-    assert controller._stt_switch_task.done() is True
+    assert controller._stt_switch_task is None
 
 
 @pytest.mark.asyncio
@@ -14646,31 +14690,61 @@ async def test_run_stt_switch_stop_path_drains_self_ingress_without_touching_pee
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
     controller._stt_desired = False
-    stop_calls: list[str] = []
-    backend_calls: list[str] = []
+    apply_calls: list[dict[str, object]] = []
     peer_calls: list[str] = []
-
-    class FakeStt:
-        async def close(self) -> None:
-            backend_calls.append("close")
 
     class FakePeerStt:
         async def close(self) -> None:
             peer_calls.append("close")
 
-    async def fake_stop_mic_loop(self) -> None:
-        _ = self
-        stop_calls.append("stop_mic")
+    class FakeOwner:
+        loop_task = None
+        source = None
+        cleanup_source = None
+        vad = None
+        last_cleanup_exception = None
 
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", fake_stop_mic_loop)
-    controller.hub = DummyHub(stt=FakeStt(), peer_stt=FakePeerStt())
+        async def apply_intent(self, config, **kwargs):
+            _ = config
+            apply_calls.append(kwargs)
+            return SelfCaptureSessionSnapshot(
+                state=SelfCaptureSessionState.STOPPED,
+                provider_status=SelfCaptureProviderStatus.DETACHED,
+                desired_active=False,
+                effective_active=False,
+                generation=1,
+                provider_id=None,
+                runtime_signature=None,
+                failure_reason=None,
+                admission_reason=None,
+                has_source=False,
+                has_vad=False,
+                has_loop_task=False,
+                cleanup_debt=0,
+                closed=False,
+            )
+
+    monkeypatch.setattr(
+        GuiController,
+        "_stop_mic_loop",
+        lambda self: (_ for _ in ()).throw(AssertionError("legacy Self stop executed")),
+    )
+    controller.hub = DummyHub(peer_stt=FakePeerStt())
+    controller._self_capture_owner = FakeOwner()
 
     await controller._run_stt_switch()
 
-    assert stop_calls == ["stop_mic"]
-    assert backend_calls == []
-    assert controller.hub.drain_self_stt_calls == [None]
+    assert apply_calls == [
+        {
+            "enabled": False,
+            "restart": False,
+            "force_immediate": False,
+            "explicit_toggle_off": True,
+        }
+    ]
+    assert controller.hub.drain_self_stt_calls == []
     assert peer_calls == []
 
 
@@ -14693,17 +14767,11 @@ async def test_run_stt_switch_restart_path_drains_and_warms_through_hub_owner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
     controller._stt_desired = True
     controller._stt_restart_requested = True
-    calls: list[str] = []
+    apply_calls: list[dict[str, object]] = []
     peer_calls: list[str] = []
-
-    class FakeStt:
-        async def close(self) -> None:
-            calls.append("close")
-
-        async def warmup(self) -> None:
-            calls.append("warmup")
 
     class FakePeerStt:
         async def close(self) -> None:
@@ -14712,23 +14780,58 @@ async def test_run_stt_switch_restart_path_drains_and_warms_through_hub_owner(
         async def warmup(self) -> None:
             peer_calls.append("warmup")
 
-    async def fake_stop_mic_loop(self) -> None:
-        _ = self
-        calls.append("stop_mic")
+    class FakeOwner:
+        loop_task = None
+        source = None
+        cleanup_source = None
+        vad = None
+        last_cleanup_exception = None
 
-    async def fake_start_mic_loop(self) -> None:
-        _ = self
-        calls.append("start_mic")
+        async def apply_intent(self, config, **kwargs):
+            _ = config
+            apply_calls.append(kwargs)
+            return SelfCaptureSessionSnapshot(
+                state=SelfCaptureSessionState.RUNNING,
+                provider_status=SelfCaptureProviderStatus.READY,
+                desired_active=True,
+                effective_active=True,
+                generation=1,
+                provider_id="deepgram",
+                runtime_signature=("runtime",),
+                failure_reason=None,
+                admission_reason=None,
+                has_source=True,
+                has_vad=True,
+                has_loop_task=True,
+                cleanup_debt=0,
+                closed=False,
+            )
 
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", fake_stop_mic_loop)
-    monkeypatch.setattr(GuiController, "_start_mic_loop", fake_start_mic_loop)
-    controller.hub = DummyHub(stt=FakeStt(), peer_stt=FakePeerStt())
+    monkeypatch.setattr(
+        GuiController,
+        "_stop_mic_loop",
+        lambda self: (_ for _ in ()).throw(AssertionError("legacy Self stop executed")),
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_start_mic_loop",
+        lambda self: (_ for _ in ()).throw(AssertionError("legacy Self start executed")),
+    )
+    controller.hub = DummyHub(peer_stt=FakePeerStt())
+    controller._self_capture_owner = FakeOwner()
 
     await controller._run_stt_switch()
 
-    assert calls == ["stop_mic", "start_mic"]
-    assert controller.hub.drain_self_stt_calls == [None]
-    assert controller.hub.warmup_stt_calls == ["self"]
+    assert apply_calls == [
+        {
+            "enabled": True,
+            "restart": True,
+            "force_immediate": False,
+            "explicit_toggle_off": False,
+        }
+    ]
+    assert controller.hub.drain_self_stt_calls == []
+    assert controller.hub.warmup_stt_calls == []
     assert peer_calls == []
 
 
@@ -15721,7 +15824,33 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
     controller.settings = settings
 
-    switch_calls: list[str] = []
+    prepared_configs: list[object] = []
+
+    class FakeOwner:
+        loop_task = None
+        source = None
+        cleanup_source = None
+        vad = None
+        last_cleanup_exception = None
+
+        async def prepare_provider(self, config):
+            prepared_configs.append(config)
+            return SelfCaptureSessionSnapshot(
+                state=SelfCaptureSessionState.STOPPED,
+                provider_status=SelfCaptureProviderStatus.READY,
+                desired_active=False,
+                effective_active=False,
+                generation=1,
+                provider_id=config.provider_id,
+                runtime_signature=config.runtime_signature,
+                failure_reason=None,
+                admission_reason=None,
+                has_source=False,
+                has_vad=False,
+                has_loop_task=False,
+                cleanup_debt=0,
+                closed=False,
+            )
 
     controller.hub = DummyHub(stt=object())
     controller.hub.source_language = settings.languages.source_language
@@ -15734,6 +15863,7 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
     controller._stt_desired = False
     controller._mic_task = None
+    controller._self_capture_owner = FakeOwner()
 
     settings.stt.custom_vocabulary_enabled = True
     settings.stt.custom_terms = {"ko": ["Puripuly"]}
@@ -15741,25 +15871,19 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
         _ = (self, enabled)
 
-    async def fake_ensure_stt_switch(self) -> None:
-        _ = self
-        switch_calls.append("switch")
-
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
         fake_configure_vrc_mic_receiver,
     )
-    monkeypatch.setattr(GuiController, "_ensure_stt_switch", fake_ensure_stt_switch)
     await controller.apply_settings(settings)
 
-    request, start = controller.hub.replace_stt_request_calls[-1]
+    request = controller._self_capture_provider_request(prepared_configs[-1], False)
     assert request.config.source_language == "ko"
     assert request.config.custom_vocabulary_enabled is True
     assert request.config.custom_terms == {"ko": ("Puripuly",)}
-    assert start is False
-    assert switch_calls == []
+    assert controller.hub.replace_stt_request_calls == []
     assert dash.stt_needs_key is False
 
 
@@ -15782,32 +15906,43 @@ async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabular
     controller.hub.hangover_s = 1.1
     controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
     controller._stt_desired = True
-    controller._mic_task = object()
 
     settings.stt.custom_vocabulary_enabled = True
     settings.stt.custom_terms = {"ko": ["Puripuly", "VRChat"]}
 
-    calls: list[str] = []
+    apply_calls: list[dict[str, object]] = []
 
-    async def fake_stop_mic_loop(self) -> None:
-        _ = self
-        calls.append("stop_mic")
+    class FakeOwner:
+        loop_task = object()
+        source = object()
+        cleanup_source = None
+        vad = object()
+        last_cleanup_exception = None
 
-    async def fake_rebuild_stt_provider(self) -> None:
-        _ = self
-        calls.append("rebuild_stt")
-
-    async def fake_ensure_stt_switch(self) -> None:
-        _ = self
-        calls.append("switch")
+        async def apply_intent(self, config, **kwargs):
+            apply_calls.append(kwargs)
+            return SelfCaptureSessionSnapshot(
+                state=SelfCaptureSessionState.RUNNING,
+                provider_status=SelfCaptureProviderStatus.READY,
+                desired_active=True,
+                effective_active=True,
+                generation=1,
+                provider_id=config.provider_id,
+                runtime_signature=config.runtime_signature,
+                failure_reason=None,
+                admission_reason=None,
+                has_source=True,
+                has_vad=True,
+                has_loop_task=True,
+                cleanup_debt=0,
+                closed=False,
+            )
 
     async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
         _ = (self, enabled)
 
+    controller._self_capture_owner = FakeOwner()
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", fake_stop_mic_loop)
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
-    monkeypatch.setattr(GuiController, "_ensure_stt_switch", fake_ensure_stt_switch)
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -15816,7 +15951,13 @@ async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabular
 
     await controller.apply_settings(settings)
 
-    assert calls == ["stop_mic", "rebuild_stt", "switch"]
+    assert apply_calls == [
+        {
+            "enabled": True,
+            "restart": False,
+            "explicit_toggle_off": False,
+        }
+    ]
     assert controller._stt_restart_requested is False
 
 

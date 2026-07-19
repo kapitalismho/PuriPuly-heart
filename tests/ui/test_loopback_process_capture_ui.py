@@ -33,6 +33,12 @@ from puripuly_heart.core.runtime.peer_channel import (
     PeerRuntimeDiagnostic,
     PeerRuntimeFailureReason,
 )
+from puripuly_heart.core.self_capture import (
+    SelfCaptureFailureReason,
+    SelfCaptureProviderStatus,
+    SelfCaptureSessionSnapshot,
+    SelfCaptureSessionState,
+)
 from puripuly_heart.ui import controller as controller_module
 from puripuly_heart.ui.app import TranslatorApp
 from puripuly_heart.ui.components.settings.settings_modal import OptionItem, SettingsModal
@@ -83,6 +89,62 @@ class ReadyProvisioningPort:
 
     async def close(self):
         return
+
+
+class RecordingControllerSelfOwner:
+    def __init__(self) -> None:
+        self.apply_calls: list[bool] = []
+        self.generation = 0
+        self.fail_start = False
+        self.loop_task = None
+        self.source = None
+        self.cleanup_source = None
+        self.vad = None
+        self.last_cleanup_exception = None
+
+    async def apply_intent(
+        self,
+        config: object,
+        *,
+        enabled: bool,
+        **kwargs: object,
+    ) -> SelfCaptureSessionSnapshot:
+        _ = (config, kwargs)
+        self.apply_calls.append(enabled)
+        self.generation += 1
+        failed = enabled and self.fail_start
+        active = enabled and not failed
+        self.loop_task = object() if active else None
+        self.source = object() if active else None
+        self.vad = object() if active else None
+        return SelfCaptureSessionSnapshot(
+            state=(
+                SelfCaptureSessionState.FAULTED
+                if failed
+                else SelfCaptureSessionState.RUNNING if active else SelfCaptureSessionState.STOPPED
+            ),
+            provider_status=(
+                SelfCaptureProviderStatus.FAILED
+                if failed
+                else (
+                    SelfCaptureProviderStatus.READY
+                    if active
+                    else SelfCaptureProviderStatus.DETACHED
+                )
+            ),
+            desired_active=active,
+            effective_active=active,
+            generation=self.generation,
+            provider_id="local_qwen",
+            runtime_signature=("runtime",),
+            failure_reason=(SelfCaptureFailureReason.SOURCE_OPEN_FAILED if failed else None),
+            admission_reason=None,
+            has_source=active,
+            has_vad=active,
+            has_loop_task=active,
+            cleanup_debt=0,
+            closed=False,
+        )
 
 
 def _runtime_hub_stub(
@@ -392,47 +454,33 @@ async def test_peer_starting_is_published_before_delayed_readiness_and_latest_in
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("final_enabled", [False, True])
-async def test_self_delayed_local_qwen_latest_intent_owns_microphone_start(
+async def test_self_toggle_path_delegates_only_to_composed_capture_owner(
     monkeypatch: pytest.MonkeyPatch,
-    final_enabled: bool,
 ) -> None:
     controller = GuiController(page=SimpleNamespace(), app=SimpleNamespace(), config_path=Path("x"))
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     controller.hub = _runtime_hub_stub()
-    entered = asyncio.Event()
-    release = asyncio.Event()
-    starts: list[int] = []
+    owner = RecordingControllerSelfOwner()
+    controller._self_capture_owner = owner
+    monkeypatch.setattr(
+        GuiController,
+        "_start_mic_loop",
+        lambda self: (_ for _ in ()).throw(AssertionError("legacy Self start executed")),
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_stop_mic_loop",
+        lambda self: (_ for _ in ()).throw(AssertionError("legacy Self stop executed")),
+    )
 
-    async def delayed_ready(_self, **_kwargs) -> bool:  # noqa: ANN001
-        entered.set()
-        await release.wait()
-        return True
+    await controller.set_stt_enabled(True)
+    await controller.set_stt_enabled(False)
+    await controller.set_stt_enabled(True)
 
-    async def start(_self) -> bool:  # noqa: ANN001
-        starts.append(controller._stt_activation_generation)
-        controller._mic_task = SimpleNamespace()
-        return True
-
-    async def stop(_self) -> None:  # noqa: ANN001
-        controller._mic_task = None
-
-    monkeypatch.setattr(GuiController, "_ensure_local_stt_ready", delayed_ready)
-    monkeypatch.setattr(GuiController, "_start_mic_loop", start)
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", stop)
-    first_on = asyncio.create_task(controller.set_stt_enabled(True))
-    await entered.wait()
-    off = asyncio.create_task(controller.set_stt_enabled(False))
-    latest = None
-    if final_enabled:
-        latest = asyncio.create_task(controller.set_stt_enabled(True))
-    heartbeat = asyncio.create_task(asyncio.sleep(0, result=True))
-    assert await heartbeat is True
-    release.set()
-    await asyncio.gather(first_on, off, *([latest] if latest is not None else []))
-    assert bool(starts) is final_enabled
-    assert controller._stt_desired is final_enabled
+    assert owner.apply_calls == [True, False, True]
+    assert controller._stt_desired is True
+    assert controller._mic_task is owner.loop_task
 
 
 @pytest.mark.asyncio
@@ -451,70 +499,19 @@ async def test_self_microphone_start_failure_becomes_effective_off_failure_notic
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     controller.hub = _runtime_hub_stub()
+    owner = RecordingControllerSelfOwner()
+    owner.fail_start = True
+    controller._self_capture_owner = owner
     monkeypatch.setattr(
         GuiController,
-        "_ensure_local_stt_ready",
-        lambda self, **_kwargs: asyncio.sleep(0, result=True),
-    )
-    monkeypatch.setattr(
-        GuiController, "_start_mic_loop", lambda self: asyncio.sleep(0, result=False)
+        "_start_mic_loop",
+        lambda self: (_ for _ in ()).throw(AssertionError("legacy Self start executed")),
     )
     await controller.set_stt_enabled(True)
     assert controller._stt_desired is False
     assert controller._stt_activation_failed is True
     assert dash.enabled[-1] is False
     assert dash.notices[-1][0] == "start_failed"
-
-
-@pytest.mark.asyncio
-async def test_stale_self_start_failure_cannot_disable_latest_generation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = SimpleNamespace(
-        enabled=[],
-        notices=[],
-        set_stt_enabled=lambda enabled: dash.enabled.append(enabled),
-        set_local_stt_notice=lambda status, percent=None: dash.notices.append((status, percent)),
-    )
-    controller = GuiController(
-        page=SimpleNamespace(), app=SimpleNamespace(view_dashboard=dash), config_path=Path("x")
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
-    controller.hub = _runtime_hub_stub()
-    first_started = asyncio.Event()
-    release_failure = asyncio.Event()
-    starts = 0
-
-    async def ready(_self, **_kwargs) -> bool:  # noqa: ANN001
-        return True
-
-    async def start(_self) -> bool:  # noqa: ANN001
-        nonlocal starts
-        starts += 1
-        if starts == 1:
-            first_started.set()
-            await release_failure.wait()
-            return False
-        controller._mic_task = SimpleNamespace()
-        return True
-
-    async def stop(_self) -> None:  # noqa: ANN001
-        controller._mic_task = None
-
-    monkeypatch.setattr(GuiController, "_ensure_local_stt_ready", ready)
-    monkeypatch.setattr(GuiController, "_start_mic_loop", start)
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", stop)
-    stale = asyncio.create_task(controller.set_stt_enabled(True))
-    await first_started.wait()
-    latest = asyncio.create_task(controller.set_stt_enabled(True))
-    await asyncio.sleep(0)
-    release_failure.set()
-    await asyncio.gather(stale, latest)
-    assert controller._stt_desired is True
-    assert controller._stt_activation_failed is False
-    assert controller._stt_activation_starting is False
-    assert dash.enabled == [True]
 
 
 @pytest.mark.asyncio

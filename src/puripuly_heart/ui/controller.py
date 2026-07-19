@@ -13,7 +13,7 @@ import secrets
 import sys
 import time
 import traceback
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -23,6 +23,7 @@ from typing import Any, Literal, Protocol, cast
 import flet as ft
 import numpy as np
 
+from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports._settings_values import freeze_settings_values
 from puripuly_heart.app.ports.canonical_settings_persistence import (
@@ -296,10 +297,20 @@ from puripuly_heart.core.runtime.peer_channel import (
 from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildService
 from puripuly_heart.core.runtime.receiver import VrcMicReceiverRuntime
 from puripuly_heart.core.runtime.self_audio import SelfAudioRuntime
+from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime_logging import (
     RuntimeLoggingSinks,
     SessionLoggingMode,
     SessionRuntimeLoggingService,
+)
+from puripuly_heart.core.self_capture import (
+    SelfCaptureAdmission,
+    SelfCaptureAdmissionStatus,
+    SelfCaptureDiagnostic,
+    SelfCaptureProviderStatus,
+    SelfCaptureSessionConfig,
+    SelfCaptureSessionSnapshot,
+    SelfCaptureSessionState,
 )
 from puripuly_heart.core.stt.controller import FinalTranscriptSuppressedNotification
 from puripuly_heart.core.stt.custom_vocab import get_effective_custom_terms
@@ -889,6 +900,25 @@ class _HubVadSink:
         await self.hub.handle_vad_event(event)
 
 
+@dataclass(slots=True)
+class _SelfCaptureAdmissionAdapter:
+    callback: Callable[[SelfCaptureSessionConfig], Awaitable[SelfCaptureAdmission]]
+
+    async def admit(self, config: SelfCaptureSessionConfig) -> SelfCaptureAdmission:
+        return await self.callback(config)
+
+
+@dataclass(slots=True)
+class _SelfCaptureVadSink:
+    hub_provider: Callable[[], ClientHub | None]
+
+    async def handle_vad_event(self, event: object) -> None:
+        hub = self.hub_provider()
+        if hub is None:
+            raise RuntimeError("Self VAD sink requires the production hub")
+        await hub.handle_vad_event(event)
+
+
 class _ControllerProviderVerifier(Protocol):
     async def verify_api_key(
         self,
@@ -993,6 +1023,7 @@ class GuiController:
     sender: VrchatOscUdpSender | None = None
     osc: ChatboxPaginator | None = None
     hub: ClientHub | None = None
+    _self_capture_owner: SelfCaptureSessionOwner | None = field(init=False, default=None)
     _self_audio_runtime: SelfAudioRuntime | None = field(init=False, default=None)
     _provider_rebuild_runtime: ProviderRuntimeRebuildService = field(
         init=False,
@@ -4624,6 +4655,25 @@ class GuiController:
             self._vrc_mic_receiver_runtime = None
         self.receiver = None
 
+    async def _close_self_capture_owner_for_release(
+        self,
+        failures: list[Exception],
+    ) -> None:
+        owner = self._self_capture_owner
+        if owner is None:
+            return
+        try:
+            await owner.close()
+        except Exception as exc:
+            failures.append(exc)
+            return
+        if self._self_capture_owner is owner:
+            self._self_capture_owner = None
+        self._mic_task = None
+        self._audio_source = None
+        self._vad = None
+        self._last_mic_loop_close_exception = None
+
     async def stop(self) -> None:
         if self._stop_complete:
             if self._stop_exception is not None:
@@ -4666,6 +4716,7 @@ class GuiController:
             await self.set_stt_enabled(False)
         except Exception as exc:
             cleanup_failures.append(exc)
+        await self._close_self_capture_owner_for_release(cleanup_failures)
         await self._cancel_vrchat_osc_presence_probe()
         try:
             await self._ui_background_scope.close()
@@ -5476,8 +5527,6 @@ class GuiController:
             "[STT] Toggle detail: "
             f"desired_before={self._stt_desired} overlay_state={self.overlay_state}"
         )
-        self._stt_activation_generation += 1
-        activation_generation = self._stt_activation_generation
         self._stt_activation_starting = bool(enabled)
         self._stt_activation_failed = False
         self._sync_local_stt_notice()
@@ -5499,70 +5548,24 @@ class GuiController:
             else:
                 self.log_basic(f"[STT] Enabled with provider: {provider}")
 
-        if (
-            enabled
-            and self.settings is not None
-            and self.settings.provider.stt.value in LOCAL_CPU_PROVIDERS
-        ):
-            current_status = self._current_local_stt_runtime_status()
-            if current_status == "downloading":
-                self._local_stt_pending_enable_after_install = True
-                self._local_stt_pending_enable_generation = activation_generation
-                self._stt_desired = False
-                dash = getattr(self.app, "view_dashboard", None)
-                if dash is not None:
-                    dash.set_stt_enabled(False)
-                self._show_short_stt_message("local_stt.download_in_progress")
-                self._stt_activation_starting = False
-                self._sync_local_stt_notice()
-                return
-            if current_status in ("missing", "invalid", "download_failed"):
-                self._request_unavailable_local_asr_repair(
-                    current_status,
-                    channel="self",
-                    activation_generation=activation_generation,
-                )
-                self._stt_activation_starting = False
-                self._sync_local_stt_notice()
-                return
-
-        if (
-            enabled
-            and self.settings is not None
-            and self.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-            and not await self._validate_gpu_activation()
-        ):
-            if self._gpu_ui_state in {"not_installed", "invalid", "install_failed", "installing"}:
-                self._gpu_pending_enable_channels = frozenset(
-                    {*self._gpu_pending_enable_channels, "self"}
-                )
-                self._stt_activation_starting = False
-                return
-            self._stt_desired = False
-            self._stt_activation_failed = True
-            self._stt_activation_starting = False
-            dash = getattr(self.app, "view_dashboard", None)
-            if dash is not None:
-                dash.set_stt_enabled(False)
-            return
-
         # Mark promo eligible when user explicitly enables STT via button
         if enabled and self.hub is not None:
             self.hub.mark_promo_eligible()
 
-        await self._ensure_stt_switch()
-        if activation_generation == self._stt_activation_generation:
-            self._stt_activation_starting = False
-            dash = getattr(self.app, "view_dashboard", None)
-            if dash is not None:
-                dash.set_stt_enabled(
-                    bool(
-                        self._stt_desired
-                        and not self._stt_activation_failed
-                        and self._mic_task is not None
-                    )
+        snapshot = await self._ensure_stt_switch()
+        self._stt_activation_starting = False
+        dash = getattr(self.app, "view_dashboard", None)
+        if dash is not None and (
+            snapshot is None or snapshot.state is not SelfCaptureSessionState.ADMISSION_PENDING
+        ):
+            dash.set_stt_enabled(
+                bool(
+                    self._stt_desired
+                    and not self._stt_activation_failed
+                    and self._mic_task is not None
                 )
-            self._sync_local_stt_notice()
+            )
+        self._sync_local_stt_notice()
 
     def _show_short_stt_message(self, message_key: str) -> None:
         self._show_short_message(message_key)
@@ -6113,26 +6116,31 @@ class GuiController:
                 if self._local_stt_pending_enable_generation is not None
                 else self._stt_activation_generation
             )
-            self._reset_local_stt_pending_enable_after_install()
             await self._rebuild_stt_provider()
-            if resume_generation != self._stt_activation_generation:
+            self._clear_local_stt_pending_enable_if_provider_switched_away()
+            if (
+                not self._local_stt_pending_enable_after_install
+                or self._local_stt_pending_enable_generation != resume_generation
+            ):
                 return
+            self._reset_local_stt_pending_enable_after_install()
             self._stt_desired = True
             self._stt_activation_starting = True
             self._sync_local_stt_notice()
-            await self._ensure_stt_switch()
-            if resume_generation == self._stt_activation_generation:
-                self._stt_activation_starting = False
-                dash = getattr(self.app, "view_dashboard", None)
-                if dash is not None:
-                    dash.set_stt_enabled(
-                        bool(
-                            self._stt_desired
-                            and not self._stt_activation_failed
-                            and self._mic_task is not None
-                        )
+            snapshot = await self._ensure_stt_switch()
+            if snapshot is not None and snapshot.generation != self._stt_activation_generation:
+                return
+            self._stt_activation_starting = False
+            dash = getattr(self.app, "view_dashboard", None)
+            if dash is not None:
+                dash.set_stt_enabled(
+                    bool(
+                        self._stt_desired
+                        and not self._stt_activation_failed
+                        and self._mic_task is not None
                     )
-                self._sync_local_stt_notice()
+                )
+            self._sync_local_stt_notice()
 
         if should_resume_peer_local_stt:
             self._reset_local_stt_pending_peer_enable_after_install()
@@ -6432,24 +6440,43 @@ class GuiController:
         if self.local_asr_provisioning is not None:
             await self.local_asr_provisioning.close()
 
-    async def _ensure_stt_switch(self) -> None:
-        if self._stt_switch_task is None or self._stt_switch_task.done():
-            self._stt_switch_task = asyncio.create_task(self._run_stt_switch())
-        await self._stt_switch_task
+    async def _ensure_stt_switch(self) -> SelfCaptureSessionSnapshot | None:
+        return await self._run_stt_switch()
 
     async def _replace_runtime_stt_provider(self, *, smooth_local: bool = False) -> None:
         self.log_detailed(
             "[STT] Replacing runtime provider detail: "
             f"desired={self._stt_desired} mic_task_active={self._mic_task is not None}"
         )
-        if smooth_local and await self._transition_active_self_local_asr():
+        if self.settings is None or self.hub is None:
             return
-        if self._mic_task is not None:
-            await self._stop_mic_loop()
-        self._stt_restart_requested = False
-        await self._rebuild_stt_provider()
+        owner = self._get_self_capture_owner()
+        config = self._build_self_capture_session_config(self.settings)
         if self._stt_desired:
-            await self._ensure_stt_switch()
+            snapshot = await owner.apply_intent(
+                config,
+                enabled=True,
+                restart=not smooth_local,
+                explicit_toggle_off=False,
+            )
+        else:
+            snapshot = await owner.prepare_provider(config)
+        self._on_self_capture_state_changed(snapshot)
+        self._project_self_provider_availability(snapshot)
+        self._stt_restart_requested = False
+
+    def _project_self_provider_availability(
+        self,
+        snapshot: SelfCaptureSessionSnapshot,
+    ) -> bool:
+        available = snapshot.provider_status is SelfCaptureProviderStatus.READY
+        self._sync_effective_hub_flags(self.settings)
+        dash = getattr(self.app, "view_dashboard", None)
+        if dash is not None:
+            dash.set_stt_needs_key(self._dashboard_stt_needs_key(stt_available=available))
+            if not available:
+                dash.set_stt_enabled(False)
+        return available
 
     async def _apply_stt_runtime_replacement(self, *, smooth_local: bool) -> None:
         replacement = self._replace_runtime_stt_provider
@@ -6541,98 +6568,30 @@ class GuiController:
             raise RuntimeError("local ASR transition coordinator is closed")
         return outcome.status == "applied"
 
-    async def _run_stt_switch(self) -> None:
-        if self._stt_switch_lock is None:
-            self._stt_switch_lock = asyncio.Lock()
-        async with self._stt_switch_lock:
-            while True:
-                desired = self._stt_desired
-                activation_generation = self._stt_activation_generation
-                restart = self._stt_restart_requested
-                self._stt_restart_requested = False
-                force_immediate = self._stt_force_immediate
-                self._stt_force_immediate = False
-
-                if not desired:
-                    await self._stop_mic_loop()
-                    if self.hub is not None:
-                        await self._drain_self_stt_for_toggle_off(
-                            force_immediate=force_immediate,
-                            explicit_toggle_off=True,
-                        )
-                else:
-                    if self.hub is None:
-                        self.log_detailed(
-                            "[STT] Enable requested before hub is ready",
-                            level=logging.WARNING,
-                        )
-                        self._stt_desired = False
-                        self._stt_activation_failed = True
-                        break
-                    if restart:
-                        await self._stop_mic_loop()
-                        await self._drain_self_stt_for_toggle_off(force_immediate=force_immediate)
-                    if (
-                        self.settings is not None
-                        and self.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-                        and not self._hub_has_stt_provider("self")
-                    ):
-                        await self._rebuild_stt_provider()
-                    resume_stt = getattr(self.hub, "resume_self_stt_after_toggle_on", None)
-                    if callable(resume_stt):
-                        await resume_stt()
-                    if not await self._ensure_local_stt_ready(
-                        activation_generation=activation_generation
-                    ):
-                        break
-                    if (
-                        activation_generation != self._stt_activation_generation
-                        or not self._stt_desired
-                    ):
-                        continue
-                    started = await self._start_mic_loop()
-                    if activation_generation != self._stt_activation_generation:
-                        if started is not False:
-                            await self._stop_mic_loop()
-                        continue
-                    if started is False:
-                        self._stt_desired = False
-                        self._stt_activation_failed = True
-                        dash = getattr(self.app, "view_dashboard", None)
-                        if dash is not None:
-                            dash.set_stt_enabled(False)
-                        self._sync_local_stt_notice()
-                        break
-                    # Pre-warm STT session for faster first response
-                    if (
-                        self.hub is not None
-                        and self._hub_has_stt_provider("self")
-                        and self._selected_stt_provider() != STTProviderName.LOCAL_QWEN
-                    ):
-                        with contextlib.suppress(Exception):
-                            await self.hub.warmup_stt_channel("self")
-                    owned_runtime = self._hub_local_asr_provider_runtime()
-                    active_gpu_snapshot = (
-                        owned_runtime.snapshot.gpu if owned_runtime is not None else None
-                    )
-                    if (
-                        self.settings is not None
-                        and self.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-                        and (
-                            active_gpu_snapshot is None
-                            or active_gpu_snapshot.phase != "ready"
-                            or "self" not in active_gpu_snapshot.active_channels
-                        )
-                    ):
-                        self._stt_desired = False
-                        self._stt_activation_failed = True
-                        dash = getattr(self.app, "view_dashboard", None)
-                        if dash is not None:
-                            dash.set_stt_enabled(False)
-                        self._sync_local_stt_notice()
-
-                if desired == self._stt_desired and not self._stt_restart_requested:
-                    break
+    async def _run_stt_switch(self) -> SelfCaptureSessionSnapshot | None:
+        if self.settings is None:
+            self.log_detailed(
+                "[STT] Enable requested before hub is ready",
+                level=logging.WARNING,
+            )
+            self._stt_desired = False
+            self._stt_activation_failed = True
+            return None
+        desired = self._stt_desired
+        restart = self._stt_restart_requested
+        force_immediate = self._stt_force_immediate
+        self._stt_restart_requested = False
+        self._stt_force_immediate = False
+        owner = self._get_self_capture_owner()
+        snapshot = await owner.apply_intent(
+            self._build_self_capture_session_config(self.settings),
+            enabled=desired,
+            restart=restart,
+            force_immediate=force_immediate,
+            explicit_toggle_off=not desired,
+        )
+        self._on_self_capture_state_changed(snapshot)
+        return snapshot
 
     def _get_clipboard_watcher_lock(self) -> asyncio.Lock:
         if self._clipboard_watcher_lock is None:
@@ -8658,8 +8617,9 @@ class GuiController:
         self,
         channels: tuple[GpuASRChannel, ...],
     ) -> None:
-        if "self" in channels and self._mic_task is not None:
-            await self._stop_mic_loop()
+        if "self" in channels and self._self_capture_owner is not None:
+            snapshot = await self._self_capture_owner.suspend_provider_consumer()
+            self._on_self_capture_state_changed(snapshot)
         if "peer" in channels and self._peer_runtime is not None:
             await self._peer_runtime.suspend_provider_consumer()
 
@@ -8678,6 +8638,11 @@ class GuiController:
             self._sync_effective_hub_flags(settings)
             self._refresh_overlay_peer_consumers()
         if "self" in channels and self._stt_desired:
+            if self._self_capture_owner is not None:
+                snapshot = await self._self_capture_owner.adopt_recovered_provider(
+                    self._build_self_capture_session_config(settings)
+                )
+                self._on_self_capture_state_changed(snapshot)
             await self._ensure_stt_switch()
 
     def _load_or_init_settings(self, path: Path) -> AppSettings:
@@ -9272,17 +9237,14 @@ class GuiController:
         if self.hub is None or self.settings is None:
             return
 
-        result = await self.hub.replace_stt_provider_request(
-            self._self_stt_provider_request(self.settings),
-            start=self._stt_desired,
-        )
-        available = result.status == "applied"
-        self._sync_effective_hub_flags(self.settings)
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is not None:
-            dash.set_stt_needs_key(self._dashboard_stt_needs_key(stt_available=available))
-            if not available:
-                dash.set_stt_enabled(False)
+        owner = self._get_self_capture_owner()
+        config = self._build_self_capture_session_config(self.settings)
+        if self._stt_desired:
+            snapshot = await owner.apply_intent(config, enabled=True)
+        else:
+            snapshot = await owner.prepare_provider(config)
+        self._on_self_capture_state_changed(snapshot)
+        available = self._project_self_provider_availability(snapshot)
         if not available:
             self._log_error("STT backend not available")
             return
@@ -9947,6 +9909,7 @@ class GuiController:
             await self.set_stt_enabled(False)
         except Exception as exc:
             cleanup_failures.append(exc)
+        await self._close_self_capture_owner_for_release(cleanup_failures)
         await self._configure_vrc_mic_receiver(enabled=False)
         await self._stop_hub_for_release(cleanup_failures)
         if self.hub is None:
@@ -10068,11 +10031,6 @@ class GuiController:
             peer_hangover_s=self.settings.desktop_audio.vad_hangover_ms / 1000.0,
         )
 
-        if stt_request is not None:
-            result = await hub.replace_stt_provider_request(stt_request, start=False)
-            if result.status != "applied":
-                self._log_error("STT backend not available")
-
         if self.vrc_mic_state is None:
             self.vrc_mic_state = VrcMicState()
         if self.vrc_mic_audio_gate is None:
@@ -10086,9 +10044,20 @@ class GuiController:
         self.vrc_mic_audio_gate.set_receiver_active(self.receiver is not None)
         self.vrc_mic_audio_gate.reset()
 
+        prior_self_capture_owner = self._self_capture_owner
+        if prior_self_capture_owner is not None:
+            await prior_self_capture_owner.close()
         self.sender = sender
         self.osc = osc
         self.hub = hub
+        self._self_capture_owner = None
+        self_capture_owner = self._get_self_capture_owner()
+        if stt_request is not None:
+            snapshot = await self_capture_owner.prepare_provider(
+                self._build_self_capture_session_config(self.settings)
+            )
+            if snapshot.provider_status.value != "ready":
+                self._log_error("STT backend not available")
 
         self._peer_runtime = PeerChannelRuntime(
             hub=hub,
@@ -10724,6 +10693,412 @@ class GuiController:
                 state_changed=self._sync_self_audio_runtime_aliases,
             )
         return self._self_audio_runtime
+
+    def _build_self_capture_session_config(
+        self,
+        settings: AppSettings,
+    ) -> SelfCaptureSessionConfig:
+        provider = settings.provider.stt.value
+        transition = self._self_local_asr_transition_request(settings, trigger="runtime")
+        return SelfCaptureSessionConfig(
+            provider_id=provider,
+            provider_signature=self._build_self_stt_provider_signature(settings),
+            runtime_signature=self._build_self_stt_runtime_signature(settings),
+            capture_signature=self._self_capture_vad_signature(settings),
+            target_sample_rate_hz=settings.audio.internal_sample_rate_hz,
+            input_host_api=settings.audio.input_host_api,
+            input_device=settings.audio.input_device,
+            internal_channels=settings.audio.internal_channels,
+            ring_buffer_ms=settings.audio.ring_buffer_ms,
+            vad_speech_threshold=settings.stt.vad_speech_threshold,
+            vad_hangover_ms=(
+                settings.stt.low_latency_vad_hangover_ms if settings.stt.low_latency_mode else 1100
+            ),
+            session_options=(transition.session_options if transition is not None else None),
+            local_cpu=provider in LOCAL_CPU_PROVIDERS,
+            local_gpu=provider == STTProviderName.LOCAL_QWEN_GPU.value,
+            release_backend_after=(
+                LOCAL_QWEN_IDLE_RELEASE_SECONDS if provider in LOCAL_CPU_PROVIDERS else None
+            ),
+            warmup=provider != STTProviderName.LOCAL_QWEN.value,
+        )
+
+    async def _admit_self_capture(
+        self,
+        config: SelfCaptureSessionConfig,
+    ) -> SelfCaptureAdmission:
+        if self.settings is None:
+            return SelfCaptureAdmission(
+                SelfCaptureAdmissionStatus.REJECTED,
+                reason="runtime_unavailable",
+            )
+        if config.local_gpu:
+            if await self._validate_gpu_activation():
+                return SelfCaptureAdmission(SelfCaptureAdmissionStatus.ADMITTED)
+            if self._gpu_ui_state in {
+                "not_installed",
+                "invalid",
+                "install_failed",
+                "installing",
+            }:
+                self._gpu_pending_enable_channels = frozenset(
+                    {*self._gpu_pending_enable_channels, "self"}
+                )
+                return SelfCaptureAdmission(
+                    SelfCaptureAdmissionStatus.PENDING,
+                    reason=self._gpu_ui_state,
+                    retain_intent=True,
+                )
+            return SelfCaptureAdmission(
+                SelfCaptureAdmissionStatus.REJECTED,
+                reason=self._gpu_ui_state or "gpu_unavailable",
+            )
+        if not config.local_cpu:
+            return SelfCaptureAdmission(
+                (
+                    SelfCaptureAdmissionStatus.ADMITTED
+                    if self.hub is not None
+                    else SelfCaptureAdmissionStatus.REJECTED
+                ),
+                reason=None if self.hub is not None else "runtime_unavailable",
+            )
+        decision = resolve_local_asr_selection(
+            self.settings.provider.stt.value,
+            self.settings.languages.source_language,
+        )
+        if not decision.supported:
+            dash = getattr(self.app, "view_dashboard", None)
+            if dash is not None:
+                dash.set_stt_enabled(False)
+                dash.set_stt_needs_key(False)
+            self._show_short_stt_message("local_stt.language_unsupported")
+            return SelfCaptureAdmission(
+                SelfCaptureAdmissionStatus.REJECTED,
+                reason="language_unsupported",
+            )
+        current_status = self._current_local_stt_runtime_status()
+        if current_status == "downloading":
+            self._local_stt_pending_enable_after_install = True
+            self._local_stt_pending_enable_generation = self._stt_activation_generation
+            dash = getattr(self.app, "view_dashboard", None)
+            if dash is not None:
+                dash.set_stt_enabled(False)
+            self._show_short_stt_message("local_stt.download_in_progress")
+            return SelfCaptureAdmission(
+                SelfCaptureAdmissionStatus.PENDING,
+                reason=current_status,
+                retain_intent=True,
+            )
+        if current_status in {"missing", "invalid", "download_failed"}:
+            self._request_unavailable_local_asr_repair(
+                current_status,
+                channel="self",
+                activation_generation=self._stt_activation_generation,
+            )
+            return SelfCaptureAdmission(
+                SelfCaptureAdmissionStatus.PENDING,
+                reason=current_status,
+                retain_intent=True,
+            )
+        return SelfCaptureAdmission(
+            (
+                SelfCaptureAdmissionStatus.ADMITTED
+                if self.hub is not None
+                else SelfCaptureAdmissionStatus.REJECTED
+            ),
+            reason=None if self.hub is not None else "runtime_unavailable",
+        )
+
+    def _get_self_capture_owner(self) -> SelfCaptureSessionOwner:
+        if self._self_capture_owner is not None:
+            return self._self_capture_owner
+        self._self_capture_owner = SelfCaptureSessionOwner(
+            admission=_SelfCaptureAdmissionAdapter(self._admit_self_capture),
+            provider=SelfCaptureProviderAdapter(self.hub),
+            provider_request_factory=self._self_capture_provider_request,
+            source_factory=self._create_self_capture_source,
+            vad_factory=self._create_self_capture_vad,
+            run_audio_loop=self._run_self_capture_audio_loop,
+            vad_sink=_SelfCaptureVadSink(lambda: self.hub),
+            state_changed=self._on_self_capture_state_changed,
+            diagnostic_sink=self._on_self_capture_diagnostic,
+            audio_gate_reset=(
+                self.vrc_mic_audio_gate.reset if self.vrc_mic_audio_gate is not None else None
+            ),
+        )
+        if self.settings is not None and (
+            self._mic_task is not None
+            or self._audio_source is not None
+            or self._vad is not None
+            or self._last_mic_loop_close_exception is not None
+        ):
+            self._self_capture_owner.adopt_legacy_state(
+                config=self._build_self_capture_session_config(self.settings),
+                desired_active=self._stt_desired,
+                task=self._mic_task,
+                source=self._audio_source,
+                vad=self._vad,
+                last_cleanup_exception=(
+                    self._last_mic_loop_close_exception
+                    if isinstance(self._last_mic_loop_close_exception, Exception)
+                    else None
+                ),
+            )
+        return self._self_capture_owner
+
+    def _self_capture_provider_request(
+        self,
+        config: SelfCaptureSessionConfig,
+        warmup: bool,
+    ) -> ProviderRuntimeBuildRequest:
+        _ = config
+        if self.settings is None:
+            raise RuntimeError("Self provider request requires settings")
+        return self._self_stt_provider_request(self.settings, warmup=warmup)
+
+    def _on_self_capture_state_changed(
+        self,
+        snapshot: SelfCaptureSessionSnapshot,
+    ) -> None:
+        owner = self._self_capture_owner
+        if owner is not None:
+            self._mic_task = owner.loop_task
+            self._audio_source = cast(
+                AudioSource | None,
+                owner.source if owner.source is not None else owner.cleanup_source,
+            )
+            self._vad = cast(VadGating | None, owner.vad)
+            self._last_mic_loop_close_exception = owner.last_cleanup_exception
+        self._stt_desired = snapshot.desired_active
+        self._stt_activation_generation = snapshot.generation
+        self._stt_activation_starting = snapshot.state in {
+            SelfCaptureSessionState.STARTING,
+            SelfCaptureSessionState.ADMISSION_PENDING,
+        }
+        self._stt_activation_failed = snapshot.state is SelfCaptureSessionState.FAULTED
+
+    def _on_self_capture_diagnostic(self, diagnostic: SelfCaptureDiagnostic) -> None:
+        fields = [
+            f"event={diagnostic.event.value}",
+            f"generation={diagnostic.generation}",
+            f"state={diagnostic.state.value}",
+        ]
+        if diagnostic.provider_id is not None:
+            fields.append(f"provider={diagnostic.provider_id}")
+        if diagnostic.reason is not None:
+            fields.append(f"reason={diagnostic.reason.value}")
+        if diagnostic.detail is not None:
+            fields.append(f"detail={diagnostic.detail}")
+        self.log_detailed(f"[SelfCapture] {' '.join(fields)}")
+
+    def _create_self_capture_vad(self, config: SelfCaptureSessionConfig) -> VadGating:
+        model_path = ensure_silero_vad_onnx()
+        return VadGating(
+            engine=SileroVadOnnx(model_path=model_path),
+            sample_rate_hz=config.target_sample_rate_hz,
+            ring_buffer_ms=config.ring_buffer_ms,
+            speech_threshold=config.vad_speech_threshold,
+            hangover_ms=config.vad_hangover_ms,
+            diagnostic_event_callback=lambda message: self.log_detailed(message),
+            diagnostics_enabled=self._detailed_audio_diag_enabled,
+            diagnostic_label="self",
+        )
+
+    def _create_self_capture_source(self, config: SelfCaptureSessionConfig) -> AudioSource:
+        def resolve_device(host_api: str, device: str) -> int | None:
+            try:
+                return resolve_sounddevice_input_device(host_api=host_api, device=device)
+            except Exception as exc:
+                self.log_detailed(
+                    "[STT] Device resolution detail: "
+                    f"host_api={host_api!r} device={device!r} error={exc}",
+                    level=logging.WARNING,
+                )
+                return None
+
+        def source_int(source: SoundDeviceAudioSource, attr: str, fallback: int) -> int:
+            try:
+                return int(getattr(source, attr, fallback))
+            except Exception:
+                return fallback
+
+        def open_source_once(
+            dev_idx: int | None,
+            *,
+            attempt: str,
+            requested_channels: int,
+            decision: SelfMicCaptureChannelDecision,
+            host_api_for_log: str,
+            device_for_log: str,
+            wasapi_auto_convert: bool = False,
+            wasapi_exclusive: bool = False,
+        ) -> SoundDeviceAudioSource:
+            source = SoundDeviceAudioSource(
+                sample_rate_hz=None,
+                channels=requested_channels,
+                device=dev_idx,
+                wasapi_auto_convert=wasapi_auto_convert,
+                wasapi_exclusive=wasapi_exclusive,
+            )
+            metadata = decision.metadata
+            opened_channels = source_int(source, "opened_channels", requested_channels)
+            frame_channels = source_int(source, "frame_channels", opened_channels)
+            actual_sample_rate_hz = source_int(source, "actual_sample_rate_hz", 0)
+            self.log_detailed(
+                "[STT] Microphone capture format: "
+                f"attempt={attempt!r} "
+                f"internal_channels={decision.internal_channels} "
+                f"preferred_capture_channels={decision.preferred_capture_channels} "
+                f"requested_channels={requested_channels} "
+                f"opened_channels={opened_channels} "
+                f"frame_channels={frame_channels} "
+                "frame_channels_source='opened_fallback' "
+                f"saved_host_api={config.input_host_api!r} "
+                f"actual_host_api={host_api_for_log!r} "
+                f"device={device_for_log!r} "
+                f"device_idx={dev_idx} "
+                f"wasapi_auto_convert={wasapi_auto_convert} "
+                f"wasapi_exclusive={wasapi_exclusive} "
+                f"actual_sample_rate_hz={actual_sample_rate_hz or None} "
+                f"metadata_device_idx={metadata.device_idx} "
+                f"metadata_device_name={metadata.name!r} "
+                f"device_max_input_channels={metadata.max_input_channels} "
+                f"device_default_samplerate={metadata.default_samplerate} "
+                f"metadata_status={metadata.metadata_status!r} "
+                f"metadata_error={metadata.metadata_error!r}"
+            )
+            return source
+
+        def open_source_with_mono_retry(
+            dev_idx: int | None,
+            *,
+            attempt: str,
+            host_api_for_log: str,
+            device_for_log: str,
+            wasapi_auto_convert: bool = False,
+            wasapi_exclusive: bool = False,
+        ) -> SoundDeviceAudioSource:
+            decision = determine_self_mic_capture_channels(
+                device_idx=dev_idx,
+                internal_channels=config.internal_channels,
+            )
+            try:
+                return open_source_once(
+                    dev_idx,
+                    attempt=attempt,
+                    requested_channels=decision.preferred_capture_channels,
+                    decision=decision,
+                    host_api_for_log=host_api_for_log,
+                    device_for_log=device_for_log,
+                    wasapi_auto_convert=wasapi_auto_convert,
+                    wasapi_exclusive=wasapi_exclusive,
+                )
+            except Exception as exc:
+                if decision.preferred_capture_channels <= config.internal_channels:
+                    raise
+                self.log_detailed(
+                    "[STT] Microphone open detail: "
+                    f"attempt={attempt!r} "
+                    f"host_api={host_api_for_log!r} "
+                    f"device={device_for_log!r} "
+                    f"device_idx={dev_idx} "
+                    f"preferred_capture_channels={decision.preferred_capture_channels} "
+                    f"requested_channels={decision.preferred_capture_channels} "
+                    f"wasapi_auto_convert={wasapi_auto_convert} "
+                    f"wasapi_exclusive={wasapi_exclusive} "
+                    f"metadata_status={decision.metadata.metadata_status!r} "
+                    "will_retry_mono=True "
+                    f"error={exc}",
+                    level=logging.WARNING,
+                )
+                return open_source_once(
+                    dev_idx,
+                    attempt=f"{attempt}_mono_retry",
+                    requested_channels=config.internal_channels,
+                    decision=decision,
+                    host_api_for_log=host_api_for_log,
+                    device_for_log=device_for_log,
+                    wasapi_auto_convert=wasapi_auto_convert,
+                    wasapi_exclusive=wasapi_exclusive,
+                )
+
+        host_api_profile = normalize_input_host_api(config.input_host_api)
+        host_api = host_api_profile.actual_host_api
+        first_open_used_wasapi_flags = (
+            host_api_profile.wasapi_auto_convert or host_api_profile.wasapi_exclusive
+        )
+        device_idx = resolve_device(host_api, config.input_device)
+        source: SoundDeviceAudioSource | None = None
+        try:
+            source = open_source_with_mono_retry(
+                device_idx,
+                attempt="primary",
+                host_api_for_log=host_api,
+                device_for_log=config.input_device,
+                wasapi_auto_convert=host_api_profile.wasapi_auto_convert,
+                wasapi_exclusive=host_api_profile.wasapi_exclusive,
+            )
+            self.log_detailed(
+                "[STT] Microphone opened: "
+                f"saved_host_api={config.input_host_api!r} "
+                f"actual_host_api={host_api!r} "
+                f"device={config.input_device!r} "
+                f"device_idx={device_idx} "
+                f"wasapi_auto_convert={host_api_profile.wasapi_auto_convert} "
+                f"wasapi_exclusive={host_api_profile.wasapi_exclusive}"
+            )
+        except Exception as exc:
+            self.log_detailed(
+                "[STT] Microphone open detail: "
+                f"host_api={host_api!r} device={config.input_device!r} error={exc}",
+                level=logging.ERROR,
+            )
+        if source is None and config.input_device:
+            fallback_idx = resolve_device("", config.input_device)
+            if fallback_idx != device_idx or first_open_used_wasapi_flags:
+                try:
+                    source = open_source_with_mono_retry(
+                        fallback_idx,
+                        attempt="name_fallback",
+                        host_api_for_log="",
+                        device_for_log=config.input_device,
+                    )
+                    self.log_detailed(
+                        f"[STT] Microphone opened with fallback: device_idx={fallback_idx}"
+                    )
+                except Exception as exc:
+                    self.log_detailed(
+                        f"[STT] Fallback microphone detail: error={exc}",
+                        level=logging.ERROR,
+                    )
+        if source is None:
+            try:
+                source = open_source_with_mono_retry(
+                    None,
+                    attempt="system_default",
+                    host_api_for_log="",
+                    device_for_log="",
+                )
+                self.log_detailed("[STT] Microphone opened with system default")
+            except Exception as exc:
+                self.log_detailed(
+                    f"[STT] System default microphone detail: error={exc}",
+                    level=logging.ERROR,
+                )
+        if source is None:
+            raise RuntimeError("All microphone attempts failed")
+        return self._wrap_diagnostic_audio_source(source, channel_label="self")
+
+    async def _run_self_capture_audio_loop(self, **kwargs: object) -> None:
+        from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
+
+        await run_audio_vad_loop(
+            **kwargs,
+            audio_gate=self.vrc_mic_audio_gate,
+            channel_label="self",
+            is_detailed_enabled=self._detailed_audio_diag_enabled,
+            log_detailed=lambda message: self.log_detailed(message),
+        )
 
     def _sync_self_audio_runtime_aliases(self, runtime: SelfAudioRuntime | None = None) -> None:
         owner = runtime or self._self_audio_runtime
