@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from puripuly_heart.core.runtime.clipboard import ClipboardRuntime
     from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
+    from puripuly_heart.core.runtime.local_asr_provisioning import LocalASRProvisioningOwner
     from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime
     from puripuly_heart.core.runtime.logging import RuntimeLoggingCloseError, RuntimeLoggingService
     from puripuly_heart.core.runtime.mic_test import MicTestRuntime
@@ -24,6 +25,7 @@ __all__ = [
     "PeerRuntimeConfig",
     "ClipboardRuntime",
     "GithubStarPromptRuntime",
+    "LocalASRProvisioningOwner",
     "LocalSTTDownloadRuntime",
     "MicTestRuntime",
     "OAuthRuntime",
@@ -46,6 +48,10 @@ def __getattr__(name: str) -> object:
             from puripuly_heart.core.runtime import github_star_prompt
 
             return getattr(github_star_prompt, name)
+        if name == "LocalASRProvisioningOwner":
+            from puripuly_heart.core.runtime import local_asr_provisioning
+
+            return getattr(local_asr_provisioning, name)
         if name == "LocalSTTDownloadRuntime":
             from puripuly_heart.core.runtime import local_stt_download
 
