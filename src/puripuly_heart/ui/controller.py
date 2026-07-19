@@ -4769,6 +4769,12 @@ class GuiController:
                 callback=self._freeze_application_ingress,
             ),
             application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="GithubStarPromptRuntime",
+                callback_name="stop_ingress",
+                callback=self._stop_github_star_prompt_ingress,
+            ),
+            application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
                 owner_name="GuiControllerCompatibilityFacade",
                 callback_name="release_manual_typing",
@@ -4932,6 +4938,11 @@ class GuiController:
         self._peer_activation_generation += 1
         self._gpu_discovery_generation += 1
         self._vrchat_osc_probe_generation += 1
+
+    def _stop_github_star_prompt_ingress(self) -> None:
+        runtime = self._github_star_prompt_runtime
+        if runtime is not None:
+            runtime.stop_ingress()
 
     async def _close_github_star_prompt_runtime(self) -> None:
         failures: list[Exception] = []

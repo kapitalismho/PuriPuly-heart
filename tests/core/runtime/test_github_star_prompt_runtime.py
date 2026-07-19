@@ -59,6 +59,31 @@ async def test_github_star_prompt_runtime_close_cancels_and_gathers_launch_timer
 
 
 @pytest.mark.asyncio
+async def test_github_star_prompt_runtime_stops_ingress_before_async_close() -> None:
+    runtime = GithubStarPromptRuntime()
+    started = asyncio.Event()
+
+    async def observe_success() -> bool:
+        started.set()
+        await asyncio.sleep(999)
+        return True
+
+    task = runtime.start_translation_success_observation(observe_success())
+    await started.wait()
+
+    runtime.stop_ingress()
+
+    assert runtime.is_closed is True
+    assert task.cancelling() > 0
+    rejected = observe_success()
+    with pytest.raises(RuntimeError, match="clos"):
+        runtime.start_translation_success_observation(rejected)
+
+    await runtime.close()
+    assert task.cancelled() is True
+
+
+@pytest.mark.asyncio
 async def test_github_star_prompt_runtime_late_prompt_generation_is_not_current_after_close() -> (
     None
 ):

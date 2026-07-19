@@ -118,6 +118,7 @@ class ApplicationShutdownCoordinator:
         self._failures: list[_RecordedFailure] = []
         self._shutdown_task: asyncio.Task[ApplicationLifecycleSnapshot] | None = None
         self._terminal_exception: BaseException | None = None
+        self._timed_out_callback_tasks: set[asyncio.Task[None]] = set()
 
     @property
     def accepting_intents(self) -> bool:
@@ -189,8 +190,28 @@ class ApplicationShutdownCoordinator:
         )
         try:
             result = callback.callback(context)
-            if inspect.isawaitable(result):
-                await asyncio.wait_for(result, timeout=callback.timeout_seconds)
+            if not inspect.isawaitable(result):
+                return
+            task = asyncio.create_task(
+                self._await_callback(result),
+                name=(
+                    "application-shutdown:"
+                    f"{callback.phase}:{callback.owner_name}:{callback.callback_name}"
+                ),
+            )
+            done, _pending = await asyncio.wait(
+                {task},
+                timeout=callback.timeout_seconds,
+                return_when=asyncio.ALL_COMPLETED,
+            )
+            if task not in done:
+                task.cancel()
+                self._timed_out_callback_tasks.add(task)
+                task.add_done_callback(self._on_timed_out_callback_done)
+                raise TimeoutError(
+                    "Application shutdown callback exceeded its coordinator deadline"
+                )
+            await task
         except BaseException as exc:
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                 raise
@@ -206,6 +227,18 @@ class ApplicationShutdownCoordinator:
             )
             self._failures.append(failure)
             await self._emit_diagnostic(failure.summary)
+
+    async def _await_callback(self, result: Awaitable[None]) -> None:
+        await result
+
+    def _on_timed_out_callback_done(self, task: asyncio.Task[None]) -> None:
+        self._timed_out_callback_tasks.discard(task)
+        if task.cancelled():
+            return
+        try:
+            task.exception()
+        except asyncio.CancelledError:
+            return
 
     async def _emit_diagnostic(self, failure: ApplicationShutdownFailure) -> None:
         if self._diagnostics_sink is None:

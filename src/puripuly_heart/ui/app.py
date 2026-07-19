@@ -336,6 +336,12 @@ class TranslatorApp:
                 callback=self._freeze_ui_ingress,
             ),
             application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="GithubStarPromptRuntime",
+                callback_name="stop_app_ingress",
+                callback=self._stop_after_launch_ingress,
+            ),
+            application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
                 owner_name="TranslatorApp",
                 callback_name="cancel_tracked_page_tasks",
@@ -358,6 +364,11 @@ class TranslatorApp:
     def _freeze_ui_ingress(self) -> None:
         self._shutting_down = True
         self._settings_mutation_queue = []
+
+    def _stop_after_launch_ingress(self) -> None:
+        runtime = getattr(self, "_github_star_prompt_runtime", None)
+        if runtime is not None:
+            runtime.stop_ingress()
 
     async def _cancel_tracked_page_tasks(self) -> None:
         current_task = asyncio.current_task()

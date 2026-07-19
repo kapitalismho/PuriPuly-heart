@@ -26,7 +26,7 @@ class GithubStarPromptRuntime:
         "_translation_success_task",
         "_generation",
     )
-    stop_ingress = "cancel scheduled prompt"
+    stop_ingress_policy = "cancel scheduled prompt"
     shutdown_policy = "cancel/gather timer task and owned prompt persistence tasks"
     late_callback_rule = "late prompt callback checks current prompt state"
 
@@ -75,7 +75,7 @@ class GithubStarPromptRuntime:
         return {
             "owner": self.owner_name,
             "resource_fields": self.resource_fields,
-            "stop_ingress": self.stop_ingress,
+            "stop_ingress": self.stop_ingress_policy,
             "shutdown_policy": self.shutdown_policy,
             "late_callback_rule": self.late_callback_rule,
         }
@@ -133,6 +133,17 @@ class GithubStarPromptRuntime:
             self._translation_success_task = None
             self._notify_state_changed()
 
+    def stop_ingress(self) -> None:
+        if self._closed:
+            return
+        self._closing = True
+        self._closed = True
+        self._generation += 1
+        for task in (self._launch_prompt_task, self._translation_success_task):
+            if task is not None and not task.done():
+                task.cancel()
+        self._notify_state_changed()
+
     async def close(self) -> None:
         if (
             self._closed
@@ -147,10 +158,7 @@ class GithubStarPromptRuntime:
                 and self._translation_success_task is None
             ):
                 return
-            self._closing = True
-            self._closed = True
-            self._generation += 1
-            self._notify_state_changed()
+            self.stop_ingress()
             try:
                 cleanup_failures: list[Exception] = []
                 launch_task = self._launch_prompt_task
@@ -208,7 +216,7 @@ class GithubStarPromptRuntime:
     ) -> list[Exception]:
         if task is None or task is asyncio.current_task():
             return []
-        if not task.done():
+        if not task.done() and task.cancelling() == 0:
             task.cancel()
         done, pending = await asyncio.wait({task}, timeout=self._cancel_timeout_s)
         for completed in done:

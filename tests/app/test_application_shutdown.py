@@ -108,9 +108,18 @@ async def test_application_shutdown_continues_after_failure_and_closes_logging_l
 @pytest.mark.asyncio
 async def test_application_shutdown_times_out_one_callback_and_continues() -> None:
     calls: list[str] = []
+    suppressed = asyncio.Event()
+    released = asyncio.Event()
+    late_returned = asyncio.Event()
 
     async def blocked() -> None:
-        await asyncio.Event().wait()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            suppressed.set()
+            await released.wait()
+            calls.append("late-return")
+            late_returned.set()
 
     coordinator = ApplicationShutdownCoordinator(
         (
@@ -130,11 +139,58 @@ async def test_application_shutdown_times_out_one_callback_and_continues() -> No
         )
     )
 
+    started = asyncio.get_running_loop().time()
     with pytest.raises(TimeoutError):
-        await coordinator.shutdown()
+        await asyncio.wait_for(coordinator.shutdown(), timeout=0.1)
+    elapsed = asyncio.get_running_loop().time() - started
 
     assert calls == ["continued"]
+    assert elapsed < 0.1
     assert coordinator.snapshot.failures[0].timed_out is True
+    await suppressed.wait()
+    released.set()
+    await late_returned.wait()
+    assert calls == ["continued", "late-return"]
+
+
+@pytest.mark.asyncio
+async def test_application_shutdown_invokes_sync_ingress_before_awaiting_cleanup() -> None:
+    ingress_stopped = False
+    release = asyncio.Event()
+
+    def stop_ingress() -> None:
+        nonlocal ingress_stopped
+        ingress_stopped = True
+
+    async def cleanup() -> None:
+        await release.wait()
+
+    coordinator = ApplicationShutdownCoordinator(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="IngressOwner",
+                callback_name="stop_ingress",
+                callback=stop_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="CleanupOwner",
+                callback_name="close",
+                callback=cleanup,
+            ),
+        )
+    )
+
+    shutdown_task = asyncio.create_task(coordinator.shutdown())
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert ingress_stopped is True
+    assert shutdown_task.done() is False
+
+    release.set()
+    await shutdown_task
 
 
 @pytest.mark.asyncio
