@@ -61,6 +61,29 @@ async def _stop_worker(process: asyncio.subprocess.Process) -> None:
     if process.returncode is not None:
         await process.wait()
         return
+    if os.name == "nt":
+        taskkill = await asyncio.create_subprocess_exec(
+            "taskkill",
+            "/PID",
+            str(process.pid),
+            "/T",
+            "/F",
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        try:
+            await asyncio.wait_for(taskkill.wait(), timeout=_WORKER_STOP_TIMEOUT_S)
+        except asyncio.TimeoutError:
+            taskkill.kill()
+            await taskkill.wait()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=_WORKER_STOP_TIMEOUT_S)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+        return
     try:
         process.terminate()
     except ProcessLookupError:
