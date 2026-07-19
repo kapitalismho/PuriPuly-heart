@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from puripuly_heart.core.runtime.oauth import OAuthRuntime
     from puripuly_heart.core.runtime.output import OutputRuntime
     from puripuly_heart.core.runtime.peer_channel import (
+        PeerCaptureSessionOwner,
         PeerChannelRuntime,
         PeerChannelRuntimeState,
         PeerRuntimeConfig,
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "PeerChannelRuntime",
+    "PeerCaptureSessionOwner",
     "PeerChannelRuntimeState",
     "PeerRuntimeConfig",
     "ClipboardRuntime",

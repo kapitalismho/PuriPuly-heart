@@ -117,6 +117,7 @@ from puripuly_heart.app.wiring import (
     build_openrouter_credential_runtime_config,
     build_openrouter_release_runtime_config,
     build_peer_stt_provider_signature_from_vnext,
+    compose_peer_capture_session_owner,
     compose_self_capture_session_owner,
     copy_stable_secrets_to_vnext_namespace,
     create_llm_provider,
@@ -143,6 +144,7 @@ from puripuly_heart.config.profile_bootstrap import import_stable_settings_if_mi
 from puripuly_heart.config.resolved import (
     ResolvedDesktopAudioCaptureTarget,
     ResolvedOverlayConfig,
+    ResolvedSTTConfig,
 )
 from puripuly_heart.config.settings import (
     DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
@@ -273,6 +275,19 @@ from puripuly_heart.core.overlay.process import (
     OverlayProcessManager,
     OverlayProcessRunner,
 )
+from puripuly_heart.core.peer_capture import (
+    PeerCaptureAdmission,
+    PeerCaptureAdmissionStatus,
+    PeerCaptureDiagnostic,
+    PeerCaptureFailureReason,
+    PeerCaptureLanguageFacts,
+    PeerCaptureResolvedTarget,
+    PeerCaptureSessionConfig,
+    PeerCaptureSessionSnapshot,
+    PeerCaptureTargetIntent,
+    PeerCaptureTargetResolution,
+    PeerCaptureTargetStatus,
+)
 from puripuly_heart.core.runtime.clipboard import ClipboardRuntime
 from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
@@ -288,11 +303,8 @@ from puripuly_heart.core.runtime.mic_test import MicTestRuntime
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.core.runtime.peer_channel import (
-    PeerChannelRuntime,
+    PeerCaptureSessionOwner,
     PeerLocalASRTransitionSuperseded,
-    PeerRuntimeConfig,
-    PeerRuntimeDiagnostic,
-    PeerRuntimeFailureReason,
 )
 from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildService
 from puripuly_heart.core.runtime.receiver import VrcMicReceiverRuntime
@@ -906,6 +918,39 @@ class _SelfCaptureVadSink:
         await hub.handle_vad_event(event)
 
 
+@dataclass(slots=True)
+class _PeerCaptureAdmissionAdapter:
+    callback: Callable[[PeerCaptureSessionConfig], Awaitable[PeerCaptureAdmission]]
+
+    async def admit(self, config: PeerCaptureSessionConfig) -> PeerCaptureAdmission:
+        return await self.callback(config)
+
+
+@dataclass(slots=True)
+class _PeerCaptureTargetResolverAdapter:
+    callback: Callable[
+        [PeerCaptureTargetIntent],
+        Awaitable[PeerCaptureTargetResolution],
+    ]
+
+    async def resolve(
+        self,
+        target: PeerCaptureTargetIntent,
+    ) -> PeerCaptureTargetResolution:
+        return await self.callback(target)
+
+
+@dataclass(slots=True)
+class _PeerCaptureVadSink:
+    hub_provider: Callable[[], ClientHub | None]
+
+    async def handle_vad_event(self, event: object) -> None:
+        hub = self.hub_provider()
+        if hub is None:
+            raise RuntimeError("Peer VAD sink requires the production hub")
+        await hub.handle_peer_vad_event(event)
+
+
 class _ControllerProviderVerifier(Protocol):
     async def verify_api_key(
         self,
@@ -1021,7 +1066,7 @@ class GuiController:
         default_factory=PeerCaptureTargetResolutionService,
         repr=False,
     )
-    _peer_runtime: PeerChannelRuntime | None = None
+    _peer_runtime: PeerCaptureSessionOwner | None = None
     receiver: VrcOscReceiver | None = None
     _vrc_mic_receiver_runtime: VrcMicReceiverRuntime | None = field(
         init=False,
@@ -4507,7 +4552,7 @@ class GuiController:
         next_desktop.position.y = bounds["y"]
         next_desktop.position.validate()
 
-    def _build_peer_runtime_config(self, settings: AppSettings) -> PeerRuntimeConfig:
+    def _build_peer_runtime_config(self, settings: AppSettings) -> PeerCaptureSessionConfig:
         vnext_settings = self._canonical_vnext_settings_for(settings)
         backend = resolve_peer_stt_runtime_config_from_vnext(vnext_settings)
         provider_signature = build_peer_stt_provider_signature_from_vnext(vnext_settings)
@@ -4538,27 +4583,74 @@ class GuiController:
             desktop_audio.vad_pre_roll_ms,
             backend.sample_rate_hz,
         )
-        return PeerRuntimeConfig(
-            backend=backend,
+        target = PeerCaptureTargetIntent(
+            kind=capture_target.kind,
+            device_name=capture_target.device_name,
+            process_kind=capture_target.process_kind,
+            executable_identity=capture_target.executable_identity,
+            discord_channel=capture_target.discord_channel,
+            executable_basename=capture_target.executable_basename,
+        )
+        return PeerCaptureSessionConfig(
+            provider_id=backend.provider,
             output_device=desktop_audio.output_device,
-            vad_threshold=desktop_audio.vad_speech_threshold,
+            vad_speech_threshold=desktop_audio.vad_speech_threshold,
             vad_hangover_ms=desktop_audio.vad_hangover_ms,
             vad_pre_roll_ms=desktop_audio.vad_pre_roll_ms,
             provider_signature=provider_signature,
             runtime_signature=(
                 backend.source_language,
                 desktop_audio.output_device,
-                capture_target,
+                target,
                 desktop_audio.vad_speech_threshold,
                 desktop_audio.vad_hangover_ms,
                 desktop_audio.vad_pre_roll_ms,
                 provider_signature,
             ),
-            capture_target=capture_target,
+            capture_signature=capture_vad_signature,
+            capture_target=target,
+            language=PeerCaptureLanguageFacts(
+                source_mode=backend.source_mode,
+                source_language=backend.source_language,
+                expected_languages=tuple(vnext_settings.intent.languages.peer_expected_languages),
+            ),
+            target_sample_rate_hz=backend.sample_rate_hz,
             model_id=model_id,
             session_options=session_options,
-            capture_vad_signature=capture_vad_signature,
+            provider_context=backend,
+            local_provider=backend.provider
+            in {*LOCAL_CPU_PROVIDERS, STTProviderName.LOCAL_QWEN_GPU.value},
+            release_backend_after=(
+                LOCAL_QWEN_IDLE_RELEASE_SECONDS
+                if backend.provider == STTProviderName.LOCAL_QWEN.value
+                else None
+            ),
+            warmup=backend.provider != STTProviderName.LOCAL_QWEN.value,
         )
+
+    async def _admit_peer_capture(
+        self,
+        config: PeerCaptureSessionConfig,
+    ) -> PeerCaptureAdmission:
+        if self.settings is None or self.hub is None:
+            return PeerCaptureAdmission(
+                PeerCaptureAdmissionStatus.REJECTED,
+                reason="runtime_unavailable",
+            )
+        if config.local_provider and not await self._ensure_peer_local_stt_ready():
+            return PeerCaptureAdmission(
+                PeerCaptureAdmissionStatus.PENDING,
+                reason="provider_unavailable",
+                retain_intent=True,
+            )
+        return PeerCaptureAdmission(PeerCaptureAdmissionStatus.ADMITTED)
+
+    def _on_peer_capture_state_changed(
+        self,
+        snapshot: PeerCaptureSessionSnapshot,
+    ) -> None:
+        if snapshot.state.value == "running":
+            self._peer_process_warning_reason = None
 
     def _resolve_peer_capture_target(
         self,
@@ -8571,7 +8663,7 @@ class GuiController:
         channels: frozenset[GpuASRChannel],
         *,
         reason: Literal["manual_retry", "settings_restart"],
-    ) -> tuple[ProviderRuntimeGpuRecoveryRequest, PeerRuntimeConfig | None]:
+    ) -> tuple[ProviderRuntimeGpuRecoveryRequest, PeerCaptureSessionConfig | None]:
         targets: list[ProviderRuntimeRecoveryChannel] = []
         peer_config = None
         self_recovery_owner = None
@@ -8643,7 +8735,7 @@ class GuiController:
         *,
         settings: AppSettings,
         channels: frozenset[GpuASRChannel],
-        peer_config: PeerRuntimeConfig | None,
+        peer_config: PeerCaptureSessionConfig | None,
         recovery: ProviderRuntimeGpuRecoveryRequest,
     ) -> None:
         if "peer" in channels and self._peer_runtime is not None:
@@ -9100,16 +9192,19 @@ class GuiController:
 
     def _peer_stt_provider_request(
         self,
-        config: PeerRuntimeConfig,
+        config: PeerCaptureSessionConfig,
         *,
         warmup: bool = False,
     ) -> ProviderRuntimeBuildRequest:
         assert self.settings is not None
+        backend = config.provider_context
+        if not isinstance(backend, ResolvedSTTConfig):
+            raise TypeError("Peer capture config requires a resolved STT provider context")
         return ProviderRuntimeBuildRequest(
-            config=config.backend,
+            config=backend,
             gpu_device_id=self.settings.stt.gpu_device_id,
             warmup=warmup,
-            model_id=config.model_id or config.backend.model,
+            model_id=config.model_id or backend.model,
             session_options=config.session_options,
         )
 
@@ -9373,17 +9468,22 @@ class GuiController:
             level=logging.ERROR if outcome == "failed" else logging.INFO,
         )
 
-    def _on_peer_runtime_diagnostic(self, diagnostic: PeerRuntimeDiagnostic) -> None:
+    def _on_peer_runtime_diagnostic(self, diagnostic: PeerCaptureDiagnostic) -> None:
+        unavailable_reason = getattr(
+            diagnostic,
+            "detail",
+            getattr(diagnostic, "process_unavailable_reason", None),
+        )
         self.log_detailed(
             "[PeerRuntime] "
             f"reason={diagnostic.reason.value} "
             f"capture_kind={diagnostic.capture_kind} "
-            f"unavailable_reason={diagnostic.process_unavailable_reason}"
+            f"unavailable_reason={unavailable_reason}"
         )
-        if diagnostic.reason is not PeerRuntimeFailureReason.PROCESS_PROVIDER_FAILED:
+        if diagnostic.reason is not PeerCaptureFailureReason.PROCESS_PROVIDER_FAILED:
             suffix = (
-                f" unavailable_reason={diagnostic.process_unavailable_reason}"
-                if diagnostic.process_unavailable_reason is not None
+                f" unavailable_reason={unavailable_reason}"
+                if unavailable_reason is not None
                 else ""
             )
             self.log_basic(
@@ -9399,10 +9499,17 @@ class GuiController:
 
     @staticmethod
     def _peer_process_warning_reason_for_diagnostic(
-        diagnostic: PeerRuntimeDiagnostic,
+        diagnostic: PeerCaptureDiagnostic,
     ) -> str:
-        if diagnostic.reason is PeerRuntimeFailureReason.PROCESS_TARGET_UNAVAILABLE:
-            unavailable = diagnostic.process_unavailable_reason or "no_process"
+        if diagnostic.reason is PeerCaptureFailureReason.PROCESS_TARGET_UNAVAILABLE:
+            unavailable = (
+                getattr(
+                    diagnostic,
+                    "detail",
+                    getattr(diagnostic, "process_unavailable_reason", None),
+                )
+                or "no_process"
+            )
             return f"process_unavailable_{unavailable}"
         return diagnostic.reason.value
 
@@ -9625,17 +9732,54 @@ class GuiController:
                     manager.terminate()
         return names
 
-    async def _create_peer_audio_source_from_runtime_config(self, config: PeerRuntimeConfig):
-        if config.capture_target.kind == "process":
-            process_target = self._process_target_from_runtime_config(config)
-            resolution = await asyncio.to_thread(
-                lambda: ProcessCaptureResolver(
-                    snapshots=PsutilCurrentUserProcessSnapshots()
-                ).resolve_for_start(process_target)
+    async def _resolve_peer_capture_target_for_owner(
+        self,
+        target: PeerCaptureTargetIntent,
+    ) -> PeerCaptureTargetResolution:
+        if target.kind != "process":
+            return PeerCaptureTargetResolution(
+                PeerCaptureTargetStatus.RESOLVED,
+                target=PeerCaptureResolvedTarget(intent=target),
             )
-            return self._create_process_peer_audio_source(config, resolution=resolution)
+        process_target = self._process_target_from_capture_target(target)
+        resolution = await asyncio.to_thread(
+            lambda: ProcessCaptureResolver(
+                snapshots=PsutilCurrentUserProcessSnapshots()
+            ).resolve_for_start(process_target)
+        )
+        if resolution.identity is None:
+            return PeerCaptureTargetResolution(
+                PeerCaptureTargetStatus.UNAVAILABLE,
+                reason=resolution.unavailable_reason,
+            )
+        return PeerCaptureTargetResolution(
+            PeerCaptureTargetStatus.RESOLVED,
+            target=PeerCaptureResolvedTarget(
+                intent=target,
+                capture_descriptor=resolution,
+            ),
+        )
 
-        device_name = config.capture_target.device_name or config.output_device
+    async def _create_peer_audio_source_from_runtime_config(
+        self,
+        config: PeerCaptureSessionConfig,
+        resolved_target: PeerCaptureResolvedTarget | None = None,
+    ) -> DesktopPeerPipeline:
+        if resolved_target is None:
+            resolution = await self._resolve_peer_capture_target_for_owner(config.capture_target)
+            if resolution.target is None:
+                raise ProcessCaptureTargetUnavailableError(
+                    cast(Any, resolution.reason or "no_process")
+                )
+            resolved_target = resolution.target
+        target = resolved_target.intent
+        if target.kind == "process":
+            return self._create_process_peer_audio_source(
+                config,
+                resolution=resolved_target.capture_descriptor,
+            )
+
+        device_name = target.device_name or config.output_device
         raw_source = DesktopLoopbackAudioSource(device_name=device_name)
         self.log_detailed(
             "[AudioDiag][Loopback][peer] "
@@ -9649,27 +9793,22 @@ class GuiController:
         wrapped_source = self._wrap_diagnostic_audio_source(raw_source, channel_label="peer")
         return DesktopPeerPipeline(
             source=wrapped_source,
-            target_sample_rate_hz=config.backend.sample_rate_hz,
+            target_sample_rate_hz=self._peer_capture_sample_rate(config),
             is_detailed_enabled=self._detailed_audio_diag_enabled,
             log_detailed=lambda message: self.log_detailed(message),
         )
 
     def _create_process_peer_audio_source(
         self,
-        config: PeerRuntimeConfig,
+        config: PeerCaptureSessionConfig,
         *,
-        resolution=None,
+        resolution: object,
     ) -> DesktopPeerPipeline:
-        if resolution is None:
-            process_target = self._process_target_from_runtime_config(config)
-            resolution = ProcessCaptureResolver(
-                snapshots=PsutilCurrentUserProcessSnapshots()
-            ).resolve_for_start(process_target)
-        if resolution.identity is None:
-            assert resolution.unavailable_reason is not None
-            raise ProcessCaptureTargetUnavailableError(resolution.unavailable_reason)
+        identity = getattr(resolution, "identity", resolution)
+        if identity is None:
+            raise RuntimeError("resolved process capture requires a process identity")
         raw_source = ProcessAudioCaptureSource(
-            identity=resolution.identity,
+            identity=identity,
             watcher=PsutilProcessIdentityWatcher(),
         )
         self.log_detailed(
@@ -9679,16 +9818,15 @@ class GuiController:
         wrapped_source = self._wrap_diagnostic_audio_source(raw_source, channel_label="peer")
         return DesktopPeerPipeline(
             source=wrapped_source,
-            target_sample_rate_hz=config.backend.sample_rate_hz,
+            target_sample_rate_hz=self._peer_capture_sample_rate(config),
             is_detailed_enabled=self._detailed_audio_diag_enabled,
             log_detailed=lambda message: self.log_detailed(message),
         )
 
     @staticmethod
-    def _process_target_from_runtime_config(
-        config: PeerRuntimeConfig,
+    def _process_target_from_capture_target(
+        target: PeerCaptureTargetIntent,
     ) -> ProcessCaptureTargetIntent:
-        target = config.capture_target
         if target.kind != "process" or target.process_kind is None:
             raise ValueError("process peer source requires a process capture target")
         if target.process_kind == "discord":
@@ -9696,6 +9834,13 @@ class GuiController:
         if target.process_kind == "vrchat":
             return ProcessCaptureTargetIntent.vrchat(target.executable_identity or "")
         return ProcessCaptureTargetIntent.generic_executable(target.executable_identity or "")
+
+    @staticmethod
+    def _peer_capture_sample_rate(config: object) -> int:
+        sample_rate = getattr(config, "target_sample_rate_hz", None)
+        if sample_rate is not None:
+            return int(sample_rate)
+        return int(getattr(getattr(config, "backend"), "sample_rate_hz"))
 
     @property
     def debug_capture_fault_profile(self) -> str:
@@ -9838,12 +9983,17 @@ class GuiController:
             extra_fields_provider=extra_fields,
         )
 
-    def _create_peer_vad_from_runtime_config(self, config: PeerRuntimeConfig, model_path: Path):
+    def _create_peer_vad_from_runtime_config(
+        self,
+        config: PeerCaptureSessionConfig,
+        model_path: Path | None = None,
+    ) -> VadGating:
+        model_path = model_path or ensure_silero_vad_onnx()
         return create_peer_vad_gating(
             engine=SileroVadOnnx(model_path=model_path),
-            sample_rate_hz=config.backend.sample_rate_hz,
+            sample_rate_hz=self._peer_capture_sample_rate(config),
             ring_buffer_ms=config.vad_pre_roll_ms,
-            speech_threshold=config.vad_threshold,
+            speech_threshold=config.vad_speech_threshold,
             hangover_ms=config.vad_hangover_ms,
             diagnostic_event_callback=lambda message: self.log_detailed(message),
             diagnostics_enabled=self._detailed_audio_diag_enabled,
@@ -9866,14 +10016,8 @@ class GuiController:
 
         config = self._build_peer_runtime_config(self.settings)
         desired_active = self._peer_runtime_should_be_active(self.settings)
-        if desired_active and not await self._ensure_peer_local_stt_ready():
-            desired_active = False
         previous_signature = getattr(self._peer_runtime, "current_signature", None)
-        peer_local_provider = bool(
-            desired_active
-            and config.backend.provider
-            in {*LOCAL_CPU_PROVIDERS, STTProviderName.LOCAL_QWEN_GPU.value}
-        )
+        peer_local_provider = bool(desired_active and config.local_provider)
         peer_local_transition = bool(
             peer_local_provider
             and previous_signature is not None
@@ -10082,8 +10226,12 @@ class GuiController:
             if snapshot.provider_status.value != "ready":
                 self._log_error("STT backend not available")
 
-        self._peer_runtime = PeerChannelRuntime(
+        self._peer_runtime = compose_peer_capture_session_owner(
             hub=hub,
+            admission=_PeerCaptureAdmissionAdapter(self._admit_peer_capture),
+            target_resolver=_PeerCaptureTargetResolverAdapter(
+                self._resolve_peer_capture_target_for_owner
+            ),
             clock=self.clock,
             provider_request_factory=lambda config, warmup: self._peer_stt_provider_request(
                 config,
@@ -10091,11 +10239,11 @@ class GuiController:
             ),
             source_factory=self._create_peer_audio_source_from_runtime_config,
             vad_factory=self._create_peer_vad_from_runtime_config,
-            vad_model_resolver=ensure_silero_vad_onnx,
             run_audio_loop=self._run_peer_audio_vad_loop,
+            vad_sink=_PeerCaptureVadSink(lambda: self.hub),
+            state_changed=self._on_peer_capture_state_changed,
             diagnostic_sink=self._on_peer_runtime_diagnostic,
             local_asr_diagnostic_sink=self._local_asr_transition_diagnostic,
-            idle_release_seconds=LOCAL_QWEN_IDLE_RELEASE_SECONDS,
         )
         self._last_peer_translation_enabled = self.settings.ui.peer_translation_enabled
         await self._configure_vrc_mic_receiver(enabled=self.settings.osc.vrc_mic_intercept)

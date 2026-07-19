@@ -54,6 +54,12 @@ class PeerCaptureFailureReason(str, Enum):
     SOURCE_LOST = "source_lost"
     SESSION_FAILED = "session_failed"
     CLEANUP_FAILED = "cleanup_failed"
+    PROCESS_TARGET_UNAVAILABLE = "target_unavailable"
+    PROCESS_SETUP_FAILED = "source_open_failed"
+    PROCESS_TARGET_EXITED = "source_lost"
+    PROCESS_SOURCE_FAILED = "source_lost"
+    PROCESS_PROVIDER_FAILED = "provider_failed"
+    PEER_RUNTIME_FAILED = "session_failed"
 
 
 class PeerCaptureDiagnosticEvent(str, Enum):
@@ -123,11 +129,25 @@ class PeerCaptureSessionConfig:
     vad_speech_threshold: float
     vad_hangover_ms: int
     vad_pre_roll_ms: int
+    output_device: str = ""
     model_id: str | None = None
     session_options: object | None = None
+    provider_context: object | None = None
     local_provider: bool = False
     release_backend_after: float | None = None
     warmup: bool = True
+
+    @property
+    def backend(self) -> object | None:
+        return self.provider_context
+
+    @property
+    def vad_threshold(self) -> float:
+        return self.vad_speech_threshold
+
+    @property
+    def capture_vad_signature(self) -> tuple[object, ...]:
+        return self.capture_signature
 
 
 @dataclass(frozen=True, slots=True)
