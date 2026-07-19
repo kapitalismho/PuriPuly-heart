@@ -988,7 +988,9 @@
       "classification": "internal_core_contract_modules",
       "modules": [
         "puripuly_heart.core.error_messages",
+        "puripuly_heart.core.gpu_worker",
         "puripuly_heart.core.lifecycle",
+        "puripuly_heart.core.local_asr_provider_runtime",
         "puripuly_heart.core.local_asr_provisioning",
         "puripuly_heart.core.observability",
         "puripuly_heart.core.openrouter_metadata",
