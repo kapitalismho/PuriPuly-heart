@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from puripuly_heart.app import wiring_llm_factory as _llm_factory
-from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
 from puripuly_heart.app.wiring_composition import create_provider_verifier
 from puripuly_heart.app.wiring_llm_factory import (
     MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
@@ -46,12 +45,10 @@ from puripuly_heart.app.wiring_stt_factory import (
     resolve_self_stt_runtime_config,
 )
 from puripuly_heart.config.runtime_resolution import resolve_llm_config
-from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
 )
 from puripuly_heart.core.openrouter_credentials import load_managed_openrouter_user_identifier
-from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnosticSink, SharedGpuASRRuntime
 from puripuly_heart.core.runtime.local_asr_provisioning import (
     LocalASRProvisioningOwner,
     ProvisioningDiagnosticSink,
@@ -90,18 +87,6 @@ def create_llm_provider(settings, **kwargs):
         compatibility_settings=settings,
         qwen_low_latency_mode=settings.stt.low_latency_mode,
         **kwargs,
-    )
-
-
-def _create_shared_gpu_asr_runtime(
-    *,
-    clock: Clock,
-    diagnostic_sink: GpuASRDiagnosticSink,
-) -> SharedGpuASRRuntime:
-    return SharedGpuASRRuntime(
-        process_factory=DefaultGpuWorkerProcessFactory(),
-        clock=clock,
-        diagnostic_sink=diagnostic_sink,
     )
 
 

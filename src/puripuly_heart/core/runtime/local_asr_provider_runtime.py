@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections import deque
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import replace
 
@@ -84,6 +84,7 @@ class LocalASRProviderRuntimeOwner:
         state_changed: ProviderRuntimeStateChanged | None = None,
         diagnostic_sink: ProviderRuntimeDiagnosticSink | None = None,
         diagnostics_capacity: int = 256,
+        prebuilt_providers: Mapping[ProviderRuntimeChannel, object | None] | None = None,
     ) -> None:
         if diagnostics_capacity < 1:
             raise ValueError("diagnostics_capacity must be positive")
@@ -100,14 +101,16 @@ class LocalASRProviderRuntimeOwner:
         self._close_lock = asyncio.Lock()
         self._gpu_recovery_lock = asyncio.Lock()
         self._started = False
+        initial_providers = dict(prebuilt_providers or {})
         self._channel_phases: dict[ProviderRuntimeChannel, ProviderRuntimeChannelPhase] = {
-            channel: "inactive" for channel in _CHANNELS
+            channel: "ready" if initial_providers.get(channel) is not None else "inactive"
+            for channel in _CHANNELS
         }
         self._provider_ids: dict[ProviderRuntimeChannel, str | None] = {
-            channel: None for channel in _CHANNELS
+            channel: _prebuilt_provider_id(initial_providers.get(channel)) for channel in _CHANNELS
         }
         self._model_ids: dict[ProviderRuntimeChannel, str | None] = {
-            channel: None for channel in _CHANNELS
+            channel: _prebuilt_model_id(initial_providers.get(channel)) for channel in _CHANNELS
         }
         self._last_requests: dict[ProviderRuntimeChannel, ProviderRuntimeBuildRequest] = {}
         self._last_terminal_failure_sinks: dict[
@@ -129,6 +132,7 @@ class LocalASRProviderRuntimeOwner:
         self._handles: dict[ProviderRuntimeChannel, ProviderRuntimeHandle] = {
             "self": ProviderRuntimeHandle(
                 name="self_stt",
+                provider=initial_providers.get("self"),
                 event_handler=self_event_handler,
                 retired_event_handler=retired_event_handler,
                 exception_handler=self_exception_handler,
@@ -136,6 +140,7 @@ class LocalASRProviderRuntimeOwner:
             ),
             "peer": ProviderRuntimeHandle(
                 name="peer_stt",
+                provider=initial_providers.get("peer"),
                 event_handler=peer_event_handler,
                 retired_event_handler=retired_event_handler,
                 exception_handler=peer_exception_handler,
@@ -201,6 +206,9 @@ class LocalASRProviderRuntimeOwner:
             return
         self._started = True
         await asyncio.gather(*(handle.start() for handle in self._handles.values()))
+        for channel in _CHANNELS:
+            if self._handles[channel].provider is not None:
+                self._channel_phases[channel] = "running"
         await self._publish_state()
 
     async def discover_gpu(
@@ -403,6 +411,61 @@ class LocalASRProviderRuntimeOwner:
                 previous_provider_id=previous_provider_id,
                 snapshot=self.snapshot,
             )
+
+    def current_provider(self, channel: ProviderRuntimeChannel) -> object | None:
+        self._validate_channel(channel)
+        return self._handles[channel].provider
+
+    async def replace_prebuilt_provider(
+        self,
+        channel: ProviderRuntimeChannel,
+        provider: object | None,
+        *,
+        start: bool,
+    ) -> object | None:
+        self._require_open("replace prebuilt provider")
+        self._validate_channel(channel)
+        async with self._operation():
+            try:
+                return await self._handles[channel].replace_provider(provider, start=start)
+            finally:
+                current = self._handles[channel].provider
+                self._provider_ids[channel] = _prebuilt_provider_id(current)
+                self._model_ids[channel] = _prebuilt_model_id(current)
+                self._channel_phases[channel] = (
+                    "inactive" if current is None else "running" if start else "ready"
+                )
+                await self._publish_state()
+
+    async def handoff_prebuilt_provider(
+        self,
+        channel: ProviderRuntimeChannel,
+        provider: object,
+        *,
+        start: bool,
+    ) -> object | None:
+        self._require_open("handoff prebuilt provider")
+        self._validate_channel(channel)
+        async with self._operation():
+            self._pending_candidates[channel] = provider
+            try:
+                previous = await self._handles[channel].handoff_provider_at_boundary(
+                    provider,
+                    start=start,
+                )
+            except asyncio.CancelledError:
+                await self._handles[channel].cancel_pending_handoff(provider)
+                await self._discard_pending_candidate(channel, provider)
+                raise
+            except Exception:
+                await self._discard_pending_candidate(channel, provider)
+                raise
+            self._pending_candidates.pop(channel, None)
+            self._provider_ids[channel] = _prebuilt_provider_id(provider)
+            self._model_ids[channel] = _prebuilt_model_id(provider)
+            self._channel_phases[channel] = "running" if start else "ready"
+            await self._publish_state()
+            return previous
 
     async def handoff_provider(
         self,
@@ -1223,6 +1286,19 @@ def _safe_channel(value: object) -> ProviderRuntimeChannel | None:
 
 def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def _prebuilt_provider_id(provider: object | None) -> str | None:
+    if provider is None:
+        return None
+    provider_name = getattr(provider, "stt_provider_name", None)
+    provider_id = getattr(provider_name, "value", provider_name)
+    return provider_id if isinstance(provider_id, str) else "prebuilt"
+
+
+def _prebuilt_model_id(provider: object | None) -> str | None:
+    model_id = getattr(getattr(provider, "backend", None), "model_id", None)
+    return model_id if isinstance(model_id, str) else None
 
 
 def _close_failure_from_task_result(result: object) -> Exception | None:

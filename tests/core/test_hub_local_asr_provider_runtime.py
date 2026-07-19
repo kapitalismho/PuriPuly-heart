@@ -16,6 +16,9 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeMutationResult,
 )
 from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.runtime.local_asr_provider_runtime import (
+    LocalASRProviderRuntimeOwner,
+)
 from puripuly_heart.core.vad.gating import SpeechEnd
 
 
@@ -121,6 +124,18 @@ class FakeOwnedRuntimeFactory:
         return self.runtime
 
 
+class PrebuiltProvider:
+    def __init__(self) -> None:
+        self.close_calls = 0
+        self.close_backend_calls = 0
+
+    async def close(self) -> None:
+        self.close_calls += 1
+
+    async def close_backend(self) -> None:
+        self.close_backend_calls += 1
+
+
 def _request() -> ProviderRuntimeBuildRequest:
     return ProviderRuntimeBuildRequest(
         config=ResolvedSTTConfig(
@@ -179,3 +194,23 @@ async def test_hub_delegates_self_provider_execution_and_close_to_one_owner() ->
     assert factory.runtime.commits == ["self"]
     assert factory.runtime.closed == 1
     assert set(hub.provider_runtime_handles) == {"llm"}
+
+
+async def test_hub_prebuilt_compatibility_uses_the_canonical_owner() -> None:
+    provider = PrebuiltProvider()
+    hub = ClientHub(
+        stt=provider,
+        llm=None,
+        osc=FakeOscQueue(messages=[]),
+    )
+
+    runtime = hub.local_asr_provider_runtime
+
+    assert isinstance(runtime, LocalASRProviderRuntimeOwner)
+    assert runtime.current_provider("self") is provider
+    assert runtime.snapshot.channel_for("self").has_resources
+
+    await hub.stop()
+
+    assert provider.close_calls == 0
+    assert provider.close_backend_calls == 1

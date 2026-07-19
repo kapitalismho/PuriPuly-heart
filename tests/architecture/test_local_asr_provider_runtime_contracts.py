@@ -108,6 +108,12 @@ def test_controller_has_no_provider_construction_or_gpu_runtime_lifecycle_path()
         "SharedGpuASRRuntime",
         "create_stt_backend",
         "create_peer_stt_backend_from_resolved_config",
+        "_gpu_reconfiguration_lock",
+        "_gpu_manual_retry_channels",
+        "_retry_gpu_activation_locked",
+        "_restore_gpu_channels_after_manual_retry",
+        "_apply_coordinated_gpu_restart",
+        "_quiesce_shared_gpu_consumers",
     ):
         assert retired_name not in source
     assert "ManagedSTTProvider(" not in source
@@ -130,6 +136,29 @@ def test_hub_has_one_local_asr_owner_port_and_no_concrete_stt_handle_lifecycle()
         "cancel_peer_stt_provider_handoff",
     ):
         assert retired_name not in function_names
+
+
+def test_prebuilt_compatibility_factory_delegates_to_canonical_owner() -> None:
+    compatibility_file = SOURCE_ROOT / "core" / "runtime" / "prebuilt_local_asr_provider_runtime.py"
+    source = compatibility_file.read_text(encoding="utf-8")
+    calls = _call_names(compatibility_file)
+
+    assert "class PrebuiltLocalASRProviderRuntime:" not in source
+    assert "ProviderRuntimeHandle" not in source
+    assert calls.count("LocalASRProviderRuntimeOwner") == 1
+    assert "prebuilt_providers=" in source
+
+
+def test_shipped_source_constructs_shared_gpu_runtime_only_in_canonical_factory() -> None:
+    constructor_calls = {}
+    for source_file in SOURCE_ROOT.rglob("*.py"):
+        count = _call_names(source_file).count("SharedGpuASRRuntime")
+        if count:
+            constructor_calls[source_file.relative_to(SOURCE_ROOT).as_posix()] = count
+
+    assert constructor_calls == {"app/wiring_local_asr_provider_runtime.py": 1}
+    wiring_source = (SOURCE_ROOT / "app" / "wiring.py").read_text(encoding="utf-8")
+    assert "_create_shared_gpu_asr_runtime" not in wiring_source
 
 
 def test_peer_runtime_retains_capture_policy_without_concrete_provider_lifecycle() -> None:
