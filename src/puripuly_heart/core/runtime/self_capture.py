@@ -34,16 +34,21 @@ class _VadSink(Protocol):
 
 
 @dataclass(slots=True)
+class _CaptureGeneration:
+    value: int
+
+
+@dataclass(slots=True)
 class _GenerationGuardedVadSink:
     sink: object
     owner: "SelfCaptureSessionOwner"
-    generation: int
+    capture_generation: _CaptureGeneration
 
     def __getattr__(self, name: str) -> object:
         return getattr(self.sink, name)
 
     async def handle_vad_event(self, event: object) -> None:
-        if not self.owner.is_current_generation(self.generation):
+        if not self.owner.is_current_generation(self.capture_generation.value):
             return
         await cast(_VadSink, self.sink).handle_vad_event(event)
 
@@ -103,6 +108,7 @@ class SelfCaptureSessionOwner:
         self._source: object | None = None
         self._vad: object | None = None
         self._loop_task: asyncio.Task[None] | None = None
+        self._capture_generation: _CaptureGeneration | None = None
         self._transition_task: asyncio.Task[None] | None = None
         self._fault_tasks: set[asyncio.Task[None]] = set()
         self._retired_sources: list[object] = []
@@ -184,7 +190,9 @@ class SelfCaptureSessionOwner:
         return _GenerationGuardedVadSink(
             sink=self._vad_sink,
             owner=self,
-            generation=self._generation if generation is None else generation,
+            capture_generation=_CaptureGeneration(
+                self._generation if generation is None else generation
+            ),
         )
 
     async def apply_intent(
@@ -488,6 +496,7 @@ class SelfCaptureSessionOwner:
                 and self._state is SelfCaptureSessionState.RUNNING
                 and self._config is not None
             ):
+                self._rebind_capture_generation(generation)
                 if self._config.runtime_signature == config.runtime_signature:
                     self._config = config
                     self._failure_reason = None
@@ -638,18 +647,23 @@ class SelfCaptureSessionOwner:
 
         self._source = source
         self._vad = vad
+        capture_generation = _CaptureGeneration(generation)
+        self._capture_generation = capture_generation
         loop_task = asyncio.create_task(
             self._run_loop_guarded(
                 source=source,
                 vad=vad,
                 config=config,
-                generation=generation,
+                capture_generation=capture_generation,
             ),
             name="SelfCaptureSessionOwner:session-loop",
         )
         self._loop_task = loop_task
         loop_task.add_done_callback(
-            lambda task: self._on_loop_task_done(task, generation=generation)
+            lambda task: self._on_loop_task_done(
+                task,
+                generation=capture_generation.value,
+            )
         )
         self._state = SelfCaptureSessionState.RUNNING
         self._notify_state_changed()
@@ -749,14 +763,23 @@ class SelfCaptureSessionOwner:
         source: object,
         vad: object,
         config: SelfCaptureSessionConfig,
-        generation: int,
+        capture_generation: _CaptureGeneration,
     ) -> None:
         await self._run_audio_loop(
             source=source,
             vad=vad,
-            sink=self.guard_vad_sink(generation),
+            sink=_GenerationGuardedVadSink(
+                sink=self._vad_sink,
+                owner=self,
+                capture_generation=capture_generation,
+            ),
             target_sample_rate_hz=config.target_sample_rate_hz,
         )
+
+    def _rebind_capture_generation(self, generation: int) -> None:
+        capture_generation = self._capture_generation
+        if capture_generation is not None:
+            capture_generation.value = generation
 
     def _on_loop_task_done(
         self,
@@ -918,6 +941,7 @@ class SelfCaptureSessionOwner:
         self._loop_task = None
         self._source = None
         self._vad = None
+        self._capture_generation = None
         self._state = SelfCaptureSessionState.STOPPING
         self._notify_state_changed()
         failures: list[Exception] = []

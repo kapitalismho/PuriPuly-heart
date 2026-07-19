@@ -448,6 +448,28 @@ async def test_running_provider_handoff_preserves_capture_and_prior_state_on_non
 
 
 @pytest.mark.asyncio
+async def test_retained_capture_rebinds_callbacks_and_source_loss_after_provider_handoff() -> None:
+    owner, _, _, sources, loop, sink = build_owner()
+    first = config("one")
+    second = config("two")
+
+    await owner.apply_intent(first, enabled=True)
+    guarded_sink = loop.calls[0]["sink"]
+    await getattr(guarded_sink, "handle_vad_event")("before")
+
+    await owner.apply_intent(first, enabled=True)
+    await getattr(guarded_sink, "handle_vad_event")("after-noop")
+    await owner.apply_intent(second, enabled=True)
+    await getattr(guarded_sink, "handle_vad_event")("after-handoff")
+    loop.release.set()
+    await wait_until(lambda: owner.snapshot.state is SelfCaptureSessionState.FAULTED)
+
+    assert sink.events == ["before", "after-noop", "after-handoff"]
+    assert sources[0].close_calls == 1
+    assert owner.snapshot.failure_reason is SelfCaptureFailureReason.SESSION_FAILED
+
+
+@pytest.mark.asyncio
 async def test_microphone_test_exclusion_stops_ingress_before_abort_release() -> None:
     events: list[str] = []
 
