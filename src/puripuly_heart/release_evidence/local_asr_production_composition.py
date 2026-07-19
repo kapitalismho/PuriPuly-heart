@@ -180,9 +180,13 @@ async def _execute(
     provider_type = type(settings.provider.stt)
     settings.provider.stt = provider_type("local_qwen_gpu")
     settings.provider.peer_stt = provider_type("local_qwen_gpu")
+    settings.provider.llm = type(settings.provider.llm)("local_llm")
+    settings.secrets.backend = type(settings.secrets.backend)("encrypted_file")
+    settings.secrets.encrypted_file_path = "release-evidence-secrets.json"
     settings.stt.gpu_device_id = "auto"
     settings.ui.peer_translation_enabled = False
     settings.osc.chatbox_send = False
+    os.environ["PURIPULY_HEART_SECRETS_PASSPHRASE"] = uuid4().hex
     controller.settings = settings
     self_events: list[object] = []
     peer_events: list[object] = []
@@ -210,11 +214,17 @@ async def _execute(
         ):
             raise RuntimeError("production controller did not compose the canonical owner")
         owner = hub.local_asr_provider_runtime
+        await hub.replace_llm_provider(None)
+        hub.translation_enabled = False
+        if hub.llm is not None:
+            raise RuntimeError("production evidence did not disable the external LLM provider")
         report["composition"] = {
             "controller": type(controller).__name__,
             "hub": type(hub).__name__,
             "factory": LocalASRProviderRuntimeFactory.__name__,
             "owner": type(owner).__name__,
+            "external_llm_disabled": True,
+            "secrets_backend": settings.secrets.backend.value,
         }
         _attach_event_evidence(owner, self_events, peer_events, retired_events)
         await hub.start()
@@ -321,11 +331,26 @@ async def _execute(
         await _wait_until(lambda: owner.snapshot.gpu.retry_required, timeout=30.0)
         failed_snapshot = _snapshot_fact(owner)
         await controller.retry_gpu_activation()
-        recovered_pid = owner.snapshot.gpu.worker_pid
-        if recovered_pid is None or recovered_pid == failed_pid:
+        controller_recovery = _snapshot_fact(owner)
+        controller_recovered_pid = owner.snapshot.gpu.worker_pid
+        if controller_recovered_pid is None or controller_recovered_pid == failed_pid:
             raise RuntimeError("production Controller recovery did not start a fresh worker")
         await hub.resume_self_stt_after_toggle_on()
-        await hub.start_peer_stt_provider_ingress()
+        peer_reactivation_status = "retained"
+        if "peer" not in owner.snapshot.gpu.active_channels:
+            peer_reactivation = await hub.replace_peer_stt_provider_request(
+                peer_request,
+                start=True,
+                on_terminal_failure=None,
+            )
+            peer_reactivation_status = peer_reactivation.status
+            if peer_reactivation.status != "applied":
+                raise RuntimeError("production Peer reactivation after recovery failed")
+        else:
+            await hub.start_peer_stt_provider_ingress()
+        recovered_pid = owner.snapshot.gpu.worker_pid
+        if recovered_pid != controller_recovered_pid:
+            raise RuntimeError("production Peer reactivation replaced the recovered worker")
         recovered_final = await _send_utterance(
             hub=hub,
             channel="peer",
@@ -337,6 +362,8 @@ async def _execute(
             "failed_pid_present_after_detection": _process_present(failed_pid),
             "failed_snapshot": failed_snapshot,
             "recovered_pid": recovered_pid,
+            "controller_recovery": controller_recovery,
+            "peer_reactivation_status": peer_reactivation_status,
             "recovered_final": _require_final(
                 recovered_final,
                 channel="peer",
