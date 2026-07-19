@@ -29,6 +29,23 @@ def test_github_star_prompt_runtime_exposes_lifecycle_inventory() -> None:
 
 
 @pytest.mark.asyncio
+async def test_github_star_prompt_runtime_idle_close_clears_closing_state() -> None:
+    runtime = GithubStarPromptRuntime()
+
+    runtime.stop_ingress()
+    assert runtime.is_closed is True
+    assert runtime.is_closing is True
+
+    await runtime.close()
+    assert runtime.is_closed is True
+    assert runtime.is_closing is False
+
+    await runtime.close()
+    assert runtime.is_closed is True
+    assert runtime.is_closing is False
+
+
+@pytest.mark.asyncio
 async def test_github_star_prompt_runtime_close_cancels_and_gathers_launch_timer() -> None:
     runtime = GithubStarPromptRuntime(cancel_timeout_s=0.01)
     prompt_started = asyncio.Event()

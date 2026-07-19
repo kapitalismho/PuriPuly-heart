@@ -150,6 +150,9 @@ class GithubStarPromptRuntime:
             and self._launch_prompt_task is None
             and self._translation_success_task is None
         ):
+            if self._closing:
+                self._closing = False
+                self._notify_state_changed()
             return
         async with self._close_lock:
             if (
@@ -157,6 +160,9 @@ class GithubStarPromptRuntime:
                 and self._launch_prompt_task is None
                 and self._translation_success_task is None
             ):
+                if self._closing:
+                    self._closing = False
+                    self._notify_state_changed()
                 return
             self.stop_ingress()
             try:
