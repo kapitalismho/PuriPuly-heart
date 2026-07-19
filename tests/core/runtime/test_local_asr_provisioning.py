@@ -219,6 +219,24 @@ async def test_failed_repair_keeps_integrity_and_exposes_only_safe_failure_type(
 
 
 @pytest.mark.asyncio
+async def test_runtime_validation_failure_is_owned_and_safely_diagnosed() -> None:
+    owner = _owner(MutableProvisioningBackend(_all_states()))
+    await owner.inspect_cpu()
+
+    snapshot = await owner.report_model_validation_failure(
+        LOCAL_STT_MODEL_ID,
+        failure_type="LocalQwenSherpaLoadError",
+    )
+
+    assert snapshot.state_for(LOCAL_STT_MODEL_ID).status == "invalid"
+    assert snapshot.state_for(PARAKEET_V3_MODEL_ID).status == "ready"
+    assert owner.diagnostics[-1].event == "validation"
+    assert owner.diagnostics[-1].failure_type == "LocalQwenSherpaLoadError"
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_gpu_install_requires_explicit_intent_and_uses_only_gpu_model() -> None:
     states = _all_states()
     states[LOCAL_QWEN_GPU_MODEL_ID] = _state("missing", LOCAL_QWEN_GPU_MODEL_ID)

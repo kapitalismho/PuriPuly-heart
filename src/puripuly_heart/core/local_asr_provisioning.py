@@ -151,6 +151,13 @@ class LocalASRProvisioningPort(Protocol):
         request: LocalASRInstallRequest,
     ) -> asyncio.Task[LocalASRInstallResult]: ...
 
+    async def report_model_validation_failure(
+        self,
+        model_id: str,
+        *,
+        failure_type: str,
+    ) -> LocalASRProvisioningSnapshot: ...
+
     async def cancel_install(self, backend: LocalASRProvisioningBackend) -> None: ...
 
     async def close(self) -> None: ...

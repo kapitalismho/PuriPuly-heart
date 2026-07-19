@@ -228,6 +228,33 @@ class LocalASRProvisioningOwner:
             ),
         )
 
+    async def report_model_validation_failure(
+        self,
+        model_id: str,
+        *,
+        failure_type: str,
+    ) -> LocalASRProvisioningSnapshot:
+        self._require_open("report model validation failure")
+        if model_id not in self._models:
+            raise ValueError("unknown Local ASR model identity")
+        current = self._models[model_id]
+        self._models[model_id] = LocalASRModelProvisioningState(
+            model_id=model_id,
+            backend=current.backend,
+            integrity="invalid",
+        )
+        await self._emit_diagnostic(
+            LocalASRProvisioningDiagnostic(
+                event="validation",
+                backend=current.backend,
+                model_id=model_id,
+                outcome="failed",
+                failure_type=failure_type,
+            )
+        )
+        await self._publish_state()
+        return self.snapshot
+
     async def cancel_install(self, backend: LocalASRProvisioningBackend) -> None:
         await self._runtime_for(backend).cancel()
 

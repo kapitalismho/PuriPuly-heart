@@ -40,8 +40,16 @@ from puripuly_heart.app.wiring_stt_factory import (
 )
 from puripuly_heart.config.runtime_resolution import resolve_llm_config
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
+    HuggingFaceXetDownloadAdapter,
+)
 from puripuly_heart.core.openrouter_credentials import load_managed_openrouter_user_identifier
 from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnosticSink, SharedGpuASRRuntime
+from puripuly_heart.core.runtime.local_asr_provisioning import (
+    LocalASRProvisioningOwner,
+    ProvisioningDiagnosticSink,
+    ProvisioningStateChanged,
+)
 
 _WIRING_SECRET_KEYS_FOR_COMPATIBILITY_GUARD = (
     "google_api_key",
@@ -90,6 +98,18 @@ def _create_shared_gpu_asr_runtime(
     )
 
 
+def create_local_asr_provisioning_owner(
+    *,
+    state_changed: ProvisioningStateChanged | None = None,
+    diagnostic_sink: ProvisioningDiagnosticSink | None = None,
+) -> LocalASRProvisioningOwner:
+    return LocalASRProvisioningOwner(
+        state_changed=state_changed,
+        diagnostic_sink=diagnostic_sink,
+        huggingface_downloader=HuggingFaceXetDownloadAdapter(),
+    )
+
+
 __all__ = (
     "SECRETS_PASSPHRASE_ENV",
     "MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR",
@@ -98,6 +118,7 @@ __all__ = (
     "build_peer_stt_provider_signature_from_vnext",
     "create_llm_provider",
     "create_llm_provider_from_resolved_config",
+    "create_local_asr_provisioning_owner",
     "create_peer_stt_backend",
     "create_peer_stt_backend_from_resolved_config",
     "create_provider_verifier",

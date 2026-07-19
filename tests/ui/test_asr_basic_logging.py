@@ -6,11 +6,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from puripuly_heart.config.settings import AppSettings, STTProviderName
-from puripuly_heart.core.local_stt_assets import (
-    LocalQwenSherpaLoadError,
-    LocalSTTInstallState,
-)
 from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
 from puripuly_heart.ui.controller import GuiController
 
@@ -120,77 +115,6 @@ def test_cpu_transition_promotes_only_terminal_load_results_to_basic(
             logging.ERROR,
         ),
     ]
-
-
-@pytest.mark.asyncio
-async def test_self_cpu_first_load_logs_resolved_model_and_elapsed_time(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller, basic, _detailed = _controller_with_logs(monkeypatch)
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.LOCAL_QWEN
-    controller.settings = settings
-    controller._local_stt_install_state = LocalSTTInstallState(status="ready")
-    controller.hub = SimpleNamespace(
-        stt=SimpleNamespace(
-            backend=SimpleNamespace(is_loaded=False, model_id="qwen-model"),
-        ),
-        peer_stt=None,
-    )
-
-    async def probe(_self, *, activation_generation=None) -> None:
-        _ = activation_generation
-
-    monkeypatch.setattr(GuiController, "_probe_self_local_stt_runtime_load", probe)
-    monkeypatch.setattr(
-        GuiController,
-        "_record_strict_local_stt_ready",
-        lambda _self, _model_ids: None,
-    )
-    monkeypatch.setattr(GuiController, "_sync_local_stt_notice", lambda _self: None)
-    assert await controller._ensure_local_stt_ready() is True
-    message, level = basic[-1]
-    assert message.startswith(
-        "[LocalASR][Load] channel=self model=qwen-model backend=CPU " "outcome=ready load_seconds="
-    )
-    assert level == logging.INFO
-
-
-@pytest.mark.asyncio
-async def test_self_cpu_load_failure_is_basic_error_without_private_message(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller, basic, _detailed = _controller_with_logs(monkeypatch)
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.LOCAL_QWEN
-    controller.settings = settings
-    controller._local_stt_install_state = LocalSTTInstallState(status="ready")
-    controller.hub = SimpleNamespace(
-        stt=SimpleNamespace(
-            backend=SimpleNamespace(is_loaded=False, model_id="qwen-model"),
-        ),
-        peer_stt=None,
-    )
-
-    async def fail_probe(_self, *, activation_generation=None) -> None:
-        _ = activation_generation
-        raise LocalQwenSherpaLoadError("C:/Users/private/model")
-
-    monkeypatch.setattr(GuiController, "_probe_self_local_stt_runtime_load", fail_probe)
-    monkeypatch.setattr(
-        GuiController,
-        "_handle_local_stt_unavailable",
-        lambda *_args, **_kwargs: False,
-    )
-    assert await controller._ensure_local_stt_ready() is False
-    message, level = basic[-1]
-    assert message.startswith(
-        "[LocalASR][Load] channel=self model=qwen3-asr-0.6b-int8-sherpa "
-        "backend=CPU outcome=failed load_seconds="
-    )
-    assert message.endswith("failure_type=LocalQwenSherpaLoadError")
-    assert level == logging.ERROR
-    assert "C:/Users/private/model" not in message
 
 
 @pytest.mark.asyncio

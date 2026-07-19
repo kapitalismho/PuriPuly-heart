@@ -18,6 +18,17 @@ from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.config.settings_vnext.facade import load_settings, save_settings_with_result
 from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent
+from puripuly_heart.core.local_asr_provisioning import (
+    LocalASRModelProvisioningState,
+    LocalASRProvisioningSnapshot,
+)
+from puripuly_heart.core.local_stt_assets import (
+    LOCAL_QWEN_GPU_MODEL_ID,
+    LOCAL_STT_MODEL_ID,
+    PARAKEET_JAPANESE_MODEL_ID,
+    PARAKEET_V3_MODEL_ID,
+    REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
+)
 from puripuly_heart.core.runtime.peer_channel import (
     PeerRuntimeDiagnostic,
     PeerRuntimeFailureReason,
@@ -33,6 +44,54 @@ from puripuly_heart.ui.overlay_peer_contract import (
 )
 from puripuly_heart.ui.views.dashboard import DashboardView
 from puripuly_heart.ui.views.settings import SettingsView
+
+
+class ReadyProvisioningPort:
+    def __init__(self) -> None:
+        self.snapshot = LocalASRProvisioningSnapshot(
+            models=(
+                LocalASRModelProvisioningState(PARAKEET_V3_MODEL_ID, "cpu", "ready"),
+                LocalASRModelProvisioningState(PARAKEET_JAPANESE_MODEL_ID, "cpu", "ready"),
+                LocalASRModelProvisioningState(LOCAL_STT_MODEL_ID, "cpu", "ready"),
+                LocalASRModelProvisioningState(LOCAL_QWEN_GPU_MODEL_ID, "gpu", "ready"),
+            ),
+            required_cpu_model_ids=REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
+            gpu_model_id=LOCAL_QWEN_GPU_MODEL_ID,
+        )
+
+    @property
+    def diagnostics(self):
+        return ()
+
+    async def inspect_cpu(self, model_ids=None, *, verify_checksums=False):
+        _ = (model_ids, verify_checksums)
+        return self.snapshot
+
+    async def inspect_gpu(self, *, explicit_intent, verify_checksums=False):
+        _ = (explicit_intent, verify_checksums)
+        return self.snapshot
+
+    def start_install(self, request):
+        raise AssertionError(f"unexpected provisioning install: {request}")
+
+    async def report_model_validation_failure(self, model_id, *, failure_type):
+        _ = (model_id, failure_type)
+        return self.snapshot
+
+    async def cancel_install(self, backend):
+        _ = backend
+
+    async def close(self):
+        return
+
+
+@pytest.fixture(autouse=True)
+def _use_ready_local_asr_provisioning(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        controller_module,
+        "create_local_asr_provisioning_owner",
+        lambda **_kwargs: ReadyProvisioningPort(),
+    )
 
 
 def _load_locale_keys(locale: str) -> set[str]:
