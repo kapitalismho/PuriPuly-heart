@@ -41,6 +41,13 @@ from puripuly_heart.app.ports.settings_repository import (
     SettingsSnapshot,
 )
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
+from puripuly_heart.app.services.application_shutdown import (
+    ApplicationShutdownCallback,
+    ApplicationShutdownContext,
+    ApplicationShutdownCoordinator,
+    ApplicationShutdownDiagnostic,
+    application_shutdown_callback,
+)
 from puripuly_heart.app.services.canonical_settings_persistence import (
     SettingsOwner,
     compose_settings_owner,
@@ -192,7 +199,16 @@ from puripuly_heart.core.audio.source import (
 from puripuly_heart.core.clipboard.watcher import create_clipboard_watcher
 from puripuly_heart.core.clock import SystemClock
 from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
-from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.lifecycle import (
+    SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
+    SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+    SHUTDOWN_PHASE_FINAL_DIAGNOSTICS,
+    SHUTDOWN_PHASE_FREEZE_INGRESS,
+    SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+    SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+    LifecycleScope,
+    start_lifecycle_task,
+)
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
@@ -1230,6 +1246,12 @@ class GuiController:
         repr=False,
     )
     _runtime_logging: RuntimeLoggingService | None = field(init=False, default=None)
+    _application_lifecycle: ApplicationShutdownCoordinator | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _shutdown_ingress_frozen: bool = field(init=False, default=False, repr=False)
     _local_qwen_hallucination_detection_count: int = field(init=False, default=0)
     _local_qwen_hallucination_modal_shown: bool = field(init=False, default=False)
     _stop_lock: asyncio.Lock | None = field(init=False, default=None, repr=False)
@@ -4730,81 +4752,299 @@ class GuiController:
         self._vad = None
         self._last_mic_loop_close_exception = None
 
-    async def stop(self) -> None:
-        if self._stop_complete:
-            if self._stop_exception is not None:
-                raise self._stop_exception
-            return
-        if self._stop_lock is None:
-            self._stop_lock = asyncio.Lock()
-        async with self._stop_lock:
-            if self._stop_complete:
-                if self._stop_exception is not None:
-                    raise self._stop_exception
-                return
-            try:
-                await self._stop_impl()
-            except BaseException as exc:
-                self._stop_exception = exc
-                raise
-            finally:
-                self._stop_complete = True
+    def bind_application_lifecycle(
+        self,
+        lifecycle: ApplicationShutdownCoordinator,
+    ) -> None:
+        if self._application_lifecycle is not None and self._application_lifecycle is not lifecycle:
+            raise RuntimeError("GuiController application lifecycle is already bound")
+        self._application_lifecycle = lifecycle
 
-    async def _stop_impl(self) -> None:
-        cleanup_failures: list[Exception] = []
-        for coordinator in (
-            self._self_local_asr_transition,
-            self._peer_local_asr_transition,
-        ):
-            try:
-                await coordinator.close()
-            except Exception as exc:
-                cleanup_failures.append(exc)
-        await self.release_manual_typing()
-        await self._close_app_github_star_prompt_runtime_for_release(cleanup_failures)
-        await self._close_github_star_prompt_runtime_for_release(cleanup_failures)
-        await self._close_clipboard_runtime()
-        await self._close_app_oauth_runtime_for_release(cleanup_failures)
-        await self._close_oauth_runtime_for_release(cleanup_failures)
-        await self._close_local_asr_provisioning()
-        await self._close_microphone_test_runtime_for_release(cleanup_failures)
+    def application_shutdown_callbacks(self) -> tuple[ApplicationShutdownCallback, ...]:
+        return (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="GuiControllerCompatibilityFacade",
+                callback_name="freeze_ingress",
+                callback=self._freeze_application_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="GuiControllerCompatibilityFacade",
+                callback_name="release_manual_typing",
+                callback=self.release_manual_typing,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="ClipboardRuntime",
+                callback_name="close",
+                callback=self._close_clipboard_runtime_for_shutdown,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="VrchatOscPresenceProbe",
+                callback_name="cancel",
+                callback=self._cancel_vrchat_osc_presence_probe,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="SelfCaptureSessionOwner",
+                callback_name="stop_ingress",
+                callback=self._stop_self_capture_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="VrcMicReceiverRuntime",
+                callback_name="close",
+                callback=self._close_vrc_mic_receiver_runtime,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="OverlayRuntimeHandle",
+                callback_name="close",
+                callback=self._close_overlay_runtime,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="PeerCaptureSessionOwner",
+                callback_name="close",
+                callback=self._close_peer_runtime,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="SelfLocalASRTransitionCoordinator",
+                callback_name="close",
+                callback=self._self_local_asr_transition.close,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="PeerLocalASRTransitionCoordinator",
+                callback_name="close",
+                callback=self._peer_local_asr_transition.close,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="GithubStarPromptRuntime",
+                callback_name="close",
+                callback=self._close_github_star_prompt_runtime,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="OAuthRuntime",
+                callback_name="close",
+                callback=self._close_oauth_runtime,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="LocalASRProvisioningRuntime",
+                callback_name="close",
+                callback=self._close_local_asr_provisioning,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="MicTestRuntime",
+                callback_name="close",
+                callback=self._close_microphone_test_runtime,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="SelfCaptureSessionOwner",
+                callback_name="close",
+                callback=self._close_self_capture_owner,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="GuiControllerBackgroundScope",
+                callback_name="close",
+                callback=self._ui_background_scope.close,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+                owner_name="ClientHub",
+                callback_name="stop_owned_runtimes",
+                callback=self._stop_hub,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+                owner_name="VrchatOscUdpSender",
+                callback_name="close",
+                callback=self._close_sender,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+                owner_name="ManagedOpenRouterReleaseService",
+                callback_name="close",
+                callback=self._close_managed_openrouter_release_service,
+            ),
+            ApplicationShutdownCallback(
+                phase=SHUTDOWN_PHASE_FINAL_DIAGNOSTICS,
+                owner_name="GuiControllerCompatibilityFacade",
+                callback_name="emit_final_shutdown_diagnostics",
+                callback=self._emit_final_application_shutdown_diagnostics,
+            ),
+            ApplicationShutdownCallback(
+                phase=SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
+                owner_name="RuntimeLoggingService",
+                callback_name="close_after_producers_stop",
+                callback=self._close_runtime_logging,
+            ),
+        )
+
+    async def stop(self) -> None:
+        lifecycle = self._application_lifecycle
+        if lifecycle is None:
+            lifecycle = ApplicationShutdownCoordinator(
+                self._standalone_application_shutdown_callbacks(),
+                diagnostics_sink=self.emit_application_shutdown_diagnostic,
+            )
+            self.bind_application_lifecycle(lifecycle)
         try:
-            await self.set_stt_enabled(False)
-        except Exception as exc:
-            cleanup_failures.append(exc)
-        await self._close_self_capture_owner_for_release(cleanup_failures)
-        await self._cancel_vrchat_osc_presence_probe()
-        try:
-            await self._ui_background_scope.close()
-        except Exception as exc:
-            cleanup_failures.append(exc)
-        await self._close_vrc_mic_receiver_runtime_for_release(cleanup_failures)
+            await lifecycle.shutdown()
+        except BaseException as exc:
+            self._stop_exception = exc
+            raise
+        finally:
+            self._stop_complete = lifecycle.is_terminal
+
+    def _standalone_application_shutdown_callbacks(
+        self,
+    ) -> tuple[ApplicationShutdownCallback, ...]:
+        app_callbacks = (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="TranslatorAppCompatibilityFacade",
+                callback_name="close_after_launch_tasks",
+                callback=self._close_app_github_star_prompt_runtime,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="TranslatorAppCompatibilityFacade",
+                callback_name="close_oauth_runtime",
+                callback=self._close_app_oauth_runtime,
+            ),
+        )
+        return app_callbacks + self.application_shutdown_callbacks()
+
+    def _freeze_application_ingress(self) -> None:
+        self._shutdown_ingress_frozen = True
+        self._stt_desired = False
+        self._stt_activation_generation += 1
+        self._peer_activation_generation += 1
+        self._gpu_discovery_generation += 1
+        self._vrchat_osc_probe_generation += 1
+
+    async def _close_github_star_prompt_runtime(self) -> None:
+        failures: list[Exception] = []
+        await self._close_github_star_prompt_runtime_for_release(failures)
+        _raise_lifecycle_cleanup_failures("GitHub prompt shutdown failed", failures)
+
+    async def _close_app_github_star_prompt_runtime(self) -> None:
+        failures: list[Exception] = []
+        await self._close_app_github_star_prompt_runtime_for_release(failures)
+        _raise_lifecycle_cleanup_failures("App prompt shutdown failed", failures)
+
+    async def _close_app_oauth_runtime(self) -> None:
+        failures: list[Exception] = []
+        await self._close_app_oauth_runtime_for_release(failures)
+        _raise_lifecycle_cleanup_failures("App OAuth shutdown failed", failures)
+
+    async def _close_microphone_test_runtime(self) -> None:
+        failures: list[Exception] = []
+        await self._close_microphone_test_runtime_for_release(failures)
+        _raise_lifecycle_cleanup_failures("Microphone test shutdown failed", failures)
+
+    async def _close_clipboard_runtime_for_shutdown(self) -> None:
+        async with self._get_clipboard_watcher_lock():
+            runtime = self._clipboard_runtime
+            if runtime is not None:
+                await runtime.close()
+
+    async def _stop_self_capture_ingress(self) -> None:
+        await self.set_stt_enabled(False)
+
+    async def _close_self_capture_owner(self) -> None:
+        failures: list[Exception] = []
+        await self._close_self_capture_owner_for_release(failures)
+        _raise_lifecycle_cleanup_failures("Self capture shutdown failed", failures)
+
+    async def _close_vrc_mic_receiver_runtime(self) -> None:
+        failures: list[Exception] = []
+        await self._close_vrc_mic_receiver_runtime_for_release(failures)
+        _raise_lifecycle_cleanup_failures("VRChat microphone receiver shutdown failed", failures)
+
+    async def _close_overlay_runtime(self) -> None:
         await self._shutdown_overlay_runtime(preserve_failure_reason=True)
         self._clear_overlay_session_desktop_fallback()
-        await self._close_peer_runtime_for_release(cleanup_failures)
 
-        await self._stop_hub_for_release(cleanup_failures)
+    async def _close_peer_runtime(self) -> None:
+        failures: list[Exception] = []
+        await self._close_peer_runtime_for_release(failures)
+        _raise_lifecycle_cleanup_failures("Peer capture shutdown failed", failures)
+
+    async def _stop_hub(self) -> None:
+        failures: list[Exception] = []
+        await self._stop_hub_for_release(failures)
         if self.hub is None:
             self._bridge_task = None
             self._ui_event_bridge = None
+        _raise_lifecycle_cleanup_failures("Hub owner shutdown failed", failures)
 
-        if self.sender is not None:
-            with contextlib.suppress(Exception):
-                self.sender.close()
-            self.sender = None
+    def _close_sender(self) -> None:
+        sender = self.sender
+        if sender is None:
+            self.osc = None
+            return
+        sender.close()
+        self.sender = None
         self.osc = None
-        await self._replace_managed_openrouter_release_service(None)
-        if self._runtime_logging is not None:
-            try:
-                self._runtime_logging.close_after_producers_stop(
-                    cleanup_failures=tuple(cleanup_failures)
-                )
-            except Exception as exc:
-                cleanup_failures.append(exc)
-        _raise_lifecycle_cleanup_failures(
-            "GUI controller stop cleanup failed",
-            cleanup_failures,
+
+    async def _close_managed_openrouter_release_service(self) -> None:
+        service = self._managed_openrouter_release_service
+        self._managed_openrouter_release_service = None
+        if service is not None:
+            await service.close()
+
+    def _emit_final_application_shutdown_diagnostics(
+        self,
+        context: ApplicationShutdownContext,
+    ) -> None:
+        if self._runtime_logging is None:
+            return
+        emit_persisted = getattr(self._runtime_logging, "emit_persisted", None)
+        if not callable(emit_persisted):
+            return
+        emit_persisted(
+            "[Lifecycle][Shutdown] coordinator_terminal "
+            "owner=ApplicationShutdownCoordinator "
+            f"failure_count={len(context.failures)}",
+            level=logging.INFO,
         )
+
+    def _close_runtime_logging(self, context: ApplicationShutdownContext) -> None:
+        if self._runtime_logging is None:
+            return
+        self._runtime_logging.close_after_producers_stop(
+            cleanup_failures=context.cleanup_exceptions,
+        )
+
+    def emit_application_shutdown_diagnostic(
+        self,
+        diagnostic: ApplicationShutdownDiagnostic,
+    ) -> None:
+        message = (
+            "[Lifecycle][Shutdown] callback_failed "
+            f"phase={diagnostic.phase} "
+            f"owner={diagnostic.owner_name} "
+            f"callback={diagnostic.callback_name} "
+            f"exception_class={diagnostic.exception_class} "
+            f"timed_out={str(diagnostic.timed_out).lower()}"
+        )
+        if self._runtime_logging is not None:
+            emit_persisted = getattr(self._runtime_logging, "emit_persisted", None)
+            if callable(emit_persisted):
+                emit_persisted(message, level=logging.ERROR)
+                return
+        logger.error(message)
 
     async def set_overlay_enabled(self, enabled: bool) -> None:
         if self.settings is None:
@@ -5483,6 +5723,8 @@ class GuiController:
             await presenter.update_calibration(self.overlay_calibration.copy())
 
     def _schedule_overlay_calibration_emit(self) -> None:
+        if self._shutdown_ingress_frozen:
+            return
         if self._current_overlay_presenter_for_direct_runtime_command() is None:
             return
         run_task = getattr(self.page, "run_task", None)
@@ -11585,6 +11827,9 @@ class GuiController:
         self._schedule_overlay_runtime_logging_mode_update()
 
     def _schedule_audio_environment_snapshot(self) -> None:
+        if self._shutdown_ingress_frozen:
+            return
+
         async def _task() -> None:
             await self._log_audio_environment_snapshot_async()
 
@@ -11641,6 +11886,8 @@ class GuiController:
         await bridge.broadcast_runtime_control(logging_mode=self.runtime_logging_mode)
 
     def _schedule_overlay_runtime_logging_mode_update(self) -> None:
+        if self._shutdown_ingress_frozen:
+            return
         if self._current_overlay_bridge_for_direct_runtime_command() is None:
             return
 

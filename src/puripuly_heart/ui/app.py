@@ -10,6 +10,11 @@ from pathlib import Path
 import flet as ft
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.services.application_shutdown import (
+    ApplicationShutdownCallback,
+    ApplicationShutdownCoordinator,
+    application_shutdown_callback,
+)
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -19,6 +24,11 @@ from puripuly_heart.core.discord_oauth_loopback import (
     render_discord_oauth_callback_completion_page,
 )
 from puripuly_heart.core.language import get_stt_compatibility_warning
+from puripuly_heart.core.lifecycle import (
+    SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+    SHUTDOWN_PHASE_FREEZE_INGRESS,
+    SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+)
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
@@ -171,6 +181,7 @@ class TranslatorApp:
         self._github_star_prompt_shown_this_launch = False
         self._microphone_test_dialog: MicrophoneTestDialog | None = None
         self._telemetry_consent_dialog: TelemetryConsentDialog | None = None
+        self._application_lifecycle = self._compose_application_lifecycle()
         self._setup_page()
         self._build_layout()
 
@@ -253,7 +264,13 @@ class TranslatorApp:
             set_overlay_calibration(overlay_calibration)
 
     def _run_page_task(self, coroutine, *args):
-        if getattr(self, "_shutting_down", False):
+        lifecycle = getattr(self, "_application_lifecycle", None)
+        if getattr(self, "_shutting_down", False) or (
+            lifecycle is not None and not lifecycle.accepting_intents
+        ):
+            close = getattr(coroutine, "close", None)
+            if callable(close):
+                close()
             return None
         task = self.page.run_task(coroutine, *args)
         tracked = getattr(self, "_tracked_page_tasks", None)
@@ -267,31 +284,97 @@ class TranslatorApp:
         return task
 
     async def shutdown(self) -> None:
-        if self._shutdown_complete:
-            return
-        if self._shutdown_lock is None:
-            self._shutdown_lock = asyncio.Lock()
-        async with self._shutdown_lock:
-            if self._shutdown_complete:
-                return
-            self._shutting_down = True
-            current_task = asyncio.current_task()
-            tasks = tuple(
-                task
-                for task in self._tracked_page_tasks
-                if task is not current_task and not getattr(task, "done", lambda: True)()
-            )
-            for task in tasks:
-                cancel = getattr(task, "cancel", None)
-                if callable(cancel):
-                    cancel()
-            awaitables = tuple(task for task in tasks if inspect.isawaitable(task))
-            if awaitables:
-                await asyncio.gather(*awaitables, return_exceptions=True)
-            self._tracked_page_tasks.difference_update(tasks)
-            self._settings_mutation_queue = []
-            await self.controller.stop()
-            self._shutdown_complete = True
+        lifecycle = self._get_application_lifecycle()
+        try:
+            await lifecycle.shutdown()
+        finally:
+            self._shutdown_complete = lifecycle.is_terminal
+
+    def _compose_application_lifecycle(self) -> ApplicationShutdownCoordinator:
+        callbacks = list(self._application_shutdown_callbacks())
+        controller_callbacks = getattr(self.controller, "application_shutdown_callbacks", None)
+        if callable(controller_callbacks):
+            callbacks.extend(controller_callbacks())
+        else:
+            controller_stop = getattr(self.controller, "stop", None)
+            if callable(controller_stop):
+                callbacks.append(
+                    application_shutdown_callback(
+                        phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+                        owner_name="GuiControllerCompatibilityFacade",
+                        callback_name="stop",
+                        callback=controller_stop,
+                    )
+                )
+        diagnostics_sink = getattr(
+            self.controller,
+            "emit_application_shutdown_diagnostic",
+            None,
+        )
+        lifecycle = ApplicationShutdownCoordinator(
+            callbacks,
+            diagnostics_sink=diagnostics_sink if callable(diagnostics_sink) else None,
+        )
+        bind = getattr(self.controller, "bind_application_lifecycle", None)
+        if callable(bind):
+            bind(lifecycle)
+        return lifecycle
+
+    def _get_application_lifecycle(self) -> ApplicationShutdownCoordinator:
+        lifecycle = getattr(self, "_application_lifecycle", None)
+        if lifecycle is None:
+            lifecycle = self._compose_application_lifecycle()
+            self._application_lifecycle = lifecycle
+        return lifecycle
+
+    def _application_shutdown_callbacks(self) -> tuple[ApplicationShutdownCallback, ...]:
+        return (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="TranslatorApp",
+                callback_name="freeze_ui_ingress",
+                callback=self._freeze_ui_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="TranslatorApp",
+                callback_name="cancel_tracked_page_tasks",
+                callback=self._cancel_tracked_page_tasks,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="GithubStarPromptRuntime",
+                callback_name="close_app_runtime",
+                callback=self.close_after_launch_tasks,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="OAuthRuntime",
+                callback_name="close_app_runtime",
+                callback=self.close_oauth_runtime,
+            ),
+        )
+
+    def _freeze_ui_ingress(self) -> None:
+        self._shutting_down = True
+        self._settings_mutation_queue = []
+
+    async def _cancel_tracked_page_tasks(self) -> None:
+        current_task = asyncio.current_task()
+        tracked = getattr(self, "_tracked_page_tasks", set())
+        tasks = tuple(
+            task
+            for task in tracked
+            if task is not current_task and not getattr(task, "done", lambda: True)()
+        )
+        for task in tasks:
+            cancel = getattr(task, "cancel", None)
+            if callable(cancel):
+                cancel()
+        awaitables = tuple(task for task in tasks if inspect.isawaitable(task))
+        if awaitables:
+            await asyncio.gather(*awaitables, return_exceptions=True)
+        tracked.difference_update(tasks)
 
     async def _on_page_lifecycle_end(self, _event=None) -> None:
         await self.shutdown()
