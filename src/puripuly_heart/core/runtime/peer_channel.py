@@ -953,6 +953,15 @@ class PeerCaptureSessionOwner:
             and self._loop_task is not None
         )
 
+    def guard_vad_sink(self, generation: int | None = None) -> object:
+        return _GenerationGuardedVadSink(
+            sink=self._vad_sink,
+            runtime=self,
+            capture_generation=_CaptureGeneration(
+                self._generation if generation is None else generation
+            ),
+        )
+
     def _rebind_capture_generation(self, generation: int) -> None:
         if self._capture_generation is not None:
             self._capture_generation.value = generation

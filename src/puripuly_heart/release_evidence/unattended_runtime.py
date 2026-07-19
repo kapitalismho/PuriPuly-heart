@@ -207,35 +207,53 @@ async def _product_process_source_probe(
     return facts
 
 
-async def _peer_generation_probe() -> dict[str, Any]:
+def _peer_probe_owner(hub: object) -> Any:
     from puripuly_heart.core.clock import SystemClock
-    from puripuly_heart.core.runtime.peer_channel import PeerChannelRuntime, _PeerHubVadSink
+    from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 
-    class Hub:
-        def __init__(self) -> None:
-            self.events: list[object] = []
-            self.local_asr_provider_runtime = self
+    class Admission:
+        async def admit(self, _config: object) -> object:
+            raise AssertionError("admission is outside this probe")
 
-        async def handle_peer_vad_event(self, event: object) -> None:
-            self.events.append(event)
+    class Resolver:
+        async def resolve(self, _target: object) -> object:
+            raise AssertionError("target resolution is outside this probe")
 
-        async def release_channel(self, *_args: object, **_kwargs: object) -> None:
+    class Provider:
+        def is_ready(self, _config: object) -> bool:
+            return False
+
+        async def release(self, **_kwargs: object) -> None:
             return None
 
-    hub = Hub()
-    runtime = PeerChannelRuntime(
-        hub=hub,
+    return PeerCaptureSessionOwner(
+        admission=Admission(),
+        target_resolver=Resolver(),
+        provider=Provider(),
         clock=SystemClock(),
         provider_request_factory=lambda *_args: (_ for _ in ()).throw(
             AssertionError("provider construction is outside this probe")
         ),
         source_factory=lambda *_args: None,
         vad_factory=lambda *_args: None,
-        vad_model_resolver=lambda: Path(),
         run_audio_loop=lambda **_kwargs: asyncio.sleep(0),
+        vad_sink=hub,
     )
+
+
+async def _peer_generation_probe() -> dict[str, Any]:
+
+    class Hub:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+
+        async def handle_peer_vad_event(self, event: object) -> None:
+            self.events.append(event)
+
+    hub = Hub()
+    runtime = _peer_probe_owner(hub)
     generation = runtime._generation
-    sink = _PeerHubVadSink(hub=hub, runtime=runtime, generation=generation)
+    sink = runtime.guard_vad_sink(generation)
     await runtime.close()
     attempted = 1
     await sink.handle_vad_event(object())
@@ -250,35 +268,22 @@ async def _peer_generation_probe() -> dict[str, Any]:
 
 
 def _active_peer_publication_gate() -> tuple[Any, Any, Any, dict[str, Any]]:
-    from puripuly_heart.core.clock import SystemClock
-    from puripuly_heart.core.runtime.peer_channel import PeerChannelRuntime, _PeerHubVadSink
+    from puripuly_heart.core.peer_capture import PeerCaptureSessionState
 
     class Hub:
         def __init__(self) -> None:
             self.events: list[object] = []
-            self.local_asr_provider_runtime = self
 
         async def handle_peer_vad_event(self, event: object) -> None:
             self.events.append(event)
 
-        async def release_channel(self, *_args: object, **_kwargs: object) -> None:
-            return None
-
     hub = Hub()
-    runtime = PeerChannelRuntime(
-        hub=hub,
-        clock=SystemClock(),
-        provider_request_factory=lambda *_args: (_ for _ in ()).throw(
-            AssertionError("provider construction is outside this probe")
-        ),
-        source_factory=lambda *_args: None,
-        vad_factory=lambda *_args: None,
-        vad_model_resolver=lambda: Path(),
-        run_audio_loop=lambda **_kwargs: asyncio.sleep(0),
-    )
+    runtime = _peer_probe_owner(hub)
     runtime._desired_active = True
+    runtime._state = PeerCaptureSessionState.RUNNING
+    runtime._loop_task = asyncio.current_task()
     generation = runtime._generation
-    sink = _PeerHubVadSink(hub=hub, runtime=runtime, generation=generation)
+    sink = runtime.guard_vad_sink(generation)
     facts = {"generation_before": generation, "attempted": 0, "published": 0}
 
     async def publish() -> None:
