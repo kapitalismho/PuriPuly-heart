@@ -155,6 +155,53 @@ async def test_owner_marks_only_the_model_with_invalid_manifest_authority_invali
 
 
 @pytest.mark.asyncio
+async def test_owner_cleans_only_known_stale_install_residue_before_inspection(
+    tmp_path,
+) -> None:
+    manifest = load_local_stt_asset_manifest(LOCAL_STT_MODEL_ID)
+    stale_staging = tmp_path / f"{manifest.install_dirname}.staging-abcd"
+    stale_backup = tmp_path / f"{manifest.install_dirname}.backup"
+    restored_install = tmp_path / manifest.install_dirname
+    unrelated = tmp_path / f"{manifest.install_dirname}.evidence"
+    stale_staging.mkdir()
+    stale_backup.mkdir()
+    unrelated.mkdir()
+    owner = _owner(MutableProvisioningBackend(_all_states()), model_root=tmp_path)
+
+    await owner.inspect_cpu()
+
+    assert not stale_staging.exists()
+    assert not stale_backup.exists()
+    assert restored_install.exists()
+    assert unrelated.exists()
+    assert owner.diagnostics[0].event == "cleanup"
+    assert owner.diagnostics[0].outcome == "ready"
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_failure_is_safely_diagnosed_without_blocking_availability() -> None:
+    def fail_cleanup(**_kwargs):
+        raise PermissionError("sensitive-path")
+
+    owner = _owner(
+        MutableProvisioningBackend(_all_states()),
+        residue_cleaner=fail_cleanup,
+    )
+
+    snapshot = await owner.inspect_cpu()
+
+    assert snapshot.cpu_auto_available is True
+    assert owner.diagnostics[0].event == "cleanup"
+    assert owner.diagnostics[0].outcome == "failed"
+    assert owner.diagnostics[0].failure_type == "PermissionError"
+    assert "sensitive-path" not in repr(owner.diagnostics)
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_targeted_cpu_repair_preserves_valid_models_and_reports_progress() -> None:
     states = _all_states()
     states[PARAKEET_JAPANESE_MODEL_ID] = _state("invalid", PARAKEET_JAPANESE_MODEL_ID)
@@ -184,7 +231,9 @@ async def test_targeted_cpu_repair_preserves_valid_models_and_reports_progress()
         and snapshot.activity_for("cpu").progress_percent == 37
         for snapshot in snapshots
     )
-    assert [diagnostic.outcome for diagnostic in owner.diagnostics] == ["started", "ready"]
+    assert [
+        diagnostic.outcome for diagnostic in owner.diagnostics if diagnostic.event == "install"
+    ] == ["started", "ready"]
 
     await owner.close()
 

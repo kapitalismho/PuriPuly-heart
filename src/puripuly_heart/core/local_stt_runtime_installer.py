@@ -43,6 +43,44 @@ class RuntimeLocalSTTStatusUpdate:
 StatusCallback = Callable[[RuntimeLocalSTTStatusUpdate], Awaitable[None] | None]
 
 
+def cleanup_local_stt_install_residue(
+    *,
+    model_root: Path | None = None,
+    install_dirnames: tuple[str, ...],
+) -> tuple[Path, ...]:
+    resolved_root = (model_root or default_local_stt_model_root()).resolve()
+    if not resolved_root.exists():
+        return ()
+    normalized_dirnames = tuple(dict.fromkeys(install_dirnames))
+    if not normalized_dirnames or any(
+        not name
+        or name.startswith(".")
+        or Path(name).name != name
+        or any(not (character.isalnum() or character in "._-") for character in name)
+        for name in normalized_dirnames
+    ):
+        raise ValueError("install_dirnames must contain safe directory names")
+    reconciled: list[Path] = []
+    for dirname in normalized_dirnames:
+        install_dir = resolved_root / dirname
+        backup_dir = resolved_root / f"{dirname}.backup"
+        if backup_dir.exists() or backup_dir.is_symlink():
+            if not install_dir.exists() and backup_dir.is_dir() and not backup_dir.is_symlink():
+                backup_dir.rename(install_dir)
+            elif backup_dir.is_symlink() or not backup_dir.is_dir():
+                backup_dir.unlink(missing_ok=True)
+            else:
+                shutil.rmtree(backup_dir)
+            reconciled.append(backup_dir)
+        for staging_dir in resolved_root.glob(f"{dirname}.staging-*"):
+            if staging_dir.is_symlink() or not staging_dir.is_dir():
+                staging_dir.unlink(missing_ok=True)
+            else:
+                shutil.rmtree(staging_dir)
+            reconciled.append(staging_dir)
+    return tuple(reconciled)
+
+
 class LocalSTTRuntimeInstallError(LocalSTTAssetError):
     """Raised when runtime local STT provisioning fails."""
 

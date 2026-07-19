@@ -41,6 +41,7 @@ from puripuly_heart.core.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallCancelled,
     LocalSTTRuntimeInstallError,
     RuntimeLocalSTTStatusUpdate,
+    cleanup_local_stt_install_residue,
     ensure_local_stt_installed,
 )
 from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime
@@ -58,6 +59,7 @@ GPUModelInspector = Callable[..., LocalGPUInstallSnapshot]
 ManifestLoader = Callable[[str], LocalSTTAssetManifest]
 GPUManifestLoader = Callable[[], LocalSTTAssetManifest]
 ProvisioningInstaller = Callable[..., Awaitable[InstalledLocalSTTManifest]]
+ProvisioningResidueCleaner = Callable[..., tuple[Path, ...]]
 DownloadRuntimeFactory = Callable[[], LocalSTTDownloadRuntime]
 
 
@@ -85,6 +87,7 @@ class LocalASRProvisioningOwner:
         manifest_loader: ManifestLoader = load_local_stt_asset_manifest,
         gpu_manifest_loader: GPUManifestLoader = load_local_gpu_asset_manifest,
         installer: ProvisioningInstaller = ensure_local_stt_installed,
+        residue_cleaner: ProvisioningResidueCleaner = cleanup_local_stt_install_residue,
         huggingface_downloader: HuggingFaceDownloadPort | None = None,
         download_runtime_factory: DownloadRuntimeFactory = LocalSTTDownloadRuntime,
     ) -> None:
@@ -98,6 +101,7 @@ class LocalASRProvisioningOwner:
         self._manifest_loader = manifest_loader
         self._gpu_manifest_loader = gpu_manifest_loader
         self._installer = installer
+        self._residue_cleaner = residue_cleaner
         self._huggingface_downloader = huggingface_downloader
         self._cpu_install_runtime = download_runtime_factory()
         self._gpu_install_runtime = download_runtime_factory()
@@ -122,6 +126,8 @@ class LocalASRProvisioningOwner:
         self._closing = False
         self._closed = False
         self._close_lock = asyncio.Lock()
+        self._cleanup_lock = asyncio.Lock()
+        self._startup_cleanup_complete = False
 
     @property
     def owner_name(self) -> str:
@@ -162,6 +168,7 @@ class LocalASRProvisioningOwner:
         verify_checksums: bool = False,
     ) -> LocalASRProvisioningSnapshot:
         self._require_open("inspect CPU assets")
+        await self._ensure_startup_cleanup()
         requested = model_ids or REQUIRED_CPU_LOCAL_STT_MODEL_IDS
         self._validate_model_ids("cpu", requested)
         installs = await asyncio.to_thread(
@@ -188,6 +195,7 @@ class LocalASRProvisioningOwner:
         verify_checksums: bool = False,
     ) -> LocalASRProvisioningSnapshot:
         self._require_open("inspect GPU assets")
+        await self._ensure_startup_cleanup()
         if not explicit_intent:
             self._models[LOCAL_QWEN_GPU_MODEL_ID] = LocalASRModelProvisioningState(
                 model_id=LOCAL_QWEN_GPU_MODEL_ID,
@@ -288,6 +296,7 @@ class LocalASRProvisioningOwner:
         cancel_event: threading.Event,
         generation: int,
     ) -> LocalASRInstallResult:
+        await self._ensure_startup_cleanup()
         runtime = self._runtime_for(request.backend)
         installed: list[str] = []
         failed: list[str] = []
@@ -431,6 +440,45 @@ class LocalASRProvisioningOwner:
             cancelled=cancelled,
             snapshot=self.snapshot,
         )
+
+    async def _ensure_startup_cleanup(self) -> None:
+        if self._startup_cleanup_complete:
+            return
+        async with self._cleanup_lock:
+            if self._startup_cleanup_complete:
+                return
+            started_at = time.monotonic()
+            try:
+                manifests = tuple(
+                    self._manifest_loader(model_id) for model_id in REQUIRED_CPU_LOCAL_STT_MODEL_IDS
+                ) + (self._gpu_manifest_loader(),)
+                removed = await asyncio.to_thread(
+                    self._residue_cleaner,
+                    model_root=self._model_root,
+                    install_dirnames=tuple(manifest.install_dirname for manifest in manifests),
+                )
+                await self._emit_diagnostic(
+                    LocalASRProvisioningDiagnostic(
+                        event="cleanup",
+                        origin="startup",
+                        outcome="ready",
+                        elapsed_seconds=time.monotonic() - started_at,
+                    )
+                )
+                if removed:
+                    await self._publish_state()
+            except Exception as exc:
+                await self._emit_diagnostic(
+                    LocalASRProvisioningDiagnostic(
+                        event="cleanup",
+                        origin="startup",
+                        outcome="failed",
+                        elapsed_seconds=time.monotonic() - started_at,
+                        failure_type=type(exc).__name__,
+                    )
+                )
+            finally:
+                self._startup_cleanup_complete = True
 
     async def _handle_install_status(
         self,

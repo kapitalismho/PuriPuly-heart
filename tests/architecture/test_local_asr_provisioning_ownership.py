@@ -51,6 +51,7 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
     assert "inspect_local_gpu_install" not in source
     assert "load_local_gpu_asset_manifest" not in source
     assert "ensure_local_stt_installed" not in source
+    assert "cleanup_local_stt_install_residue" not in source
     assert "_local_stt_download_runtime" not in source
     assert "_gpu_install_runtime" not in source
     assert "_peer_local_stt_probe_task" not in source

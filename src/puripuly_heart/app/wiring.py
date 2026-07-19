@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from puripuly_heart.app import wiring_llm_factory as _llm_factory
 from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
 from puripuly_heart.app.wiring_composition import create_provider_verifier
@@ -100,10 +102,12 @@ def _create_shared_gpu_asr_runtime(
 
 def create_local_asr_provisioning_owner(
     *,
+    model_root: Path | None = None,
     state_changed: ProvisioningStateChanged | None = None,
     diagnostic_sink: ProvisioningDiagnosticSink | None = None,
 ) -> LocalASRProvisioningOwner:
     return LocalASRProvisioningOwner(
+        model_root=model_root,
         state_changed=state_changed,
         diagnostic_sink=diagnostic_sink,
         huggingface_downloader=HuggingFaceXetDownloadAdapter(),

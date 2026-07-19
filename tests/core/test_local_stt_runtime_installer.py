@@ -23,6 +23,7 @@ from puripuly_heart.core.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallCancelled,
     LocalSTTRuntimeInstallError,
     RuntimeLocalSTTStatusUpdate,
+    cleanup_local_stt_install_residue,
     ensure_local_stt_installed,
 )
 
@@ -39,6 +40,40 @@ def temp_dir() -> Path:
         yield base_dir
     finally:
         shutil.rmtree(base_dir, ignore_errors=True)
+
+
+def test_cleanup_restores_backup_and_removes_only_known_staging(tmp_path: Path) -> None:
+    backup = tmp_path / "known-model.backup"
+    staging = tmp_path / "known-model.staging-abcd"
+    unrelated = tmp_path / "other-model.staging-abcd"
+    backup.mkdir()
+    staging.mkdir()
+    unrelated.mkdir()
+    (backup / "model.bin").write_bytes(b"ready")
+
+    reconciled = cleanup_local_stt_install_residue(
+        model_root=tmp_path,
+        install_dirnames=("known-model",),
+    )
+
+    assert {path.name for path in reconciled} == {backup.name, staging.name}
+    assert (tmp_path / "known-model" / "model.bin").read_bytes() == b"ready"
+    assert not backup.exists()
+    assert not staging.exists()
+    assert unrelated.exists()
+
+
+def test_cleanup_rejects_unsafe_install_directory_names(tmp_path: Path) -> None:
+    sentinel = tmp_path / "sentinel"
+    sentinel.mkdir()
+
+    with pytest.raises(ValueError, match="safe directory names"):
+        cleanup_local_stt_install_residue(
+            model_root=tmp_path,
+            install_dirnames=("../sentinel",),
+        )
+
+    assert sentinel.exists()
 
 
 @pytest.fixture()
