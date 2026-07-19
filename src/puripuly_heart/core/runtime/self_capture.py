@@ -256,9 +256,9 @@ class SelfCaptureSessionOwner:
                     result = await self._provider.replace(
                         self._provider_request_factory(config, False),
                         start=False,
-                        on_terminal_failure=lambda exc: self._on_prepared_provider_failure(
+                        on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                             exc,
-                            generation=generation,
+                            provider_signature=config.provider_signature,
                         ),
                     )
                 except asyncio.CancelledError:
@@ -493,7 +493,7 @@ class SelfCaptureSessionOwner:
                     start=False,
                     on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                         exc,
-                        generation=generation,
+                        provider_signature=config.provider_signature,
                     ),
                 )
             except asyncio.CancelledError:
@@ -582,7 +582,7 @@ class SelfCaptureSessionOwner:
         try:
             await self._provider.start_ingress()
         except Exception as exc:
-            await self._fault_generation(
+            await self._fault_generation_locked(
                 generation,
                 SelfCaptureFailureReason.PROVIDER_FAILED,
                 exc,
@@ -618,7 +618,7 @@ class SelfCaptureSessionOwner:
                     start=True,
                     on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                         exc,
-                        generation=generation,
+                        provider_signature=config.provider_signature,
                     ),
                 )
                 result_status = result.status
@@ -710,22 +710,26 @@ class SelfCaptureSessionOwner:
         self,
         exc: Exception,
         *,
-        generation: int,
-    ) -> None:
-        await self._fault_generation(
-            generation,
-            SelfCaptureFailureReason.PROVIDER_FAILED,
-            exc,
-        )
-
-    async def _on_prepared_provider_failure(
-        self,
-        exc: Exception,
-        *,
-        generation: int,
+        provider_signature: tuple[object, ...],
     ) -> None:
         async with self._activation_lock:
-            if self._is_superseded(generation):
+            if (
+                self._closed
+                or provider_signature != self._provider_signature
+                or self._provider_status
+                in {
+                    SelfCaptureProviderStatus.DETACHED,
+                    SelfCaptureProviderStatus.RELEASING,
+                }
+            ):
+                return
+            generation = self._generation
+            if self._desired_active:
+                await self._fault_generation_locked(
+                    generation,
+                    SelfCaptureFailureReason.PROVIDER_FAILED,
+                    exc,
+                )
                 return
             self._provider_status = SelfCaptureProviderStatus.FAILED
             self._state = SelfCaptureSessionState.FAULTED
@@ -747,24 +751,39 @@ class SelfCaptureSessionOwner:
         completed_task: asyncio.Task[None] | None = None,
     ) -> None:
         async with self._activation_lock:
-            if self._is_stale(generation):
-                return
-            self._desired_active = False
-            self._generation += 1
-            teardown_generation = self._generation
-            self._failure_reason = reason
-            self._emit(
-                SelfCaptureDiagnosticEvent.FAILURE,
-                generation=generation,
-                reason=reason,
-                detail=type(exc).__name__ if exc is not None else None,
-            )
-            await self._teardown(
-                generation=teardown_generation,
-                target_state=SelfCaptureSessionState.FAULTED,
-                release_mode="abort",
+            await self._fault_generation_locked(
+                generation,
+                reason,
+                exc,
                 completed_task=completed_task,
             )
+
+    async def _fault_generation_locked(
+        self,
+        generation: int,
+        reason: SelfCaptureFailureReason,
+        exc: Exception | None = None,
+        *,
+        completed_task: asyncio.Task[None] | None = None,
+    ) -> None:
+        if self._is_stale(generation):
+            return
+        self._desired_active = False
+        self._generation += 1
+        teardown_generation = self._generation
+        self._failure_reason = reason
+        self._emit(
+            SelfCaptureDiagnosticEvent.FAILURE,
+            generation=generation,
+            reason=reason,
+            detail=type(exc).__name__ if exc is not None else None,
+        )
+        await self._teardown(
+            generation=teardown_generation,
+            target_state=SelfCaptureSessionState.FAULTED,
+            release_mode="abort",
+            completed_task=completed_task,
+        )
 
     async def _fail_start(
         self,

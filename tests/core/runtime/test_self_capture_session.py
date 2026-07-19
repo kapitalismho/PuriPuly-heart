@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from typing import Literal
 
 import pytest
@@ -49,6 +50,7 @@ class RecordingProvider:
         self.reconfigure_calls: list[object] = []
         self.cancel_handoff_calls = 0
         self.start_calls = 0
+        self.start_failure: Exception | None = None
         self.warmup_calls = 0
         self.terminal_failure_handler = None
 
@@ -86,6 +88,8 @@ class RecordingProvider:
 
     async def start_ingress(self) -> None:
         self.start_calls += 1
+        if self.start_failure is not None:
+            raise self.start_failure
 
     async def warmup(self) -> None:
         self.warmup_calls += 1
@@ -488,6 +492,92 @@ async def test_terminal_provider_failure_faults_only_current_generation_and_clea
 
     assert owner.snapshot.state is SelfCaptureSessionState.FAULTED
     assert owner.snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
+    assert sources[0].close_calls == 1
+    assert provider.release_calls == [("abort", None)]
+
+
+@pytest.mark.asyncio
+async def test_prepared_provider_terminal_failure_faults_enabled_session() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+    session_config = config()
+
+    await owner.prepare_provider(session_config)
+    handler = provider.terminal_failure_handler
+    assert handler is not None
+    await owner.apply_intent(session_config, enabled=True)
+    await handler(RuntimeError("prepared provider terminal failure"))
+
+    assert owner.snapshot.state is SelfCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
+    assert sources[0].close_calls == 1
+    assert provider.release_calls == [("abort", None)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("transition", ["no_op", "reconfigure"])
+async def test_provider_terminal_failure_survives_same_provider_generation_changes(
+    transition: str,
+) -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+    session_config = config()
+
+    await owner.apply_intent(session_config, enabled=True)
+    handler = provider.terminal_failure_handler
+    assert handler is not None
+    next_config = session_config
+    if transition == "reconfigure":
+        next_config = replace(
+            session_config,
+            runtime_signature=("runtime", "reconfigured"),
+            session_options=("options", "reconfigured"),
+        )
+    await owner.apply_intent(next_config, enabled=True)
+    await handler(RuntimeError("same provider terminal failure"))
+
+    assert owner.snapshot.state is SelfCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
+    assert sources[0].close_calls == 1
+    assert provider.release_calls == [("abort", None)]
+    assert provider.reconfigure_calls == (
+        [("options", "reconfigured")] if transition == "reconfigure" else []
+    )
+
+
+@pytest.mark.asyncio
+async def test_retired_provider_terminal_failure_cannot_fault_handoff_session() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+
+    await owner.apply_intent(config("one"), enabled=True)
+    retired_handler = provider.terminal_failure_handler
+    assert retired_handler is not None
+    await owner.apply_intent(config("two"), enabled=True)
+    await retired_handler(RuntimeError("retired provider terminal failure"))
+
+    assert owner.snapshot.state is SelfCaptureSessionState.RUNNING
+    assert owner.snapshot.provider_id == "provider-two"
+    assert owner.snapshot.failure_reason is None
+    assert sources[0].close_calls == 0
+    assert provider.release_calls == []
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_provider_ingress_start_failure_completes_and_releases_owned_resources() -> None:
+    provider = RecordingProvider()
+    provider.start_failure = RuntimeError("provider ingress failed")
+    owner, _, _, sources, _, _ = build_owner(provider=provider)
+
+    snapshot = await asyncio.wait_for(
+        owner.apply_intent(config(), enabled=True),
+        timeout=1.0,
+    )
+
+    assert snapshot.state is SelfCaptureSessionState.FAULTED
+    assert snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
+    assert snapshot.has_source is False
+    assert snapshot.has_vad is False
+    assert snapshot.has_loop_task is False
     assert sources[0].close_calls == 1
     assert provider.release_calls == [("abort", None)]
 
