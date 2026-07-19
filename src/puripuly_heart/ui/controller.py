@@ -23,7 +23,6 @@ from typing import Any, Literal, Protocol, cast
 import flet as ft
 import numpy as np
 
-from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports._settings_values import freeze_settings_values
 from puripuly_heart.app.ports.canonical_settings_persistence import (
@@ -118,6 +117,7 @@ from puripuly_heart.app.wiring import (
     build_openrouter_credential_runtime_config,
     build_openrouter_release_runtime_config,
     build_peer_stt_provider_signature_from_vnext,
+    compose_self_capture_session_owner,
     copy_stable_secrets_to_vnext_namespace,
     create_llm_provider,
     create_local_asr_provisioning_owner,
@@ -296,7 +296,6 @@ from puripuly_heart.core.runtime.peer_channel import (
 )
 from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildService
 from puripuly_heart.core.runtime.receiver import VrcMicReceiverRuntime
-from puripuly_heart.core.runtime.self_audio import SelfAudioRuntime
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime_logging import (
     RuntimeLoggingSinks,
@@ -319,7 +318,7 @@ from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryResult,
     TranslationSuccessTelemetryService,
 )
-from puripuly_heart.core.vad.bundled import SILERO_VAD_VERSION, ensure_silero_vad_onnx
+from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
 from puripuly_heart.core.vad.gating import VadGating, create_peer_vad_gating
 from puripuly_heart.core.vad.silero import SileroVadOnnx
 from puripuly_heart.ui.components.settings.settings_modal import OptionItem
@@ -889,18 +888,6 @@ def _managed_openrouter_identity_signature(settings: AppSettings) -> tuple[objec
 
 
 @dataclass(slots=True)
-class _HubVadSink:
-    hub: ClientHub
-    channel: str = "self"
-
-    async def handle_vad_event(self, event) -> None:  # noqa: ANN001
-        if self.channel == "peer":
-            await self.hub.handle_peer_vad_event(event)
-            return
-        await self.hub.handle_vad_event(event)
-
-
-@dataclass(slots=True)
 class _SelfCaptureAdmissionAdapter:
     callback: Callable[[SelfCaptureSessionConfig], Awaitable[SelfCaptureAdmission]]
 
@@ -1024,7 +1011,6 @@ class GuiController:
     osc: ChatboxPaginator | None = None
     hub: ClientHub | None = None
     _self_capture_owner: SelfCaptureSessionOwner | None = field(init=False, default=None)
-    _self_audio_runtime: SelfAudioRuntime | None = field(init=False, default=None)
     _provider_rebuild_runtime: ProviderRuntimeRebuildService = field(
         init=False,
         default_factory=ProviderRuntimeRebuildService,
@@ -1067,7 +1053,6 @@ class GuiController:
     _vad: VadGating | None = None
     _stt_desired: bool = False
     _stt_switch_lock: asyncio.Lock | None = None
-    _stt_switch_task: asyncio.Task[None] | None = None
     _stt_restart_requested: bool = False
     _stt_force_immediate: bool = False
     _stt_activation_generation: int = field(init=False, default=0)
@@ -1321,29 +1306,6 @@ class GuiController:
         if callable(refresh_contract):
             with contextlib.suppress(Exception):
                 refresh_contract()
-
-    async def _drain_self_stt_for_toggle_off(
-        self,
-        *,
-        force_immediate: bool = False,
-        explicit_toggle_off: bool = False,
-    ) -> None:
-        if self.hub is None:
-            return
-        gpu_provider = bool(
-            self.settings is not None
-            and self.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-        )
-        local_cpu_provider = bool(
-            self.settings is not None and self.settings.provider.stt.value in LOCAL_CPU_PROVIDERS
-        )
-        if gpu_provider or force_immediate or (explicit_toggle_off and local_cpu_provider):
-            if force_immediate:
-                self.log_detailed("[STT] Force immediate toggle-off requested")
-            await self.hub.abort_self_stt_for_toggle_off()
-            return
-        release_backend_after = LOCAL_QWEN_IDLE_RELEASE_SECONDS if local_cpu_provider else None
-        await self.hub.drain_self_stt_for_toggle_off(release_backend_after=release_backend_after)
 
     async def _refresh_overlay_runtime_dependencies(
         self,
@@ -10687,13 +10649,6 @@ class GuiController:
             if direct_generation:
                 runtime.end_direct_capture(capture_generation)
 
-    def _get_self_audio_runtime(self) -> SelfAudioRuntime:
-        if self._self_audio_runtime is None:
-            self._self_audio_runtime = SelfAudioRuntime(
-                state_changed=self._sync_self_audio_runtime_aliases,
-            )
-        return self._self_audio_runtime
-
     def _build_self_capture_session_config(
         self,
         settings: AppSettings,
@@ -10812,9 +10767,9 @@ class GuiController:
     def _get_self_capture_owner(self) -> SelfCaptureSessionOwner:
         if self._self_capture_owner is not None:
             return self._self_capture_owner
-        self._self_capture_owner = SelfCaptureSessionOwner(
+        self._self_capture_owner = compose_self_capture_session_owner(
+            hub=self.hub,
             admission=_SelfCaptureAdmissionAdapter(self._admit_self_capture),
-            provider=SelfCaptureProviderAdapter(self.hub),
             provider_request_factory=self._self_capture_provider_request,
             source_factory=self._create_self_capture_source,
             vad_factory=self._create_self_capture_vad,
@@ -10826,24 +10781,6 @@ class GuiController:
                 self.vrc_mic_audio_gate.reset if self.vrc_mic_audio_gate is not None else None
             ),
         )
-        if self.settings is not None and (
-            self._mic_task is not None
-            or self._audio_source is not None
-            or self._vad is not None
-            or self._last_mic_loop_close_exception is not None
-        ):
-            self._self_capture_owner.adopt_legacy_state(
-                config=self._build_self_capture_session_config(self.settings),
-                desired_active=self._stt_desired,
-                task=self._mic_task,
-                source=self._audio_source,
-                vad=self._vad,
-                last_cleanup_exception=(
-                    self._last_mic_loop_close_exception
-                    if isinstance(self._last_mic_loop_close_exception, Exception)
-                    else None
-                ),
-            )
         return self._self_capture_owner
 
     def _self_capture_provider_request(
@@ -11099,342 +11036,6 @@ class GuiController:
             is_detailed_enabled=self._detailed_audio_diag_enabled,
             log_detailed=lambda message: self.log_detailed(message),
         )
-
-    def _sync_self_audio_runtime_aliases(self, runtime: SelfAudioRuntime | None = None) -> None:
-        owner = runtime or self._self_audio_runtime
-        if owner is None:
-            return
-        self._mic_task = owner.loop_task
-        self._audio_source = owner.audio_source  # type: ignore[assignment]
-        self._vad = owner.vad  # type: ignore[assignment]
-        self._last_mic_loop_close_exception = owner.last_close_exception
-
-    def _adopt_self_audio_legacy_aliases(self) -> SelfAudioRuntime:
-        owner = self._get_self_audio_runtime()
-        if (
-            owner.loop_task is not self._mic_task
-            or owner.audio_source is not self._audio_source
-            or owner.vad is not self._vad
-            or owner.last_close_exception is not self._last_mic_loop_close_exception
-        ):
-            owner.adopt_legacy_state(
-                task=self._mic_task,
-                source=self._audio_source,
-                vad=self._vad,
-                last_close_exception=self._last_mic_loop_close_exception,
-            )
-        return owner
-
-    async def _start_mic_loop(self) -> bool:
-        assert self.settings is not None
-        assert self.hub is not None
-        self_audio_runtime = self._adopt_self_audio_legacy_aliases()
-
-        if self._mic_task is not None:
-            return True
-
-        if self._audio_source is not None or self._last_mic_loop_close_exception is not None:
-            with contextlib.suppress(Exception):
-                await self._stop_mic_loop()
-            if self._audio_source is not None or self._last_mic_loop_close_exception is not None:
-                self.log_detailed(
-                    "[STT] Skipping microphone start while previous microphone source close is pending",
-                    level=logging.WARNING,
-                    exception=self._last_mic_loop_close_exception,
-                )
-                return False
-
-        try:
-            model_path = ensure_silero_vad_onnx()
-        except Exception as exc:
-            self._log_error(f"Failed to prepare Silero VAD model ({SILERO_VAD_VERSION}): {exc}")
-            return False
-
-        if self._mic_task is None:
-            vad = VadGating(
-                engine=SileroVadOnnx(model_path=model_path),
-                sample_rate_hz=self.settings.audio.internal_sample_rate_hz,
-                ring_buffer_ms=self.settings.audio.ring_buffer_ms,
-                speech_threshold=self.settings.stt.vad_speech_threshold,
-                hangover_ms=(
-                    self.settings.stt.low_latency_vad_hangover_ms
-                    if self.settings.stt.low_latency_mode
-                    else 1100
-                ),
-                diagnostic_event_callback=lambda message: self.log_detailed(message),
-                diagnostics_enabled=self._detailed_audio_diag_enabled,
-                diagnostic_label="self",
-            )
-
-            def _resolve_device(host_api: str, device: str) -> int | None:
-                try:
-                    return resolve_sounddevice_input_device(host_api=host_api, device=device)
-                except Exception as exc:
-                    self.log_detailed(
-                        "[STT] Device resolution detail: "
-                        f"host_api={host_api!r} device={device!r} error={exc}",
-                        level=logging.WARNING,
-                    )
-                    return None
-
-            def _source_int(source: SoundDeviceAudioSource, attr: str, fallback: int) -> int:
-                try:
-                    value = getattr(source, attr, fallback)
-                    return int(value)
-                except Exception:
-                    return fallback
-
-            def _log_mic_capture_format(
-                *,
-                attempt: str,
-                dev_idx: int | None,
-                requested_channels: int,
-                decision: SelfMicCaptureChannelDecision,
-                source: SoundDeviceAudioSource,
-                host_api_for_log: str,
-                device_for_log: str,
-                wasapi_auto_convert: bool,
-                wasapi_exclusive: bool,
-            ) -> None:
-                metadata = decision.metadata
-                opened_channels = _source_int(source, "opened_channels", requested_channels)
-                frame_channels = _source_int(source, "frame_channels", opened_channels)
-                frame_channels_source = "opened_fallback"
-                actual_sample_rate_hz = _source_int(source, "actual_sample_rate_hz", 0)
-                self.log_detailed(
-                    "[STT] Microphone capture format: "
-                    f"attempt={attempt!r} "
-                    f"internal_channels={decision.internal_channels} "
-                    f"preferred_capture_channels={decision.preferred_capture_channels} "
-                    f"requested_channels={requested_channels} "
-                    f"opened_channels={opened_channels} "
-                    f"frame_channels={frame_channels} "
-                    f"frame_channels_source={frame_channels_source!r} "
-                    f"saved_host_api={saved_host_api!r} "
-                    f"actual_host_api={host_api_for_log!r} "
-                    f"device={device_for_log!r} "
-                    f"device_idx={dev_idx} "
-                    f"wasapi_auto_convert={wasapi_auto_convert} "
-                    f"wasapi_exclusive={wasapi_exclusive} "
-                    f"actual_sample_rate_hz={actual_sample_rate_hz or None} "
-                    f"metadata_device_idx={metadata.device_idx} "
-                    f"metadata_device_name={metadata.name!r} "
-                    f"device_max_input_channels={metadata.max_input_channels} "
-                    f"device_default_samplerate={metadata.default_samplerate} "
-                    f"metadata_status={metadata.metadata_status!r} "
-                    f"metadata_error={metadata.metadata_error!r}"
-                )
-
-            def _open_source_once(
-                dev_idx: int | None,
-                *,
-                attempt: str,
-                requested_channels: int,
-                decision: SelfMicCaptureChannelDecision,
-                host_api_for_log: str,
-                device_for_log: str,
-                wasapi_auto_convert: bool = False,
-                wasapi_exclusive: bool = False,
-            ) -> SoundDeviceAudioSource:
-                source = SoundDeviceAudioSource(
-                    sample_rate_hz=None,
-                    channels=requested_channels,
-                    device=dev_idx,
-                    wasapi_auto_convert=wasapi_auto_convert,
-                    wasapi_exclusive=wasapi_exclusive,
-                )
-                _log_mic_capture_format(
-                    attempt=attempt,
-                    dev_idx=dev_idx,
-                    requested_channels=requested_channels,
-                    decision=decision,
-                    source=source,
-                    host_api_for_log=host_api_for_log,
-                    device_for_log=device_for_log,
-                    wasapi_auto_convert=wasapi_auto_convert,
-                    wasapi_exclusive=wasapi_exclusive,
-                )
-                return source
-
-            def _open_source_with_mono_retry(
-                dev_idx: int | None,
-                *,
-                attempt: str,
-                host_api_for_log: str,
-                device_for_log: str,
-                wasapi_auto_convert: bool = False,
-                wasapi_exclusive: bool = False,
-            ) -> SoundDeviceAudioSource:
-                decision = determine_self_mic_capture_channels(
-                    device_idx=dev_idx,
-                    internal_channels=self.settings.audio.internal_channels,
-                )
-                try:
-                    return _open_source_once(
-                        dev_idx,
-                        attempt=attempt,
-                        requested_channels=decision.preferred_capture_channels,
-                        decision=decision,
-                        host_api_for_log=host_api_for_log,
-                        device_for_log=device_for_log,
-                        wasapi_auto_convert=wasapi_auto_convert,
-                        wasapi_exclusive=wasapi_exclusive,
-                    )
-                except Exception as exc:
-                    if decision.preferred_capture_channels <= self.settings.audio.internal_channels:
-                        raise
-                    self.log_detailed(
-                        "[STT] Microphone open detail: "
-                        f"attempt={attempt!r} "
-                        f"host_api={host_api_for_log!r} "
-                        f"device={device_for_log!r} "
-                        f"device_idx={dev_idx} "
-                        f"preferred_capture_channels={decision.preferred_capture_channels} "
-                        f"requested_channels={decision.preferred_capture_channels} "
-                        f"wasapi_auto_convert={wasapi_auto_convert} "
-                        f"wasapi_exclusive={wasapi_exclusive} "
-                        f"metadata_status={decision.metadata.metadata_status!r} "
-                        f"will_retry_mono=True "
-                        f"error={exc}",
-                        level=logging.WARNING,
-                    )
-                    retry_attempt = f"{attempt}_mono_retry"
-                    return _open_source_once(
-                        dev_idx,
-                        attempt=retry_attempt,
-                        requested_channels=self.settings.audio.internal_channels,
-                        decision=decision,
-                        host_api_for_log=host_api_for_log,
-                        device_for_log=device_for_log,
-                        wasapi_auto_convert=wasapi_auto_convert,
-                        wasapi_exclusive=wasapi_exclusive,
-                    )
-
-            saved_host_api = self.settings.audio.input_host_api
-            host_api_profile = normalize_input_host_api(saved_host_api)
-            host_api = host_api_profile.actual_host_api
-            first_open_used_wasapi_flags = (
-                host_api_profile.wasapi_auto_convert or host_api_profile.wasapi_exclusive
-            )
-            device_name = self.settings.audio.input_device
-
-            # 1차 시도: 설정된 Host API + 마이크
-            device_idx = _resolve_device(host_api, device_name)
-            source: SoundDeviceAudioSource | None = None
-
-            try:
-                source = _open_source_with_mono_retry(
-                    device_idx,
-                    attempt="primary",
-                    host_api_for_log=host_api,
-                    device_for_log=device_name,
-                    wasapi_auto_convert=host_api_profile.wasapi_auto_convert,
-                    wasapi_exclusive=host_api_profile.wasapi_exclusive,
-                )
-                self.log_detailed(
-                    "[STT] Microphone opened: "
-                    f"saved_host_api={saved_host_api!r} "
-                    f"actual_host_api={host_api!r} "
-                    f"device={device_name!r} "
-                    f"device_idx={device_idx} "
-                    f"wasapi_auto_convert={host_api_profile.wasapi_auto_convert} "
-                    f"wasapi_exclusive={host_api_profile.wasapi_exclusive}"
-                )
-            except Exception as exc:
-                self.log_detailed(
-                    "[STT] Microphone open detail: "
-                    f"host_api={host_api!r} device={device_name!r} error={exc}",
-                    level=logging.ERROR,
-                )
-
-            # 2차 시도: Host API 무시, 마이크 이름만
-            if source is None and device_name:
-                fallback_idx = _resolve_device("", device_name)
-                if fallback_idx != device_idx or first_open_used_wasapi_flags:
-                    try:
-                        source = _open_source_with_mono_retry(
-                            fallback_idx,
-                            attempt="name_fallback",
-                            host_api_for_log="",
-                            device_for_log=device_name,
-                            wasapi_auto_convert=False,
-                            wasapi_exclusive=False,
-                        )
-                        self.log_detailed(
-                            f"[STT] Microphone opened with fallback: device_idx={fallback_idx}"
-                        )
-                    except Exception as exc:
-                        self.log_detailed(
-                            f"[STT] Fallback microphone detail: error={exc}",
-                            level=logging.ERROR,
-                        )
-
-            # 3차 시도: 시스템 기본 장치
-            if source is None:
-                try:
-                    source = _open_source_with_mono_retry(
-                        None,
-                        attempt="system_default",
-                        host_api_for_log="",
-                        device_for_log="",
-                        wasapi_auto_convert=False,
-                        wasapi_exclusive=False,
-                    )
-                    self.log_detailed("[STT] Microphone opened with system default")
-                except Exception as exc:
-                    self.log_detailed(
-                        f"[STT] System default microphone detail: error={exc}",
-                        level=logging.ERROR,
-                    )
-
-            if source is None:
-                self._log_error("All microphone attempts failed")
-                return False
-
-            self._vad = vad
-            self._audio_source = self._wrap_diagnostic_audio_source(source, channel_label="self")
-            self_audio_runtime.start(
-                source=self._audio_source,
-                vad=vad,
-                run_loop=self._run_mic_loop,
-            )
-            self._sync_self_audio_runtime_aliases(self_audio_runtime)
-        return self._mic_task is not None
-
-    async def _stop_mic_loop(self) -> None:
-        self_audio_runtime = self._adopt_self_audio_legacy_aliases()
-        try:
-            await self_audio_runtime.stop()
-        finally:
-            self._sync_self_audio_runtime_aliases(self_audio_runtime)
-            if self.vrc_mic_audio_gate is not None:
-                self.vrc_mic_audio_gate.reset()
-
-    async def _run_mic_loop(self) -> None:
-        assert self.hub is not None
-        assert self._audio_source is not None
-        assert self._vad is not None
-
-        from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
-
-        try:
-            sink: object = _HubVadSink(hub=self.hub)
-            if self._self_audio_runtime is not None:
-                sink = self._self_audio_runtime.guard_vad_sink(sink)
-            await run_audio_vad_loop(
-                source=self._audio_source,
-                vad=self._vad,
-                sink=sink,
-                target_sample_rate_hz=self.settings.audio.internal_sample_rate_hz,  # type: ignore[union-attr]
-                audio_gate=self.vrc_mic_audio_gate,
-                channel_label="self",
-                is_detailed_enabled=self._detailed_audio_diag_enabled,
-                log_detailed=lambda message: self.log_detailed(message),
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self._log_error(f"Mic loop error: {exc}")
 
     def _create_vrc_osc_receiver_for_runtime(self, **kwargs: object) -> VrcOscReceiver:
         return VrcOscReceiver(**kwargs)  # type: ignore[arg-type]

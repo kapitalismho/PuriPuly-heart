@@ -592,28 +592,3 @@ async def test_suspend_and_recovery_preserve_intent_without_releasing_provider()
     assert provider.replace_calls == [(("provider-one", True), False)]
 
     await owner.close()
-
-
-@pytest.mark.asyncio
-async def test_adopted_legacy_resources_transfer_to_owner_teardown() -> None:
-    owner, _, provider, _, _, _ = build_owner()
-    source = RecordingSource()
-    task = asyncio.create_task(asyncio.sleep(3600))
-
-    owner.adopt_legacy_state(
-        config=config(),
-        desired_active=True,
-        task=task,
-        source=source,
-        vad=object(),
-    )
-    snapshot = await owner.apply_intent(
-        config(),
-        enabled=False,
-        explicit_toggle_off=True,
-    )
-
-    assert snapshot.state is SelfCaptureSessionState.STOPPED
-    assert task.cancelled() is True
-    assert source.close_calls == 1
-    assert provider.release_calls == [("drain", None)]

@@ -181,39 +181,6 @@ class SelfCaptureSessionOwner:
             generation=self._generation if generation is None else generation,
         )
 
-    def adopt_legacy_state(
-        self,
-        *,
-        config: SelfCaptureSessionConfig,
-        desired_active: bool,
-        task: asyncio.Task[None] | None,
-        source: object | None,
-        vad: object | None,
-        last_cleanup_exception: Exception | None = None,
-    ) -> None:
-        if self._source is not None or self._vad is not None or self._loop_task is not None:
-            return
-        self._generation += 1
-        generation = self._generation
-        self._config = config
-        self._provider_signature = config.provider_signature
-        self._provider_status = SelfCaptureProviderStatus.READY
-        self._desired_active = desired_active
-        self._source = source
-        self._vad = vad
-        self._loop_task = task
-        self._last_cleanup_exception = last_cleanup_exception
-        self._state = (
-            SelfCaptureSessionState.RUNNING
-            if task is not None or source is not None or vad is not None
-            else SelfCaptureSessionState.STOPPED
-        )
-        if task is not None:
-            task.add_done_callback(
-                lambda completed: self._on_loop_task_done(completed, generation=generation)
-            )
-        self._notify_state_changed()
-
     async def apply_intent(
         self,
         config: SelfCaptureSessionConfig,

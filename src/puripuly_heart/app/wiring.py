@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from puripuly_heart.app import wiring_llm_factory as _llm_factory
+from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
 from puripuly_heart.app.wiring_composition import create_provider_verifier
 from puripuly_heart.app.wiring_llm_factory import (
     MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
@@ -49,11 +51,22 @@ from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
 )
 from puripuly_heart.core.openrouter_credentials import load_managed_openrouter_user_identifier
+from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.runtime.local_asr_provisioning import (
     LocalASRProvisioningOwner,
     ProvisioningDiagnosticSink,
     ProvisioningStateChanged,
 )
+from puripuly_heart.core.runtime.self_capture import (
+    SelfCaptureAudioLoop,
+    SelfCaptureDiagnosticSink,
+    SelfCaptureProviderRequestFactory,
+    SelfCaptureSessionOwner,
+    SelfCaptureSourceFactory,
+    SelfCaptureStateChanged,
+    SelfCaptureVadFactory,
+)
+from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
 
 _WIRING_SECRET_KEYS_FOR_COMPATIBILITY_GUARD = (
     "google_api_key",
@@ -66,6 +79,34 @@ _WIRING_SECRET_KEYS_FOR_COMPATIBILITY_GUARD = (
     "local_llm_api_key",
     "cerebras_api_key",
 )
+
+
+def compose_self_capture_session_owner(
+    *,
+    hub: ClientHub | None,
+    admission: SelfCaptureAdmissionPort,
+    provider_request_factory: SelfCaptureProviderRequestFactory,
+    source_factory: SelfCaptureSourceFactory,
+    vad_factory: SelfCaptureVadFactory,
+    run_audio_loop: SelfCaptureAudioLoop,
+    vad_sink: object,
+    state_changed: SelfCaptureStateChanged | None = None,
+    diagnostic_sink: SelfCaptureDiagnosticSink | None = None,
+    audio_gate_reset: Callable[[], object] | None = None,
+) -> SelfCaptureSessionOwner:
+    return SelfCaptureSessionOwner(
+        admission=admission,
+        provider=SelfCaptureProviderAdapter(hub),
+        provider_request_factory=provider_request_factory,
+        source_factory=source_factory,
+        vad_factory=vad_factory,
+        run_audio_loop=run_audio_loop,
+        vad_sink=vad_sink,
+        state_changed=state_changed,
+        diagnostic_sink=diagnostic_sink,
+        audio_gate_reset=audio_gate_reset,
+    )
+
 
 _base_llm_provider_from_resolved_config = _llm_factory._base_llm_provider_from_resolved_config
 _openrouter_provider_from_resolved_config = _llm_factory._openrouter_provider_from_resolved_config

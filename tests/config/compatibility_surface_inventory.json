@@ -244,6 +244,7 @@
         {"name": "MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR", "kind": "attribute"},
         {"name": "ResolvedPeerSTTConfig", "kind": "attribute"},
         {"name": "build_peer_stt_provider_signature", "kind": "attribute"},
+        {"name": "compose_self_capture_session_owner", "kind": "attribute"},
         {"name": "create_llm_provider", "kind": "attribute"},
         {"name": "create_llm_provider_from_resolved_config", "kind": "attribute"},
         {"name": "create_peer_stt_backend", "kind": "attribute"},
@@ -259,6 +260,14 @@
         {"name": "resolve_peer_stt_config", "kind": "attribute"},
         {"name": "resolve_peer_stt_runtime_config", "kind": "attribute"}
       ]
+    },
+    {
+      "module": "puripuly_heart.app.adapters.self_capture_provider",
+      "source_rule": "__all__",
+      "source_of_truth_refs": ["src/puripuly_heart/app/adapters/self_capture_provider.py"],
+      "runtime_all_matches_exports": true,
+      "facade_contract": null,
+      "exports": [{"name": "SelfCaptureProviderAdapter", "kind": "attribute"}]
     },
     {
       "module": "puripuly_heart.config",
@@ -647,8 +656,33 @@
         {"name": "OutputRuntime", "kind": "attribute"},
         {"name": "RuntimeLoggingCloseError", "kind": "attribute"},
         {"name": "RuntimeLoggingService", "kind": "attribute"},
+        {"name": "SelfCaptureSessionOwner", "kind": "attribute"},
         {"name": "SpeechChannelRuntime", "kind": "attribute"},
         {"name": "VrcMicReceiverRuntime", "kind": "attribute"}
+      ]
+    },
+    {
+      "module": "puripuly_heart.core.self_capture",
+      "source_rule": "__all__",
+      "source_of_truth_refs": ["src/puripuly_heart/core/self_capture.py"],
+      "runtime_all_matches_exports": true,
+      "facade_contract": null,
+      "exports": [
+        {"name": "SelfCaptureAdmission", "kind": "attribute"},
+        {"name": "SelfCaptureAdmissionPort", "kind": "attribute"},
+        {"name": "SelfCaptureAdmissionStatus", "kind": "attribute"},
+        {"name": "SelfCaptureDiagnostic", "kind": "attribute"},
+        {"name": "SelfCaptureDiagnosticEvent", "kind": "attribute"},
+        {"name": "SelfCaptureFailureReason", "kind": "attribute"},
+        {"name": "SelfCaptureProviderMutation", "kind": "attribute"},
+        {"name": "SelfCaptureProviderMutationStatus", "kind": "attribute"},
+        {"name": "SelfCaptureProviderPort", "kind": "attribute"},
+        {"name": "SelfCaptureProviderStatus", "kind": "attribute"},
+        {"name": "SelfCaptureSessionConfig", "kind": "attribute"},
+        {"name": "SelfCaptureSessionSnapshot", "kind": "attribute"},
+        {"name": "SelfCaptureSessionState", "kind": "attribute"},
+        {"name": "SelfCaptureSourcePort", "kind": "attribute"},
+        {"name": "SelfCaptureTerminalFailureHandler", "kind": "attribute"}
       ]
     },
     {
@@ -666,14 +700,6 @@
       "runtime_all_matches_exports": true,
       "facade_contract": null,
       "exports": [{"name": "ProviderRuntimeHandle", "kind": "attribute"}]
-    },
-    {
-      "module": "puripuly_heart.core.runtime.self_audio",
-      "source_rule": "__all__",
-      "source_of_truth_refs": ["src/puripuly_heart/core/runtime/self_audio.py"],
-      "runtime_all_matches_exports": true,
-      "facade_contract": null,
-      "exports": [{"name": "SelfAudioRuntime", "kind": "attribute"}]
     },
     {
       "module": "puripuly_heart.core.output",

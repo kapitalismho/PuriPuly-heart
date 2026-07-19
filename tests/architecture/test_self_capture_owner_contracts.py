@@ -13,6 +13,8 @@ from puripuly_heart.core.self_capture import (
 
 ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
+CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+LEGACY_OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_audio.py"
 
 
 def test_self_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() -> None:
@@ -45,3 +47,30 @@ def test_self_capture_owner_has_no_ui_or_hub_dependency() -> None:
     assert not any(module.startswith("puripuly_heart.ui") for module in imports)
     assert "puripuly_heart.core.orchestrator.hub" not in imports
     assert "puripuly_heart.config.settings" not in imports
+
+
+def test_controller_has_no_legacy_self_capture_lifecycle() -> None:
+    tree = ast.parse(CONTROLLER_PATH.read_text(encoding="utf-8"))
+    controller = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "GuiController"
+    )
+    methods = {
+        node.name
+        for node in controller.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+    assert not LEGACY_OWNER_PATH.exists()
+    assert methods.isdisjoint(
+        {
+            "_get_self_audio_runtime",
+            "_sync_self_audio_runtime_aliases",
+            "_adopt_self_audio_legacy_aliases",
+            "_start_mic_loop",
+            "_stop_mic_loop",
+            "_run_mic_loop",
+            "_drain_self_stt_for_toggle_off",
+        }
+    )

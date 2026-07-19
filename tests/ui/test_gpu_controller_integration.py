@@ -195,9 +195,7 @@ async def test_gpu_settings_receive_hardware_name_separately_from_vulkan_slot() 
     )
 
 
-async def test_public_self_gpu_toggle_surfaces_provider_teardown_failure(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_public_self_gpu_toggle_surfaces_provider_teardown_failure() -> None:
     controller, _view = _controller()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
     controller._stt_desired = True
@@ -209,11 +207,7 @@ async def test_public_self_gpu_toggle_surfaces_provider_teardown_failure(
         abort_calls += 1
         raise failure
 
-    async def stop_mic_loop(_self: GuiController) -> None:
-        return None
-
     controller.hub = SimpleNamespace(abort_self_stt_for_toggle_off=abort_self_stt_for_toggle_off)
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", stop_mic_loop)
 
     with pytest.raises(RuntimeError, match="provider teardown failed") as exc_info:
         await controller.set_stt_enabled(False)

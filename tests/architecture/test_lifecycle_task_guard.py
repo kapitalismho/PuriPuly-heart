@@ -49,7 +49,6 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
     {
         ("src/puripuly_heart/core/runtime/peer_channel.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/provider_handle.py", ASYNCIO_CREATE_TASK): 1,
-        ("src/puripuly_heart/core/runtime/self_audio.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/self_capture.py", ASYNCIO_CREATE_TASK): 3,
         ("src/puripuly_heart/core/runtime/overlay.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/output.py", ASYNCIO_CREATE_TASK): 2,
@@ -148,10 +147,6 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         "src/puripuly_heart/core/runtime/provider_handle.py",
         ASYNCIO_CREATE_TASK,
     ): "ProviderRuntimeHandle is the named lifecycle owner for provider event draining",
-    (
-        "src/puripuly_heart/core/runtime/self_audio.py",
-        ASYNCIO_CREATE_TASK,
-    ): "SelfAudioRuntime is the named lifecycle owner for its audio loop",
     (
         "src/puripuly_heart/core/runtime/self_capture.py",
         ASYNCIO_CREATE_TASK,

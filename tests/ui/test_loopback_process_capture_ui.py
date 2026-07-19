@@ -454,26 +454,13 @@ async def test_peer_starting_is_published_before_delayed_readiness_and_latest_in
 
 
 @pytest.mark.asyncio
-async def test_self_toggle_path_delegates_only_to_composed_capture_owner(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_self_toggle_path_delegates_only_to_composed_capture_owner() -> None:
     controller = GuiController(page=SimpleNamespace(), app=SimpleNamespace(), config_path=Path("x"))
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     controller.hub = _runtime_hub_stub()
     owner = RecordingControllerSelfOwner()
     controller._self_capture_owner = owner
-    monkeypatch.setattr(
-        GuiController,
-        "_start_mic_loop",
-        lambda self: (_ for _ in ()).throw(AssertionError("legacy Self start executed")),
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_stop_mic_loop",
-        lambda self: (_ for _ in ()).throw(AssertionError("legacy Self stop executed")),
-    )
-
     await controller.set_stt_enabled(True)
     await controller.set_stt_enabled(False)
     await controller.set_stt_enabled(True)
@@ -484,9 +471,7 @@ async def test_self_toggle_path_delegates_only_to_composed_capture_owner(
 
 
 @pytest.mark.asyncio
-async def test_self_microphone_start_failure_becomes_effective_off_failure_notice(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_self_microphone_start_failure_becomes_effective_off_failure_notice() -> None:
     dash = SimpleNamespace(
         enabled=[],
         notices=[],
@@ -502,11 +487,6 @@ async def test_self_microphone_start_failure_becomes_effective_off_failure_notic
     owner = RecordingControllerSelfOwner()
     owner.fail_start = True
     controller._self_capture_owner = owner
-    monkeypatch.setattr(
-        GuiController,
-        "_start_mic_loop",
-        lambda self: (_ for _ in ()).throw(AssertionError("legacy Self start executed")),
-    )
     await controller.set_stt_enabled(True)
     assert controller._stt_desired is False
     assert controller._stt_activation_failed is True
