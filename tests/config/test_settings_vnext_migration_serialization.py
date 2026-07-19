@@ -132,7 +132,8 @@ def test_v24_maximal_fixture_migrates_to_canonical_vnext_serialization() -> None
     assert serialized["intent"]["stt"]["provider"] == "deepgram"
     assert serialized["intent"]["peer_stt"]["provider"] == "soniox"
     assert serialized["intent"]["ui"]["locale"] == "ja"
-    assert serialized["intent"]["integrated_context"]["enabled"] is False
+    assert serialized["intent"]["stt"]["low_latency_mode"] is True
+    assert serialized["intent"]["integrated_context"]["enabled"] is True
     assert serialized["state"]["integrated_context"]["bootstrapped"] is True
     assert serialized["state"]["peer_translation"]["eula_accepted"] is True
     assert serialized["state"]["provider_verification"]["deepgram"]["status"] == "verified"

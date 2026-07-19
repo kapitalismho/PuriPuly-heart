@@ -51,6 +51,13 @@ class DummyPage:
         self.updated += 1
 
 
+def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:
+    def persist(owner) -> None:
+        callback(owner.path, owner.compatibility_projection())
+
+    monkeypatch.setattr(controller_module.SettingsOwner, "persist", persist)
+
+
 class Flet028SnackBarPage(DummyPage):
     """Model Flet 0.28.3's state-only SnackBar close behavior.
 
@@ -172,9 +179,8 @@ async def test_launch_github_star_snackbar_counts_eligible_launches_before_first
         sleeps.append(seconds)
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -221,9 +227,8 @@ async def test_launch_github_star_snackbar_does_not_count_ineligible_launch(
         pytest.fail("ineligible launch should skip before sleeping")
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fail_sleep)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -243,9 +248,8 @@ def test_record_github_star_prompt_opened_persists_timestamp_count_and_not_click
     saved_payloads: list[dict[str, object]] = []
     opened_at = datetime(2026, 5, 24, 12, 34, 56, tzinfo=timezone.utc)
 
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -265,9 +269,8 @@ def test_record_github_star_prompt_clicked_persists_permanent_suppression(
     controller = _eligible_managed_controller()
     saved_payloads: list[dict[str, object]] = []
 
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -300,9 +303,8 @@ async def test_prompt_open_persistence_uses_async_save_before_display(
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
     monkeypatch.setattr(controller_module.asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -329,7 +331,7 @@ async def test_prompt_open_refuses_display_and_restores_state_when_persistence_f
     def fail_save_settings(*_args: object, **_kwargs: object) -> None:
         raise OSError("settings write failed")
 
-    monkeypatch.setattr(controller_module, "save_settings", fail_save_settings)
+    _patch_settings_save(monkeypatch, fail_save_settings)
 
     shown = await app.maybe_show_github_star_prompt_after_launch()
 
@@ -359,9 +361,8 @@ async def test_apply_settings_preserves_current_github_star_prompt_state(
         return None
 
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", noop)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -407,9 +408,8 @@ async def test_prompt_open_persistence_does_not_stale_overwrite_replaced_setting
 
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", _async_noop)
     monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_first_to_thread)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -459,9 +459,8 @@ async def test_prompt_click_persistence_does_not_stale_overwrite_replaced_settin
 
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", _async_noop)
     monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_first_to_thread)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -497,9 +496,8 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
         sleeps.append(seconds)
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
     monkeypatch.setattr(app_module.webbrowser, "open", lambda url: opened_urls.append(url) or True)
@@ -538,7 +536,7 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
             return
         saved_payloads.append(to_dict(updated))
 
-    monkeypatch.setattr(controller_module, "save_settings", capture_click_save)
+    _patch_settings_save(monkeypatch, capture_click_save)
 
     action.on_click(None)
     in_click_callback = False
@@ -563,7 +561,7 @@ async def test_github_star_action_displaces_visible_snackbar_when_page_close_is_
     app, page, _controller = _eligible_app(flet028_page)
     opened_urls: list[str] = []
 
-    monkeypatch.setattr(controller_module, "save_settings", lambda _path, _updated: None)
+    _patch_settings_save(monkeypatch, lambda _path, _updated: None)
     monkeypatch.setattr(app_module.webbrowser, "open", lambda url: opened_urls.append(url) or True)
 
     shown = await app._open_github_star_prompt_snackbar()  # noqa: SLF001
@@ -591,9 +589,8 @@ async def test_launch_github_star_snackbar_skips_if_higher_priority_feedback_was
         sleeps.append(seconds)
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
     app._mark_launch_high_priority_feedback_shown("update")
@@ -619,9 +616,8 @@ async def test_launch_github_star_snackbar_skips_if_feedback_appears_during_dela
         app._mark_launch_high_priority_feedback_shown("connection_failure")
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -654,7 +650,7 @@ async def test_launch_github_star_prompt_runtime_close_cancels_delay_and_prevent
             raise
 
     monkeypatch.setattr(app_module.asyncio, "sleep", cancellable_sleep)
-    monkeypatch.setattr(controller_module, "save_settings", lambda _path, _updated: None)
+    _patch_settings_save(monkeypatch, lambda _path, _updated: None)
 
     prompt_task = asyncio.create_task(app.maybe_show_github_star_prompt_after_launch())
     await sleep_started.wait()
@@ -690,9 +686,8 @@ async def test_launch_github_star_snackbar_skips_and_restores_if_feedback_appear
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
     monkeypatch.setattr(controller_module.asyncio, "to_thread", feedback_during_first_to_thread)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -729,9 +724,8 @@ async def test_named_higher_priority_launch_feedback_categories_suppress_prompt(
         pytest.fail("conflicted launch prompts must skip before sleeping")
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fail_sleep)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
     app._mark_launch_high_priority_feedback_shown(reason)

@@ -1200,7 +1200,9 @@ async def test_controller_capture_target_apply_uses_narrow_settings_refresh(
         return None
 
     monkeypatch.setattr(
-        controller_module, "persist_desktop_audio_capture_target", lambda *_args: saved
+        type(controller._get_settings_owner()),
+        "update_capture_target",
+        lambda *_args: saved,
     )
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", refresh_peer_stt_runtime)
     monkeypatch.setattr(GuiController, "_sync_effective_hub_flags", sync_effective_hub_flags)

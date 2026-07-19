@@ -65,22 +65,20 @@ def _controller_with_verified_openrouter(
     controller = GuiController(page=SimpleNamespace(), app=SimpleNamespace(), config_path=path)
     controller.settings = AppSettings()
     controller.settings.api_key_verified.openrouter = True
-    controller.vnext_settings = (
-        controller.canonical_settings_persistence.bind_provider_verification(
-            AppSettingsVNext(),
-            ProviderVerificationBinding(
-                provider="openrouter",
-                secret_key="openrouter_api_key",
-                secret_revision=None,
-                secret_fingerprint="sha256:old-secret",
-                verifier_context={"flow": "settings_api_key_verification"},
-                verifier_evidence={"source": "provider_verifier"},
-            ),
+    owner = controller._get_settings_owner()
+    owner.canonical = AppSettingsVNext()
+    owner.bind_provider_verification(
+        ProviderVerificationBinding(
+            provider="openrouter",
+            secret_key="openrouter_api_key",
+            secret_revision=None,
+            secret_fingerprint="sha256:old-secret",
+            verifier_context={"flow": "settings_api_key_verification"},
+            verifier_evidence={"source": "provider_verifier"},
         )
     )
     controller._vnext_settings_authoritative = True
-    controller._canonical_persistence_port_enabled = True
-    controller.canonical_settings_persistence.persist(path, controller.vnext_settings)
+    owner.persist()
     controller._remember_canonical_legacy_projection(controller.settings)
     monkeypatch.setattr(
         controller_module,
@@ -104,16 +102,17 @@ def test_canonical_settings_persistence_port_covers_load_project_delta_save_and_
     monkeypatch.setattr(
         adapter_module,
         "load_vnext_settings",
-        lambda _path: SimpleNamespace(settings=canonical),
+        lambda _path: SimpleNamespace(
+            settings=canonical,
+            migrated=False,
+            backup_path=None,
+        ),
     )
-    assert adapter.load(path, settings) is canonical
+    loaded = adapter.load_active(path)
+    assert loaded.canonical_settings is canonical
+    assert loaded.compatibility_settings.stt.low_latency_mode is True
 
-    monkeypatch.setattr(
-        adapter_module,
-        "load_vnext_settings",
-        lambda _path: SimpleNamespace(settings=None),
-    )
-    projected = adapter.load(path, settings)
+    projected = adapter.project(settings, canonical=None, authoritative=False)
     assert projected.intent.languages.peer_source_mode == "manual"
     assert projected.intent.languages.peer_expected_languages == []
 
@@ -193,7 +192,6 @@ def test_controller_persist_settings_roundtrips_verification_transitions(
     controller.settings = AppSettings()
     controller.vnext_settings = AppSettingsVNext()
     controller._vnext_settings_authoritative = True
-    controller._canonical_persistence_port_enabled = True
     controller._remember_canonical_legacy_projection(controller.settings)
 
     raw_secret = "raw-openrouter-secret-value"
@@ -232,7 +230,6 @@ def test_controller_rejects_verification_for_nonmatching_secret_store_value(
     controller.settings = AppSettings()
     controller.vnext_settings = AppSettingsVNext()
     controller._vnext_settings_authoritative = True
-    controller._canonical_persistence_port_enabled = True
     controller._remember_canonical_legacy_projection(controller.settings)
     monkeypatch.setattr(
         controller_module,
@@ -291,7 +288,7 @@ async def test_provider_secret_change_restores_secret_and_verification_on_commit
     def fail_persist(_path: Path, _settings: AppSettingsVNext) -> None:
         raise OSError("injected persistence failure")
 
-    monkeypatch.setattr(controller.canonical_settings_persistence, "persist", fail_persist)
+    monkeypatch.setattr(controller._get_settings_owner().persistence, "persist", fail_persist)
 
     assert not await controller.persist_provider_secret_change(
         "openrouter_api_key",
@@ -358,20 +355,17 @@ async def test_overlapping_provider_secret_changes_preserve_both_invalidations(
     )
     controller = _controller_with_verified_openrouter(path, store, monkeypatch)
     controller.settings.api_key_verified.deepseek = True
-    controller.vnext_settings = (
-        controller.canonical_settings_persistence.bind_provider_verification(
-            controller.vnext_settings,
-            ProviderVerificationBinding(
-                provider="deepseek",
-                secret_key="deepseek_api_key",
-                secret_revision=None,
-                secret_fingerprint="sha256:old-deepseek-secret",
-                verifier_context={"flow": "settings_api_key_verification"},
-                verifier_evidence={"source": "provider_verifier"},
-            ),
+    controller._get_settings_owner().bind_provider_verification(
+        ProviderVerificationBinding(
+            provider="deepseek",
+            secret_key="deepseek_api_key",
+            secret_revision=None,
+            secret_fingerprint="sha256:old-deepseek-secret",
+            verifier_context={"flow": "settings_api_key_verification"},
+            verifier_evidence={"source": "provider_verifier"},
         )
     )
-    controller.canonical_settings_persistence.persist(path, controller.vnext_settings)
+    controller._get_settings_owner().persist()
     controller._remember_canonical_legacy_projection(controller.settings)
 
     first_task = asyncio.create_task(

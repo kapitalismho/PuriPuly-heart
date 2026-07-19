@@ -1603,7 +1603,7 @@ async def test_order22_live_settings_view_audio_change_emits_copied_draft_and_ro
     view.on_settings_changed = emitted.append
     view._audio_settings.microphone = "Headset Mic"
     monkeypatch.setattr(settings_mutation.SettingsMutationService, "mutate", capture_mutate)
-    monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(controller_module.SettingsOwner, "persist", lambda _self: None)
 
     view._on_audio_change()
 
@@ -1641,12 +1641,12 @@ async def test_order22_live_settings_view_audio_change_save_failure_restores_con
     emitted: list[AppSettings] = []
     raw_failure_text = "save failed secret-token-must-not-leak"
 
-    def fail_save_settings(_path, _settings) -> None:
+    def fail_save_settings(_self) -> None:
         raise RuntimeError(raw_failure_text)
 
     view.on_settings_changed = emitted.append
     view._audio_settings.microphone = "Headset Mic"
-    monkeypatch.setattr(controller_module, "save_settings", fail_save_settings)
+    monkeypatch.setattr(controller_module.SettingsOwner, "persist", fail_save_settings)
 
     view._on_audio_change()
     assert controller.settings.audio.input_device == "Headset Mic"

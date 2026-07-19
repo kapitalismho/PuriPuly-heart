@@ -9,6 +9,20 @@ LegacySettingsT = TypeVar("LegacySettingsT", contravariant=True)
 CanonicalSettingsT = TypeVar("CanonicalSettingsT")
 
 
+class CanonicalSettingsPersistenceError(RuntimeError):
+    def __init__(self, status: str, message: str | None = None) -> None:
+        self.status = status
+        super().__init__(message or status)
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalSettingsLoadResult:
+    compatibility_settings: object
+    canonical_settings: object
+    migrated: bool
+    backup_path: Path | None
+
+
 @dataclass(frozen=True, slots=True)
 class ProviderVerificationBinding:
     provider: str
@@ -21,7 +35,12 @@ class ProviderVerificationBinding:
 
 @runtime_checkable
 class CanonicalSettingsPersistencePort(Protocol[LegacySettingsT, CanonicalSettingsT]):
-    def load(self, path: Path, compatibility_settings: LegacySettingsT) -> CanonicalSettingsT: ...
+    def load_active(self, path: Path) -> CanonicalSettingsLoadResult: ...
+
+    def compatibility_projection(
+        self,
+        settings: CanonicalSettingsT,
+    ) -> LegacySettingsT: ...
 
     def persist(self, path: Path, settings: CanonicalSettingsT) -> None: ...
 
@@ -50,3 +69,11 @@ class CanonicalSettingsPersistencePort(Protocol[LegacySettingsT, CanonicalSettin
     def snapshot(self, canonical: CanonicalSettingsT | None) -> CanonicalSettingsT | None: ...
 
     def rollback(self, snapshot: CanonicalSettingsT | None) -> CanonicalSettingsT | None: ...
+
+
+__all__ = [
+    "CanonicalSettingsPersistenceError",
+    "CanonicalSettingsLoadResult",
+    "CanonicalSettingsPersistencePort",
+    "ProviderVerificationBinding",
+]

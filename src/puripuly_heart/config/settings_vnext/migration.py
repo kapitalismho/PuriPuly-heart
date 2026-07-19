@@ -46,8 +46,10 @@ from puripuly_heart.config.settings_vnext.schema import (
     TranslationIntent,
     UiIntent,
     UserIntentSettings,
+    is_safe_compatibility_extension_key,
     normalize_managed_claim_sources,
     with_telemetry_consent,
+    with_translation_runtime_policy,
 )
 
 
@@ -125,6 +127,21 @@ _FALLBACK_FIELDS_ALIAS: dict[tuple[bool, str, str], str] = {
     (True, "gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
 }
+_LEGACY_OPEN_MAPPING_PATHS = frozenset(
+    {
+        ("translation", "connection_history"),
+        ("stt", "custom_terms"),
+        ("local_llm", "extra_body"),
+        ("system_prompts",),
+    }
+)
+_LEGACY_RETIRED_COMPATIBILITY_PATHS = frozenset(
+    {
+        ("peer_qwen_asr_stt",),
+        ("peer_soniox_stt",),
+        ("provider", "peer_soniox_stt"),
+    }
+)
 
 
 def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
@@ -370,7 +387,9 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
         raise ValueError("settings must be a JSON object")
     if is_vnext_settings_dict(data):
         _validate_vnext_top_level_shape(data)
-        return serialization.from_dict(_prepare_vnext_migration_dict(data))
+        return with_translation_runtime_policy(
+            serialization.from_dict(_prepare_vnext_migration_dict(data))
+        )
 
     # Legacy compatibility belongs here: use the public legacy migration chain first, then
     # project the normalized AppSettings values into canonical vNext intent/state values.
@@ -396,9 +415,46 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
         preserve_provider_verification=True,
     )
     settings = replace(settings, state=replace(settings.state, telemetry=telemetry_state))
+    legacy_template = legacy_settings.to_dict(legacy_settings.AppSettings())
+    legacy_extensions = _extract_unknown_legacy_values(migrated, legacy_template, path=())
+    if legacy_extensions:
+        settings = replace(
+            settings,
+            compatibility_extensions={"legacy_compatibility": legacy_extensions},
+        )
     from puripuly_heart.config.settings_vnext.schema import ensure_telemetry_default_allow
 
-    return ensure_telemetry_default_allow(with_telemetry_consent(settings, telemetry_consent))
+    return with_translation_runtime_policy(
+        ensure_telemetry_default_allow(with_telemetry_consent(settings, telemetry_consent))
+    )
+
+
+def _extract_unknown_legacy_values(
+    raw: Mapping[str, Any],
+    template: Mapping[str, Any],
+    *,
+    path: tuple[str, ...],
+) -> dict[str, Any]:
+    extensions: dict[str, Any] = {}
+    for key, value in raw.items():
+        child_path = (*path, key)
+        if key == "settings_version":
+            continue
+        if child_path in _LEGACY_RETIRED_COMPATIBILITY_PATHS:
+            continue
+        if not is_safe_compatibility_extension_key(key):
+            continue
+        if key not in template:
+            extensions[key] = copy.deepcopy(value)
+            continue
+        template_value = template[key]
+        if isinstance(value, Mapping) and isinstance(template_value, Mapping):
+            if child_path in _LEGACY_OPEN_MAPPING_PATHS:
+                continue
+            nested = _extract_unknown_legacy_values(value, template_value, path=child_path)
+            if nested:
+                extensions[key] = nested
+    return extensions
 
 
 def from_legacy_app_settings(
@@ -417,193 +473,199 @@ def from_legacy_app_settings(
         data.get("translation"),
         openrouter_data=data.get("openrouter"),
     )
-    return AppSettingsVNext(
-        settings_version=VNEXT_SETTINGS_SCHEMA_VERSION,
-        intent=UserIntentSettings(
-            translation=TranslationIntent(
-                model=data["translation"]["model"],
-                connection=data["translation"]["connection"],
-                connection_history=dict(data["translation"]["connection_history"]),
-                concurrency_limit=int(data["llm"]["concurrency_limit"]),
-                fallback=fallback,
-                openrouter_broker_base_url=data["openrouter"]["broker_base_url"],
-                openrouter_routing_mode=data["openrouter"]["routing_mode"],
-                openrouter_model=data["openrouter"]["llm_model"],
-                openrouter_selected_source=data["openrouter"]["selected_source"],
-                openrouter_selection_alias=data["openrouter"]["selection_alias"],
-                openrouter_provider_routing=data["openrouter"]["provider_routing"],
-                gemini=GeminiTranslationIntent(
-                    llm_model=data["gemini"]["llm_model"],
-                ),
-                deepseek=DeepSeekTranslationIntent(
-                    llm_model=data["deepseek"]["llm_model"],
-                ),
-                qwen=QwenTranslationIntent(
-                    region=data["qwen"]["region"],
-                    llm_model=data["qwen"]["llm_model"],
-                ),
-                cerebras=CerebrasTranslationIntent(
-                    llm_model=data["cerebras"]["llm_model"],
-                ),
-            ),
-            local_llm=LocalLLMIntent(
-                backend=data["local_llm"]["backend"],
-                base_url=data["local_llm"]["base_url"],
-                model=data["local_llm"]["model"],
-                extra_body=dict(data["local_llm"]["extra_body"]),
-            ),
-            stt=STTIntent(
-                provider=data["provider"]["stt"],
-                drain_timeout_s=float(data["stt"]["drain_timeout_s"]),
-                vad_speech_threshold=float(data["stt"]["vad_speech_threshold"]),
-                low_latency_mode=bool(data["stt"]["low_latency_mode"]),
-                low_latency_vad_hangover_ms=int(data["stt"]["low_latency_vad_hangover_ms"]),
-                low_latency_merge_gap_ms=int(data["stt"]["low_latency_merge_gap_ms"]),
-                low_latency_spec_retry_max=int(data["stt"]["low_latency_spec_retry_max"]),
-                custom_vocabulary_enabled=bool(data["stt"]["custom_vocabulary_enabled"]),
-                custom_terms=copy.deepcopy(data["stt"]["custom_terms"]),
-                gpu_device_id=data["stt"]["gpu_device_id"],
-                deepgram=DeepgramSTTIntent(model=data["deepgram_stt"]["model"]),
-                qwen_asr=QwenASRSTTIntent(model=data["qwen_asr_stt"]["model"]),
-                soniox=SonioxSTTIntent(
-                    model=data["soniox_stt"]["model"],
-                    endpoint=data["soniox_stt"]["endpoint"],
-                    keepalive_interval_s=float(data["soniox_stt"]["keepalive_interval_s"]),
-                    trailing_silence_ms=int(data["soniox_stt"]["trailing_silence_ms"]),
-                ),
-            ),
-            peer_stt=PeerSTTIntent(provider=data["provider"]["peer_stt"]),
-            languages=LanguageIntent(
-                source_language=data["languages"]["source_language"],
-                target_language=data["languages"]["target_language"],
-                peer_source_language=data["languages"]["peer_source_language"],
-                peer_target_language=data["languages"]["peer_target_language"],
-                peer_source_mode=(
-                    "auto"
-                    if data["languages"].get("peer_source_mode") == "soniox_auto"
-                    else data["languages"].get("peer_source_mode", "manual")
-                ),
-                peer_expected_languages=list(
-                    data["languages"].get("peer_expected_languages") or []
-                ),
-                recent_source_languages=list(data["languages"]["recent_source_languages"]),
-                recent_target_languages=list(data["languages"]["recent_target_languages"]),
-            ),
-            audio=AudioIntent(
-                ring_buffer_ms=int(data["audio"]["ring_buffer_ms"]),
-                input_host_api=data["audio"]["input_host_api"],
-                input_device=data["audio"]["input_device"],
-            ),
-            desktop_audio=DesktopAudioIntent(
-                output_device=data["desktop_audio"]["output_device"],
-                capture_target=_capture_target_from_legacy_output_device(
-                    data["desktop_audio"]["output_device"]
-                ),
-                vad_speech_threshold=float(data["desktop_audio"]["vad_speech_threshold"]),
-                vad_hangover_ms=int(data["desktop_audio"]["vad_hangover_ms"]),
-                vad_pre_roll_ms=int(data["desktop_audio"]["vad_pre_roll_ms"]),
-            ),
-            overlay=OverlayIntent(
-                target=data["overlay"]["target"],
-                show_translation=bool(data["overlay"]["show_translation"]),
-                show_peer_original=bool(data["overlay"]["show_peer_original"]),
-                calibration=OverlayCalibration(**data["overlay"]["calibration"]),
-                desktop_flet=DesktopFletOverlayIntent(
-                    size_preset=data["overlay"]["desktop_flet"]["size_preset"],
-                    position=DesktopFletOverlayPositionIntent(
-                        x=data["overlay"]["desktop_flet"]["position"]["x"],
-                        y=data["overlay"]["desktop_flet"]["position"]["y"],
+    return with_translation_runtime_policy(
+        AppSettingsVNext(
+            settings_version=VNEXT_SETTINGS_SCHEMA_VERSION,
+            intent=UserIntentSettings(
+                translation=TranslationIntent(
+                    model=data["translation"]["model"],
+                    connection=data["translation"]["connection"],
+                    connection_history=dict(data["translation"]["connection_history"]),
+                    concurrency_limit=int(data["llm"]["concurrency_limit"]),
+                    fallback=fallback,
+                    openrouter_broker_base_url=data["openrouter"]["broker_base_url"],
+                    openrouter_routing_mode=data["openrouter"]["routing_mode"],
+                    openrouter_model=data["openrouter"]["llm_model"],
+                    openrouter_selected_source=data["openrouter"]["selected_source"],
+                    openrouter_selection_alias=data["openrouter"]["selection_alias"],
+                    openrouter_provider_routing=data["openrouter"]["provider_routing"],
+                    gemini=GeminiTranslationIntent(
+                        llm_model=data["gemini"]["llm_model"],
                     ),
-                    visual=DesktopFletOverlayVisualIntent(
-                        background_alpha=float(
-                            data["overlay"]["desktop_flet"]["visual"]["background_alpha"]
+                    deepseek=DeepSeekTranslationIntent(
+                        llm_model=data["deepseek"]["llm_model"],
+                    ),
+                    qwen=QwenTranslationIntent(
+                        region=data["qwen"]["region"],
+                        llm_model=data["qwen"]["llm_model"],
+                    ),
+                    cerebras=CerebrasTranslationIntent(
+                        llm_model=data["cerebras"]["llm_model"],
+                    ),
+                ),
+                local_llm=LocalLLMIntent(
+                    backend=data["local_llm"]["backend"],
+                    base_url=data["local_llm"]["base_url"],
+                    model=data["local_llm"]["model"],
+                    extra_body=dict(data["local_llm"]["extra_body"]),
+                ),
+                stt=STTIntent(
+                    provider=data["provider"]["stt"],
+                    drain_timeout_s=float(data["stt"]["drain_timeout_s"]),
+                    vad_speech_threshold=float(data["stt"]["vad_speech_threshold"]),
+                    low_latency_mode=bool(data["stt"]["low_latency_mode"]),
+                    low_latency_vad_hangover_ms=int(data["stt"]["low_latency_vad_hangover_ms"]),
+                    low_latency_merge_gap_ms=int(data["stt"]["low_latency_merge_gap_ms"]),
+                    low_latency_spec_retry_max=int(data["stt"]["low_latency_spec_retry_max"]),
+                    custom_vocabulary_enabled=bool(data["stt"]["custom_vocabulary_enabled"]),
+                    custom_terms=copy.deepcopy(data["stt"]["custom_terms"]),
+                    gpu_device_id=data["stt"]["gpu_device_id"],
+                    deepgram=DeepgramSTTIntent(model=data["deepgram_stt"]["model"]),
+                    qwen_asr=QwenASRSTTIntent(model=data["qwen_asr_stt"]["model"]),
+                    soniox=SonioxSTTIntent(
+                        model=data["soniox_stt"]["model"],
+                        endpoint=data["soniox_stt"]["endpoint"],
+                        keepalive_interval_s=float(data["soniox_stt"]["keepalive_interval_s"]),
+                        trailing_silence_ms=int(data["soniox_stt"]["trailing_silence_ms"]),
+                    ),
+                ),
+                peer_stt=PeerSTTIntent(provider=data["provider"]["peer_stt"]),
+                languages=LanguageIntent(
+                    source_language=data["languages"]["source_language"],
+                    target_language=data["languages"]["target_language"],
+                    peer_source_language=data["languages"]["peer_source_language"],
+                    peer_target_language=data["languages"]["peer_target_language"],
+                    peer_source_mode=(
+                        "auto"
+                        if data["languages"].get("peer_source_mode") == "soniox_auto"
+                        else data["languages"].get("peer_source_mode", "manual")
+                    ),
+                    peer_expected_languages=list(
+                        data["languages"].get("peer_expected_languages") or []
+                    ),
+                    recent_source_languages=list(data["languages"]["recent_source_languages"]),
+                    recent_target_languages=list(data["languages"]["recent_target_languages"]),
+                ),
+                audio=AudioIntent(
+                    ring_buffer_ms=int(data["audio"]["ring_buffer_ms"]),
+                    input_host_api=data["audio"]["input_host_api"],
+                    input_device=data["audio"]["input_device"],
+                ),
+                desktop_audio=DesktopAudioIntent(
+                    output_device=data["desktop_audio"]["output_device"],
+                    capture_target=_capture_target_from_legacy_output_device(
+                        data["desktop_audio"]["output_device"]
+                    ),
+                    vad_speech_threshold=float(data["desktop_audio"]["vad_speech_threshold"]),
+                    vad_hangover_ms=int(data["desktop_audio"]["vad_hangover_ms"]),
+                    vad_pre_roll_ms=int(data["desktop_audio"]["vad_pre_roll_ms"]),
+                ),
+                overlay=OverlayIntent(
+                    target=data["overlay"]["target"],
+                    show_translation=bool(data["overlay"]["show_translation"]),
+                    show_peer_original=bool(data["overlay"]["show_peer_original"]),
+                    calibration=OverlayCalibration(**data["overlay"]["calibration"]),
+                    desktop_flet=DesktopFletOverlayIntent(
+                        size_preset=data["overlay"]["desktop_flet"]["size_preset"],
+                        position=DesktopFletOverlayPositionIntent(
+                            x=data["overlay"]["desktop_flet"]["position"]["x"],
+                            y=data["overlay"]["desktop_flet"]["position"]["y"],
+                        ),
+                        visual=DesktopFletOverlayVisualIntent(
+                            background_alpha=float(
+                                data["overlay"]["desktop_flet"]["visual"]["background_alpha"]
+                            ),
                         ),
                     ),
                 ),
-            ),
-            osc=OscIntent(
-                host=data["osc"]["host"],
-                port=int(data["osc"]["port"]),
-                chatbox_address=data["osc"]["chatbox_address"],
-                chatbox_send=bool(data["osc"]["chatbox_send"]),
-                chatbox_clear=bool(data["osc"]["chatbox_clear"]),
-                chatbox_max_chars=int(data["osc"]["chatbox_max_chars"]),
-                vrc_mic_intercept=bool(data["osc"]["vrc_mic_intercept"]),
-                chatbox_include_source=bool(data["osc"]["chatbox_include_source"]),
-            ),
-            secrets=SecretsIntent(
-                backend=data["secrets"]["backend"],
-                encrypted_file_path=data["secrets"]["encrypted_file_path"],
-            ),
-            ui=UiIntent(locale=data["ui"]["locale"]),
-            clipboard=ClipboardIntent(
-                auto_translate_enabled=bool(data["ui"]["clipboard_auto_translate_enabled"]),
-            ),
-            integrated_context=IntegratedContextIntent(
-                enabled=bool(data["ui"]["integrated_context_enabled"]),
-            ),
-            telemetry=TelemetryConsentIntent(data.get("telemetry", {}).get("consent", "unknown")),
-            prompts=PromptIntent(system_prompt=data["system_prompt"]),
-        ),
-        state=PersistedOperationalState(
-            provider_verification=_provider_verification_state(
-                data["api_key_verified"],
-                preserve_provider_verification=preserve_provider_verification,
-            ),
-            managed_connection=ManagedConnectionState(
-                installation_id=data["managed_identity"]["installation_id"],
-                release_token=data["managed_identity"]["release_token"],
-                release_token_expires_at=data["managed_identity"]["release_token_expires_at"],
-                verified_hardware_hash=data["managed_identity"]["verified_hardware_hash"],
-                verified_hardware_hash_salt_version=data["managed_identity"][
-                    "verified_hardware_hash_salt_version"
-                ],
-                active_managed_credential_ref=data["managed_identity"][
-                    "active_managed_credential_ref"
-                ],
-                active_managed_expires_at=data["managed_identity"]["active_managed_expires_at"],
-                founder_letter_seen_credential_ref=data["managed_identity"][
-                    "founder_letter_seen_credential_ref"
-                ],
-                referral_id=data["managed_identity"]["referral_id"],
-                local_managed_claim_sources=normalize_managed_claim_sources(
-                    data["managed_identity"].get("local_managed_claim_sources")
+                osc=OscIntent(
+                    host=data["osc"]["host"],
+                    port=int(data["osc"]["port"]),
+                    chatbox_address=data["osc"]["chatbox_address"],
+                    chatbox_send=bool(data["osc"]["chatbox_send"]),
+                    chatbox_clear=bool(data["osc"]["chatbox_clear"]),
+                    chatbox_max_chars=int(data["osc"]["chatbox_max_chars"]),
+                    vrc_mic_intercept=bool(data["osc"]["vrc_mic_intercept"]),
+                    chatbox_include_source=bool(data["osc"]["chatbox_include_source"]),
                 ),
-                pending_delivery_ack_source=data["managed_identity"].get(
-                    "pending_delivery_ack_source"
+                secrets=SecretsIntent(
+                    backend=data["secrets"]["backend"],
+                    encrypted_file_path=data["secrets"]["encrypted_file_path"],
                 ),
-                pending_delivery_ack_delivery_id=data["managed_identity"].get(
-                    "pending_delivery_ack_delivery_id"
+                ui=UiIntent(locale=data["ui"]["locale"]),
+                clipboard=ClipboardIntent(
+                    auto_translate_enabled=bool(data["ui"]["clipboard_auto_translate_enabled"]),
                 ),
-                pending_delivery_ack_managed_credential_ref=data["managed_identity"].get(
-                    "pending_delivery_ack_managed_credential_ref"
+                integrated_context=IntegratedContextIntent(
+                    enabled=bool(data["ui"]["integrated_context_enabled"]),
                 ),
-                pending_delivery_ack_expires_at=data["managed_identity"].get(
-                    "pending_delivery_ack_expires_at"
+                telemetry=TelemetryConsentIntent(
+                    data.get("telemetry", {}).get("consent", "unknown")
+                ),
+                prompts=PromptIntent(system_prompt=data["system_prompt"]),
+            ),
+            state=PersistedOperationalState(
+                provider_verification=_provider_verification_state(
+                    data["api_key_verified"],
+                    preserve_provider_verification=preserve_provider_verification,
+                ),
+                managed_connection=ManagedConnectionState(
+                    installation_id=data["managed_identity"]["installation_id"],
+                    release_token=data["managed_identity"]["release_token"],
+                    release_token_expires_at=data["managed_identity"]["release_token_expires_at"],
+                    verified_hardware_hash=data["managed_identity"]["verified_hardware_hash"],
+                    verified_hardware_hash_salt_version=data["managed_identity"][
+                        "verified_hardware_hash_salt_version"
+                    ],
+                    active_managed_credential_ref=data["managed_identity"][
+                        "active_managed_credential_ref"
+                    ],
+                    active_managed_expires_at=data["managed_identity"]["active_managed_expires_at"],
+                    founder_letter_seen_credential_ref=data["managed_identity"][
+                        "founder_letter_seen_credential_ref"
+                    ],
+                    referral_id=data["managed_identity"]["referral_id"],
+                    local_managed_claim_sources=normalize_managed_claim_sources(
+                        data["managed_identity"].get("local_managed_claim_sources")
+                    ),
+                    pending_delivery_ack_source=data["managed_identity"].get(
+                        "pending_delivery_ack_source"
+                    ),
+                    pending_delivery_ack_delivery_id=data["managed_identity"].get(
+                        "pending_delivery_ack_delivery_id"
+                    ),
+                    pending_delivery_ack_managed_credential_ref=data["managed_identity"].get(
+                        "pending_delivery_ack_managed_credential_ref"
+                    ),
+                    pending_delivery_ack_expires_at=data["managed_identity"].get(
+                        "pending_delivery_ack_expires_at"
+                    ),
+                ),
+                github_star_prompt=GithubStarPromptState(
+                    clicked=bool(data["ui"]["github_star_prompt_clicked"]),
+                    last_shown_at=data["ui"]["github_star_prompt_last_shown_at"],
+                    show_count=int(data["ui"]["github_star_prompt_show_count"]),
+                    translation_success_observed=bool(
+                        data["ui"]["github_star_prompt_translation_success_observed"]
+                    ),
+                    eligible_launch_count=int(
+                        data["ui"]["github_star_prompt_eligible_launch_count"]
+                    ),
+                ),
+                peer_translation=PeerTranslationState(
+                    eula_accepted=bool(data["ui"]["peer_translation_eula_accepted"]),
+                ),
+                integrated_context=IntegratedContextState(
+                    bootstrapped=bool(data["ui"]["integrated_context_bootstrapped"]),
+                ),
+                telemetry=TelemetryOperationalState(
+                    anonymous_id=data.get("telemetry_state", {}).get("anonymous_id"),
+                    sent_translation_success_dates_utc=data.get("telemetry_state", {}).get(
+                        "sent_translation_success_dates_utc"
+                    ),
                 ),
             ),
-            github_star_prompt=GithubStarPromptState(
-                clicked=bool(data["ui"]["github_star_prompt_clicked"]),
-                last_shown_at=data["ui"]["github_star_prompt_last_shown_at"],
-                show_count=int(data["ui"]["github_star_prompt_show_count"]),
-                translation_success_observed=bool(
-                    data["ui"]["github_star_prompt_translation_success_observed"]
-                ),
-                eligible_launch_count=int(data["ui"]["github_star_prompt_eligible_launch_count"]),
-            ),
-            peer_translation=PeerTranslationState(
-                eula_accepted=bool(data["ui"]["peer_translation_eula_accepted"]),
-            ),
-            integrated_context=IntegratedContextState(
-                bootstrapped=bool(data["ui"]["integrated_context_bootstrapped"]),
-            ),
-            telemetry=TelemetryOperationalState(
-                anonymous_id=data.get("telemetry_state", {}).get("anonymous_id"),
-                sent_translation_success_dates_utc=data.get("telemetry_state", {}).get(
-                    "sent_translation_success_dates_utc"
-                ),
-            ),
-        ),
+        )
     )
 
 

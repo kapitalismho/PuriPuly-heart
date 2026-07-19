@@ -3,14 +3,16 @@ from __future__ import annotations
 import copy
 import json
 from collections.abc import Mapping
-from dataclasses import asdict, fields, is_dataclass
+from dataclasses import asdict, fields, is_dataclass, replace
 from typing import Any, Final
 
 from puripuly_heart.config.settings_vnext.schema import (
     VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
     ensure_telemetry_default_allow,
+    is_safe_compatibility_extension_key,
     with_telemetry_consent,
+    with_translation_runtime_policy,
 )
 
 CANONICAL_TOP_LEVEL_KEYS: Final = frozenset({"settings_version", "intent", "state"})
@@ -61,6 +63,13 @@ _FALLBACK_FIELDS_ALIAS: Final = {
     (True, "gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
 }
+_OPEN_MAPPING_PATHS: Final = frozenset(
+    {
+        ("intent", "translation", "connection_history"),
+        ("intent", "local_llm", "extra_body"),
+        ("intent", "stt", "custom_terms"),
+    }
+)
 
 
 def to_dict(settings: AppSettingsVNext) -> dict[str, Any]:
@@ -72,12 +81,15 @@ def to_dict(settings: AppSettingsVNext) -> dict[str, Any]:
 
     if not isinstance(settings, AppSettingsVNext):
         raise TypeError("vNext settings serializer requires AppSettingsVNext")
-    data = asdict(settings)
-    return {
+    normalized = with_translation_runtime_policy(settings)
+    data = asdict(normalized)
+    persisted = {
         "settings_version": VNEXT_SETTINGS_SCHEMA_VERSION,
         "intent": data["intent"],
         "state": data["state"],
     }
+    _merge_compatible_extensions(persisted, normalized.compatibility_extensions)
+    return persisted
 
 
 def to_json_text(settings: AppSettingsVNext) -> str:
@@ -115,11 +127,68 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
     merged = _merge_dataclass(default, compatible_data, path="settings")
     if not isinstance(merged, AppSettingsVNext):
         raise TypeError("vNext settings merge produced unexpected type")
+    merged = replace(
+        merged,
+        compatibility_extensions=_extract_compatible_extensions(data, default),
+    )
     merged = with_telemetry_consent(
         merged,
         merged.intent.telemetry.consent,
     )
-    return ensure_telemetry_default_allow(merged)
+    return with_translation_runtime_policy(ensure_telemetry_default_allow(merged))
+
+
+def _extract_compatible_extensions(
+    raw: Mapping[str, Any],
+    default: AppSettingsVNext,
+) -> dict[str, object]:
+    template_data = asdict(default)
+    template = {
+        "settings_version": VNEXT_SETTINGS_SCHEMA_VERSION,
+        "intent": template_data["intent"],
+        "state": template_data["state"],
+    }
+    return _extract_unknown_mapping(raw, template, path=())
+
+
+def _extract_unknown_mapping(
+    raw: Mapping[object, object],
+    template: Mapping[object, object],
+    *,
+    path: tuple[str, ...],
+) -> dict[str, object]:
+    extensions: dict[str, object] = {}
+    for key, value in raw.items():
+        if not is_safe_compatibility_extension_key(key):
+            continue
+        if key not in template:
+            extensions[str(key)] = copy.deepcopy(value)
+            continue
+        template_value = template[key]
+        if isinstance(value, Mapping) and isinstance(template_value, Mapping):
+            child_path = (*path, str(key))
+            if child_path in _OPEN_MAPPING_PATHS or child_path[-1] in {
+                "verifier_context",
+                "verifier_evidence",
+            }:
+                continue
+            nested = _extract_unknown_mapping(value, template_value, path=child_path)
+            if nested:
+                extensions[str(key)] = nested
+    return extensions
+
+
+def _merge_compatible_extensions(
+    target: dict[str, Any],
+    extensions: Mapping[str, object],
+) -> None:
+    for key, value in extensions.items():
+        if key not in target:
+            target[key] = copy.deepcopy(value)
+            continue
+        target_value = target[key]
+        if isinstance(target_value, dict) and isinstance(value, Mapping):
+            _merge_compatible_extensions(target_value, value)
 
 
 def _with_current_settings_version(data: Mapping[str, Any]) -> Mapping[str, Any]:

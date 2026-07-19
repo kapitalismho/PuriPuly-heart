@@ -4,11 +4,17 @@ import copy
 from dataclasses import replace
 from pathlib import Path
 
-from puripuly_heart.app.ports.canonical_settings_persistence import ProviderVerificationBinding
+from puripuly_heart.app.ports.canonical_settings_persistence import (
+    CanonicalSettingsLoadResult,
+    CanonicalSettingsPersistenceError,
+    ProviderVerificationBinding,
+)
+from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings, save_vnext_settings
 from puripuly_heart.config.settings_vnext.migration import (
     apply_legacy_app_settings_delta,
     from_legacy_app_settings,
+    to_legacy_dict,
 )
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
@@ -17,18 +23,35 @@ from puripuly_heart.config.settings_vnext.schema import (
 
 
 class SettingsVNextCanonicalPersistenceAdapter:
-    def load(self, path: Path, compatibility_settings: object) -> AppSettingsVNext:
+    def load_active(self, path: Path) -> CanonicalSettingsLoadResult:
         result = load_vnext_settings(path)
-        if result.settings is not None:
-            return result.settings
-        return from_legacy_app_settings(compatibility_settings)
+        if result.settings is None:
+            status = getattr(result.status, "value", result.status)
+            message = result.error.message if result.error is not None else status
+            raise CanonicalSettingsPersistenceError(str(status), message)
+        compatibility_settings = self.compatibility_projection(result.settings)
+        return CanonicalSettingsLoadResult(
+            compatibility_settings=compatibility_settings,
+            canonical_settings=result.settings,
+            migrated=result.migrated,
+            backup_path=result.backup_path,
+        )
+
+    def compatibility_projection(self, settings: AppSettingsVNext) -> object:
+        from puripuly_heart.config import settings as legacy_settings
+
+        compatibility_settings = legacy_settings.from_dict(to_legacy_dict(settings))
+        compatibility_settings.desktop_audio.runtime_capture_target = (
+            resolve_desktop_audio_capture_target(settings.intent.desktop_audio.capture_target)
+        )
+        return compatibility_settings
 
     def persist(self, path: Path, settings: AppSettingsVNext) -> None:
         result = save_vnext_settings(path, settings)
         if not result.ok:
             status = getattr(result.status, "value", result.status)
             message = result.error.message if result.error is not None else status
-            raise RuntimeError(message)
+            raise CanonicalSettingsPersistenceError(str(status), message)
 
     def project(
         self,

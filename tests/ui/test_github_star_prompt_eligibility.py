@@ -41,6 +41,13 @@ def _controller_for(settings: AppSettings) -> GuiController:
     return controller
 
 
+def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:
+    def persist(owner) -> None:
+        callback(owner.path, owner.compatibility_projection())
+
+    monkeypatch.setattr(controller_module.SettingsOwner, "persist", persist)
+
+
 def _settings_for_connection(connection: TranslationConnection) -> AppSettings:
     settings = AppSettings()
     settings.translation.connection = connection
@@ -181,7 +188,7 @@ def test_user_owned_cloud_translation_success_observation_persists_through_setti
     def fake_save_settings(_path: Path, updated: AppSettings) -> None:
         saved_payloads.append(to_dict(updated))
 
-    monkeypatch.setattr(controller_module, "save_settings", fake_save_settings)
+    _patch_settings_save(monkeypatch, fake_save_settings)
 
     assert controller.record_github_star_prompt_translation_success_observed() is True
 
@@ -201,7 +208,7 @@ def test_translation_success_observation_restores_state_when_persistence_fails(
     def fail_save_settings(*_args: object, **_kwargs: object) -> None:
         raise OSError("settings write failed")
 
-    monkeypatch.setattr(controller_module, "save_settings", fail_save_settings)
+    _patch_settings_save(monkeypatch, fail_save_settings)
 
     assert controller.record_github_star_prompt_translation_success_observed() is False
     assert settings.ui.github_star_prompt_translation_success_observed is False
@@ -209,7 +216,7 @@ def test_translation_success_observation_restores_state_when_persistence_fails(
     def capture_save_settings(_path: Path, updated: AppSettings) -> None:
         saved_payloads.append(to_dict(updated))
 
-    monkeypatch.setattr(controller_module, "save_settings", capture_save_settings)
+    _patch_settings_save(monkeypatch, capture_save_settings)
 
     assert controller.record_github_star_prompt_translation_success_observed() is True
     assert settings.ui.github_star_prompt_translation_success_observed is True
@@ -239,7 +246,7 @@ async def test_pending_translation_success_observation_save_retargets_replaced_s
             await release_first_to_thread.wait()
         return func(*args, **kwargs)
 
-    monkeypatch.setattr(controller_module, "save_settings", fake_save_settings)
+    _patch_settings_save(monkeypatch, fake_save_settings)
     monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_first_to_thread)
 
     persist_task = asyncio.create_task(
@@ -274,9 +281,8 @@ def test_translation_success_observation_ignores_non_user_owned_cloud_connection
     controller = _controller_for(settings)
     save_calls: list[str] = []
 
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, _updated: save_calls.append("save"),
     )
 
@@ -351,7 +357,7 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
     def fake_save_settings(_path: Path, updated: AppSettings) -> None:
         saved_payloads.append(to_dict(updated))
 
-    monkeypatch.setattr(controller_module, "save_settings", fake_save_settings)
+    _patch_settings_save(monkeypatch, fake_save_settings)
 
     app = SimpleNamespace(
         controller=controller,
@@ -403,9 +409,8 @@ async def test_apply_settings_preserves_durable_observation_when_connection_swit
     saved_payloads: list[dict[str, object]] = []
 
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", _async_noop)
-    monkeypatch.setattr(
-        controller_module,
-        "save_settings",
+    _patch_settings_save(
+        monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
@@ -435,7 +440,7 @@ async def test_apply_providers_drains_pending_observation_before_settings_replac
         await release_first_to_thread.wait()
         return func(*args, **kwargs)
 
-    monkeypatch.setattr(controller_module, "save_settings", fake_save_settings)
+    _patch_settings_save(monkeypatch, fake_save_settings)
     monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_to_thread)
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", _async_noop)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", _async_noop)
@@ -488,7 +493,7 @@ async def test_stop_cancels_pending_github_star_observation_via_runtime_owner(
         await release_first_to_thread.wait()
         return func(*args, **kwargs)
 
-    monkeypatch.setattr(controller_module, "save_settings", fake_save_settings)
+    _patch_settings_save(monkeypatch, fake_save_settings)
     monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_to_thread)
     _patch_stop_side_effects(monkeypatch)
 

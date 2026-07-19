@@ -525,6 +525,7 @@ SETTINGS_PUBLIC_COMPATIBILITY_FACADE_PATHS = frozenset(
 
 SETTINGS_PERSISTENCE_COMPOSITION_PATHS = frozenset(
     {
+        "src/puripuly_heart/app/adapters/settings_vnext_canonical_persistence.py",
         "src/puripuly_heart/app/services/canonical_settings_persistence.py",
         "src/puripuly_heart/app/services/capture_target_settings.py",
     }
@@ -603,19 +604,7 @@ KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementVio
             "legacy-settings-api-import",
             "src/puripuly_heart/ui/controller.py",
             "AppSettings",
-            "GuiController remains the UI settings/persistence boundary for loading, saving, and view synchronization while vNext serialization remains behind the public settings facade; no private legacy runtime shim may be reintroduced.",
-        ),
-        SettingsRuntimeConfinementViolation(
-            "legacy-settings-api-import",
-            "src/puripuly_heart/ui/controller.py",
-            "load_settings",
-            "GuiController loads through the preserved public settings facade as the UI persistence boundary; facade compatibility is frozen by Gate 0 and backed by vNext serialization internally.",
-        ),
-        SettingsRuntimeConfinementViolation(
-            "legacy-settings-api-import",
-            "src/puripuly_heart/ui/controller.py",
-            "save_settings",
-            "GuiController saves through the preserved public settings facade as the UI persistence boundary; facade compatibility is frozen by Gate 0 and backed by vNext serialization internally.",
+            "GuiController retains the AppSettings compatibility DTO for view and runtime handoff while SettingsOwner exclusively owns load, normalization, migration, backup, and persistence.",
         ),
         SettingsRuntimeConfinementViolation(
             "legacy-settings-api-import",
@@ -1215,7 +1204,7 @@ def test_settings_public_facade_delegates_persistence_helpers_to_vnext_facade() 
     assert delegated_names <= facade_imports
 
 
-def test_controller_consumes_only_canonical_settings_port_and_composition_entrypoint() -> None:
+def test_controller_consumes_only_settings_owner_and_public_binding_contract() -> None:
     controller_path = SOURCE_PACKAGE_ROOT / "ui" / "controller.py"
     tree = ast.parse(controller_path.read_text(encoding="utf-8"))
     imports = {
@@ -1225,11 +1214,11 @@ def test_controller_consumes_only_canonical_settings_port_and_composition_entryp
     }
 
     assert imports["puripuly_heart.app.ports.canonical_settings_persistence"] == {
-        "CanonicalSettingsPersistencePort",
         "ProviderVerificationBinding",
     }
     assert imports["puripuly_heart.app.services.canonical_settings_persistence"] == {
-        "compose_canonical_settings_persistence"
+        "SettingsOwner",
+        "compose_settings_owner",
     }
     forbidden_modules = {
         "puripuly_heart.app.adapters.settings_vnext_canonical_persistence",
@@ -1241,6 +1230,9 @@ def test_controller_consumes_only_canonical_settings_port_and_composition_entryp
     assert "save_vnext_settings" not in {
         node.id for node in ast.walk(tree) if isinstance(node, ast.Name)
     }
+    assert {"load_settings", "save_settings", "persist_desktop_audio_capture_target"}.isdisjoint(
+        node.id for node in ast.walk(tree) if isinstance(node, ast.Name)
+    )
 
 
 def test_canonical_settings_persistence_layers_are_explicit() -> None:
@@ -1265,13 +1257,93 @@ def test_canonical_settings_persistence_composition_uses_only_public_settings_ty
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert imports["puripuly_heart.config.settings"] == {"AppSettings"}
-    assert imports["puripuly_heart.config.settings_vnext.schema"] == {"AppSettingsVNext"}
+    assert imports["puripuly_heart.config.settings"] == {
+        "AppSettings",
+        "new_settings_for_first_run",
+    }
+    assert imports["puripuly_heart.config.settings_vnext.schema"] == {
+        "AppSettingsVNext",
+        "CaptureTargetIntent",
+        "with_capture_target",
+    }
     assert {
         "puripuly_heart.config.settings_vnext.facade",
         "puripuly_heart.config.settings_vnext.migration",
         "puripuly_heart.config.settings_vnext.serialization",
     }.isdisjoint(imports)
+
+
+def test_capture_target_compatibility_service_delegates_to_settings_owner() -> None:
+    service_path = SOURCE_PACKAGE_ROOT / "app" / "services" / "capture_target_settings.py"
+    tree = ast.parse(service_path.read_text(encoding="utf-8"))
+    imports = {
+        node.module: {alias.name for alias in node.names}
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+
+    assert imports["puripuly_heart.app.services.canonical_settings_persistence"] == {
+        "compose_settings_owner"
+    }
+    assert {
+        "puripuly_heart.config.settings_vnext.compat",
+        "puripuly_heart.config.settings_vnext.facade",
+        "puripuly_heart.config.settings_vnext.migration",
+        "puripuly_heart.config.settings_vnext.serialization",
+    }.isdisjoint(imports)
+
+
+def test_settings_persistence_calls_are_confined_to_owner_mechanics() -> None:
+    allowed_paths = {
+        "app/adapters/settings_vnext_canonical_persistence.py",
+        "config/profile_bootstrap.py",
+        "config/settings_vnext/compat.py",
+        "config/settings_vnext/facade.py",
+    }
+    persistence_calls = {
+        "load_settings",
+        "load_settings_with_result",
+        "load_vnext_settings",
+        "save_settings",
+        "save_vnext_settings",
+    }
+    violations: list[tuple[str, str]] = []
+    for path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
+        relative_path = path.relative_to(SOURCE_PACKAGE_ROOT).as_posix()
+        if relative_path in allowed_paths or relative_path == "main.py":
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            callee = node.func.id if isinstance(node.func, ast.Name) else None
+            if isinstance(node.func, ast.Attribute):
+                callee = node.func.attr
+            if callee in persistence_calls:
+                violations.append((relative_path, callee))
+
+    assert violations == []
+
+    main_tree = ast.parse((SOURCE_PACKAGE_ROOT / "main.py").read_text(encoding="utf-8"))
+    assert not any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_load_settings_or_default"
+        for node in ast.walk(main_tree)
+    )
+
+    owner_path = SOURCE_PACKAGE_ROOT / "app" / "services" / "canonical_settings_persistence.py"
+    owner_tree = ast.parse(owner_path.read_text(encoding="utf-8"))
+    assert (
+        sum(
+            1
+            for node in ast.walk(owner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "import_stable_settings_if_missing"
+        )
+        == 1
+    )
 
 
 def test_internal_source_imports_canonical_overlay_calibration_not_ui_facade() -> None:

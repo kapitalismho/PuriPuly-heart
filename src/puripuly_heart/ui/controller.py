@@ -26,7 +26,6 @@ import numpy as np
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports._settings_values import freeze_settings_values
 from puripuly_heart.app.ports.canonical_settings_persistence import (
-    CanonicalSettingsPersistencePort,
     ProviderVerificationBinding,
 )
 from puripuly_heart.app.ports.gpu_worker import GpuWorkerDevice
@@ -43,9 +42,9 @@ from puripuly_heart.app.ports.settings_repository import (
 )
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
 from puripuly_heart.app.services.canonical_settings_persistence import (
-    compose_canonical_settings_persistence,
+    SettingsOwner,
+    compose_settings_owner,
 )
-from puripuly_heart.app.services.capture_target_settings import persist_desktop_audio_capture_target
 from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_CPU_AUTO_PROVIDER,
     LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER,
@@ -140,7 +139,6 @@ from puripuly_heart.config.process_capture_resolution import (
     ProcessCaptureResolver,
     ProcessCaptureTargetUnavailableError,
 )
-from puripuly_heart.config.profile_bootstrap import import_stable_settings_if_missing
 from puripuly_heart.config.resolved import (
     ResolvedDesktopAudioCaptureTarget,
     ResolvedOverlayConfig,
@@ -165,10 +163,7 @@ from puripuly_heart.config.settings import (
     STTProviderName,
     TranslationConnection,
     TranslationModel,
-    load_settings,
-    new_settings_for_first_run,
     normalize_owned_referral_id,
-    save_settings,
 )
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
@@ -670,7 +665,9 @@ class _ControllerSettingsPatchRepository:
         self.controller._begin_canonical_mutation()
         try:
             self.controller._update_canonical_settings_from_legacy_delta(
-                base_settings or next_settings,
+                self.controller._canonical_legacy_projection_snapshot
+                or base_settings
+                or next_settings,
                 next_settings,
             )
             if self.provider_verification_binding is not None:
@@ -993,26 +990,10 @@ class GuiController:
         default=None,
         repr=False,
     )
-    canonical_settings_persistence: CanonicalSettingsPersistencePort[
-        AppSettings, AppSettingsVNext
-    ] = field(
-        default_factory=compose_canonical_settings_persistence,
-        repr=False,
-    )
+    settings_owner: SettingsOwner | None = field(default=None, repr=False)
 
     settings: AppSettings | None = None
-    vnext_settings: AppSettingsVNext | None = None
     _vnext_settings_authoritative: bool = field(init=False, default=False, repr=False)
-    _canonical_persistence_port_enabled: bool = field(
-        init=False,
-        default=False,
-        repr=False,
-    )
-    _canonical_mutation_rollback_snapshot: AppSettingsVNext | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
     _canonical_mutation_rollback_legacy_snapshot: AppSettings | None = field(
         init=False,
         default=None,
@@ -1265,6 +1246,19 @@ class GuiController:
     overlay_calibration: OverlayCalibration = field(default_factory=OverlayCalibration)
     _overlay_calibration_draft: OverlayCalibration | None = None
 
+    def _get_settings_owner(self) -> SettingsOwner:
+        if self.settings_owner is None:
+            self.settings_owner = compose_settings_owner(self.config_path)
+        return self.settings_owner
+
+    @property
+    def vnext_settings(self) -> AppSettingsVNext | None:
+        return self._get_settings_owner().canonical
+
+    @vnext_settings.setter
+    def vnext_settings(self, settings: AppSettingsVNext | None) -> None:
+        self._get_settings_owner().canonical = settings
+
     @property
     def effective_peer_translation_enabled(self) -> bool:
         if self.settings is None:
@@ -1380,9 +1374,7 @@ class GuiController:
 
     async def _start_impl(self) -> None:
         self.settings = self._load_or_init_settings(self.config_path)
-        self.vnext_settings = self._load_canonical_vnext_settings(self.config_path, self.settings)
         self._vnext_settings_authoritative = True
-        self._canonical_persistence_port_enabled = True
         self._remember_canonical_legacy_projection(self.settings)
         provisioning = self._get_local_asr_provisioning_owner()
         await provisioning.inspect_cpu()
@@ -7097,6 +7089,10 @@ class GuiController:
             self._sync_memory_runtime_fields_from_settings(committed_settings)
 
     async def apply_settings(self, settings: AppSettings) -> None:
+        owner = self._get_settings_owner()
+        if self.settings is not None:
+            owner.normalize_compatibility(self.settings)
+        owner.normalize_compatibility(settings)
         fallback_channels: tuple[str, ...] = ()
         installation_fallback = False
         normalization_channels = self._manual_local_asr_fallback_normalization_channels(settings)
@@ -7164,6 +7160,7 @@ class GuiController:
         strict_persistence_errors: bool = False,
         reload_settings_view: bool = True,
     ) -> None:
+        await self._preserve_github_star_prompt_observation_before_settings_replace(settings)
         if persist:
             self._begin_canonical_mutation(
                 legacy_snapshot=self._canonical_legacy_projection_snapshot or self.settings
@@ -7177,7 +7174,6 @@ class GuiController:
         def _effective_peer_language(language: str, peer_language: str) -> str:
             return peer_language or language
 
-        await self._preserve_github_star_prompt_observation_before_settings_replace(settings)
         prev_microphone_test_audio_signature = (
             self._last_microphone_test_audio_settings_signature
             or self._microphone_test_audio_settings_signature(self.settings)
@@ -8752,57 +8748,30 @@ class GuiController:
                 await self._ensure_stt_switch()
 
     def _load_or_init_settings(self, path: Path) -> AppSettings:
-        if path.exists():
-            return load_settings(path)
-        if self.allow_stable_settings_import:
-            import_result = import_stable_settings_if_missing(path)
-            if import_result.error is not None:
-                raise RuntimeError(
-                    "failed to import stable settings into vNext profile: "
-                    f"{import_result.error.message}"
+        if path != self.config_path:
+            raise ValueError("settings owner path does not match controller config path")
+        result = self._get_settings_owner().start(
+            allow_stable_settings_import=self.allow_stable_settings_import
+        )
+        if result.stable_source_path is not None and result.imported_settings is not None:
+            with contextlib.suppress(Exception):
+                copy_stable_secrets_to_vnext_namespace(
+                    (result.stable_source_settings or result.imported_settings).intent.secrets,
+                    stable_config_path=result.stable_source_path,
+                    vnext_config_path=path,
+                    vnext_settings=result.imported_settings.intent.secrets,
                 )
-            if import_result.imported and import_result.settings is not None:
-                if import_result.source_path is not None:
-                    with contextlib.suppress(Exception):
-                        copy_stable_secrets_to_vnext_namespace(
-                            (
-                                import_result.source_settings or import_result.settings
-                            ).intent.secrets,
-                            stable_config_path=import_result.source_path,
-                            vnext_config_path=path,
-                            vnext_settings=import_result.settings.intent.secrets,
-                        )
-                return load_settings(path)
-        settings = new_settings_for_first_run()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        save_settings(path, settings)
-        return settings
-
-    def _load_canonical_vnext_settings(
-        self,
-        path: Path,
-        compatibility_settings: AppSettings,
-    ) -> AppSettingsVNext:
-        return self.canonical_settings_persistence.load(path, compatibility_settings)
+        return result.settings
 
     def _persist_settings_at_controller_boundary(self, settings: AppSettings) -> None:
-        canonical = self.vnext_settings
-        if self._canonical_persistence_port_enabled and canonical is not None:
-            self.canonical_settings_persistence.persist(
-                self.config_path,
-                canonical,
-            )
-            return
-        save_settings(self.config_path, settings)
+        _ = settings
+        self._get_settings_owner().persist()
 
     def _canonical_vnext_settings_for(self, settings: AppSettings) -> AppSettingsVNext:
-        projected = self.canonical_settings_persistence.project(
+        projected = self._get_settings_owner().project(
             settings,
-            canonical=self.vnext_settings,
             authoritative=self._vnext_settings_authoritative,
         )
-        if settings is self.settings and not self._vnext_settings_authoritative:
-            self.vnext_settings = projected
         return projected
 
     def _update_canonical_settings_from_legacy_delta(
@@ -8822,11 +8791,7 @@ class GuiController:
         base_settings: AppSettings | None,
         next_settings: AppSettings,
     ) -> AppSettingsVNext:
-        return self.canonical_settings_persistence.apply_legacy_delta(
-            canonical=self.vnext_settings,
-            base_settings=base_settings,
-            next_settings=next_settings,
-        )
+        return self._get_settings_owner().apply_legacy_delta(base_settings, next_settings)
 
     def _provider_verification_binding(
         self,
@@ -8869,13 +8834,7 @@ class GuiController:
         self,
         binding: ProviderVerificationBinding,
     ) -> None:
-        canonical = self.vnext_settings
-        if canonical is None:
-            raise RuntimeError("canonical settings unavailable for provider verification")
-        self.vnext_settings = self.canonical_settings_persistence.bind_provider_verification(
-            canonical,
-            binding,
-        )
+        self._get_settings_owner().bind_provider_verification(binding)
 
     async def persist_provider_secret_change(
         self,
@@ -9057,23 +9016,19 @@ class GuiController:
         legacy_snapshot: AppSettings | None = None,
     ) -> None:
         if self._canonical_mutation_depth == 0:
-            self._canonical_mutation_rollback_snapshot = (
-                self.canonical_settings_persistence.snapshot(self.vnext_settings)
-            )
             self._canonical_mutation_rollback_active_settings = self.settings
             self._canonical_mutation_rollback_legacy_snapshot = copy.deepcopy(
                 legacy_snapshot if legacy_snapshot is not None else self.settings
             )
             self._canonical_mutation_rollback_authoritative = self._vnext_settings_authoritative
             self._canonical_mutation_rollback_pending = True
+        self._get_settings_owner().begin()
         self._canonical_mutation_depth += 1
 
     def _rollback_canonical_mutation(self) -> None:
         if not self._canonical_mutation_rollback_pending:
             return
-        self.vnext_settings = self.canonical_settings_persistence.rollback(
-            self._canonical_mutation_rollback_snapshot
-        )
+        self._get_settings_owner().rollback()
         active_settings = self._canonical_mutation_rollback_active_settings
         legacy_snapshot = self._canonical_mutation_rollback_legacy_snapshot
         if active_settings is not None and legacy_snapshot is not None:
@@ -9094,9 +9049,9 @@ class GuiController:
         if self._canonical_mutation_depth == 0:
             return
         self._canonical_mutation_depth -= 1
+        self._get_settings_owner().complete()
         if self._canonical_mutation_depth:
             return
-        self._canonical_mutation_rollback_snapshot = None
         self._canonical_mutation_rollback_legacy_snapshot = None
         self._canonical_mutation_rollback_active_settings = None
         self._canonical_mutation_rollback_authoritative = False
@@ -9594,8 +9549,7 @@ class GuiController:
         if self.settings is None:
             return
         capture_target = self._decode_capture_option(value)
-        next_settings = persist_desktop_audio_capture_target(
-            self.config_path,
+        next_settings = self._get_settings_owner().update_capture_target(
             self.settings,
             capture_target,
         )
@@ -9603,11 +9557,8 @@ class GuiController:
         next_settings.ui.overlay_enabled = self.settings.ui.overlay_enabled
         next_settings.ui.peer_translation_enabled = self.settings.ui.peer_translation_enabled
         self.settings = next_settings
-        self.vnext_settings = self._load_canonical_vnext_settings(
-            self.config_path,
-            next_settings,
-        )
         self._vnext_settings_authoritative = True
+        self._remember_canonical_legacy_projection(next_settings)
         self._peer_process_warning_reason = None
         await self._refresh_peer_stt_runtime()
         self._sync_effective_hub_flags(self.settings)

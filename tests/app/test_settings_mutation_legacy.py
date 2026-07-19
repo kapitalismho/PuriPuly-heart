@@ -62,7 +62,6 @@ def test_order22_stt_language_audio_patch_records_initial_covered_surface_list()
         "desktop_audio.vad_pre_roll_ms",
         "stt.drain_timeout_s",
         "stt.vad_speech_threshold",
-        "stt.low_latency_mode",
         "stt.low_latency_vad_hangover_ms",
         "stt.low_latency_merge_gap_ms",
         "stt.low_latency_spec_retry_max",
@@ -110,7 +109,6 @@ def test_order24_ui_prompt_clipboard_state_patch_records_initial_covered_surface
         "secrets.encrypted_file_path",
         "ui.locale",
         "ui.peer_translation_eula_accepted",
-        "ui.integrated_context_enabled",
         "ui.integrated_context_bootstrapped",
         "ui.clipboard_auto_translate_enabled",
         "ui.github_star_prompt_clicked",
@@ -188,7 +186,6 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order22_surface()
     patch = SettingsPathPatch(
         values_by_path={
             "languages.source_language": "ja",
-            "stt.low_latency_mode": False,
             "audio.input_device": "Headset Mic",
         },
         surface=settings_mutation.SETTINGS_MUTATION_SURFACE_STT_LANGUAGE_AUDIO,
@@ -202,7 +199,6 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order22_surface()
     assert request == settings_mutation.SettingsMutationRequest(
         values={
             "languages.source_language": "ja",
-            "stt.low_latency_mode": False,
             "audio.input_device": "Headset Mic",
         },
         expected_revision="settings-r2",
@@ -348,7 +344,6 @@ async def test_order22_path_validator_accepts_only_stt_language_audio_paths() ->
             "languages.source_language": "ja",
             "audio.input_device": "Headset Mic",
             "desktop_audio.vad_hangover_ms": 900,
-            "stt.low_latency_mode": False,
             "soniox_stt.trailing_silence_ms": 150,
         },
         expected_revision=None,
@@ -490,7 +485,6 @@ async def test_order24_path_validator_accepts_only_ui_prompt_clipboard_state_pat
             "secrets.encrypted_file_path": "secure-secrets.json",
             "ui.locale": "ja",
             "ui.peer_translation_eula_accepted": True,
-            "ui.integrated_context_enabled": False,
             "ui.integrated_context_bootstrapped": True,
             "ui.clipboard_auto_translate_enabled": True,
             "ui.github_star_prompt_clicked": False,
@@ -512,6 +506,48 @@ async def test_order24_path_validator_accepts_only_ui_prompt_clipboard_state_pat
         message=None,
         diagnostics=None,
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("allowed_paths", "operation", "path"),
+    [
+        (
+            ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS,
+            "validate_stt_language_audio_patch",
+            "stt.low_latency_mode",
+        ),
+        (
+            ORDER24_UI_PROMPT_CLIPBOARD_STATE_SETTINGS_PATHS,
+            "validate_ui_prompt_clipboard_state_patch",
+            "ui.integrated_context_enabled",
+        ),
+    ],
+)
+async def test_retired_policy_paths_are_rejected(
+    allowed_paths: tuple[str, ...],
+    operation: str,
+    path: str,
+) -> None:
+    validator = SettingsPathMutationValidator(
+        allowed_paths=allowed_paths,
+        component="settings_mutation",
+        operation=operation,
+    )
+
+    result = await validator.validate(
+        settings_mutation.SettingsMutationRequest(
+            values={path: False},
+            expected_revision=None,
+            reason="retired_policy",
+            correlation_id="corr-retired-policy",
+        )
+    )
+
+    assert result.succeeded is False
+    assert result.diagnostics is not None
+    assert result.diagnostics.code == "settings_path_not_covered"
+    assert result.diagnostics.fields == {"path": path}
 
 
 @pytest.mark.asyncio

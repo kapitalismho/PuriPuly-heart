@@ -5,7 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from puripuly_heart.app.services import capture_target_settings
+from puripuly_heart.app.adapters import (
+    settings_vnext_canonical_persistence as persistence_adapter,
+)
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
 from puripuly_heart.app.services.capture_target_settings import (
     CaptureTargetSettingsError,
     persist_desktop_audio_capture_target,
@@ -13,11 +18,7 @@ from puripuly_heart.app.services.capture_target_settings import (
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings import to_dict as legacy_to_dict
 from puripuly_heart.config.settings_vnext import compat
-from puripuly_heart.config.settings_vnext.facade import (
-    FacadeSettingsLoadResult,
-    load_vnext_settings,
-    save_vnext_settings,
-)
+from puripuly_heart.config.settings_vnext.facade import load_vnext_settings, save_vnext_settings
 from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
 from puripuly_heart.config.settings_vnext.schema import (
     CaptureTargetIntent,
@@ -79,24 +80,17 @@ def test_capture_target_persistence_rejects_unreadable_existing_settings_without
     path = tmp_path / "settings.json"
     original_bytes = b'{"legacy": "must remain untouched"}'
     path.write_bytes(original_bytes)
-    save_calls: list[object] = []
 
     def fail_load(_path: Path):
         raise PermissionError("raw unreadable settings detail")
 
-    monkeypatch.setattr(capture_target_settings, "load_vnext_settings", fail_load)
-    monkeypatch.setattr(
-        capture_target_settings,
-        "save_vnext_settings",
-        lambda *_args: save_calls.append(_args),
-    )
+    monkeypatch.setattr(persistence_adapter, "load_vnext_settings", fail_load)
 
     with pytest.raises(CaptureTargetSettingsError) as raised:
         persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
 
     assert raised.value.status == "load_failed"
     assert "raw unreadable settings detail" not in str(raised.value)
-    assert save_calls == []
     assert path.read_bytes() == original_bytes
 
 
@@ -120,20 +114,13 @@ def test_capture_target_persistence_never_overwrites_a_failed_existing_load(
         status=status,
         error=compat.SettingsPersistenceError(status, "raw secret failure detail"),
     )
-    save_calls: list[object] = []
-    monkeypatch.setattr(capture_target_settings, "load_vnext_settings", lambda _path: failure)
-    monkeypatch.setattr(
-        capture_target_settings,
-        "save_vnext_settings",
-        lambda *_args: save_calls.append(_args),
-    )
+    monkeypatch.setattr(persistence_adapter, "load_vnext_settings", lambda _path: failure)
 
     with pytest.raises(CaptureTargetSettingsError) as raised:
         persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
 
     assert raised.value.status == status.value
     assert "raw secret failure detail" not in str(raised.value)
-    assert save_calls == []
     assert path.read_bytes() == original_bytes
 
 
@@ -143,10 +130,10 @@ def test_capture_target_persistence_rejects_absent_file_migration_failure_withou
 ) -> None:
     path = tmp_path / "settings.json"
 
-    def fail_migration(*_args, **_kwargs):
+    def fail_projection(*_args, **_kwargs):
         raise RuntimeError("raw migration failure")
 
-    monkeypatch.setattr(capture_target_settings, "from_legacy_app_settings", fail_migration)
+    monkeypatch.setattr(SettingsVNextCanonicalPersistenceAdapter, "project", fail_projection)
 
     with pytest.raises(CaptureTargetSettingsError) as raised:
         persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
@@ -156,100 +143,71 @@ def test_capture_target_persistence_rejects_absent_file_migration_failure_withou
     assert not path.exists()
 
 
-def _post_save_load_failure() -> FacadeSettingsLoadResult:
-    status = compat.SettingsPersistenceStatus.PARSE_FAILED
-    return FacadeSettingsLoadResult(
-        status=status,
-        error=compat.SettingsPersistenceError(status, "raw post-save reload detail"),
-    )
+def test_capture_target_persistence_loads_existing_file_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "settings.json"
+    save_vnext_settings(path, from_legacy_app_settings(AppSettings()))
+    original_load = persistence_adapter.load_vnext_settings
+    loads: list[Path] = []
+
+    def counted_load(incoming: Path):
+        loads.append(incoming)
+        return original_load(incoming)
+
+    monkeypatch.setattr(persistence_adapter, "load_vnext_settings", counted_load)
+
+    persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
+
+    assert loads == [path]
 
 
-def test_capture_target_persistence_rolls_back_existing_source_after_post_save_load_failure(
+def test_capture_target_projection_failure_does_not_change_persisted_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     path = tmp_path / "settings.json"
     save_vnext_settings(path, from_legacy_app_settings(AppSettings()))
     original_bytes = path.read_bytes()
-    live_settings = AppSettings()
-    previous_runtime_target = live_settings.desktop_audio.runtime_capture_target
+    original_projection = SettingsVNextCanonicalPersistenceAdapter.compatibility_projection
+    projections = 0
+
+    def fail_second_projection(self, settings):
+        nonlocal projections
+        projections += 1
+        if projections == 2:
+            raise RuntimeError("raw projection failure")
+        return original_projection(self, settings)
+
     monkeypatch.setattr(
-        capture_target_settings,
-        "load_settings_with_result",
-        lambda _path: _post_save_load_failure(),
+        SettingsVNextCanonicalPersistenceAdapter,
+        "compatibility_projection",
+        fail_second_projection,
     )
 
     with pytest.raises(CaptureTargetSettingsError) as raised:
-        persist_desktop_audio_capture_target(path, live_settings, _process_target())
-
-    assert raised.value.status == "parse_failed"
-    assert "raw post-save reload detail" not in str(raised.value)
-    assert path.read_bytes() == original_bytes
-    assert live_settings.desktop_audio.runtime_capture_target == previous_runtime_target
-
-
-def test_capture_target_persistence_removes_new_file_after_post_save_load_failure(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    path = tmp_path / "settings.json"
-    live_settings = AppSettings()
-    previous_runtime_target = live_settings.desktop_audio.runtime_capture_target
-    monkeypatch.setattr(
-        capture_target_settings,
-        "load_settings_with_result",
-        lambda _path: _post_save_load_failure(),
-    )
-
-    with pytest.raises(CaptureTargetSettingsError) as raised:
-        persist_desktop_audio_capture_target(path, live_settings, _process_target())
-
-    assert raised.value.status == "parse_failed"
-    assert not path.exists()
-    assert live_settings.desktop_audio.runtime_capture_target == previous_runtime_target
-
-
-def test_capture_target_persistence_keeps_migration_backup_during_post_save_rollback(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    path = tmp_path / "settings.json"
-    original_bytes = json.dumps(legacy_to_dict(AppSettings()), ensure_ascii=False).encode("utf-8")
-    path.write_bytes(original_bytes)
-    monkeypatch.setattr(
-        capture_target_settings,
-        "load_settings_with_result",
-        lambda _path: _post_save_load_failure(),
-    )
-
-    with pytest.raises(CaptureTargetSettingsError):
         persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
+
+    assert raised.value.status == "save_failed"
+    assert "raw projection failure" not in str(raised.value)
+    assert path.read_bytes() == original_bytes
+
+
+def test_capture_target_persistence_keeps_migration_backup_and_compatibility_data(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "settings.json"
+    raw = legacy_to_dict(AppSettings())
+    raw["legacy_extension"] = {"theme_hint": "violet"}
+    original_bytes = json.dumps(raw, ensure_ascii=False).encode("utf-8")
+    path.write_bytes(original_bytes)
+
+    persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
 
     backups = list(tmp_path.glob("settings.json.pre-v*.bak"))
-    assert path.read_bytes() == original_bytes
+    persisted = json.loads(path.read_text(encoding="utf-8"))
     assert len(backups) == 1
     assert backups[0].read_bytes() == original_bytes
-
-
-def test_capture_target_persistence_reports_safe_rollback_failure(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    path = tmp_path / "settings.json"
-    save_vnext_settings(path, from_legacy_app_settings(AppSettings()))
-
-    def fail_restore(_path: Path, _original_bytes: bytes | None) -> None:
-        raise OSError("raw rollback failure")
-
-    monkeypatch.setattr(
-        capture_target_settings,
-        "load_settings_with_result",
-        lambda _path: _post_save_load_failure(),
-    )
-    monkeypatch.setattr(capture_target_settings, "_restore_source_bytes", fail_restore)
-
-    with pytest.raises(CaptureTargetSettingsError) as raised:
-        persist_desktop_audio_capture_target(path, AppSettings(), _process_target())
-
-    assert raised.value.status == "rollback_failed"
-    assert "raw rollback failure" not in str(raised.value)
+    assert persisted["legacy_compatibility"] == {"legacy_extension": {"theme_hint": "violet"}}
+    assert persisted["intent"]["desktop_audio"]["capture_target"]["kind"] == "process"
