@@ -210,6 +210,14 @@ class SelfCaptureSessionOwner:
             self._generation += 1
             generation = self._generation
             self._desired_active = enabled
+            if (
+                enabled
+                and not restart
+                and self._state is SelfCaptureSessionState.RUNNING
+                and self._config is not None
+                and self._config.capture_signature == config.capture_signature
+            ):
+                self._rebind_capture_generation(generation)
             previous_task = self._transition_task
             transition_task = asyncio.create_task(
                 self._apply_generation(

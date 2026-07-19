@@ -470,6 +470,59 @@ async def test_retained_capture_rebinds_callbacks_and_source_loss_after_provider
 
 
 @pytest.mark.asyncio
+async def test_superseded_handoff_keeps_retained_callbacks_current_during_cancellation() -> None:
+    class BlockingHandoffProvider(RecordingProvider):
+        def __init__(self) -> None:
+            super().__init__()
+            self.handoff_started = asyncio.Event()
+            self.cancel_started = asyncio.Event()
+            self.cancel_release = asyncio.Event()
+            self.handoff_count = 0
+
+        async def handoff(
+            self,
+            request: object,
+            *,
+            start: bool,
+            on_terminal_failure: Callable[[Exception], Awaitable[None]],
+        ) -> SelfCaptureProviderMutation:
+            self.handoff_count += 1
+            if self.handoff_count == 1:
+                self.handoff_started.set()
+                await asyncio.Event().wait()
+            return await super().handoff(
+                request,
+                start=start,
+                on_terminal_failure=on_terminal_failure,
+            )
+
+        async def cancel_handoff(self) -> bool:
+            self.cancel_started.set()
+            await self.cancel_release.wait()
+            return await super().cancel_handoff()
+
+    provider = BlockingHandoffProvider()
+    owner, _, _, sources, loop, sink = build_owner(provider=provider)
+    await owner.apply_intent(config("one"), enabled=True)
+    guarded_sink = loop.calls[0]["sink"]
+
+    first_handoff = asyncio.create_task(owner.apply_intent(config("two"), enabled=True))
+    await provider.handoff_started.wait()
+    second_handoff = asyncio.create_task(owner.apply_intent(config("three"), enabled=True))
+    await provider.cancel_started.wait()
+
+    await getattr(guarded_sink, "handle_vad_event")("during-cancellation")
+    loop.release.set()
+    provider.cancel_release.set()
+    await asyncio.gather(first_handoff, second_handoff)
+    await wait_until(lambda: owner.snapshot.state is SelfCaptureSessionState.FAULTED)
+
+    assert sink.events == ["during-cancellation"]
+    assert sources[0].close_calls == 1
+    assert owner.snapshot.failure_reason is SelfCaptureFailureReason.SESSION_FAILED
+
+
+@pytest.mark.asyncio
 async def test_microphone_test_exclusion_stops_ingress_before_abort_release() -> None:
     events: list[str] = []
 
