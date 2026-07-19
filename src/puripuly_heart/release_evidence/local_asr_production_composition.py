@@ -21,12 +21,10 @@ from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
 )
 from puripuly_heart.config.paths import default_settings_path
-from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
-from puripuly_heart.core.runtime.local_asr_provisioning import LocalASRProvisioningOwner
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.ui.controller import GuiController
 
@@ -173,19 +171,18 @@ async def _execute(
     if not model_path.is_file() or not audio_path.is_file():
         raise FileNotFoundError({"model": str(model_path), "audio": str(audio_path)})
     samples = _read_audio(audio_path)
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
-    settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
-    settings.stt.gpu_device_id = "auto"
-    settings.ui.peer_translation_enabled = False
-    settings.osc.chatbox_send = False
-    provisioning = LocalASRProvisioningOwner()
     controller = GuiController(
         page=SimpleNamespace(),
         app=SimpleNamespace(debug_ui_preview=False),
         config_path=default_settings_path(),
-        local_asr_provisioning=provisioning,
     )
+    settings = controller._load_or_init_settings(controller.config_path)
+    provider_type = type(settings.provider.stt)
+    settings.provider.stt = provider_type("local_qwen_gpu")
+    settings.provider.peer_stt = provider_type("local_qwen_gpu")
+    settings.stt.gpu_device_id = "auto"
+    settings.ui.peer_translation_enabled = False
+    settings.osc.chatbox_send = False
     controller.settings = settings
     self_events: list[object] = []
     peer_events: list[object] = []
@@ -454,6 +451,3 @@ def run_local_asr_production_composition(
     report_path.write_text(rendered, encoding="utf-8")
     print(rendered)
     return exit_code
-
-
-__all__ = ["run_local_asr_production_composition"]
