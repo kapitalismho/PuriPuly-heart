@@ -19,9 +19,11 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeEventHandler,
     ProviderRuntimeExceptionHandler,
     ProviderRuntimeGpuPhase,
+    ProviderRuntimeGpuRecoveryRequest,
     ProviderRuntimeGpuSnapshot,
     ProviderRuntimeMutationResult,
     ProviderRuntimeProviderFactoryPort,
+    ProviderRuntimeRecoveryQuiesce,
     ProviderRuntimeReleaseMode,
     ProviderRuntimeTerminalFailureSink,
 )
@@ -52,6 +54,7 @@ class LocalASRProviderRuntimeOwner:
         "_self_provider_handle",
         "_peer_provider_handle",
         "_gpu_runtime",
+        "_gpu_recovery_lock",
         "_gpu_discovery_task",
         "_operation_tasks",
         "_callback_tasks",
@@ -95,6 +98,7 @@ class LocalASRProviderRuntimeOwner:
         self._closed = False
         self._close_complete = False
         self._close_lock = asyncio.Lock()
+        self._gpu_recovery_lock = asyncio.Lock()
         self._started = False
         self._channel_phases: dict[ProviderRuntimeChannel, ProviderRuntimeChannelPhase] = {
             channel: "inactive" for channel in _CHANNELS
@@ -228,6 +232,19 @@ class LocalASRProviderRuntimeOwner:
         explicit_intent: bool,
         device_id: str,
     ) -> LocalASRProviderRuntimeSnapshot:
+        return await self._inspect_gpu_readiness(
+            explicit_intent=explicit_intent,
+            device_id=device_id,
+            allow_device_change=False,
+        )
+
+    async def _inspect_gpu_readiness(
+        self,
+        *,
+        explicit_intent: bool,
+        device_id: str,
+        allow_device_change: bool,
+    ) -> LocalASRProviderRuntimeSnapshot:
         self._require_open("inspect GPU readiness")
         if not device_id.strip():
             raise ValueError("device_id must be non-empty")
@@ -268,6 +285,7 @@ class LocalASRProviderRuntimeOwner:
                 active_channels
                 and configured_device_id is not None
                 and device_id != configured_device_id
+                and not allow_device_change
             ):
                 self._gpu_phase = "failed"
                 self._gpu_failure_code = "device_change_requires_quiesce"
@@ -614,53 +632,146 @@ class LocalASRProviderRuntimeOwner:
             ):
                 return
 
-    async def retry_gpu(
+    async def recover_gpu(
         self,
-        channels: tuple[ProviderRuntimeChannel, ...],
+        request: ProviderRuntimeGpuRecoveryRequest,
+        *,
+        quiesce: ProviderRuntimeRecoveryQuiesce | None = None,
     ) -> LocalASRProviderRuntimeSnapshot:
-        self._require_open("retry GPU runtime")
-        if not channels:
-            raise ValueError("manual GPU retry requires at least one channel")
-        if len(frozenset(channels)) != len(channels):
-            raise ValueError("manual GPU retry channels must be unique")
-        for channel in channels:
-            self._validate_channel(channel)
-        async with self._operation():
-            self._gpu_phase = "validating"
-            await self._publish_state()
-            runtime_state = _enum_value(getattr(self._gpu_runtime, "state", "idle"))
-            active_channels = frozenset(getattr(self._gpu_runtime, "active_channels", ()))
-            if runtime_state == "failed" and active_channels:
-                await self._gpu_runtime.retry()
-            elif runtime_state == "failed":
-                previous_runtime = self._gpu_runtime
-                await previous_runtime.close()
+        self._require_open("recover GPU runtime")
+        targets = {item.request.channel: item for item in request.channels}
+        async with self._gpu_recovery_lock:
+            async with self._operation():
+                unavailable_phase: ProviderRuntimeGpuPhase | None = None
+                unavailable_failure_code: str | None = None
+                if targets:
+                    readiness = await self._inspect_gpu_readiness(
+                        explicit_intent=True,
+                        device_id=request.device_id,
+                        allow_device_change=True,
+                    )
+                    if readiness.gpu.phase not in {"available", "ready"}:
+                        unavailable_phase = readiness.gpu.phase
+                        unavailable_failure_code = readiness.gpu.failure_code
+                current_gpu_channels = {
+                    channel
+                    for channel in _CHANNELS
+                    if self._provider_ids[channel] == _GPU_PROVIDER_ID
+                    or channel in getattr(self._gpu_runtime, "active_channels", frozenset())
+                }
+                affected_channels = tuple(
+                    channel
+                    for channel in _CHANNELS
+                    if channel in current_gpu_channels | targets.keys()
+                )
+                for channel, target in targets.items():
+                    self._last_requests[channel] = target.request
+                    self._last_terminal_failure_sinks[channel] = target.on_terminal_failure
+                if unavailable_phase is None:
+                    self._gpu_phase = "validating"
+                    self._gpu_failure_code = None
+                await self._publish_state()
+                try:
+                    if quiesce is not None and affected_channels:
+                        await quiesce(affected_channels)
+                    for channel in _CHANNELS:
+                        if self._provider_ids[channel] == _GPU_PROVIDER_ID:
+                            await self.release_channel(channel, mode="abort")
+                    previous_runtime = self._gpu_runtime
+                    await previous_runtime.close()
+                    self._gpu_runtime = self._create_gpu_runtime()
+                    self._gpu_phase = "idle"
+                    if unavailable_phase is not None:
+                        self._gpu_phase = unavailable_phase
+                        self._gpu_failure_code = unavailable_failure_code
+                        await self._emit_diagnostic(
+                            ProviderRuntimeDiagnostic(
+                                event="gpu_recovery",
+                                outcome="unavailable",
+                                phase=unavailable_phase,
+                                device_id=request.device_id,
+                                failure_code=unavailable_failure_code,
+                            )
+                        )
+                        await self._publish_state()
+                        return self.snapshot
+                    for channel in _CHANNELS:
+                        target = targets.get(channel)
+                        if target is None:
+                            continue
+                        result = await self.replace_provider(
+                            target.request,
+                            start=target.start,
+                            on_terminal_failure=target.on_terminal_failure,
+                        )
+                        if result.status != "applied":
+                            raise RuntimeError(f"GPU provider recovery failed for {channel}")
+                except asyncio.CancelledError as exc:
+                    if self._closing:
+                        raise
+                    cleanup_failures = await asyncio.shield(self._cleanup_failed_gpu_recovery())
+                    if cleanup_failures:
+                        raise BaseExceptionGroup(
+                            "GPU provider recovery cancellation cleanup failed",
+                            [exc, *cleanup_failures],
+                        ) from exc
+                    raise
+                except Exception as exc:
+                    cleanup_failures = await self._cleanup_failed_gpu_recovery()
+                    self._gpu_phase = "failed"
+                    self._gpu_failure_code = (
+                        _optional_string(getattr(exc, "code", None)) or type(exc).__name__
+                    )
+                    await self._emit_diagnostic(
+                        ProviderRuntimeDiagnostic(
+                            event="gpu_recovery",
+                            outcome="failed",
+                            phase="failed",
+                            device_id=request.device_id,
+                            failure_code=self._gpu_failure_code,
+                            failure_type=type(exc).__name__,
+                        )
+                    )
+                    await self._publish_state()
+                    if cleanup_failures:
+                        raise ExceptionGroup(
+                            "GPU provider recovery and cleanup failed",
+                            [exc, *cleanup_failures],
+                        ) from exc
+                    raise
+                self._gpu_phase = "ready" if targets else "inactive"
+                self._gpu_failure_code = None
+                await self._emit_diagnostic(
+                    ProviderRuntimeDiagnostic(
+                        event="gpu_recovery",
+                        outcome="applied",
+                        phase=self._gpu_phase,
+                        device_id=request.device_id,
+                    )
+                )
+                await self._publish_state()
+                return self.snapshot
+
+    async def _cleanup_failed_gpu_recovery(self) -> list[Exception]:
+        failures: list[Exception] = []
+        for channel in _CHANNELS:
+            if self._provider_ids[channel] != _GPU_PROVIDER_ID:
+                continue
+            try:
+                await self.release_channel(channel, mode="abort")
+            except Exception as exc:
+                failures.append(exc)
+        if failures:
+            return failures
+        runtime = self._gpu_runtime
+        try:
+            await runtime.close()
+        except Exception as exc:
+            failures.append(exc)
+        else:
+            if self._gpu_runtime is runtime:
                 self._gpu_runtime = self._create_gpu_runtime()
-                self._gpu_phase = "idle"
-            for channel in channels:
-                if channel in getattr(self._gpu_runtime, "active_channels", frozenset()):
-                    continue
-                request = self._last_requests.get(channel)
-                if request is None or request.provider_id != _GPU_PROVIDER_ID:
-                    raise RuntimeError(f"no retained GPU provider request for {channel}")
-                result = await self.replace_provider(
-                    replace(request, warmup=True),
-                    start=True,
-                    on_terminal_failure=self._last_terminal_failure_sinks.get(channel),
-                )
-                if result.status != "applied":
-                    raise RuntimeError(f"GPU provider retry failed for {channel}")
-            self._gpu_phase = "ready"
-            self._gpu_failure_code = None
-            await self._emit_diagnostic(
-                ProviderRuntimeDiagnostic(
-                    event="gpu_manual_retry",
-                    outcome="applied",
-                    phase="ready",
-                )
-            )
-            await self._publish_state()
-            return self.snapshot
+        return failures
 
     async def close(self) -> None:
         if self._close_complete:
@@ -694,7 +805,9 @@ class LocalASRProviderRuntimeOwner:
                     return_exceptions=True,
                 )
                 failures.extend(
-                    result for result in operation_results if isinstance(result, Exception)
+                    failure
+                    for result in operation_results
+                    if (failure := _close_failure_from_task_result(result)) is not None
                 )
             if discovery_task is not None and discovery_task is not current:
                 discovery_results = await asyncio.gather(
@@ -702,7 +815,9 @@ class LocalASRProviderRuntimeOwner:
                     return_exceptions=True,
                 )
                 failures.extend(
-                    result for result in discovery_results if isinstance(result, Exception)
+                    failure
+                    for result in discovery_results
+                    if (failure := _close_failure_from_task_result(result)) is not None
                 )
             for channel in _CHANNELS:
                 try:
@@ -1108,6 +1223,16 @@ def _safe_channel(value: object) -> ProviderRuntimeChannel | None:
 
 def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def _close_failure_from_task_result(result: object) -> Exception | None:
+    if isinstance(result, Exception):
+        return result
+    if isinstance(result, BaseExceptionGroup):
+        _cancelled, failure = result.split(asyncio.CancelledError)
+        if isinstance(failure, Exception):
+            return failure
+    return None
 
 
 def _optional_int(value: object) -> int | None:

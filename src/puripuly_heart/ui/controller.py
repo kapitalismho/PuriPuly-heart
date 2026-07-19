@@ -18,7 +18,7 @@ from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 import flet as ft
 import numpy as np
@@ -201,6 +201,8 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeSnapshot,
     ProviderRuntimeBuildRequest,
     ProviderRuntimeDiagnostic,
+    ProviderRuntimeGpuRecoveryRequest,
+    ProviderRuntimeRecoveryChannel,
 )
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRInstallRequest,
@@ -272,10 +274,7 @@ from puripuly_heart.core.overlay.process import (
 )
 from puripuly_heart.core.runtime.clipboard import ClipboardRuntime
 from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
-from puripuly_heart.core.runtime.gpu_asr import (
-    GpuASRChannel,
-    GpuASRManualRetryRequired,
-)
+from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRSessionOptions,
     LocalASRTransitionCoordinator,
@@ -1101,16 +1100,6 @@ class GuiController:
     _local_stt_pending_enable_after_install: bool = field(init=False, default=False)
     _local_stt_pending_enable_generation: int | None = field(init=False, default=None)
     _local_stt_pending_peer_enable_after_install: bool = field(init=False, default=False)
-    _gpu_reconfiguration_lock: asyncio.Lock | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _gpu_manual_retry_channels: frozenset[GpuASRChannel] = field(
-        init=False,
-        default=frozenset(),
-        repr=False,
-    )
     _gpu_pending_enable_channels: frozenset[GpuASRChannel] = field(
         init=False,
         default=frozenset(),
@@ -1745,71 +1734,45 @@ class GuiController:
     async def retry_gpu_activation(self) -> None:
         if self.settings is None:
             return
-        if self._gpu_reconfiguration_lock is None:
-            self._gpu_reconfiguration_lock = asyncio.Lock()
-        async with self._gpu_reconfiguration_lock:
-            await self._retry_gpu_activation_locked()
-
-    async def _retry_gpu_activation_locked(self) -> None:
-        if self.settings is None:
-            return
-        selected_device = self.settings.stt.gpu_device_id
-        known_devices = {device.device_id for device in self._gpu_devices}
-        if not self._gpu_devices or (
-            selected_device != "auto" and selected_device not in known_devices
-        ):
-            await self.ensure_gpu_device_discovery(force=True, origin="manual_retry")
-        if not await self._validate_gpu_activation():
-            return
-        await self._restore_gpu_channels_after_manual_retry()
-
-    async def _restore_gpu_channels_after_manual_retry(self) -> None:
-        if self.settings is None:
-            return
         owned_runtime = self._hub_local_asr_provider_runtime()
         if owned_runtime is None:
             raise RuntimeError("local ASR provider runtime is unavailable")
-        restore_channels = set(self._gpu_manual_retry_channels) | set(
-            self._desired_gpu_channels(self.settings)
+        desired_channels = frozenset(
+            {
+                *self._desired_gpu_channels(self.settings),
+                *self._gpu_pending_enable_channels,
+            }
         )
+        recovery, peer_config = self._build_gpu_recovery_request(
+            self.settings,
+            desired_channels,
+            reason="manual_retry",
+        )
+        if not recovery.channels:
+            return
         try:
-            snapshot = owned_runtime.snapshot
-            attached_gpu_channels = tuple(
-                channel.channel
-                for channel in snapshot.channels
-                if channel.provider_id == STTProviderName.LOCAL_QWEN_GPU.value
-                and channel.has_resources
+            snapshot = await owned_runtime.recover_gpu(
+                recovery,
+                quiesce=self._suspend_gpu_provider_consumers,
             )
-            if snapshot.gpu.retry_required and attached_gpu_channels:
-                snapshot = await owned_runtime.retry_gpu(attached_gpu_channels)
-            if (
-                self.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-                and (self._stt_desired or "self" in restore_channels)
-                and "self" not in snapshot.gpu.active_channels
+            recovered_channels = frozenset(item.request.channel for item in recovery.channels)
+            if snapshot.gpu.retry_required or not recovered_channels.issubset(
+                snapshot.gpu.active_channels
             ):
-                await self._rebuild_stt_provider()
-                self._stt_desired = True
-                await self.set_stt_enabled(True)
-            if (
-                self.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-                and (self.settings.ui.peer_translation_enabled or "peer" in restore_channels)
-                and "peer" not in owned_runtime.snapshot.gpu.active_channels
-            ):
-                await self._refresh_peer_stt_runtime()
-            if owned_runtime.snapshot.gpu.retry_required:
-                raise GpuASRManualRetryRequired(
-                    owned_runtime.snapshot.gpu.failure_code or "manual_retry_required"
-                )
-            self._gpu_manual_retry_channels = frozenset()
+                self._on_local_asr_provider_runtime_state_changed(snapshot)
+                return
+            await self._resume_gpu_provider_consumers(
+                settings=self.settings,
+                channels=recovered_channels,
+                peer_config=peer_config,
+            )
             self._gpu_pending_enable_channels = frozenset(
                 channel
                 for channel in self._gpu_pending_enable_channels
-                if channel not in restore_channels
+                if channel not in recovered_channels
             )
             self._set_gpu_ui_state("ready", origin="manual_retry")
         except Exception:
-            self._gpu_manual_retry_channels = frozenset(restore_channels)
-            await self._quiesce_shared_gpu_consumers(self.settings)
             self._set_gpu_ui_state(
                 "activation_failed",
                 publish_notice=True,
@@ -8569,7 +8532,7 @@ class GuiController:
             await self._rebuild_llm_provider()
 
         if plan.coordinated_gpu_restart:
-            await self._apply_coordinated_gpu_restart(next_settings, plan)
+            await self._apply_gpu_runtime_owner_recovery(next_settings, plan)
             self._sync_signature_caches(next_settings)
             if plan.should_rebuild_llm and self.hub is not None and self.hub.llm is None:
                 self._last_llm_provider_signature = ()
@@ -8590,45 +8553,52 @@ class GuiController:
         if plan.should_rebuild_llm and self.hub is not None and self.hub.llm is None:
             self._last_llm_provider_signature = ()
 
-    async def _apply_coordinated_gpu_restart(
+    async def _apply_gpu_runtime_owner_recovery(
         self,
         next_settings: AppSettings,
         plan: _ProviderRuntimeApplyPlan,
     ) -> None:
-        if self._gpu_reconfiguration_lock is None:
-            self._gpu_reconfiguration_lock = asyncio.Lock()
-        async with self._gpu_reconfiguration_lock:
-            desired_channels = self._desired_gpu_channels(next_settings)
-            self._gpu_manual_retry_channels = desired_channels
-            activation_allowed = await self._validate_gpu_activation()
-            await self._quiesce_shared_gpu_consumers(next_settings)
-            if not activation_allowed:
+        owned_runtime = self._hub_local_asr_provider_runtime()
+        if owned_runtime is None:
+            raise RuntimeError("local ASR provider runtime is unavailable")
+        desired_channels = self._desired_gpu_channels(next_settings)
+        recovery, peer_config = self._build_gpu_recovery_request(
+            next_settings,
+            desired_channels,
+            reason="settings_restart",
+        )
+        try:
+            snapshot = await owned_runtime.recover_gpu(
+                recovery,
+                quiesce=self._suspend_gpu_provider_consumers,
+            )
+            recovered_channels = frozenset(item.request.channel for item in recovery.channels)
+            if recovered_channels and (
+                snapshot.gpu.retry_required
+                or not recovered_channels.issubset(snapshot.gpu.active_channels)
+            ):
+                self._on_local_asr_provider_runtime_state_changed(snapshot)
                 return
-            try:
-                if plan.should_refresh_self_stt:
-                    if self._stt_desired:
-                        await self._replace_runtime_stt_provider()
-                    else:
-                        await self._rebuild_stt_provider()
-                if plan.should_refresh_peer:
-                    await self._refresh_peer_stt_runtime()
-                    self._sync_effective_hub_flags(next_settings)
-                    self._refresh_overlay_peer_consumers()
-                owned_runtime = self._hub_local_asr_provider_runtime()
-                if owned_runtime is None:
-                    raise RuntimeError("local ASR provider runtime is unavailable")
-                if owned_runtime.snapshot.gpu.retry_required:
-                    raise GpuASRManualRetryRequired(
-                        owned_runtime.snapshot.gpu.failure_code or "manual_retry_required"
-                    )
-                self._gpu_manual_retry_channels = frozenset()
-            except Exception:
-                await self._quiesce_shared_gpu_consumers(next_settings)
-                self._set_gpu_ui_state(
-                    "activation_failed",
-                    publish_notice=True,
-                    origin="settings_apply",
-                )
+            await self._resume_gpu_provider_consumers(
+                settings=next_settings,
+                channels=recovered_channels,
+                peer_config=peer_config,
+            )
+            if plan.should_refresh_self_stt and "self" not in recovered_channels:
+                if self._stt_desired:
+                    await self._replace_runtime_stt_provider()
+                else:
+                    await self._rebuild_stt_provider()
+            if plan.should_refresh_peer and "peer" not in recovered_channels:
+                await self._refresh_peer_stt_runtime()
+                self._sync_effective_hub_flags(next_settings)
+                self._refresh_overlay_peer_consumers()
+        except Exception:
+            self._set_gpu_ui_state(
+                "activation_failed",
+                publish_notice=True,
+                origin="settings_apply",
+            )
 
     def _desired_gpu_channels(self, settings: AppSettings) -> frozenset[GpuASRChannel]:
         owned_runtime = self._hub_local_asr_provider_runtime()
@@ -8646,28 +8616,69 @@ class GuiController:
             desired.add("peer")
         return frozenset(desired)
 
-    async def _quiesce_shared_gpu_consumers(self, settings: AppSettings) -> None:
-        owned_runtime = self._hub_local_asr_provider_runtime()
-        active_channels = (
-            owned_runtime.snapshot.gpu.active_channels if owned_runtime is not None else frozenset()
-        )
-        selected_desired = self._desired_gpu_channels(settings)
-        channels_to_stop = active_channels | selected_desired
-        if "self" in channels_to_stop and self._mic_task is not None:
-            await self._stop_mic_loop()
-        closures: list[object] = []
-        if "self" in channels_to_stop and self.hub is not None:
-            closures.append(self.hub.abort_self_stt_for_toggle_off())
-        if "peer" in channels_to_stop and self._peer_runtime is not None:
-            closures.append(
-                self._provider_rebuild_runtime.apply_peer_policy(
-                    peer_runtime=self._peer_runtime,
-                    config=self._build_peer_runtime_config(settings),
-                    desired_active=False,
+    def _build_gpu_recovery_request(
+        self,
+        settings: AppSettings,
+        channels: frozenset[GpuASRChannel],
+        *,
+        reason: Literal["manual_retry", "settings_restart"],
+    ) -> tuple[ProviderRuntimeGpuRecoveryRequest, PeerRuntimeConfig | None]:
+        targets: list[ProviderRuntimeRecoveryChannel] = []
+        peer_config = None
+        if "self" in channels and settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU:
+            targets.append(
+                ProviderRuntimeRecoveryChannel(
+                    request=self._self_stt_provider_request(settings, warmup=True),
+                    start=self._stt_desired,
                 )
             )
-        if closures:
-            await asyncio.gather(*closures)
+        if "peer" in channels and settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU:
+            peer_config = self._build_peer_runtime_config(settings)
+            targets.append(
+                ProviderRuntimeRecoveryChannel(
+                    request=self._peer_stt_provider_request(peer_config, warmup=True),
+                    start=False,
+                    on_terminal_failure=(
+                        self._peer_runtime.handle_terminal_provider_failure
+                        if self._peer_runtime is not None
+                        else None
+                    ),
+                )
+            )
+        return (
+            ProviderRuntimeGpuRecoveryRequest(
+                device_id=settings.stt.gpu_device_id,
+                channels=tuple(targets),
+                reason=reason,
+            ),
+            peer_config,
+        )
+
+    async def _suspend_gpu_provider_consumers(
+        self,
+        channels: tuple[GpuASRChannel, ...],
+    ) -> None:
+        if "self" in channels and self._mic_task is not None:
+            await self._stop_mic_loop()
+        if "peer" in channels and self._peer_runtime is not None:
+            await self._peer_runtime.suspend_provider_consumer()
+
+    async def _resume_gpu_provider_consumers(
+        self,
+        *,
+        settings: AppSettings,
+        channels: frozenset[GpuASRChannel],
+        peer_config: PeerRuntimeConfig | None,
+    ) -> None:
+        if "peer" in channels and self._peer_runtime is not None:
+            if peer_config is None:
+                peer_config = self._build_peer_runtime_config(settings)
+            await self._peer_runtime.adopt_recovered_provider(peer_config)
+            await self._refresh_peer_stt_runtime()
+            self._sync_effective_hub_flags(settings)
+            self._refresh_overlay_peer_consumers()
+        if "self" in channels and self._stt_desired:
+            await self._ensure_stt_switch()
 
     def _load_or_init_settings(self, path: Path) -> AppSettings:
         if path.exists():
@@ -9250,13 +9261,6 @@ class GuiController:
                 origin=self._gpu_discovery_origin,
             )
         elif diagnostic.event in {"activation_failed", "worker_failed"}:
-            if self.settings is not None:
-                self._gpu_manual_retry_channels = frozenset(
-                    {
-                        *self._gpu_manual_retry_channels,
-                        *self._desired_gpu_channels(self.settings),
-                    }
-                )
             self._set_gpu_ui_state(
                 "activation_failed",
                 publish_notice=True,

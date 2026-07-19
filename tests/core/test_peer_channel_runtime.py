@@ -340,6 +340,45 @@ async def test_start_and_release_delegate_provider_lifecycle_to_owner() -> None:
     assert hub.local_asr_provider_runtime.releases == [("peer", "abort", None)]
 
 
+async def test_provider_recovery_suspends_capture_without_releasing_and_adopts_rebuild() -> None:
+    hub = FakeOwnedPeerHub()
+    sources: list[DummySource] = []
+    runtime = make_runtime(
+        hub,
+        source_factory=lambda _config: sources.append(DummySource()) or sources[-1],
+    )
+    initial = make_peer_runtime_config()
+    recovered = replace(
+        initial,
+        provider_signature=(*initial.provider_signature, "recovered"),
+        runtime_signature=(*initial.runtime_signature, "recovered"),
+    )
+
+    await runtime.apply_policy(config=initial, desired_active=True)
+    await runtime.suspend_provider_consumer()
+
+    assert runtime.state is PeerChannelRuntimeState.STOPPED
+    assert sources[0].close_calls == 1
+    assert hub.local_asr_provider_runtime.releases == []
+    assert hub.local_asr_provider_runtime.snapshot.channel_for("peer").has_resources
+
+    recovered_request = ProviderRuntimeBuildRequest(
+        config=recovered.backend,
+        model_id=recovered.model_id or recovered.backend.model,
+        session_options=recovered.session_options,
+    )
+    hub.local_asr_provider_runtime.attach(recovered_request, start=False)
+    await runtime.adopt_recovered_provider(recovered)
+    await runtime.apply_policy(config=recovered, desired_active=True)
+
+    assert runtime.state is PeerChannelRuntimeState.RUNNING
+    assert len(hub.requests) == 1
+    assert len(sources) == 2
+
+    await runtime.close()
+    assert hub.local_asr_provider_runtime.releases == [("peer", "abort", None)]
+
+
 async def test_local_qwen_reuses_owner_retained_provider() -> None:
     hub = FakeOwnedPeerHub()
     sources: list[DummySource] = []

@@ -99,6 +99,10 @@ class SpeechChannelRuntime(Protocol):
 
     async def warmup(self) -> None: ...
 
+    async def suspend_provider_consumer(self) -> None: ...
+
+    async def adopt_recovered_provider(self, config: PeerRuntimeConfig) -> None: ...
+
     async def close(self) -> None: ...
 
 
@@ -294,6 +298,42 @@ class PeerChannelRuntime:
     async def warmup(self) -> None:
         if self._desired_active and self._state == PeerChannelRuntimeState.RUNNING:
             await self.hub.warmup_stt_channel("peer")
+
+    async def suspend_provider_consumer(self) -> None:
+        async with self._lock:
+            if self._closed:
+                return
+            self._generation += 1
+            generation = self._generation
+            self._desired_active = False
+            self._state = PeerChannelRuntimeState.STOPPING
+        async with self._activation_lock:
+            await self._teardown_resources(
+                target_state=PeerChannelRuntimeState.STOPPED,
+                generation=generation,
+                release_mode="drain",
+                release_provider=False,
+            )
+
+    async def adopt_recovered_provider(self, config: PeerRuntimeConfig) -> None:
+        runtime = self.hub.local_asr_provider_runtime
+        current = runtime.snapshot.channel_for("peer") if runtime is not None else None
+        if (
+            current is None
+            or current.provider_id != config.backend.provider
+            or not current.has_resources
+        ):
+            raise RuntimeError("recovered Peer provider is not attached")
+        async with self._lock:
+            if self._closed:
+                raise RuntimeError("PeerChannelRuntime is closed")
+            if self._state != PeerChannelRuntimeState.STOPPED:
+                raise RuntimeError("Peer provider recovery requires suspended capture")
+            self._config = config
+            self._provider_signature = config.provider_signature
+
+    async def handle_terminal_provider_failure(self, exc: Exception) -> None:
+        await self._on_terminal_stt_failure(exc)
 
     async def close(self) -> None:
         await self._transition_coordinator.close()
@@ -628,6 +668,7 @@ class PeerChannelRuntime:
         target_state: PeerChannelRuntimeState,
         generation: int,
         release_mode: Literal["drain", "abort"],
+        release_provider: bool = True,
     ) -> None:
         async with self._lock:
             if self._generation != generation:
@@ -638,7 +679,7 @@ class PeerChannelRuntime:
             self._audio_source = None
             self._vad = None
             self._signature = None
-            if release_mode == "abort":
+            if release_mode == "abort" and release_provider:
                 self._provider_signature = None
         failures: list[Exception] = []
         await self._attempt_cleanup(failures, lambda: self._cancel_loop(loop_task))
@@ -648,20 +689,21 @@ class PeerChannelRuntime:
             retain_on_failure=lambda: self._retain_retired_source(source),
         )
         await self._retry_retired_cleanup_debt(failures)
-        runtime = self.hub.local_asr_provider_runtime
-        if runtime is None:
-            failures.append(RuntimeError("local ASR provider runtime is unavailable"))
-        else:
-            await self._attempt_cleanup(
-                failures,
-                lambda: runtime.release_channel(
-                    "peer",
-                    mode=release_mode,
-                    release_backend_after=(
-                        self._idle_release_seconds if release_mode == "drain" else None
+        if release_provider:
+            runtime = self.hub.local_asr_provider_runtime
+            if runtime is None:
+                failures.append(RuntimeError("local ASR provider runtime is unavailable"))
+            else:
+                await self._attempt_cleanup(
+                    failures,
+                    lambda: runtime.release_channel(
+                        "peer",
+                        mode=release_mode,
+                        release_backend_after=(
+                            self._idle_release_seconds if release_mode == "drain" else None
+                        ),
                     ),
-                ),
-            )
+                )
         async with self._lock:
             if self._generation == generation:
                 self._state = target_state

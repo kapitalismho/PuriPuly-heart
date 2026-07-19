@@ -18,7 +18,11 @@ from puripuly_heart.core.gpu_worker import (
     GpuWorkerDevice,
     GpuWorkerTranscription,
 )
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+from puripuly_heart.core.local_asr_provider_runtime import (
+    ProviderRuntimeBuildRequest,
+    ProviderRuntimeGpuRecoveryRequest,
+    ProviderRuntimeRecoveryChannel,
+)
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRModelProvisioningState,
     LocalASRProvisioningSnapshot,
@@ -574,7 +578,7 @@ async def test_gpu_discovery_is_single_flight_and_exposes_pending_state() -> Non
 
 
 @pytest.mark.asyncio
-async def test_manual_retry_is_explicit_and_never_builds_cpu_fallback() -> None:
+async def test_manual_recovery_is_explicit_quiesced_and_never_builds_cpu_fallback() -> None:
     owner, _provisioning, gpu_factory, provider_factory = _owner()
     request = ProviderRuntimeBuildRequest(
         config=_resolved_config("self", "local_qwen_gpu"),
@@ -590,11 +594,30 @@ async def test_manual_retry_is_explicit_and_never_builds_cpu_fallback() -> None:
     runtime.state = "failed"
     runtime.last_failure_code = "decode_failed"
 
-    snapshot = await owner.retry_gpu(("self",))
+    quiesced: list[tuple[str, ...]] = []
 
-    assert runtime.retry_calls == 1
+    async def quiesce(channels: tuple[str, ...]) -> None:
+        assert owner.snapshot.gpu.active_channels == frozenset({"self"})
+        quiesced.append(channels)
+
+    snapshot = await owner.recover_gpu(
+        ProviderRuntimeGpuRecoveryRequest(
+            device_id=GPU_DEVICE.device_id,
+            channels=(ProviderRuntimeRecoveryChannel(request=request, start=True),),
+            reason="manual_retry",
+        ),
+        quiesce=quiesce,
+    )
+
+    assert quiesced == [("self",)]
+    assert runtime.retry_calls == 0
+    assert runtime.close_calls == 1
+    assert len(gpu_factory.instances) == 2
     assert snapshot.gpu.phase == "ready"
-    assert [request.provider_id for request in provider_factory.requests] == ["local_qwen_gpu"]
+    assert [request.provider_id for request in provider_factory.requests] == [
+        "local_qwen_gpu",
+        "local_qwen_gpu",
+    ]
 
     await owner.close()
 
@@ -632,7 +655,7 @@ async def test_manual_retry_creates_one_fresh_runtime_after_full_quiesce() -> No
     request = ProviderRuntimeBuildRequest(
         config=_resolved_config("peer", "local_qwen_gpu"),
         gpu_device_id=GPU_DEVICE.device_id,
-        warmup=False,
+        warmup=True,
     )
     await owner.replace_provider(request, start=False)
     await owner.release_channel("peer", mode="abort")
@@ -640,7 +663,13 @@ async def test_manual_retry_creates_one_fresh_runtime_after_full_quiesce() -> No
     failed_runtime.state = "failed"
     failed_runtime.last_failure_code = "worker_failed"
 
-    snapshot = await owner.retry_gpu(("peer",))
+    snapshot = await owner.recover_gpu(
+        ProviderRuntimeGpuRecoveryRequest(
+            device_id=GPU_DEVICE.device_id,
+            channels=(ProviderRuntimeRecoveryChannel(request=request, start=False),),
+            reason="manual_retry",
+        )
+    )
 
     assert len(gpu_factory.instances) == 2
     assert failed_runtime.close_calls == 1
@@ -659,6 +688,123 @@ async def test_manual_retry_creates_one_fresh_runtime_after_full_quiesce() -> No
     )
     assert owner.snapshot.gpu.phase == "ready"
     assert len(owner.diagnostics) == diagnostic_count
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_gpu_recovery_unavailability_quiesces_and_releases_previous_runtime() -> None:
+    owner, provisioning, gpu_factory, provider_factory = _owner()
+    request = ProviderRuntimeBuildRequest(
+        config=_resolved_config("self", "local_qwen_gpu"),
+        gpu_device_id=GPU_DEVICE.device_id,
+        warmup=True,
+    )
+    await owner.replace_provider(request, start=True)
+    old_runtime = gpu_factory.instances[0]
+    provisioning.integrity = "missing"
+    quiesced: list[tuple[str, ...]] = []
+
+    async def quiesce(channels: tuple[str, ...]) -> None:
+        quiesced.append(channels)
+
+    snapshot = await owner.recover_gpu(
+        ProviderRuntimeGpuRecoveryRequest(
+            device_id=GPU_DEVICE.device_id,
+            channels=(ProviderRuntimeRecoveryChannel(request=request, start=True),),
+            reason="settings_restart",
+        ),
+        quiesce=quiesce,
+    )
+
+    assert quiesced == [("self",)]
+    assert snapshot.gpu.phase == "not_installed"
+    assert snapshot.channel_for("self").provider_id is None
+    assert old_runtime.close_calls == 1
+    assert len(gpu_factory.instances) == 2
+    assert gpu_factory.instances[1].active_channels == frozenset()
+    assert len(provider_factory.requests) == 1
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_gpu_recovery_build_failure_aborts_partial_resources_and_keeps_retryable_owner() -> (
+    None
+):
+    owner, _provisioning, gpu_factory, provider_factory = _owner()
+    request = ProviderRuntimeBuildRequest(
+        config=_resolved_config("peer", "local_qwen_gpu"),
+        gpu_device_id=GPU_DEVICE.device_id,
+        warmup=True,
+    )
+    await owner.replace_provider(request, start=False)
+    provider_factory.fail_next = True
+
+    with pytest.raises(RuntimeError, match="GPU provider recovery failed for peer"):
+        await owner.recover_gpu(
+            ProviderRuntimeGpuRecoveryRequest(
+                device_id=GPU_DEVICE.device_id,
+                channels=(ProviderRuntimeRecoveryChannel(request=request, start=False),),
+                reason="manual_retry",
+            )
+        )
+
+    assert owner.snapshot.gpu.phase == "failed"
+    assert owner.snapshot.channel_for("peer").provider_id is None
+    assert all(runtime.active_channels == frozenset() for runtime in gpu_factory.instances)
+    assert len(gpu_factory.instances) == 3
+
+    snapshot = await owner.recover_gpu(
+        ProviderRuntimeGpuRecoveryRequest(
+            device_id=GPU_DEVICE.device_id,
+            channels=(ProviderRuntimeRecoveryChannel(request=request, start=False),),
+            reason="manual_retry",
+        )
+    )
+
+    assert snapshot.gpu.phase == "ready"
+    assert snapshot.channel_for("peer").has_resources
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_gpu_recovery_commands_are_serialized_by_owner() -> None:
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner()
+    request = ProviderRuntimeBuildRequest(
+        config=_resolved_config("self", "local_qwen_gpu"),
+        gpu_device_id=GPU_DEVICE.device_id,
+        warmup=True,
+    )
+    recovery = ProviderRuntimeGpuRecoveryRequest(
+        device_id=GPU_DEVICE.device_id,
+        channels=(ProviderRuntimeRecoveryChannel(request=request, start=True),),
+        reason="manual_retry",
+    )
+    first_entered = asyncio.Event()
+    allow_first = asyncio.Event()
+    order: list[str] = []
+
+    async def first_quiesce(_channels: tuple[str, ...]) -> None:
+        order.append("first")
+        first_entered.set()
+        await allow_first.wait()
+
+    async def second_quiesce(_channels: tuple[str, ...]) -> None:
+        order.append("second")
+
+    first = asyncio.create_task(owner.recover_gpu(recovery, quiesce=first_quiesce))
+    await first_entered.wait()
+    second = asyncio.create_task(owner.recover_gpu(recovery, quiesce=second_quiesce))
+    await asyncio.sleep(0)
+
+    assert order == ["first"]
+
+    allow_first.set()
+    await asyncio.gather(first, second)
+
+    assert order == ["first", "second"]
 
     await owner.close()
 
@@ -799,6 +945,42 @@ async def test_close_cancels_in_flight_provider_execution() -> None:
 
     assert execution.cancelled()
     assert provider.close_backend_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_close_cancels_owner_serialized_gpu_recovery_and_finishes_cleanup() -> None:
+    owner, _provisioning, gpu_factory, provider_factory = _owner()
+    request = ProviderRuntimeBuildRequest(
+        config=_resolved_config("self", "local_qwen_gpu"),
+        gpu_device_id=GPU_DEVICE.device_id,
+        warmup=True,
+    )
+    await owner.replace_provider(request, start=True)
+    quiesce_entered = asyncio.Event()
+
+    async def quiesce(_channels: tuple[str, ...]) -> None:
+        quiesce_entered.set()
+        await asyncio.Event().wait()
+
+    recovery = asyncio.create_task(
+        owner.recover_gpu(
+            ProviderRuntimeGpuRecoveryRequest(
+                device_id=GPU_DEVICE.device_id,
+                channels=(ProviderRuntimeRecoveryChannel(request=request, start=True),),
+                reason="manual_retry",
+            ),
+            quiesce=quiesce,
+        )
+    )
+    await quiesce_entered.wait()
+
+    await owner.close()
+
+    with pytest.raises(asyncio.CancelledError):
+        await recovery
+    assert owner.snapshot.closed is True
+    assert provider_factory.providers[0].close_backend_calls == 1
+    assert gpu_factory.instances[0].close_calls == 1
 
 
 @pytest.mark.asyncio

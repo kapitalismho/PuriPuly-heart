@@ -47,6 +47,10 @@ ProviderRuntimeReleaseMode = Literal["drain", "dormant", "abort"]
 ProviderRuntimeEventHandler = Callable[[object], Awaitable[None]]
 ProviderRuntimeExceptionHandler = Callable[[Exception], Awaitable[None] | None]
 ProviderRuntimeTerminalFailureSink = Callable[[Exception], Awaitable[None]]
+ProviderRuntimeRecoveryQuiesce = Callable[
+    [tuple[ProviderRuntimeChannel, ...]],
+    Awaitable[None],
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +83,34 @@ class ProviderRuntimeBuildRequest:
     @property
     def provider_id(self) -> str:
         return self.config.provider
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderRuntimeRecoveryChannel:
+    request: ProviderRuntimeBuildRequest
+    start: bool
+    on_terminal_failure: ProviderRuntimeTerminalFailureSink | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderRuntimeGpuRecoveryRequest:
+    device_id: str
+    channels: tuple[ProviderRuntimeRecoveryChannel, ...]
+    reason: Literal["manual_retry", "settings_restart"]
+
+    def __post_init__(self) -> None:
+        if not self.device_id.strip():
+            raise ValueError("GPU recovery device_id must be non-empty")
+        channel_ids = tuple(item.request.channel for item in self.channels)
+        if len(frozenset(channel_ids)) != len(channel_ids):
+            raise ValueError("GPU recovery channels must be unique")
+        for item in self.channels:
+            if item.request.provider_id != "local_qwen_gpu":
+                raise ValueError("GPU recovery accepts only local_qwen_gpu requests")
+            if item.request.gpu_device_id != self.device_id:
+                raise ValueError("GPU recovery channel device_id must match the recovery device")
+            if not item.request.warmup:
+                raise ValueError("GPU recovery channels must request warmup")
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,9 +299,11 @@ class LocalASRProviderRuntimePort(Protocol):
         event: object,
     ) -> None: ...
 
-    async def retry_gpu(
+    async def recover_gpu(
         self,
-        channels: tuple[ProviderRuntimeChannel, ...],
+        request: ProviderRuntimeGpuRecoveryRequest,
+        *,
+        quiesce: ProviderRuntimeRecoveryQuiesce | None = None,
     ) -> LocalASRProviderRuntimeSnapshot: ...
 
     async def close(self) -> None: ...
@@ -296,10 +330,13 @@ __all__ = [
     "ProviderRuntimeEventHandler",
     "ProviderRuntimeExceptionHandler",
     "ProviderRuntimeGpuPhase",
+    "ProviderRuntimeGpuRecoveryRequest",
     "ProviderRuntimeGpuSnapshot",
     "ProviderRuntimeMutationResult",
     "ProviderRuntimeMutationStatus",
     "ProviderRuntimeProviderFactoryPort",
+    "ProviderRuntimeRecoveryChannel",
+    "ProviderRuntimeRecoveryQuiesce",
     "ProviderRuntimeReleaseMode",
     "ProviderRuntimeTerminalFailureSink",
 ]

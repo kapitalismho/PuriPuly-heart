@@ -343,7 +343,7 @@ async def test_gpu_discovery_keeps_startup_progress_off_dashboard() -> None:
     assert view.states == []
 
 
-async def test_gpu_worker_failure_preserves_channels_for_restart_action() -> None:
+async def test_gpu_worker_failure_keeps_recovery_membership_out_of_controller_state() -> None:
     controller, view = _controller()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
     controller._stt_desired = True
@@ -356,7 +356,7 @@ async def test_gpu_worker_failure_preserves_channels_for_restart_action() -> Non
         )
     )
 
-    assert controller._gpu_manual_retry_channels == frozenset({"self"})
+    assert not hasattr(controller, "_gpu_manual_retry_channels")
     assert view.states[-1][0] == "activation_failed"
 
 
@@ -377,6 +377,7 @@ async def test_saved_gpu_preload_skips_non_gpu_and_runs_once_for_gpu(
     assert calls == []
 
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
+    controller.settings.ui.peer_translation_enabled = True
     assert await controller.preload_saved_gpu_device_discovery() == ()
     assert calls == ["startup"]
 
@@ -399,45 +400,47 @@ async def test_valid_device_change_quiesces_both_before_either_restore(
     controller.settings.stt.gpu_device_id = "vk:1"
     controller._stt_desired = True
     events: list[str] = []
-    controller.hub = SimpleNamespace(
-        local_asr_provider_runtime=SimpleNamespace(
-            snapshot=_owned_gpu_snapshot(
+
+    class Owner:
+        def __init__(self) -> None:
+            self.snapshot = _owned_gpu_snapshot(
                 phase="ready",
                 active_channels=frozenset({"self", "peer"}),
                 attached_channels=frozenset({"self", "peer"}),
             )
-        )
-    )
 
-    async def validate(_self: GuiController) -> bool:
-        events.append("validated")
-        return True
+        async def recover_gpu(self, request, *, quiesce):
+            events.append("owner_started")
+            assert tuple(item.request.channel for item in request.channels) == ("self", "peer")
+            await quiesce(("self", "peer"))
+            events.append("owner_rebuilt")
+            self.snapshot = _owned_gpu_snapshot(
+                phase="ready",
+                active_channels=frozenset({"self", "peer"}),
+                attached_channels=frozenset({"self", "peer"}),
+            )
+            return self.snapshot
 
-    async def quiesce(_self: GuiController, _settings: AppSettings) -> None:
+    controller.hub = SimpleNamespace(local_asr_provider_runtime=Owner())
+
+    async def suspend(_self: GuiController, _channels) -> None:
         events.extend(("self_closed", "peer_closed"))
 
-    async def restore_self(_self: GuiController) -> None:
-        assert events[:3] == ["validated", "self_closed", "peer_closed"]
-        events.append("self_restored")
+    async def resume(_self: GuiController, **_kwargs) -> None:
+        assert events[-1] == "owner_rebuilt"
+        events.append("consumers_resumed")
 
-    async def restore_peer(_self: GuiController) -> None:
-        assert "self_closed" in events and "peer_closed" in events
-        events.append("peer_restored")
+    monkeypatch.setattr(GuiController, "_suspend_gpu_provider_consumers", suspend)
+    monkeypatch.setattr(GuiController, "_resume_gpu_provider_consumers", resume)
 
-    monkeypatch.setattr(GuiController, "_validate_gpu_activation", validate)
-    monkeypatch.setattr(GuiController, "_quiesce_shared_gpu_consumers", quiesce)
-    monkeypatch.setattr(GuiController, "_replace_runtime_stt_provider", restore_self)
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", restore_peer)
-    monkeypatch.setattr(GuiController, "_refresh_overlay_peer_consumers", lambda _self: None)
-
-    await controller._apply_coordinated_gpu_restart(controller.settings, _gpu_restart_plan())
+    await controller._apply_gpu_runtime_owner_recovery(controller.settings, _gpu_restart_plan())
 
     assert events == [
-        "validated",
+        "owner_started",
         "self_closed",
         "peer_closed",
-        "self_restored",
-        "peer_restored",
+        "owner_rebuilt",
+        "consumers_resumed",
     ]
 
 
@@ -449,32 +452,44 @@ async def test_unavailable_device_change_retains_selection_and_stops_both(
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.stt.gpu_device_id = "vk:missing"
     controller._stt_desired = True
-    quiesce = AsyncMock()
-    restore_self = AsyncMock()
-    restore_peer = AsyncMock()
+    suspend = AsyncMock()
+    resume = AsyncMock()
 
-    async def validate(_self: GuiController) -> bool:
-        return False
+    class Owner:
+        def __init__(self) -> None:
+            self.snapshot = _owned_gpu_snapshot(
+                phase="failed",
+                active_channels=frozenset({"self", "peer"}),
+                retry_required=True,
+                failure_code="saved_device_missing",
+                attached_channels=frozenset({"self", "peer"}),
+            )
 
-    async def quiesce_call(_self: GuiController, settings: AppSettings) -> None:
-        await quiesce(settings)
+        async def recover_gpu(self, _request, *, quiesce):
+            await quiesce(("self", "peer"))
+            self.snapshot = _owned_gpu_snapshot(
+                phase="failed",
+                retry_required=True,
+                failure_code="saved_device_missing",
+            )
+            return self.snapshot
 
-    async def restore_self_call(_self: GuiController) -> None:
-        await restore_self()
+    controller.hub = SimpleNamespace(local_asr_provider_runtime=Owner())
+    monkeypatch.setattr(
+        GuiController,
+        "_suspend_gpu_provider_consumers",
+        lambda _self, channels: suspend(channels),
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_resume_gpu_provider_consumers",
+        lambda _self, **kwargs: resume(**kwargs),
+    )
 
-    async def restore_peer_call(_self: GuiController) -> None:
-        await restore_peer()
+    await controller._apply_gpu_runtime_owner_recovery(controller.settings, _gpu_restart_plan())
 
-    monkeypatch.setattr(GuiController, "_validate_gpu_activation", validate)
-    monkeypatch.setattr(GuiController, "_quiesce_shared_gpu_consumers", quiesce_call)
-    monkeypatch.setattr(GuiController, "_replace_runtime_stt_provider", restore_self_call)
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", restore_peer_call)
-
-    await controller._apply_coordinated_gpu_restart(controller.settings, _gpu_restart_plan())
-
-    quiesce.assert_awaited_once_with(controller.settings)
-    restore_self.assert_not_awaited()
-    restore_peer.assert_not_awaited()
+    suspend.assert_awaited_once_with(("self", "peer"))
+    resume.assert_not_awaited()
     assert controller.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
     assert controller.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
     assert controller.settings.stt.gpu_device_id == "vk:missing"
@@ -488,69 +503,54 @@ async def test_device_activation_failure_releases_both_and_requires_manual_retry
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.stt.gpu_device_id = "vk:1"
     controller._stt_desired = True
-    quiesce = AsyncMock()
+    suspend = AsyncMock()
 
-    async def validate(_self: GuiController) -> bool:
-        return True
+    class Owner:
+        snapshot = _owned_gpu_snapshot(
+            phase="ready",
+            active_channels=frozenset({"self", "peer"}),
+            attached_channels=frozenset({"self", "peer"}),
+        )
 
-    async def quiesce_call(_self: GuiController, settings: AppSettings) -> None:
-        await quiesce(settings)
+        async def recover_gpu(self, _request, *, quiesce):
+            await quiesce(("self", "peer"))
+            raise RuntimeError("activation failed")
 
-    async def fail_restore(_self: GuiController) -> None:
-        raise RuntimeError("activation failed")
+    controller.hub = SimpleNamespace(local_asr_provider_runtime=Owner())
+    monkeypatch.setattr(
+        GuiController,
+        "_suspend_gpu_provider_consumers",
+        lambda _self, channels: suspend(channels),
+    )
 
-    monkeypatch.setattr(GuiController, "_validate_gpu_activation", validate)
-    monkeypatch.setattr(GuiController, "_quiesce_shared_gpu_consumers", quiesce_call)
-    monkeypatch.setattr(GuiController, "_replace_runtime_stt_provider", fail_restore)
+    await controller._apply_gpu_runtime_owner_recovery(controller.settings, _gpu_restart_plan())
 
-    await controller._apply_coordinated_gpu_restart(controller.settings, _gpu_restart_plan())
-
-    assert quiesce.await_count == 2
+    suspend.assert_awaited_once_with(("self", "peer"))
     assert view.states[-1][0] == "activation_failed"
     assert controller.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
     assert controller.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
     assert controller.settings.stt.gpu_device_id == "vk:1"
 
 
-async def test_gpu_quiescence_does_not_detach_unrelated_non_gpu_self_channel(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_gpu_consumer_suspension_does_not_detach_unrelated_non_gpu_self_channel() -> None:
     controller, _view = _controller()
     controller.settings.provider.stt = STTProviderName.DEEPGRAM
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.ui.peer_translation_enabled = True
-    abort_self = AsyncMock()
-    controller.hub = SimpleNamespace(
-        local_asr_provider_runtime=SimpleNamespace(
-            snapshot=_owned_gpu_snapshot(
-                phase="ready",
-                active_channels=frozenset({"peer"}),
-                attached_channels=frozenset({"peer"}),
-            )
-        ),
-        abort_self_stt_for_toggle_off=abort_self,
-    )
 
     class PeerRuntime:
         def __init__(self) -> None:
-            self.calls: list[tuple[object, bool]] = []
+            self.suspend_calls = 0
 
-        async def apply_policy(self, *, config: object, desired_active: bool) -> None:
-            self.calls.append((config, desired_active))
+        async def suspend_provider_consumer(self) -> None:
+            self.suspend_calls += 1
 
     peer_runtime = PeerRuntime()
     controller._peer_runtime = peer_runtime
-    config = object()
-    monkeypatch.setattr(
-        GuiController,
-        "_build_peer_runtime_config",
-        lambda _self, _settings: config,
-    )
 
-    await controller._quiesce_shared_gpu_consumers(controller.settings)
+    await controller._suspend_gpu_provider_consumers(("peer",))
 
-    abort_self.assert_not_awaited()
-    assert peer_runtime.calls == [(config, False)]
+    assert peer_runtime.suspend_calls == 1
 
 
 @pytest.mark.parametrize(
@@ -559,6 +559,7 @@ async def test_gpu_quiescence_does_not_detach_unrelated_non_gpu_self_channel(
 )
 async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
     channels: frozenset[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller, _view = _controller()
     device = GpuWorkerDevice(
@@ -579,8 +580,13 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
     )
     controller.settings.ui.peer_translation_enabled = "peer" in channels
     controller._stt_desired = "self" in channels
-    controller._gpu_manual_retry_channels = channels
     controller._gpu_devices = (device,)
+    resumed = AsyncMock()
+    monkeypatch.setattr(
+        GuiController,
+        "_resume_gpu_provider_consumers",
+        lambda _self, **kwargs: resumed(**kwargs),
+    )
 
     class Owner:
         def __init__(self) -> None:
@@ -591,15 +597,11 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
                 failure_code="worker_failed",
                 attached_channels=channels,
             )
-            self.retry_calls: list[tuple[str, ...]] = []
+            self.recovery_calls = []
 
-        async def inspect_gpu_readiness(self, *, explicit_intent: bool, device_id: str):
-            assert explicit_intent is True
-            assert device_id == device.device_id
-            return self.snapshot
-
-        async def retry_gpu(self, retry_channels: tuple[str, ...]):
-            self.retry_calls.append(retry_channels)
+        async def recover_gpu(self, request, *, quiesce):
+            self.recovery_calls.append(request)
+            await quiesce(tuple(item.request.channel for item in request.channels))
             self.snapshot = _owned_gpu_snapshot(
                 device,
                 phase="ready",
@@ -613,13 +615,17 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
 
     await controller.retry_gpu_activation()
 
-    assert owner.retry_calls == [
-        tuple(channel for channel in ("self", "peer") if channel in channels)
-    ]
+    assert len(owner.recovery_calls) == 1
+    recovery = owner.recovery_calls[0]
+    assert recovery.reason == "manual_retry"
+    assert tuple(item.request.channel for item in recovery.channels) == tuple(
+        channel for channel in ("self", "peer") if channel in channels
+    )
+    assert all(item.request.warmup for item in recovery.channels)
     assert owner.snapshot.gpu.active_channels == channels
-    assert controller._gpu_manual_retry_channels == frozenset()
     assert controller.settings.stt.gpu_device_id == device.device_id
     assert controller._gpu_ui_state == "ready"
+    resumed.assert_awaited_once()
 
 
 async def test_controller_gpu_discovery_and_readiness_delegate_to_owned_runtime() -> None:
