@@ -15696,7 +15696,7 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
 
     await controller.apply_settings(settings)
 
-    assert rebuild_llm_calls == ["rebuild_llm"]
+    assert rebuild_llm_calls == []
     assert receiver_calls == [True]
     assert controller._stt_restart_requested is False
     assert switch_calls == ["replace_stt"]
@@ -17483,7 +17483,7 @@ async def test_order22_apply_settings_routes_stt_language_audio_patch_through_de
     assert saved_settings[0].languages.source_language == "ja"
     assert saved_settings[0].audio.input_device == "Headset Mic"
     assert controller.hub.clear_language_runtime_state_calls == ["self", "peer"]
-    assert calls == ["mic_stop", "llm", "peer", "replace"]
+    assert calls == ["mic_stop", "peer", "replace"]
     assert controller.hub.source_language == "ja"
     assert controller.hub.low_latency_mode is True
 
@@ -18490,7 +18490,7 @@ async def test_order22_mixed_settings_direct_fallback_degrades_when_stt_unavaila
 
 
 @pytest.mark.asyncio
-async def test_order22_qwen_low_latency_rebuild_unavailable_llm_degrades_default_service(
+async def test_order22_qwen_historical_low_latency_change_does_not_rebuild_llm(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
@@ -18512,9 +18512,11 @@ async def test_order22_qwen_low_latency_rebuild_unavailable_llm_degrades_default
     pending = copy.deepcopy(controller.settings)
     pending.stt.low_latency_mode = True
 
+    rebuild_calls: list[bool] = []
+
     async def unavailable_rebuild_llm_provider(self) -> None:
         assert self.hub is not None
-        self.hub.llm = None
+        rebuild_calls.append(self.hub.low_latency_mode)
 
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
@@ -18530,23 +18532,14 @@ async def test_order22_qwen_low_latency_rebuild_unavailable_llm_degrades_default
 
     result = controller.last_settings_mutation_result
     assert result is not None
-    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-    assert result.diagnostics == messages.ErrorDiagnostics(
-        component="gui_controller",
-        operation="apply_stt_language_audio_runtime",
-        code="llm_stt_language_audio_runtime_unavailable",
-        category=messages.DIAGNOSTIC_CATEGORY_LIFECYCLE,
-        visibility=messages.DIAGNOSTIC_VISIBILITY_BASIC,
-        content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
-        status_code=None,
-        retry_after_ms=None,
-        fields={"surface": "stt_language_audio"},
-    )
-    assert controller.hub.llm is None
+    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert rebuild_calls == []
+    assert controller.hub.llm is not None
+    assert controller.hub.low_latency_mode is True
 
 
 @pytest.mark.asyncio
-async def test_order22_qwen_low_latency_unavailable_preserves_retry_marker(
+async def test_order22_qwen_historical_false_cannot_restore_non_fast_runtime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
@@ -18566,14 +18559,13 @@ async def test_order22_qwen_low_latency_unavailable_preserves_retry_marker(
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     pending = copy.deepcopy(controller.settings)
-    pending.stt.low_latency_mode = True
-    recovered_llm = object()
+    pending.stt.low_latency_mode = False
+    pending.stt.low_latency_merge_gap_ms += 1
     rebuild_markers: list[bool] = []
 
     async def fail_then_recover_rebuild_llm_provider(self) -> None:
         assert self.hub is not None
         rebuild_markers.append(self.hub.low_latency_mode)
-        self.hub.llm = None if len(rebuild_markers) == 1 else recovered_llm
 
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
@@ -18592,16 +18584,15 @@ async def test_order22_qwen_low_latency_unavailable_preserves_retry_marker(
     first_result = controller.last_settings_mutation_result
     assert first_result is not None
     assert (
-        first_result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
+        first_result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
     )
-    assert rebuild_markers == [False]
-    assert controller.hub.llm is None
-    assert controller.hub.low_latency_mode is False
+    assert rebuild_markers == []
+    assert controller.hub.llm is not None
+    assert controller.hub.low_latency_mode is True
 
     await controller.apply_settings(copy.deepcopy(controller.settings))
 
-    assert rebuild_markers == [False, False]
-    assert controller.hub.llm is recovered_llm
+    assert rebuild_markers == []
     assert controller.hub.low_latency_mode is True
 
 
@@ -20044,7 +20035,7 @@ async def test_verify_qwen_llm_api_key_uses_async_provider_in_low_latency_mode(
 
 
 @pytest.mark.asyncio
-async def test_verify_qwen_llm_api_key_uses_sync_provider_when_low_latency_disabled(
+async def test_verify_qwen_llm_api_key_uses_async_provider_for_historical_false(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -20056,7 +20047,7 @@ async def test_verify_qwen_llm_api_key_uses_sync_provider_when_low_latency_disab
         calls.append((api_key, base_url, model))
         return True
 
-    monkeypatch.setattr(QwenLLMProvider, "verify_api_key", staticmethod(fake_verify))
+    monkeypatch.setattr(AsyncQwenLLMProvider, "verify_api_key", staticmethod(fake_verify))
 
     result = await controller._verify_qwen_llm_api_key(
         "secret",
@@ -20065,7 +20056,9 @@ async def test_verify_qwen_llm_api_key_uses_sync_provider_when_low_latency_disab
     )
 
     assert result is True
-    assert calls == [("secret", "https://dashscope.aliyuncs.com/api/v1", "qwen3.5-flash")]
+    assert calls == [
+        ("secret", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen3.5-flash")
+    ]
 
 
 def test_overlay_calibration_controls_follow_apply_cancel_contract() -> None:

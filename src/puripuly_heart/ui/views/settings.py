@@ -478,7 +478,6 @@ class SettingsView(ft.Column):
 
     def _iter_locale_sensitive_clickable_text_controls(self) -> tuple[ft.Container, ...]:
         return (
-            self._integrated_context_button,
             self._stt_text,
             self._peer_stt_text,
             self._gpu_device_text,
@@ -491,7 +490,6 @@ class SettingsView(ft.Column):
             self._mic_audio_text,
             self._audio_host_api_text,
             self._loopback_audio_text,
-            self._low_latency_text,
             self._overlay_translation_button,
             self._overlay_peer_original_button,
             self._overlay_target_button,
@@ -760,25 +758,6 @@ class SettingsView(ft.Column):
             width=width,
             height=height,
         )
-
-    def _build_integrated_context_unit_card(self) -> SettingsUnitCard:
-        self._integrated_context_label = ft.Text(
-            t("settings.integrated_context"),
-            size=24,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
-        )
-        self._integrated_context_button = self._build_clickable_text(
-            t("settings.context.local"),
-            self._on_integrated_context_click,
-        )
-        self._integrated_context_hint = ft.Text("", size=13, color=COLOR_NEUTRAL)
-
-        self._integrated_context_card = self._wrap_unit_card(
-            title=self._integrated_context_label,
-            value=self._integrated_context_button,
-        )
-        return self._integrated_context_card
 
     def _build_overlay_calibration_field(
         self,
@@ -1279,14 +1258,11 @@ class SettingsView(ft.Column):
             value=self._microphone_test_text,
         )
 
-        integrated_context_card = self._build_integrated_context_unit_card()
-
         general_primary_row = ft.Container(
             content=ft.Row(
                 [
                     ui_card,
                     chatbox_source_card,
-                    integrated_context_card,
                 ],
                 spacing=16,
                 expand=True,
@@ -1343,22 +1319,6 @@ class SettingsView(ft.Column):
                 spacing=16,
                 expand=True,
             ),
-        )
-
-        # === API Tab Row 2: Response Mode / Routing / Fallback ===
-        self._low_latency_text = self._build_clickable_text(
-            t("toggle.off"),
-            self._on_low_latency_click,
-        )
-        self._low_latency_title = ft.Text(
-            t("settings.low_latency_mode"),
-            size=24,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
-        )
-        self._low_latency_card = self._wrap_unit_card(
-            title=self._low_latency_title,
-            value=self._low_latency_text,
         )
 
         # === General Tab Row 3: VRChat Mute Sync / Self VAD / Peer VAD ===
@@ -1914,7 +1874,6 @@ class SettingsView(ft.Column):
         self._desktop_overlay_recovery_row = overlay_row6
         self._sync_overlay_target_specific_visibility()
 
-        # === Row 7: Response Mode / Translation Connection / Fallback ===
         self._translation_connection_title = ft.Text(
             t("settings.translation_connection"),
             size=24,
@@ -1951,7 +1910,6 @@ class SettingsView(ft.Column):
         self._translation_connection_row = ft.Container(
             content=ft.Row(
                 [
-                    self._low_latency_card,
                     self._translation_connection_card,
                     self._openrouter_fallback_card,
                 ],
@@ -3144,9 +3102,6 @@ class SettingsView(ft.Column):
         self._peer_vad_field.value = f"{settings.desktop_audio.vad_speech_threshold:.2f}"
         self._peer_hangover_field.value = str(settings.desktop_audio.vad_hangover_ms)
         self._peer_pre_roll_field.value = str(settings.desktop_audio.vad_pre_roll_ms)
-        self._low_latency_text.content.value = t(
-            "toggle.on" if settings.stt.low_latency_mode else "toggle.off"
-        )
         # --- 新增：读取 VRChat 同步开关状态 ---
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if settings.osc.vrc_mic_intercept else "settings.vrc_mic.off"
@@ -4678,10 +4633,6 @@ class SettingsView(ft.Column):
         overlay_peer_original_enabled = bool(
             self._settings and self._settings.overlay.show_peer_original
         )
-        integrated_context_enabled = bool(
-            self._settings and self._settings.ui.integrated_context_enabled
-        )
-
         self._set_unit_card_value_text(
             self._overlay_translation_button,
             t("settings.option.on" if overlay_translation_enabled else "settings.option.off"),
@@ -4689,14 +4640,6 @@ class SettingsView(ft.Column):
         self._set_unit_card_value_text(
             self._overlay_peer_original_button,
             t("settings.option.on" if overlay_peer_original_enabled else "settings.option.off"),
-        )
-        self._set_unit_card_value_text(
-            self._integrated_context_button,
-            t(
-                "settings.context.integrated"
-                if integrated_context_enabled
-                else "settings.context.local"
-            ),
         )
         self._sync_overlay_target_control()
         self._sync_overlay_target_specific_visibility()
@@ -4717,9 +4660,6 @@ class SettingsView(ft.Column):
         self._desktop_overlay_background_alpha_increase_button.disabled = self._settings is None
         self._overlay_vr_reset_button.disabled = self._settings is None
         self._overlay_desktop_reset_button.disabled = self._settings is None
-        self._integrated_context_button.disabled = self._settings is None
-        self._integrated_context_hint.value = ""
-
         if self.page:
             self.update()
 
@@ -4778,33 +4718,6 @@ class SettingsView(ft.Column):
         if not self._settings:
             return
         self._settings.overlay.show_peer_original = value == "on"
-        self._sync_overlay_controls()
-        self._emit_settings_changed()
-
-    def _on_integrated_context_click(self, e) -> None:
-        if not self.page or not self._settings:
-            return
-        options = [
-            OptionItem(value="off", label=t("settings.context.local")),
-            OptionItem(
-                value="on",
-                label=t("settings.context.integrated"),
-                description=t("settings.context.integrated_modal_helper"),
-            ),
-        ]
-        modal = SettingsModal(
-            self.page,
-            t("settings.integrated_context"),
-            options,
-            self._on_integrated_context_selected,
-            show_description=True,
-        )
-        modal.open("on" if self._settings.ui.integrated_context_enabled else "off")
-
-    def _on_integrated_context_selected(self, value: str) -> None:
-        if not self._settings:
-            return
-        self._settings.ui.integrated_context_enabled = value == "on"
         self._sync_overlay_controls()
         self._emit_settings_changed()
 
@@ -5033,50 +4946,6 @@ class SettingsView(ft.Column):
         )
         modal.open("decline" if self._settings.telemetry.consent == "decline" else "allow")
 
-    def _on_low_latency_click(self, e) -> None:
-        """Open low latency mode selection modal."""
-        if not self.page:
-            return
-        options = [
-            OptionItem(
-                value="on",
-                label=t("toggle.on"),
-                description=t("toggle.on.description", default=""),
-            ),
-            OptionItem(
-                value="off",
-                label=t("toggle.off"),
-                description=t("toggle.off.description", default=""),
-            ),
-        ]
-        current = "on" if self._settings.stt.low_latency_mode else "off"
-        modal = SettingsModal(
-            self.page,
-            t("settings.low_latency_mode"),
-            options,
-            self._on_low_latency_selected,
-            show_description=True,
-        )
-        modal.open(current)
-
-    def _on_low_latency_selected(self, value: str) -> None:
-        """Handle low latency mode selection from modal."""
-        if not self._settings:
-            return
-        new_value = value == "on"
-        old_value = self._settings.stt.low_latency_mode
-        if new_value != old_value:
-            self._emit_runtime_detailed(
-                f"[Settings] Low latency mode changed: {old_value} -> {new_value}"
-            )
-        self._settings.stt.low_latency_mode = new_value
-
-        # Update text
-        self._low_latency_text.content.value = t("toggle.on" if new_value else "toggle.off")
-        if self.page:
-            self._low_latency_text.update()
-        self._emit_settings_changed()
-
     def _on_prompt_change(self, value: str) -> None:
         self._stage_prompt_draft(value)
 
@@ -5246,7 +5115,6 @@ class SettingsView(ft.Column):
         self._peer_vad_field.label = t("settings.vad.peer")
         self._peer_hangover_field.label = t("settings.vad.peer_hangover_ms")
         self._peer_pre_roll_field.label = t("settings.vad.peer_pre_roll_ms")
-        self._low_latency_title.value = t("settings.low_latency_mode")
         self._translation_connection_title.value = t("settings.translation_connection")
         self._openrouter_fallback_title.value = t("settings.fallback")
         self._local_llm_connection_title.value = t("settings.local_llm.connection")
@@ -5282,7 +5150,6 @@ class SettingsView(ft.Column):
         self._overlay_target_title.value = t("settings.overlay.caption_location")
         self._overlay_translation_title.value = t("settings.overlay.show_translation")
         self._overlay_peer_original_title.value = t("settings.overlay.show_peer_original")
-        self._integrated_context_label.value = t("settings.integrated_context")
         self._audio_settings.apply_locale()
         self._sync_general_audio_card_texts()
         self._overlay_anchor_title.value = t("settings.overlay.calibration.anchor")
@@ -5356,9 +5223,6 @@ class SettingsView(ft.Column):
                 self._managed_key_pass_status,
             )
             self._ui_text.content.value = locale_label(display_settings.ui.locale)
-            self._low_latency_text.content.value = t(
-                "toggle.on" if display_settings.stt.low_latency_mode else "toggle.off"
-            )
             self._vrc_mic_text.content.value = t(
                 "settings.vrc_mic.on"
                 if display_settings.osc.vrc_mic_intercept

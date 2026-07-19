@@ -16,11 +16,11 @@ from puripuly_heart.core.messages import (
     ErrorDiagnostics,
 )
 from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
+from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
-from puripuly_heart.providers.llm.qwen import QwenLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
@@ -126,17 +126,14 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
         model: str | None,
         low_latency: bool,
     ) -> bool:
-        if low_latency:
-            async_base_url = _compatible_qwen_base_url(base_url)
-            kwargs = {"base_url": async_base_url}
-            if model is not None:
-                kwargs["model"] = model
-            return await AsyncQwenLLMProvider.verify_api_key(api_key, **kwargs)
-
-        kwargs = {"base_url": base_url}
+        _ = low_latency
+        async_base_url = _compatible_qwen_base_url(base_url)
+        kwargs = {"base_url": async_base_url}
         if model is not None:
             kwargs["model"] = model
-        return await QwenLLMProvider.verify_api_key(api_key, **kwargs)
+        if not FIXED_TRANSLATION_POLICY.fast_translation_enabled:
+            raise RuntimeError("Fast Translation policy is disabled")
+        return await AsyncQwenLLMProvider.verify_api_key(api_key, **kwargs)
 
     async def fetch_openrouter_key_metadata(
         self,

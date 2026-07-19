@@ -47,6 +47,7 @@ from puripuly_heart.core.stt.custom_vocab import (
     CustomVocabularyRuntimeConfig,
     get_effective_custom_terms,
 )
+from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 
 def build_custom_vocabulary_runtime_config(
@@ -172,7 +173,7 @@ def _self_stt_runtime_intent_from_compatibility_settings(settings: AppSettings) 
         vad_speech_threshold=settings.stt.vad_speech_threshold,
         vad_hangover_ms=settings.stt.low_latency_vad_hangover_ms,
         vad_pre_roll_ms=500,
-        low_latency_enabled=settings.stt.low_latency_mode,
+        low_latency_enabled=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
         low_latency_merge_gap_ms=settings.stt.low_latency_merge_gap_ms,
         low_latency_spec_retry_max=settings.stt.low_latency_spec_retry_max,
         custom_vocabulary_enabled=settings.stt.custom_vocabulary_enabled,
@@ -233,7 +234,7 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         vad_speech_threshold=intent.desktop_audio.vad_speech_threshold,
         vad_hangover_ms=intent.desktop_audio.vad_hangover_ms,
         vad_pre_roll_ms=intent.desktop_audio.vad_pre_roll_ms,
-        low_latency_enabled=intent.stt.low_latency_mode,
+        low_latency_enabled=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
         low_latency_merge_gap_ms=intent.stt.low_latency_merge_gap_ms,
         low_latency_spec_retry_max=intent.stt.low_latency_spec_retry_max,
         custom_vocabulary_enabled=False,

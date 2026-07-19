@@ -1161,6 +1161,14 @@
       "rationale": "Orchestrator internals are not public compatibility facades; public behavior is preserved through runtime/message/output contracts and tests."
     },
     {
+      "surface": "puripuly_heart.core.translation_policy",
+      "classification": "internal_translation_policy_contract",
+      "modules": [
+        "puripuly_heart.core.translation_policy"
+      ],
+      "rationale": "The fixed translation policy is an internal owner and adapter contract. Product compatibility is enforced through production wiring and behavioral tests rather than a public import guarantee."
+    },
+    {
       "surface": "puripuly_heart.core.audio, core.osc, core.stt, and core.vad implementation modules not listed in public_imports",
       "classification": "internal_adapter_or_runtime_support",
       "module_prefixes": [

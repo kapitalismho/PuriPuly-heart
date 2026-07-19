@@ -93,8 +93,10 @@ async def test_provider_verifier_adapter_maps_controller_provider_checks(
 
 
 @pytest.mark.asyncio
-async def test_provider_verifier_adapter_uses_async_qwen_compatible_mode_for_low_latency(
+@pytest.mark.parametrize("historical_value", [True, False])
+async def test_provider_verifier_adapter_always_uses_async_qwen_compatible_mode(
     monkeypatch: pytest.MonkeyPatch,
+    historical_value: bool,
 ) -> None:
     adapter_module = importlib.import_module("puripuly_heart.app.adapters.provider_verifier")
     adapter = adapter_module.ProviderVerifierAdapter()
@@ -104,25 +106,16 @@ async def test_provider_verifier_adapter_uses_async_qwen_compatible_mode_for_low
         calls.append((api_key, base_url, model))
         return True
 
-    async def fail_sync_qwen(*_args: object, **_kwargs: object) -> bool:
-        raise AssertionError("sync Qwen verifier must not run in low latency mode")
-
     monkeypatch.setattr(
         adapter_module.AsyncQwenLLMProvider,
         "verify_api_key",
         staticmethod(fake_async_qwen),
     )
-    monkeypatch.setattr(
-        adapter_module.QwenLLMProvider,
-        "verify_api_key",
-        staticmethod(fail_sync_qwen),
-    )
-
     assert await adapter.verify_qwen_llm_api_key(
         "secret",
         base_url="https://dashscope.aliyuncs.com/api/v1",
         model="qwen3.5-flash",
-        low_latency=True,
+        low_latency=historical_value,
     )
     assert calls == [
         (

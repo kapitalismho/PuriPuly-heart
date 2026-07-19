@@ -330,6 +330,7 @@ from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryResult,
     TranslationSuccessTelemetryService,
 )
+from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
 from puripuly_heart.core.vad.gating import VadGating, create_peer_vad_gating
 from puripuly_heart.core.vad.silero import SileroVadOnnx
@@ -1312,10 +1313,7 @@ class GuiController:
         return self.overlay_state == "connected"
 
     def _effective_integrated_context_enabled_for(self, settings: AppSettings) -> bool:
-        return bool(
-            settings.ui.integrated_context_enabled
-            and self._effective_peer_translation_enabled_for(settings)
-        )
+        return self._effective_peer_translation_enabled_for(settings)
 
     def _sync_effective_hub_flags(self, settings: AppSettings | None = None) -> None:
         resolved_settings = settings or self.settings
@@ -1977,7 +1975,7 @@ class GuiController:
             settings.audio.input_device,
             settings.provider.stt,
             settings.stt.vad_speech_threshold,
-            settings.stt.low_latency_mode,
+            FIXED_TRANSLATION_POLICY.fast_translation_enabled,
             settings.stt.low_latency_merge_gap_ms,
             settings.stt.low_latency_spec_retry_max,
             settings.stt.low_latency_vad_hangover_ms,
@@ -7020,12 +7018,12 @@ class GuiController:
             self.hub.peer_source_language = restored_settings.languages.peer_source_language
             self.hub.peer_target_language = restored_settings.languages.peer_target_language
             self.hub.system_prompt = restored_settings.system_prompt
-            self.hub.low_latency_mode = restored_settings.stt.low_latency_mode
+            self.hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
             self.hub.low_latency_merge_gap_ms = restored_settings.stt.low_latency_merge_gap_ms
             self.hub.low_latency_spec_retry_max = restored_settings.stt.low_latency_spec_retry_max
             self.hub.hangover_s = (
                 restored_settings.stt.low_latency_vad_hangover_ms / 1000.0
-                if restored_settings.stt.low_latency_mode
+                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
                 else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
             )
             self.hub.peer_hangover_s = restored_settings.desktop_audio.vad_hangover_ms / 1000.0
@@ -7268,7 +7266,6 @@ class GuiController:
             if prev_target_lang is not None and prev_peer_target_lang is not None
             else None
         )
-        prev_low_latency = self.hub.low_latency_mode if self.hub else None
         source_language_changed = (
             prev_source_lang is not None and prev_source_lang != settings.languages.source_language
         )
@@ -7351,37 +7348,18 @@ class GuiController:
         )
         self._clear_local_stt_pending_enable_if_provider_switched_away()
 
-        # low_latency_mode 변경 시 Qwen LLM 프로바이더 재생성 필요
-        # (AsyncQwenLLMProvider vs QwenLLMProvider 전환)
-        low_latency_llm_rebuild_unavailable = False
-        if (
-            prev_low_latency is not None
-            and prev_low_latency != settings.stt.low_latency_mode
-            and self.settings.provider.llm.value == "qwen"
-        ):
-            self.log_detailed(
-                "[Settings] Low latency detail: "
-                f"mode={prev_low_latency}->{settings.stt.low_latency_mode} rebuilding_llm_provider=True"
-            )
-            await self._rebuild_llm_provider()
-            if self.hub is not None and self.hub.llm is None:
-                low_latency_llm_rebuild_unavailable = True
-
         if self.hub is not None:
-            effective_low_latency_mode = settings.stt.low_latency_mode
-            if low_latency_llm_rebuild_unavailable:
-                effective_low_latency_mode = prev_low_latency
             self.hub.source_language = settings.languages.source_language
             self.hub.target_language = settings.languages.target_language
             self.hub.peer_source_language = settings.languages.peer_source_language
             self.hub.peer_target_language = settings.languages.peer_target_language
             self.hub.system_prompt = settings.system_prompt
-            self.hub.low_latency_mode = effective_low_latency_mode
+            self.hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
             self.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
             self.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
             self.hub.hangover_s = (
                 settings.stt.low_latency_vad_hangover_ms / 1000.0
-                if effective_low_latency_mode
+                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
                 else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
             )
             self.hub.peer_hangover_s = settings.desktop_audio.vad_hangover_ms / 1000.0
@@ -8541,12 +8519,12 @@ class GuiController:
             self.hub.peer_source_language = next_settings.languages.peer_source_language
             self.hub.peer_target_language = next_settings.languages.peer_target_language
             self.hub.system_prompt = next_settings.system_prompt
-            self.hub.low_latency_mode = next_settings.stt.low_latency_mode
+            self.hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
             self.hub.low_latency_merge_gap_ms = next_settings.stt.low_latency_merge_gap_ms
             self.hub.low_latency_spec_retry_max = next_settings.stt.low_latency_spec_retry_max
             self.hub.hangover_s = (
                 next_settings.stt.low_latency_vad_hangover_ms / 1000.0
-                if next_settings.stt.low_latency_mode
+                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
                 else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
             )
             self.hub.peer_hangover_s = next_settings.desktop_audio.vad_hangover_ms / 1000.0
@@ -8875,7 +8853,7 @@ class GuiController:
                     else "https://dashscope-intl.aliyuncs.com/api/v1"
                 )
                 context["model"] = settings.qwen.llm_model.value
-                context["low_latency"] = settings.stt.low_latency_mode
+                context["low_latency"] = FIXED_TRANSLATION_POLICY.fast_translation_enabled
         if context_values is not None:
             context.update(context_values)
         return ProviderVerificationBinding(
@@ -10199,13 +10177,13 @@ class GuiController:
             fallback_transcript_only=True,
             translation_enabled=True,
             peer_translation_enabled=False,
-            integrated_context_enabled=False,
-            low_latency_mode=self.settings.stt.low_latency_mode,
+            integrated_context_enabled=True,
+            low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
             low_latency_merge_gap_ms=self.settings.stt.low_latency_merge_gap_ms,
             low_latency_spec_retry_max=self.settings.stt.low_latency_spec_retry_max,
             hangover_s=(
                 self.settings.stt.low_latency_vad_hangover_ms / 1000.0
-                if self.settings.stt.low_latency_mode
+                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
                 else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
             ),
             peer_hangover_s=self.settings.desktop_audio.vad_hangover_ms / 1000.0,
@@ -10889,7 +10867,9 @@ class GuiController:
             ring_buffer_ms=settings.audio.ring_buffer_ms,
             vad_speech_threshold=settings.stt.vad_speech_threshold,
             vad_hangover_ms=(
-                settings.stt.low_latency_vad_hangover_ms if settings.stt.low_latency_mode else 1100
+                settings.stt.low_latency_vad_hangover_ms
+                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
+                else 1100
             ),
             session_options=(transition.session_options if transition is not None else None),
             local_cpu=provider in LOCAL_CPU_PROVIDERS,
@@ -11849,7 +11829,7 @@ class GuiController:
             api_key,
             base_url=base_url,
             model=runtime_model,
-            low_latency=self.settings.stt.low_latency_mode,
+            low_latency=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
         )
 
     async def _verify_and_update_status(self) -> None:

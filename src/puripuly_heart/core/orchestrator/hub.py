@@ -47,11 +47,6 @@ from puripuly_heart.core.orchestrator.channel_runtime import (
     _MergeBuffer,
 )
 from puripuly_heart.core.orchestrator.context import ContextMode, ContextResolver
-from puripuly_heart.core.orchestrator.peer_final_runs import (
-    PeerFinalRunChild,
-    PeerFinalRunOutcome,
-    PeerFinalRunsLifecycleOwner,
-)
 from puripuly_heart.core.orchestrator.ports import (
     HubChatboxPort,
     HubOverlayEventFactoryPort,
@@ -64,6 +59,15 @@ from puripuly_heart.core.orchestrator.ports import (
     format_translation_ready_for_output,
     runtime_logging_mode_is_detailed,
 )
+from puripuly_heart.core.orchestrator.translation_turn import (
+    TranslationOutputSubmission,
+    TranslationTurnChild,
+    TranslationTurnKind,
+    TranslationTurnLifecycleOwner,
+    TranslationTurnOutcome,
+    TranslationTurnProcessResult,
+    TranslationTurnRequest,
+)
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.sink import OverlayEventUnion
 from puripuly_heart.core.runtime.output import (
@@ -75,6 +79,7 @@ from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
     PrebuiltLocalASRProviderRuntimeFactory,
 )
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
+from puripuly_heart.core.translation_policy import TranslationContextPolicy
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart, VadEvent
 from puripuly_heart.domain.events import (
     STTErrorEvent,
@@ -217,11 +222,13 @@ class ClientHub:
     _merge_buffer: _MergeBuffer | None = None
     self_runtime: ChannelRuntime = field(init=False)
     peer_runtime: ChannelRuntime = field(init=False)
-    peer_final_runs: PeerFinalRunsLifecycleOwner = field(init=False)
+    translation_turns: TranslationTurnLifecycleOwner = field(init=False)
+    peer_final_runs: TranslationTurnLifecycleOwner = field(init=False)
     _peer_turn_parent_ids: dict[UUID, UUID] = field(default_factory=dict)
     _peer_parent_turn_ids: dict[UUID, set[UUID]] = field(default_factory=dict)
     _peer_completed_turn_ids: set[UUID] = field(default_factory=set)
     _peer_parent_speech_end_times: dict[UUID, float] = field(default_factory=dict)
+    _peer_translation_parent_ids: set[UUID] = field(default_factory=set)
     context_resolver: ContextResolver = field(init=False)
     active_chatbox_channel: ChannelId = field(init=False, default="self")
     output_runtime: OutputRuntime = field(init=False)
@@ -283,14 +290,16 @@ class ClientHub:
             alias_target=self,
         )
         self.peer_runtime = ChannelRuntime(channel="peer", stt=self.peer_stt)
-        self.peer_final_runs = PeerFinalRunsLifecycleOwner(
+        self.translation_turns = TranslationTurnLifecycleOwner(
             on_child_created=self._on_peer_final_run_child_created,
             on_child_started=self._on_peer_final_run_child_started,
             process_child=self._process_peer_final_run_child,
             on_child_terminal=self._on_peer_final_run_child_terminal,
             on_parent_closed=self._on_peer_final_run_parent_closed,
             on_parent_rejected=self._on_peer_final_run_parent_rejected,
+            output=self,
         )
+        self.peer_final_runs = self.translation_turns
         self._local_asr_provider_runtime = runtime_factory.create(
             LocalASRProviderRuntimeCallbacks(
                 self_event_handler=self._handle_stt_event,
@@ -974,7 +983,7 @@ class ClientHub:
             self._running = False
             raise
         self._running = True
-        await self.peer_final_runs.start()
+        await self.translation_turns.start()
         await self._require_local_asr_provider_runtime().start()
         self._sync_provider_runtime_aliases()
 
@@ -982,7 +991,7 @@ class ClientHub:
         if (
             not self._running
             and not self._provider_runtime_handles_have_resources()
-            and not self.peer_final_runs.has_resources
+            and not self.translation_turns.has_resources
             and not self.output_runtime.has_resources
             and self.output_runtime.state == "closed"
         ):
@@ -997,7 +1006,7 @@ class ClientHub:
             cleanup_failures.append(exc)
 
         try:
-            await self.peer_final_runs.close()
+            await self.translation_turns.close()
         except Exception as exc:
             cleanup_failures.append(exc)
 
@@ -1024,6 +1033,7 @@ class ClientHub:
         on_terminal_failure=None,
     ) -> ProviderRuntimeMutationResult:
         runtime = self._require_local_asr_provider_runtime()
+        await self.translation_turns.cancel_pending(channel="self")
         await self.reset_overlay_preview()
         await self.self_runtime.reset_runtime_state()
         self._clear_latency_state(channel="self")
@@ -1057,7 +1067,7 @@ class ClientHub:
         start: bool | None = None,
         on_terminal_failure=None,
     ) -> ProviderRuntimeMutationResult:
-        await self.peer_final_runs.cancel_pending()
+        await self.translation_turns.cancel_pending(channel="peer")
         await self.peer_runtime.reset_runtime_state()
         self._clear_peer_logical_turn_state()
         self._clear_latency_state(channel="peer")
@@ -1089,7 +1099,7 @@ class ClientHub:
         await self._require_local_asr_provider_runtime().start_channel("peer")
 
     async def abort_peer_stt_for_toggle_off(self) -> None:
-        await self.peer_final_runs.cancel_pending()
+        await self.translation_turns.cancel_pending(channel="peer")
         await self.peer_runtime.reset_runtime_state()
         self._clear_peer_logical_turn_state()
         self._clear_latency_state(channel="peer")
@@ -1111,6 +1121,7 @@ class ClientHub:
         )
 
     async def abort_self_stt_for_toggle_off(self) -> None:
+        await self.translation_turns.cancel_pending(channel="self")
         await self.reset_overlay_preview()
         await self.self_runtime.reset_runtime_state()
         self._clear_latency_state(channel="self")
@@ -1287,7 +1298,7 @@ class ClientHub:
             await self._sync_overlay_active_self(resume_overlay_resync_buffer)
 
     async def handle_peer_vad_event(self, event: VadEvent) -> None:
-        if isinstance(event, SpeechEnd) and not self.peer_final_runs.is_parent_closed(
+        if isinstance(event, SpeechEnd) and not self.translation_turns.is_parent_closed(
             event.utterance_id
         ):
             speech_end_at = self.clock.now()
@@ -1329,14 +1340,11 @@ class ClientHub:
         )
         await self._handle_transcript(transcript, is_final=True, source=source)
 
-        if self.llm is None or not self.translation_enabled:
-            await self._publish_chatbox_candidate(
-                utterance_id,
-                transcript_text=text,
-                translation_text=None,
-            )
-        else:
-            await self._ensure_translation(transcript)
+        await self._ensure_translation(
+            transcript,
+            turn_kind="manual",
+            wait_for_parent=self.llm is None or not self.translation_enabled,
+        )
 
         return utterance_id
 
@@ -1345,8 +1353,7 @@ class ClientHub:
 
     async def clear_language_runtime_state(self, *, channel: ChannelId) -> None:
         runtime = self._runtime_for_channel(channel)
-        if channel == "peer":
-            await self.peer_final_runs.cancel_pending()
+        await self.translation_turns.cancel_pending(channel=channel)
         await runtime.clear_live_translation_state()
         if channel == "peer":
             self._clear_peer_logical_turn_state()
@@ -1460,7 +1467,13 @@ class ClientHub:
             runtime = self._runtime_for_channel(event.channel)
             source = "Peer" if runtime.channel == "peer" else "Mic"
             if runtime.channel == "peer":
-                await self.peer_final_runs.submit_parent(event.transcript, source=source)
+                await self._ensure_translation(
+                    event.transcript,
+                    turn_kind="peer",
+                    wait_for_parent=(
+                        self.llm is None or not self._translation_enabled_for_runtime(runtime)
+                    ),
+                )
                 return
             if runtime.channel == "self":
                 self._send_stt_connected_notification()
@@ -1473,25 +1486,13 @@ class ClientHub:
                 stage="stt_final",
             )
             await self._handle_transcript(event.transcript, is_final=True, source=source)
-            if self.llm is None or not self._translation_enabled_for_runtime(runtime):
-                self._log_translation_skipped(
-                    stage="final",
-                    runtime=runtime,
-                    publish_chatbox=self.output_runtime.chatbox_is_eligible(runtime.channel),
-                )
-                if self.output_runtime.chatbox_is_eligible(runtime.channel):
-                    await self._publish_chatbox_candidate(
-                        event.transcript.utterance_id,
-                        transcript_text=event.transcript.text,
-                        translation_text=None,
-                    )
-                else:
-                    self._finalize_latency_timeline(
-                        channel=runtime.channel,
-                        utterance_id=event.transcript.utterance_id,
-                    )
-            else:
-                await self._ensure_translation(event.transcript)
+            await self._ensure_translation(
+                event.transcript,
+                turn_kind="self",
+                wait_for_parent=(
+                    self.llm is None or not self._translation_enabled_for_runtime(runtime)
+                ),
+            )
             return
 
     async def _handle_retired_stt_event(self, event: object) -> None:
@@ -1558,7 +1559,7 @@ class ClientHub:
                 deny_peer_chatbox_attempt = self.output_runtime.chatbox_is_denied(runtime.channel)
                 peer_terminal_work_will_follow = self._peer_terminal_work_will_follow(runtime)
                 if self._overlay_translation_will_follow(runtime):
-                    await self._ensure_translation(transcript)
+                    await self._ensure_translation(transcript, turn_kind="peer")
                 elif self.output_runtime.has_overlay_destination:
                     await self._finalize_peer_source_only(
                         transcript,
@@ -1609,60 +1610,86 @@ class ClientHub:
             stage="stt_final",
         )
 
-    async def _on_peer_final_run_child_created(self, child: PeerFinalRunChild) -> None:
-        self._register_peer_logical_turn(
-            parent_utterance_id=child.parent_utterance_id,
-            peer_turn_id=child.utterance_id,
-        )
-        await self._handle_peer_final_transcript(
-            child.transcript,
-            parent_utterance_id=child.parent_utterance_id,
-            source=child.source,
-        )
+    async def _on_peer_final_run_child_created(self, child: TranslationTurnChild) -> None:
+        if child.channel == "peer":
+            self._register_peer_logical_turn(
+                parent_utterance_id=child.parent_utterance_id,
+                peer_turn_id=child.utterance_id,
+            )
+            await self._handle_peer_final_transcript(
+                child.transcript,
+                parent_utterance_id=child.parent_utterance_id,
+                source=child.source,
+            )
+        elif child.utterance_id != child.parent_utterance_id:
+            await self._handle_transcript(child.transcript, is_final=True, source=child.source)
 
     async def _process_peer_final_run_child(
         self,
-        child: PeerFinalRunChild,
+        child: TranslationTurnChild,
         cancellation_requested: Callable[[], bool],
-    ) -> PeerFinalRunOutcome:
-        runtime = self.peer_runtime
+    ) -> TranslationTurnProcessResult:
+        runtime = self._runtime_for_channel(child.channel)
         if cancellation_requested():
             raise asyncio.CancelledError
-        if self.llm is None or not self._translation_enabled_for_runtime(runtime):
-            self._log_translation_skipped(stage="final", runtime=runtime, publish_chatbox=False)
-            await self._finalize_peer_source_only(
-                child.transcript,
-                close_is_final=True,
-                finalize_latency=True,
-                preserve_parent_speech_end_time=True,
+        target_language = (
+            self._target_language_for(runtime)
+            if child.target_language == "und"
+            else child.target_language
+        )
+        if child.precomputed_translation is not None:
+            self._remember_context_entry(
+                child.transcript.text,
+                self.clock.now(),
+                runtime=runtime,
+                source_language=child.precomputed_translation.source_language,
             )
-            await self._publish_peer_chatbox_candidate(child.utterance_id)
-            return "source_only"
-        await self._translate_and_enqueue(
-            child.utterance_id,
-            child.transcript.text,
+            return TranslationTurnProcessResult(
+                "translated",
+                TranslationOutputSubmission(
+                    parent_utterance_id=child.parent_utterance_id,
+                    child_utterance_id=child.utterance_id,
+                    sequence=child.sequence,
+                    channel=child.channel,
+                    source=child.source,
+                    source_text=child.transcript.text,
+                    source_language=child.detected_language,
+                    target_language=target_language,
+                    outcome="translated",
+                    translation=child.precomputed_translation,
+                ),
+            )
+        result = await self._build_translation_process_result(
+            parent_utterance_id=child.parent_utterance_id,
+            utterance_id=child.utterance_id,
+            sequence=child.sequence,
+            text=child.transcript.text,
             runtime=runtime,
+            source=child.source,
+            target_language=target_language,
+            context_policy=child.context_policy,
             detected_language=child.detected_language,
             cancellation_requested=cancellation_requested,
         )
         if cancellation_requested():
             raise asyncio.CancelledError
-        return "translated"
+        return result
 
     async def _on_peer_final_run_child_started(
         self,
-        child: PeerFinalRunChild,
-        task: asyncio.Task[PeerFinalRunOutcome],
+        child: TranslationTurnChild,
+        task: asyncio.Task[TranslationTurnProcessResult],
     ) -> None:
-        self.peer_runtime.translation_tasks[child.utterance_id] = task
+        self._runtime_for_channel(child.channel).translation_tasks[child.utterance_id] = task
 
     async def _on_peer_final_run_child_terminal(
         self,
-        child: PeerFinalRunChild,
-        outcome: PeerFinalRunOutcome,
+        child: TranslationTurnChild,
+        outcome: TranslationTurnOutcome,
     ) -> None:
-        self.peer_runtime.translation_tasks.pop(child.utterance_id, None)
-        if outcome == "cancelled":
+        runtime = self._runtime_for_channel(child.channel)
+        runtime.translation_tasks.pop(child.utterance_id, None)
+        if outcome == "cancelled" and child.channel == "peer":
             await self._finalize_peer_source_only(
                 child.transcript,
                 close_is_final=False,
@@ -1670,16 +1697,30 @@ class ClientHub:
                 preserve_parent_speech_end_time=True,
             )
             await self._publish_peer_chatbox_candidate(child.utterance_id)
-        self._complete_peer_logical_turn(
-            child.utterance_id,
-            preserve_parent_speech_end_time=True,
-        )
+        elif outcome == "cancelled":
+            await self._emit_overlay_utterance_closed(
+                utterance_id=child.utterance_id,
+                channel=child.channel,
+                is_final=False,
+                finalize_latency=not self.output_runtime.chatbox_is_eligible(child.channel),
+            )
+        if child.channel == "peer":
+            self._complete_peer_logical_turn(
+                child.utterance_id,
+                preserve_parent_speech_end_time=True,
+            )
 
     async def _on_peer_final_run_parent_closed(self, parent_utterance_id: UUID) -> None:
-        self._clear_peer_parent_vad_bookkeeping(parent_utterance_id)
+        if parent_utterance_id in self._peer_translation_parent_ids:
+            self._peer_translation_parent_ids.discard(parent_utterance_id)
+            self._clear_peer_parent_vad_bookkeeping(parent_utterance_id)
 
     async def _on_peer_final_run_parent_rejected(self, parent_utterance_id: UUID) -> None:
-        await self._publish_peer_chatbox_candidate(parent_utterance_id)
+        if parent_utterance_id in self._peer_translation_parent_ids:
+            try:
+                await self._publish_peer_chatbox_candidate(parent_utterance_id)
+            finally:
+                self._peer_translation_parent_ids.discard(parent_utterance_id)
 
     async def _emit_final_transcript_to_overlay(self, transcript: Transcript) -> None:
         if not self.output_runtime.has_overlay_destination:
@@ -2874,13 +2915,10 @@ class ClientHub:
         await self._handle_transcript(transcript, is_final=True, source="Mic")
 
         if self.llm is None or not self.translation_enabled:
-            self._log_translation_skipped(
-                stage="final",
-                runtime=self.self_runtime,
-                publish_chatbox=True,
-            )
-            await self._publish_chatbox_candidate(
-                buffer.merge_id, transcript_text=final_text, translation_text=None
+            await self._ensure_translation(
+                transcript,
+                turn_kind="self",
+                wait_for_parent=True,
             )
             return
 
@@ -2907,35 +2945,11 @@ class ClientHub:
                     len(translation.text),
                     True,
                 )
-                bundle = self.get_or_create_bundle(buffer.merge_id)
-                bundle.with_translation(translation)
-                bundle.with_translation(translation)
-                self._emit_translation_ready_for_output(
-                    translation=translation,
-                    runtime=self.self_runtime,
-                )
-                self._remember_context_entry(final_text, self.clock.now())
-                await self.ui_events.put(
-                    UIEvent(
-                        type=UIEventType.TRANSLATION_DONE,
-                        utterance_id=buffer.merge_id,
-                        payload=translation,
-                        source=self._get_source(buffer.merge_id),
-                    )
-                )
-                await self._emit_translation_to_overlay(
-                    translation=translation,
-                    applied_context_mode=None,
-                )
-                await self._emit_overlay_utterance_closed(
-                    utterance_id=buffer.merge_id,
-                    channel="self",
-                    is_final=True,
-                )
-                await self._publish_chatbox_candidate(
-                    buffer.merge_id,
-                    transcript_text=final_text,
-                    translation_text=translation.text,
+                await self._ensure_translation(
+                    transcript,
+                    turn_kind="self",
+                    precomputed_translation=translation,
+                    wait_for_parent=True,
                 )
                 return
 
@@ -2945,7 +2959,11 @@ class ClientHub:
                 "[Metric] spec_cancel id=%s reason=final_mismatch", str(buffer.merge_id)[:8]
             )
 
-        await self._translate_and_enqueue(buffer.merge_id, final_text)
+        await self._ensure_translation(
+            transcript,
+            turn_kind="self",
+            wait_for_parent=True,
+        )
 
     async def _maybe_restart_spec(self, buffer: _MergeBuffer) -> None:
         if self.llm is None or not self.translation_enabled:
@@ -3188,11 +3206,13 @@ class ClientHub:
         *,
         runtime: ChannelRuntime | None = None,
         detected_language: str | None = None,
+        context_policy: TranslationContextPolicy = "integrated_preferred",
     ) -> tuple[str, str, float]:
         formatted_prompt, context_str, now, _ = self._prepare_llm_request_with_mode(
             text,
             runtime=runtime,
             detected_language=detected_language,
+            context_policy=context_policy,
         )
         return formatted_prompt, context_str, now
 
@@ -3202,6 +3222,7 @@ class ClientHub:
         *,
         runtime: ChannelRuntime | None = None,
         detected_language: str | None = None,
+        context_policy: TranslationContextPolicy = "integrated_preferred",
     ) -> tuple[str, str, float, ContextMode]:
         _ = text
         runtime = runtime or self.self_runtime
@@ -3212,7 +3233,9 @@ class ClientHub:
         if request_source is None:
             raise _UnmappedDetectedLanguage
         source_language, source_name = request_source
-        requested_mode: ContextMode = "integrated" if self.integrated_context_enabled else "local"
+        if context_policy != "integrated_preferred":
+            raise ValueError("unsupported translation context policy")
+        requested_mode: ContextMode = "integrated"
         now = self.clock.now()
         other_runtime = self._other_runtime(runtime)
         context_str, applied_mode = self.context_resolver.resolve_for_request(
@@ -3322,30 +3345,31 @@ class ClientHub:
             target_language=request_target_language,
         )
 
-    async def _ensure_translation(self, transcript: Transcript) -> None:
-        if self.llm is None:
-            return
+    async def _ensure_translation(
+        self,
+        transcript: Transcript,
+        *,
+        turn_kind: TranslationTurnKind | None = None,
+        precomputed_translation: Translation | None = None,
+        wait_for_parent: bool = False,
+    ) -> None:
         runtime = self._runtime_for_channel(transcript.channel)
-        if not self._translation_enabled_for_runtime(runtime):
-            return
+        resolved_kind = turn_kind or ("peer" if runtime.channel == "peer" else "self")
         if runtime.channel == "peer":
-            await self.peer_final_runs.submit_parent(
-                transcript,
-                source=self._get_source(transcript.utterance_id, channel="peer") or "Peer",
-            )
-            return
-        utterance_id = transcript.utterance_id
-        if utterance_id in runtime.translation_tasks:
-            return
-        task = asyncio.create_task(
-            self._translate_and_enqueue(
-                utterance_id,
-                transcript.text,
-                runtime=runtime,
-            )
+            self._peer_translation_parent_ids.add(transcript.utterance_id)
+        source = self._get_source(transcript.utterance_id, channel=runtime.channel)
+        if source is None:
+            source = "Peer" if runtime.channel == "peer" else "Mic"
+        await self.translation_turns.submit(
+            TranslationTurnRequest(
+                transcript=transcript,
+                source=source,
+                turn_kind=resolved_kind,
+                target_languages=(self._target_language_for(runtime),),
+                precomputed_translation=precomputed_translation,
+            ),
+            wait_for_parent=wait_for_parent,
         )
-        runtime.translation_tasks[utterance_id] = task
-        task.add_done_callback(lambda _t: runtime.translation_tasks.pop(utterance_id, None))
 
     async def _cleanup_dropped_translation(
         self,
@@ -3365,56 +3389,89 @@ class ClientHub:
             finalize_latency=True,
         )
 
-    async def _translate_and_enqueue(
+    async def _build_translation_process_result(
         self,
-        utterance_id: UUID,
-        text: str,
         *,
-        runtime: ChannelRuntime | None = None,
+        parent_utterance_id: UUID,
+        utterance_id: UUID,
+        sequence: int,
+        text: str,
+        runtime: ChannelRuntime,
+        source: str,
+        target_language: str,
+        context_policy: TranslationContextPolicy,
         detected_language: str | None = None,
         cancellation_requested: Callable[[], bool] | None = None,
-    ) -> None:
+    ) -> TranslationTurnProcessResult:
         llm_request = self._capture_llm_provider_request()
-        if llm_request is None:
-            return
+        if llm_request is None or not self._translation_enabled_for_runtime(runtime):
+            self._log_translation_skipped(
+                stage="final",
+                runtime=runtime,
+                publish_chatbox=self.output_runtime.chatbox_is_eligible(runtime.channel),
+            )
+            return TranslationTurnProcessResult(
+                "source_only",
+                TranslationOutputSubmission(
+                    parent_utterance_id=parent_utterance_id,
+                    child_utterance_id=utterance_id,
+                    sequence=sequence,
+                    channel=runtime.channel,
+                    source=source,
+                    source_text=text,
+                    source_language=detected_language,
+                    target_language=target_language,
+                    outcome="source_only",
+                    failure_code="translation_unavailable",
+                ),
+            )
         llm, llm_generation = llm_request
-        runtime = runtime or self.self_runtime
-        if self._request_source_language(runtime, detected_language=detected_language) is None:
-            if runtime.channel == "peer":
-                await self._finalize_peer_source_only(
-                    Transcript(
-                        utterance_id=utterance_id,
-                        text=text,
-                        is_final=True,
-                        created_at=self.clock.now(),
-                        channel="peer",
-                    ),
-                    close_is_final=False,
-                    finalize_latency=True,
-                )
-                if self.output_runtime.chatbox_is_denied(runtime.channel):
-                    await self._publish_peer_chatbox_candidate(utterance_id)
-                return
-            raise _UnmappedDetectedLanguage
-        applied_mode: ContextMode | None = None
-        peer_overlay_active = (
-            runtime.channel == "peer" and self.output_runtime.has_overlay_destination
+        request_source = self._request_source_language(
+            runtime,
+            detected_language=detected_language,
         )
+        if request_source is None:
+            outcome: TranslationTurnOutcome = (
+                "source_only" if runtime.channel == "peer" else "failed"
+            )
+            if outcome == "failed":
+                exc = _UnmappedDetectedLanguage()
+                report = self._log_translation_failure(stage="final", runtime=runtime, exc=exc)
+                await self.ui_events.put(
+                    UIEvent(
+                        type=UIEventType.ERROR,
+                        utterance_id=utterance_id,
+                        payload=report,
+                        source=source,
+                        channel=runtime.channel,
+                        runtime_log_handled=True,
+                    )
+                )
+            return TranslationTurnProcessResult(
+                outcome,
+                TranslationOutputSubmission(
+                    parent_utterance_id=parent_utterance_id,
+                    child_utterance_id=utterance_id,
+                    sequence=sequence,
+                    channel=runtime.channel,
+                    source=source,
+                    source_text=text,
+                    source_language=detected_language,
+                    target_language=target_language,
+                    outcome=outcome,
+                    failure_code="unsupported_source_language",
+                ),
+            )
+
+        request_source_language, _ = request_source
+        applied_mode: ContextMode | None = None
         try:
             formatted_prompt, context_str, now, applied_mode = self._prepare_llm_request_with_mode(
                 text,
                 runtime=runtime,
                 detected_language=detected_language,
+                context_policy=context_policy,
             )
-
-            request_source = self._request_source_language(
-                runtime,
-                detected_language=detected_language,
-            )
-            if request_source is None:
-                raise _UnmappedDetectedLanguage
-            request_source_language, _ = request_source
-            request_target_language = self._target_language_for(runtime)
             self._remember_context_entry(
                 text,
                 now,
@@ -3432,7 +3489,7 @@ class ClientHub:
                     text=text,
                     system_prompt=formatted_prompt,
                     source_language=request_source_language,
-                    target_language=request_target_language,
+                    target_language=target_language,
                     context=context_str,
                 )
             except Exception:
@@ -3446,7 +3503,7 @@ class ClientHub:
                 runtime=runtime,
                 text=text,
                 source_language=request_source_language,
-                target_language=request_target_language,
+                target_language=target_language,
             )
             self._record_latency_stage(
                 channel=runtime.channel,
@@ -3454,47 +3511,122 @@ class ClientHub:
                 stage="llm_done",
             )
         except asyncio.CancelledError:
-            if runtime.channel == "self":
-                await self._emit_overlay_utterance_closed(
-                    utterance_id=utterance_id,
-                    channel=runtime.channel,
-                    is_final=False,
-                    finalize_latency=not self.output_runtime.chatbox_is_eligible(runtime.channel),
-                )
-            elif runtime.channel != "peer":
-                self._finalize_latency_timeline(channel=runtime.channel, utterance_id=utterance_id)
             raise
         except _StaleProviderCompletion:
-            await self._cleanup_dropped_translation(utterance_id, text, runtime=runtime)
-            return
+            return TranslationTurnProcessResult(
+                "failed",
+                TranslationOutputSubmission(
+                    parent_utterance_id=parent_utterance_id,
+                    child_utterance_id=utterance_id,
+                    sequence=sequence,
+                    channel=runtime.channel,
+                    source=source,
+                    source_text=text,
+                    source_language=request_source_language,
+                    target_language=target_language,
+                    outcome="failed",
+                    failure_code="stale_provider_completion",
+                ),
+            )
         except Exception as exc:
             report = self._log_translation_failure(stage="final", runtime=runtime, exc=exc)
+            await self.ui_events.put(
+                UIEvent(
+                    type=UIEventType.ERROR,
+                    utterance_id=utterance_id,
+                    payload=self._translation_error_payload(exc, report),
+                    source=source,
+                    channel=runtime.channel,
+                    runtime_log_handled=True,
+                )
+            )
+            return TranslationTurnProcessResult(
+                "failed",
+                TranslationOutputSubmission(
+                    parent_utterance_id=parent_utterance_id,
+                    child_utterance_id=utterance_id,
+                    sequence=sequence,
+                    channel=runtime.channel,
+                    source=source,
+                    source_text=text,
+                    source_language=request_source_language,
+                    target_language=target_language,
+                    outcome="failed",
+                    failure_code="provider_error",
+                ),
+            )
+
+        return TranslationTurnProcessResult(
+            "translated",
+            TranslationOutputSubmission(
+                parent_utterance_id=parent_utterance_id,
+                child_utterance_id=utterance_id,
+                sequence=sequence,
+                channel=runtime.channel,
+                source=source,
+                source_text=text,
+                source_language=request_source_language,
+                target_language=target_language,
+                outcome="translated",
+                translation=translation,
+                applied_context_mode=applied_mode,
+            ),
+        )
+
+    async def submit_translation_output(self, submission: TranslationOutputSubmission) -> None:
+        await self._publish_translation_result(submission)
+
+    async def _publish_translation_result(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> None:
+        runtime = self._runtime_for_channel(submission.channel)
+        utterance_id = submission.child_utterance_id
+        text = submission.source_text
+        if submission.outcome == "source_only":
+            if runtime.channel == "peer":
+                await self._finalize_peer_source_only(
+                    Transcript(
+                        utterance_id=utterance_id,
+                        text=text,
+                        is_final=True,
+                        created_at=self.clock.now(),
+                        channel="peer",
+                    ),
+                    close_is_final=True,
+                    finalize_latency=True,
+                    preserve_parent_speech_end_time=True,
+                )
+                await self._publish_peer_chatbox_candidate(utterance_id)
+            elif self.output_runtime.chatbox_is_eligible(runtime.channel):
+                await self._publish_chatbox_candidate(
+                    utterance_id,
+                    transcript_text=text,
+                    translation_text=None,
+                )
+            else:
+                self._finalize_latency_timeline(
+                    channel=runtime.channel,
+                    utterance_id=utterance_id,
+                )
+            return
+
+        if submission.outcome == "failed":
+            if submission.failure_code == "stale_provider_completion":
+                await self._cleanup_dropped_translation(utterance_id, text, runtime=runtime)
+                return
             deny_peer_chatbox_attempt = self.output_runtime.chatbox_is_denied(runtime.channel)
             fallback_to_chatbox = (
                 self.fallback_transcript_only
                 and self.output_runtime.chatbox_is_eligible(runtime.channel)
             )
             denied_fallback_to_chatbox = self.fallback_transcript_only and deny_peer_chatbox_attempt
-            payload = self._translation_error_payload(exc, report)
-            await self.ui_events.put(
-                UIEvent(
-                    type=UIEventType.ERROR,
-                    utterance_id=utterance_id,
-                    payload=payload,
-                    source=self._get_source(utterance_id, channel=runtime.channel),
-                    channel=runtime.channel,
-                    runtime_log_handled=True,
-                )
-            )
             if runtime.channel == "self":
                 await self._emit_overlay_utterance_closed(
                     utterance_id=utterance_id,
                     channel=runtime.channel,
                     is_final=False,
-                    finalize_latency=not (
-                        self.fallback_transcript_only
-                        and self.output_runtime.chatbox_is_eligible(runtime.channel)
-                    ),
+                    finalize_latency=not fallback_to_chatbox,
                 )
             elif runtime.channel == "peer":
                 await self._finalize_peer_source_only(
@@ -3507,6 +3639,7 @@ class ClientHub:
                     ),
                     close_is_final=False,
                     finalize_latency=not denied_fallback_to_chatbox,
+                    preserve_parent_speech_end_time=True,
                 )
             if fallback_to_chatbox:
                 await self._publish_chatbox_candidate(
@@ -3517,9 +3650,15 @@ class ClientHub:
             elif deny_peer_chatbox_attempt:
                 await self._publish_peer_chatbox_candidate(utterance_id)
             elif runtime.channel != "peer":
-                self._finalize_latency_timeline(channel=runtime.channel, utterance_id=utterance_id)
+                self._finalize_latency_timeline(
+                    channel=runtime.channel,
+                    utterance_id=utterance_id,
+                )
             return
 
+        translation = submission.translation
+        if translation is None:
+            raise ValueError("translated submission requires a translation")
         publish_to_chatbox = self.output_runtime.chatbox_is_eligible(runtime.channel)
         deny_peer_chatbox_attempt = self.output_runtime.chatbox_is_denied(runtime.channel)
         bundle = self.get_or_create_bundle(utterance_id, channel=runtime.channel)
@@ -3528,11 +3667,11 @@ class ClientHub:
             translation=translation,
             runtime=runtime,
         )
-        if peer_overlay_active:
+        if runtime.channel == "peer" and self.output_runtime.has_overlay_destination:
             await self._emit_peer_translation_to_overlay(
                 translation=translation,
                 runtime=runtime,
-                applied_context_mode=applied_mode,
+                applied_context_mode=submission.applied_context_mode,
             )
             await self._emit_overlay_utterance_closed(
                 utterance_id=utterance_id,
@@ -3545,13 +3684,13 @@ class ClientHub:
                 type=UIEventType.TRANSLATION_DONE,
                 utterance_id=utterance_id,
                 payload=translation,
-                source=self._get_source(utterance_id, channel=runtime.channel),
+                source=submission.source,
             )
         )
         if runtime.channel == "self":
             await self._emit_translation_to_overlay(
                 translation=translation,
-                applied_context_mode=applied_mode,
+                applied_context_mode=submission.applied_context_mode,
             )
             await self._emit_overlay_utterance_closed(
                 utterance_id=utterance_id,
@@ -3568,7 +3707,38 @@ class ClientHub:
         elif deny_peer_chatbox_attempt:
             await self._publish_peer_chatbox_candidate(utterance_id)
         else:
-            self._finalize_latency_timeline(channel=runtime.channel, utterance_id=utterance_id)
+            self._finalize_latency_timeline(
+                channel=runtime.channel,
+                utterance_id=utterance_id,
+            )
+
+    async def _translate_and_enqueue(
+        self,
+        utterance_id: UUID,
+        text: str,
+        *,
+        runtime: ChannelRuntime | None = None,
+        detected_language: str | None = None,
+        cancellation_requested: Callable[[], bool] | None = None,
+    ) -> None:
+        runtime = runtime or self.self_runtime
+        source = self._get_source(utterance_id, channel=runtime.channel)
+        if source is None:
+            source = "Peer" if runtime.channel == "peer" else "Mic"
+        result = await self._build_translation_process_result(
+            parent_utterance_id=utterance_id,
+            utterance_id=utterance_id,
+            sequence=0,
+            text=text,
+            runtime=runtime,
+            source=source,
+            target_language=self._target_language_for(runtime),
+            context_policy=self.translation_turns.policy.context_policy,
+            detected_language=detected_language,
+            cancellation_requested=cancellation_requested,
+        )
+        if result.output is not None:
+            await self.submit_translation_output(result.output)
 
     async def handle_peer_transcript_final_for_test(
         self,
@@ -3594,7 +3764,7 @@ class ClientHub:
             )
         )
         if self.llm is None or not self._translation_enabled_for_runtime(self.peer_runtime):
-            await self.peer_final_runs.wait_for_idle()
+            await self.translation_turns.wait_for_idle()
         if hasattr(self.overlay_sink, "events"):
             new_events = self.overlay_sink.events[before_event_count:]  # type: ignore[attr-defined]
             for event in new_events:
@@ -3614,7 +3784,7 @@ class ClientHub:
         utterance_id = await self.handle_peer_transcript_final_for_test(
             text=text,
         )
-        await self.peer_final_runs.wait_for_idle()
+        await self.translation_turns.wait_for_idle()
         return utterance_id
 
     async def _publish_chatbox_candidate(

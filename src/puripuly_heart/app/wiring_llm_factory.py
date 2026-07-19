@@ -72,13 +72,13 @@ from puripuly_heart.core.openrouter_credentials import (
 )
 from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 from puripuly_heart.core.storage.secrets import SecretStore
+from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
-from puripuly_heart.providers.llm.qwen import QwenLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 
 MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR = (
@@ -674,16 +674,10 @@ def _provider_from_resolved_target(
 
     if target.provider == PROVIDER_QWEN:
         api_key = _qwen_api_key_for_resolved_credential(target.credential, secrets=secrets)
-        if qwen_low_latency_mode:
-            return AsyncQwenLLMProvider(
-                api_key=api_key,
-                base_url=_qwen_async_base_url(target),
-                model=target.model,
-                runtime_logging=runtime_logging,
-            )
-        return QwenLLMProvider(
+        _ = qwen_low_latency_mode
+        return AsyncQwenLLMProvider(
             api_key=api_key,
-            base_url=_qwen_sync_base_url(target),
+            base_url=_qwen_async_base_url(target),
             model=target.model,
             runtime_logging=runtime_logging,
         )
@@ -809,5 +803,5 @@ def create_llm_provider(
         managed_delegate_ready=managed_delegate_ready,
         runtime_logging=runtime_logging,
         compatibility_settings=settings,
-        qwen_low_latency_mode=settings.stt.low_latency_mode,
+        qwen_low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
     )

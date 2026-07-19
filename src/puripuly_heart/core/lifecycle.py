@@ -187,6 +187,7 @@ class LifecycleScope:
         coroutine: Coroutine[Any, Any, _TaskResultT],
         *,
         name: str,
+        eager_start: bool = False,
     ) -> asyncio.Task[_TaskResultT]:
         if self._closed:
             coroutine.close()
@@ -197,7 +198,16 @@ class LifecycleScope:
                 f"LifecycleScope {self._name!r} already has task {name!r}"
             )
 
-        task = asyncio.create_task(coroutine, name=f"{self._name}:{name}")
+        task_name = f"{self._name}:{name}"
+        if eager_start:
+            task = asyncio.Task(
+                coroutine,
+                loop=asyncio.get_running_loop(),
+                name=task_name,
+                eager_start=True,
+            )
+        else:
+            task = asyncio.create_task(coroutine, name=task_name)
         self._tasks_by_name[name] = task
         self._task_names[task] = name
         task.add_done_callback(self._on_task_done)
@@ -363,8 +373,9 @@ def start_lifecycle_task(
     coroutine: Coroutine[Any, Any, _TaskResultT],
     *,
     name: str,
+    eager_start: bool = False,
 ) -> asyncio.Task[_TaskResultT]:
-    return scope.create_task(coroutine, name=name)
+    return scope.create_task(coroutine, name=name, eager_start=eager_start)
 
 
 def _shutdown_diagnostic_event(

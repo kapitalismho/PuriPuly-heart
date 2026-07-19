@@ -75,6 +75,12 @@ class ContextResolver:
             other_source_language=other_source_language,
             other_target_language=other_target_language,
         )
+        if not any(channel_runtime.channel == "peer" for channel_runtime, _ in integrated_entries):
+            return self.resolve_local(
+                runtime=runtime,
+                source_language=source_language,
+                target_language=target_language,
+            )
         return self.format_integrated(integrated_entries), "integrated"
 
     def _format_entries(self, entries: list[ContextEntry]) -> str:

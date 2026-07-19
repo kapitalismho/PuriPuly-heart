@@ -482,6 +482,29 @@ class TestContextInternalPaths:
         assert mode == "integrated"
         assert '- [peer, 7s ago] "peer line"' in context
 
+    def test_context_resolver_falls_back_to_local_when_peer_context_is_empty(self):
+        self_runtime = ChannelRuntime(channel="self")
+        peer_runtime = ChannelRuntime(channel="peer")
+        self_runtime.remember_context(
+            "safe local line",
+            timestamp=100.0,
+            source_language="en",
+            target_language="ko",
+        )
+        resolver = ContextResolver(clock=FakeClock(initial_time=112.0))
+
+        context, mode = resolver.resolve_for_request(
+            runtime=self_runtime,
+            other_runtime=peer_runtime,
+            requested_mode="integrated",
+            peer_translation_enabled=True,
+            source_language="en",
+            target_language="ko",
+        )
+
+        assert mode == "local"
+        assert context == '- [self, 12s ago] "safe local line"'
+
     def test_integrated_context_uses_40_second_window_before_entry_budget(self):
         hub = ClientHub(
             stt=None,
@@ -781,6 +804,12 @@ class TestContextLogging:
             hub._prepare_llm_request("second")
             hub.integrated_context_enabled = True
             hub.peer_translation_enabled = True
+            hub.peer_runtime.remember_context(
+                "peer context",
+                timestamp=19.5,
+                source_language="ko",
+                target_language="en",
+            )
             hub._prepare_llm_request("third")
             hub._prepare_llm_request("fourth")
 
@@ -824,8 +853,9 @@ class TestContextLogging:
         await hub._ensure_translation(transcript)
         await hub._ensure_translation(transcript)
 
-        assert len(hub._translation_tasks) == 1
-        await asyncio.gather(*hub._translation_tasks.values(), return_exceptions=True)
+        assert len(hub.llm.calls) == 1
+        assert hub.translation_turns.is_parent_closed(transcript.utterance_id)
+        assert hub._translation_tasks == {}
 
     @pytest.mark.asyncio
     async def test_submit_text_translation_success_updates_bundle_and_events(self):

@@ -85,7 +85,6 @@ from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
-from puripuly_heart.providers.llm.qwen import QwenLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 from puripuly_heart.providers.stt.local_cpu import LocalCPUAutoSTTBackend
@@ -306,7 +305,7 @@ def test_create_llm_provider_qwen_uses_legacy_alibaba_secret_key() -> None:
     assert secrets.get("alibaba_api_key_beijing") == "legacy-k2"
 
 
-def test_create_llm_provider_qwen_standard_mode_uses_sync_provider() -> None:
+def test_create_llm_provider_qwen_historical_false_still_uses_async_provider() -> None:
     settings = AppSettings(
         provider=ProviderSettings(llm=LLMProviderName.QWEN),
         stt=STTSettings(low_latency_mode=False),
@@ -317,13 +316,13 @@ def test_create_llm_provider_qwen_standard_mode_uses_sync_provider() -> None:
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, QwenLLMProvider)
+    assert isinstance(provider.inner, AsyncQwenLLMProvider)
     assert provider.inner.api_key == "k2"
-    assert provider.inner.base_url == "https://dashscope.aliyuncs.com/api/v1"
+    assert provider.inner.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
     assert provider.inner.model == "qwen3.5-plus"
 
 
-def test_create_llm_provider_qwen_standard_mode_passes_runtime_logging() -> None:
+def test_create_llm_provider_qwen_historical_false_passes_runtime_logging() -> None:
     settings = AppSettings(
         provider=ProviderSettings(llm=LLMProviderName.QWEN),
         stt=STTSettings(low_latency_mode=False),
@@ -335,11 +334,11 @@ def test_create_llm_provider_qwen_standard_mode_passes_runtime_logging() -> None
     provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
 
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, QwenLLMProvider)
+    assert isinstance(provider.inner, AsyncQwenLLMProvider)
     assert provider.inner.runtime_logging is runtime_logging
 
 
-def test_create_llm_provider_qwen_standard_mode_singapore() -> None:
+def test_create_llm_provider_qwen_historical_false_uses_async_singapore() -> None:
     settings = AppSettings(
         provider=ProviderSettings(llm=LLMProviderName.QWEN),
         qwen=QwenSettings(region=QwenRegion.SINGAPORE, llm_model=QwenLLMModel.QWEN_35_FLASH),
@@ -350,9 +349,9 @@ def test_create_llm_provider_qwen_standard_mode_singapore() -> None:
 
     provider = create_llm_provider(settings, secrets=secrets)
     assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, QwenLLMProvider)
+    assert isinstance(provider.inner, AsyncQwenLLMProvider)
     assert provider.inner.api_key == "k3"
-    assert provider.inner.base_url == "https://dashscope-intl.aliyuncs.com/api/v1"
+    assert provider.inner.base_url == "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
     assert provider.inner.model == "qwen3.5-flash"
 
 

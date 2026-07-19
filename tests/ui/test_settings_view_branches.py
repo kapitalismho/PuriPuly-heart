@@ -47,7 +47,6 @@ from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 from puripuly_heart.ui.i18n import language_name, provider_label, t
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
-from puripuly_heart.ui.overlay_peer_contract import build_overlay_peer_consumer_contract
 from puripuly_heart.ui.theme import COLOR_NEUTRAL_DARK
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import attach_dummy_page
@@ -3947,7 +3946,7 @@ def test_on_secret_change_saves_and_clears_keys(monkeypatch: pytest.MonkeyPatch)
     assert cleared == ["google_api_key"]
 
 
-def test_audio_vad_and_low_latency_handlers_update_state(
+def test_audio_and_vad_handlers_update_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
@@ -3964,19 +3963,15 @@ def test_audio_vad_and_low_latency_handlers_update_state(
     view._handle_vad_change(visual_event)
     view._peer_vad_field.value = "0.61"
     view._on_peer_vad_threshold_change(SimpleNamespace(control=view._peer_vad_field))
-    view._on_low_latency_selected("on")
 
     assert view._settings.audio.input_host_api == "MME"
     assert view._settings.audio.input_device == "Mic 2"
     assert view._settings.stt.vad_speech_threshold == 0.72
     assert view._settings.desktop_audio.vad_speech_threshold == 0.61
-    assert view._settings.stt.low_latency_mode is True
     assert settings.audio.input_host_api == "MME"
     assert settings.audio.input_device == "Mic 2"
     assert settings.stt.vad_speech_threshold == 0.72
     assert settings.desktop_audio.vad_speech_threshold == 0.61
-    assert settings.stt.low_latency_mode is True
-    assert view._low_latency_text.content.value == t("toggle.on")
 
 
 def test_peer_vad_slider_change_skips_hidden_field_update_when_view_is_mounted(
@@ -4059,157 +4054,21 @@ def test_audio_change_messages_use_basic_runtime_log(
     assert changed[0].desktop_audio.output_device == "New Speakers"
 
 
-def test_immediate_settings_emit_preserves_peer_local_qwen(
+def test_retired_translation_policy_controls_are_not_constructed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
-    changed: list[AppSettings] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
-
-    view._on_low_latency_selected("off")
-
-    assert changed
-    assert changed[-1].provider.peer_stt == STTProviderName.LOCAL_QWEN
-    assert settings.provider.peer_stt == STTProviderName.LOCAL_QWEN
-    assert settings.stt.low_latency_mode is False
-
-
-def test_overlay_controls_gate_integrated_context_until_peer_translation_is_effective(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.ui.peer_translation_enabled = True
-    settings.ui.integrated_context_enabled = True
+    settings.stt.low_latency_mode = False
+    settings.ui.integrated_context_enabled = False
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    assert view._integrated_context_button.disabled is False
-    assert view._integrated_context_hint.value == ""
-
-    view.set_overlay_peer_contract(
-        build_overlay_peer_consumer_contract(
-            overlay_intent_enabled=True,
-            overlay_state="connected",
-            overlay_failure_reason=None,
-            peer_intent_enabled=True,
-            peer_effective_enabled=True,
-        )
-    )
-
-    assert view._integrated_context_button.disabled is False
-    assert view._integrated_context_hint.value == ""
-
-
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN"])
-def test_overlay_failure_contract_drives_integrated_context_copy_from_i18n(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        settings = AppSettings()
-        settings.ui.locale = locale
-        settings.ui.overlay_enabled = True
-        settings.ui.peer_translation_enabled = True
-
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-        view.set_overlay_peer_contract(
-            build_overlay_peer_consumer_contract(
-                overlay_intent_enabled=True,
-                overlay_state="failed",
-                overlay_failure_reason="runtime_crashed",
-                peer_intent_enabled=True,
-                peer_effective_enabled=False,
-            )
-        )
-
-        assert view._integrated_context_hint.value == ""
-        assert view._integrated_context_button.disabled is False
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
-def test_runtime_unavailable_contract_drives_integrated_context_hint(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.ui.overlay_enabled = True
-    settings.ui.peer_translation_enabled = True
-    settings.ui.integrated_context_enabled = True
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.set_overlay_peer_contract(
-        build_overlay_peer_consumer_contract(
-            overlay_intent_enabled=True,
-            overlay_state="connected",
-            overlay_failure_reason=None,
-            peer_intent_enabled=True,
-            peer_effective_enabled=False,
-            peer_warning_reason="runtime_unavailable",
-        )
-    )
-
-    assert view._integrated_context_hint.value == ""
-    assert view._integrated_context_button.disabled is False
-
-
-def test_overlay_stopping_contract_drives_integrated_context_hint(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.ui.overlay_enabled = True
-    settings.ui.peer_translation_enabled = True
-    settings.ui.integrated_context_enabled = True
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.set_overlay_peer_contract(
-        build_overlay_peer_consumer_contract(
-            overlay_intent_enabled=True,
-            overlay_state="stopping",
-            overlay_failure_reason=None,
-            peer_intent_enabled=True,
-            peer_effective_enabled=False,
-        )
-    )
-
-    assert view._integrated_context_hint.value == ""
-    assert view._integrated_context_button.disabled is False
-
-
-@pytest.mark.parametrize(
-    ("locale", "expected_hint"),
-    [
-        ("en", "Turn on peer translation from Dashboard first."),
-        ("ko", "먼저 대시보드에서 상대 번역을 켜주세요."),
-        ("zh-CN", "请先在仪表板打开对方翻译。"),
-    ],
-)
-def test_integrated_context_peer_disabled_hint_redirects_to_dashboard(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-    expected_hint: str,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        settings = AppSettings()
-        settings.ui.locale = locale
-
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-        view.set_overlay_runtime_state("connected")
-
-        assert view._integrated_context_hint.value == ""
-        assert view._integrated_context_button.disabled is False
-    finally:
-        i18n_module.set_locale(old_locale)
+    assert not hasattr(view, "_low_latency_card")
+    assert not hasattr(view, "_low_latency_text")
+    assert not hasattr(view, "_on_low_latency_click")
+    assert not hasattr(view, "_integrated_context_card")
+    assert not hasattr(view, "_integrated_context_button")
+    assert not hasattr(view, "_on_integrated_context_click")
 
 
 def test_peer_qwen_region_control_is_removed_before_peer_translation_is_enabled(
@@ -4662,22 +4521,6 @@ def test_overlay_anchor_click_opens_modal_with_current_selection(
     assert captured["show_description"] is False
     assert [option.value for option in captured["options"]] == ["head_locked"]
     assert captured["current"] == "head_locked"
-
-
-def test_integrated_context_card_uses_broad_value_slot_click_target(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-
-    card = _general_tab_card(view, t("settings.integrated_context"))
-    value_control = _wrapped_card_column(card).controls[1].content
-
-    assert value_control is view._integrated_context_button
-    assert isinstance(view._integrated_context_button, ft.Container)
-    assert view._integrated_context_button.expand is True
-    assert view._integrated_context_button.content.value == t("settings.context.local")
-    assert view._integrated_context_button.content.size == 28
-    assert view._integrated_context_button.content.color == settings_view.COLOR_ON_BACKGROUND
 
 
 def test_overlay_single_action_cards_use_broad_value_slot_click_targets(
@@ -5517,21 +5360,20 @@ def test_audio_change_updates_desktop_loopback_controls(monkeypatch: pytest.Monk
     assert changed[-1].desktop_audio.vad_pre_roll_ms == 420
 
 
-def test_general_tab_places_microphone_test_and_displaced_cards(
+def test_general_tab_reflows_only_retired_context_row(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
     general_controls = _subtab_controls(view, "general")
 
     assert len(general_controls) == 4
-    assert len(general_controls[0].content.controls) == 3
+    assert len(general_controls[0].content.controls) == 2
     assert len(general_controls[1].content.controls) == 3
     assert len(general_controls[2].content.controls) == 3
     assert len(general_controls[3].content.controls) == 3
     assert _row_card_titles(general_controls[0]) == [
         t("settings.section.ui"),
         t("settings.chatbox_include_source"),
-        t("settings.integrated_context"),
     ]
     assert _row_card_titles(general_controls[1]) == [
         t("settings.audio_host_api"),
@@ -5631,28 +5473,8 @@ def test_general_tab_excludes_prompt_and_overlay_controls(
     assert t("settings.section.custom_vocabulary") not in general_labels
     assert t("settings.section.overlay") not in general_labels
     assert t("settings.overlay.enabled") not in general_labels
-    assert t("settings.integrated_context") in general_labels
+    assert "settings.integrated_context" not in general_labels
     assert t("settings.overlay.calibration") not in general_labels
-
-
-def test_integrated_context_general_tab_uses_dedicated_unit_card(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-
-    prompt_titles = _prompt_tab_card_titles(view)
-    prompt_labels: list[str] = []
-    for control in _subtab_controls(view, "prompt"):
-        prompt_labels.extend(_control_labels(control))
-    general_card = _general_tab_card(view, t("settings.integrated_context"))
-
-    assert prompt_titles == [
-        t("settings.section.custom_vocabulary"),
-        t("settings.section.persona"),
-    ]
-    assert t("settings.integrated_context") not in prompt_labels
-    assert _tree_contains_control(general_card, view._integrated_context_button)
-    assert not _tree_contains_control(general_card, view._integrated_context_hint)
 
 
 def test_api_tab_places_independent_managed_key_card_above_api_keys(
@@ -5668,7 +5490,6 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
         t("settings.section.translation"),
     ]
     assert _row_card_titles(api_controls[1]) == [
-        t("settings.low_latency_mode"),
         t("settings.translation_connection"),
         t("settings.fallback"),
     ]
@@ -5694,7 +5515,6 @@ def test_api_tab_primary_value_typography_is_consistent_across_rows(
         _container_text_size(view._stt_text),
         _container_text_size(view._peer_stt_text),
         _container_text_size(view._llm_text),
-        _container_text_size(view._low_latency_text),
         _container_text_size(view._translation_connection_text),
         _container_text_size(view._openrouter_fallback_text),
     } == {28}
@@ -5843,8 +5663,6 @@ def test_general_tab_labels_and_section_headings_render_from_i18n(
         assert view._audio_host_api_title.value == t("settings.audio_host_api")
         assert view._mic_audio_title.value == t("settings.section.microphone_audio")
         assert view._loopback_audio_title.value == t("settings.section.loopback_audio")
-        assert view._integrated_context_label.value == t("settings.integrated_context")
-        assert view._low_latency_title.value == t("settings.low_latency_mode")
         assert view._microphone_test_title.value == t("settings.microphone_test")
         assert view._microphone_test_text.content.value == t("settings.microphone_test.action")
         assert view._self_vad_title.value == t("settings.section.self_vad_sensitivity")
@@ -6131,26 +5949,19 @@ def test_legacy_vr_overlay_shell_removed_from_settings_subtabs(
     assert t("settings.peer_translation") not in overlay_labels
 
 
-def test_migrated_overlay_copy_cleanup_keeps_prompt_and_overlay_context_separate(
+def test_migrated_overlay_copy_cleanup_keeps_prompt_and_overlay_sections_separate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
 
-    general_card = _general_tab_card(view, t("settings.integrated_context"))
     translation_card = _overlay_tab_card(view, t("settings.overlay.show_translation"))
     anchor_card = _overlay_tab_card(view, t("settings.overlay.calibration.anchor"))
-    general_labels = _control_labels(general_card)
     translation_labels = _control_labels(translation_card)
     anchor_labels = _control_labels(anchor_card)
 
-    assert t("settings.integrated_context") in general_labels
     assert t("settings.integrated_context") not in translation_labels
     assert t("settings.integrated_context") not in anchor_labels
-    assert t("settings.context.integrated_modal_helper") not in general_labels
-    assert t("settings.overlay.show_translation") not in general_labels
-    assert t("settings.overlay.show_peer_original") not in general_labels
     assert t("settings.overlay.show_translation") in translation_labels
-    assert t("settings.overlay.calibration") not in general_labels
     assert t("settings.overlay.calibration.anchor") in anchor_labels
 
 
@@ -6168,9 +5979,6 @@ def test_legacy_overlay_cleanup_copy_renders_from_i18n(
             view.load_from_settings(settings, config_path=Path("settings.json"))
 
             i18n_module.set_locale(locale)
-            view._integrated_context_label.value = "stale"
-            view._integrated_context_button.content.value = "stale"
-            view._integrated_context_hint.value = "stale"
             view._overlay_target_title.value = "stale"
             view._overlay_translation_title.value = "stale"
             view._overlay_peer_original_title.value = "stale"
@@ -6188,16 +5996,11 @@ def test_legacy_overlay_cleanup_copy_renders_from_i18n(
 
             view.apply_locale()
 
-            general_card = _general_tab_card(view, t("settings.integrated_context"))
             translation_card = _overlay_tab_card(view, t("settings.overlay.show_translation"))
             anchor_card = _overlay_tab_card(view, t("settings.overlay.calibration.anchor"))
-            general_labels = _control_labels(general_card)
             translation_labels = _control_labels(translation_card)
             anchor_labels = _control_labels(anchor_card)
 
-            assert view._integrated_context_label.value == t("settings.integrated_context")
-            assert view._integrated_context_button.content.value == t("settings.context.integrated")
-            assert view._integrated_context_hint.value == ""
             assert view._overlay_target_title.value == t("settings.overlay.caption_location")
             assert view._overlay_translation_title.value == t("settings.overlay.show_translation")
             assert view._overlay_peer_original_title.value == t(
@@ -6226,19 +6029,13 @@ def test_legacy_overlay_cleanup_copy_renders_from_i18n(
                 "settings.overlay.desktop.lock.title"
             )
             assert view._desktop_overlay_status_card.visible is False
-            assert t("settings.integrated_context") in general_labels
-            assert t("settings.context.integrated") in general_labels
-            assert t("settings.context.integrated_modal_helper") not in general_labels
             assert t("settings.overlay.caption_location") in _control_labels(
                 _overlay_tab_card(view, t("settings.overlay.caption_location"))
             )
             assert t("settings.overlay.show_translation") in translation_labels
             assert t("settings.overlay.calibration.anchor") in anchor_labels
-            assert t("settings.section.overlay") not in general_labels
             assert t("settings.section.overlay") not in translation_labels
-            assert t("settings.overlay.enabled") not in general_labels
             assert t("settings.overlay.enabled") not in translation_labels
-            assert t("settings.peer_translation") not in general_labels
             assert t("settings.peer_translation") not in translation_labels
     finally:
         i18n_module.set_locale(previous_locale)
@@ -6268,7 +6065,6 @@ def test_apply_locale_updates_general_clickable_value_fonts_to_zh_cn(
             view._mic_audio_text,
             view._audio_host_api_text,
             view._loopback_audio_text,
-            view._integrated_context_button,
         ):
             assert control.content.font_family == zh_font
     finally:
@@ -6296,7 +6092,6 @@ def test_apply_locale_updates_all_settings_clickable_value_fonts_to_zh_cn(
             view._stt_text,
             view._peer_stt_text,
             view._llm_text,
-            view._low_latency_text,
             view._translation_connection_text,
             view._openrouter_fallback_text,
             view._overlay_target_button,
@@ -6788,23 +6583,6 @@ def test_apply_locale_and_refresh_prompt_if_empty(monkeypatch: pytest.MonkeyPatc
     assert view._translation_connection_title.value == t("settings.translation_connection")
 
 
-def test_low_latency_card_title_uses_response_mode_copy_in_korean(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale("ko")
-        settings = AppSettings()
-        settings.ui.locale = "ko"
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-        view.apply_locale()
-
-        assert view._low_latency_title.value == "응답 방식"
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
 def test_apply_locale_refreshes_peer_labels_and_inherit_texts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -6986,43 +6764,6 @@ def test_on_vrc_mic_selected_updates_setting_label_and_emits_change(
     assert settings.osc.vrc_mic_intercept is True
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
     assert changed == [settings]
-
-
-def test_on_integrated_context_click_opens_modal_with_current_selection_and_helper_copy(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.ui.integrated_context_enabled = True
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    attach_dummy_page(monkeypatch, view)
-
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(self, _page, title, options, _on_select, *, show_description=False):
-            captured["title"] = title
-            captured["options"] = options
-            captured["show_description"] = show_description
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_integrated_context_click(None)
-
-    options = captured["options"]
-    assert captured["title"] == t("settings.integrated_context")
-    assert captured["show_description"] is True
-    assert [option.value for option in options] == ["off", "on"]
-    assert [option.label for option in options] == [
-        t("settings.context.local"),
-        t("settings.context.integrated"),
-    ]
-    assert options[0].description == ""
-    assert options[1].description == t("settings.context.integrated_modal_helper")
-    assert captured["current"] == "on"
 
 
 def test_on_vrc_mic_selected_without_settings_returns_early(
@@ -7232,7 +6973,6 @@ def test_settings_api_unit_cards_use_settings_unit_card_defaults(
         _api_tab_card(view, t("settings.section.stt")),
         _api_tab_card(view, t("settings.section.peer_stt")),
         _api_tab_card(view, t("settings.section.translation")),
-        _api_tab_card(view, t("settings.low_latency_mode")),
         view._translation_connection_card,
         view._openrouter_fallback_card,
     ]
@@ -7253,7 +6993,6 @@ def test_general_cards_use_settings_unit_card_defaults(
         _general_tab_card(view, t("settings.section.ui")),
         _general_tab_card(view, t("settings.chatbox_include_source")),
         _general_tab_card(view, t("settings.clipboard_auto_translate")),
-        _general_tab_card(view, t("settings.integrated_context")),
         _general_tab_card(view, t("settings.vrc_mic_intercept")),
         _general_tab_card(view, t("settings.audio_host_api")),
         _general_tab_card(view, t("settings.section.microphone_audio")),
@@ -7266,10 +7005,6 @@ def test_general_cards_use_settings_unit_card_defaults(
     assert {card.height for card in general_cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
     assert all(card.expand is True for card in general_cards)
     assert all(getattr(row, "height", None) is None for row in _subtab_controls(view, "general"))
-    assert isinstance(view._integrated_context_button, ft.Container)
-    assert view._integrated_context_button.expand is True
-    assert view._integrated_context_button.content.size == 28
-    assert view._integrated_context_button.content.color == settings_view.COLOR_ON_BACKGROUND
     assert view._translation_connection_row.height is None
 
 
@@ -7327,38 +7062,8 @@ def test_integrated_context_controls_are_removed_from_overlay_tab(
         overlay_labels.extend(_control_labels(control))
 
     assert t("settings.integrated_context") not in overlay_labels
-    assert not any(
-        _tree_contains_control(control, view._integrated_context_button)
-        or _tree_contains_control(control, view._integrated_context_hint)
-        for control in _subtab_controls(view, "overlay")
-    )
-
-
-def test_integrated_context_general_card_labels_render_from_i18n(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.ui.locale = "ko"
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale("ko")
-        view.apply_locale()
-
-        general_card = _general_tab_card(view, t("settings.integrated_context"))
-        general_labels = _control_labels(general_card)
-
-        assert view._integrated_context_label.value == t("settings.integrated_context")
-        assert view._integrated_context_button.content.value == t("settings.context.integrated")
-        assert view._integrated_context_hint.value == ""
-        assert t("settings.integrated_context") in general_labels
-        assert t("settings.context.integrated") in general_labels
-        assert t("settings.context.integrated_modal_helper") not in general_labels
-    finally:
-        i18n_module.set_locale(old_locale)
+    assert not hasattr(view, "_integrated_context_button")
+    assert not hasattr(view, "_integrated_context_hint")
 
 
 def test_custom_vocabulary_switching_source_language_updates_tags_and_clears_add_input(

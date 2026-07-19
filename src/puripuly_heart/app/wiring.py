@@ -73,6 +73,7 @@ from puripuly_heart.core.runtime.self_capture import (
     SelfCaptureVadFactory,
 )
 from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
+from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 _WIRING_SECRET_KEYS_FOR_COMPATIBILITY_GUARD = (
     "google_api_key",
@@ -163,7 +164,7 @@ def create_llm_provider(settings, **kwargs):
     return create_llm_provider_from_resolved_config(
         resolved,
         compatibility_settings=settings,
-        qwen_low_latency_mode=settings.stt.low_latency_mode,
+        qwen_low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
         **kwargs,
     )
 
