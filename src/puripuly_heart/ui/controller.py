@@ -11,7 +11,6 @@ import math
 import os
 import secrets
 import sys
-import threading
 import time
 import traceback
 from collections.abc import Callable, Mapping
@@ -19,7 +18,7 @@ from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 import flet as ft
 import numpy as np
@@ -30,7 +29,7 @@ from puripuly_heart.app.ports.canonical_settings_persistence import (
     CanonicalSettingsPersistencePort,
     ProviderVerificationBinding,
 )
-from puripuly_heart.app.ports.gpu_worker import GpuWorkerDevice, GpuWorkerRequestError
+from puripuly_heart.app.ports.gpu_worker import GpuWorkerDevice
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
 from puripuly_heart.app.ports.secret_store import (
     SecretReadResult,
@@ -110,8 +109,9 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
 from puripuly_heart.app.wiring import (
     DiscordManagedBrokerClientAdapter,
     DiscordOAuthAuthAdapter,
+    LocalASRProviderRuntimeFactory,
     ManagedIdentityPreflightAdapter,
-    _create_shared_gpu_asr_runtime,
+    ManagedSTTProviderFactory,
     build_custom_vocabulary_runtime_config,
     build_managed_identity_state_port,
     build_openrouter_credential_runtime_config,
@@ -119,12 +119,12 @@ from puripuly_heart.app.wiring import (
     build_peer_stt_provider_signature_from_vnext,
     copy_stable_secrets_to_vnext_namespace,
     create_llm_provider,
-    create_peer_stt_backend_from_resolved_config,
+    create_local_asr_provisioning_owner,
     create_provider_verifier,
     create_secret_store,
-    create_stt_backend,
     resolve_overlay_config,
     resolve_peer_stt_runtime_config_from_vnext,
+    resolve_self_stt_runtime_config,
 )
 from puripuly_heart.config.audio_host_api import normalize_input_host_api
 from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
@@ -139,7 +139,10 @@ from puripuly_heart.config.process_capture_resolution import (
     ProcessCaptureTargetUnavailableError,
 )
 from puripuly_heart.config.profile_bootstrap import import_stable_settings_if_missing
-from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget, ResolvedOverlayConfig
+from puripuly_heart.config.resolved import (
+    ResolvedDesktopAudioCaptureTarget,
+    ResolvedOverlayConfig,
+)
 from puripuly_heart.config.settings import (
     DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
     DESKTOP_FLET_DEFAULT_TEXT_SCALE,
@@ -193,35 +196,33 @@ from puripuly_heart.core.clock import SystemClock
 from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
-from puripuly_heart.core.local_gpu_assets import (
-    LocalGPUInstallSnapshot,
-    inspect_local_gpu_install,
-    load_local_gpu_asset_manifest,
-    local_gpu_model_path,
+from puripuly_heart.core.local_asr_provider_runtime import (
+    LocalASRProviderRuntimePort,
+    LocalASRProviderRuntimeSnapshot,
+    ProviderRuntimeBuildRequest,
+    ProviderRuntimeDiagnostic,
+    ProviderRuntimeGpuRecoveryRequest,
+    ProviderRuntimeRecoveryChannel,
 )
+from puripuly_heart.core.local_asr_provisioning import (
+    LocalASRInstallRequest,
+    LocalASRInstallResult,
+    LocalASRProvisioningDiagnostic,
+    LocalASRProvisioningPort,
+    LocalASRProvisioningSnapshot,
+)
+from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
 from puripuly_heart.core.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LOCAL_STT_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
     LocalParakeetSherpaLoadError,
     LocalQwenSherpaLoadError,
-    LocalSTTInstallState,
     LocalSTTManifestInvalidError,
     LocalSTTModelMissingError,
-    inspect_local_stt_install_state,
 )
 from puripuly_heart.core.local_stt_catalog import (
     LocalCPUAutoUnavailableError,
-    LocalCPUInstallSnapshot,
-    LocalCPUModelInstall,
-    inspect_local_cpu_model_installs,
-    inspect_required_cpu_model_installs,
-)
-from puripuly_heart.core.local_stt_runtime_installer import (
-    LocalSTTRuntimeInstallCancelled,
-    LocalSTTRuntimeInstallError,
-    RuntimeLocalSTTStatusUpdate,
-    ensure_local_stt_installed,
 )
 from puripuly_heart.core.managed_openrouter_broker_client import (
     HttpManagedOpenRouterBrokerClient,
@@ -271,16 +272,9 @@ from puripuly_heart.core.overlay.process import (
     OverlayProcessManager,
     OverlayProcessRunner,
 )
-from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.clipboard import ClipboardRuntime
 from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
-from puripuly_heart.core.runtime.gpu_asr import (
-    GpuASRChannel,
-    GpuASRDiagnostic,
-    GpuASRManualRetryRequired,
-    GpuASRRuntimeState,
-    SharedGpuASRRuntime,
-)
+from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRSessionOptions,
     LocalASRTransitionCoordinator,
@@ -288,7 +282,6 @@ from puripuly_heart.core.runtime.local_asr_transition import (
     PreparedLocalASRTransition,
 )
 from puripuly_heart.core.runtime.local_qwen_lifecycle import LOCAL_QWEN_IDLE_RELEASE_SECONDS
-from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.core.runtime.mic_test import MicTestRuntime
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
@@ -308,10 +301,7 @@ from puripuly_heart.core.runtime_logging import (
     SessionLoggingMode,
     SessionRuntimeLoggingService,
 )
-from puripuly_heart.core.stt.controller import (
-    FinalTranscriptSuppressedNotification,
-    ManagedSTTProvider,
-)
+from puripuly_heart.core.stt.controller import FinalTranscriptSuppressedNotification
 from puripuly_heart.core.stt.custom_vocab import get_effective_custom_terms
 from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryClientPort,
@@ -936,6 +926,10 @@ class GuiController:
     provider_verifier: _ControllerProviderVerifier | None = None
     telemetry_client: TranslationSuccessTelemetryClientPort | None = None
     vrchat_osc_presence: VrchatOscPresencePort | None = field(default=None, repr=False)
+    local_asr_provisioning: LocalASRProvisioningPort | None = field(
+        default=None,
+        repr=False,
+    )
     canonical_settings_persistence: CanonicalSettingsPersistencePort[
         AppSettings, AppSettingsVNext
     ] = field(
@@ -1103,41 +1097,9 @@ class GuiController:
         default=False,
         repr=False,
     )
-    _local_stt_install_state: LocalSTTInstallState = field(
-        init=False,
-        default_factory=lambda: LocalSTTInstallState(status="ready"),
-    )
-    _local_cpu_install_snapshot: LocalCPUInstallSnapshot | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _local_stt_download_model_ids: tuple[str, ...] = field(
-        init=False,
-        default=(),
-        repr=False,
-    )
-    _local_stt_notice_model_id: str | None = field(init=False, default=None)
-    _local_stt_runtime_status: str = field(init=False, default="ready")
-    _local_stt_download_runtime: LocalSTTDownloadRuntime | None = field(
-        init=False,
-        default=None,
-    )
-    _local_stt_download_percent: int | None = field(init=False, default=None)
     _local_stt_pending_enable_after_install: bool = field(init=False, default=False)
     _local_stt_pending_enable_generation: int | None = field(init=False, default=None)
     _local_stt_pending_peer_enable_after_install: bool = field(init=False, default=False)
-    _gpu_asr_runtime: SharedGpuASRRuntime | None = field(init=False, default=None, repr=False)
-    _gpu_reconfiguration_lock: asyncio.Lock | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _gpu_manual_retry_channels: frozenset[GpuASRChannel] = field(
-        init=False,
-        default=frozenset(),
-        repr=False,
-    )
     _gpu_pending_enable_channels: frozenset[GpuASRChannel] = field(
         init=False,
         default=frozenset(),
@@ -1145,32 +1107,11 @@ class GuiController:
     )
     _gpu_ui_state: str | None = field(init=False, default=None, repr=False)
     _gpu_devices: tuple[GpuWorkerDevice, ...] = field(init=False, default=(), repr=False)
-    _gpu_discovery_task: asyncio.Task[tuple[GpuWorkerDevice, ...]] | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
     _gpu_discovery_attempted: bool = field(init=False, default=False, repr=False)
     _gpu_discovery_failed: bool = field(init=False, default=False, repr=False)
     _gpu_discovery_failure_state: str | None = field(init=False, default=None, repr=False)
     _gpu_discovery_generation: int = field(init=False, default=0, repr=False)
     _gpu_discovery_origin: str = field(init=False, default="settings", repr=False)
-    _gpu_install_runtime: LocalSTTDownloadRuntime | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _gpu_install_snapshot: LocalGPUInstallSnapshot | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _gpu_install_percent: int | None = field(init=False, default=None, repr=False)
-    _peer_local_stt_probe_task: asyncio.Task[LocalCPUInstallSnapshot] | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
     # Overlay runtime internals are owned by OverlayRuntimeHandle.
     _overlay_runtime: OverlayRuntimeHandle | None = None
     _overlay_lock: asyncio.Lock | None = None
@@ -1288,7 +1229,7 @@ class GuiController:
             self._peer_translation_activation_requested_for(settings)
             and self._effective_peer_overlay_enabled_for(settings)
             and self.hub is not None
-            and getattr(self.hub, "peer_stt", None) is not None
+            and self._hub_has_stt_provider("peer")
         )
 
     def _peer_translation_eula_accepted_for(self, settings: AppSettings) -> bool:
@@ -1365,40 +1306,13 @@ class GuiController:
         local_cpu_provider = bool(
             self.settings is not None and self.settings.provider.stt.value in LOCAL_CPU_PROVIDERS
         )
-        if gpu_provider:
-            abort = getattr(self.hub, "abort_self_stt_for_toggle_off", None)
-            if callable(abort):
-                await abort()
-                return
-            replace_provider = getattr(self.hub, "replace_stt_provider", None)
-            if callable(replace_provider):
-                await replace_provider(None)
-                return
-        if explicit_toggle_off and local_cpu_provider:
-            abort = getattr(self.hub, "abort_self_stt_for_toggle_off", None)
-            if callable(abort):
-                await abort()
-                return
-        if not force_immediate:
-            drain = getattr(self.hub, "drain_self_stt_for_toggle_off", None)
-            if callable(drain):
-                release_backend_after = (
-                    LOCAL_QWEN_IDLE_RELEASE_SECONDS
-                    if self.settings is not None
-                    and self.settings.provider.stt.value in LOCAL_CPU_PROVIDERS
-                    else None
-                )
-                await drain(release_backend_after=release_backend_after)
-                return
-        else:
-            self.log_detailed("[STT] Force immediate toggle-off requested")
-        stt = getattr(self.hub, "stt", None)
-        if stt is not None:
-            close = getattr(stt, "close", None)
-            if callable(close):
-                result = close()
-                if inspect.isawaitable(result):
-                    await result
+        if gpu_provider or force_immediate or (explicit_toggle_off and local_cpu_provider):
+            if force_immediate:
+                self.log_detailed("[STT] Force immediate toggle-off requested")
+            await self.hub.abort_self_stt_for_toggle_off()
+            return
+        release_backend_after = LOCAL_QWEN_IDLE_RELEASE_SECONDS if local_cpu_provider else None
+        await self.hub.drain_self_stt_for_toggle_off(release_backend_after=release_backend_after)
 
     async def _refresh_overlay_runtime_dependencies(
         self,
@@ -1429,6 +1343,11 @@ class GuiController:
         self._vnext_settings_authoritative = True
         self._canonical_persistence_port_enabled = True
         self._remember_canonical_legacy_projection(self.settings)
+        provisioning = self._get_local_asr_provisioning_owner()
+        await provisioning.inspect_cpu()
+        await provisioning.inspect_gpu(
+            explicit_intent=self._selected_gpu_provider_requires_model(),
+        )
         loaded_settings = self.settings
         (
             normalized_settings,
@@ -1468,7 +1387,7 @@ class GuiController:
             runtime_logging.attach_realtime_sink(logs_view)
 
         await self._init_pipeline()
-        self._refresh_local_stt_runtime_state()
+        self._sync_local_stt_notice()
 
         assert self.hub is not None
 
@@ -1482,7 +1401,7 @@ class GuiController:
                 stt_key_map = {"qwen_asr": self._get_alibaba_verified_key()}
                 stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
                 stt_verified = getattr(self.settings.api_key_verified, stt_verified_key, False)
-                dash.stt_needs_key = (self.hub.stt is None) or (not stt_verified)
+                dash.stt_needs_key = (not self._hub_has_stt_provider("self")) or (not stt_verified)
             else:
                 dash.stt_needs_key = False
 
@@ -1548,18 +1467,14 @@ class GuiController:
         with contextlib.suppress(Exception):
             await asyncio.to_thread(lambda: tuple(PsutilCurrentUserProcessSnapshots().snapshots()))
 
-    def _get_gpu_asr_runtime(self) -> SharedGpuASRRuntime:
-        if self._gpu_asr_runtime is None:
-            self._gpu_asr_runtime = _create_shared_gpu_asr_runtime(
-                clock=self.clock,
-                diagnostic_sink=self._on_gpu_asr_diagnostic,
-            )
-        return self._gpu_asr_runtime
+    def _hub_has_stt_provider(self, channel: str) -> bool:
+        if self.hub is None:
+            return False
+        return bool(self.hub.has_stt_provider(channel))
 
-    def _gpu_runtime_for_provider(self, provider: object) -> SharedGpuASRRuntime | None:
-        value = provider.value if isinstance(provider, STTProviderName) else str(provider)
+    def _hub_local_asr_provider_runtime(self) -> LocalASRProviderRuntimePort | None:
         return (
-            self._get_gpu_asr_runtime() if value == STTProviderName.LOCAL_QWEN_GPU.value else None
+            getattr(self.hub, "local_asr_provider_runtime", None) if self.hub is not None else None
         )
 
     def _set_gpu_ui_state(
@@ -1631,280 +1546,116 @@ class GuiController:
         if action == "restart":
             await self.retry_gpu_activation()
 
-    async def _on_gpu_asr_diagnostic(self, diagnostic: GpuASRDiagnostic) -> None:
-        self.log_detailed(f"[GPU ASR] lifecycle={diagnostic.kind} fields={dict(diagnostic.fields)}")
-        if diagnostic.kind == "activation_ready":
-            active_channels = tuple(
-                sorted(getattr(self._gpu_asr_runtime, "active_channels", ()) or ())
-            )
-            self._log_local_asr_load_result(
-                channel=",".join(active_channels) or "unknown",
-                model_id=str(diagnostic.fields.get("model") or "unknown"),
-                backend="Vulkan",
-                device=str(diagnostic.fields.get("device") or "unknown"),
-                outcome="ready",
-                load_seconds=float(diagnostic.fields.get("model_load_seconds") or 0.0),
-                warmup_seconds=float(diagnostic.fields.get("warmup_seconds") or 0.0),
-            )
-        elif diagnostic.kind == "activation_failed":
-            self._log_local_asr_load_result(
-                channel=(
-                    ",".join(sorted(self._desired_gpu_channels(self.settings)))
-                    if self.settings is not None
-                    else "unknown"
-                ),
-                model_id=str(diagnostic.fields.get("model") or "unknown"),
-                backend="Vulkan",
-                outcome="failed",
-                load_seconds=0.0,
-                failure_code=str(diagnostic.fields.get("failure") or "activation_failed"),
-            )
-        elif diagnostic.kind == "worker_failed":
-            failure_code = str(diagnostic.fields.get("failure") or "worker_failed")
-            exit_code = diagnostic.fields.get("exit_code")
-            suffix = f" exit_code={exit_code}" if exit_code is not None else ""
-            self.log_basic(
-                "[LocalASR][Worker] backend=Vulkan outcome=failed "
-                f"failure_code={failure_code}{suffix}",
-                level=logging.ERROR,
-            )
-        elif diagnostic.kind == "worker_recovery_started":
-            failure_code = str(diagnostic.fields.get("failure") or "decode_failure")
-            self.log_basic(
-                "[LocalASR][Worker] backend=Vulkan outcome=restarting "
-                f"failure_code={failure_code} utterance_retry=false",
-                level=logging.WARNING,
-            )
-        elif diagnostic.kind == "worker_recovery_ready":
-            self.log_basic(
-                "[LocalASR][Worker] backend=Vulkan outcome=recovered " "utterance_retry=false"
-            )
-        elif diagnostic.kind == "decode_attempt":
-            audio_seconds = diagnostic.fields.get("audio_seconds")
-            decode_seconds = diagnostic.fields.get("decode_seconds")
-            rtf = diagnostic.fields.get("rtf")
-            queue_wait_seconds = diagnostic.fields.get("queue_wait_seconds")
-            if all(
-                isinstance(value, (int, float)) and not isinstance(value, bool)
-                for value in (audio_seconds, decode_seconds, rtf, queue_wait_seconds)
-            ):
-                self.log_basic(
-                    "[LocalASR][Attempt] "
-                    f"channel={diagnostic.fields.get('channel') or 'unknown'} "
-                    f"model={diagnostic.fields.get('model') or 'unknown'} "
-                    "backend=Vulkan "
-                    f"audio_seconds={audio_seconds:.3f} "
-                    f"decode_seconds={decode_seconds:.3f} "
-                    f"rtf={rtf:.6f} "
-                    f"result={diagnostic.fields.get('result') or 'unknown'} "
-                    f"queue_wait_seconds={queue_wait_seconds:.3f}"
-                )
-        if diagnostic.kind == "worker_lifecycle":
-            phase = diagnostic.fields.get("phase")
-            if phase in {"validating", "loading", "warming", "ready"}:
-                self._set_gpu_ui_state(str(phase), origin="worker_lifecycle")
-        elif diagnostic.kind == "activation_ready":
-            self._set_gpu_ui_state("ready", origin="activation")
-        elif diagnostic.kind == "discovery_pending":
-            self._set_gpu_ui_state(
-                "discovery_pending",
-                origin=self._gpu_discovery_origin,
-            )
-        elif diagnostic.kind in {"activation_failed", "worker_failed"}:
-            if self.settings is not None:
-                self._gpu_manual_retry_channels = frozenset(
-                    {
-                        *self._gpu_manual_retry_channels,
-                        *self._desired_gpu_channels(self.settings),
-                    }
-                )
-            self._set_gpu_ui_state(
-                "activation_failed",
-                publish_notice=True,
-                origin="worker",
-            )
-
     async def ensure_gpu_device_discovery(
         self,
         *,
         force: bool = False,
         origin: str = "settings",
     ) -> tuple[GpuWorkerDevice, ...]:
-        task = self._gpu_discovery_task
-        if task is not None and not task.done():
-            return await asyncio.shield(task)
-        if not force and (self._gpu_discovery_attempted or self._gpu_devices):
-            self._gpu_discovery_attempted = True
-            return self._gpu_devices
-        self._gpu_discovery_generation += 1
+        owned_runtime = self._hub_local_asr_provider_runtime()
+        if owned_runtime is None:
+            raise RuntimeError("local ASR provider runtime is unavailable")
         self._gpu_discovery_origin = origin
-        task = start_lifecycle_task(
-            self._ui_background_scope,
-            self._run_gpu_device_discovery(origin=origin),
-            name=f"gpu-device-discovery-{self._gpu_discovery_generation}",
-        )
-        self._gpu_discovery_task = task
-        try:
-            return await asyncio.shield(task)
-        finally:
-            if self._gpu_discovery_task is task and task.done():
-                self._gpu_discovery_task = None
-
-    async def _run_gpu_device_discovery(self, *, origin: str) -> tuple[GpuWorkerDevice, ...]:
         self._set_gpu_ui_state("discovering", origin=origin)
-        runtime = self._get_gpu_asr_runtime()
-        try:
-            self._gpu_devices = await runtime.discover_devices()
-            self._gpu_discovery_attempted = True
-            self._gpu_discovery_failed = False
-            self._gpu_discovery_failure_state = None
-            if not self._gpu_devices:
-                self.log_basic(
-                    "[LocalASR][Device] backend=Vulkan outcome=unavailable "
-                    f"reason=no_supported_gpu origin={origin}",
-                    level=logging.WARNING,
-                )
-                self._set_gpu_ui_state("unsupported", origin=origin)
-                return self._gpu_devices
+        snapshot = await owned_runtime.discover_gpu(force=force)
+        self._on_local_asr_provider_runtime_state_changed(snapshot)
+        if snapshot.gpu.phase == "unsupported":
+            self._set_gpu_ui_state("unsupported", origin=origin)
+        elif snapshot.gpu.phase == "failed":
             self._set_gpu_ui_state(
-                self._gpu_idle_ui_state(),
+                "discovery_failed",
+                publish_notice=True,
                 origin=origin,
             )
-            return self._gpu_devices
-        except asyncio.CancelledError:
-            raise
-        except (FileNotFoundError, GpuWorkerRequestError) as exc:
-            self._gpu_discovery_attempted = True
-            self._gpu_discovery_failed = True
-            self._gpu_devices = ()
-            code = exc.code if isinstance(exc, GpuWorkerRequestError) else "worker_missing"
-            state = (
-                "unsupported"
-                if "unsupported" in code or "vulkan" in code or code == "worker_missing"
-                else "discovery_failed"
+        else:
+            self._set_gpu_ui_state(self._gpu_idle_ui_state(), origin=origin)
+        return snapshot.gpu.devices
+
+    def _get_local_asr_provisioning_owner(self) -> LocalASRProvisioningPort:
+        if self.local_asr_provisioning is None:
+            self.local_asr_provisioning = create_local_asr_provisioning_owner(
+                state_changed=self._on_local_asr_provisioning_state_changed,
+                diagnostic_sink=self._on_local_asr_provisioning_diagnostic,
             )
-            self._gpu_discovery_failure_state = state
-            self.log_detailed(
-                f"[GPU ASR] discovery failure={code}",
-                level=logging.WARNING,
-                exception=exc,
+        return self.local_asr_provisioning
+
+    def _on_local_asr_provisioning_state_changed(
+        self,
+        snapshot: LocalASRProvisioningSnapshot,
+    ) -> None:
+        self._sync_local_cpu_auto_availability(snapshot.cpu_auto_available)
+        activity = snapshot.activity_for("gpu")
+        if activity is not None:
+            self._set_gpu_ui_state(
+                "installing",
+                progress_percent=activity.progress_percent,
+                publish_notice=True,
+                origin=activity.origin,
             )
-            self.log_basic(
-                "[LocalASR][Device] backend=Vulkan outcome=failed "
-                f"failure_code={code} origin={origin}",
-                level=logging.ERROR,
-            )
-            self._set_gpu_ui_state(state, origin=origin)
-            return self._gpu_devices
-        except Exception as exc:
-            self._gpu_discovery_attempted = True
-            self._gpu_discovery_failed = True
-            self._gpu_discovery_failure_state = "discovery_failed"
-            self._gpu_devices = ()
-            self.log_detailed(
-                "[GPU ASR] Device discovery failed",
-                level=logging.WARNING,
-                exception=exc,
-            )
-            self.log_basic(
-                "[LocalASR][Device] backend=Vulkan outcome=failed "
-                f"failure_type={type(exc).__name__} origin={origin}",
-                level=logging.ERROR,
-            )
-            self._set_gpu_ui_state("discovery_failed", origin=origin)
-            return self._gpu_devices
+        self._sync_local_stt_notice()
+
+    def _on_local_asr_provisioning_diagnostic(
+        self,
+        diagnostic: LocalASRProvisioningDiagnostic,
+    ) -> None:
+        fields = [
+            f"model={diagnostic.model_id or 'unknown'}",
+            f"origin={diagnostic.origin or 'runtime'}",
+            f"outcome={diagnostic.outcome or 'observed'}",
+        ]
+        if diagnostic.elapsed_seconds is not None:
+            fields.append(f"elapsed_seconds={diagnostic.elapsed_seconds:.3f}")
+        if diagnostic.failure_type is not None:
+            fields.append(f"failure_type={diagnostic.failure_type}")
+        level = logging.ERROR if diagnostic.outcome == "failed" else logging.INFO
+        self.log_basic(f"[LocalASR][{diagnostic.event.title()}] {' '.join(fields)}", level=level)
 
     def _gpu_idle_ui_state(self) -> str:
-        model_path = local_gpu_model_path()
-        if not model_path.is_file():
+        snapshot = self._get_local_asr_provisioning_owner().snapshot
+        status = snapshot.state_for(LOCAL_QWEN_GPU_MODEL_ID).status
+        if status in {"not_requested", "missing"}:
             return "not_installed"
-        snapshot = inspect_local_gpu_install(explicit_opt_in=True, verify_checksums=False)
-        self._gpu_install_snapshot = snapshot
-        return "installed" if snapshot.activation_allowed else "invalid"
+        if status in {"invalid", "download_failed", "cancelled"}:
+            return "invalid"
+        if status == "downloading":
+            return "installing"
+        return "installed"
 
     async def _validate_gpu_activation(self) -> bool:
         if self.settings is None:
             return False
-        if (
-            self._gpu_asr_runtime is not None
-            and self._gpu_asr_runtime.state == GpuASRRuntimeState.READY
-            and self._gpu_asr_runtime.configured_device_id == self.settings.stt.gpu_device_id
-        ):
-            self._set_gpu_ui_state("ready", origin="activation")
-            return True
-        await self.ensure_gpu_device_discovery(origin="activation")
-        if self._gpu_discovery_failed:
-            self._set_gpu_ui_state(
-                self._gpu_discovery_failure_state or "discovery_failed",
-                publish_notice=True,
-                origin="activation",
-            )
-            return False
-        selected_device = self.settings.stt.gpu_device_id
-        known_devices = {device.device_id for device in self._gpu_devices}
-        if not self._gpu_devices:
-            self._set_gpu_ui_state(
-                "unsupported",
-                publish_notice=True,
-                origin="activation",
-            )
-            return False
-        if selected_device != "auto" and selected_device not in known_devices:
-            self.log_basic(
-                "[LocalASR][Device] backend=Vulkan outcome=unavailable "
-                f"device={selected_device} reason=saved_device_missing",
-                level=logging.WARNING,
-            )
-            self._set_gpu_ui_state(
-                "unavailable_device",
-                publish_notice=True,
-                origin="activation",
-            )
-            return False
-        install_runtime = self._gpu_install_runtime
-        if (
-            install_runtime is not None
-            and install_runtime.download_task is not None
-            and not install_runtime.download_task.done()
-        ):
-            self._set_gpu_ui_state(
-                "installing",
-                progress_percent=self._gpu_install_percent or 0,
-                publish_notice=True,
-                origin="explicit_install",
-            )
-            return False
-        if self._gpu_ui_state == "install_failed":
-            self._set_gpu_ui_state(
-                "install_failed",
-                publish_notice=True,
-                origin="explicit_install",
-            )
-            return False
+        owned_runtime = self._hub_local_asr_provider_runtime()
+        if owned_runtime is None:
+            raise RuntimeError("local ASR provider runtime is unavailable")
         self._set_gpu_ui_state("validating", origin="activation")
-        snapshot = await run_owned_thread_call(
-            lambda: inspect_local_gpu_install(
-                explicit_opt_in=True,
-                verify_checksums=False,
-            )
+        snapshot = await owned_runtime.inspect_gpu_readiness(
+            explicit_intent=True,
+            device_id=self.settings.stt.gpu_device_id,
         )
-        self._gpu_install_snapshot = snapshot
-        if snapshot.status == "missing":
+        self._on_local_asr_provider_runtime_state_changed(snapshot)
+        phase = snapshot.gpu.phase
+        if phase in {"available", "ready"}:
             self._set_gpu_ui_state(
-                "not_installed",
-                publish_notice=True,
+                "ready" if phase == "ready" else "loading",
                 origin="activation",
             )
-            return False
-        if not snapshot.activation_allowed:
-            self._set_gpu_ui_state(
-                "invalid",
-                publish_notice=True,
-                origin="activation",
-            )
-            return False
-        self._set_gpu_ui_state("loading", origin="activation")
-        return True
+            return True
+        state_by_phase = {
+            "unsupported": "unsupported",
+            "not_installed": "not_installed",
+            "invalid": "invalid",
+            "failed": (
+                "unavailable_device"
+                if snapshot.gpu.failure_code == "saved_device_missing"
+                else "activation_failed"
+            ),
+        }
+        self._set_gpu_ui_state(
+            state_by_phase.get(phase, "activation_failed"),
+            publish_notice=True,
+            origin="activation",
+        )
+        return False
 
     def _selected_gpu_provider_requires_model(self) -> bool:
         return bool(
@@ -1918,121 +1669,61 @@ class GuiController:
     async def install_selected_gpu_model_if_needed(self) -> bool:
         if not self._selected_gpu_provider_requires_model():
             return False
-        runtime = self._gpu_install_runtime
-        if (
-            runtime is not None
-            and runtime.download_task is not None
-            and not runtime.download_task.done()
-        ):
+        provisioning = self._get_local_asr_provisioning_owner()
+        if provisioning.snapshot.activity_for("gpu") is not None:
             return False
-        snapshot = await run_owned_thread_call(
-            lambda: inspect_local_gpu_install(
-                explicit_opt_in=True,
-                verify_checksums=False,
-            )
+        snapshot = await provisioning.inspect_gpu(
+            explicit_intent=True,
+            verify_checksums=False,
         )
         if not self._selected_gpu_provider_requires_model():
             return False
-        self._gpu_install_snapshot = snapshot
-        if snapshot.status == "ready" and snapshot.activation_allowed:
+        if snapshot.state_for(LOCAL_QWEN_GPU_MODEL_ID).status == "ready":
             return False
         await self.install_or_repair_gpu_model(origin="settings_exit")
         return True
 
     async def install_or_repair_gpu_model(self, *, origin: str = "manual") -> None:
-        runtime = self._gpu_install_runtime
-        if runtime is None or runtime.is_closed:
-            runtime = LocalSTTDownloadRuntime()
-            self._gpu_install_runtime = runtime
-        if runtime.download_task is not None and not runtime.download_task.done():
+        provisioning = self._get_local_asr_provisioning_owner()
+        if provisioning.snapshot.activity_for("gpu") is not None:
             return
-        manifest = load_local_gpu_asset_manifest()
-
-        async def run_install(cancel_event: threading.Event, generation: int) -> object:
-            async def on_status(update: RuntimeLocalSTTStatusUpdate) -> None:
-                if runtime.is_current_generation(generation):
-                    self._gpu_install_percent = update.percent
-                    self._set_gpu_ui_state(
-                        "installing",
-                        progress_percent=update.percent,
-                        publish_notice=True,
-                        origin=origin,
-                    )
-
-            return await ensure_local_stt_installed(
-                model_id=manifest.model_id,
-                manifest=manifest,
-                locale=self.settings.ui.locale if self.settings is not None else None,
-                on_status=on_status,
-                cancel_event=cancel_event,
-            )
-
-        self._gpu_install_percent = 0
         self._set_gpu_ui_state(
             "installing",
             progress_percent=0,
             publish_notice=True,
             origin=origin,
         )
-        install_started_at = time.monotonic()
-        self.log_basic(
-            f"[LocalASR][Install] model={manifest.model_id} origin={origin} outcome=started"
-        )
-        task = runtime.start(origin=origin, run_download=run_install)
-        try:
-            await task
-            snapshot = await run_owned_thread_call(
-                lambda: inspect_local_gpu_install(
-                    explicit_opt_in=True,
-                    verify_checksums=True,
-                )
+        task = provisioning.start_install(
+            LocalASRInstallRequest(
+                backend="gpu",
+                model_ids=(LOCAL_QWEN_GPU_MODEL_ID,),
+                locale=self.settings.ui.locale if self.settings is not None else None,
+                origin=origin,
+                explicit_gpu_intent=True,
             )
-            self._gpu_install_snapshot = snapshot
-            if not snapshot.activation_allowed:
-                self._gpu_install_percent = None
-                self.log_basic(
-                    "[LocalASR][Install] "
-                    f"model={manifest.model_id} origin={origin} outcome=failed "
-                    f"elapsed_seconds={time.monotonic() - install_started_at:.3f} "
-                    "failure_code=post_install_validation_failed",
-                    level=logging.ERROR,
-                )
+        )
+        try:
+            result = await task
+            if result.cancelled:
+                return
+            if result.failed_model_ids:
                 self._set_gpu_ui_state(
-                    "invalid",
+                    "install_failed",
                     publish_notice=True,
                     origin=origin,
                 )
                 return
             pending = self._gpu_pending_enable_channels
-            self._gpu_install_percent = None
             self._set_gpu_ui_state("installed", origin=origin)
-            self.log_basic(
-                "[LocalASR][Install] "
-                f"model={manifest.model_id} origin={origin} outcome=ready "
-                f"elapsed_seconds={time.monotonic() - install_started_at:.3f}"
-            )
             if pending:
                 await self.retry_gpu_activation()
         except asyncio.CancelledError:
-            self.log_detailed(
-                "[LocalASR][Install] "
-                f"model={manifest.model_id} origin={origin} outcome=cancelled "
-                f"elapsed_seconds={time.monotonic() - install_started_at:.3f}"
-            )
             raise
         except Exception as exc:
-            self._gpu_install_percent = None
             self.log_detailed(
                 "[GPU ASR] model_install failure=unexpected",
                 level=logging.WARNING,
                 exception=exc,
-            )
-            self.log_basic(
-                "[LocalASR][Install] "
-                f"model={manifest.model_id} origin={origin} outcome=failed "
-                f"elapsed_seconds={time.monotonic() - install_started_at:.3f} "
-                f"failure_type={type(exc).__name__}",
-                level=logging.ERROR,
             )
             self._set_gpu_ui_state(
                 "install_failed",
@@ -2043,64 +1734,45 @@ class GuiController:
     async def retry_gpu_activation(self) -> None:
         if self.settings is None:
             return
-        if self._gpu_reconfiguration_lock is None:
-            self._gpu_reconfiguration_lock = asyncio.Lock()
-        async with self._gpu_reconfiguration_lock:
-            await self._retry_gpu_activation_locked()
-
-    async def _retry_gpu_activation_locked(self) -> None:
-        if self.settings is None:
-            return
-        selected_device = self.settings.stt.gpu_device_id
-        known_devices = {device.device_id for device in self._gpu_devices}
-        if not self._gpu_devices or (
-            selected_device != "auto" and selected_device not in known_devices
-        ):
-            await self.ensure_gpu_device_discovery(force=True, origin="manual_retry")
-        if not await self._validate_gpu_activation():
-            return
-        await self._restore_gpu_channels_after_manual_retry()
-
-    async def _restore_gpu_channels_after_manual_retry(self) -> None:
-        if self.settings is None:
-            return
-        runtime = self._get_gpu_asr_runtime()
-        restore_channels = set(self._gpu_manual_retry_channels) | set(
-            self._desired_gpu_channels(self.settings)
+        owned_runtime = self._hub_local_asr_provider_runtime()
+        if owned_runtime is None:
+            raise RuntimeError("local ASR provider runtime is unavailable")
+        desired_channels = frozenset(
+            {
+                *self._desired_gpu_channels(self.settings),
+                *self._gpu_pending_enable_channels,
+            }
         )
+        recovery, peer_config = self._build_gpu_recovery_request(
+            self.settings,
+            desired_channels,
+            reason="manual_retry",
+        )
+        if not recovery.channels:
+            return
         try:
-            if runtime.state == GpuASRRuntimeState.FAILED and runtime.active_channels:
-                await runtime.retry()
-                self._set_gpu_ui_state("ready", origin="manual_retry")
-                restore_channels.difference_update(runtime.active_channels)
-            if (
-                self.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-                and (self._stt_desired or "self" in restore_channels)
-                and "self" not in runtime.active_channels
+            snapshot = await owned_runtime.recover_gpu(
+                recovery,
+                quiesce=self._suspend_gpu_provider_consumers,
+            )
+            recovered_channels = frozenset(item.request.channel for item in recovery.channels)
+            if snapshot.gpu.retry_required or not recovered_channels.issubset(
+                snapshot.gpu.active_channels
             ):
-                await self._rebuild_stt_provider()
-                self._stt_desired = True
-                await self.set_stt_enabled(True)
-            if (
-                self.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-                and (self.settings.ui.peer_translation_enabled or "peer" in restore_channels)
-                and "peer" not in runtime.active_channels
-            ):
-                await self._refresh_peer_stt_runtime()
-            if runtime.state == GpuASRRuntimeState.FAILED:
-                raise GpuASRManualRetryRequired(
-                    runtime.last_failure_code or "manual_retry_required"
-                )
-            self._gpu_manual_retry_channels = frozenset()
+                self._on_local_asr_provider_runtime_state_changed(snapshot)
+                return
+            await self._resume_gpu_provider_consumers(
+                settings=self.settings,
+                channels=recovered_channels,
+                peer_config=peer_config,
+            )
             self._gpu_pending_enable_channels = frozenset(
                 channel
                 for channel in self._gpu_pending_enable_channels
-                if channel not in restore_channels
+                if channel not in recovered_channels
             )
             self._set_gpu_ui_state("ready", origin="manual_retry")
         except Exception:
-            self._gpu_manual_retry_channels = frozenset(restore_channels)
-            await self._quiesce_shared_gpu_consumers(self.settings)
             self._set_gpu_ui_state(
                 "activation_failed",
                 publish_notice=True,
@@ -4988,13 +4660,7 @@ class GuiController:
         await self._close_clipboard_runtime()
         await self._close_app_oauth_runtime_for_release(cleanup_failures)
         await self._close_oauth_runtime_for_release(cleanup_failures)
-        await self._cancel_local_stt_download()
-        if self._gpu_install_runtime is not None:
-            await self._gpu_install_runtime.close()
-        gpu_discovery_task = self._gpu_discovery_task
-        if gpu_discovery_task is not None and gpu_discovery_task is not asyncio.current_task():
-            gpu_discovery_task.cancel()
-            await asyncio.gather(gpu_discovery_task, return_exceptions=True)
+        await self._close_local_asr_provisioning()
         await self._close_microphone_test_runtime_for_release(cleanup_failures)
         try:
             await self.set_stt_enabled(False)
@@ -5011,13 +4677,6 @@ class GuiController:
         await self._close_peer_runtime_for_release(cleanup_failures)
 
         await self._stop_hub_for_release(cleanup_failures)
-        gpu_runtime = self._gpu_asr_runtime
-        if gpu_runtime is not None:
-            try:
-                await gpu_runtime.close()
-            except Exception as exc:
-                cleanup_failures.append(exc)
-            self._gpu_asr_runtime = None
         if self.hub is None:
             self._bridge_task = None
             self._ui_event_bridge = None
@@ -5059,7 +4718,6 @@ class GuiController:
             self._last_peer_translation_enabled = False
             self._last_peer_translation_activation_requested = False
             self._clear_overlay_session_desktop_fallback()
-            await self._cancel_peer_local_stt_probe()
         self._refresh_overlay_peer_consumers()
 
         if enabled:
@@ -5121,7 +4779,6 @@ class GuiController:
             self._gpu_pending_enable_channels = frozenset(
                 channel for channel in self._gpu_pending_enable_channels if channel != "peer"
             )
-            await self._cancel_peer_local_stt_probe()
         self._clear_local_stt_pending_enable_if_provider_switched_away()
         self._sync_local_stt_notice()
         self._refresh_overlay_peer_consumers()
@@ -5860,7 +5517,7 @@ class GuiController:
                 self._sync_local_stt_notice()
                 return
             if current_status in ("missing", "invalid", "download_failed"):
-                self._handle_local_stt_unavailable(
+                self._request_unavailable_local_asr_repair(
                     current_status,
                     channel="self",
                     activation_generation=activation_generation,
@@ -6099,11 +5756,9 @@ class GuiController:
         )
         cpu_auto_available = True
         if cpu_auto_requested:
-            snapshot = self._local_cpu_install_snapshot
-            if snapshot is None:
-                snapshot = self._inspect_local_cpu_model_installs_for_selection()
-                self._set_local_cpu_install_snapshot(snapshot)
-            cpu_auto_available = snapshot.cpu_auto_available
+            cpu_auto_available = (
+                self._get_local_asr_provisioning_owner().snapshot.cpu_auto_available
+            )
         self_decision = resolve_local_asr_selection(
             settings.provider.stt.value,
             settings.languages.source_language,
@@ -6256,58 +5911,11 @@ class GuiController:
                 f"model={decision.model_id or 'unknown'} reason=preferred_model_unavailable"
             )
 
-    def _refresh_local_stt_runtime_state(self) -> None:
-        if self.settings is None:
-            return
-        snapshot = self._inspect_local_cpu_model_installs_for_selection()
-        self._set_local_cpu_install_snapshot(snapshot)
-        recovered_model_ids = self._local_stt_download_model_ids
-        recovered_from_download_failure = (
-            self._local_stt_runtime_status == "download_failed"
-            and bool(recovered_model_ids)
-            and all(
-                snapshot.state_for(model_id).status == "ready" for model_id in recovered_model_ids
-            )
-        )
-        if recovered_from_download_failure:
-            self._local_stt_runtime_status = "ready"
-            self._local_stt_download_model_ids = ()
-            self._local_stt_notice_model_id = None
-            self._local_stt_download_percent = None
-        elif self._local_stt_runtime_status not in ("downloading", "download_failed"):
-            self._local_stt_runtime_status = self._local_stt_install_state_for_provider(
-                self.settings.provider.stt.value
-            ).status
-        self._sync_local_stt_notice()
-
-    def _inspect_local_cpu_model_installs_for_selection(self) -> LocalCPUInstallSnapshot:
-        qwen_state = inspect_local_stt_install_state()
-        snapshot = inspect_required_cpu_model_installs(verify_checksums=False)
-        return LocalCPUInstallSnapshot(
-            models=tuple(
-                LocalCPUModelInstall(
-                    model_id=model.model_id,
-                    state=qwen_state if model.model_id == LOCAL_STT_MODEL_ID else model.state,
-                )
-                for model in snapshot.models
-            )
-        )
-
-    def _get_local_stt_download_runtime(self) -> LocalSTTDownloadRuntime:
-        if self._local_stt_download_runtime is None:
-            self._local_stt_download_runtime = LocalSTTDownloadRuntime()
-        return self._local_stt_download_runtime
-
     def _required_local_stt_model_ids_for_provider(self, provider: str) -> tuple[str, ...]:
         if provider == LOCAL_CPU_AUTO_PROVIDER:
             return REQUIRED_CPU_LOCAL_STT_MODEL_IDS
         model_id = LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER.get(provider)
         return (model_id,) if model_id is not None else ()
-
-    def _set_local_cpu_install_snapshot(self, snapshot: LocalCPUInstallSnapshot) -> None:
-        self._local_cpu_install_snapshot = snapshot
-        self._local_stt_install_state = snapshot.state_for(LOCAL_STT_MODEL_ID)
-        self._sync_local_cpu_auto_availability(snapshot.cpu_auto_available)
 
     def _sync_local_cpu_auto_availability(self, available: bool) -> None:
         view_settings = getattr(self.app, "view_settings", None)
@@ -6315,82 +5923,20 @@ class GuiController:
         if callable(setter):
             setter(available)
 
-    def _replace_local_stt_model_states(
-        self,
-        states: Mapping[str, LocalSTTInstallState],
-    ) -> None:
-        snapshot = self._local_cpu_install_snapshot
-        if snapshot is None:
-            snapshot = LocalCPUInstallSnapshot(
-                models=tuple(
-                    LocalCPUModelInstall(
-                        model_id=model_id,
-                        state=(
-                            self._local_stt_install_state
-                            if model_id == LOCAL_STT_MODEL_ID
-                            else LocalSTTInstallState(status="ready")
-                        ),
-                    )
-                    for model_id in REQUIRED_CPU_LOCAL_STT_MODEL_IDS
-                )
-            )
-        self._set_local_cpu_install_snapshot(
-            LocalCPUInstallSnapshot(
-                models=tuple(
-                    LocalCPUModelInstall(
-                        model_id=model.model_id,
-                        state=states.get(model.model_id, model.state),
-                    )
-                    for model in snapshot.models
-                )
-            )
-        )
-
-    def _local_stt_install_state_for_provider(self, provider: str) -> LocalSTTInstallState:
-        model_ids = self._required_local_stt_model_ids_for_provider(provider)
-        snapshot = self._local_cpu_install_snapshot
-        if not model_ids:
-            return self._local_stt_install_state
-        if snapshot is None:
-            if provider == STTProviderName.LOCAL_QWEN.value:
-                return self._local_stt_install_state
-            return LocalSTTInstallState(status="missing")
-        states = tuple(snapshot.state_for(model_id) for model_id in model_ids)
-        if all(state.status == "ready" for state in states):
-            return LocalSTTInstallState(status="ready")
-        invalid = next((state for state in states if state.status == "invalid"), None)
-        if invalid is not None:
-            return LocalSTTInstallState(
-                status="invalid",
-                error_message=invalid.error_message,
-            )
-        return LocalSTTInstallState(status="missing")
-
     def _local_stt_runtime_status_for_provider(self, provider: str) -> str:
-        required_model_ids = set(self._required_local_stt_model_ids_for_provider(provider))
-        downloading_model_ids = set(self._local_stt_download_model_ids or (LOCAL_STT_MODEL_ID,))
-        if (
-            self._local_stt_runtime_status in ("downloading", "download_failed")
-            and required_model_ids & downloading_model_ids
-        ):
-            return self._local_stt_runtime_status
-        return self._local_stt_install_state_for_provider(provider).status
+        model_ids = self._required_local_stt_model_ids_for_provider(provider)
+        if not model_ids:
+            return "ready"
+        return self._get_local_asr_provisioning_owner().snapshot.status_for(model_ids)
 
     def _current_local_stt_runtime_status(self) -> str:
         if self.settings is None:
-            return self._local_stt_install_state.status
+            return "ready"
         return self._local_stt_runtime_status_for_provider(self.settings.provider.stt.value)
 
     def _local_stt_models_needing_install(self, provider: str) -> tuple[str, ...]:
         model_ids = self._required_local_stt_model_ids_for_provider(provider)
-        snapshot = self._local_cpu_install_snapshot
-        if snapshot is None:
-            if provider == STTProviderName.LOCAL_QWEN.value:
-                return model_ids if self._local_stt_install_state.status != "ready" else ()
-            return model_ids
-        return tuple(
-            model_id for model_id in model_ids if snapshot.state_for(model_id).status != "ready"
-        )
+        return self._get_local_asr_provisioning_owner().snapshot.unavailable_model_ids(model_ids)
 
     def _peer_local_stt_requested(self, settings: AppSettings | None = None) -> bool:
         resolved_settings = settings or self.settings
@@ -6448,6 +5994,23 @@ class GuiController:
             if self_local
             else self._local_stt_runtime_status_for_provider(peer_provider)
         )
+        provisioning_snapshot = self._get_local_asr_provisioning_owner().snapshot
+        visible_model_ids = self._required_local_stt_model_ids_for_provider(
+            self_provider if self_local else peer_provider
+        )
+        activity = provisioning_snapshot.activity_for("cpu")
+        notice_model_id = (
+            activity.model_id
+            if activity is not None and activity.model_id in visible_model_ids
+            else next(
+                (
+                    model_id
+                    for model_id in visible_model_ids
+                    if provisioning_snapshot.state_for(model_id).status != "ready"
+                ),
+                None,
+            )
+        )
         if (self._stt_activation_starting or self._self_asr_model_loading) and self_local_asr:
             status = "self_loading"
         elif (self._peer_activation_starting or self._peer_asr_model_loading) and peer_local_asr:
@@ -6460,149 +6023,74 @@ class GuiController:
         with contextlib.suppress(Exception):
             set_model = getattr(dash, "set_local_stt_notice_model", None)
             if callable(set_model):
-                set_model(self._local_stt_notice_model_id if should_show else None)
+                set_model(notice_model_id if should_show else None)
             dash.set_local_stt_notice(
                 status if should_show else None,
-                percent=self._local_stt_download_percent if status == "downloading" else None,
-            )
-
-    def _start_local_stt_download(self, *, origin: str) -> bool:
-        runtime = self._get_local_stt_download_runtime()
-        task = runtime.download_task
-        if task is not None and not task.done():
-            return False
-        if not self._local_stt_download_model_ids:
-            self._local_stt_download_model_ids = (LOCAL_STT_MODEL_ID,)
-        self._local_stt_download_percent = 0
-        try:
-            runtime.start(
-                origin=origin,
-                run_download=lambda cancel_event, generation: self._run_local_stt_download(
-                    origin=origin,
-                    cancel_event=cancel_event,
-                    generation=generation,
+                percent=(
+                    activity.progress_percent
+                    if status == "downloading" and activity is not None
+                    else None
                 ),
             )
-        except RuntimeError:
-            return False
-        return True
 
-    async def _run_local_stt_download(
+    def _request_local_asr_install(
         self,
         *,
         origin: str,
-        cancel_event: threading.Event | None = None,
-        generation: int | None = None,
-    ) -> None:
-        runtime = self._local_stt_download_runtime
-        if generation is None and runtime is not None:
-            generation = runtime.generation
+        model_ids: tuple[str, ...] | None = None,
+    ) -> bool:
         if self.settings is None:
-            return
-        if generation is not None and runtime is not None:
-            if not runtime.is_current_generation(generation):
-                return
-        self._local_stt_runtime_status = "downloading"
-        self._local_stt_download_percent = 0
-        self._sync_local_stt_notice()
-        installed_manifests: dict[str, object] = {}
-        failures: list[tuple[str, LocalSTTRuntimeInstallError]] = []
-        active_model_id: str | None = None
-        active_install_started_at: float | None = None
+            return False
+        provisioning = self._get_local_asr_provisioning_owner()
+        if provisioning.snapshot.activity_for("cpu") is not None:
+            return False
+        requested_model_ids = model_ids or (LOCAL_STT_MODEL_ID,)
         try:
-            for model_id in self._local_stt_download_model_ids:
-                active_model_id = model_id
-                active_install_started_at = time.monotonic()
-                self.log_basic(
-                    f"[LocalASR][Install] model={model_id} origin={origin} outcome=started"
+            task = provisioning.start_install(
+                LocalASRInstallRequest(
+                    backend="cpu",
+                    model_ids=requested_model_ids,
+                    locale=self.settings.ui.locale,
+                    origin=origin,
                 )
-                self._local_stt_notice_model_id = model_id
-                self._local_stt_download_percent = 0
-                self._sync_local_stt_notice()
-
-                async def on_status(update: RuntimeLocalSTTStatusUpdate) -> None:
-                    if generation is not None and runtime is not None:
-                        await runtime.dispatch_status_update(
-                            update,
-                            generation=generation,
-                            on_status=self._handle_local_stt_download_status,
-                        )
-                        return
-                    await self._handle_local_stt_download_status(update)
-
-                try:
-                    if model_id == LOCAL_STT_MODEL_ID:
-                        installed = await ensure_local_stt_installed(
-                            locale=self.settings.ui.locale,
-                            on_status=on_status,
-                            cancel_event=cancel_event,
-                        )
-                    else:
-                        installed = await ensure_local_stt_installed(
-                            model_id=model_id,
-                            locale=self.settings.ui.locale,
-                            on_status=on_status,
-                            cancel_event=cancel_event,
-                        )
-                    installed_manifests[model_id] = installed
-                    self.log_basic(
-                        "[LocalASR][Install] "
-                        f"model={model_id} origin={origin} outcome=ready "
-                        f"elapsed_seconds={time.monotonic() - active_install_started_at:.3f}"
-                    )
-                except LocalSTTRuntimeInstallError as exc:
-                    failures.append((model_id, exc))
-                    self.log_basic(
-                        "[LocalASR][Install] "
-                        f"model={model_id} origin={origin} outcome=failed "
-                        f"elapsed_seconds={time.monotonic() - active_install_started_at:.3f} "
-                        f"failure_type={type(exc).__name__}",
-                        level=logging.ERROR,
-                    )
-        except (asyncio.CancelledError, LocalSTTRuntimeInstallCancelled):
-            if active_model_id is not None and active_install_started_at is not None:
-                self.log_detailed(
-                    "[LocalASR][Install] "
-                    f"model={active_model_id} origin={origin} outcome=cancelled "
-                    f"elapsed_seconds={time.monotonic() - active_install_started_at:.3f}"
-                )
-            return
-        if installed_manifests:
-            self._replace_local_stt_model_states(
-                {
-                    model_id: LocalSTTInstallState(
-                        status="ready",
-                        installed_manifest=installed,
-                    )
-                    for model_id, installed in installed_manifests.items()
-                }
             )
-        if failures:
-            if generation is not None and runtime is not None:
-                if not runtime.is_current_generation(generation):
-                    return
-            self._local_stt_download_model_ids = tuple(model_id for model_id, _ in failures)
-            self._local_stt_notice_model_id = self._local_stt_download_model_ids[0]
-            self._local_stt_runtime_status = "download_failed"
-            self._local_stt_download_percent = None
-            self._sync_local_stt_notice()
+        except RuntimeError:
+            return False
+
+        def schedule_result_handler(
+            completed: asyncio.Task[LocalASRInstallResult],
+        ) -> None:
+            if self._ui_background_scope.is_closed:
+                return
+            start_lifecycle_task(
+                self._ui_background_scope,
+                self._handle_local_stt_install_result(completed, origin=origin),
+                name=f"local-asr-install-result-{id(completed)}",
+            )
+
+        task.add_done_callback(schedule_result_handler)
+        return True
+
+    async def _handle_local_stt_install_result(
+        self,
+        task: asyncio.Task[LocalASRInstallResult],
+        *,
+        origin: str,
+    ) -> None:
+        result = await task
+        if result.cancelled:
+            return
+        if result.failed_model_ids:
             if origin == "manual":
                 self._show_short_stt_message("local_stt.download_failed")
             return
-        if generation is not None and runtime is not None:
-            if not runtime.is_current_generation(generation):
-                return
 
-        self._local_stt_runtime_status = "ready"
-        self._local_stt_download_percent = None
         self._clear_local_stt_pending_enable_if_provider_switched_away()
-        self._sync_local_stt_notice()
-
         should_resume_self_local_stt = (
             origin == "manual"
             and self.settings is not None
             and self.settings.provider.stt.value in LOCAL_CPU_PROVIDERS
-            and self._local_stt_install_state_for_provider(self.settings.provider.stt.value).status
+            and self._local_stt_runtime_status_for_provider(self.settings.provider.stt.value)
             == "ready"
             and self._local_stt_pending_enable_after_install
             and (
@@ -6614,9 +6102,7 @@ class GuiController:
             origin == "manual"
             and self.settings is not None
             and self._peer_local_stt_requested(self.settings)
-            and self._local_stt_install_state_for_provider(
-                self.settings.provider.peer_stt.value
-            ).status
+            and self._local_stt_runtime_status_for_provider(self.settings.provider.peer_stt.value)
             == "ready"
             and self._local_stt_pending_peer_enable_after_install
         )
@@ -6652,26 +6138,12 @@ class GuiController:
             self._reset_local_stt_pending_peer_enable_after_install()
             await self._refresh_overlay_runtime_dependencies()
 
-    async def _handle_local_stt_download_status(
-        self,
-        update: RuntimeLocalSTTStatusUpdate,
-        *,
-        generation: int | None = None,
-    ) -> None:
-        if generation is not None and self._local_stt_download_runtime is not None:
-            if not self._local_stt_download_runtime.is_current_generation(generation):
-                return
-        self._local_stt_runtime_status = update.status
-        self._local_stt_download_percent = update.percent
-        self._sync_local_stt_notice()
-
-    def _handle_local_stt_unavailable(
+    def _request_unavailable_local_asr_repair(
         self,
         status: str,
         *,
         channel: str,
         model_ids: tuple[str, ...] | None = None,
-        snapshot: LocalCPUInstallSnapshot | None = None,
         activation_generation: int | None = None,
     ) -> bool:
         if self.settings is None:
@@ -6689,16 +6161,6 @@ class GuiController:
             if channel == "self"
             else self.settings.provider.peer_stt.value
         )
-        required_model_ids = self._required_local_stt_model_ids_for_provider(provider)
-        if snapshot is not None:
-            self._set_local_cpu_install_snapshot(snapshot)
-        elif status in ("missing", "invalid") and model_ids:
-            self._replace_local_stt_model_states(
-                {model_id: LocalSTTInstallState(status=status) for model_id in model_ids}
-            )
-        if self._local_stt_runtime_status != "downloading":
-            self._local_stt_runtime_status = status
-            self._local_stt_download_percent = None
         if channel == "self":
             self._local_stt_pending_enable_after_install = True
             self._local_stt_pending_enable_generation = (
@@ -6710,52 +6172,34 @@ class GuiController:
         else:
             self._local_stt_pending_peer_enable_after_install = True
         affected_model_ids = model_ids or self._local_stt_models_needing_install(provider)
-        if status == "download_failed":
-            affected_model_ids = tuple(
-                model_id
-                for model_id in self._local_stt_download_model_ids
-                if model_id in required_model_ids
-            )
         if not affected_model_ids:
-            affected_model_ids = required_model_ids
-        self._local_stt_download_model_ids = affected_model_ids
-        self._local_stt_notice_model_id = (
-            self._local_stt_download_model_ids[0] if self._local_stt_download_model_ids else None
-        )
+            affected_model_ids = self._required_local_stt_model_ids_for_provider(provider)
         dash = getattr(self.app, "view_dashboard", None)
         if channel == "self" and dash is not None:
             dash.set_stt_enabled(False)
             dash.set_stt_needs_key(False)
         self._sync_local_stt_notice()
-        self._start_local_stt_download(origin="manual")
+        self._request_local_asr_install(
+            origin="manual",
+            model_ids=affected_model_ids,
+        )
         return False
 
-    def _record_strict_local_stt_ready(self, model_ids: tuple[str, ...]) -> None:
-        snapshot = inspect_local_cpu_model_installs(model_ids, verify_checksums=False)
-        self._replace_local_stt_model_states(
-            {model.model_id: model.state for model in snapshot.models}
-        )
-        if self._local_stt_runtime_status != "download_failed":
-            return
-        remaining_failed_model_ids = tuple(
-            model_id for model_id in self._local_stt_download_model_ids if model_id not in model_ids
-        )
-        self._local_stt_download_model_ids = remaining_failed_model_ids
-        if remaining_failed_model_ids:
-            self._local_stt_notice_model_id = remaining_failed_model_ids[0]
-        else:
-            self._local_stt_runtime_status = "ready"
-            self._local_stt_notice_model_id = None
-
     @staticmethod
-    def _snapshot_unavailable_status(snapshot: LocalCPUInstallSnapshot) -> str:
-        if any(model.state.status == "invalid" for model in snapshot.models):
+    def _snapshot_unavailable_status(
+        snapshot: LocalASRProvisioningSnapshot,
+        model_ids: tuple[str, ...],
+    ) -> str:
+        if any(snapshot.state_for(model_id).integrity == "invalid" for model_id in model_ids):
             return "invalid"
         return "missing"
 
     @staticmethod
-    def _snapshot_unavailable_model_ids(snapshot: LocalCPUInstallSnapshot) -> tuple[str, ...]:
-        return tuple(model.model_id for model in snapshot.models if model.state.status != "ready")
+    def _snapshot_unavailable_model_ids(
+        snapshot: LocalASRProvisioningSnapshot,
+        model_ids: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        return snapshot.unavailable_model_ids(model_ids)
 
     async def _probe_self_local_stt_runtime_load(
         self,
@@ -6764,14 +6208,11 @@ class GuiController:
     ) -> None:
         if not self._self_local_stt_activation_is_current(activation_generation):
             return
-        if self.hub is None or self.hub.stt is None:
+        if self.hub is None or not self._hub_has_stt_provider("self"):
             raise RuntimeError("self STT provider is unavailable")
-        backend = getattr(self.hub.stt, "backend", None)
-        if backend is None:
-            await self.hub.stt.warmup()
-            return
-        session = await backend.open_session()
-        await session.close()
+        if self._hub_local_asr_provider_runtime() is None:
+            raise RuntimeError("local ASR provider runtime is unavailable")
+        await self.hub.warmup_stt_channel("self")
 
     async def _ensure_local_stt_ready(
         self,
@@ -6809,16 +6250,16 @@ class GuiController:
             self._show_short_stt_message("local_stt.download_in_progress")
             return False
         if current_status in ("missing", "invalid", "download_failed"):
-            return self._handle_local_stt_unavailable(
+            return self._request_unavailable_local_asr_repair(
                 current_status,
                 channel="self",
                 activation_generation=activation_generation,
             )
-        if self.hub is not None and self.hub.stt is None:
+        if self.hub is not None and not self._hub_has_stt_provider("self"):
             await self._rebuild_stt_provider()
             if not self._self_local_stt_activation_is_current(activation_generation):
                 return False
-        if self.hub is None or self.hub.stt is None:
+        if self.hub is None or not self._hub_has_stt_provider("self"):
             self._stt_desired = False
             dash = getattr(self.app, "view_dashboard", None)
             if dash is not None:
@@ -6826,8 +6267,11 @@ class GuiController:
                 dash.set_stt_needs_key(False)
             self._show_short_stt_message("error.local_stt_model_invalid")
             return False
-        backend = getattr(self.hub.stt, "backend", None)
-        was_loaded = bool(getattr(backend, "is_loaded", False))
+        runtime = self._hub_local_asr_provider_runtime()
+        if runtime is None:
+            raise RuntimeError("local ASR provider runtime is unavailable")
+        channel_snapshot = runtime.snapshot.channel_for("self")
+        was_loaded = channel_snapshot.phase in {"ready", "running"}
         load_started_at = time.monotonic()
         try:
             await self._probe_self_local_stt_runtime_load(
@@ -6835,7 +6279,7 @@ class GuiController:
             )
             if not self._self_local_stt_activation_is_current(activation_generation):
                 return False
-            loaded_model_id = self._managed_local_asr_model_id(self.hub.stt) or decision.model_id
+            loaded_model_id = channel_snapshot.model_id or decision.model_id
             if not was_loaded:
                 self._log_local_asr_load_result(
                     channel="self",
@@ -6844,13 +6288,18 @@ class GuiController:
                     outcome="ready",
                     load_seconds=time.monotonic() - load_started_at,
                 )
-            self._record_strict_local_stt_ready(
+            await self._get_local_asr_provisioning_owner().inspect_cpu(
                 self._required_local_stt_model_ids_for_provider(self.settings.provider.stt.value)
             )
             self._sync_local_stt_notice()
             return True
-        except LocalCPUAutoUnavailableError as exc:
-            self._set_local_cpu_install_snapshot(exc.snapshot)
+        except LocalCPUAutoUnavailableError:
+            required_model_ids = self._required_local_stt_model_ids_for_provider(
+                self.settings.provider.stt.value
+            )
+            snapshot = await self._get_local_asr_provisioning_owner().inspect_cpu(
+                required_model_ids
+            )
             if (
                 self.settings is not None
                 and self.settings.provider.stt == STTProviderName.LOCAL_CPU_AUTO
@@ -6861,11 +6310,10 @@ class GuiController:
                 return await self._ensure_local_stt_ready(
                     activation_generation=activation_generation
                 )
-            return self._handle_local_stt_unavailable(
-                self._snapshot_unavailable_status(exc.snapshot),
+            return self._request_unavailable_local_asr_repair(
+                self._snapshot_unavailable_status(snapshot, required_model_ids),
                 channel="self",
-                model_ids=self._snapshot_unavailable_model_ids(exc.snapshot),
-                snapshot=exc.snapshot,
+                model_ids=self._snapshot_unavailable_model_ids(snapshot, required_model_ids),
                 activation_generation=activation_generation,
             )
         except LocalSTTModelMissingError as exc:
@@ -6877,7 +6325,7 @@ class GuiController:
                 load_seconds=time.monotonic() - load_started_at,
                 failure_type=type(exc).__name__,
             )
-            return self._handle_local_stt_unavailable(
+            return self._request_unavailable_local_asr_repair(
                 "missing",
                 channel="self",
                 model_ids=((decision.model_id,) if decision.model_id is not None else None),
@@ -6896,7 +6344,12 @@ class GuiController:
                 load_seconds=time.monotonic() - load_started_at,
                 failure_type=type(exc).__name__,
             )
-            return self._handle_local_stt_unavailable(
+            if decision.model_id is not None:
+                await self._get_local_asr_provisioning_owner().report_model_validation_failure(
+                    decision.model_id,
+                    failure_type=type(exc).__name__,
+                )
+            return self._request_unavailable_local_asr_repair(
                 "invalid",
                 channel="self",
                 model_ids=((decision.model_id,) if decision.model_id is not None else None),
@@ -6946,116 +6399,38 @@ class GuiController:
             self._sync_local_stt_notice()
             return False
         if current_status in ("missing", "invalid", "download_failed"):
-            return self._handle_local_stt_unavailable(
+            return self._request_unavailable_local_asr_repair(
                 current_status,
                 channel="peer",
                 activation_generation=activation_generation,
             )
-        try:
-            strict_snapshot = await self._run_peer_local_stt_runtime_probe()
-            if not self._peer_local_stt_activation_is_current(activation_generation):
-                return False
-            self._replace_local_stt_model_states(
-                {model.model_id: model.state for model in strict_snapshot.models}
-            )
-            unavailable_model_ids = self._snapshot_unavailable_model_ids(strict_snapshot)
-            if unavailable_model_ids:
-                return self._handle_local_stt_unavailable(
-                    self._snapshot_unavailable_status(strict_snapshot),
-                    channel="peer",
-                    model_ids=unavailable_model_ids,
-                    activation_generation=activation_generation,
-                )
-            self._record_strict_local_stt_ready(
-                self._required_local_stt_model_ids_for_provider(
-                    self.settings.provider.peer_stt.value
-                )
-            )
-            self._sync_local_stt_notice()
-            return True
-        except LocalCPUAutoUnavailableError as exc:
-            self._set_local_cpu_install_snapshot(exc.snapshot)
-            if (
-                self.settings is not None
-                and self.settings.provider.peer_stt == STTProviderName.LOCAL_CPU_AUTO
-            ):
-                if not self._persist_current_manual_local_asr_fallback(channel="peer"):
-                    return False
-                await self._refresh_peer_stt_runtime()
-                return await self._ensure_peer_local_stt_ready(
-                    activation_generation=activation_generation
-                )
-            return self._handle_local_stt_unavailable(
-                self._snapshot_unavailable_status(exc.snapshot),
-                channel="peer",
-                model_ids=self._snapshot_unavailable_model_ids(exc.snapshot),
-                snapshot=exc.snapshot,
-                activation_generation=activation_generation,
-            )
-        except LocalSTTModelMissingError:
-            return self._handle_local_stt_unavailable(
-                "missing",
-                channel="peer",
-                model_ids=((decision.model_id,) if decision.model_id is not None else None),
-                activation_generation=activation_generation,
-            )
-        except (
-            LocalSTTManifestInvalidError,
-            LocalQwenSherpaLoadError,
-            LocalParakeetSherpaLoadError,
-        ):
-            return self._handle_local_stt_unavailable(
-                "invalid",
-                channel="peer",
-                model_ids=((decision.model_id,) if decision.model_id is not None else None),
-                activation_generation=activation_generation,
-            )
-
-    async def _run_peer_local_stt_runtime_probe(self) -> LocalCPUInstallSnapshot:
-        await self._cancel_peer_local_stt_probe()
-        task = start_lifecycle_task(
-            self._ui_background_scope,
-            self._probe_peer_local_stt_runtime_load(),
-            name=f"peer-local-stt-probe-{self._peer_activation_generation}",
-        )
-        self._peer_local_stt_probe_task = task
-        try:
-            return await task
-        finally:
-            if self._peer_local_stt_probe_task is task:
-                self._peer_local_stt_probe_task = None
-
-    async def _probe_peer_local_stt_runtime_load(self) -> LocalCPUInstallSnapshot:
-        assert self.settings is not None
-        model_ids = self._required_local_stt_model_ids_for_provider(
+        required_model_ids = self._required_local_stt_model_ids_for_provider(
             self.settings.provider.peer_stt.value
         )
-        return await run_owned_thread_call(
-            lambda: inspect_local_cpu_model_installs(
-                model_ids,
-                None,
-                verify_checksums=False,
-            )
+        strict_snapshot = await self._get_local_asr_provisioning_owner().inspect_cpu(
+            required_model_ids
         )
+        if not self._peer_local_stt_activation_is_current(activation_generation):
+            return False
+        unavailable_model_ids = self._snapshot_unavailable_model_ids(
+            strict_snapshot,
+            required_model_ids,
+        )
+        if unavailable_model_ids:
+            return self._request_unavailable_local_asr_repair(
+                self._snapshot_unavailable_status(strict_snapshot, required_model_ids),
+                channel="peer",
+                model_ids=unavailable_model_ids,
+                activation_generation=activation_generation,
+            )
+        self._sync_local_stt_notice()
+        return True
 
-    async def _cancel_peer_local_stt_probe(self) -> None:
-        task = self._peer_local_stt_probe_task
-        if task is None:
-            return
-        if not task.done():
-            task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
-        if self._peer_local_stt_probe_task is task:
-            self._peer_local_stt_probe_task = None
-
-    async def _cancel_local_stt_download(self) -> None:
+    async def _close_local_asr_provisioning(self) -> None:
         self._reset_local_stt_pending_enable_after_install()
         self._reset_local_stt_pending_peer_enable_after_install()
-        runtime = self._local_stt_download_runtime
-        if runtime is not None:
-            await runtime.close()
-            return
+        if self.local_asr_provisioning is not None:
+            await self.local_asr_provisioning.close()
 
     async def _ensure_stt_switch(self) -> None:
         if self._stt_switch_task is None or self._stt_switch_task.done():
@@ -7090,7 +6465,7 @@ class GuiController:
             not self._stt_desired
             or self.hub is None
             or self.settings is None
-            or self.hub.stt is None
+            or not self._hub_has_stt_provider("self")
         ):
             return False
         transition_settings = self.settings
@@ -7100,17 +6475,14 @@ class GuiController:
         )
         if request is None:
             return False
-        current_provider = self.hub.stt
-        current_model_id = self._managed_local_asr_model_id(current_provider)
+        runtime = self._hub_local_asr_provider_runtime()
+        if runtime is None:
+            raise RuntimeError("local ASR provider runtime is unavailable")
+        current_model_id = runtime.snapshot.channel_for("self").model_id
         if current_model_id is None:
             return False
         if current_model_id == request.model_id:
-            reconfigure = getattr(current_provider, "reconfigure_session_options", None)
-            if callable(reconfigure):
-                result = reconfigure(request.session_options)
-                if inspect.isawaitable(result):
-                    await result
-            current_provider.stt_provider_name = self.settings.provider.stt
+            await self.hub.reconfigure_stt_channel("self", request.session_options)
             self.log_detailed(
                 "[LocalASR][Transition] "
                 f"channel=self requested_provider={request.requested_provider} "
@@ -7125,45 +6497,35 @@ class GuiController:
         self._self_asr_model_loading = True
         self._sync_local_stt_notice()
 
-        async def prepare(
+        async def prepare_owned(
             prepared_request: LocalASRTransitionRequest,
             generation: int,
         ) -> PreparedLocalASRTransition:
-            started_at = time.monotonic()
-            candidate = self._create_self_stt_provider_for_settings(target_settings)
-            try:
-                await candidate.warmup()
-            except BaseException:
-                await candidate.close_backend()
-                raise
             return PreparedLocalASRTransition(
                 request=prepared_request,
-                provider=candidate,
+                provider=self._self_stt_provider_request(target_settings, warmup=True),
                 generation=generation,
-                load_ms=max(0, int(round((time.monotonic() - started_at) * 1000))),
             )
 
-        async def commit(prepared: PreparedLocalASRTransition) -> None:
-            handoff = getattr(self.hub, "handoff_stt_provider", None)
-            if not callable(handoff):
-                raise RuntimeError("self STT handoff is unavailable")
-            result = handoff(prepared.provider)
+        async def commit_owned(prepared: PreparedLocalASRTransition) -> None:
+            if not isinstance(prepared.provider, ProviderRuntimeBuildRequest):
+                raise TypeError("owned Self STT transition requires a build request")
             try:
-                if inspect.isawaitable(result):
-                    await result
+                result = await self.hub.handoff_stt_provider_request(
+                    prepared.provider,
+                    start=True,
+                )
             except asyncio.CancelledError:
-                cancel_handoff = getattr(self.hub, "cancel_stt_provider_handoff", None)
-                if callable(cancel_handoff):
-                    cancel_result = cancel_handoff(prepared.provider)
-                    if inspect.isawaitable(cancel_result):
-                        await cancel_result
+                await self.hub.cancel_stt_provider_request_handoff()
                 raise
+            if result.status != "applied":
+                raise RuntimeError("owned Self STT handoff failed")
 
         try:
             outcome = await coordinator.request_transition(
                 request,
-                prepare=prepare,
-                commit=commit,
+                prepare=prepare_owned,
+                commit=commit_owned,
             )
         finally:
             self._self_asr_model_loading = False
@@ -7213,7 +6575,7 @@ class GuiController:
                     if (
                         self.settings is not None
                         and self.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-                        and self.hub.stt is None
+                        and not self._hub_has_stt_provider("self")
                     ):
                         await self._rebuild_stt_provider()
                     resume_stt = getattr(self.hub, "resume_self_stt_after_toggle_on", None)
@@ -7244,27 +6606,22 @@ class GuiController:
                     # Pre-warm STT session for faster first response
                     if (
                         self.hub is not None
-                        and self.hub.stt is not None
+                        and self._hub_has_stt_provider("self")
                         and self._selected_stt_provider() != STTProviderName.LOCAL_QWEN
                     ):
                         with contextlib.suppress(Exception):
-                            await self.hub.stt.warmup()
-                    active_gpu_runtime = self._gpu_asr_runtime
-                    if self.hub is not None and self.hub.stt is not None:
-                        backend_runtime = getattr(
-                            getattr(self.hub.stt, "backend", None),
-                            "runtime",
-                            None,
-                        )
-                        if backend_runtime is not None:
-                            active_gpu_runtime = backend_runtime
+                            await self.hub.warmup_stt_channel("self")
+                    owned_runtime = self._hub_local_asr_provider_runtime()
+                    active_gpu_snapshot = (
+                        owned_runtime.snapshot.gpu if owned_runtime is not None else None
+                    )
                     if (
                         self.settings is not None
                         and self.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
                         and (
-                            active_gpu_runtime is None
-                            or active_gpu_runtime.state != GpuASRRuntimeState.READY
-                            or "self" not in active_gpu_runtime.active_channels
+                            active_gpu_snapshot is None
+                            or active_gpu_snapshot.phase != "ready"
+                            or "self" not in active_gpu_snapshot.active_channels
                         )
                     ):
                         self._stt_desired = False
@@ -7721,6 +7078,7 @@ class GuiController:
         installation_fallback = False
         normalization_channels = self._manual_local_asr_fallback_normalization_channels(settings)
         if normalization_channels:
+            await self._get_local_asr_provisioning_owner().inspect_cpu()
             normalized_settings, normalized_channels, installation_fallback = (
                 self._normalize_manual_local_asr_fallbacks(settings)
             )
@@ -7961,7 +7319,11 @@ class GuiController:
             self._strict_runtime_errors_for_clipboard_watcher = (
                 previous_strict_clipboard_runtime_errors
             )
-        self._refresh_local_stt_runtime_state()
+        provisioning = self._get_local_asr_provisioning_owner()
+        await provisioning.inspect_cpu()
+        await provisioning.inspect_gpu(
+            explicit_intent=self._selected_gpu_provider_requires_model(),
+        )
         self._clear_local_stt_pending_enable_if_provider_switched_away()
 
         # low_latency_mode 변경 시 Qwen LLM 프로바이더 재생성 필요
@@ -9170,7 +8532,7 @@ class GuiController:
             await self._rebuild_llm_provider()
 
         if plan.coordinated_gpu_restart:
-            await self._apply_coordinated_gpu_restart(next_settings, plan)
+            await self._apply_gpu_runtime_owner_recovery(next_settings, plan)
             self._sync_signature_caches(next_settings)
             if plan.should_rebuild_llm and self.hub is not None and self.hub.llm is None:
                 self._last_llm_provider_signature = ()
@@ -9191,47 +8553,58 @@ class GuiController:
         if plan.should_rebuild_llm and self.hub is not None and self.hub.llm is None:
             self._last_llm_provider_signature = ()
 
-    async def _apply_coordinated_gpu_restart(
+    async def _apply_gpu_runtime_owner_recovery(
         self,
         next_settings: AppSettings,
         plan: _ProviderRuntimeApplyPlan,
     ) -> None:
-        if self._gpu_reconfiguration_lock is None:
-            self._gpu_reconfiguration_lock = asyncio.Lock()
-        async with self._gpu_reconfiguration_lock:
-            desired_channels = self._desired_gpu_channels(next_settings)
-            self._gpu_manual_retry_channels = desired_channels
-            activation_allowed = await self._validate_gpu_activation()
-            await self._quiesce_shared_gpu_consumers(next_settings)
-            if not activation_allowed:
+        owned_runtime = self._hub_local_asr_provider_runtime()
+        if owned_runtime is None:
+            raise RuntimeError("local ASR provider runtime is unavailable")
+        desired_channels = self._desired_gpu_channels(next_settings)
+        recovery, peer_config = self._build_gpu_recovery_request(
+            next_settings,
+            desired_channels,
+            reason="settings_restart",
+        )
+        try:
+            snapshot = await owned_runtime.recover_gpu(
+                recovery,
+                quiesce=self._suspend_gpu_provider_consumers,
+            )
+            recovered_channels = frozenset(item.request.channel for item in recovery.channels)
+            if recovered_channels and (
+                snapshot.gpu.retry_required
+                or not recovered_channels.issubset(snapshot.gpu.active_channels)
+            ):
+                self._on_local_asr_provider_runtime_state_changed(snapshot)
                 return
-            try:
-                if plan.should_refresh_self_stt:
-                    if self._stt_desired:
-                        await self._replace_runtime_stt_provider()
-                    else:
-                        await self._rebuild_stt_provider()
-                if plan.should_refresh_peer:
-                    await self._refresh_peer_stt_runtime()
-                    self._sync_effective_hub_flags(next_settings)
-                    self._refresh_overlay_peer_consumers()
-                runtime = self._gpu_asr_runtime
-                if runtime is not None and runtime.state == GpuASRRuntimeState.FAILED:
-                    raise GpuASRManualRetryRequired(
-                        runtime.last_failure_code or "manual_retry_required"
-                    )
-                self._gpu_manual_retry_channels = frozenset()
-            except Exception:
-                await self._quiesce_shared_gpu_consumers(next_settings)
-                self._set_gpu_ui_state(
-                    "activation_failed",
-                    publish_notice=True,
-                    origin="settings_apply",
-                )
+            await self._resume_gpu_provider_consumers(
+                settings=next_settings,
+                channels=recovered_channels,
+                peer_config=peer_config,
+            )
+            if plan.should_refresh_self_stt and "self" not in recovered_channels:
+                if self._stt_desired:
+                    await self._replace_runtime_stt_provider()
+                else:
+                    await self._rebuild_stt_provider()
+            if plan.should_refresh_peer and "peer" not in recovered_channels:
+                await self._refresh_peer_stt_runtime()
+                self._sync_effective_hub_flags(next_settings)
+                self._refresh_overlay_peer_consumers()
+        except Exception:
+            self._set_gpu_ui_state(
+                "activation_failed",
+                publish_notice=True,
+                origin="settings_apply",
+            )
 
     def _desired_gpu_channels(self, settings: AppSettings) -> frozenset[GpuASRChannel]:
-        runtime = self._gpu_asr_runtime
-        active_channels = runtime.active_channels if runtime is not None else frozenset()
+        owned_runtime = self._hub_local_asr_provider_runtime()
+        active_channels = (
+            owned_runtime.snapshot.gpu.active_channels if owned_runtime is not None else frozenset()
+        )
         desired: set[GpuASRChannel] = set()
         if settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU and (
             self._stt_desired or "self" in active_channels
@@ -9243,26 +8616,69 @@ class GuiController:
             desired.add("peer")
         return frozenset(desired)
 
-    async def _quiesce_shared_gpu_consumers(self, settings: AppSettings) -> None:
-        runtime = self._gpu_asr_runtime
-        active_channels = runtime.active_channels if runtime is not None else frozenset()
-        selected_desired = self._desired_gpu_channels(settings)
-        channels_to_stop = active_channels | selected_desired
-        if "self" in channels_to_stop and self._mic_task is not None:
-            await self._stop_mic_loop()
-        closures: list[object] = []
-        if "self" in channels_to_stop and self.hub is not None:
-            closures.append(self.hub.replace_stt_provider(None))
-        if "peer" in channels_to_stop and self._peer_runtime is not None:
-            closures.append(
-                self._provider_rebuild_runtime.apply_peer_policy(
-                    peer_runtime=self._peer_runtime,
-                    config=self._build_peer_runtime_config(settings),
-                    desired_active=False,
+    def _build_gpu_recovery_request(
+        self,
+        settings: AppSettings,
+        channels: frozenset[GpuASRChannel],
+        *,
+        reason: Literal["manual_retry", "settings_restart"],
+    ) -> tuple[ProviderRuntimeGpuRecoveryRequest, PeerRuntimeConfig | None]:
+        targets: list[ProviderRuntimeRecoveryChannel] = []
+        peer_config = None
+        if "self" in channels and settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU:
+            targets.append(
+                ProviderRuntimeRecoveryChannel(
+                    request=self._self_stt_provider_request(settings, warmup=True),
+                    start=self._stt_desired,
                 )
             )
-        if closures:
-            await asyncio.gather(*closures)
+        if "peer" in channels and settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU:
+            peer_config = self._build_peer_runtime_config(settings)
+            targets.append(
+                ProviderRuntimeRecoveryChannel(
+                    request=self._peer_stt_provider_request(peer_config, warmup=True),
+                    start=False,
+                    on_terminal_failure=(
+                        self._peer_runtime.handle_terminal_provider_failure
+                        if self._peer_runtime is not None
+                        else None
+                    ),
+                )
+            )
+        return (
+            ProviderRuntimeGpuRecoveryRequest(
+                device_id=settings.stt.gpu_device_id,
+                channels=tuple(targets),
+                reason=reason,
+            ),
+            peer_config,
+        )
+
+    async def _suspend_gpu_provider_consumers(
+        self,
+        channels: tuple[GpuASRChannel, ...],
+    ) -> None:
+        if "self" in channels and self._mic_task is not None:
+            await self._stop_mic_loop()
+        if "peer" in channels and self._peer_runtime is not None:
+            await self._peer_runtime.suspend_provider_consumer()
+
+    async def _resume_gpu_provider_consumers(
+        self,
+        *,
+        settings: AppSettings,
+        channels: frozenset[GpuASRChannel],
+        peer_config: PeerRuntimeConfig | None,
+    ) -> None:
+        if "peer" in channels and self._peer_runtime is not None:
+            if peer_config is None:
+                peer_config = self._build_peer_runtime_config(settings)
+            await self._peer_runtime.adopt_recovered_provider(peer_config)
+            await self._refresh_peer_stt_runtime()
+            self._sync_effective_hub_flags(settings)
+            self._refresh_overlay_peer_consumers()
+        if "self" in channels and self._stt_desired:
+            await self._ensure_stt_switch()
 
     def _load_or_init_settings(self, path: Path) -> AppSettings:
         if path.exists():
@@ -9671,60 +9087,205 @@ class GuiController:
 
         self.log_basic("[Settings] LLM provider rebuilt successfully")
 
-    def _create_self_stt_provider_for_settings(
+    def _self_stt_provider_request(
         self,
         settings: AppSettings,
-    ) -> ManagedSTTProvider:
-        secrets = create_secret_store(settings.secrets, config_path=self.config_path)
-        backend = create_stt_backend(
-            settings,
-            secrets=secrets,
-            diagnostics_enabled=self._detailed_audio_diag_enabled,
-            gpu_runtime=self._gpu_runtime_for_provider(settings.provider.stt),
-            gpu_model_path=local_gpu_model_path(),
-        )
-        return ManagedSTTProvider(
-            backend=backend,
-            sample_rate_hz=settings.audio.internal_sample_rate_hz,
-            stt_provider_name=settings.provider.stt,
-            clock=self.clock,
-            reset_deadline_s=STT_RESET_DEADLINE_S,
-            drain_timeout_s=settings.stt.drain_timeout_s,
-            bridging_ms=settings.audio.ring_buffer_ms,
-            on_final_transcript_suppressed=self._on_final_transcript_suppressed,
-            runtime_logging=self.runtime_logging,
-            stt_input_fault_profile_provider=lambda: (
-                self._debug_stt_fault_profile if self._debug_audio_fault_allowed() else "none"
+        *,
+        warmup: bool = False,
+    ) -> ProviderRuntimeBuildRequest:
+        config = resolve_self_stt_runtime_config(settings)
+        transition = self._self_local_asr_transition_request(settings, trigger="runtime")
+        return ProviderRuntimeBuildRequest(
+            config=config,
+            gpu_device_id=settings.stt.gpu_device_id,
+            warmup=warmup,
+            model_id=transition.model_id if transition is not None else config.model,
+            session_options=(
+                transition.session_options
+                if transition is not None
+                else self._local_asr_session_options(
+                    source_language=config.source_language,
+                    source_mode=config.source_mode,
+                )
             ),
         )
+
+    def _peer_stt_provider_request(
+        self,
+        config: PeerRuntimeConfig,
+        *,
+        warmup: bool = False,
+    ) -> ProviderRuntimeBuildRequest:
+        assert self.settings is not None
+        return ProviderRuntimeBuildRequest(
+            config=config.backend,
+            gpu_device_id=self.settings.stt.gpu_device_id,
+            warmup=warmup,
+            model_id=config.model_id or config.backend.model,
+            session_options=config.session_options,
+        )
+
+    def _build_local_asr_provider_runtime_factory(
+        self,
+        *,
+        secrets,
+    ) -> LocalASRProviderRuntimeFactory:
+        assert self.local_asr_provisioning is not None
+        return LocalASRProviderRuntimeFactory(
+            provider_factory=ManagedSTTProviderFactory(
+                secrets=secrets,
+                clock=self.clock,
+                reset_deadline_s=STT_RESET_DEADLINE_S,
+                gpu_model_path=local_gpu_model_path(),
+                diagnostics_enabled=self._detailed_audio_diag_enabled,
+                on_final_transcript_suppressed=self._on_final_transcript_suppressed,
+                runtime_logging=self.runtime_logging,
+                fault_profile_provider=lambda: (
+                    self._debug_stt_fault_profile if self._debug_audio_fault_allowed() else "none"
+                ),
+            ),
+            provisioning=self.local_asr_provisioning,
+            clock=self.clock,
+            state_changed=self._on_local_asr_provider_runtime_state_changed,
+            diagnostic_sink=self._on_local_asr_provider_runtime_diagnostic,
+        )
+
+    def _on_local_asr_provider_runtime_state_changed(
+        self,
+        snapshot: LocalASRProviderRuntimeSnapshot,
+    ) -> None:
+        self._gpu_devices = snapshot.gpu.devices
+        self._gpu_discovery_attempted = bool(snapshot.gpu.devices) or snapshot.gpu.phase not in {
+            "inactive",
+            "idle",
+        }
+        self._gpu_discovery_failed = snapshot.gpu.phase in {"failed", "unsupported"}
+        self._gpu_discovery_failure_state = (
+            "unsupported"
+            if snapshot.gpu.phase == "unsupported"
+            else "discovery_failed" if snapshot.gpu.phase == "failed" else None
+        )
+
+    def _on_local_asr_provider_runtime_diagnostic(
+        self,
+        diagnostic: ProviderRuntimeDiagnostic,
+    ) -> None:
+        fields = [f"event={diagnostic.event}"]
+        for name in (
+            "channel",
+            "provider_id",
+            "model_id",
+            "device_id",
+            "phase",
+            "outcome",
+            "failure_code",
+            "failure_type",
+        ):
+            value = getattr(diagnostic, name)
+            if value is not None:
+                fields.append(f"{name}={value}")
+        self.log_detailed(f"[LocalASR][ProviderRuntime] {' '.join(fields)}")
+        if diagnostic.event == "activation_ready":
+            self._log_local_asr_load_result(
+                channel=diagnostic.channel or "unknown",
+                model_id=diagnostic.model_id or "unknown",
+                backend="Vulkan",
+                device=diagnostic.device_id or "unknown",
+                outcome="ready",
+                load_seconds=diagnostic.model_load_seconds or 0.0,
+                warmup_seconds=diagnostic.warmup_seconds or 0.0,
+            )
+        elif diagnostic.event == "activation_failed":
+            self._log_local_asr_load_result(
+                channel=diagnostic.channel or "unknown",
+                model_id=diagnostic.model_id or "unknown",
+                backend="Vulkan",
+                outcome="failed",
+                load_seconds=diagnostic.model_load_seconds or 0.0,
+                failure_code=diagnostic.failure_code or "activation_failed",
+            )
+        elif diagnostic.event == "worker_failed":
+            exit_code = (
+                f" exit_code={diagnostic.worker_exit_code}"
+                if diagnostic.worker_exit_code is not None
+                else ""
+            )
+            self.log_basic(
+                "[LocalASR][Worker] backend=Vulkan outcome=failed "
+                f"failure_code={diagnostic.failure_code or 'worker_failed'}{exit_code}",
+                level=logging.ERROR,
+            )
+        elif diagnostic.event == "worker_recovery_started":
+            self.log_basic(
+                "[LocalASR][Worker] backend=Vulkan outcome=restarting "
+                f"failure_code={diagnostic.failure_code or 'decode_failure'} "
+                "utterance_retry=false",
+                level=logging.WARNING,
+            )
+        elif diagnostic.event == "worker_recovery_ready":
+            self.log_basic(
+                "[LocalASR][Worker] backend=Vulkan outcome=recovered utterance_retry=false"
+            )
+        elif diagnostic.event == "decode_attempt" and all(
+            value is not None
+            for value in (
+                diagnostic.audio_seconds,
+                diagnostic.decode_seconds,
+                diagnostic.rtf,
+                diagnostic.queue_wait_seconds,
+            )
+        ):
+            self.log_basic(
+                "[LocalASR][Attempt] "
+                f"channel={diagnostic.channel or 'unknown'} "
+                f"model={diagnostic.model_id or 'unknown'} "
+                "backend=Vulkan "
+                f"audio_seconds={diagnostic.audio_seconds:.3f} "
+                f"decode_seconds={diagnostic.decode_seconds:.3f} "
+                f"rtf={diagnostic.rtf:.6f} "
+                f"result={diagnostic.outcome or 'unknown'} "
+                f"queue_wait_seconds={diagnostic.queue_wait_seconds:.3f}"
+            )
+        if diagnostic.event == "worker_lifecycle" and diagnostic.phase in {
+            "validating",
+            "loading",
+            "warming",
+            "ready",
+        }:
+            self._set_gpu_ui_state(diagnostic.phase, origin="worker_lifecycle")
+        elif diagnostic.event == "activation_ready":
+            self._set_gpu_ui_state("ready", origin="activation")
+        elif diagnostic.event == "discovery_pending":
+            self._set_gpu_ui_state(
+                "discovery_pending",
+                origin=self._gpu_discovery_origin,
+            )
+        elif diagnostic.event in {"activation_failed", "worker_failed"}:
+            self._set_gpu_ui_state(
+                "activation_failed",
+                publish_notice=True,
+                origin="worker",
+            )
 
     async def _rebuild_stt_provider(self) -> None:
         """Rebuild only the STT provider so later enable uses current settings."""
         if self.hub is None or self.settings is None:
             return
 
-        def create_provider() -> object | None:
-            assert self.settings is not None
-            return self._create_self_stt_provider_for_settings(self.settings)
-
-        outcome = await self._provider_rebuild_runtime.rebuild_stt_provider(
-            replace_provider=self.hub.replace_stt_provider,
-            create_provider=create_provider,
+        result = await self.hub.replace_stt_provider_request(
+            self._self_stt_provider_request(self.settings),
+            start=self._stt_desired,
         )
-        stt = outcome.provider
+        available = result.status == "applied"
         self._sync_effective_hub_flags(self.settings)
-
         dash = getattr(self.app, "view_dashboard", None)
         if dash is not None:
-            dash.set_stt_needs_key(self._dashboard_stt_needs_key(stt_available=stt is not None))
-            if stt is None:
+            dash.set_stt_needs_key(self._dashboard_stt_needs_key(stt_available=available))
+            if not available:
                 dash.set_stt_enabled(False)
-
-        if stt is None:
-            assert outcome.error is not None
+        if not available:
             self._log_error("STT backend not available")
             return
-
         self.log_basic("[Settings] STT provider replacement completed successfully")
 
     @staticmethod
@@ -9742,14 +9303,6 @@ class GuiController:
                 None if source_mode == "auto" else get_local_qwen_language_hint(source_language)
             ),
         )
-
-    @staticmethod
-    def _managed_local_asr_model_id(provider: object | None) -> str | None:
-        backend = getattr(provider, "backend", None)
-        if backend is None:
-            return None
-        resolved_model_id = getattr(backend, "resolved_model_id", None)
-        return resolved_model_id or getattr(backend, "model_id", None)
 
     def _self_local_asr_transition_request(
         self,
@@ -9833,38 +9386,6 @@ class GuiController:
         self.log_basic(
             f"[LocalASR][Load] {' '.join(fields)}",
             level=logging.ERROR if outcome == "failed" else logging.INFO,
-        )
-
-    def _create_peer_stt_provider_from_runtime_config(
-        self,
-        config: PeerRuntimeConfig,
-        on_terminal_failure,
-    ) -> ManagedSTTProvider:
-        assert self.settings is not None
-        secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
-        peer_backend = create_peer_stt_backend_from_resolved_config(
-            config.backend,
-            secrets=secrets,
-            diagnostics_enabled=self._detailed_audio_diag_enabled,
-            gpu_runtime=self._gpu_runtime_for_provider(config.backend.provider),
-            gpu_model_path=local_gpu_model_path(),
-            gpu_device_id=self.settings.stt.gpu_device_id,
-        )
-        return ManagedSTTProvider(
-            backend=peer_backend,
-            sample_rate_hz=config.backend.sample_rate_hz,
-            stt_provider_name=config.backend.provider,
-            channel="peer",
-            clock=self.clock,
-            reset_deadline_s=STT_RESET_DEADLINE_S,
-            drain_timeout_s=self.settings.stt.drain_timeout_s,
-            bridging_ms=max(1, config.vad_pre_roll_ms),
-            on_terminal_failure=on_terminal_failure,
-            on_final_transcript_suppressed=self._on_final_transcript_suppressed,
-            runtime_logging=self.runtime_logging,
-            stt_input_fault_profile_provider=lambda: (
-                self._debug_stt_fault_profile if self._debug_audio_fault_allowed() else "none"
-            ),
         )
 
     def _on_peer_runtime_diagnostic(self, diagnostic: PeerRuntimeDiagnostic) -> None:
@@ -10376,7 +9897,7 @@ class GuiController:
         peer_local_loading = bool(
             peer_local_provider
             and (
-                getattr(self.hub, "peer_stt", None) is None
+                not self._hub_has_stt_provider("peer")
                 or previous_signature != config.runtime_signature
             )
         )
@@ -10453,7 +9974,7 @@ class GuiController:
                 and self._llm_provider_requires_secret(self.settings.provider.llm)
             )
             dash.set_stt_needs_key(
-                self._dashboard_stt_needs_key(stt_available=self.hub.stt is not None)
+                self._dashboard_stt_needs_key(stt_available=self._hub_has_stt_provider("self"))
             )
 
             self.hub.translation_enabled = (
@@ -10477,6 +9998,7 @@ class GuiController:
 
     async def _init_pipeline(self) -> None:
         assert self.settings is not None
+        self._get_local_asr_provisioning_owner()
         self._sync_signature_caches(self.settings)
         secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
         new_managed_release_service = self._create_managed_openrouter_release_service(
@@ -10494,31 +10016,12 @@ class GuiController:
                 runtime_logging=self.runtime_logging,
             )
 
-        stt = None
-        try:
-            backend = create_stt_backend(
-                self.settings,
-                secrets=secrets,
-                diagnostics_enabled=self._detailed_audio_diag_enabled,
-                gpu_runtime=self._gpu_runtime_for_provider(self.settings.provider.stt),
-                gpu_model_path=local_gpu_model_path(),
-            )
-            stt = ManagedSTTProvider(
-                backend=backend,
-                sample_rate_hz=self.settings.audio.internal_sample_rate_hz,
-                stt_provider_name=self.settings.provider.stt,
-                clock=self.clock,
-                reset_deadline_s=STT_RESET_DEADLINE_S,
-                drain_timeout_s=self.settings.stt.drain_timeout_s,
-                bridging_ms=self.settings.audio.ring_buffer_ms,
-                on_final_transcript_suppressed=self._on_final_transcript_suppressed,
-                runtime_logging=self.runtime_logging,
-                stt_input_fault_profile_provider=lambda: (
-                    self._debug_stt_fault_profile if self._debug_audio_fault_allowed() else "none"
-                ),
-            )
-        except Exception:
-            self._log_error("STT backend not available")
+        stt_request = None
+        if self.settings.provider.stt != STTProviderName.LOCAL_QWEN_GPU:
+            try:
+                stt_request = self._self_stt_provider_request(self.settings)
+            except Exception:
+                self._log_error("STT backend not available")
 
         sender = VrchatOscUdpSender(
             host=self.settings.osc.host,
@@ -10535,12 +10038,15 @@ class GuiController:
         )
 
         hub = ClientHub(
-            stt=stt,
+            stt=None,
             llm=llm,
             osc=osc,
             peer_stt=None,
             clock=self.clock,
             runtime_logging=self.runtime_logging,
+            local_asr_provider_runtime_factory=self._build_local_asr_provider_runtime_factory(
+                secrets=secrets
+            ),
             source_language=self.settings.languages.source_language,
             target_language=self.settings.languages.target_language,
             peer_source_language=self.settings.languages.peer_source_language,
@@ -10562,6 +10068,11 @@ class GuiController:
             peer_hangover_s=self.settings.desktop_audio.vad_hangover_ms / 1000.0,
         )
 
+        if stt_request is not None:
+            result = await hub.replace_stt_provider_request(stt_request, start=False)
+            if result.status != "applied":
+                self._log_error("STT backend not available")
+
         if self.vrc_mic_state is None:
             self.vrc_mic_state = VrcMicState()
         if self.vrc_mic_audio_gate is None:
@@ -10582,7 +10093,10 @@ class GuiController:
         self._peer_runtime = PeerChannelRuntime(
             hub=hub,
             clock=self.clock,
-            stt_factory=self._create_peer_stt_provider_from_runtime_config,
+            provider_request_factory=lambda config, warmup: self._peer_stt_provider_request(
+                config,
+                warmup=warmup,
+            ),
             source_factory=self._create_peer_audio_source_from_runtime_config,
             vad_factory=self._create_peer_vad_from_runtime_config,
             vad_model_resolver=ensure_silero_vad_onnx,
@@ -12277,7 +11791,7 @@ class GuiController:
         # 2. Verify STT
         stt_requires_secret = self._stt_provider_requires_secret(self.settings.provider.stt)
         stt_valid = not stt_requires_secret
-        if self.hub and self.hub.stt and stt_requires_secret:
+        if self.hub and self._hub_has_stt_provider("self") and stt_requires_secret:
             try:
                 provider_name = self.settings.provider.stt
 

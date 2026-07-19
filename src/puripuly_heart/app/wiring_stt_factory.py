@@ -272,6 +272,12 @@ def create_stt_backend(
     )
 
 
+def resolve_self_stt_runtime_config(settings: AppSettings) -> ResolvedSTTConfig:
+    return resolve_stt_runtime_config(
+        _self_stt_runtime_intent_from_compatibility_settings(settings)
+    )
+
+
 def _resolved_stt_keyterms(config: ResolvedSTTConfig) -> tuple[str, ...]:
     if not config.custom_vocabulary_enabled:
         return ()

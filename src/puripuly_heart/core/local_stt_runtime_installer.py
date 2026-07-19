@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import hashlib
 import inspect
 import json
+import os
 import shutil
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Awaitable, Callable, Literal
+from typing import IO, Awaitable, Callable, Literal
 from uuid import uuid4
 
 import httpx
@@ -41,6 +44,127 @@ class RuntimeLocalSTTStatusUpdate:
 
 
 StatusCallback = Callable[[RuntimeLocalSTTStatusUpdate], Awaitable[None] | None]
+
+
+class LocalSTTProvisioningLease:
+    def __init__(self, handle: IO[bytes]) -> None:
+        self._handle = handle
+        self._closed = False
+
+    @classmethod
+    def acquire(
+        cls,
+        *,
+        model_root: Path,
+        wait: bool,
+        cancel_event: threading.Event | None = None,
+    ) -> LocalSTTProvisioningLease | None:
+        model_root.mkdir(parents=True, exist_ok=True)
+        handle = (model_root / ".local-asr-provisioning.lock").open("a+b")
+        handle.seek(0, 2)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        try:
+            while True:
+                if cls._try_lock(handle):
+                    return cls(handle)
+                if not wait:
+                    handle.close()
+                    return None
+                _raise_if_cancelled(cancel_event)
+                time.sleep(0.05)
+        except BaseException:
+            handle.close()
+            raise
+
+    @staticmethod
+    def _try_lock(handle: IO[bytes]) -> bool:
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
+
+            try:
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            except OSError as exc:
+                if exc.errno in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
+                    return False
+                raise
+            return True
+        import fcntl
+
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            if exc.errno in {errno.EACCES, errno.EAGAIN}:
+                return False
+            raise
+        return True
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        try:
+            self._handle.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(self._handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            self._closed = True
+            self._handle.close()
+
+
+def cleanup_local_stt_install_residue(
+    *,
+    model_root: Path | None = None,
+    install_dirnames: tuple[str, ...],
+    wait_for_lease: bool = False,
+    cancel_event: threading.Event | None = None,
+) -> tuple[Path, ...] | None:
+    resolved_root = (model_root or default_local_stt_model_root()).resolve()
+    normalized_dirnames = tuple(dict.fromkeys(install_dirnames))
+    if not normalized_dirnames or any(
+        not name
+        or name.startswith(".")
+        or Path(name).name != name
+        or any(not (character.isalnum() or character in "._-") for character in name)
+        for name in normalized_dirnames
+    ):
+        raise ValueError("install_dirnames must contain safe directory names")
+    lease = LocalSTTProvisioningLease.acquire(
+        model_root=resolved_root,
+        wait=wait_for_lease,
+        cancel_event=cancel_event,
+    )
+    if lease is None:
+        return None
+    try:
+        reconciled: list[Path] = []
+        for dirname in normalized_dirnames:
+            install_dir = resolved_root / dirname
+            backup_dir = resolved_root / f"{dirname}.backup"
+            if backup_dir.exists() or backup_dir.is_symlink():
+                if not install_dir.exists() and backup_dir.is_dir() and not backup_dir.is_symlink():
+                    backup_dir.rename(install_dir)
+                elif backup_dir.is_symlink() or not backup_dir.is_dir():
+                    backup_dir.unlink(missing_ok=True)
+                else:
+                    shutil.rmtree(backup_dir)
+                reconciled.append(backup_dir)
+            for staging_dir in resolved_root.glob(f"{dirname}.staging-*"):
+                if staging_dir.is_symlink() or not staging_dir.is_dir():
+                    staging_dir.unlink(missing_ok=True)
+                else:
+                    shutil.rmtree(staging_dir)
+                reconciled.append(staging_dir)
+        return tuple(reconciled)
+    finally:
+        lease.close()
 
 
 class LocalSTTRuntimeInstallError(LocalSTTAssetError):
@@ -333,6 +457,41 @@ def _promote_staging_install(
 
 
 async def ensure_local_stt_installed(
+    *,
+    model_id: str | None = None,
+    preferred_source: str | None = None,
+    locale: str | None = None,
+    model_root: Path | None = None,
+    manifest: LocalSTTAssetManifest | None = None,
+    on_status: StatusCallback | None = None,
+    cancel_event: threading.Event | None = None,
+    huggingface_downloader: HuggingFaceDownloadPort | None = None,
+) -> InstalledLocalSTTManifest:
+    resolved_root = (model_root or default_local_stt_model_root()).resolve()
+    lease = await asyncio.to_thread(
+        LocalSTTProvisioningLease.acquire,
+        model_root=resolved_root,
+        wait=True,
+        cancel_event=cancel_event,
+    )
+    if lease is None:
+        raise LocalSTTRuntimeInstallError("local STT provisioning lease is unavailable")
+    try:
+        return await _ensure_local_stt_installed_with_lease(
+            model_id=model_id,
+            preferred_source=preferred_source,
+            locale=locale,
+            model_root=resolved_root,
+            manifest=manifest,
+            on_status=on_status,
+            cancel_event=cancel_event,
+            huggingface_downloader=huggingface_downloader,
+        )
+    finally:
+        await asyncio.to_thread(lease.close)
+
+
+async def _ensure_local_stt_installed_with_lease(
     *,
     model_id: str | None = None,
     preferred_source: str | None = None,

@@ -128,13 +128,11 @@ class LocalSTTDownloadRuntime:
         self._generation += 1
         task = self._download_task
         cancel_event = self._cancel_event
-        self._download_task = None
-        self._cancel_event = None
-        self._origin = None
         if cancel_event is not None:
             cancel_event.set()
         self._notify_state_changed()
         await self._cancel_task_bounded(task)
+        self._release_download_task(task)
 
     async def close(self) -> None:
         if self._closed and not self._has_resources():
@@ -159,18 +157,24 @@ class LocalSTTDownloadRuntime:
             return
         if not task.done():
             task.cancel()
-        done, _pending = await asyncio.wait({task}, timeout=self._cancel_timeout_s)
+        done, pending = await asyncio.wait({task}, timeout=self._cancel_timeout_s)
         for completed in done:
             self._observe_task_exception(completed)
+        if pending:
+            raise TimeoutError("Local STT download task cancellation timed out")
 
     def _on_download_task_done(self, task: asyncio.Task[object]) -> None:
         self._observe_task_exception(task)
-        if self._download_task is task:
-            self._download_task = None
-            self._cancel_event = None
-            self._origin = None
-            self._generation += 1
-            self._notify_state_changed()
+        self._release_download_task(task)
+
+    def _release_download_task(self, task: asyncio.Task[object] | None) -> None:
+        if task is None or self._download_task is not task or not task.done():
+            return
+        self._download_task = None
+        self._cancel_event = None
+        self._origin = None
+        self._generation += 1
+        self._notify_state_changed()
 
     @staticmethod
     def _observe_task_exception(task: asyncio.Task[Any]) -> None:

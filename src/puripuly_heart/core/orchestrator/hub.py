@@ -24,6 +24,14 @@ from puripuly_heart.core.language import (
     map_detected_language_for_llm,
 )
 from puripuly_heart.core.llm.provider import LLMProvider
+from puripuly_heart.core.local_asr_provider_runtime import (
+    LocalASRProviderRuntimeCallbacks,
+    LocalASRProviderRuntimeFactoryPort,
+    LocalASRProviderRuntimePort,
+    ProviderRuntimeBuildRequest,
+    ProviderRuntimeChannel,
+    ProviderRuntimeMutationResult,
+)
 from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterUserFacingError,
 )
@@ -62,6 +70,9 @@ from puripuly_heart.core.runtime.output import (
     SELF_SPEECH_TYPING_REASON,
     OutputPublicationResult,
     OutputRuntime,
+)
+from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
+    PrebuiltLocalASRProviderRuntimeFactory,
 )
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart, VadEvent
@@ -160,6 +171,7 @@ class ClientHub:
     overlay_diagnostics: OverlayDiagnosticsRecorder | None = None
     clock: Clock = SystemClock()
     runtime_logging: HubRuntimeLoggingPort | None = None
+    local_asr_provider_runtime_factory: LocalASRProviderRuntimeFactoryPort | None = None
 
     source_language: str = "ko"
     target_language: str = "en"
@@ -218,6 +230,10 @@ class ClientHub:
         init=False,
         default_factory=lambda: {"self": None, "peer": None},
     )
+    _stt_session_states: dict[ChannelId, STTSessionState | None] = field(
+        init=False,
+        default_factory=lambda: {"self": None, "peer": None},
+    )
     last_error_source: str | None = None
     _last_overlay_secondary_runtime_signature: tuple[object, ...] | None = field(
         init=False,
@@ -231,11 +247,21 @@ class ClientHub:
         init=False,
         default_factory=dict,
     )
-    _self_stt_provider_runtime: ProviderRuntimeHandle = field(init=False)
-    _peer_stt_provider_runtime: ProviderRuntimeHandle = field(init=False)
+    _local_asr_provider_runtime: LocalASRProviderRuntimePort | None = field(
+        init=False,
+        default=None,
+    )
     _llm_provider_runtime: ProviderRuntimeHandle = field(init=False)
 
     def __post_init__(self) -> None:
+        runtime_factory = self.local_asr_provider_runtime_factory
+        if runtime_factory is None:
+            runtime_factory = PrebuiltLocalASRProviderRuntimeFactory(
+                self_provider=self.stt,
+                peer_provider=self.peer_stt,
+            )
+        object.__setattr__(self, "stt", None)
+        object.__setattr__(self, "peer_stt", None)
         self.output_runtime = OutputRuntime(
             chatbox=self.osc,
             clock=self.clock,
@@ -265,27 +291,20 @@ class ClientHub:
             on_parent_closed=self._on_peer_final_run_parent_closed,
             on_parent_rejected=self._on_peer_final_run_parent_rejected,
         )
-        self._self_stt_provider_runtime = ProviderRuntimeHandle(
-            name="self_stt",
-            provider=self.stt,
-            event_handler=self._handle_stt_event,
-            retired_event_handler=self._handle_retired_stt_event,
-            exception_handler=lambda exc: self._handle_stt_event_loop_exception(
-                exc,
-                channel="self",
-            ),
-            state_changed=self._sync_provider_runtime_aliases,
-        )
-        self._peer_stt_provider_runtime = ProviderRuntimeHandle(
-            name="peer_stt",
-            provider=self.peer_stt,
-            event_handler=self._handle_stt_event,
-            retired_event_handler=self._handle_retired_stt_event,
-            exception_handler=lambda exc: self._handle_stt_event_loop_exception(
-                exc,
-                channel="peer",
-            ),
-            state_changed=self._sync_provider_runtime_aliases,
+        self._local_asr_provider_runtime = runtime_factory.create(
+            LocalASRProviderRuntimeCallbacks(
+                self_event_handler=self._handle_stt_event,
+                peer_event_handler=self._handle_stt_event,
+                retired_event_handler=self._handle_retired_stt_event,
+                self_exception_handler=lambda exc: self._handle_stt_event_loop_exception(
+                    exc,
+                    channel="self",
+                ),
+                peer_exception_handler=lambda exc: self._handle_stt_event_loop_exception(
+                    exc,
+                    channel="peer",
+                ),
+            )
         )
         self._llm_provider_runtime = ProviderRuntimeHandle(
             name="llm",
@@ -304,6 +323,13 @@ class ClientHub:
         self._sync_self_runtime_aliases()
 
     def __setattr__(self, name: str, value: object) -> None:
+        if name in {"stt", "peer_stt"} and value is not None:
+            try:
+                object.__getattribute__(self, "_local_asr_provider_runtime")
+            except AttributeError:
+                pass
+            else:
+                raise RuntimeError("concrete STT assignment is disabled")
         object.__setattr__(self, name, value)
         if name in {
             "clock",
@@ -346,7 +372,7 @@ class ClientHub:
                 output_runtime = None
             if output_runtime is not None:
                 output_runtime.chatbox = value  # type: ignore[assignment]
-        if name in {"stt", "peer_stt", "llm"}:
+        if name == "llm":
             self._attach_provider_assignment(name, value)
         runtime_field = _SELF_RUNTIME_FIELDS.get(name)
         if runtime_field is None:
@@ -359,37 +385,43 @@ class ClientHub:
 
     @property
     def provider_runtime_handles(self) -> dict[str, ProviderRuntimeHandle]:
-        return {
-            "self_stt": self._self_stt_provider_runtime,
-            "peer_stt": self._peer_stt_provider_runtime,
-            "llm": self._llm_provider_runtime,
-        }
+        return {"llm": self._llm_provider_runtime}
+
+    @property
+    def local_asr_provider_runtime(self) -> LocalASRProviderRuntimePort | None:
+        return self._local_asr_provider_runtime
+
+    def has_stt_provider(self, channel: ProviderRuntimeChannel) -> bool:
+        return (
+            self._require_local_asr_provider_runtime().snapshot.channel_for(channel).provider_id
+            is not None
+        )
+
+    def stt_session_state(self, channel: ChannelId = "self") -> STTSessionState | None:
+        return self._stt_session_states[channel]
 
     def _attach_provider_assignment(self, name: str, value: object) -> None:
+        if name != "llm":
+            return
         try:
-            if name == "stt":
-                handle = object.__getattribute__(self, "_self_stt_provider_runtime")
-            elif name == "peer_stt":
-                handle = object.__getattribute__(self, "_peer_stt_provider_runtime")
-            else:
-                handle = object.__getattribute__(self, "_llm_provider_runtime")
+            handle = object.__getattribute__(self, "_llm_provider_runtime")
         except AttributeError:
             return
         if handle.provider is not value:
             handle.attach_provider_reference(value)
 
     def _sync_provider_runtime_aliases(self, _handle: ProviderRuntimeHandle | None = None) -> None:
-        object.__setattr__(self, "stt", self._self_stt_provider_runtime.provider)
-        object.__setattr__(self, "peer_stt", self._peer_stt_provider_runtime.provider)
+        object.__setattr__(self, "stt", None)
+        object.__setattr__(self, "peer_stt", None)
         object.__setattr__(self, "llm", self._llm_provider_runtime.provider)
-        object.__setattr__(self, "_stt_task", self._self_stt_provider_runtime.event_task)
-        object.__setattr__(self, "_peer_stt_task", self._peer_stt_provider_runtime.event_task)
+        object.__setattr__(self, "_stt_task", None)
+        object.__setattr__(self, "_peer_stt_task", None)
         if hasattr(self, "self_runtime"):
-            self.self_runtime.stt = self.stt
-            self.self_runtime.stt_task = self._stt_task
+            self.self_runtime.stt = None
+            self.self_runtime.stt_task = None
         if hasattr(self, "peer_runtime"):
-            self.peer_runtime.stt = self.peer_stt
-            self.peer_runtime.stt_task = self._peer_stt_task
+            self.peer_runtime.stt = None
+            self.peer_runtime.stt_task = None
 
     def _sync_self_runtime_aliases(self) -> None:
         self._stt_task = self.self_runtime.stt_task
@@ -943,8 +975,7 @@ class ClientHub:
             raise
         self._running = True
         await self.peer_final_runs.start()
-        await self._self_stt_provider_runtime.start()
-        await self._peer_stt_provider_runtime.start()
+        await self._require_local_asr_provider_runtime().start()
         self._sync_provider_runtime_aliases()
 
     async def stop(self) -> None:
@@ -985,84 +1016,80 @@ class ClientHub:
             cleanup_failures.append(exc)
         _raise_output_provider_runtime_close_failures(cleanup_failures)
 
-    async def replace_stt_provider(self, stt: STTProvider | None) -> None:
-        await self._self_stt_provider_runtime.stop_ingress()
+    async def replace_stt_provider_request(
+        self,
+        request: ProviderRuntimeBuildRequest,
+        *,
+        start: bool | None = None,
+    ) -> ProviderRuntimeMutationResult:
+        runtime = self._require_local_asr_provider_runtime()
         await self.reset_overlay_preview()
         await self.self_runtime.reset_runtime_state()
         self._clear_latency_state(channel="self")
         self._sync_self_runtime_aliases()
-        await self._self_stt_provider_runtime.replace_provider(stt, start=self._running)
-        self._sync_provider_runtime_aliases()
-
-    async def handoff_stt_provider(self, stt: STTProvider) -> STTProvider | None:
-        retired = await self._self_stt_provider_runtime.handoff_provider_at_boundary(
-            stt,
-            start=self._running,
+        return await runtime.replace_provider(
+            request,
+            start=self._running if start is None else start,
         )
-        self._sync_provider_runtime_aliases()
-        return retired
 
-    async def cancel_stt_provider_handoff(self, stt: STTProvider) -> bool:
-        return await self._self_stt_provider_runtime.cancel_pending_handoff(stt)
-
-    async def replace_peer_stt_provider(
+    async def handoff_stt_provider_request(
         self,
-        stt: STTProvider | None,
+        request: ProviderRuntimeBuildRequest,
         *,
         start: bool | None = None,
-    ) -> None:
-        await self._peer_stt_provider_runtime.stop_ingress()
+    ) -> ProviderRuntimeMutationResult:
+        return await self._require_local_asr_provider_runtime().handoff_provider(
+            request,
+            start=self._running if start is None else start,
+        )
+
+    async def cancel_stt_provider_request_handoff(self) -> bool:
+        return await self._require_local_asr_provider_runtime().cancel_handoff("self")
+
+    async def replace_peer_stt_provider_request(
+        self,
+        request: ProviderRuntimeBuildRequest,
+        *,
+        start: bool | None = None,
+        on_terminal_failure=None,
+    ) -> ProviderRuntimeMutationResult:
         await self.peer_final_runs.cancel_pending()
         await self.peer_runtime.reset_runtime_state()
         self._clear_peer_logical_turn_state()
         self._clear_latency_state(channel="peer")
-        await self._peer_stt_provider_runtime.replace_provider(
-            stt,
+        return await self._require_local_asr_provider_runtime().replace_provider(
+            request,
             start=self._running if start is None else start,
+            on_terminal_failure=on_terminal_failure,
         )
-        self._sync_provider_runtime_aliases()
 
-    async def handoff_peer_stt_provider(
+    async def handoff_peer_stt_provider_request(
         self,
-        stt: STTProvider,
+        request: ProviderRuntimeBuildRequest,
         *,
         start: bool | None = None,
-    ) -> STTProvider | None:
-        retired = await self._peer_stt_provider_runtime.handoff_provider_at_boundary(
-            stt,
+        on_terminal_failure=None,
+    ) -> ProviderRuntimeMutationResult:
+        return await self._require_local_asr_provider_runtime().handoff_provider(
+            request,
             start=self._running if start is None else start,
+            on_terminal_failure=on_terminal_failure,
         )
-        self._sync_provider_runtime_aliases()
-        return retired
 
-    async def cancel_peer_stt_provider_handoff(self, stt: STTProvider) -> bool:
-        return await self._peer_stt_provider_runtime.cancel_pending_handoff(stt)
+    async def cancel_peer_stt_provider_request_handoff(self) -> bool:
+        return await self._require_local_asr_provider_runtime().cancel_handoff("peer")
 
-    async def start_peer_stt_provider_ingress(self, stt: STTProvider) -> None:
+    async def start_peer_stt_provider_ingress(self) -> None:
         if not self._running:
             return
-        await self._peer_stt_provider_runtime.start_if_provider(stt)
-        self._sync_provider_runtime_aliases()
+        await self._require_local_asr_provider_runtime().start_channel("peer")
 
-    async def drain_peer_stt_for_toggle_off(self, stt: STTProvider) -> None:
-        if self.peer_stt is not stt:
-            return
+    async def abort_peer_stt_for_toggle_off(self) -> None:
         await self.peer_final_runs.cancel_pending()
         await self.peer_runtime.reset_runtime_state()
         self._clear_peer_logical_turn_state()
         self._clear_latency_state(channel="peer")
-        await self._peer_stt_provider_runtime.retire_for_dormant_reuse(stt)
-        self._sync_provider_runtime_aliases()
-
-    async def abort_peer_stt_for_toggle_off(self, stt: STTProvider | None = None) -> None:
-        if stt is not None and self.peer_stt is not stt:
-            return
-        await self.peer_final_runs.cancel_pending()
-        await self.peer_runtime.reset_runtime_state()
-        self._clear_peer_logical_turn_state()
-        self._clear_latency_state(channel="peer")
-        await self._peer_stt_provider_runtime.abort_and_release()
-        self._sync_provider_runtime_aliases()
+        await self._require_local_asr_provider_runtime().release_channel("peer", mode="abort")
 
     async def replace_llm_provider(self, llm: LLMProvider | None) -> None:
         await self._llm_provider_runtime.replace_provider(llm, start=False)
@@ -1073,33 +1100,52 @@ class ClientHub:
         *,
         release_backend_after: float | None = None,
     ) -> None:
-        await self._self_stt_provider_runtime.drain_for_toggle_off(
-            release_backend_after=release_backend_after
+        await self._require_local_asr_provider_runtime().release_channel(
+            "self",
+            mode="drain",
+            release_backend_after=release_backend_after,
         )
-        self._sync_provider_runtime_aliases()
 
     async def abort_self_stt_for_toggle_off(self) -> None:
         await self.reset_overlay_preview()
         await self.self_runtime.reset_runtime_state()
         self._clear_latency_state(channel="self")
         self._sync_self_runtime_aliases()
-        await self._self_stt_provider_runtime.abort_and_release()
-        self._sync_provider_runtime_aliases()
+        await self._require_local_asr_provider_runtime().release_channel("self", mode="abort")
 
     async def schedule_self_stt_idle_release(self, *, release_backend_after: float) -> None:
-        await self._self_stt_provider_runtime.schedule_idle_release(
-            release_backend_after=release_backend_after
+        await self._require_local_asr_provider_runtime().release_channel(
+            "self",
+            mode="drain",
+            release_backend_after=release_backend_after,
         )
 
     async def resume_self_stt_after_toggle_on(self) -> None:
-        await self._self_stt_provider_runtime.start()
-        self._sync_provider_runtime_aliases()
+        await self._require_local_asr_provider_runtime().start_channel("self")
+
+    async def warmup_stt_channel(self, channel: ProviderRuntimeChannel) -> None:
+        await self._require_local_asr_provider_runtime().warmup_channel(channel)
+
+    async def reconfigure_stt_channel(
+        self,
+        channel: ProviderRuntimeChannel,
+        options,
+    ) -> None:
+        await self._require_local_asr_provider_runtime().reconfigure_channel(channel, options)
 
     def _provider_runtime_handles_have_resources(self) -> bool:
-        return any(handle.has_resources for handle in self.provider_runtime_handles.values())
+        runtime = self._require_local_asr_provider_runtime()
+        runtime_resources = any(channel.has_resources for channel in runtime.snapshot.channels)
+        return runtime_resources or any(
+            handle.has_resources for handle in self.provider_runtime_handles.values()
+        )
 
     async def _close_provider_runtime_handles(self) -> None:
         failures: list[Exception] = []
+        try:
+            await self._require_local_asr_provider_runtime().close()
+        except Exception as exc:
+            failures.append(exc)
         for handle in self.provider_runtime_handles.values():
             try:
                 await handle.close()
@@ -1107,6 +1153,12 @@ class ClientHub:
                 failures.append(exc)
         self._sync_provider_runtime_aliases()
         _raise_provider_runtime_close_failures(failures)
+
+    def _require_local_asr_provider_runtime(self) -> LocalASRProviderRuntimePort:
+        runtime = self._local_asr_provider_runtime
+        if runtime is None:
+            raise RuntimeError("local ASR provider runtime is not configured")
+        return runtime
 
     def mark_promo_eligible(self) -> None:
         """Mark that user clicked STT button. Next STREAMING state will send promo."""
@@ -1219,12 +1271,10 @@ class ClientHub:
                 self._maybe_start_finalize_wait(event.utterance_id)
                 await self._maybe_clear_resume_on_end(event)
 
-        if self.stt is not None:
-            await self.stt.handle_vad_event(event)
+        await self._require_local_asr_provider_runtime().handle_vad_event("self", event)
 
         if isinstance(event, SpeechEnd):
-            await self._self_stt_provider_runtime.commit_pending_handoff()
-            self._sync_provider_runtime_aliases()
+            await self._require_local_asr_provider_runtime().commit_handoff("self")
 
         if (
             resume_overlay_resync_buffer is not None
@@ -1255,11 +1305,9 @@ class ClientHub:
                 )
             if event.utterance_id in self._peer_parent_turn_ids:
                 self._maybe_clear_completed_peer_parent(event.utterance_id)
-        if self.peer_stt is not None:
-            await self.peer_stt.handle_vad_event(event)
+        await self._require_local_asr_provider_runtime().handle_vad_event("peer", event)
         if isinstance(event, SpeechEnd):
-            await self._peer_stt_provider_runtime.commit_pending_handoff()
-            self._sync_provider_runtime_aliases()
+            await self._require_local_asr_provider_runtime().commit_handoff("peer")
 
     async def submit_text(self, text: str, *, source: str = "You") -> UUID:
         text = text.strip()
@@ -1338,18 +1386,10 @@ class ClientHub:
         self._emit_stt_event_loop_failure(exc, channel=channel)
 
     async def _stop_stt_event_loop(self) -> None:
-        await self._self_stt_provider_runtime.stop_ingress()
-        await self._peer_stt_provider_runtime.stop_ingress()
-        self._sync_provider_runtime_aliases()
+        return
 
     async def _stop_stt_task(self, attr_name: str) -> None:
-        if attr_name == "_stt_task":
-            await self._self_stt_provider_runtime.stop_ingress()
-            self._sync_provider_runtime_aliases()
-            return
-        if attr_name == "_peer_stt_task":
-            await self._peer_stt_provider_runtime.stop_ingress()
-            self._sync_provider_runtime_aliases()
+        if attr_name in {"_stt_task", "_peer_stt_task"}:
             return
         task = getattr(self, attr_name)
         if task is None:
@@ -1367,6 +1407,7 @@ class ClientHub:
 
     async def _handle_stt_event(self, event: object) -> None:
         if isinstance(event, STTSessionStateEvent):
+            self._stt_session_states[event.channel] = event.state
             self._emit_basic(
                 "[Hub] STT state: channel=%s state=%s",
                 event.channel,

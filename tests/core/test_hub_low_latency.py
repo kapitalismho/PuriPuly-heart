@@ -308,20 +308,15 @@ async def test_hub_exposes_named_provider_runtime_handles_and_shutdown_policies(
     handles = getattr(hub, "provider_runtime_handles", None)
 
     assert handles is not None
-    assert set(handles) >= {"self_stt", "peer_stt", "llm"}
-    assert handles["self_stt"].owner_name == "ProviderRuntimeHandle:self_stt"
-    assert handles["self_stt"].resource_fields == (
-        "provider",
-        "event_task",
-        "idle_release_task",
-        "generation",
-    )
-    assert "STT toggle-off drains" in handles["self_stt"].toggle_off_policy
+    assert set(handles) == {"llm"}
+    assert hub.local_asr_provider_runtime is not None
+    assert hub.local_asr_provider_runtime.snapshot.channel_for("self").has_resources
+    assert hub.local_asr_provider_runtime.snapshot.channel_for("peer").has_resources
     assert "await provider.close" in handles["llm"].shutdown_policy
 
     await hub.start(auto_flush_osc=False)
-    assert hub._stt_task is handles["self_stt"].event_task
-    assert hub._peer_stt_task is handles["peer_stt"].event_task
+    assert hub._stt_task is None
+    assert hub._peer_stt_task is None
 
     await hub.stop()
     await hub.stop()
@@ -359,8 +354,8 @@ async def test_stop_attempts_all_provider_closes_and_retries_failed_handles() ->
     assert self_stt.close_calls == 1
     assert peer_stt.close_calls == 1
     assert llm.close_calls == 1
-    assert hub.stt is self_stt
-    assert hub.peer_stt is peer_stt
+    assert hub.local_asr_provider_runtime.snapshot.channel_for("self").has_resources
+    assert hub.local_asr_provider_runtime.snapshot.channel_for("peer").has_resources
     assert hub.llm is None
 
     await hub.stop()
@@ -369,8 +364,8 @@ async def test_stop_attempts_all_provider_closes_and_retries_failed_handles() ->
     assert peer_stt.close_calls == 2
     assert self_stt.closed is True
     assert peer_stt.closed is True
-    assert hub.stt is None
-    assert hub.peer_stt is None
+    assert not hub.local_asr_provider_runtime.snapshot.channel_for("self").has_resources
+    assert not hub.local_asr_provider_runtime.snapshot.channel_for("peer").has_resources
     assert hub.llm is None
 
 
@@ -385,7 +380,7 @@ async def test_replaced_peer_provider_late_final_cannot_mutate_or_enqueue_chatbo
     assert getattr(hub, "provider_runtime_handles", None) is not None
 
     await hub.start(auto_flush_osc=False)
-    await hub.replace_peer_stt_provider(new_peer)
+    await hub.local_asr_provider_runtime.replace_prebuilt_provider("peer", new_peer, start=True)
     stale_utterance_id = uuid4()
     await old_peer.emit(
         STTFinalEvent(
@@ -581,15 +576,9 @@ async def test_self_stt_toggle_off_keeps_event_ingress_for_later_reenable_events
 
     await hub.start(auto_flush_osc=False)
     try:
-        handle = hub.provider_runtime_handles["self_stt"]
-        event_task = handle.event_task
-        assert event_task is not None
-
         await hub.drain_self_stt_for_toggle_off()
 
         assert stt.closed is True
-        assert handle.event_task is event_task
-        assert handle.event_task is not None and not handle.event_task.done()
 
         await stt.emit(
             STTSessionStateEvent(

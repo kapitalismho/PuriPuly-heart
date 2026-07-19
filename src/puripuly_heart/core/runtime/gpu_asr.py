@@ -14,7 +14,8 @@ from uuid import uuid4
 
 import numpy as np
 
-from puripuly_heart.app.ports.gpu_worker import (
+from puripuly_heart.core.clock import Clock, SystemClock
+from puripuly_heart.core.gpu_worker import (
     GpuWorkerActivation,
     GpuWorkerClientPort,
     GpuWorkerClosedError,
@@ -24,7 +25,6 @@ from puripuly_heart.app.ports.gpu_worker import (
     GpuWorkerRequestError,
     GpuWorkerTranscription,
 )
-from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 

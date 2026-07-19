@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from puripuly_heart.app import wiring_llm_factory as _llm_factory
-from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
 from puripuly_heart.app.wiring_composition import create_provider_verifier
 from puripuly_heart.app.wiring_llm_factory import (
     MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
     _LazyFactoryLLMProvider,
+)
+from puripuly_heart.app.wiring_local_asr_provider_runtime import (
+    LocalASRProviderRuntimeFactory,
+    ManagedSTTProviderFactory,
 )
 from puripuly_heart.app.wiring_managed_auth_factory import (
     DiscordManagedBrokerClientAdapter,
@@ -37,11 +42,18 @@ from puripuly_heart.app.wiring_stt_factory import (
     resolve_peer_stt_config,
     resolve_peer_stt_runtime_config,
     resolve_peer_stt_runtime_config_from_vnext,
+    resolve_self_stt_runtime_config,
 )
 from puripuly_heart.config.runtime_resolution import resolve_llm_config
-from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
+    HuggingFaceXetDownloadAdapter,
+)
 from puripuly_heart.core.openrouter_credentials import load_managed_openrouter_user_identifier
-from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnosticSink, SharedGpuASRRuntime
+from puripuly_heart.core.runtime.local_asr_provisioning import (
+    LocalASRProvisioningOwner,
+    ProvisioningDiagnosticSink,
+    ProvisioningStateChanged,
+)
 
 _WIRING_SECRET_KEYS_FOR_COMPATIBILITY_GUARD = (
     "google_api_key",
@@ -78,26 +90,31 @@ def create_llm_provider(settings, **kwargs):
     )
 
 
-def _create_shared_gpu_asr_runtime(
+def create_local_asr_provisioning_owner(
     *,
-    clock: Clock,
-    diagnostic_sink: GpuASRDiagnosticSink,
-) -> SharedGpuASRRuntime:
-    return SharedGpuASRRuntime(
-        process_factory=DefaultGpuWorkerProcessFactory(),
-        clock=clock,
+    model_root: Path | None = None,
+    state_changed: ProvisioningStateChanged | None = None,
+    diagnostic_sink: ProvisioningDiagnosticSink | None = None,
+) -> LocalASRProvisioningOwner:
+    return LocalASRProvisioningOwner(
+        model_root=model_root,
+        state_changed=state_changed,
         diagnostic_sink=diagnostic_sink,
+        huggingface_downloader=HuggingFaceXetDownloadAdapter(),
     )
 
 
 __all__ = (
     "SECRETS_PASSPHRASE_ENV",
     "MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR",
+    "LocalASRProviderRuntimeFactory",
+    "ManagedSTTProviderFactory",
     "ResolvedPeerSTTConfig",
     "build_peer_stt_provider_signature",
     "build_peer_stt_provider_signature_from_vnext",
     "create_llm_provider",
     "create_llm_provider_from_resolved_config",
+    "create_local_asr_provisioning_owner",
     "create_peer_stt_backend",
     "create_peer_stt_backend_from_resolved_config",
     "create_provider_verifier",
@@ -111,6 +128,7 @@ __all__ = (
     "resolve_peer_stt_config",
     "resolve_peer_stt_runtime_config",
     "resolve_peer_stt_runtime_config_from_vnext",
+    "resolve_self_stt_runtime_config",
     "DiscordManagedBrokerClientAdapter",
     "DiscordOAuthAuthAdapter",
     "ManagedIdentityPreflightAdapter",

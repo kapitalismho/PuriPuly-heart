@@ -191,6 +191,9 @@ async def test_gpu_huggingface_cancel_stops_helper_and_never_promotes(tmp_path: 
     script = (
         "import json,os,pathlib,sys,time;"
         "event=pathlib.Path(sys.argv[2]);"
+        "cache=pathlib.Path(sys.argv[1]).parent/'.cache';"
+        "cache.mkdir(parents=True);"
+        "held=(cache/'held.lock').open('w');"
         "pathlib.Path(r'" + str(pid_path) + "').write_text(str(os.getpid()));"
         "event.write_text(json.dumps({'type':'progress','downloaded_bytes':1,'total_bytes':100})+'\\n');"
         "time.sleep(60)"

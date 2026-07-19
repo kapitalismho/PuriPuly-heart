@@ -66,6 +66,17 @@ from puripuly_heart.core.audio.source import (
 )
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
+from puripuly_heart.core.local_asr_provisioning import (
+    LocalASRModelProvisioningState,
+    LocalASRProvisioningSnapshot,
+)
+from puripuly_heart.core.local_stt_assets import (
+    LOCAL_QWEN_GPU_MODEL_ID,
+    LOCAL_STT_MODEL_ID,
+    PARAKEET_JAPANESE_MODEL_ID,
+    PARAKEET_V3_MODEL_ID,
+    REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
+)
 from puripuly_heart.core.managed_openrouter_broker_client import (
     HttpManagedOpenRouterBrokerClient,
 )
@@ -304,6 +315,7 @@ class DummyHub:
         self.llm = llm
         self.stt = stt
         self.peer_stt = peer_stt
+        self.local_asr_provider_runtime = None
         self.translation_enabled = True
         self.peer_translation_enabled = False
         self.integrated_context_enabled = False
@@ -319,6 +331,10 @@ class DummyHub:
         self.promo_calls = 0
         self.replace_stt_calls: list[object | None] = []
         self.replace_peer_stt_calls: list[object | None] = []
+        self.replace_stt_request_calls: list[tuple[object, bool]] = []
+        self.drain_self_stt_calls: list[float | None] = []
+        self.abort_self_stt_calls = 0
+        self.warmup_stt_calls: list[str] = []
         self.replace_llm_calls: list[object | None] = []
         self.start_calls: list[bool] = []
         self.stop_calls = 0
@@ -361,6 +377,28 @@ class DummyHub:
         if old_stt is not None and hasattr(old_stt, "close"):
             await old_stt.close()
         self.stt = stt
+
+    def has_stt_provider(self, channel: str) -> bool:
+        return self.stt is not None if channel == "self" else self.peer_stt is not None
+
+    async def replace_stt_provider_request(self, request: object, *, start: bool):
+        self.replace_stt_request_calls.append((request, start))
+        self.stt = request
+        return SimpleNamespace(status="applied")
+
+    async def drain_self_stt_for_toggle_off(
+        self,
+        *,
+        release_backend_after: float | None = None,
+    ) -> None:
+        self.drain_self_stt_calls.append(release_backend_after)
+
+    async def abort_self_stt_for_toggle_off(self) -> None:
+        self.abort_self_stt_calls += 1
+        self.stt = None
+
+    async def warmup_stt_channel(self, channel: str) -> None:
+        self.warmup_stt_calls.append(channel)
 
     async def replace_peer_stt_provider(self, stt: object | None) -> None:
         old_stt = self.peer_stt
@@ -676,8 +714,55 @@ class FakeOverlayProcessManager:
         self._monitor_release.set()
 
 
+class ReadyProvisioningPort:
+    def __init__(self) -> None:
+        self.snapshot = LocalASRProvisioningSnapshot(
+            models=(
+                LocalASRModelProvisioningState(PARAKEET_V3_MODEL_ID, "cpu", "ready"),
+                LocalASRModelProvisioningState(PARAKEET_JAPANESE_MODEL_ID, "cpu", "ready"),
+                LocalASRModelProvisioningState(LOCAL_STT_MODEL_ID, "cpu", "ready"),
+                LocalASRModelProvisioningState(LOCAL_QWEN_GPU_MODEL_ID, "gpu", "ready"),
+            ),
+            required_cpu_model_ids=REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
+            gpu_model_id=LOCAL_QWEN_GPU_MODEL_ID,
+        )
+
+    @property
+    def diagnostics(self):
+        return ()
+
+    async def inspect_cpu(self, model_ids=None, *, verify_checksums=False):
+        _ = (model_ids, verify_checksums)
+        return self.snapshot
+
+    async def inspect_gpu(self, *, explicit_intent, verify_checksums=False):
+        _ = (explicit_intent, verify_checksums)
+        return self.snapshot
+
+    def start_install(self, request):
+        raise AssertionError(f"unexpected provisioning install: {request}")
+
+    async def report_model_validation_failure(self, model_id, *, failure_type):
+        _ = (model_id, failure_type)
+        return self.snapshot
+
+    async def cancel_install(self, backend):
+        _ = backend
+
+    async def close(self):
+        return
+
+    def lifecycle_owner_snapshot(self):
+        return {"owner": "LocalASRProvisioningOwner"}
+
+
 def _make_controller(*, app: object) -> GuiController:
-    return GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    return GuiController(
+        page=SimpleNamespace(),
+        app=app,
+        config_path=Path("settings.json"),
+        local_asr_provisioning=ReadyProvisioningPort(),
+    )
 
 
 def _language_selection_change(
@@ -1223,13 +1308,6 @@ def _patch_init_pipeline_dependencies(monkeypatch: pytest.MonkeyPatch) -> dict[s
 
     monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
     monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: "llm")
-    monkeypatch.setattr(controller_module, "create_stt_backend", lambda *_a, **_k: "backend")
-    monkeypatch.setattr(
-        controller_module,
-        "create_peer_stt_backend_from_resolved_config",
-        lambda *_a, **_k: "peer-backend",
-    )
-    monkeypatch.setattr(controller_module, "ManagedSTTProvider", lambda *a, **k: "stt")
 
     class FakeSender:
         def close(self) -> None:
@@ -1251,9 +1329,22 @@ def _patch_init_pipeline_dependencies(monkeypatch: pytest.MonkeyPatch) -> dict[s
             llm=kwargs.get("llm"),
             stt=kwargs.get("stt"),
             peer_stt=kwargs.get("peer_stt"),
+            local_asr_provider_runtime=None,
             peer_translation_enabled=kwargs.get("peer_translation_enabled", False),
             integrated_context_enabled=kwargs.get("integrated_context_enabled", False),
         )
+
+        def has_stt_provider(channel: str) -> bool:
+            return hub.stt is not None if channel == "self" else hub.peer_stt is not None
+
+        async def replace_stt_provider_request(request, *, start):
+            _ = start
+            created["stt_request"] = request
+            hub.stt = "owned-stt"
+            return SimpleNamespace(status="applied")
+
+        hub.has_stt_provider = has_stt_provider
+        hub.replace_stt_provider_request = replace_stt_provider_request
         created["hub"] = hub
         return hub
 
@@ -1269,16 +1360,20 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     stt_calls: list[dict[str, object]] = []
-    _patch_init_pipeline_dependencies(monkeypatch)
+    created = _patch_init_pipeline_dependencies(monkeypatch)
 
-    def fake_stt_provider(*_args, **kwargs):
+    def fake_stt_provider_factory(*_args, **kwargs):
         stt_calls.append(dict(kwargs))
         return SimpleNamespace()
 
     app = SimpleNamespace(debug_ui_preview=True)
     controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
     controller.settings = AppSettings()
-    monkeypatch.setattr(controller_module, "ManagedSTTProvider", fake_stt_provider)
+    monkeypatch.setattr(
+        controller_module,
+        "ManagedSTTProviderFactory",
+        fake_stt_provider_factory,
+    )
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -1288,8 +1383,9 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
     assert controller.cycle_debug_stt_fault_profile() == "stt_input_low_snr_vad_pass"
     await controller._init_pipeline()
 
-    provider = stt_calls[0]["stt_input_fault_profile_provider"]
-    assert stt_calls[0]["stt_provider_name"] == controller.settings.provider.stt
+    provider = stt_calls[0]["fault_profile_provider"]
+    assert created["stt_request"].provider_id == controller.settings.provider.stt.value
+    assert controller._hub_has_stt_provider("self")
     assert callable(stt_calls[0]["on_final_transcript_suppressed"])
     assert callable(provider)
     assert provider() == "stt_input_low_snr_vad_pass"
@@ -1300,73 +1396,42 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
 
 
 @pytest.mark.asyncio
-async def test_rebuild_stt_provider_wires_self_stt_fault_provider_with_debug_gate(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    stt_calls: list[dict[str, object]] = []
-
-    def fake_stt_provider(*_args, **kwargs):
-        stt = SimpleNamespace()
-        stt_calls.append(dict(kwargs))
-        return stt
-
+async def test_rebuild_stt_provider_delegates_immutable_owner_request() -> None:
     app = SimpleNamespace(debug_ui_preview=False)
     controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
     controller._runtime_logging = RuntimeLoggingSpy()
     controller.settings = AppSettings()
-    controller.hub = DummyHub(stt=object())
+    requests: list[tuple[object, bool]] = []
+
+    async def replace_stt_provider_request(request: object, *, start: bool):
+        requests.append((request, start))
+        return SimpleNamespace(status="applied")
+
+    controller.hub = SimpleNamespace(
+        replace_stt_provider_request=replace_stt_provider_request,
+    )
     controller._debug_stt_fault_profile = "stt_input_low_snr_vad_pass"
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(controller_module, "create_stt_backend", lambda *_a, **_k: object())
-    monkeypatch.setattr(controller_module, "ManagedSTTProvider", fake_stt_provider)
 
     await controller._rebuild_stt_provider()
 
-    provider = stt_calls[0]["stt_input_fault_profile_provider"]
-    assert stt_calls[0]["stt_provider_name"] == controller.settings.provider.stt
-    assert callable(stt_calls[0]["on_final_transcript_suppressed"])
-    assert callable(provider)
-    assert provider() == "none"
-    assert controller.debug_stt_fault_profile == "stt_input_low_snr_vad_pass"
-
-    app.debug_ui_preview = True
-    assert provider() == "stt_input_low_snr_vad_pass"
+    request, start = requests[0]
+    assert request.provider_id == controller.settings.provider.stt.value
+    assert request.config.source_language == controller.settings.languages.source_language
+    assert start is False
 
 
-def test_create_peer_stt_provider_wires_fault_provider_with_debug_gate(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    stt_calls: list[dict[str, object]] = []
-
-    def fake_stt_provider(*_args, **kwargs):
-        stt_calls.append(dict(kwargs))
-        return SimpleNamespace()
-
+def test_peer_stt_provider_request_preserves_resolved_runtime_config() -> None:
     app = SimpleNamespace(debug_ui_preview=True)
     controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
     controller.settings = AppSettings()
-    controller._debug_stt_fault_profile = "stt_input_low_snr_vad_pass"
     config = controller._build_peer_runtime_config(controller.settings)
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        controller_module,
-        "create_peer_stt_backend_from_resolved_config",
-        lambda *_a, **_k: object(),
-    )
-    monkeypatch.setattr(controller_module, "ManagedSTTProvider", fake_stt_provider)
 
-    controller._create_peer_stt_provider_from_runtime_config(config, lambda _exc: None)
+    request = controller._peer_stt_provider_request(config)
 
-    provider = stt_calls[0]["stt_input_fault_profile_provider"]
-    assert stt_calls[0]["channel"] == "peer"
-    assert stt_calls[0]["stt_provider_name"] == config.backend.provider
-    assert callable(stt_calls[0]["on_final_transcript_suppressed"])
-    assert callable(provider)
-    assert provider() == "stt_input_low_snr_vad_pass"
-
-    app.debug_ui_preview = False
-    assert provider() == "none"
-    assert controller.debug_stt_fault_profile == "stt_input_low_snr_vad_pass"
+    assert request.config is config.backend
+    assert request.provider_id == config.backend.provider
+    assert request.model_id == config.model_id or config.backend.model
+    assert request.session_options is config.session_options
 
 
 def test_cycle_debug_stt_fault_profile_requires_debug_preview() -> None:
@@ -1610,12 +1675,6 @@ async def test_start_local_llm_without_runtime_does_not_show_api_key_warning(
     monkeypatch.setattr(
         controller_module, "create_secret_store", lambda *_a, **_k: DummySecrets({})
     )
-    monkeypatch.setattr(
-        controller_module,
-        "inspect_local_stt_install_state",
-        lambda *_a, **_k: controller_module.LocalSTTInstallState(status="ready"),
-    )
-
     controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
     await controller.start()
     await asyncio.sleep(0)
@@ -4786,38 +4845,6 @@ async def test_set_peer_translation_enabled_enqueues_peer_disclosure_once(
 
 
 @pytest.mark.asyncio
-async def test_set_peer_translation_enabled_surfaces_local_notice_for_peer_local_qwen_when_runtime_missing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=dash,
-            refresh_overlay_peer_contract=lambda: None,
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.ui.peer_translation_eula_accepted = True
-    controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
-    controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=None)
-    controller._local_stt_install_state = controller_module.LocalSTTInstallState(status="missing")
-
-    async def fake_begin_overlay_start(self: GuiController) -> None:
-        self.overlay_state = "starting"
-
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_begin_overlay_start", fake_begin_overlay_start)
-    monkeypatch.setattr(
-        GuiController, "_refresh_overlay_runtime_dependencies", lambda self: asyncio.sleep(0)
-    )
-
-    await controller.set_peer_translation_enabled(True)
-
-    assert controller.settings.ui.peer_translation_enabled is True
-    assert dash.local_stt_notice_status == "missing"
-
-
-@pytest.mark.asyncio
 async def test_rebuild_pipeline_closes_previous_peer_runtime_before_replacement(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -5286,18 +5313,28 @@ async def test_init_pipeline_passes_chatbox_and_peer_language_settings_to_hub(
         return "llm"
 
     monkeypatch.setattr(controller_module, "create_llm_provider", fake_create_llm_provider)
-    monkeypatch.setattr(controller_module, "create_stt_backend", lambda *_a, **_k: "backend")
-    monkeypatch.setattr(controller_module, "ManagedSTTProvider", lambda *a, **k: "stt")
     monkeypatch.setattr(controller_module, "VrchatOscUdpSender", lambda *a, **k: object())
     monkeypatch.setattr(controller_module, "ChatboxPaginator", lambda *a, **k: object())
 
     def fake_hub(*_args, **kwargs):
         captured.update(kwargs)
-        return SimpleNamespace(
+        hub = SimpleNamespace(
             llm=kwargs.get("llm"),
             stt=kwargs.get("stt"),
             peer_stt=kwargs.get("peer_stt"),
+            local_asr_provider_runtime=None,
         )
+
+        async def replace_stt_provider_request(request, *, start):
+            _ = request, start
+            hub.stt = "owned-stt"
+            return SimpleNamespace(status="applied")
+
+        hub.has_stt_provider = lambda channel: (
+            hub.stt is not None if channel == "self" else hub.peer_stt is not None
+        )
+        hub.replace_stt_provider_request = replace_stt_provider_request
+        return hub
 
     monkeypatch.setattr(controller_module, "ClientHub", fake_hub)
     monkeypatch.setattr(
@@ -5322,6 +5359,20 @@ async def test_init_pipeline_passes_chatbox_and_peer_language_settings_to_hub(
 async def test_init_pipeline_constructs_production_output_owner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    requests: list[object] = []
+
+    class ProviderFactory:
+        async def create(
+            self,
+            request,
+            *,
+            gpu_runtime,
+            on_terminal_failure=None,
+        ):
+            _ = gpu_runtime, on_terminal_failure
+            requests.append(request)
+            return object()
+
     class Chatbox:
         def enqueue(self, message) -> None:
             _ = message
@@ -5347,8 +5398,8 @@ async def test_init_pipeline_constructs_production_output_owner(
     monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: None)
     monkeypatch.setattr(
         controller_module,
-        "create_stt_backend",
-        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("unavailable")),
+        "ManagedSTTProviderFactory",
+        lambda **_kwargs: ProviderFactory(),
     )
     monkeypatch.setattr(controller_module, "VrchatOscUdpSender", lambda *a, **k: object())
     monkeypatch.setattr(controller_module, "ChatboxPaginator", lambda *a, **k: chatbox)
@@ -5367,6 +5418,17 @@ async def test_init_pipeline_constructs_production_output_owner(
     assert controller.hub.output_runtime.chatbox is chatbox
     assert controller.hub.output_runtime.overlay_sink is None
     assert controller.hub.output_runtime.state == "open"
+    assert controller.hub.local_asr_provider_runtime is not None
+    assert (
+        controller.hub.local_asr_provider_runtime.snapshot.channel_for("self").provider_id
+        == controller.settings.provider.stt.value
+    )
+    assert set(controller.hub.provider_runtime_handles) == {"llm"}
+    assert [request.provider_id for request in requests] == [controller.settings.provider.stt.value]
+    assert controller.local_asr_provisioning is not None
+    assert controller.local_asr_provisioning.lifecycle_owner_snapshot()["owner"] == (
+        "LocalASRProvisioningOwner"
+    )
 
 
 @pytest.mark.asyncio
@@ -5414,11 +5476,6 @@ async def test_real_controller_composition_routes_all_output_channels_once(
     overlay = RecordingOverlay()
     monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
     monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: None)
-    monkeypatch.setattr(
-        controller_module,
-        "create_stt_backend",
-        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("unavailable")),
-    )
     monkeypatch.setattr(controller_module, "VrchatOscUdpSender", lambda *a, **k: object())
     monkeypatch.setattr(controller_module, "ChatboxPaginator", lambda *a, **k: chatbox)
     monkeypatch.setattr(
@@ -5564,163 +5621,6 @@ async def test_initial_peer_local_activation_publishes_starting_until_provider_a
 
     assert controller._peer_asr_model_loading is False
     assert contracts[-1].peer.state == "on"
-
-
-@pytest.mark.asyncio
-async def test_refresh_peer_stt_runtime_blocks_peer_local_qwen_until_local_runtime_ready(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
-    controller.settings.ui.peer_translation_enabled = True
-    controller.settings.ui.peer_translation_eula_accepted = True
-    controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=None)
-    controller.overlay_state = "connected"
-    _attach_overlay_bridge(controller, object())
-    controller._peer_runtime = DummyPeerRuntime()
-    controller._local_stt_install_state = controller_module.LocalSTTInstallState(status="missing")
-
-    download_requests: list[str] = []
-
-    monkeypatch.setattr(
-        GuiController,
-        "_start_local_stt_download",
-        lambda self, *, origin: download_requests.append(origin) or True,
-    )
-
-    await controller._refresh_peer_stt_runtime()
-
-    assert len(controller._peer_runtime.policy_calls) == 1
-    assert controller._peer_runtime.policy_calls[0]["desired_active"] is False
-    assert download_requests == ["manual"]
-    assert dash.local_stt_notice_status == "missing"
-    assert dash.stt_enabled is None
-    assert dash.stt_needs_key is None
-
-
-@pytest.mark.asyncio
-async def test_peer_local_qwen_download_completion_resumes_peer_runtime_after_refresh_request(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
-    controller.settings.ui.peer_translation_enabled = True
-    controller.settings.ui.peer_translation_eula_accepted = True
-    controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=None)
-    controller.overlay_state = "connected"
-    _attach_overlay_bridge(controller, object())
-    controller._peer_runtime = DummyPeerRuntime()
-    controller._local_stt_install_state = controller_module.LocalSTTInstallState(status="missing")
-
-    download_requests: list[str] = []
-
-    monkeypatch.setattr(
-        GuiController,
-        "_start_local_stt_download",
-        lambda self, *, origin: download_requests.append(origin) or True,
-    )
-
-    await controller._refresh_peer_stt_runtime()
-
-    async def fake_install(*, locale: str, on_status, cancel_event) -> object:
-        _ = (locale, on_status, cancel_event)
-        return object()
-
-    class SuccessfulPeerSession:
-        async def close(self) -> None:
-            return None
-
-    class SuccessfulPeerBackend:
-        async def open_session(self):
-            return SuccessfulPeerSession()
-
-        async def close(self) -> None:
-            return None
-
-    monkeypatch.setattr(controller_module, "ensure_local_stt_installed", fake_install)
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        controller_module,
-        "create_peer_stt_backend_from_resolved_config",
-        lambda *_a, **_k: SuccessfulPeerBackend(),
-    )
-    monkeypatch.setattr(
-        controller_module,
-        "inspect_local_cpu_model_installs",
-        lambda model_ids, *_a, **_k: controller_module.LocalCPUInstallSnapshot(
-            models=tuple(
-                controller_module.LocalCPUModelInstall(
-                    model_id=model_id,
-                    state=controller_module.LocalSTTInstallState(status="ready"),
-                )
-                for model_id in model_ids
-            )
-        ),
-    )
-
-    await controller._run_local_stt_download(origin="manual")
-
-    assert download_requests == ["manual"]
-    assert [call["desired_active"] for call in controller._peer_runtime.policy_calls] == [
-        False,
-        True,
-    ]
-    assert dash.local_stt_notice_status is None
-
-
-@pytest.mark.asyncio
-async def test_refresh_peer_stt_runtime_does_not_create_disposable_local_qwen_probe(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
-    controller.settings.ui.peer_translation_enabled = True
-    controller.settings.ui.peer_translation_eula_accepted = True
-    controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=None)
-    controller.overlay_state = "connected"
-    _attach_overlay_bridge(controller, object())
-    controller._peer_runtime = DummyPeerRuntime()
-    controller._local_stt_install_state = controller_module.LocalSTTInstallState(status="ready")
-
-    download_requests: list[str] = []
-
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        controller_module,
-        "create_peer_stt_backend_from_resolved_config",
-        lambda *_a, **_k: pytest.fail("disposable Peer backend probe created"),
-    )
-    monkeypatch.setattr(
-        controller_module,
-        "inspect_local_cpu_model_installs",
-        lambda model_ids, *_a, **_k: controller_module.LocalCPUInstallSnapshot(
-            models=tuple(
-                controller_module.LocalCPUModelInstall(
-                    model_id=model_id,
-                    state=controller_module.LocalSTTInstallState(status="ready"),
-                )
-                for model_id in model_ids
-            )
-        ),
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_start_local_stt_download",
-        lambda self, *, origin: download_requests.append(origin) or True,
-    )
-
-    await controller._refresh_peer_stt_runtime()
-
-    assert len(controller._peer_runtime.policy_calls) == 1
-    assert controller._peer_runtime.policy_calls[0]["desired_active"] is True
-    assert download_requests == []
-    assert dash.local_stt_notice_status is None
 
 
 @pytest.mark.asyncio
@@ -9475,13 +9375,6 @@ async def test_overlay_runtime_disconnect_keeps_saved_preferences_without_auto_r
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
     )
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        controller_module,
-        "create_peer_stt_backend_from_resolved_config",
-        lambda *_a, **_k: "peer",
-    )
-    monkeypatch.setattr(controller_module, "ManagedSTTProvider", lambda *a, **k: "peer-stt")
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -9516,13 +9409,6 @@ async def test_overlay_runtime_crash_keeps_saved_preferences_without_auto_restar
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
     )
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        controller_module,
-        "create_peer_stt_backend_from_resolved_config",
-        lambda *_a, **_k: "peer",
-    )
-    monkeypatch.setattr(controller_module, "ManagedSTTProvider", lambda *a, **k: "peer-stt")
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -12789,7 +12675,7 @@ async def test_controller_stop_closes_vrc_mic_receiver_before_hub_shutdown(
     monkeypatch.setattr(GuiController, "_close_clipboard_runtime", fake_noop)
     monkeypatch.setattr(GuiController, "_close_app_oauth_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_close_oauth_runtime", fake_noop)
-    monkeypatch.setattr(GuiController, "_cancel_local_stt_download", fake_noop)
+    monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", fake_noop)
     monkeypatch.setattr(GuiController, "_close_microphone_test_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay)
     monkeypatch.setattr(GuiController, "_close_peer_runtime_for_release", fake_noop)
@@ -12849,7 +12735,7 @@ async def test_controller_stop_uses_bounded_prompt_runtime_close_and_still_stops
     monkeypatch.setattr(GuiController, "_close_clipboard_runtime", fake_noop)
     monkeypatch.setattr(GuiController, "_close_app_oauth_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_close_oauth_runtime", fake_noop)
-    monkeypatch.setattr(GuiController, "_cancel_local_stt_download", fake_noop)
+    monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", fake_noop)
     monkeypatch.setattr(GuiController, "_close_microphone_test_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay)
     monkeypatch.setattr(GuiController, "_close_peer_runtime_for_release", fake_noop)
@@ -12957,12 +12843,6 @@ async def test_start_initializes_dashboard_and_bridge(
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
     monkeypatch.setattr(controller_module, "set_locale", lambda locale: locale_calls.append(locale))
     monkeypatch.setattr(controller_module, "UIEventBridge", FakeBridge)
-    monkeypatch.setattr(
-        GuiController,
-        "_get_gpu_asr_runtime",
-        lambda _self: pytest.fail("non-GPU startup must not create the GPU runtime"),
-    )
-
     app = SimpleNamespace(
         view_dashboard=dash,
         view_logs=logs,
@@ -14762,7 +14642,7 @@ async def test_ensure_stt_switch_creates_task_when_missing(
 
 
 @pytest.mark.asyncio
-async def test_run_stt_switch_stop_path_closes_backend(
+async def test_run_stt_switch_stop_path_drains_self_ingress_without_touching_peer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -14789,7 +14669,8 @@ async def test_run_stt_switch_stop_path_closes_backend(
     await controller._run_stt_switch()
 
     assert stop_calls == ["stop_mic"]
-    assert backend_calls == ["close"]
+    assert backend_calls == []
+    assert controller.hub.drain_self_stt_calls == [None]
     assert peer_calls == []
 
 
@@ -14808,7 +14689,7 @@ async def test_run_stt_switch_warns_when_hub_missing() -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_stt_switch_restart_path_closes_and_warms_backend(
+async def test_run_stt_switch_restart_path_drains_and_warms_through_hub_owner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -14845,7 +14726,9 @@ async def test_run_stt_switch_restart_path_closes_and_warms_backend(
 
     await controller._run_stt_switch()
 
-    assert calls == ["stop_mic", "close", "start_mic", "warmup"]
+    assert calls == ["stop_mic", "start_mic"]
+    assert controller.hub.drain_self_stt_calls == [None]
+    assert controller.hub.warmup_stt_calls == ["self"]
     assert peer_calls == []
 
 
@@ -15015,7 +14898,6 @@ async def test_apply_settings_target_only_change_clears_self_language_runtime_st
 
     monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -15070,7 +14952,6 @@ async def test_apply_settings_self_target_change_clears_peer_runtime_when_peer_t
 
     monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -15125,7 +15006,6 @@ async def test_apply_settings_self_source_change_clears_peer_runtime_when_peer_s
 
     monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -15179,7 +15059,6 @@ async def test_apply_settings_logs_and_continues_when_language_cleanup_fails(
 
     monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -15229,7 +15108,6 @@ async def test_order22_language_runtime_clear_failure_degrades_without_raw_log_t
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -15791,6 +15669,16 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
         _ = self
         switch_calls.append("switch")
 
+    async def fake_replace_runtime_stt_provider(
+        self,
+        *,
+        smooth_local: bool = False,
+    ) -> None:
+        _ = smooth_local
+        await self._stop_mic_loop()
+        await self._rebuild_stt_provider()
+        await self._ensure_stt_switch()
+
     monkeypatch.setattr(controller_module, "get_locale", lambda: "en")
     monkeypatch.setattr(controller_module, "set_locale", lambda locale: locale_calls.append(locale))
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
@@ -15803,6 +15691,11 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
     )
     monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
     monkeypatch.setattr(GuiController, "_ensure_stt_switch", fake_ensure_stt_switch)
+    monkeypatch.setattr(
+        GuiController,
+        "_replace_runtime_stt_provider",
+        fake_replace_runtime_stt_provider,
+    )
     monkeypatch.setattr(GuiController, "_log_error", lambda self, message: errors.append(message))
 
     await controller.apply_settings(settings)
@@ -15828,16 +15721,9 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
     controller.settings = settings
 
-    close_calls: list[str] = []
     switch_calls: list[str] = []
-    backend_calls: list[str] = []
-    new_stt = object()
 
-    class OldStt:
-        async def close(self) -> None:
-            close_calls.append("close")
-
-    controller.hub = DummyHub(stt=OldStt())
+    controller.hub = DummyHub(stt=object())
     controller.hub.source_language = settings.languages.source_language
     controller.hub.target_language = settings.languages.target_language
     controller.hub.system_prompt = settings.system_prompt
@@ -15866,23 +15752,13 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
         fake_configure_vrc_mic_receiver,
     )
     monkeypatch.setattr(GuiController, "_ensure_stt_switch", fake_ensure_stt_switch)
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        controller_module,
-        "create_stt_backend",
-        lambda current_settings, **_kwargs: backend_calls.append(
-            current_settings.languages.source_language
-        )
-        or "backend",
-    )
-    monkeypatch.setattr(controller_module, "ManagedSTTProvider", lambda *a, **k: new_stt)
-
     await controller.apply_settings(settings)
 
-    assert close_calls == ["close"]
-    assert backend_calls == ["ko"]
-    assert controller.hub.stt is new_stt
-    assert controller.hub.replace_stt_calls == [new_stt]
+    request, start = controller.hub.replace_stt_request_calls[-1]
+    assert request.config.source_language == "ko"
+    assert request.config.custom_vocabulary_enabled is True
+    assert request.config.custom_terms == {"ko": ("Puripuly",)}
+    assert start is False
     assert switch_calls == []
     assert dash.stt_needs_key is False
 
@@ -17536,7 +17412,6 @@ async def test_order22_apply_settings_routes_stt_language_audio_patch_through_de
     monkeypatch.setattr(controller_module, "save_settings", record_saved_settings)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17611,7 +17486,6 @@ async def test_order22_apply_settings_runtime_failure_degrades_without_rollback_
     monkeypatch.setattr(controller_module, "save_settings", record_saved_settings)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17721,7 +17595,6 @@ async def test_order22_apply_settings_self_stt_provider_specific_change_restarts
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17784,7 +17657,6 @@ async def test_order22_apply_settings_mixed_draft_applies_audio_runtime_and_pres
     monkeypatch.setattr(controller_module, "save_settings", record_saved_settings)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17875,7 +17747,6 @@ async def test_mixed_order22_order23_order24_fallback_save_failure_restores_comm
     monkeypatch.setattr(controller_module, "save_settings", fail_uncommitted_full_draft_save)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17964,7 +17835,6 @@ async def test_order22_apply_settings_mixed_full_draft_save_failure_degrades_and
     monkeypatch.setattr(controller_module, "save_settings", fail_third_save)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -18557,7 +18427,6 @@ async def test_order22_mixed_settings_direct_fallback_degrades_when_stt_unavaila
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -18616,7 +18485,6 @@ async def test_order22_qwen_low_latency_rebuild_unavailable_llm_degrades_default
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -18676,7 +18544,6 @@ async def test_order22_qwen_low_latency_unavailable_preserves_retry_marker(
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -19364,7 +19231,6 @@ async def test_dashboard_peer_language_change_refreshes_peer_translation_pipelin
     refreshed: list[str] = []
 
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -19606,7 +19472,6 @@ async def test_apply_providers_clears_local_qwen_pending_enable_after_switch_awa
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     controller.hub = DummyHub()
     controller._local_stt_pending_enable_after_install = True
-    controller._local_stt_runtime_status = "downloading"
 
     updated = AppSettings()
     updated.provider.stt = STTProviderName.DEEPGRAM
@@ -19940,60 +19805,29 @@ async def test_rebuild_llm_provider_closes_previous_managed_release_service(
 
 
 @pytest.mark.asyncio
-async def test_rebuild_stt_provider_logs_only_failure_when_backend_unavailable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_rebuild_stt_provider_logs_only_failure_when_owned_replacement_fails() -> None:
     dash = DummyDashboard()
     controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
     controller._runtime_logging = RuntimeLoggingSpy()
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.DEEPGRAM
-    controller.hub = DummyHub(stt=object())
+    previous_stt = object()
+    controller.hub = DummyHub(stt=previous_stt)
 
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        controller_module,
-        "create_stt_backend",
-        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom secret-token-must-not-leak")),
-    )
+    async def failed_replacement(request: object, *, start: bool):
+        _ = request, start
+        return SimpleNamespace(status="failed")
+
+    controller.hub.replace_stt_provider_request = failed_replacement
 
     await controller._rebuild_stt_provider()
 
-    assert controller.hub.stt is None
+    assert controller.hub.stt is previous_stt
     assert dash.stt_needs_key is True
     assert dash.stt_enabled is False
     assert controller._runtime_logging.basic_messages == [
         (logging.ERROR, "STT backend not available")
     ]
-    assert "secret-token-must-not-leak" not in repr(controller._runtime_logging.basic_messages)
-
-
-@pytest.mark.asyncio
-async def test_rebuild_stt_provider_logs_basic_failure_when_secret_store_setup_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller.settings = AppSettings()
-    controller.settings.provider.stt = STTProviderName.DEEPGRAM
-    controller.hub = DummyHub(stt=object())
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom secret-token-must-not-leak")),
-    )
-
-    await controller._rebuild_stt_provider()
-
-    assert controller.hub.stt is None
-    assert dash.stt_needs_key is True
-    assert dash.stt_enabled is False
-    assert controller._runtime_logging.basic_messages == [
-        (logging.ERROR, "STT backend not available")
-    ]
-    assert "secret-token-must-not-leak" not in repr(controller._runtime_logging.basic_messages)
 
 
 @pytest.mark.asyncio
@@ -20514,20 +20348,36 @@ async def test_self_local_qwen_rebuilds_after_idle_release(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     warmup_calls = 0
+    available = False
 
-    class Provider:
-        async def warmup(self) -> None:
+    class Hub:
+        local_asr_provider_runtime = SimpleNamespace(
+            snapshot=SimpleNamespace(
+                channel_for=lambda channel: SimpleNamespace(
+                    phase="ready",
+                    model_id=LOCAL_STT_MODEL_ID,
+                )
+            )
+        )
+
+        def has_stt_provider(self, channel: str) -> bool:
+            assert channel == "self"
+            return available
+
+        async def warmup_stt_channel(self, channel: str) -> None:
             nonlocal warmup_calls
+            assert channel == "self"
             warmup_calls += 1
 
-    hub = SimpleNamespace(stt=None)
+    hub = Hub()
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     controller.hub = hub
 
     async def rebuild(_self) -> None:
-        hub.stt = Provider()
+        nonlocal available
+        available = True
 
     monkeypatch.setattr(GuiController, "_current_local_stt_runtime_status", lambda _self: "ready")
     monkeypatch.setattr(GuiController, "_rebuild_stt_provider", rebuild)

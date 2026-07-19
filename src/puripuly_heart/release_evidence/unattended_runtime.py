@@ -212,22 +212,23 @@ async def _peer_generation_probe() -> dict[str, Any]:
     from puripuly_heart.core.runtime.peer_channel import PeerChannelRuntime, _PeerHubVadSink
 
     class Hub:
-        peer_stt = None
-
         def __init__(self) -> None:
             self.events: list[object] = []
+            self.local_asr_provider_runtime = self
 
         async def handle_peer_vad_event(self, event: object) -> None:
             self.events.append(event)
 
-        async def replace_peer_stt_provider(self, provider: object | None) -> None:
-            self.peer_stt = provider
+        async def release_channel(self, *_args: object, **_kwargs: object) -> None:
+            return None
 
     hub = Hub()
     runtime = PeerChannelRuntime(
         hub=hub,
         clock=SystemClock(),
-        stt_factory=lambda *_args: None,
+        provider_request_factory=lambda *_args: (_ for _ in ()).throw(
+            AssertionError("provider construction is outside this probe")
+        ),
         source_factory=lambda *_args: None,
         vad_factory=lambda *_args: None,
         vad_model_resolver=lambda: Path(),
@@ -253,22 +254,23 @@ def _active_peer_publication_gate() -> tuple[Any, Any, Any, dict[str, Any]]:
     from puripuly_heart.core.runtime.peer_channel import PeerChannelRuntime, _PeerHubVadSink
 
     class Hub:
-        peer_stt = None
-
         def __init__(self) -> None:
             self.events: list[object] = []
+            self.local_asr_provider_runtime = self
 
         async def handle_peer_vad_event(self, event: object) -> None:
             self.events.append(event)
 
-        async def replace_peer_stt_provider(self, provider: object | None) -> None:
-            self.peer_stt = provider
+        async def release_channel(self, *_args: object, **_kwargs: object) -> None:
+            return None
 
     hub = Hub()
     runtime = PeerChannelRuntime(
         hub=hub,
         clock=SystemClock(),
-        stt_factory=lambda *_args: None,
+        provider_request_factory=lambda *_args: (_ for _ in ()).throw(
+            AssertionError("provider construction is outside this probe")
+        ),
         source_factory=lambda *_args: None,
         vad_factory=lambda *_args: None,
         vad_model_resolver=lambda: Path(),

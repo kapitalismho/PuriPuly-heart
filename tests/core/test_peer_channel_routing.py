@@ -335,7 +335,7 @@ async def test_peer_transcripts_stay_peer_routed_across_runtime_swap_without_dup
     await hub.handle_peer_vad_event(SpeechEnd(first_id))
     first_final = await _next_transcript_final_event(hub.ui_events)
 
-    await hub.replace_peer_stt_provider(new_peer)
+    await hub.local_asr_provider_runtime.replace_prebuilt_provider("peer", new_peer, start=True)
 
     second_id = __import__("uuid").uuid4()
     await hub.handle_peer_vad_event(
