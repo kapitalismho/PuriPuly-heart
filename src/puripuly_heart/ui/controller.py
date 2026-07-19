@@ -1771,6 +1771,8 @@ class GuiController:
                 publish_notice=True,
                 origin="manual_retry",
             )
+        finally:
+            self._abort_self_provider_recovery(recovery)
 
     def _create_ui_event_bridge(self, *, runtime_logging) -> UIEventBridge:  # noqa: ANN001
         assert self.hub is not None
@@ -8520,6 +8522,8 @@ class GuiController:
                 publish_notice=True,
                 origin="settings_apply",
             )
+        finally:
+            self._abort_self_provider_recovery(recovery)
 
     def _desired_gpu_channels(self, settings: AppSettings) -> frozenset[GpuASRChannel]:
         owned_runtime = self._hub_local_asr_provider_runtime()
@@ -8546,30 +8550,37 @@ class GuiController:
     ) -> tuple[ProviderRuntimeGpuRecoveryRequest, PeerRuntimeConfig | None]:
         targets: list[ProviderRuntimeRecoveryChannel] = []
         peer_config = None
-        if "self" in channels and settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU:
-            self_config = self._build_self_capture_session_config(settings)
-            targets.append(
-                ProviderRuntimeRecoveryChannel(
-                    request=self._self_stt_provider_request(settings, warmup=True),
-                    start=self._stt_desired,
-                    on_terminal_failure=self._get_self_capture_owner().prepare_provider_recovery(
-                        self_config
-                    ),
+        self_recovery_owner = None
+        self_recovery_handler = None
+        try:
+            if "self" in channels and settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU:
+                self_config = self._build_self_capture_session_config(settings)
+                self_recovery_owner = self._get_self_capture_owner()
+                self_recovery_handler = self_recovery_owner.prepare_provider_recovery(self_config)
+                targets.append(
+                    ProviderRuntimeRecoveryChannel(
+                        request=self._self_stt_provider_request(settings, warmup=True),
+                        start=self._stt_desired,
+                        on_terminal_failure=self_recovery_handler,
+                    )
                 )
-            )
-        if "peer" in channels and settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU:
-            peer_config = self._build_peer_runtime_config(settings)
-            targets.append(
-                ProviderRuntimeRecoveryChannel(
-                    request=self._peer_stt_provider_request(peer_config, warmup=True),
-                    start=False,
-                    on_terminal_failure=(
-                        self._peer_runtime.handle_terminal_provider_failure
-                        if self._peer_runtime is not None
-                        else None
-                    ),
+            if "peer" in channels and settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU:
+                peer_config = self._build_peer_runtime_config(settings)
+                targets.append(
+                    ProviderRuntimeRecoveryChannel(
+                        request=self._peer_stt_provider_request(peer_config, warmup=True),
+                        start=False,
+                        on_terminal_failure=(
+                            self._peer_runtime.handle_terminal_provider_failure
+                            if self._peer_runtime is not None
+                            else None
+                        ),
+                    )
                 )
-            )
+        except BaseException:
+            if self_recovery_owner is not None and self_recovery_handler is not None:
+                self_recovery_owner.abort_provider_recovery(self_recovery_handler)
+            raise
         return (
             ProviderRuntimeGpuRecoveryRequest(
                 device_id=settings.stt.gpu_device_id,
@@ -8578,6 +8589,20 @@ class GuiController:
             ),
             peer_config,
         )
+
+    def _abort_self_provider_recovery(
+        self,
+        recovery: ProviderRuntimeGpuRecoveryRequest,
+    ) -> None:
+        owner = self._self_capture_owner
+        if owner is None:
+            return
+        target = next(
+            (item for item in recovery.channels if item.request.channel == "self"),
+            None,
+        )
+        if target is not None and target.on_terminal_failure is not None:
+            owner.abort_provider_recovery(target.on_terminal_failure)
 
     async def _suspend_gpu_provider_consumers(
         self,

@@ -96,7 +96,9 @@ class SelfCaptureSessionOwner:
         self._config: SelfCaptureSessionConfig | None = None
         self._provider_signature: tuple[object, ...] | None = None
         self._provider_attachment_token: object | None = None
-        self._pending_provider_recovery: tuple[tuple[object, ...], object] | None = None
+        self._pending_provider_recovery: (
+            tuple[tuple[object, ...], object, SelfCaptureTerminalFailureHandler] | None
+        ) = None
         self._pending_provider_recovery_failure: Exception | None = None
         self._source: object | None = None
         self._vad: object | None = None
@@ -353,8 +355,6 @@ class SelfCaptureSessionOwner:
         if self._closed:
             raise RuntimeError("SelfCaptureSessionOwner is closed")
         attachment_token = object()
-        self._pending_provider_recovery = (config.provider_signature, attachment_token)
-        self._pending_provider_recovery_failure = None
 
         async def on_terminal_failure(exc: Exception) -> None:
             await self._on_terminal_provider_failure(
@@ -362,7 +362,24 @@ class SelfCaptureSessionOwner:
                 attachment_token=attachment_token,
             )
 
+        self._pending_provider_recovery = (
+            config.provider_signature,
+            attachment_token,
+            on_terminal_failure,
+        )
+        self._pending_provider_recovery_failure = None
         return on_terminal_failure
+
+    def abort_provider_recovery(
+        self,
+        on_terminal_failure: SelfCaptureTerminalFailureHandler,
+    ) -> bool:
+        pending = self._pending_provider_recovery
+        if pending is None or pending[2] is not on_terminal_failure:
+            return False
+        self._pending_provider_recovery = None
+        self._pending_provider_recovery_failure = None
+        return True
 
     async def adopt_recovered_provider(
         self,
@@ -773,7 +790,7 @@ class SelfCaptureSessionOwner:
             if pending is not None:
                 if attachment_token is pending[1]:
                     self._pending_provider_recovery_failure = exc
-                return
+                    return
             if (
                 self._closed
                 or attachment_token is not self._provider_attachment_token

@@ -765,3 +765,41 @@ async def test_recovered_provider_failure_before_adoption_is_contained_on_commit
     assert snapshot.has_loop_task is False
     assert sources[0].close_calls == 1
     assert provider.release_calls == [("abort", None)]
+
+
+@pytest.mark.asyncio
+async def test_current_provider_failure_during_recovery_preparation_is_contained() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+    session_config = config(local_gpu=True)
+
+    await owner.apply_intent(session_config, enabled=True)
+    current_handler = provider.terminal_failure_handler
+    assert current_handler is not None
+    pending_handler = owner.prepare_provider_recovery(session_config)
+    await current_handler(RuntimeError("current provider failed before quiesce"))
+
+    assert owner.snapshot.state is SelfCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
+    assert sources[0].close_calls == 1
+    assert provider.release_calls == [("abort", None)]
+    assert owner.abort_provider_recovery(pending_handler) is False
+
+
+@pytest.mark.asyncio
+async def test_aborted_provider_recovery_retains_current_failure_callback() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+    session_config = config(local_gpu=True)
+
+    await owner.apply_intent(session_config, enabled=True)
+    current_handler = provider.terminal_failure_handler
+    assert current_handler is not None
+    pending_handler = owner.prepare_provider_recovery(session_config)
+
+    assert owner.abort_provider_recovery(pending_handler) is True
+    assert owner.abort_provider_recovery(pending_handler) is False
+    await current_handler(RuntimeError("current provider failed after recovery abort"))
+
+    assert owner.snapshot.state is SelfCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
+    assert sources[0].close_calls == 1
+    assert provider.release_calls == [("abort", None)]
