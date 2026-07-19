@@ -1309,9 +1309,18 @@ def _patch_init_pipeline_dependencies(monkeypatch: pytest.MonkeyPatch) -> dict[s
             llm=kwargs.get("llm"),
             stt=kwargs.get("stt"),
             peer_stt=kwargs.get("peer_stt"),
+            local_asr_provider_runtime=None,
             peer_translation_enabled=kwargs.get("peer_translation_enabled", False),
             integrated_context_enabled=kwargs.get("integrated_context_enabled", False),
         )
+
+        async def replace_stt_provider_request(request, *, start):
+            _ = start
+            created["stt_request"] = request
+            hub.stt = "owned-stt"
+            return SimpleNamespace(status="applied")
+
+        hub.replace_stt_provider_request = replace_stt_provider_request
         created["hub"] = hub
         return hub
 
@@ -1327,16 +1336,20 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     stt_calls: list[dict[str, object]] = []
-    _patch_init_pipeline_dependencies(monkeypatch)
+    created = _patch_init_pipeline_dependencies(monkeypatch)
 
-    def fake_stt_provider(*_args, **kwargs):
+    def fake_stt_provider_factory(*_args, **kwargs):
         stt_calls.append(dict(kwargs))
         return SimpleNamespace()
 
     app = SimpleNamespace(debug_ui_preview=True)
     controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
     controller.settings = AppSettings()
-    monkeypatch.setattr(controller_module, "ManagedSTTProvider", fake_stt_provider)
+    monkeypatch.setattr(
+        controller_module,
+        "ManagedSTTProviderFactory",
+        fake_stt_provider_factory,
+    )
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -1346,8 +1359,9 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
     assert controller.cycle_debug_stt_fault_profile() == "stt_input_low_snr_vad_pass"
     await controller._init_pipeline()
 
-    provider = stt_calls[0]["stt_input_fault_profile_provider"]
-    assert stt_calls[0]["stt_provider_name"] == controller.settings.provider.stt
+    provider = stt_calls[0]["fault_profile_provider"]
+    assert created["stt_request"].provider_id == controller.settings.provider.stt.value
+    assert controller._hub_has_stt_provider("self")
     assert callable(stt_calls[0]["on_final_transcript_suppressed"])
     assert callable(provider)
     assert provider() == "stt_input_low_snr_vad_pass"
@@ -5313,11 +5327,20 @@ async def test_init_pipeline_passes_chatbox_and_peer_language_settings_to_hub(
 
     def fake_hub(*_args, **kwargs):
         captured.update(kwargs)
-        return SimpleNamespace(
+        hub = SimpleNamespace(
             llm=kwargs.get("llm"),
             stt=kwargs.get("stt"),
             peer_stt=kwargs.get("peer_stt"),
+            local_asr_provider_runtime=None,
         )
+
+        async def replace_stt_provider_request(request, *, start):
+            _ = request, start
+            hub.stt = "owned-stt"
+            return SimpleNamespace(status="applied")
+
+        hub.replace_stt_provider_request = replace_stt_provider_request
+        return hub
 
     monkeypatch.setattr(controller_module, "ClientHub", fake_hub)
     monkeypatch.setattr(
@@ -5342,6 +5365,20 @@ async def test_init_pipeline_passes_chatbox_and_peer_language_settings_to_hub(
 async def test_init_pipeline_constructs_production_output_owner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    requests: list[object] = []
+
+    class ProviderFactory:
+        async def create(
+            self,
+            request,
+            *,
+            gpu_runtime,
+            on_terminal_failure=None,
+        ):
+            _ = gpu_runtime, on_terminal_failure
+            requests.append(request)
+            return object()
+
     class Chatbox:
         def enqueue(self, message) -> None:
             _ = message
@@ -5367,6 +5404,11 @@ async def test_init_pipeline_constructs_production_output_owner(
     monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: None)
     monkeypatch.setattr(
         controller_module,
+        "ManagedSTTProviderFactory",
+        lambda **_kwargs: ProviderFactory(),
+    )
+    monkeypatch.setattr(
+        controller_module,
         "create_stt_backend",
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("unavailable")),
     )
@@ -5387,6 +5429,13 @@ async def test_init_pipeline_constructs_production_output_owner(
     assert controller.hub.output_runtime.chatbox is chatbox
     assert controller.hub.output_runtime.overlay_sink is None
     assert controller.hub.output_runtime.state == "open"
+    assert controller.hub.local_asr_provider_runtime is not None
+    assert (
+        controller.hub.local_asr_provider_runtime.snapshot.channel_for("self").provider_id
+        == controller.settings.provider.stt.value
+    )
+    assert set(controller.hub.provider_runtime_handles) == {"llm"}
+    assert [request.provider_id for request in requests] == [controller.settings.provider.stt.value]
     assert controller.local_asr_provisioning is not None
     assert controller.local_asr_provisioning.lifecycle_owner_snapshot()["owner"] == (
         "LocalASRProvisioningOwner"

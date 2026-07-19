@@ -50,6 +50,15 @@ ProviderRuntimeTerminalFailureSink = Callable[[Exception], Awaitable[None]]
 
 
 @dataclass(frozen=True, slots=True)
+class LocalASRProviderRuntimeCallbacks:
+    self_event_handler: ProviderRuntimeEventHandler
+    peer_event_handler: ProviderRuntimeEventHandler
+    retired_event_handler: ProviderRuntimeEventHandler
+    self_exception_handler: ProviderRuntimeExceptionHandler
+    peer_exception_handler: ProviderRuntimeExceptionHandler
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderRuntimeBuildRequest:
     config: ResolvedSTTConfig
     gpu_device_id: str = "auto"
@@ -266,7 +275,16 @@ class LocalASRProviderRuntimePort(Protocol):
     async def close(self) -> None: ...
 
 
+class LocalASRProviderRuntimeFactoryPort(Protocol):
+    def create(
+        self,
+        callbacks: LocalASRProviderRuntimeCallbacks,
+    ) -> LocalASRProviderRuntimePort: ...
+
+
 __all__ = [
+    "LocalASRProviderRuntimeCallbacks",
+    "LocalASRProviderRuntimeFactoryPort",
     "LocalASRProviderRuntimePort",
     "LocalASRProviderRuntimeSnapshot",
     "ProviderGpuRuntimePort",

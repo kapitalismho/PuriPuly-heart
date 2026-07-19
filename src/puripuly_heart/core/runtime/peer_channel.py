@@ -14,6 +14,7 @@ from puripuly_heart.core.audio.process_source import (
     ProcessAudioCaptureUnavailableError,
 )
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRSessionOptions,
     LocalASRTransitionCoordinator,
@@ -136,6 +137,13 @@ class PeerChannelRuntime:
             [PeerRuntimeConfig, Callable[[Exception], Awaitable[None]]],
             Awaitable[object] | object,
         ],
+        provider_request_factory: (
+            Callable[
+                [PeerRuntimeConfig, bool],
+                ProviderRuntimeBuildRequest,
+            ]
+            | None
+        ) = None,
         source_factory: Callable[[PeerRuntimeConfig], Awaitable[object] | object],
         vad_factory: Callable[[PeerRuntimeConfig, Path], object],
         vad_model_resolver: Callable[[], Path],
@@ -148,6 +156,7 @@ class PeerChannelRuntime:
         self.hub = hub
         self.clock = clock
         self._stt_factory = stt_factory
+        self._provider_request_factory = provider_request_factory
         self._source_factory = source_factory
         self._vad_factory = vad_factory
         self._vad_model_resolver = vad_model_resolver
@@ -228,6 +237,13 @@ class PeerChannelRuntime:
     ) -> None:
         if stop_mode not in {"retain", "release"}:
             raise ValueError("stop_mode must be 'retain' or 'release'")
+        if self._provider_request_factory is not None:
+            await self._apply_owned_policy(
+                config=config,
+                desired_active=desired_active,
+                stop_mode=stop_mode,
+            )
+            return
         async with self._lock:
             if (
                 not desired_active
@@ -325,7 +341,10 @@ class PeerChannelRuntime:
             return
 
         try:
-            await self._start_generation(generation, config)
+            if self._provider_request_factory is not None:
+                await self._start_owned_generation(generation, config)
+            else:
+                await self._start_generation(generation, config)
         finally:
             assert activation_event is not None
             activation_event.set()
@@ -351,7 +370,10 @@ class PeerChannelRuntime:
             activation_event = asyncio.Event()
             self._activation_events[generation] = activation_event
         try:
-            await self._start_generation(generation, config)
+            if self._provider_request_factory is not None:
+                await self._start_owned_generation(generation, config)
+            else:
+                await self._start_generation(generation, config)
         finally:
             activation_event.set()
             async with self._lock:
@@ -359,6 +381,10 @@ class PeerChannelRuntime:
         return self._state == PeerChannelRuntimeState.RUNNING
 
     async def warmup(self) -> None:
+        if self._provider_request_factory is not None:
+            if self._desired_active and self._state == PeerChannelRuntimeState.RUNNING:
+                await self.hub.warmup_stt_channel("peer")
+            return
         async with self._lock:
             stt = self._stt
             if (
@@ -373,6 +399,19 @@ class PeerChannelRuntime:
         self._idle_release_deadline = None
         await self._cancel_idle_release_task()
         await self._transition_coordinator.close()
+        if self._provider_request_factory is not None:
+            async with self._lock:
+                self._closed = True
+                self._generation += 1
+                generation = self._generation
+                self._desired_active = False
+                self._state = PeerChannelRuntimeState.STOPPING
+            await self._teardown_owned_resources(
+                target_state=PeerChannelRuntimeState.STOPPED,
+                generation=generation,
+                release_mode="abort",
+            )
+            return
         async with self._lock:
             self._closed = True
             self._generation += 1
@@ -384,6 +423,278 @@ class PeerChannelRuntime:
             target_state=PeerChannelRuntimeState.STOPPED,
             generation=generation,
         )
+
+    async def _apply_owned_policy(
+        self,
+        *,
+        config: PeerRuntimeConfig,
+        desired_active: bool,
+        stop_mode: Literal["retain", "release"],
+    ) -> None:
+        transition_only = False
+        async with self._lock:
+            if self._closed:
+                return
+            if (
+                desired_active
+                and self._desired_active
+                and self._state == PeerChannelRuntimeState.RUNNING
+                and self._signature == config.runtime_signature
+            ):
+                self._config = config
+                return
+            current_config = self._config
+            if (
+                desired_active
+                and self._desired_active
+                and self._state == PeerChannelRuntimeState.RUNNING
+                and current_config is not None
+                and current_config.backend.provider in _LOCAL_ASR_PROVIDERS
+                and config.backend.provider in _LOCAL_ASR_PROVIDERS
+                and current_config.capture_vad_signature == config.capture_vad_signature
+            ):
+                self._config = config
+                transition_only = True
+                generation = self._generation
+            else:
+                self._generation += 1
+                generation = self._generation
+                self._config = config
+                self._desired_active = desired_active
+                self._state = (
+                    PeerChannelRuntimeState.STARTING
+                    if desired_active
+                    else PeerChannelRuntimeState.STOPPING
+                )
+        if transition_only:
+            await self._transition_owned_running_provider(config, generation=generation)
+            return
+        if not desired_active:
+            release_mode = (
+                "drain"
+                if stop_mode == "retain"
+                and config.backend.provider == "local_qwen"
+                and self._provider_signature == config.provider_signature
+                else "abort"
+            )
+            await self._teardown_owned_resources(
+                target_state=PeerChannelRuntimeState.STOPPED,
+                generation=generation,
+                release_mode=release_mode,
+            )
+            return
+        await self._start_owned_generation(generation, config)
+
+    async def _transition_owned_running_provider(
+        self,
+        config: PeerRuntimeConfig,
+        *,
+        generation: int,
+    ) -> None:
+        runtime = self.hub.local_asr_provider_runtime
+        if runtime is None:
+            self._last_local_asr_transition_status = "failed"
+            return
+        current = runtime.snapshot.channel_for("peer")
+        options = config.session_options or LocalASRSessionOptions(
+            source_language=config.backend.source_language,
+            source_mode=config.backend.source_mode,
+        )
+        if current.model_id == config.model_id:
+            await self.hub.reconfigure_stt_channel("peer", options)
+            async with self._lock:
+                if self._config is config and self._generation == generation:
+                    self._provider_signature = config.provider_signature
+                    self._signature = config.runtime_signature
+            self._last_local_asr_transition_status = "applied"
+            return
+        transition_request = LocalASRTransitionRequest(
+            channel="peer",
+            requested_provider=config.backend.provider,
+            actual_provider=config.backend.provider,
+            model_id=config.model_id,
+            session_options=options,
+            trigger="settings",
+        )
+
+        async def prepare(
+            prepared_request: LocalASRTransitionRequest,
+            transition_generation: int,
+        ) -> PreparedLocalASRTransition:
+            assert self._provider_request_factory is not None
+            return PreparedLocalASRTransition(
+                request=prepared_request,
+                provider=self._provider_request_factory(config, True),
+                generation=transition_generation,
+            )
+
+        async def commit(prepared: PreparedLocalASRTransition) -> None:
+            async with self._lock:
+                if (
+                    self._config is not config
+                    or self._generation != generation
+                    or not self._desired_active
+                ):
+                    raise RuntimeError("peer provider transition superseded")
+            if not isinstance(prepared.provider, ProviderRuntimeBuildRequest):
+                raise TypeError("owned Peer STT transition requires a build request")
+            try:
+                result = await self.hub.handoff_peer_stt_provider_request(
+                    prepared.provider,
+                    start=True,
+                    on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
+                        exc,
+                        generation=generation,
+                    ),
+                )
+            except asyncio.CancelledError:
+                await self.hub.cancel_peer_stt_provider_request_handoff()
+                raise
+            if result.status != "applied":
+                raise RuntimeError("owned Peer STT handoff failed")
+            async with self._lock:
+                if self._config is config and self._generation == generation:
+                    self._provider_signature = config.provider_signature
+                    self._signature = config.runtime_signature
+
+        outcome = await self._transition_coordinator.request_transition(
+            transition_request,
+            prepare=prepare,
+            commit=commit,
+        )
+        self._last_local_asr_transition_status = outcome.status
+
+    async def _start_owned_generation(
+        self,
+        generation: int,
+        config: PeerRuntimeConfig,
+    ) -> None:
+        assert self._provider_request_factory is not None
+        source = None
+        attached = False
+        try:
+            owner = self.hub.local_asr_provider_runtime
+            current = owner.snapshot.channel_for("peer")
+            reusable = (
+                self._provider_signature == config.provider_signature
+                and current.provider_id == config.backend.provider
+                and current.has_resources
+            )
+            if reusable:
+                attached = True
+            else:
+                request = self._provider_request_factory(
+                    config,
+                    config.backend.provider in _LOCAL_ASR_PROVIDERS,
+                )
+                result = await self.hub.replace_peer_stt_provider_request(
+                    request,
+                    start=False,
+                    on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
+                        exc,
+                        generation=generation,
+                    ),
+                )
+                if result.status != "applied":
+                    raise RuntimeError("owned Peer STT replacement failed")
+                attached = True
+            if self._is_superseded(generation):
+                await self.hub.abort_peer_stt_for_toggle_off()
+                return
+            source = self._source_factory(config)
+            if inspect.isawaitable(source):
+                source = await source
+            vad = self._vad_factory(config, self._vad_model_resolver())
+            if self._is_superseded(generation):
+                await self._close_if_possible(source)
+                await self.hub.abort_peer_stt_for_toggle_off()
+                return
+            async with self._lock:
+                if self._is_superseded(generation):
+                    return
+                old_loop = self._loop_task
+                old_source = self._audio_source
+                self._loop_task = None
+                self._audio_source = source
+                self._vad = vad
+                self._provider_signature = config.provider_signature
+                self._signature = config.runtime_signature
+                loop_task = self._create_task(
+                    self._run_peer_loop_guarded(
+                        source=source,
+                        vad=vad,
+                        target_sample_rate_hz=config.backend.sample_rate_hz,
+                        generation=generation,
+                    ),
+                    task_name="session-loop",
+                )
+                loop_task.add_done_callback(self._on_loop_task_done)
+                self._loop_task = loop_task
+                self._state = PeerChannelRuntimeState.RUNNING
+            await self._cancel_loop(old_loop)
+            await self._close_if_possible(old_source)
+            await self.hub.start_peer_stt_provider_ingress()
+        except Exception as exc:
+            if source is not None:
+                await self._close_if_possible(source)
+            if attached:
+                await self.hub.abort_peer_stt_for_toggle_off()
+            await self._fault_current_generation(
+                generation,
+                config=config,
+                reason=(
+                    PeerRuntimeFailureReason.PROCESS_PROVIDER_FAILED
+                    if config.capture_target.kind == "process"
+                    else PeerRuntimeFailureReason.PEER_RUNTIME_FAILED
+                ),
+                detach_provider=False,
+            )
+            self._emit_local_asr_diagnostic(
+                config,
+                outcome="failed",
+                load_started_at=self.clock.now(),
+                failure_type=type(exc).__name__,
+            )
+
+    async def _teardown_owned_resources(
+        self,
+        *,
+        target_state: PeerChannelRuntimeState,
+        generation: int,
+        release_mode: Literal["drain", "abort"],
+    ) -> None:
+        async with self._lock:
+            loop_task = self._loop_task
+            source = self._audio_source
+            self._loop_task = None
+            self._audio_source = None
+            self._vad = None
+            self._signature = None
+            if release_mode == "abort":
+                self._provider_signature = None
+        failures: list[Exception] = []
+        await self._attempt_cleanup(failures, lambda: self._cancel_loop(loop_task))
+        await self._attempt_cleanup(
+            failures,
+            lambda: self._close_if_possible(source),
+            retain_on_failure=lambda: self._retain_retired_source(source),
+        )
+        runtime = self.hub.local_asr_provider_runtime
+        if runtime is not None:
+            await self._attempt_cleanup(
+                failures,
+                lambda: runtime.release_channel(
+                    "peer",
+                    mode=release_mode,
+                    release_backend_after=(
+                        self._idle_release_seconds if release_mode == "drain" else None
+                    ),
+                ),
+            )
+        async with self._lock:
+            if self._generation == generation:
+                self._state = target_state
+        self._raise_cleanup_failures("peer owned runtime teardown failed", failures)
 
     async def _transition_running_provider(
         self,
@@ -841,6 +1152,18 @@ class PeerChannelRuntime:
         _ = exc
         target_generation = self._generation if generation is None else generation
         config = self._config
+        if self._provider_request_factory is not None:
+            await self._fault_current_generation(
+                target_generation,
+                config=config,
+                reason=(
+                    PeerRuntimeFailureReason.PROCESS_PROVIDER_FAILED
+                    if config is not None and config.capture_target.kind == "process"
+                    else PeerRuntimeFailureReason.PEER_RUNTIME_FAILED
+                ),
+                detach_provider=True,
+            )
+            return
         async with self._lock:
             if self._is_superseded(target_generation):
                 return
@@ -929,6 +1252,13 @@ class PeerChannelRuntime:
         retry_retired: bool = True,
         abort_for_toggle_off: bool = False,
     ) -> None:
+        if self._provider_request_factory is not None:
+            await self._teardown_owned_resources(
+                target_state=target_state,
+                generation=generation,
+                release_mode="abort",
+            )
+            return
         async with self._lock:
             loop_task = self._loop_task
             source = self._audio_source

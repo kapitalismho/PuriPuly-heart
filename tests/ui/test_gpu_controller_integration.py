@@ -17,6 +17,11 @@ from puripuly_heart.app.ports.gpu_worker import (
 )
 from puripuly_heart.app.services.provider_runtime_apply import _ProviderRuntimeApplyPlan
 from puripuly_heart.config.settings import AppSettings, STTProviderName
+from puripuly_heart.core.local_asr_provider_runtime import (
+    LocalASRProviderRuntimeSnapshot,
+    ProviderRuntimeChannelSnapshot,
+    ProviderRuntimeGpuSnapshot,
+)
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRModelProvisioningState,
     LocalASRProvisioningSnapshot,
@@ -36,6 +41,38 @@ from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 
 pytestmark = pytest.mark.asyncio
+
+
+def _owned_gpu_snapshot(
+    device: GpuWorkerDevice,
+    *,
+    phase: str,
+) -> LocalASRProviderRuntimeSnapshot:
+    return LocalASRProviderRuntimeSnapshot(
+        channels=tuple(
+            ProviderRuntimeChannelSnapshot(
+                channel=channel,
+                provider_id=None,
+                model_id=None,
+                phase="inactive",
+                generation=0,
+                pending_handoff=False,
+                has_resources=False,
+            )
+            for channel in ("self", "peer")
+        ),
+        gpu=ProviderRuntimeGpuSnapshot(
+            phase=phase,
+            devices=(device,),
+            active_channels=frozenset(),
+            pending_count=0,
+            worker_pid=None,
+            configured_device_id=None,
+            model_resident=False,
+            retry_required=False,
+            failure_code=None,
+        ),
+    )
 
 
 class CapturingGpuSettingsView:
@@ -877,3 +914,51 @@ async def test_manual_retry_restores_detached_gpu_providers_on_one_fresh_runtime
     await asyncio.gather(*(item.close() for item in tuple(backends.values())))
     await runtime.close()
     assert successful_client.close_calls == 1
+
+
+async def test_controller_gpu_discovery_and_readiness_delegate_to_owned_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller, _view = _controller()
+    device = GpuWorkerDevice(
+        device_id="vk:0",
+        registry_index=0,
+        name="GPU",
+        description="GPU",
+        device_type="discrete",
+        memory_total_bytes=8,
+        memory_free_bytes=4,
+    )
+
+    class Owner:
+        def __init__(self) -> None:
+            self.snapshot = _owned_gpu_snapshot(device, phase="idle")
+            self.discovery_calls: list[bool] = []
+            self.readiness_calls: list[tuple[bool, str]] = []
+
+        async def discover_gpu(self, *, force: bool):
+            self.discovery_calls.append(force)
+            return self.snapshot
+
+        async def inspect_gpu_readiness(self, *, explicit_intent: bool, device_id: str):
+            self.readiness_calls.append((explicit_intent, device_id))
+            self.snapshot = _owned_gpu_snapshot(device, phase="available")
+            return self.snapshot
+
+    owner = Owner()
+    controller.hub = SimpleNamespace(local_asr_provider_runtime=owner)
+    monkeypatch.setattr(
+        GuiController,
+        "_get_gpu_asr_runtime",
+        lambda _self: (_ for _ in ()).throw(
+            AssertionError("legacy Controller GPU runtime was constructed")
+        ),
+    )
+
+    devices = await controller.ensure_gpu_device_discovery(force=True)
+    ready = await controller._validate_gpu_activation()
+
+    assert devices == (device,)
+    assert ready is True
+    assert owner.discovery_calls == [True]
+    assert owner.readiness_calls == [(True, controller.settings.stt.gpu_device_id)]

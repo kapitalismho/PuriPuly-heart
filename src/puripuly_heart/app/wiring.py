@@ -9,6 +9,10 @@ from puripuly_heart.app.wiring_llm_factory import (
     MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
     _LazyFactoryLLMProvider,
 )
+from puripuly_heart.app.wiring_local_asr_provider_runtime import (
+    LocalASRProviderRuntimeFactory,
+    ManagedSTTProviderFactory,
+)
 from puripuly_heart.app.wiring_managed_auth_factory import (
     DiscordManagedBrokerClientAdapter,
     DiscordOAuthAuthAdapter,
@@ -39,6 +43,7 @@ from puripuly_heart.app.wiring_stt_factory import (
     resolve_peer_stt_config,
     resolve_peer_stt_runtime_config,
     resolve_peer_stt_runtime_config_from_vnext,
+    resolve_self_stt_runtime_config,
 )
 from puripuly_heart.config.runtime_resolution import resolve_llm_config
 from puripuly_heart.core.clock import Clock
@@ -117,6 +122,8 @@ def create_local_asr_provisioning_owner(
 __all__ = (
     "SECRETS_PASSPHRASE_ENV",
     "MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR",
+    "LocalASRProviderRuntimeFactory",
+    "ManagedSTTProviderFactory",
     "ResolvedPeerSTTConfig",
     "build_peer_stt_provider_signature",
     "build_peer_stt_provider_signature_from_vnext",
@@ -136,6 +143,7 @@ __all__ = (
     "resolve_peer_stt_config",
     "resolve_peer_stt_runtime_config",
     "resolve_peer_stt_runtime_config_from_vnext",
+    "resolve_self_stt_runtime_config",
     "DiscordManagedBrokerClientAdapter",
     "DiscordOAuthAuthAdapter",
     "ManagedIdentityPreflightAdapter",
