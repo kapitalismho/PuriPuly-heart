@@ -616,6 +616,12 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
         channel for channel in ("self", "peer") if channel in channels
     )
     assert all(item.request.warmup for item in recovery.channels)
+    self_target = next(
+        (item for item in recovery.channels if item.request.channel == "self"),
+        None,
+    )
+    if self_target is not None:
+        assert callable(self_target.on_terminal_failure)
     assert owner.snapshot.gpu.active_channels == channels
     assert controller.settings.stt.gpu_device_id == device.device_id
     assert controller._gpu_ui_state == "ready"

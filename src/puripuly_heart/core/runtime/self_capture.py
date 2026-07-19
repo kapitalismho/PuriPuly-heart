@@ -18,6 +18,7 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionConfig,
     SelfCaptureSessionSnapshot,
     SelfCaptureSessionState,
+    SelfCaptureTerminalFailureHandler,
 )
 
 SelfCaptureProviderRequestFactory = Callable[[SelfCaptureSessionConfig, bool], object]
@@ -95,6 +96,8 @@ class SelfCaptureSessionOwner:
         self._config: SelfCaptureSessionConfig | None = None
         self._provider_signature: tuple[object, ...] | None = None
         self._provider_attachment_token: object | None = None
+        self._pending_provider_recovery: tuple[tuple[object, ...], object] | None = None
+        self._pending_provider_recovery_failure: Exception | None = None
         self._source: object | None = None
         self._vad: object | None = None
         self._loop_task: asyncio.Task[None] | None = None
@@ -276,7 +279,7 @@ class SelfCaptureSessionOwner:
                 return self.snapshot
             if result_status is SelfCaptureProviderMutationStatus.APPLIED:
                 self._provider_signature = config.provider_signature
-                self._provider_attachment_token = attachment_token
+                self._commit_provider_attachment(attachment_token)
                 self._provider_status = SelfCaptureProviderStatus.READY
                 self._state = SelfCaptureSessionState.STOPPED
                 self._emit(SelfCaptureDiagnosticEvent.PROVIDER_CHANGED, generation=generation)
@@ -343,22 +346,65 @@ class SelfCaptureSessionOwner:
             )
         return self.snapshot
 
+    def prepare_provider_recovery(
+        self,
+        config: SelfCaptureSessionConfig,
+    ) -> SelfCaptureTerminalFailureHandler:
+        if self._closed:
+            raise RuntimeError("SelfCaptureSessionOwner is closed")
+        attachment_token = object()
+        self._pending_provider_recovery = (config.provider_signature, attachment_token)
+        self._pending_provider_recovery_failure = None
+
+        async def on_terminal_failure(exc: Exception) -> None:
+            await self._on_terminal_provider_failure(
+                exc,
+                attachment_token=attachment_token,
+            )
+
+        return on_terminal_failure
+
     async def adopt_recovered_provider(
         self,
         config: SelfCaptureSessionConfig,
     ) -> SelfCaptureSessionSnapshot:
-        if not self._provider.is_ready(config):
-            raise RuntimeError("recovered Self provider is not attached")
-        async with self._state_lock:
-            if self._closed:
-                raise RuntimeError("SelfCaptureSessionOwner is closed")
-            if self._source is not None or self._loop_task is not None:
-                raise RuntimeError("Self provider recovery requires suspended capture")
-            self._config = config
-            self._provider_signature = config.provider_signature
-            self._provider_status = SelfCaptureProviderStatus.READY
-            self._state = SelfCaptureSessionState.STOPPED
-            self._notify_state_changed()
+        async with self._activation_lock:
+            if not self._provider.is_ready(config):
+                raise RuntimeError("recovered Self provider is not attached")
+            pending = self._pending_provider_recovery
+            if pending is None or pending[0] != config.provider_signature:
+                raise RuntimeError("recovered Self provider has no matching owner callback")
+            attachment_token = pending[1]
+            pending_failure = self._pending_provider_recovery_failure
+            async with self._state_lock:
+                if self._closed:
+                    raise RuntimeError("SelfCaptureSessionOwner is closed")
+                if self._source is not None or self._loop_task is not None:
+                    raise RuntimeError("Self provider recovery requires suspended capture")
+                self._config = config
+                self._provider_signature = config.provider_signature
+                self._commit_provider_attachment(attachment_token)
+                self._provider_status = SelfCaptureProviderStatus.READY
+                self._state = SelfCaptureSessionState.STOPPED
+                self._notify_state_changed()
+            if pending_failure is not None:
+                if self._desired_active:
+                    await self._fault_generation_locked(
+                        self._generation,
+                        SelfCaptureFailureReason.PROVIDER_FAILED,
+                        pending_failure,
+                    )
+                else:
+                    self._provider_status = SelfCaptureProviderStatus.FAILED
+                    self._state = SelfCaptureSessionState.FAULTED
+                    self._failure_reason = SelfCaptureFailureReason.PROVIDER_FAILED
+                    self._emit(
+                        SelfCaptureDiagnosticEvent.FAILURE,
+                        generation=self._generation,
+                        reason=SelfCaptureFailureReason.PROVIDER_FAILED,
+                        detail=type(pending_failure).__name__,
+                    )
+                    self._notify_state_changed()
         return self.snapshot
 
     async def close(self) -> None:
@@ -535,7 +581,7 @@ class SelfCaptureSessionOwner:
                 return
         self._provider_status = SelfCaptureProviderStatus.READY
         self._provider_signature = config.provider_signature
-        self._provider_attachment_token = attachment_token
+        self._commit_provider_attachment(attachment_token)
         self._emit(SelfCaptureDiagnosticEvent.PROVIDER_CHANGED, generation=generation)
 
         try:
@@ -653,7 +699,7 @@ class SelfCaptureSessionOwner:
         if result_status is SelfCaptureProviderMutationStatus.APPLIED:
             self._config = config
             self._provider_signature = config.provider_signature
-            self._provider_attachment_token = attachment_token
+            self._commit_provider_attachment(attachment_token)
             self._provider_status = SelfCaptureProviderStatus.READY
             self._failure_reason = None
             self._emit(SelfCaptureDiagnosticEvent.PROVIDER_CHANGED, generation=generation)
@@ -723,6 +769,11 @@ class SelfCaptureSessionOwner:
         attachment_token: object,
     ) -> None:
         async with self._activation_lock:
+            pending = self._pending_provider_recovery
+            if pending is not None:
+                if attachment_token is pending[1]:
+                    self._pending_provider_recovery_failure = exc
+                return
             if (
                 self._closed
                 or attachment_token is not self._provider_attachment_token
@@ -875,7 +926,7 @@ class SelfCaptureSessionOwner:
                 failures.append(exc)
             else:
                 self._provider_status = SelfCaptureProviderStatus.DETACHED
-                self._provider_attachment_token = None
+                self._retire_provider_attachment()
                 if release_mode == "abort":
                     self._provider_signature = None
         if not preserve_intent:
@@ -913,9 +964,17 @@ class SelfCaptureSessionOwner:
             )
         finally:
             self._provider_status = SelfCaptureProviderStatus.DETACHED
-            self._provider_attachment_token = None
+            self._retire_provider_attachment()
             if mode == "abort":
                 self._provider_signature = None
+
+    def _commit_provider_attachment(self, attachment_token: object | None) -> None:
+        self._provider_attachment_token = attachment_token
+        self._pending_provider_recovery = None
+        self._pending_provider_recovery_failure = None
+
+    def _retire_provider_attachment(self) -> None:
+        self._commit_provider_attachment(None)
 
     async def _close_source(self, source: object) -> None:
         close = getattr(source, "close", None)

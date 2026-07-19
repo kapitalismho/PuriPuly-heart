@@ -714,6 +714,8 @@ async def test_suspend_and_recovery_preserve_intent_without_releasing_provider()
     session_config = config(local_gpu=True)
 
     await owner.apply_intent(session_config, enabled=True)
+    retired_handler = provider.terminal_failure_handler
+    assert retired_handler is not None
     suspended = await owner.suspend_provider_consumer()
 
     assert suspended.state is SelfCaptureSessionState.STOPPED
@@ -722,11 +724,44 @@ async def test_suspend_and_recovery_preserve_intent_without_releasing_provider()
     assert sources[0].close_calls == 1
     assert provider.release_calls == []
 
+    recovered_handler = owner.prepare_provider_recovery(session_config)
+    provider.terminal_failure_handler = recovered_handler
     recovered = await owner.adopt_recovered_provider(session_config)
     resumed = await owner.apply_intent(session_config, enabled=True)
+    await retired_handler(RuntimeError("retired pre-recovery provider failure"))
 
     assert recovered.provider_status is SelfCaptureProviderStatus.READY
     assert resumed.state is SelfCaptureSessionState.RUNNING
     assert provider.replace_calls == [(("provider-one", True), False)]
+    assert sources[1].close_calls == 0
+
+    await recovered_handler(RuntimeError("recovered provider failure"))
+
+    assert owner.snapshot.state is SelfCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
+    assert sources[1].close_calls == 1
+    assert provider.release_calls == [("abort", None)]
 
     await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_recovered_provider_failure_before_adoption_is_contained_on_commit() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+    session_config = config(local_gpu=True)
+
+    await owner.apply_intent(session_config, enabled=True)
+    await owner.suspend_provider_consumer()
+    recovered_handler = owner.prepare_provider_recovery(session_config)
+    provider.terminal_failure_handler = recovered_handler
+    await recovered_handler(RuntimeError("recovered provider failed before adoption"))
+
+    snapshot = await owner.adopt_recovered_provider(session_config)
+
+    assert snapshot.state is SelfCaptureSessionState.FAULTED
+    assert snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
+    assert snapshot.has_source is False
+    assert snapshot.has_vad is False
+    assert snapshot.has_loop_task is False
+    assert sources[0].close_calls == 1
+    assert provider.release_calls == [("abort", None)]

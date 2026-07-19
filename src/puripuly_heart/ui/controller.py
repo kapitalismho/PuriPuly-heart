@@ -8547,10 +8547,14 @@ class GuiController:
         targets: list[ProviderRuntimeRecoveryChannel] = []
         peer_config = None
         if "self" in channels and settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU:
+            self_config = self._build_self_capture_session_config(settings)
             targets.append(
                 ProviderRuntimeRecoveryChannel(
                     request=self._self_stt_provider_request(settings, warmup=True),
                     start=self._stt_desired,
+                    on_terminal_failure=self._get_self_capture_owner().prepare_provider_recovery(
+                        self_config
+                    ),
                 )
             )
         if "peer" in channels and settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU:
@@ -8599,13 +8603,14 @@ class GuiController:
             await self._refresh_peer_stt_runtime()
             self._sync_effective_hub_flags(settings)
             self._refresh_overlay_peer_consumers()
-        if "self" in channels and self._stt_desired:
+        if "self" in channels:
             if self._self_capture_owner is not None:
                 snapshot = await self._self_capture_owner.adopt_recovered_provider(
                     self._build_self_capture_session_config(settings)
                 )
                 self._on_self_capture_state_changed(snapshot)
-            await self._ensure_stt_switch()
+            if self._stt_desired:
+                await self._ensure_stt_switch()
 
     def _load_or_init_settings(self, path: Path) -> AppSettings:
         if path.exists():
