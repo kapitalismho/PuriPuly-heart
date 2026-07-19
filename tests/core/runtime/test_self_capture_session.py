@@ -523,6 +523,42 @@ async def test_superseded_handoff_keeps_retained_callbacks_current_during_cancel
 
 
 @pytest.mark.asyncio
+async def test_superseded_start_retries_incomplete_provider_ingress() -> None:
+    class BlockingIngressProvider(RecordingProvider):
+        def __init__(self) -> None:
+            super().__init__()
+            self.ingress_started = asyncio.Event()
+            self.completed_starts = 0
+
+        async def start_ingress(self) -> None:
+            self.start_calls += 1
+            if self.start_calls == 1:
+                self.ingress_started.set()
+                await asyncio.Event().wait()
+            self.completed_starts += 1
+
+    provider = BlockingIngressProvider()
+    owner, _, _, sources, _, _ = build_owner(provider=provider)
+    session_config = config()
+
+    first_start = asyncio.create_task(owner.apply_intent(session_config, enabled=True))
+    await provider.ingress_started.wait()
+    assert owner.snapshot.state is SelfCaptureSessionState.STARTING
+    second_start = asyncio.create_task(owner.apply_intent(session_config, enabled=True))
+    await asyncio.gather(first_start, second_start)
+
+    assert owner.snapshot.state is SelfCaptureSessionState.RUNNING
+    assert owner.snapshot.effective_active is True
+    assert provider.start_calls == 2
+    assert provider.completed_starts == 1
+    assert len(sources) == 2
+    assert sources[0].close_calls == 1
+    assert sources[1].close_calls == 0
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_microphone_test_exclusion_stops_ingress_before_abort_release() -> None:
     events: list[str] = []
 

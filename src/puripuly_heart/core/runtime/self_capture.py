@@ -673,8 +673,6 @@ class SelfCaptureSessionOwner:
                 generation=capture_generation.value,
             )
         )
-        self._state = SelfCaptureSessionState.RUNNING
-        self._notify_state_changed()
         try:
             await self._provider.start_ingress()
         except Exception as exc:
@@ -684,6 +682,8 @@ class SelfCaptureSessionOwner:
                 exc,
             )
             return
+        self._state = SelfCaptureSessionState.RUNNING
+        self._notify_state_changed()
         if config.warmup:
             try:
                 await self._provider.warmup()
