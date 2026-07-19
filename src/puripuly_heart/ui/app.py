@@ -1986,8 +1986,7 @@ class TranslatorApp:
         return bool(self.controller.hub.translation_enabled)
 
     def get_event_stt_state(self) -> object | None:
-        stt = self.controller.hub.stt
-        return stt.state if stt is not None else None
+        return self.controller.hub.stt_session_state("self")
 
     def on_github_star_translation_success(self) -> None:
         self.controller.schedule_github_star_prompt_translation_success_observed()

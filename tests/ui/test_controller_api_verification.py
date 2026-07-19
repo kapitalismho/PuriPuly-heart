@@ -89,6 +89,9 @@ class DummyHub:
     async def start(self, *, auto_flush_osc: bool) -> None:
         self.start_calls.append(auto_flush_osc)
 
+    def has_stt_provider(self, channel: str) -> bool:
+        return self.stt is not None if channel == "self" else False
+
     async def replace_llm_provider(self, llm: object | None) -> None:
         old_llm = self.llm
         self.replace_llm_calls.append(llm)

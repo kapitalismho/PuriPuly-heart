@@ -144,7 +144,11 @@ def _provider_runtime_apply_unavailable_result(
             code="provider_runtime_apply_unavailable",
             surface=surface,
         )
-    if plan.should_refresh_self_stt and controller._stt_desired and controller.hub.stt is None:
+    if (
+        plan.should_refresh_self_stt
+        and controller._stt_desired
+        and not controller.hub.has_stt_provider("self")
+    ):
         return _runtime_apply_failed_result(
             operation=operation,
             code="stt_runtime_apply_unavailable",
@@ -153,7 +157,7 @@ def _provider_runtime_apply_unavailable_result(
     if (
         plan.should_refresh_peer
         and controller._peer_runtime_should_be_active(settings)
-        and getattr(controller.hub, "peer_stt", None) is None
+        and not controller.hub.has_stt_provider("peer")
     ):
         return _runtime_apply_failed_result(
             operation=operation,
@@ -170,15 +174,14 @@ def _stt_language_audio_runtime_unavailable_result(
 ) -> RuntimeApplyResult | None:
     if controller.hub is None:
         return None
-    if controller._stt_desired and controller.hub.stt is None:
+    if controller._stt_desired and not controller.hub.has_stt_provider("self"):
         return _runtime_apply_failed_result(
             operation="apply_stt_language_audio_runtime",
             code="stt_language_audio_runtime_unavailable",
             surface="stt_language_audio",
         )
-    if (
-        controller._peer_runtime_should_be_active(settings)
-        and getattr(controller.hub, "peer_stt", None) is None
+    if controller._peer_runtime_should_be_active(settings) and not controller.hub.has_stt_provider(
+        "peer"
     ):
         return _runtime_apply_failed_result(
             operation="apply_stt_language_audio_runtime",

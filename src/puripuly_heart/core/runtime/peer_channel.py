@@ -96,7 +96,9 @@ class SpeechChannelRuntime(Protocol):
         desired_active: bool,
         stop_mode: Literal["retain", "release"] = "retain",
     ) -> None: ...
+
     async def warmup(self) -> None: ...
+
     async def close(self) -> None: ...
 
 
@@ -114,18 +116,16 @@ class _PeerHubVadSink:
 
 class PeerChannelRuntime:
     resource_fields = (
-        "_stt",
-        "_retained_stt",
         "_audio_source",
         "_vad",
         "_loop_task",
-        "_idle_release_task",
         "_generation",
         "_desired_active",
         "_lock",
+        "_activation_lock",
     )
     stop_ingress = "invalidate generation and desired-active state"
-    shutdown_policy = "cancel loop, close source, detach/close peer STT"
+    shutdown_policy = "cancel capture loop, close source, release owner channel"
     late_callback_rule = "late peer callbacks cannot mutate current runtime or output to chatbox"
 
     def __init__(
@@ -133,17 +133,10 @@ class PeerChannelRuntime:
         *,
         hub: ClientHub,
         clock: Clock,
-        stt_factory: Callable[
-            [PeerRuntimeConfig, Callable[[Exception], Awaitable[None]]],
-            Awaitable[object] | object,
+        provider_request_factory: Callable[
+            [PeerRuntimeConfig, bool],
+            ProviderRuntimeBuildRequest,
         ],
-        provider_request_factory: (
-            Callable[
-                [PeerRuntimeConfig, bool],
-                ProviderRuntimeBuildRequest,
-            ]
-            | None
-        ) = None,
         source_factory: Callable[[PeerRuntimeConfig], Awaitable[object] | object],
         vad_factory: Callable[[PeerRuntimeConfig, Path], object],
         vad_model_resolver: Callable[[], Path],
@@ -151,11 +144,9 @@ class PeerChannelRuntime:
         diagnostic_sink: Callable[[PeerRuntimeDiagnostic], object] | None = None,
         local_asr_diagnostic_sink: LocalASRTransitionDiagnosticSink | None = None,
         idle_release_seconds: float | None = None,
-        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self.hub = hub
         self.clock = clock
-        self._stt_factory = stt_factory
         self._provider_request_factory = provider_request_factory
         self._source_factory = source_factory
         self._vad_factory = vad_factory
@@ -164,17 +155,10 @@ class PeerChannelRuntime:
         self._diagnostic_sink = diagnostic_sink
         self._local_asr_diagnostic_sink = local_asr_diagnostic_sink
         self._idle_release_seconds = idle_release_seconds
-        self._sleep = sleep
-
         self._config: PeerRuntimeConfig | None = None
-        self._stt: object | None = None
-        self._retained_stt: object | None = None
         self._audio_source: object | None = None
         self._vad: object | None = None
         self._loop_task: asyncio.Task[None] | None = None
-        self._idle_release_task: asyncio.Task[None] | None = None
-        self._idle_release_started = False
-        self._idle_release_deadline: float | None = None
         self._signature: tuple[object, ...] | None = None
         self._provider_signature: tuple[object, ...] | None = None
         self._state = PeerChannelRuntimeState.STOPPED
@@ -183,16 +167,14 @@ class PeerChannelRuntime:
         self._closed = False
         self._lock = asyncio.Lock()
         self._activation_lock = asyncio.Lock()
-        self._activation_events: dict[int, asyncio.Event] = {}
         self._retired_sources: list[object] = []
-        self._retired_peer_providers: list[object] = []
         self._last_failure: PeerRuntimeDiagnostic | None = None
         self._last_failure_unavailable_reason: str | None = None
-        self._last_idle_release_error_type: str | None = None
         self._retry_required_capture_target: ResolvedDesktopAudioCaptureTarget | None = None
         self._deferred_loop_diagnostics: dict[asyncio.Task[None], PeerRuntimeDiagnostic] = {}
         self._transition_coordinator = LocalASRTransitionCoordinator(
             channel="peer",
+            clock=clock.now,
             diagnostic_sink=local_asr_diagnostic_sink,
         )
         self._last_local_asr_transition_status = "idle"
@@ -224,7 +206,6 @@ class PeerChannelRuntime:
             "stop_ingress": self.stop_ingress,
             "shutdown_policy": self.shutdown_policy,
             "late_callback_rule": self.late_callback_rule,
-            "idle_release_error_type": self._last_idle_release_error_type,
             "local_asr_transition": self._transition_coordinator.lifecycle_snapshot(),
         }
 
@@ -237,200 +218,6 @@ class PeerChannelRuntime:
     ) -> None:
         if stop_mode not in {"retain", "release"}:
             raise ValueError("stop_mode must be 'retain' or 'release'")
-        if self._provider_request_factory is not None:
-            await self._apply_owned_policy(
-                config=config,
-                desired_active=desired_active,
-                stop_mode=stop_mode,
-            )
-            return
-        async with self._lock:
-            if (
-                not desired_active
-                and not self._desired_active
-                and self._state == PeerChannelRuntimeState.STOPPED
-                and self._retained_stt is not None
-                and self._provider_signature == config.provider_signature
-                and self._idle_release_task is not None
-            ):
-                return
-            if desired_active:
-                self._idle_release_deadline = None
-            elif config.backend.provider != "local_qwen" or self._provider_signature not in (
-                None,
-                config.provider_signature,
-            ):
-                self._idle_release_deadline = None
-            elif self._idle_release_seconds is not None and self._idle_release_deadline is None:
-                self._idle_release_deadline = self.clock.now() + self._idle_release_seconds
-        await self._cancel_idle_release_task()
-        provider_only_transition = False
-        async with self._lock:
-            if self._closed:
-                return
-            if (
-                desired_active
-                and self._desired_active
-                and self._state == PeerChannelRuntimeState.RUNNING
-                and self._signature == config.runtime_signature
-            ):
-                self._config = config
-                return
-            current_config = self._config
-            if (
-                desired_active
-                and self._desired_active
-                and self._state == PeerChannelRuntimeState.RUNNING
-                and current_config is not None
-                and current_config.backend.provider in _LOCAL_ASR_PROVIDERS
-                and config.backend.provider in _LOCAL_ASR_PROVIDERS
-                and current_config.capture_vad_signature == config.capture_vad_signature
-            ):
-                self._config = config
-                provider_only_transition = True
-            if provider_only_transition:
-                generation = self._generation
-                activation_event = None
-            else:
-                self._generation += 1
-                generation = self._generation
-                self._config = config
-                self._desired_active = desired_active
-                activation_event = None
-                if not desired_active:
-                    self._retry_required_capture_target = None
-                    self._state = PeerChannelRuntimeState.STOPPING
-                elif (
-                    self._signature == config.runtime_signature
-                    and self._state == PeerChannelRuntimeState.RUNNING
-                ):
-                    return
-                else:
-                    self._state = PeerChannelRuntimeState.STARTING
-                    activation_event = asyncio.Event()
-                    self._activation_events[generation] = activation_event
-
-            if (
-                desired_active
-                and self._state == PeerChannelRuntimeState.STARTING
-                and self._retry_required_capture_target == config.capture_target
-            ):
-                self._desired_active = False
-                self._state = PeerChannelRuntimeState.FAULTED
-                if activation_event is not None:
-                    activation_event.set()
-                    self._activation_events.pop(generation, None)
-                return
-
-        if provider_only_transition:
-            await self._transition_running_provider(config, generation=generation)
-            return
-
-        if not desired_active:
-            await self._wait_for_activations_before(generation)
-            async with self._lock:
-                if self._generation != generation or self._desired_active:
-                    return
-            if stop_mode == "retain" and await self._stop_for_dormant_reuse(generation, config):
-                return
-            await self._teardown_resources(
-                target_state=PeerChannelRuntimeState.STOPPED,
-                generation=generation,
-                abort_for_toggle_off=stop_mode == "release",
-            )
-            return
-
-        try:
-            if self._provider_request_factory is not None:
-                await self._start_owned_generation(generation, config)
-            else:
-                await self._start_generation(generation, config)
-        finally:
-            assert activation_event is not None
-            activation_event.set()
-            async with self._lock:
-                self._activation_events.pop(generation, None)
-
-    async def retry_process_capture(self, *, config: PeerRuntimeConfig) -> bool:
-        self._idle_release_deadline = None
-        await self._cancel_idle_release_task()
-        async with self._lock:
-            if (
-                config.capture_target.kind != "process"
-                or self._retry_required_capture_target != config.capture_target
-                or self._state != PeerChannelRuntimeState.FAULTED
-            ):
-                return False
-            self._generation += 1
-            generation = self._generation
-            self._config = config
-            self._desired_active = True
-            self._retry_required_capture_target = None
-            self._state = PeerChannelRuntimeState.STARTING
-            activation_event = asyncio.Event()
-            self._activation_events[generation] = activation_event
-        try:
-            if self._provider_request_factory is not None:
-                await self._start_owned_generation(generation, config)
-            else:
-                await self._start_generation(generation, config)
-        finally:
-            activation_event.set()
-            async with self._lock:
-                self._activation_events.pop(generation, None)
-        return self._state == PeerChannelRuntimeState.RUNNING
-
-    async def warmup(self) -> None:
-        if self._provider_request_factory is not None:
-            if self._desired_active and self._state == PeerChannelRuntimeState.RUNNING:
-                await self.hub.warmup_stt_channel("peer")
-            return
-        async with self._lock:
-            stt = self._stt
-            if (
-                self._desired_active
-                and stt is not None
-                and self._state == PeerChannelRuntimeState.RUNNING
-                and hasattr(stt, "warmup")
-            ):
-                await stt.warmup()
-
-    async def close(self) -> None:
-        self._idle_release_deadline = None
-        await self._cancel_idle_release_task()
-        await self._transition_coordinator.close()
-        if self._provider_request_factory is not None:
-            async with self._lock:
-                self._closed = True
-                self._generation += 1
-                generation = self._generation
-                self._desired_active = False
-                self._state = PeerChannelRuntimeState.STOPPING
-            await self._teardown_owned_resources(
-                target_state=PeerChannelRuntimeState.STOPPED,
-                generation=generation,
-                release_mode="abort",
-            )
-            return
-        async with self._lock:
-            self._closed = True
-            self._generation += 1
-            generation = self._generation
-            self._desired_active = False
-            self._state = PeerChannelRuntimeState.STOPPING
-        await self._wait_for_activations_before(generation)
-        await self._teardown_resources(
-            target_state=PeerChannelRuntimeState.STOPPED,
-            generation=generation,
-        )
-
-    async def _apply_owned_policy(
-        self,
-        *,
-        config: PeerRuntimeConfig,
-        desired_active: bool,
-        stop_mode: Literal["retain", "release"],
-    ) -> None:
         transition_only = False
         async with self._lock:
             if self._closed:
@@ -466,26 +253,64 @@ class PeerChannelRuntime:
                     if desired_active
                     else PeerChannelRuntimeState.STOPPING
                 )
-        if transition_only:
-            await self._transition_owned_running_provider(config, generation=generation)
-            return
-        if not desired_active:
-            release_mode = (
-                "drain"
-                if stop_mode == "retain"
-                and config.backend.provider == "local_qwen"
-                and self._provider_signature == config.provider_signature
-                else "abort"
-            )
-            await self._teardown_owned_resources(
+        async with self._activation_lock:
+            if transition_only:
+                await self._transition_running_provider(config, generation=generation)
+                return
+            if not desired_active:
+                release_mode = (
+                    "drain"
+                    if stop_mode == "retain"
+                    and config.backend.provider == "local_qwen"
+                    and self._provider_signature == config.provider_signature
+                    else "abort"
+                )
+                await self._teardown_resources(
+                    target_state=PeerChannelRuntimeState.STOPPED,
+                    generation=generation,
+                    release_mode=release_mode,
+                )
+                return
+            await self._start_generation(generation, config)
+
+    async def retry_process_capture(self, *, config: PeerRuntimeConfig) -> bool:
+        async with self._lock:
+            if (
+                config.capture_target.kind != "process"
+                or self._retry_required_capture_target != config.capture_target
+                or self._state != PeerChannelRuntimeState.FAULTED
+            ):
+                return False
+            self._generation += 1
+            generation = self._generation
+            self._config = config
+            self._desired_active = True
+            self._retry_required_capture_target = None
+            self._state = PeerChannelRuntimeState.STARTING
+        async with self._activation_lock:
+            await self._start_generation(generation, config)
+        return self._state == PeerChannelRuntimeState.RUNNING
+
+    async def warmup(self) -> None:
+        if self._desired_active and self._state == PeerChannelRuntimeState.RUNNING:
+            await self.hub.warmup_stt_channel("peer")
+
+    async def close(self) -> None:
+        await self._transition_coordinator.close()
+        async with self._lock:
+            self._closed = True
+            self._generation += 1
+            generation = self._generation
+            self._desired_active = False
+            self._state = PeerChannelRuntimeState.STOPPING
+        async with self._activation_lock:
+            await self._teardown_resources(
                 target_state=PeerChannelRuntimeState.STOPPED,
                 generation=generation,
-                release_mode=release_mode,
+                release_mode="abort",
             )
-            return
-        await self._start_owned_generation(generation, config)
 
-    async def _transition_owned_running_provider(
+    async def _transition_running_provider(
         self,
         config: PeerRuntimeConfig,
         *,
@@ -493,8 +318,7 @@ class PeerChannelRuntime:
     ) -> None:
         runtime = self.hub.local_asr_provider_runtime
         if runtime is None:
-            self._last_local_asr_transition_status = "failed"
-            return
+            raise RuntimeError("local ASR provider runtime is unavailable")
         current = runtime.snapshot.channel_for("peer")
         options = config.session_options or LocalASRSessionOptions(
             source_language=config.backend.source_language,
@@ -521,7 +345,6 @@ class PeerChannelRuntime:
             prepared_request: LocalASRTransitionRequest,
             transition_generation: int,
         ) -> PreparedLocalASRTransition:
-            assert self._provider_request_factory is not None
             return PreparedLocalASRTransition(
                 request=prepared_request,
                 provider=self._provider_request_factory(config, True),
@@ -564,25 +387,25 @@ class PeerChannelRuntime:
         )
         self._last_local_asr_transition_status = outcome.status
 
-    async def _start_owned_generation(
+    async def _start_generation(
         self,
         generation: int,
         config: PeerRuntimeConfig,
     ) -> None:
-        assert self._provider_request_factory is not None
         source = None
-        attached = False
+        provider_ready = False
+        load_started_at = self.clock.now()
         try:
             owner = self.hub.local_asr_provider_runtime
+            if owner is None:
+                raise RuntimeError("local ASR provider runtime is unavailable")
             current = owner.snapshot.channel_for("peer")
             reusable = (
                 self._provider_signature == config.provider_signature
                 and current.provider_id == config.backend.provider
                 and current.has_resources
             )
-            if reusable:
-                attached = True
-            else:
+            if not reusable:
                 request = self._provider_request_factory(
                     config,
                     config.backend.provider in _LOCAL_ASR_PROVIDERS,
@@ -597,7 +420,7 @@ class PeerChannelRuntime:
                 )
                 if result.status != "applied":
                     raise RuntimeError("owned Peer STT replacement failed")
-                attached = True
+            provider_ready = True
             if self._is_superseded(generation):
                 await self.hub.abort_peer_stt_for_toggle_off()
                 return
@@ -610,486 +433,57 @@ class PeerChannelRuntime:
                 await self.hub.abort_peer_stt_for_toggle_off()
                 return
             async with self._lock:
-                if self._is_superseded(generation):
-                    return
-                old_loop = self._loop_task
-                old_source = self._audio_source
-                self._loop_task = None
-                self._audio_source = source
-                self._vad = vad
-                self._provider_signature = config.provider_signature
-                self._signature = config.runtime_signature
-                loop_task = self._create_task(
-                    self._run_peer_loop_guarded(
-                        source=source,
-                        vad=vad,
-                        target_sample_rate_hz=config.backend.sample_rate_hz,
-                        generation=generation,
-                    ),
-                    task_name="session-loop",
-                )
-                loop_task.add_done_callback(self._on_loop_task_done)
-                self._loop_task = loop_task
-                self._state = PeerChannelRuntimeState.RUNNING
+                superseded = self._is_superseded(generation)
+                if not superseded:
+                    old_loop = self._loop_task
+                    old_source = self._audio_source
+                    self._loop_task = None
+                    self._audio_source = source
+                    self._vad = vad
+                    self._provider_signature = config.provider_signature
+                    self._signature = config.runtime_signature
+                    loop_task = self._create_task(
+                        self._run_peer_loop_guarded(
+                            source=source,
+                            vad=vad,
+                            target_sample_rate_hz=config.backend.sample_rate_hz,
+                            generation=generation,
+                        ),
+                        task_name="session-loop",
+                    )
+                    loop_task.add_done_callback(self._on_loop_task_done)
+                    self._loop_task = loop_task
+                    self._state = PeerChannelRuntimeState.RUNNING
+            if superseded:
+                await self._close_if_possible(source)
+                await self.hub.abort_peer_stt_for_toggle_off()
+                return
             await self._cancel_loop(old_loop)
             await self._close_if_possible(old_source)
             await self.hub.start_peer_stt_provider_ingress()
         except Exception as exc:
-            if source is not None:
+            if source is not None and self._audio_source is not source:
                 await self._close_if_possible(source)
-            if attached:
-                await self.hub.abort_peer_stt_for_toggle_off()
-            await self._fault_current_generation(
-                generation,
-                config=config,
-                reason=(
+            reason = (
+                self._failure_reason_from_startup_exception(config, exc)
+                if provider_ready
+                else (
                     PeerRuntimeFailureReason.PROCESS_PROVIDER_FAILED
                     if config.capture_target.kind == "process"
                     else PeerRuntimeFailureReason.PEER_RUNTIME_FAILED
-                ),
-                detach_provider=False,
+                )
+            )
+            await self._fault_current_generation_locked(
+                generation,
+                config=config,
+                reason=reason,
             )
             self._emit_local_asr_diagnostic(
                 config,
                 outcome="failed",
-                load_started_at=self.clock.now(),
+                load_started_at=load_started_at,
                 failure_type=type(exc).__name__,
             )
-
-    async def _teardown_owned_resources(
-        self,
-        *,
-        target_state: PeerChannelRuntimeState,
-        generation: int,
-        release_mode: Literal["drain", "abort"],
-    ) -> None:
-        async with self._lock:
-            loop_task = self._loop_task
-            source = self._audio_source
-            self._loop_task = None
-            self._audio_source = None
-            self._vad = None
-            self._signature = None
-            if release_mode == "abort":
-                self._provider_signature = None
-        failures: list[Exception] = []
-        await self._attempt_cleanup(failures, lambda: self._cancel_loop(loop_task))
-        await self._attempt_cleanup(
-            failures,
-            lambda: self._close_if_possible(source),
-            retain_on_failure=lambda: self._retain_retired_source(source),
-        )
-        runtime = self.hub.local_asr_provider_runtime
-        if runtime is not None:
-            await self._attempt_cleanup(
-                failures,
-                lambda: runtime.release_channel(
-                    "peer",
-                    mode=release_mode,
-                    release_backend_after=(
-                        self._idle_release_seconds if release_mode == "drain" else None
-                    ),
-                ),
-            )
-        async with self._lock:
-            if self._generation == generation:
-                self._state = target_state
-        self._raise_cleanup_failures("peer owned runtime teardown failed", failures)
-
-    async def _transition_running_provider(
-        self,
-        config: PeerRuntimeConfig,
-        *,
-        generation: int,
-    ) -> None:
-        self._last_local_asr_transition_status = "preparing"
-        current = self._stt
-        if current is None:
-            self._last_local_asr_transition_status = "failed"
-            return
-        options = config.session_options
-        current_backend = getattr(current, "backend", None)
-        current_model_id = getattr(current_backend, "resolved_model_id", None) or getattr(
-            current_backend,
-            "model_id",
-            None,
-        )
-        if current_model_id == config.model_id and options is not None:
-            reconfigure = getattr(current, "reconfigure_session_options", None)
-            if callable(reconfigure):
-                result = reconfigure(options)
-                if inspect.isawaitable(result):
-                    await result
-            async with self._lock:
-                if self._config is config and self._generation == generation:
-                    if config.backend.provider == "local_qwen":
-                        self._retained_stt = current
-                    self._provider_signature = config.provider_signature
-                    self._signature = config.runtime_signature
-            self._last_local_asr_transition_status = "applied"
-            return
-        request = LocalASRTransitionRequest(
-            channel="peer",
-            requested_provider=config.backend.provider,
-            actual_provider=config.backend.provider,
-            model_id=config.model_id,
-            session_options=options
-            or LocalASRSessionOptions(source_language=config.backend.source_language),
-            trigger="settings",
-        )
-
-        async def prepare(
-            prepared_request: LocalASRTransitionRequest,
-            transition_generation: int,
-        ) -> PreparedLocalASRTransition:
-            load_started_at = self.clock.now()
-            candidate = self._stt_factory(
-                config,
-                lambda exc, *, _generation=generation: self._on_terminal_stt_failure(
-                    exc,
-                    generation=_generation,
-                ),
-            )
-            if inspect.isawaitable(candidate):
-                candidate = await candidate
-            try:
-                warmup = getattr(candidate, "warmup", None)
-                if callable(warmup):
-                    result = warmup()
-                    if inspect.isawaitable(result):
-                        await result
-            except BaseException:
-                await self._close_peer_provider_for_discard(candidate)
-                raise
-            return PreparedLocalASRTransition(
-                request=prepared_request,
-                provider=candidate,
-                generation=transition_generation,
-                load_ms=max(0, int(round((self.clock.now() - load_started_at) * 1000))),
-            )
-
-        async def commit(prepared: PreparedLocalASRTransition) -> None:
-            async with self._lock:
-                if (
-                    self._config is not config
-                    or self._generation != generation
-                    or not self._desired_active
-                ):
-                    raise RuntimeError("peer provider transition superseded")
-            handoff = getattr(self.hub, "handoff_peer_stt_provider", None)
-            if callable(handoff):
-                result = handoff(prepared.provider, start=True)
-                try:
-                    if inspect.isawaitable(result):
-                        await result
-                except asyncio.CancelledError:
-                    cancel_handoff = getattr(self.hub, "cancel_peer_stt_provider_handoff", None)
-                    if callable(cancel_handoff):
-                        cancel_result = cancel_handoff(prepared.provider)
-                        if inspect.isawaitable(cancel_result):
-                            await cancel_result
-                    raise
-            else:
-                await self._replace_peer_stt_provider(prepared.provider, start=True)
-            async with self._lock:
-                if self._config is config and self._generation == generation:
-                    self._stt = prepared.provider
-                    self._retained_stt = (
-                        prepared.provider if config.backend.provider == "local_qwen" else None
-                    )
-                    self._provider_signature = config.provider_signature
-                    self._signature = config.runtime_signature
-
-        outcome = await self._transition_coordinator.request_transition(
-            request,
-            prepare=prepare,
-            commit=commit,
-        )
-        self._last_local_asr_transition_status = outcome.status
-
-    async def _wait_for_activations_before(self, generation: int) -> None:
-        async with self._lock:
-            pending = tuple(
-                event
-                for activation_generation, event in self._activation_events.items()
-                if activation_generation < generation
-            )
-        if pending:
-            await asyncio.gather(*(event.wait() for event in pending))
-
-    async def _start_generation(self, generation: int, config: PeerRuntimeConfig) -> None:
-        fresh_candidate = False
-        created_candidate: object | None = None
-        try:
-            reusable = config.backend.provider == "local_qwen"
-
-            async def build_and_warm() -> object:
-                nonlocal created_candidate, fresh_candidate
-                load_started_at = self.clock.now()
-                try:
-                    stt = (
-                        self._retained_stt
-                        if reusable and self._provider_signature == config.provider_signature
-                        else None
-                    )
-                    if stt is None:
-                        fresh_candidate = True
-                        stt = self._stt_factory(
-                            config,
-                            lambda exc, *, _generation=generation: self._on_terminal_stt_failure(
-                                exc, generation=_generation
-                            ),
-                        )
-                        if inspect.isawaitable(stt):
-                            stt = await stt
-                        created_candidate = stt
-                    warmup = (
-                        getattr(stt, "warmup", None)
-                        if config.backend.provider in _LOCAL_ASR_PROVIDERS
-                        else None
-                    )
-                    if callable(warmup):
-                        result = warmup()
-                        if inspect.isawaitable(result):
-                            await result
-                except Exception as exc:
-                    if fresh_candidate and config.backend.provider in _LOCAL_ASR_PROVIDERS:
-                        self._emit_local_asr_diagnostic(
-                            config,
-                            outcome="failed",
-                            load_started_at=load_started_at,
-                            failure_type=type(exc).__name__,
-                        )
-                    raise
-                if fresh_candidate and config.backend.provider in _LOCAL_ASR_PROVIDERS:
-                    self._emit_local_asr_diagnostic(
-                        config,
-                        outcome="applied",
-                        load_started_at=load_started_at,
-                    )
-                if reusable and fresh_candidate:
-                    async with self._lock:
-                        current_config = self._config
-                        if (
-                            current_config is not None
-                            and current_config.provider_signature == config.provider_signature
-                            and self._retained_stt is None
-                        ):
-                            self._retained_stt = stt
-                            self._provider_signature = config.provider_signature
-                return stt
-
-            if reusable:
-                async with self._activation_lock:
-                    if self._is_superseded(generation):
-                        return
-                    stt = await build_and_warm()
-            else:
-                stt = await build_and_warm()
-        except Exception:
-            if created_candidate is not None and fresh_candidate:
-                await self._close_peer_provider_for_discard(created_candidate)
-            await self._fault_current_generation(
-                generation,
-                config=config,
-                reason=(
-                    PeerRuntimeFailureReason.PROCESS_PROVIDER_FAILED
-                    if config.capture_target.kind == "process"
-                    else PeerRuntimeFailureReason.PEER_RUNTIME_FAILED
-                ),
-                detach_provider=False,
-            )
-            return
-
-        if self._is_superseded(generation):
-            if not await self._retain_superseded_compatible_candidate(
-                stt,
-                config=config,
-                fresh_candidate=fresh_candidate,
-            ):
-                await self._discard_unattached_peer_start(None, stt)
-            return
-
-        source = None
-        try:
-            source = self._source_factory(config)
-            if inspect.isawaitable(source):
-                source = await source
-            model_path = self._vad_model_resolver()
-            vad = self._vad_factory(config, model_path)
-        except Exception as exc:
-            await self._cleanup_failed_startup(generation, source, stt, config=config, exc=exc)
-            return
-
-        if self._is_superseded(generation):
-            await self._discard_unattached_peer_start(source, stt)
-            return
-
-        cleanup_failures: list[Exception] = []
-        loop_to_cancel = None
-        source_to_close = None
-        replacement_failure: Exception | None = None
-        replacement_failed_before_attach = False
-        superseded_before_replacement = False
-
-        async with self._lock:
-            if self._is_superseded(generation):
-                superseded_before_replacement = True
-            else:
-                loop_to_cancel = self._loop_task
-                source_to_close = self._audio_source
-                self._loop_task = None
-                self._audio_source = None
-                self._vad = None
-
-        if superseded_before_replacement:
-            await self._discard_unattached_peer_start(source, stt)
-            return
-
-        try:
-            await self._replace_peer_stt_provider(stt, start=False)
-        except Exception as exc:
-            replacement_failure = exc
-            replacement_failed_before_attach = getattr(self.hub, "peer_stt", None) is not stt
-
-        if replacement_failed_before_attach or (
-            replacement_failure is not None and config.capture_target.kind == "process"
-        ):
-            if replacement_failure is not None:
-                cleanup_failures.append(replacement_failure)
-            await self._attempt_cleanup(
-                cleanup_failures,
-                lambda: self._cancel_loop(loop_to_cancel),
-            )
-            await self._attempt_cleanup(
-                cleanup_failures,
-                lambda: self._close_if_possible(source_to_close),
-                retain_on_failure=lambda: self._retain_retired_source(source_to_close),
-            )
-            await self._attempt_cleanup(
-                cleanup_failures,
-                lambda: self._close_if_possible(source),
-                retain_on_failure=lambda: self._retain_retired_source(source),
-            )
-            await self._attempt_cleanup(
-                cleanup_failures,
-                lambda: self._close_replacement_provider(stt),
-                retain_on_failure=lambda: self._retain_retired_peer_provider(stt),
-            )
-            await self._attempt_cleanup(
-                cleanup_failures,
-                lambda: self._fault_current_generation(
-                    generation,
-                    config=config,
-                    reason=(
-                        PeerRuntimeFailureReason.PROCESS_PROVIDER_FAILED
-                        if config.capture_target.kind == "process"
-                        else PeerRuntimeFailureReason.PEER_RUNTIME_FAILED
-                    ),
-                    detach_provider=True,
-                    retry_retired=False,
-                ),
-            )
-            self._raise_cleanup_failures(
-                "peer provider replacement failed before attach",
-                cleanup_failures,
-            )
-            return
-
-        if self._is_superseded(generation):
-            if replacement_failure is not None:
-                cleanup_failures.append(replacement_failure)
-            await self._attempt_cleanup(
-                cleanup_failures,
-                lambda: self._cancel_loop(loop_to_cancel),
-            )
-            await self._attempt_cleanup(
-                cleanup_failures,
-                lambda: self._close_if_possible(source_to_close),
-                retain_on_failure=lambda: self._retain_retired_source(source_to_close),
-            )
-            await self._attempt_cleanup(
-                cleanup_failures,
-                lambda: self._close_if_possible(source),
-                retain_on_failure=lambda: self._retain_retired_source(source),
-            )
-            if stt is not self._retained_stt:
-                await self._attempt_cleanup(
-                    cleanup_failures,
-                    lambda: self._close_peer_provider_if_current(stt),
-                    retain_on_failure=lambda: self._retain_retired_peer_provider(stt),
-                )
-            self._raise_cleanup_failures(
-                "peer channel superseded replacement cleanup failed",
-                cleanup_failures,
-            )
-            return
-
-        self._stt = stt
-        if reusable:
-            self._retained_stt = stt
-            self._provider_signature = config.provider_signature
-        self._audio_source = source
-        self._vad = vad
-        self._signature = config.runtime_signature
-
-        await self._attempt_cleanup(
-            cleanup_failures,
-            lambda: self._cancel_loop(loop_to_cancel),
-        )
-        await self._attempt_cleanup(
-            cleanup_failures,
-            lambda: self._close_if_possible(source_to_close),
-            retain_on_failure=lambda: self._retain_retired_source(source_to_close),
-        )
-        if self._is_superseded(generation):
-            if replacement_failure is not None:
-                cleanup_failures.append(replacement_failure)
-            self._raise_cleanup_failures(
-                "peer channel superseded running cleanup failed",
-                cleanup_failures,
-            )
-            return
-
-        loop_task = None
-        async with self._lock:
-            if (
-                not self._is_superseded(generation)
-                and self._stt is stt
-                and self._audio_source is source
-            ):
-                loop_task = self._create_task(
-                    self._run_peer_loop_guarded(
-                        source=source,
-                        vad=vad,
-                        target_sample_rate_hz=config.backend.sample_rate_hz,
-                        generation=generation,
-                    ),
-                    task_name="session-loop",
-                )
-                loop_task.add_done_callback(self._on_loop_task_done)
-                self._loop_task = loop_task
-                self._state = PeerChannelRuntimeState.RUNNING
-
-        if loop_task is None:
-            if replacement_failure is not None:
-                cleanup_failures.append(replacement_failure)
-            self._raise_cleanup_failures(
-                "peer channel superseded running cleanup failed",
-                cleanup_failures,
-            )
-            return
-
-        await self._attempt_cleanup(
-            cleanup_failures,
-            lambda: self._start_peer_stt_provider_ingress_if_current(stt, generation),
-        )
-        if replacement_failure is not None:
-            cleanup_failures.append(replacement_failure)
-        self._raise_cleanup_failures(
-            "peer channel replacement cleanup failed",
-            cleanup_failures,
-        )
 
     async def _run_peer_loop_guarded(
         self,
@@ -1121,7 +515,6 @@ class PeerChannelRuntime:
                 generation,
                 config=self._config,
                 reason=self._failure_reason_from_terminal_source(terminal_reason),
-                detach_provider=True,
             )
 
     async def _on_runtime_failure(
@@ -1140,7 +533,6 @@ class PeerChannelRuntime:
                 if config is not None and config.capture_target.kind == "process"
                 else PeerRuntimeFailureReason.PEER_RUNTIME_FAILED
             ),
-            detach_provider=True,
         )
 
     async def _on_terminal_stt_failure(
@@ -1152,28 +544,6 @@ class PeerChannelRuntime:
         _ = exc
         target_generation = self._generation if generation is None else generation
         config = self._config
-        if self._provider_request_factory is not None:
-            await self._fault_current_generation(
-                target_generation,
-                config=config,
-                reason=(
-                    PeerRuntimeFailureReason.PROCESS_PROVIDER_FAILED
-                    if config is not None and config.capture_target.kind == "process"
-                    else PeerRuntimeFailureReason.PEER_RUNTIME_FAILED
-                ),
-                detach_provider=True,
-            )
-            return
-        async with self._lock:
-            if self._is_superseded(target_generation):
-                return
-            if (
-                self._desired_active
-                and self._state == PeerChannelRuntimeState.RUNNING
-                and self._stt is not None
-                and (config is None or config.capture_target.kind != "process")
-            ):
-                return
         await self._fault_current_generation(
             target_generation,
             config=config,
@@ -1182,7 +552,6 @@ class PeerChannelRuntime:
                 if config is not None and config.capture_target.kind == "process"
                 else PeerRuntimeFailureReason.PEER_RUNTIME_FAILED
             ),
-            detach_provider=True,
         )
 
     async def _fault_current_generation(
@@ -1191,8 +560,20 @@ class PeerChannelRuntime:
         *,
         config: PeerRuntimeConfig | None,
         reason: PeerRuntimeFailureReason,
-        detach_provider: bool,
-        retry_retired: bool = True,
+    ) -> None:
+        async with self._activation_lock:
+            await self._fault_current_generation_locked(
+                generation,
+                config=config,
+                reason=reason,
+            )
+
+    async def _fault_current_generation_locked(
+        self,
+        generation: int,
+        *,
+        config: PeerRuntimeConfig | None,
+        reason: PeerRuntimeFailureReason,
     ) -> None:
         current_task = asyncio.current_task()
         defer_diagnostic = current_task is not None and self._loop_task is current_task
@@ -1208,347 +589,73 @@ class PeerChannelRuntime:
             )
             if config.capture_target.kind == "process":
                 self._retry_required_capture_target = config.capture_target
-        try:
-            await self._mark_faulted_if_current(
-                generation,
-                detach_provider=detach_provider,
-                retry_retired=retry_retired,
-            )
-        finally:
-            if diagnostic is not None:
-                if defer_diagnostic:
-                    self._deferred_loop_diagnostics[current_task] = diagnostic
-                else:
-                    self._emit_failure(diagnostic)
-
-    async def _mark_faulted_if_current(
-        self,
-        generation: int,
-        *,
-        detach_provider: bool,
-        retry_retired: bool = True,
-    ) -> None:
         async with self._lock:
             if self._is_superseded(generation):
                 return
             self._generation += 1
             teardown_generation = self._generation
             self._desired_active = False
-        await self._teardown_resources(
-            target_state=PeerChannelRuntimeState.FAULTED,
-            generation=teardown_generation,
-            retry_retired=retry_retired,
-        )
-        if not detach_provider:
-            return
-        if getattr(self.hub, "peer_stt", None) is None:
-            await self._replace_peer_stt_provider(None, start=False)
+            self._state = PeerChannelRuntimeState.STOPPING
+        try:
+            await self._teardown_resources(
+                target_state=PeerChannelRuntimeState.FAULTED,
+                generation=teardown_generation,
+                release_mode="abort",
+            )
+        finally:
+            if diagnostic is not None:
+                if defer_diagnostic and current_task is not None:
+                    self._deferred_loop_diagnostics[current_task] = diagnostic
+                else:
+                    self._emit_failure(diagnostic)
 
     async def _teardown_resources(
         self,
         *,
         target_state: PeerChannelRuntimeState,
         generation: int,
-        retry_retired: bool = True,
-        abort_for_toggle_off: bool = False,
+        release_mode: Literal["drain", "abort"],
     ) -> None:
-        if self._provider_request_factory is not None:
-            await self._teardown_owned_resources(
-                target_state=target_state,
-                generation=generation,
-                release_mode="abort",
-            )
-            return
         async with self._lock:
-            loop_task = self._loop_task
-            source = self._audio_source
-            stt = self._stt if self._stt is not None else self._retained_stt
-            self._loop_task = None
-            self._audio_source = None
-            self._vad = None
-            self._stt = None
-            self._retained_stt = None
-            self._provider_signature = None
-            self._signature = None
-
-        cleanup_failures: list[Exception] = []
-        detached_peer_provider: object | None = None
-
-        async def detach_current_peer_provider() -> None:
-            nonlocal detached_peer_provider
-            detached_peer_provider = await self._detach_current_peer_provider()
-
-        abort_peer = getattr(self.hub, "abort_peer_stt_for_toggle_off", None)
-        if (
-            abort_for_toggle_off
-            and stt is not None
-            and getattr(self.hub, "peer_stt", None) is stt
-            and callable(abort_peer)
-        ):
-
-            async def abort_current_peer_provider() -> None:
-                nonlocal detached_peer_provider
-                result = abort_peer(stt)
-                if inspect.isawaitable(result):
-                    await result
-                detached_peer_provider = stt
-
-            await self._attempt_cleanup(
-                cleanup_failures,
-                abort_current_peer_provider,
-                retain_on_failure=lambda: self._retain_retired_peer_provider(stt),
-            )
-        else:
-            await self._attempt_cleanup(
-                cleanup_failures,
-                detach_current_peer_provider,
-                retain_on_failure=lambda: self._retain_retired_peer_provider(stt),
-            )
-        if stt is not None and detached_peer_provider is None:
-            await self._attempt_cleanup(
-                cleanup_failures,
-                lambda: self._close_peer_provider_for_discard(stt),
-                retain_on_failure=lambda: self._retain_retired_peer_provider(stt),
-            )
-        if retry_retired:
-            await self._retry_retired_cleanup_debt(cleanup_failures)
-        await self._attempt_cleanup(
-            cleanup_failures,
-            lambda: self._cancel_loop(loop_task),
-        )
-        await self._attempt_cleanup(
-            cleanup_failures,
-            lambda: self._close_if_possible(source),
-            retain_on_failure=lambda: self._retain_retired_source(source),
-        )
-
-        async with self._lock:
-            if self._generation == generation:
-                self._state = target_state
-
-        self._raise_cleanup_failures("peer channel teardown failed", cleanup_failures)
-
-    async def _retain_superseded_compatible_candidate(
-        self,
-        stt: object,
-        *,
-        config: PeerRuntimeConfig,
-        fresh_candidate: bool,
-    ) -> bool:
-        if not fresh_candidate or config.backend.provider != "local_qwen":
-            return False
-        async with self._lock:
-            current_config = self._config
-            if (
-                current_config is None
-                or current_config.provider_signature != config.provider_signature
-                or self._retained_stt not in (None, stt)
-            ):
-                return False
-            self._retained_stt = stt
-            self._provider_signature = config.provider_signature
-            return True
-
-    async def _stop_for_dormant_reuse(
-        self,
-        generation: int,
-        config: PeerRuntimeConfig,
-    ) -> bool:
-        drain = getattr(self.hub, "drain_peer_stt_for_toggle_off", None)
-        async with self._lock:
-            stt = self._stt if self._stt is not None else self._retained_stt
-            if (
-                stt is None
-                or config.backend.provider != "local_qwen"
-                or self._provider_signature != config.provider_signature
-                or not callable(drain)
-            ):
-                return False
+            if self._generation != generation:
+                return
             loop_task = self._loop_task
             source = self._audio_source
             self._loop_task = None
             self._audio_source = None
             self._vad = None
-            self._stt = None
             self._signature = None
-
+            if release_mode == "abort":
+                self._provider_signature = None
         failures: list[Exception] = []
-        if getattr(self.hub, "peer_stt", None) is stt:
-            await self._attempt_cleanup(failures, lambda: drain(stt))
-        else:
-            await self._attempt_cleanup(
-                failures,
-                lambda: self._retire_unattached_provider_for_reuse(stt),
-            )
         await self._attempt_cleanup(failures, lambda: self._cancel_loop(loop_task))
         await self._attempt_cleanup(
             failures,
             lambda: self._close_if_possible(source),
             retain_on_failure=lambda: self._retain_retired_source(source),
         )
+        await self._retry_retired_cleanup_debt(failures)
+        runtime = self.hub.local_asr_provider_runtime
+        if runtime is None:
+            failures.append(RuntimeError("local ASR provider runtime is unavailable"))
+        else:
+            await self._attempt_cleanup(
+                failures,
+                lambda: runtime.release_channel(
+                    "peer",
+                    mode=release_mode,
+                    release_backend_after=(
+                        self._idle_release_seconds if release_mode == "drain" else None
+                    ),
+                ),
+            )
         async with self._lock:
             if self._generation == generation:
-                self._state = PeerChannelRuntimeState.STOPPED
-        self._raise_cleanup_failures("peer channel dormant teardown failed", failures)
-        await self._schedule_idle_release(
-            stt=stt,
-            provider_signature=config.provider_signature,
-            generation=generation,
-        )
-        return True
-
-    async def _retire_unattached_provider_for_reuse(self, stt: object) -> None:
-        await self._close_if_possible(stt)
-        discard_pending_events = getattr(stt, "discard_pending_events", None)
-        if not callable(discard_pending_events):
-            return
-        result = discard_pending_events()
-        if inspect.isawaitable(result):
-            await result
-
-    async def _schedule_idle_release(
-        self,
-        *,
-        stt: object,
-        provider_signature: tuple[object, ...],
-        generation: int,
-    ) -> None:
-        if self._idle_release_seconds is None:
-            return
-        async with self._lock:
-            if (
-                self._closed
-                or self._desired_active
-                or self._generation != generation
-                or self._retained_stt is not stt
-                or self._provider_signature != provider_signature
-            ):
-                return
-            self._last_idle_release_error_type = None
-            self._idle_release_started = False
-            delay_seconds = max(
-                0.0,
-                (self._idle_release_deadline or self.clock.now()) - self.clock.now(),
-            )
-            task = self._create_task(
-                self._release_dormant_provider_after(
-                    stt=stt,
-                    provider_signature=provider_signature,
-                    generation=generation,
-                    delay_seconds=delay_seconds,
-                ),
-                task_name="idle-release",
-            )
-            self._idle_release_task = task
-            task.add_done_callback(self._on_idle_release_task_done)
-
-    async def _release_dormant_provider_after(
-        self,
-        *,
-        stt: object,
-        provider_signature: tuple[object, ...],
-        generation: int,
-        delay_seconds: float,
-    ) -> None:
-        await self._sleep(delay_seconds)
-        self._idle_release_started = True
-        async with self._activation_lock:
-            async with self._lock:
-                if (
-                    self._closed
-                    or self._desired_active
-                    or self._generation != generation
-                    or self._retained_stt is not stt
-                    or self._provider_signature != provider_signature
-                ):
-                    return
-                self._retained_stt = None
-                self._provider_signature = None
-            try:
-                if getattr(self.hub, "peer_stt", None) is stt:
-                    await self._replace_peer_stt_provider(None, start=False)
-                else:
-                    await self._close_peer_provider_for_discard(stt)
-            except Exception:
-                self._retain_retired_peer_provider(stt)
-                raise
-
-    async def _cancel_idle_release_task(self) -> None:
-        task = self._idle_release_task
-        if task is None:
-            return
-        self._idle_release_task = None
-        if task is asyncio.current_task():
-            return
-        if not task.done() and not self._idle_release_started:
-            task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-
-    def _on_idle_release_task_done(self, task: asyncio.Task[None]) -> None:
-        if not task.cancelled():
-            exception = task.exception()
-            if exception is not None:
-                self._last_idle_release_error_type = type(exception).__name__
-        if self._idle_release_task is task:
-            self._idle_release_task = None
-            self._idle_release_deadline = None
-        self._idle_release_started = False
+                self._state = target_state
+        self._raise_cleanup_failures("peer owned runtime teardown failed", failures)
 
     def _create_task(self, coroutine: Awaitable[None], *, task_name: str) -> asyncio.Task[None]:
         return asyncio.create_task(coroutine, name=f"PeerChannelRuntime:{task_name}")
-
-    async def _cleanup_failed_startup(
-        self,
-        generation: int,
-        source: object | None,
-        stt: object,
-        *,
-        config: PeerRuntimeConfig,
-        exc: Exception,
-    ) -> None:
-        cleanup_failures: list[Exception] = []
-        await self._attempt_cleanup(
-            cleanup_failures,
-            lambda: self._close_if_possible(source),
-            retain_on_failure=lambda: self._retain_retired_source(source),
-        )
-        await self._attempt_cleanup(
-            cleanup_failures,
-            lambda: self._close_peer_provider_for_discard(stt),
-            retain_on_failure=lambda: self._retain_retired_peer_provider(stt),
-        )
-        await self._attempt_cleanup(
-            cleanup_failures,
-            lambda: self._fault_current_generation(
-                generation,
-                config=config,
-                reason=self._failure_reason_from_startup_exception(config, exc),
-                detach_provider=True,
-                retry_retired=False,
-            ),
-        )
-        self._raise_cleanup_failures("peer channel startup cleanup failed", cleanup_failures)
-
-    async def _discard_unattached_peer_start(
-        self,
-        source: object | None,
-        stt: object,
-    ) -> None:
-        cleanup_failures: list[Exception] = []
-        await self._attempt_cleanup(
-            cleanup_failures,
-            lambda: self._close_if_possible(source),
-            retain_on_failure=lambda: self._retain_retired_source(source),
-        )
-        if stt is not self._retained_stt:
-            await self._attempt_cleanup(
-                cleanup_failures,
-                lambda: self._close_peer_provider_for_discard(stt),
-                retain_on_failure=lambda: self._retain_retired_peer_provider(stt),
-            )
-        self._raise_cleanup_failures(
-            "peer channel discarded startup cleanup failed", cleanup_failures
-        )
 
     async def _attempt_cleanup(
         self,
@@ -1568,24 +675,13 @@ class PeerChannelRuntime:
         self,
         cleanup_failures: list[Exception],
     ) -> None:
-        retired_sources = tuple(self._retired_sources)
-        retired_peer_providers = tuple(self._retired_peer_providers)
-
-        for source in retired_sources:
+        for source in tuple(self._retired_sources):
             try:
                 await self._close_if_possible(source)
             except Exception as exc:
                 cleanup_failures.append(exc)
             else:
                 self._forget_retired_source(source)
-
-        for stt in retired_peer_providers:
-            try:
-                await self._close_peer_provider_for_discard(stt)
-            except Exception as exc:
-                cleanup_failures.append(exc)
-            else:
-                self._forget_retired_peer_provider(stt)
 
     def _retain_retired_source(self, source: object | None) -> None:
         if source is None:
@@ -1601,20 +697,6 @@ class PeerChannelRuntime:
             if retired_source is not source
         ]
 
-    def _retain_retired_peer_provider(self, stt: object | None) -> None:
-        if stt is None:
-            return
-        if any(retired_provider is stt for retired_provider in self._retired_peer_providers):
-            return
-        self._retired_peer_providers.append(stt)
-
-    def _forget_retired_peer_provider(self, stt: object) -> None:
-        self._retired_peer_providers = [
-            retired_provider
-            for retired_provider in self._retired_peer_providers
-            if retired_provider is not stt
-        ]
-
     def _raise_cleanup_failures(
         self,
         message: str,
@@ -1626,9 +708,7 @@ class PeerChannelRuntime:
             raise ExceptionGroup(message, cleanup_failures)
 
     async def _cancel_loop(self, loop_task: asyncio.Task[None] | None) -> None:
-        if loop_task is None:
-            return
-        if loop_task is asyncio.current_task():
+        if loop_task is None or loop_task is asyncio.current_task():
             return
         loop_task.cancel()
         await asyncio.gather(loop_task, return_exceptions=True)
@@ -1649,83 +729,6 @@ class PeerChannelRuntime:
         result = resource.close()
         if inspect.isawaitable(result):
             await result
-
-    async def _close_peer_provider_if_current(self, stt: object | None) -> None:
-        if stt is None:
-            return
-        if getattr(self.hub, "peer_stt", None) is stt:
-            await self._replace_peer_stt_provider(None, start=False)
-            return
-        await self._close_peer_provider_for_discard(stt)
-
-    async def _close_replacement_provider(self, stt: object) -> None:
-        if getattr(self.hub, "peer_stt", None) is stt:
-            await self._close_peer_provider_if_current(stt)
-            return
-        await self._close_peer_provider_for_discard(stt)
-
-    async def _detach_current_peer_provider(self) -> object | None:
-        current_peer_stt = getattr(self.hub, "peer_stt", None)
-        if current_peer_stt is None:
-            return None
-        await self._replace_peer_stt_provider(None, start=False)
-        return current_peer_stt
-
-    async def _replace_peer_stt_provider(
-        self,
-        stt: object | None,
-        *,
-        start: bool,
-    ) -> None:
-        replace_provider = self.hub.replace_peer_stt_provider
-        if self._call_supports_start_keyword(replace_provider):
-            result = replace_provider(stt, start=start)
-        else:
-            result = replace_provider(stt)
-        if inspect.isawaitable(result):
-            await result
-
-    async def _start_peer_stt_provider_ingress_if_current(
-        self,
-        stt: object,
-        generation: int,
-    ) -> None:
-        async with self._lock:
-            should_start = (
-                not self._is_superseded(generation)
-                and self._stt is stt
-                and self._state == PeerChannelRuntimeState.RUNNING
-            )
-        if not should_start:
-            return
-        start_ingress = getattr(self.hub, "start_peer_stt_provider_ingress", None)
-        if not callable(start_ingress):
-            return
-        result = start_ingress(stt)
-        if inspect.isawaitable(result):
-            await result
-
-    @staticmethod
-    def _call_supports_start_keyword(callable_object: object) -> bool:
-        try:
-            signature = inspect.signature(callable_object)
-        except (TypeError, ValueError):
-            return False
-        return any(
-            name == "start" or parameter.kind is inspect.Parameter.VAR_KEYWORD
-            for name, parameter in signature.parameters.items()
-        )
-
-    async def _close_peer_provider_for_discard(self, stt: object | None) -> None:
-        if stt is None:
-            return
-        close_backend = getattr(stt, "close_backend", None)
-        if callable(close_backend):
-            result = close_backend()
-            if inspect.isawaitable(result):
-                await result
-            return
-        await self._close_if_possible(stt)
 
     def _is_superseded(self, generation: int) -> bool:
         return generation != self._generation or not self._desired_active

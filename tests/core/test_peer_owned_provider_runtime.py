@@ -126,13 +126,9 @@ async def test_peer_capture_owner_requests_provider_and_never_constructs_it() ->
     sources: list[DummySource] = []
     config = make_peer_runtime_config()
 
-    def forbidden_stt_factory(*_args, **_kwargs):
-        raise AssertionError("legacy Peer provider factory was called")
-
     runtime = PeerChannelRuntime(
         hub=hub,
         clock=FakeClock(),
-        stt_factory=forbidden_stt_factory,
         provider_request_factory=lambda peer_config, warmup: ProviderRuntimeBuildRequest(
             config=peer_config.backend,
             warmup=warmup,
@@ -165,9 +161,6 @@ async def test_peer_capture_owner_reuses_retained_local_qwen_provider() -> None:
     runtime = PeerChannelRuntime(
         hub=hub,
         clock=FakeClock(),
-        stt_factory=lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("legacy Peer provider factory was called")
-        ),
         provider_request_factory=lambda peer_config, warmup: ProviderRuntimeBuildRequest(
             config=peer_config.backend,
             warmup=warmup,

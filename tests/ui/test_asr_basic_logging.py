@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
+from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 from puripuly_heart.ui.controller import GuiController
 
 
@@ -117,36 +117,36 @@ def test_cpu_transition_promotes_only_terminal_load_results_to_basic(
     ]
 
 
-@pytest.mark.asyncio
-async def test_gpu_ready_and_worker_failure_are_basic_terminal_logs(
+def test_gpu_ready_and_worker_failure_are_basic_terminal_logs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller, basic, detailed = _controller_with_logs(monkeypatch)
-    controller._gpu_asr_runtime = SimpleNamespace(active_channels=frozenset({"self", "peer"}))
     monkeypatch.setattr(GuiController, "_set_gpu_ui_state", lambda *_args, **_kwargs: None)
 
-    await controller._on_gpu_asr_diagnostic(
-        GpuASRDiagnostic(
-            kind="activation_ready",
-            fields={
-                "model": "qwen-gpu",
-                "device": "vulkan-index-0",
-                "model_load_seconds": 4.12,
-                "warmup_seconds": 0.382,
-            },
+    controller._on_local_asr_provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(
+            event="activation_ready",
+            channel="self",
+            model_id="qwen-gpu",
+            device_id="vulkan-index-0",
+            outcome="ready",
+            model_load_seconds=4.12,
+            warmup_seconds=0.382,
         )
     )
-    await controller._on_gpu_asr_diagnostic(
-        GpuASRDiagnostic(
-            kind="worker_failed",
-            fields={"failure": "heartbeat_timeout", "exit_code": 1},
+    controller._on_local_asr_provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(
+            event="worker_failed",
+            outcome="failed",
+            failure_code="heartbeat_timeout",
+            worker_exit_code=1,
         )
     )
 
     assert len(detailed) == 2
     assert basic == [
         (
-            "[LocalASR][Load] channel=peer,self model=qwen-gpu backend=Vulkan "
+            "[LocalASR][Load] channel=self model=qwen-gpu backend=Vulkan "
             "device=vulkan-index-0 outcome=ready load_seconds=4.120 warmup_seconds=0.382",
             logging.INFO,
         ),
@@ -158,25 +158,21 @@ async def test_gpu_ready_and_worker_failure_are_basic_terminal_logs(
     ]
 
 
-@pytest.mark.asyncio
-async def test_gpu_decode_attempt_logs_rtf_in_basic_mode(
+def test_gpu_decode_attempt_logs_rtf_in_basic_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller, basic, detailed = _controller_with_logs(monkeypatch)
 
-    await controller._on_gpu_asr_diagnostic(
-        GpuASRDiagnostic(
-            kind="decode_attempt",
-            fields={
-                "channel": "self",
-                "model": "qwen-gpu",
-                "backend": "Vulkan",
-                "audio_seconds": 2.0,
-                "decode_seconds": 0.25,
-                "rtf": 0.125,
-                "result": "success",
-                "queue_wait_seconds": 0.031,
-            },
+    controller._on_local_asr_provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(
+            event="decode_attempt",
+            channel="self",
+            model_id="qwen-gpu",
+            audio_seconds=2.0,
+            decode_seconds=0.25,
+            rtf=0.125,
+            outcome="success",
+            queue_wait_seconds=0.031,
         )
     )
 
@@ -191,23 +187,19 @@ async def test_gpu_decode_attempt_logs_rtf_in_basic_mode(
     ]
 
 
-@pytest.mark.asyncio
-async def test_gpu_worker_recovery_logs_restart_without_utterance_retry(
+def test_gpu_worker_recovery_logs_restart_without_utterance_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller, basic, detailed = _controller_with_logs(monkeypatch)
 
-    await controller._on_gpu_asr_diagnostic(
-        GpuASRDiagnostic(
-            kind="worker_recovery_started",
-            fields={"failure": "decode_failure", "utterance_retry": False},
+    controller._on_local_asr_provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(
+            event="worker_recovery_started",
+            failure_code="decode_failure",
         )
     )
-    await controller._on_gpu_asr_diagnostic(
-        GpuASRDiagnostic(
-            kind="worker_recovery_ready",
-            fields={"utterance_retry": False},
-        )
+    controller._on_local_asr_provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(event="worker_recovery_ready")
     )
 
     assert len(detailed) == 2

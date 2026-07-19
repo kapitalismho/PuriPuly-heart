@@ -7,19 +7,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-import puripuly_heart.ui.controller as controller_module
-from puripuly_heart.app.ports.gpu_worker import (
-    GpuWorkerActivation,
-    GpuWorkerClosedError,
-    GpuWorkerDevice,
-    GpuWorkerEvent,
-    GpuWorkerRequestError,
-)
+from puripuly_heart.app.ports.gpu_worker import GpuWorkerDevice
 from puripuly_heart.app.services.provider_runtime_apply import _ProviderRuntimeApplyPlan
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeSnapshot,
     ProviderRuntimeChannelSnapshot,
+    ProviderRuntimeDiagnostic,
     ProviderRuntimeGpuSnapshot,
 )
 from puripuly_heart.core.local_asr_provisioning import (
@@ -33,10 +27,6 @@ from puripuly_heart.core.local_stt_assets import (
     PARAKEET_V3_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
-from puripuly_heart.core.runtime.gpu_asr import GpuASRRuntimeState, SharedGpuASRRuntime
-from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
-from puripuly_heart.core.stt.controller import ManagedSTTProvider
-from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 
@@ -44,33 +34,39 @@ pytestmark = pytest.mark.asyncio
 
 
 def _owned_gpu_snapshot(
-    device: GpuWorkerDevice,
+    device: GpuWorkerDevice | None = None,
     *,
     phase: str,
+    active_channels: frozenset[str] = frozenset(),
+    retry_required: bool = False,
+    failure_code: str | None = None,
+    attached_channels: frozenset[str] = frozenset(),
 ) -> LocalASRProviderRuntimeSnapshot:
     return LocalASRProviderRuntimeSnapshot(
         channels=tuple(
             ProviderRuntimeChannelSnapshot(
                 channel=channel,
-                provider_id=None,
-                model_id=None,
-                phase="inactive",
+                provider_id=(
+                    STTProviderName.LOCAL_QWEN_GPU.value if channel in attached_channels else None
+                ),
+                model_id=LOCAL_QWEN_GPU_MODEL_ID if channel in attached_channels else None,
+                phase="ready" if channel in active_channels else "inactive",
                 generation=0,
                 pending_handoff=False,
-                has_resources=False,
+                has_resources=channel in attached_channels,
             )
             for channel in ("self", "peer")
         ),
         gpu=ProviderRuntimeGpuSnapshot(
             phase=phase,
-            devices=(device,),
-            active_channels=frozenset(),
+            devices=(device,) if device is not None else (),
+            active_channels=active_channels,
             pending_count=0,
             worker_pid=None,
             configured_device_id=None,
             model_resident=False,
-            retry_required=False,
-            failure_code=None,
+            retry_required=retry_required,
+            failure_code=failure_code,
         ),
     )
 
@@ -87,75 +83,6 @@ class CapturingGpuSettingsView:
         progress_percent: int | None = None,
     ) -> None:
         self.states.append((state, devices, progress_percent))
-
-
-class RecoveryGpuWorkerClient:
-    def __init__(
-        self,
-        device: GpuWorkerDevice,
-        *,
-        activation_error: bool = False,
-    ) -> None:
-        self.device = device
-        self.activation_error = activation_error
-        self.activate_calls: list[str] = []
-        self.close_calls = 0
-        self._closed = False
-        self._events: asyncio.Queue[GpuWorkerEvent | None] = asyncio.Queue()
-
-    @property
-    def pid(self) -> int | None:
-        return None if self._closed else 4321
-
-    @property
-    def is_closed(self) -> bool:
-        return self._closed
-
-    async def discover(self) -> tuple[GpuWorkerDevice, ...]:
-        return (self.device,)
-
-    async def activate(self, *, model_path: Path, device_id: str) -> GpuWorkerActivation:
-        assert model_path == Path("gpu-model.gguf").resolve()
-        self.activate_calls.append(device_id)
-        if self.activation_error:
-            raise GpuWorkerRequestError("activation_failed")
-        return GpuWorkerActivation(
-            device=self.device,
-            model_load_seconds=0.01,
-            warmup_seconds=0.01,
-        )
-
-    async def transcribe(self, **_kwargs):
-        raise AssertionError("transcribe is not used by recovery tests")
-
-    async def cancel(self, _target_request_id: str) -> None:
-        return
-
-    async def next_event(self) -> GpuWorkerEvent:
-        event = await self._events.get()
-        if event is None:
-            raise GpuWorkerClosedError("closed")
-        return event
-
-    async def close(self) -> None:
-        self.close_calls += 1
-        if self._closed:
-            return
-        self._closed = True
-        await self._events.put(None)
-
-    async def force_close(self) -> None:
-        await self.close()
-
-
-class RecoveryGpuWorkerFactory:
-    def __init__(self, clients: list[RecoveryGpuWorkerClient]) -> None:
-        self.clients = clients
-        self.modes: list[str] = []
-
-    async def start(self, *, mode: str) -> RecoveryGpuWorkerClient:
-        self.modes.append(mode)
-        return self.clients.pop(0)
 
 
 class ReadyProvisioningPort:
@@ -268,93 +195,6 @@ async def test_gpu_settings_receive_hardware_name_separately_from_vulkan_slot() 
     )
 
 
-async def test_self_gpu_toggle_off_releases_worker_and_toggle_on_rebuilds_provider(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller, _view = _controller()
-    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
-    device = GpuWorkerDevice(
-        device_id="vk:0",
-        registry_index=0,
-        name="GPU",
-        description="GPU",
-        device_type="discrete",
-        memory_total_bytes=8,
-        memory_free_bytes=4,
-    )
-    first_client = RecoveryGpuWorkerClient(device)
-    second_client = RecoveryGpuWorkerClient(device)
-    factory = RecoveryGpuWorkerFactory([first_client, second_client])
-    runtime = SharedGpuASRRuntime(process_factory=factory)
-
-    def create_provider() -> ManagedSTTProvider:
-        return ManagedSTTProvider(
-            backend=LocalGpuSTTBackend(
-                runtime=runtime,
-                channel="self",
-                model_path=Path("gpu-model.gguf"),
-                model_id="gpu-model",
-                device_id="vk:0",
-            ),
-            sample_rate_hz=16_000,
-            stt_provider_name=STTProviderName.LOCAL_QWEN_GPU,
-        )
-
-    handle = ProviderRuntimeHandle(name="self-stt", provider=create_provider())
-
-    class Hub:
-        @property
-        def stt(self):
-            return handle.provider
-
-        async def replace_stt_provider(self, provider) -> None:
-            await handle.stop_ingress()
-            await handle.replace_provider(provider, start=True)
-
-        async def resume_self_stt_after_toggle_on(self) -> None:
-            await handle.start()
-
-    hub = Hub()
-    controller.hub = hub
-    assert hub.stt is not None
-    await hub.stt.warmup()
-    first_pid = runtime.worker_pid
-    assert first_pid is not None
-    assert runtime.active_channels == frozenset({"self"})
-
-    await controller._drain_self_stt_for_toggle_off()
-
-    assert hub.stt is None
-    assert runtime.state == GpuASRRuntimeState.STOPPED
-    assert runtime.active_channels == frozenset()
-    assert runtime.worker_pid is None
-    assert first_client.close_calls == 1
-
-    async def rebuild(_self: GuiController) -> None:
-        await hub.replace_stt_provider(create_provider())
-
-    async def start_mic(_self: GuiController) -> bool:
-        assert hub.stt is not None
-        await hub.stt.warmup()
-        return True
-
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", rebuild)
-    monkeypatch.setattr(GuiController, "_start_mic_loop", start_mic)
-    controller._stt_desired = True
-    controller._stt_activation_generation = 1
-
-    await controller._run_stt_switch()
-
-    assert hub.stt is not None
-    assert runtime.state == GpuASRRuntimeState.READY
-    assert runtime.active_channels == frozenset({"self"})
-    assert runtime.worker_pid is not None
-    assert second_client.activate_calls == ["vk:0"]
-    assert factory.modes == ["persistent", "persistent"]
-    await handle.close()
-    await runtime.close()
-
-
 async def test_public_self_gpu_toggle_surfaces_provider_teardown_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -362,23 +202,24 @@ async def test_public_self_gpu_toggle_surfaces_provider_teardown_failure(
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
     controller._stt_desired = True
     failure = RuntimeError("provider teardown failed")
-    replace_calls: list[object | None] = []
+    abort_calls = 0
 
-    async def replace_stt_provider(provider: object | None) -> None:
-        replace_calls.append(provider)
+    async def abort_self_stt_for_toggle_off() -> None:
+        nonlocal abort_calls
+        abort_calls += 1
         raise failure
 
     async def stop_mic_loop(_self: GuiController) -> None:
         return None
 
-    controller.hub = SimpleNamespace(replace_stt_provider=replace_stt_provider)
+    controller.hub = SimpleNamespace(abort_self_stt_for_toggle_off=abort_self_stt_for_toggle_off)
     monkeypatch.setattr(GuiController, "_stop_mic_loop", stop_mic_loop)
 
     with pytest.raises(RuntimeError, match="provider teardown failed") as exc_info:
         await controller.set_stt_enabled(False)
 
     assert exc_info.value is failure
-    assert replace_calls == [None]
+    assert abort_calls == 1
     assert controller._stt_desired is False
 
 
@@ -386,24 +227,38 @@ async def test_unavailable_saved_gpu_device_retains_gpu_without_runtime_start() 
     controller, view = _controller()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.stt.gpu_device_id = "vk:missing"
-    controller._gpu_devices = (
-        GpuWorkerDevice(
-            device_id="vk:0",
-            registry_index=0,
-            name="GPU",
-            description="GPU",
-            device_type="discrete",
-            memory_total_bytes=1,
-            memory_free_bytes=1,
-        ),
+    device = GpuWorkerDevice(
+        device_id="vk:0",
+        registry_index=0,
+        name="GPU",
+        description="GPU",
+        device_type="discrete",
+        memory_total_bytes=1,
+        memory_free_bytes=1,
     )
+
+    class Owner:
+        snapshot = _owned_gpu_snapshot(device, phase="idle")
+
+        async def inspect_gpu_readiness(self, *, explicit_intent: bool, device_id: str):
+            assert explicit_intent is True
+            assert device_id == "vk:missing"
+            self.snapshot = _owned_gpu_snapshot(
+                device,
+                phase="failed",
+                failure_code="saved_device_missing",
+            )
+            return self.snapshot
+
+    owner = Owner()
+    controller.hub = SimpleNamespace(local_asr_provider_runtime=owner)
 
     ready = await controller._validate_gpu_activation()
 
     assert ready is False
     assert controller.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
     assert controller.settings.stt.gpu_device_id == "vk:missing"
-    assert controller._gpu_asr_runtime is None
+    assert owner.snapshot.gpu.active_channels == frozenset()
     assert view.states[-1][0] == "unavailable_device"
 
 
@@ -448,9 +303,7 @@ async def test_missing_gpu_model_preserves_self_enable_intent_without_downloadin
     install.assert_not_awaited()
 
 
-async def test_gpu_discovery_keeps_startup_progress_off_dashboard(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_gpu_discovery_keeps_startup_progress_off_dashboard() -> None:
     controller, view = _controller()
     gate = asyncio.Event()
     device = GpuWorkerDevice(
@@ -463,24 +316,30 @@ async def test_gpu_discovery_keeps_startup_progress_off_dashboard(
         memory_free_bytes=1,
     )
 
-    class Runtime:
-        async def discover_devices(self):
-            await gate.wait()
-            return (device,)
+    class Owner:
+        snapshot = _owned_gpu_snapshot(phase="idle")
 
-    monkeypatch.setattr(GuiController, "_get_gpu_asr_runtime", lambda _self: Runtime())
-    monkeypatch.setattr(GuiController, "_gpu_idle_ui_state", lambda _self: "not_installed")
+        async def discover_gpu(self, *, force: bool):
+            assert force is False
+            await gate.wait()
+            self.snapshot = _owned_gpu_snapshot(device, phase="available")
+            return self.snapshot
+
+    controller.hub = SimpleNamespace(local_asr_provider_runtime=Owner())
+    controller.local_asr_provisioning = ReadyProvisioningPort()
 
     task = asyncio.create_task(controller.ensure_gpu_device_discovery(origin="startup"))
     await asyncio.sleep(0)
     await asyncio.sleep(0)
-    await controller._on_gpu_asr_diagnostic(SimpleNamespace(kind="discovery_pending", fields={}))
+    controller._on_local_asr_provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(event="discovery_pending")
+    )
     assert controller._gpu_ui_state == "discovery_pending"
     assert view.states == []
 
     gate.set()
     await task
-    assert controller._gpu_ui_state == "not_installed"
+    assert controller._gpu_ui_state == "installed"
     assert view.states == []
 
 
@@ -489,46 +348,16 @@ async def test_gpu_worker_failure_preserves_channels_for_restart_action() -> Non
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
     controller._stt_desired = True
 
-    await controller._on_gpu_asr_diagnostic(
-        SimpleNamespace(kind="worker_failed", fields={"code": "out_of_memory"})
+    controller._on_local_asr_provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(
+            event="worker_failed",
+            outcome="failed",
+            failure_code="out_of_memory",
+        )
     )
 
     assert controller._gpu_manual_retry_channels == frozenset({"self"})
     assert view.states[-1][0] == "activation_failed"
-
-
-async def test_gpu_discovery_success_and_empty_results_are_cached(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    for devices in (
-        (
-            GpuWorkerDevice(
-                device_id="vk:0",
-                registry_index=0,
-                name="GPU",
-                description="GPU",
-                device_type="discrete",
-                memory_total_bytes=1,
-                memory_free_bytes=1,
-            ),
-        ),
-        (),
-    ):
-        controller, _view = _controller()
-        calls = 0
-
-        class Runtime:
-            async def discover_devices(self):
-                nonlocal calls
-                calls += 1
-                return devices
-
-        monkeypatch.setattr(GuiController, "_get_gpu_asr_runtime", lambda _self: Runtime())
-        monkeypatch.setattr(GuiController, "_gpu_idle_ui_state", lambda _self: "not_installed")
-
-        assert await controller.ensure_gpu_device_discovery() == devices
-        assert await controller.ensure_gpu_device_discovery() == devices
-        assert calls == 1
 
 
 async def test_saved_gpu_preload_skips_non_gpu_and_runs_once_for_gpu(
@@ -552,75 +381,6 @@ async def test_saved_gpu_preload_skips_non_gpu_and_runs_once_for_gpu(
     assert calls == ["startup"]
 
 
-async def test_gpu_discovery_concurrent_requests_and_activation_share_one_task(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller, _view = _controller()
-    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
-    gate = asyncio.Event()
-    calls = 0
-    device = GpuWorkerDevice(
-        device_id="vk:0",
-        registry_index=0,
-        name="GPU",
-        description="GPU",
-        device_type="discrete",
-        memory_total_bytes=1,
-        memory_free_bytes=1,
-    )
-
-    class Runtime:
-        async def discover_devices(self):
-            nonlocal calls
-            calls += 1
-            await gate.wait()
-            return (device,)
-
-    monkeypatch.setattr(GuiController, "_get_gpu_asr_runtime", lambda _self: Runtime())
-    monkeypatch.setattr(GuiController, "_gpu_idle_ui_state", lambda _self: "installed")
-
-    first = asyncio.create_task(controller.ensure_gpu_device_discovery())
-    second = asyncio.create_task(controller.ensure_gpu_device_discovery())
-    activation = asyncio.create_task(controller._validate_gpu_activation())
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
-    assert calls == 1
-
-    gate.set()
-    assert await first == (device,)
-    assert await second == (device,)
-    assert await activation is True
-    assert calls == 1
-
-
-async def test_gpu_discovery_failure_is_cached_until_forced_retry(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller, view = _controller()
-    calls = 0
-
-    class Runtime:
-        async def discover_devices(self):
-            nonlocal calls
-            calls += 1
-            if calls == 1:
-                raise GpuWorkerRequestError("discovery_failed")
-            return ()
-
-    monkeypatch.setattr(GuiController, "_get_gpu_asr_runtime", lambda _self: Runtime())
-
-    assert await controller.ensure_gpu_device_discovery() == ()
-    assert await controller.ensure_gpu_device_discovery() == ()
-    assert calls == 1
-    assert controller._gpu_ui_state == "discovery_failed"
-    assert view.states == []
-
-    assert await controller.ensure_gpu_device_discovery(force=True) == ()
-    assert calls == 2
-    assert controller._gpu_ui_state == "unsupported"
-    assert view.states == []
-
-
 def _gpu_restart_plan() -> _ProviderRuntimeApplyPlan:
     return _ProviderRuntimeApplyPlan(
         should_rebuild_llm=False,
@@ -639,6 +399,15 @@ async def test_valid_device_change_quiesces_both_before_either_restore(
     controller.settings.stt.gpu_device_id = "vk:1"
     controller._stt_desired = True
     events: list[str] = []
+    controller.hub = SimpleNamespace(
+        local_asr_provider_runtime=SimpleNamespace(
+            snapshot=_owned_gpu_snapshot(
+                phase="ready",
+                active_channels=frozenset({"self", "peer"}),
+                attached_channels=frozenset({"self", "peer"}),
+            )
+        )
+    )
 
     async def validate(_self: GuiController) -> bool:
         events.append("validated")
@@ -750,9 +519,17 @@ async def test_gpu_quiescence_does_not_detach_unrelated_non_gpu_self_channel(
     controller.settings.provider.stt = STTProviderName.DEEPGRAM
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.ui.peer_translation_enabled = True
-    controller._gpu_asr_runtime = SimpleNamespace(active_channels=frozenset({"peer"}))
-    replace_self = AsyncMock()
-    controller.hub = SimpleNamespace(replace_stt_provider=replace_self)
+    abort_self = AsyncMock()
+    controller.hub = SimpleNamespace(
+        local_asr_provider_runtime=SimpleNamespace(
+            snapshot=_owned_gpu_snapshot(
+                phase="ready",
+                active_channels=frozenset({"peer"}),
+                attached_channels=frozenset({"peer"}),
+            )
+        ),
+        abort_self_stt_for_toggle_off=abort_self,
+    )
 
     class PeerRuntime:
         def __init__(self) -> None:
@@ -772,7 +549,7 @@ async def test_gpu_quiescence_does_not_detach_unrelated_non_gpu_self_channel(
 
     await controller._quiesce_shared_gpu_consumers(controller.settings)
 
-    replace_self.assert_not_awaited()
+    abort_self.assert_not_awaited()
     assert peer_runtime.calls == [(config, False)]
 
 
@@ -780,43 +557,20 @@ async def test_gpu_quiescence_does_not_detach_unrelated_non_gpu_self_channel(
     "channels",
     [frozenset({"self"}), frozenset({"peer"}), frozenset({"self", "peer"})],
 )
-@pytest.mark.parametrize("initial_failure", ["unavailable", "activation"])
-async def test_manual_retry_restores_detached_gpu_providers_on_one_fresh_runtime(
+async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
     channels: frozenset[str],
-    initial_failure: str,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    controller, view = _controller()
-    new_device = GpuWorkerDevice(
-        device_id="vk:new",
-        registry_index=1,
-        name="New GPU",
-        description="New GPU",
-        device_type="discrete",
-        memory_total_bytes=8,
-        memory_free_bytes=4,
-    )
-    stale_device = GpuWorkerDevice(
-        device_id="vk:stale",
+    controller, _view = _controller()
+    device = GpuWorkerDevice(
+        device_id="vk:0",
         registry_index=0,
-        name="Stale GPU",
-        description="Stale GPU",
+        name="GPU",
+        description="GPU",
         device_type="discrete",
         memory_total_bytes=8,
         memory_free_bytes=4,
     )
-    discovery_client = RecoveryGpuWorkerClient(new_device)
-    failed_client = RecoveryGpuWorkerClient(new_device, activation_error=True)
-    successful_client = RecoveryGpuWorkerClient(new_device)
-    clients = (
-        [discovery_client, successful_client]
-        if initial_failure == "unavailable"
-        else [failed_client, successful_client]
-    )
-    factory = RecoveryGpuWorkerFactory(clients)
-    runtime = SharedGpuASRRuntime(process_factory=factory)
-    controller._gpu_asr_runtime = runtime
-    controller.settings.stt.gpu_device_id = "vk:new"
+    controller.settings.stt.gpu_device_id = device.device_id
     controller.settings.provider.stt = (
         STTProviderName.LOCAL_QWEN_GPU if "self" in channels else STTProviderName.DEEPGRAM
     )
@@ -826,99 +580,49 @@ async def test_manual_retry_restores_detached_gpu_providers_on_one_fresh_runtime
     controller.settings.ui.peer_translation_enabled = "peer" in channels
     controller._stt_desired = "self" in channels
     controller._gpu_manual_retry_channels = channels
-    controller._gpu_devices = (stale_device,) if initial_failure == "unavailable" else (new_device,)
-    monkeypatch.setattr(controller_module, "local_gpu_model_path", lambda: Path("gpu-model.gguf"))
-    backends: dict[str, LocalGpuSTTBackend] = {}
-    sessions: dict[str, object] = {}
-    restores: list[str] = []
+    controller._gpu_devices = (device,)
 
-    def backend(channel: str) -> LocalGpuSTTBackend:
-        return LocalGpuSTTBackend(
-            runtime=runtime,
-            channel=channel,
-            model_path=Path("gpu-model.gguf"),
-            model_id="gpu-model",
-            device_id=controller.settings.stt.gpu_device_id,
-        )
+    class Owner:
+        def __init__(self) -> None:
+            self.snapshot = _owned_gpu_snapshot(
+                device,
+                phase="available",
+                retry_required=True,
+                failure_code="worker_failed",
+                attached_channels=channels,
+            )
+            self.retry_calls: list[tuple[str, ...]] = []
 
-    async def rebuild_self(_self: GuiController) -> None:
-        restores.append("self_rebuilt")
-        backends["self"] = backend("self")
+        async def inspect_gpu_readiness(self, *, explicit_intent: bool, device_id: str):
+            assert explicit_intent is True
+            assert device_id == device.device_id
+            return self.snapshot
 
-    async def enable_self(
-        _self: GuiController,
-        enabled: bool,
-        *,
-        force_immediate: bool = False,
-    ) -> None:
-        _ = force_immediate
-        assert enabled
-        assert "self" in backends
-        sessions["self"] = await backends["self"].open_session()
-        restores.append("self_enabled")
+        async def retry_gpu(self, retry_channels: tuple[str, ...]):
+            self.retry_calls.append(retry_channels)
+            self.snapshot = _owned_gpu_snapshot(
+                device,
+                phase="ready",
+                active_channels=channels,
+                attached_channels=channels,
+            )
+            return self.snapshot
 
-    async def refresh_peer(_self: GuiController) -> None:
-        restores.append("peer_rebuilt")
-        backends["peer"] = backend("peer")
-        sessions["peer"] = await backends["peer"].open_session()
-        restores.append("peer_enabled")
-
-    async def quiesce(_self: GuiController, _settings: AppSettings) -> None:
-        current = tuple(backends.values())
-        backends.clear()
-        sessions.clear()
-        await asyncio.gather(*(item.close() for item in current))
-
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", rebuild_self)
-    monkeypatch.setattr(GuiController, "set_stt_enabled", enable_self)
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", refresh_peer)
-    monkeypatch.setattr(GuiController, "_quiesce_shared_gpu_consumers", quiesce)
-
-    if initial_failure == "activation":
-        await controller.retry_gpu_activation()
-        assert factory.modes == ["persistent"]
-        assert runtime.state == GpuASRRuntimeState.STOPPED
-        assert runtime.active_channels == frozenset()
-        assert backends == {}
-        assert controller._gpu_manual_retry_channels == channels
-        assert view.states[-1][0] == "activation_failed"
+    owner = Owner()
+    controller.hub = SimpleNamespace(local_asr_provider_runtime=owner)
 
     await controller.retry_gpu_activation()
 
-    expected_modes = (
-        ["discovery", "persistent"]
-        if initial_failure == "unavailable"
-        else ["persistent", "persistent"]
-    )
-    assert factory.modes == expected_modes
-    assert controller._gpu_devices == (new_device,)
-    assert runtime.state == GpuASRRuntimeState.READY
-    assert runtime.active_channels == channels
-    assert runtime.configured_device_id == "vk:new"
-    assert successful_client.activate_calls == ["vk:new"]
-    assert set(backends) == set(channels)
-    assert set(sessions) == set(channels)
+    assert owner.retry_calls == [
+        tuple(channel for channel in ("self", "peer") if channel in channels)
+    ]
+    assert owner.snapshot.gpu.active_channels == channels
     assert controller._gpu_manual_retry_channels == frozenset()
-    assert controller.settings.stt.gpu_device_id == "vk:new"
-    if "self" in channels:
-        assert controller.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-        assert restores[-2:] == (
-            ["self_rebuilt", "self_enabled"]
-            if channels == frozenset({"self"})
-            else ["peer_rebuilt", "peer_enabled"]
-        )
-    if "peer" in channels:
-        assert controller.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-    assert successful_client.close_calls == 0
-
-    await asyncio.gather(*(item.close() for item in tuple(backends.values())))
-    await runtime.close()
-    assert successful_client.close_calls == 1
+    assert controller.settings.stt.gpu_device_id == device.device_id
+    assert controller._gpu_ui_state == "ready"
 
 
-async def test_controller_gpu_discovery_and_readiness_delegate_to_owned_runtime(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_controller_gpu_discovery_and_readiness_delegate_to_owned_runtime() -> None:
     controller, _view = _controller()
     device = GpuWorkerDevice(
         device_id="vk:0",
@@ -947,13 +651,6 @@ async def test_controller_gpu_discovery_and_readiness_delegate_to_owned_runtime(
 
     owner = Owner()
     controller.hub = SimpleNamespace(local_asr_provider_runtime=owner)
-    monkeypatch.setattr(
-        GuiController,
-        "_get_gpu_asr_runtime",
-        lambda _self: (_ for _ in ()).throw(
-            AssertionError("legacy Controller GPU runtime was constructed")
-        ),
-    )
 
     devices = await controller.ensure_gpu_device_discovery(force=True)
     ready = await controller._validate_gpu_activation()

@@ -191,7 +191,7 @@ async def test_stt_promo_respects_interval():
         clock=clock,
         reset_deadline_s=90.0,
     )
-    await hub.replace_stt_provider(stt2)
+    await hub.local_asr_provider_runtime.replace_prebuilt_provider("self", stt2, start=True)
 
     # 두 번째 버튼 클릭 (5분 내)
     hub.mark_promo_eligible()
@@ -236,7 +236,7 @@ async def test_stt_promo_sends_after_interval():
         clock=clock,
         reset_deadline_s=90.0,
     )
-    await hub.replace_stt_provider(stt2)
+    await hub.local_asr_provider_runtime.replace_prebuilt_provider("self", stt2, start=True)
 
     # 두 번째 버튼 클릭 (5분 후)
     hub.mark_promo_eligible()

@@ -85,6 +85,36 @@ class ReadyProvisioningPort:
         return
 
 
+def _runtime_hub_stub(
+    *,
+    self_available: bool = True,
+    peer_available: bool = False,
+    **values: object,
+) -> SimpleNamespace:
+    async def abort_self_stt_for_toggle_off() -> None:
+        return None
+
+    async def drain_self_stt_for_toggle_off(
+        *,
+        release_backend_after: float | None = None,
+    ) -> None:
+        _ = release_backend_after
+
+    async def warmup_stt_channel(channel: str) -> None:
+        _ = channel
+
+    return SimpleNamespace(
+        stt=object() if self_available else None,
+        peer_stt=object() if peer_available else None,
+        has_stt_provider=lambda channel: (self_available if channel == "self" else peer_available),
+        abort_self_stt_for_toggle_off=abort_self_stt_for_toggle_off,
+        drain_self_stt_for_toggle_off=drain_self_stt_for_toggle_off,
+        warmup_stt_channel=warmup_stt_channel,
+        mark_promo_eligible=lambda: None,
+        **values,
+    )
+
+
 @pytest.fixture(autouse=True)
 def _use_ready_local_asr_provisioning(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
@@ -328,8 +358,10 @@ async def test_peer_starting_is_published_before_delayed_readiness_and_latest_in
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.settings.ui.overlay_enabled = True
     controller.overlay_state = "connected"
-    controller.hub = SimpleNamespace(
-        peer_stt=None, peer_translation_enabled=False, integrated_context_enabled=False
+    controller.hub = _runtime_hub_stub(
+        self_available=False,
+        peer_translation_enabled=False,
+        integrated_context_enabled=False,
     )
     entered = asyncio.Event()
     release = asyncio.Event()
@@ -368,7 +400,7 @@ async def test_self_delayed_local_qwen_latest_intent_owns_microphone_start(
     controller = GuiController(page=SimpleNamespace(), app=SimpleNamespace(), config_path=Path("x"))
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
-    controller.hub = SimpleNamespace(stt=object(), mark_promo_eligible=lambda: None)
+    controller.hub = _runtime_hub_stub()
     entered = asyncio.Event()
     release = asyncio.Event()
     starts: list[int] = []
@@ -418,7 +450,7 @@ async def test_self_microphone_start_failure_becomes_effective_off_failure_notic
     )
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
-    controller.hub = SimpleNamespace(stt=object(), mark_promo_eligible=lambda: None)
+    controller.hub = _runtime_hub_stub()
     monkeypatch.setattr(
         GuiController,
         "_ensure_local_stt_ready",
@@ -449,7 +481,7 @@ async def test_stale_self_start_failure_cannot_disable_latest_generation(
     )
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
-    controller.hub = SimpleNamespace(stt=object(), mark_promo_eligible=lambda: None)
+    controller.hub = _runtime_hub_stub()
     first_started = asyncio.Event()
     release_failure = asyncio.Event()
     starts = 0
@@ -496,8 +528,8 @@ async def test_peer_post_readiness_runtime_completion_cannot_publish_after_super
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.settings.ui.overlay_enabled = True
     controller.overlay_state = "connected"
-    controller.hub = SimpleNamespace(
-        peer_stt=object(),
+    controller.hub = _runtime_hub_stub(
+        peer_available=True,
         peer_translation_enabled=False,
         integrated_context_enabled=False,
         enqueue_peer_translation_disclosure=disclosures.append,
