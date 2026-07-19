@@ -426,6 +426,7 @@ async def test_valid_device_change_quiesces_both_before_either_restore(
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.stt.gpu_device_id = "vk:1"
     controller._stt_desired = True
+    controller._peer_runtime = RecordingSelfRecoveryOwner()
     events: list[str] = []
 
     class Owner:
@@ -479,6 +480,7 @@ async def test_unavailable_device_change_retains_selection_and_stops_both(
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.stt.gpu_device_id = "vk:missing"
     controller._stt_desired = True
+    controller._peer_runtime = RecordingSelfRecoveryOwner()
     suspend = AsyncMock()
     resume = AsyncMock()
 
@@ -533,6 +535,7 @@ async def test_device_activation_failure_releases_both_and_requires_manual_retry
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.stt.gpu_device_id = "vk:1"
     controller._stt_desired = True
+    controller._peer_runtime = RecordingSelfRecoveryOwner()
     suspend = AsyncMock()
 
     class Owner:
@@ -613,6 +616,7 @@ async def test_recovery_request_build_failure_aborts_pending_self_callback(
     controller._stt_desired = True
     self_owner = RecordingSelfRecoveryOwner()
     controller._self_capture_owner = self_owner
+    controller._peer_runtime = RecordingSelfRecoveryOwner()
 
     def fail_peer_request(*_args, **_kwargs):
         raise RuntimeError("peer recovery request failed")
@@ -841,6 +845,8 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
 
     owner = Owner()
     controller.hub = SimpleNamespace(local_asr_provider_runtime=owner)
+    if "peer" in channels:
+        controller._peer_runtime = RecordingSelfRecoveryOwner()
 
     await controller.retry_gpu_activation()
 

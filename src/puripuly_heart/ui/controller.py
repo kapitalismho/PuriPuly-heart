@@ -1827,7 +1827,7 @@ class GuiController:
                 origin="manual_retry",
             )
         finally:
-            self._abort_self_provider_recovery(recovery)
+            self._abort_provider_recoveries(recovery)
 
     def _create_ui_event_bridge(self, *, runtime_logging) -> UIEventBridge:  # noqa: ANN001
         assert self.hub is not None
@@ -8634,7 +8634,7 @@ class GuiController:
                 origin="settings_apply",
             )
         finally:
-            self._abort_self_provider_recovery(recovery)
+            self._abort_provider_recoveries(recovery)
 
     def _get_gpu_provider_recovery_lock(self) -> asyncio.Lock:
         if self._gpu_provider_recovery_lock is None:
@@ -8668,6 +8668,8 @@ class GuiController:
         peer_config = None
         self_recovery_owner = None
         self_recovery_handler = None
+        peer_recovery_owner = None
+        peer_recovery_handler = None
         try:
             if "self" in channels and settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU:
                 self_config = self._build_self_capture_session_config(settings)
@@ -8682,20 +8684,22 @@ class GuiController:
                 )
             if "peer" in channels and settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU:
                 peer_config = self._build_peer_runtime_config(settings)
+                peer_recovery_owner = self._peer_runtime
+                if peer_recovery_owner is None:
+                    raise RuntimeError("Peer recovery requires a capture owner")
+                peer_recovery_handler = peer_recovery_owner.prepare_provider_recovery(peer_config)
                 targets.append(
                     ProviderRuntimeRecoveryChannel(
                         request=self._peer_stt_provider_request(peer_config, warmup=True),
                         start=False,
-                        on_terminal_failure=(
-                            self._peer_runtime.handle_terminal_provider_failure
-                            if self._peer_runtime is not None
-                            else None
-                        ),
+                        on_terminal_failure=peer_recovery_handler,
                     )
                 )
         except BaseException:
             if self_recovery_owner is not None and self_recovery_handler is not None:
                 self_recovery_owner.abort_provider_recovery(self_recovery_handler)
+            if peer_recovery_owner is not None and peer_recovery_handler is not None:
+                peer_recovery_owner.abort_provider_recovery(peer_recovery_handler)
             raise
         return (
             ProviderRuntimeGpuRecoveryRequest(
@@ -8706,19 +8710,22 @@ class GuiController:
             peer_config,
         )
 
-    def _abort_self_provider_recovery(
+    def _abort_provider_recoveries(
         self,
         recovery: ProviderRuntimeGpuRecoveryRequest,
     ) -> None:
-        owner = self._self_capture_owner
-        if owner is None:
-            return
-        target = next(
-            (item for item in recovery.channels if item.request.channel == "self"),
-            None,
-        )
-        if target is not None and target.on_terminal_failure is not None:
-            owner.abort_provider_recovery(target.on_terminal_failure)
+        for channel, owner in (
+            ("self", self._self_capture_owner),
+            ("peer", self._peer_runtime),
+        ):
+            if owner is None:
+                continue
+            target = next(
+                (item for item in recovery.channels if item.request.channel == channel),
+                None,
+            )
+            if target is not None and target.on_terminal_failure is not None:
+                owner.abort_provider_recovery(target.on_terminal_failure)
 
     async def _suspend_gpu_provider_consumers(
         self,
@@ -8741,7 +8748,13 @@ class GuiController:
         if "peer" in channels and self._peer_runtime is not None:
             if peer_config is None:
                 peer_config = self._build_peer_runtime_config(settings)
-            await self._peer_runtime.adopt_recovered_provider(peer_config)
+            peer_target = next(item for item in recovery.channels if item.request.channel == "peer")
+            if peer_target.on_terminal_failure is None:
+                raise RuntimeError("Peer recovery requires an owner failure callback")
+            await self._peer_runtime.adopt_recovered_provider(
+                peer_config,
+                on_terminal_failure=peer_target.on_terminal_failure,
+            )
             await self._refresh_peer_stt_runtime()
             self._sync_effective_hub_flags(settings)
             self._refresh_overlay_peer_consumers()

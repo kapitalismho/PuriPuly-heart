@@ -94,6 +94,7 @@ class FakeProvider:
         self.replace_gate: asyncio.Event | None = None
         self.handoff_gate: asyncio.Event | None = None
         self.start_error: Exception | None = None
+        self.replace_terminal_error: Exception | None = None
         self.terminal_handlers: list = []
 
     def is_ready(self, config: PeerCaptureSessionConfig) -> bool:
@@ -103,6 +104,8 @@ class FakeProvider:
         _ = start
         self.requests.append(request)
         self.terminal_handlers.append(on_terminal_failure)
+        if self.replace_terminal_error is not None:
+            await on_terminal_failure(self.replace_terminal_error)
         if self.replace_gate is not None:
             await self.replace_gate.wait()
         if self.replace_result.status is PeerCaptureProviderMutationStatus.APPLIED:
@@ -476,6 +479,122 @@ async def test_stale_vad_and_provider_callbacks_cannot_fault_replacement_generat
     assert sink.events == ["current"]
     assert owner.snapshot.state is PeerCaptureSessionState.RUNNING
     await owner.close()
+
+
+async def test_current_initial_provider_terminal_failure_faults_and_releases() -> None:
+    owner, _admission, _resolver, provider, sources, _sink = make_owner()
+    await owner.apply_intent(make_config(), enabled=True)
+
+    await provider.terminal_handlers[-1](RuntimeError("terminal"))
+
+    assert owner.snapshot.state is PeerCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason.value == "provider_failed"
+    assert owner.snapshot.has_source is False
+    assert owner.snapshot.has_vad is False
+    assert owner.snapshot.has_loop_task is False
+    assert sources[0].close_calls == 1
+    assert provider.releases[-1][0] == "abort"
+
+
+async def test_terminal_failure_before_initial_attachment_commit_faults_without_leak() -> None:
+    provider = FakeProvider()
+    provider.replace_terminal_error = RuntimeError("terminal during replace")
+    owner, _admission, _resolver, _provider, sources, _sink = make_owner(provider=provider)
+
+    snapshot = await owner.apply_intent(make_config(), enabled=True)
+
+    assert snapshot.state is PeerCaptureSessionState.FAULTED
+    assert snapshot.failure_reason.value == "provider_failed"
+    assert snapshot.has_source is False
+    assert sources == []
+    assert provider.releases[-1][0] == "abort"
+
+
+async def test_retained_reconfiguration_keeps_provider_callback_current() -> None:
+    owner, _admission, _resolver, provider, _sources, _sink = make_owner()
+    first = make_config()
+    await owner.apply_intent(first, enabled=True)
+    current_terminal = provider.terminal_handlers[-1]
+    reconfigured = replace(
+        first,
+        runtime_signature=("retained",),
+        language=replace(first.language, source_language="en"),
+    )
+
+    await owner.apply_intent(reconfigured, enabled=True)
+    await current_terminal(RuntimeError("terminal after reconfigure"))
+
+    assert provider.reconfigurations
+    assert owner.snapshot.state is PeerCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason.value == "provider_failed"
+
+
+async def test_retained_local_provider_callback_remains_current_after_restart() -> None:
+    owner, _admission, _resolver, provider, _sources, _sink = make_owner()
+    config = make_config(provider_id="local_qwen")
+    await owner.apply_intent(config, enabled=True)
+    retained_terminal = provider.terminal_handlers[-1]
+
+    await owner.apply_intent(config, enabled=False, stop_mode="retain")
+    await owner.apply_intent(config, enabled=True)
+    await retained_terminal(RuntimeError("retained terminal"))
+
+    assert len(provider.terminal_handlers) == 1
+    assert owner.snapshot.state is PeerCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason.value == "provider_failed"
+
+
+async def test_failed_handoff_retires_candidate_callback_and_keeps_current_callback() -> None:
+    owner, _admission, _resolver, provider, _sources, _sink = make_owner()
+    first = make_config(provider_id="soniox")
+    await owner.apply_intent(first, enabled=True)
+    current_terminal = provider.terminal_handlers[-1]
+    provider.handoff_result = PeerCaptureProviderMutation(
+        PeerCaptureProviderMutationStatus.FAILED,
+        reason="offline",
+    )
+
+    await owner.apply_intent(make_config(provider_id="deepgram"), enabled=True)
+    candidate_terminal = provider.terminal_handlers[-1]
+    await candidate_terminal(RuntimeError("retired candidate"))
+
+    assert owner.snapshot.state is PeerCaptureSessionState.RUNNING
+    await current_terminal(RuntimeError("current terminal"))
+    assert owner.snapshot.state is PeerCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason.value == "provider_failed"
+
+
+async def test_successful_handoff_retires_old_callback_and_faults_from_new_callback() -> None:
+    owner, _admission, _resolver, provider, _sources, _sink = make_owner()
+    await owner.apply_intent(make_config(provider_id="soniox"), enabled=True)
+    old_terminal = provider.terminal_handlers[-1]
+
+    await owner.apply_intent(make_config(provider_id="deepgram"), enabled=True)
+    new_terminal = provider.terminal_handlers[-1]
+    await old_terminal(RuntimeError("retired old"))
+
+    assert owner.snapshot.state is PeerCaptureSessionState.RUNNING
+    await new_terminal(RuntimeError("current new"))
+    assert owner.snapshot.state is PeerCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason.value == "provider_failed"
+
+
+async def test_recovery_terminal_failure_before_adoption_faults_recovered_attachment() -> None:
+    owner, _admission, _resolver, provider, _sources, _sink = make_owner()
+    config = make_config(provider_id="local_qwen_gpu")
+    await owner.apply_intent(config, enabled=True)
+    await owner.suspend_provider_consumer()
+    recovered_terminal = owner.prepare_provider_recovery(config)
+
+    await recovered_terminal(RuntimeError("recovered terminal"))
+    await owner.adopt_recovered_provider(
+        config,
+        on_terminal_failure=recovered_terminal,
+    )
+
+    assert owner.snapshot.state is PeerCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason.value == "provider_failed"
+    assert provider.releases[-1][0] == "abort"
 
 
 async def test_close_cancels_pending_start_and_is_idempotent() -> None:

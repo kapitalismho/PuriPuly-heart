@@ -26,6 +26,7 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureSessionState,
     PeerCaptureTargetResolverPort,
     PeerCaptureTargetStatus,
+    PeerCaptureTerminalFailureHandler,
 )
 from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRSessionOptions,
@@ -112,7 +113,12 @@ class SpeechChannelRuntime(Protocol):
 
     async def suspend_provider_consumer(self) -> None: ...
 
-    async def adopt_recovered_provider(self, config: PeerRuntimeConfig) -> None: ...
+    async def adopt_recovered_provider(
+        self,
+        config: PeerRuntimeConfig,
+        *,
+        on_terminal_failure: PeerCaptureTerminalFailureHandler | None = None,
+    ) -> None: ...
 
     async def close(self) -> None: ...
 
@@ -193,6 +199,12 @@ class PeerCaptureSessionOwner:
         self._loop_task: asyncio.Task[None] | None = None
         self._signature: tuple[object, ...] | None = None
         self._provider_signature: tuple[object, ...] | None = None
+        self._provider_attachment_token: object | None = None
+        self._pending_provider_failures: dict[object, Exception | None] = {}
+        self._pending_provider_recoveries: dict[
+            PeerCaptureTerminalFailureHandler,
+            tuple[tuple[object, ...], object],
+        ] = {}
         self._provider_status = PeerCaptureProviderStatus.DETACHED
         self._target_status: PeerCaptureTargetStatus | None = None
         self._state = PeerCaptureSessionState.STOPPED
@@ -255,6 +267,22 @@ class PeerCaptureSessionOwner:
     @property
     def loop_task(self) -> asyncio.Task[None] | None:
         return self._loop_task
+
+    @property
+    def source(self) -> object | None:
+        return self._audio_source
+
+    @property
+    def cleanup_source(self) -> object | None:
+        return self._retired_sources[0] if self._retired_sources else None
+
+    @property
+    def vad(self) -> object | None:
+        return self._vad
+
+    @property
+    def current_config(self) -> PeerCaptureSessionConfig | None:
+        return self._config
 
     @property
     def last_failure(self) -> PeerCaptureDiagnostic | None:
@@ -405,21 +433,86 @@ class PeerCaptureSessionOwner:
                 release_provider=False,
             )
 
-    async def adopt_recovered_provider(self, config: PeerCaptureSessionConfig) -> None:
-        if not self._provider.is_ready(config):
-            raise RuntimeError("recovered Peer provider is not attached")
-        async with self._lock:
-            if self._closed:
-                raise RuntimeError("PeerCaptureSessionOwner is closed")
-            if self._state is not PeerCaptureSessionState.STOPPED:
-                raise RuntimeError("Peer provider recovery requires suspended capture")
-            self._config = config
-            self._provider_signature = config.provider_signature
-            self._provider_status = PeerCaptureProviderStatus.READY
-            self._notify_state_changed()
+    def prepare_provider_recovery(
+        self,
+        config: PeerCaptureSessionConfig,
+    ) -> PeerCaptureTerminalFailureHandler:
+        if self._closed:
+            raise RuntimeError("PeerCaptureSessionOwner is closed")
+        attachment_token = object()
+        self._pending_provider_failures[attachment_token] = None
+
+        async def on_terminal_failure(exc: Exception) -> None:
+            await self._on_terminal_stt_failure(
+                exc,
+                attachment_token=attachment_token,
+            )
+
+        self._pending_provider_recoveries[on_terminal_failure] = (
+            config.provider_signature,
+            attachment_token,
+        )
+        return on_terminal_failure
+
+    def abort_provider_recovery(
+        self,
+        on_terminal_failure: PeerCaptureTerminalFailureHandler,
+    ) -> bool:
+        pending = self._pending_provider_recoveries.pop(on_terminal_failure, None)
+        if pending is None:
+            return False
+        self._pending_provider_failures.pop(pending[1], None)
+        return True
+
+    async def adopt_recovered_provider(
+        self,
+        config: PeerCaptureSessionConfig,
+        *,
+        on_terminal_failure: PeerCaptureTerminalFailureHandler | None = None,
+    ) -> None:
+        async with self._activation_lock:
+            pending = (
+                self._pending_provider_recoveries.get(on_terminal_failure)
+                if on_terminal_failure is not None
+                else None
+            )
+            if on_terminal_failure is not None and (
+                pending is None or pending[0] != config.provider_signature
+            ):
+                if self._provider.is_ready(config):
+                    await self._provider.release(mode="abort")
+                raise RuntimeError("recovered Peer provider has no matching owner callback")
+            if not self._provider.is_ready(config):
+                if on_terminal_failure is not None:
+                    self.abort_provider_recovery(on_terminal_failure)
+                raise RuntimeError("recovered Peer provider is not attached")
+            attachment_token = pending[1] if pending is not None else object()
+            pending_failure = self._pending_provider_failures.pop(attachment_token, None)
+            async with self._lock:
+                if self._closed:
+                    raise RuntimeError("PeerCaptureSessionOwner is closed")
+                if self._state is not PeerCaptureSessionState.STOPPED:
+                    raise RuntimeError("Peer provider recovery requires suspended capture")
+                self._config = config
+                self._provider_signature = config.provider_signature
+                self._commit_provider_attachment(
+                    attachment_token,
+                    recovery_handler=on_terminal_failure,
+                )
+                self._provider_status = PeerCaptureProviderStatus.READY
+                self._notify_state_changed()
+            if pending_failure is not None:
+                await self._fault_current_generation_locked(
+                    self._generation,
+                    config=config,
+                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                )
 
     async def handle_terminal_provider_failure(self, exc: Exception) -> None:
-        await self._on_terminal_stt_failure(exc)
+        await self._on_terminal_stt_failure(
+            exc,
+            attachment_token=self._provider_attachment_token,
+        )
 
     async def close(self) -> None:
         if self._closed:
@@ -438,6 +531,8 @@ class PeerCaptureSessionOwner:
                 generation=generation,
                 release_mode="abort",
             )
+        self._pending_provider_failures.clear()
+        self._pending_provider_recoveries.clear()
 
     async def _transition_running_provider(
         self,
@@ -484,24 +579,39 @@ class PeerCaptureSessionOwner:
                     or not self._desired_active
                 ):
                     raise RuntimeError("peer provider transition superseded")
+            attachment_token = object()
+            self._pending_provider_failures[attachment_token] = None
             try:
                 result = await self._provider.handoff(
                     prepared.provider,
                     start=True,
                     on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
                         exc,
-                        generation=generation,
+                        attachment_token=attachment_token,
                     ),
                 )
             except asyncio.CancelledError:
+                self._pending_provider_failures.pop(attachment_token, None)
                 await self._provider.cancel_handoff()
                 raise
+            except Exception:
+                self._pending_provider_failures.pop(attachment_token, None)
+                raise
             if result.status is not PeerCaptureProviderMutationStatus.APPLIED:
+                self._pending_provider_failures.pop(attachment_token, None)
                 raise RuntimeError("owned Peer STT handoff failed")
+            pending_failure = self._pending_provider_failures.pop(attachment_token, None)
             async with self._lock:
                 if self._config is config and self._generation == generation:
                     self._provider_signature = config.provider_signature
                     self._signature = config.runtime_signature
+                    self._commit_provider_attachment(attachment_token)
+            if pending_failure is not None:
+                await self._fault_current_generation_locked(
+                    generation,
+                    config=config,
+                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                )
 
         outcome = await self._transition_coordinator.request_transition(
             transition_request,
@@ -549,39 +659,71 @@ class PeerCaptureSessionOwner:
             self._resolved_target = resolution.target
             self._target_status = PeerCaptureTargetStatus.RESOLVED
             self._emit_event(PeerCaptureDiagnosticEvent.TARGET_CHANGED)
-            reusable = self._provider.is_ready(config)
+            reusable = (
+                self._provider.is_ready(config) and self._provider_attachment_token is not None
+            )
+            attachment_token = self._provider_attachment_token
             if not reusable:
+                attachment_token = object()
+                self._pending_provider_failures[attachment_token] = None
                 self._provider_status = PeerCaptureProviderStatus.PENDING
                 self._notify_state_changed()
                 request = self._provider_request_factory(
                     config,
                     config.local_provider,
                 )
-                result = await self._provider.replace(
-                    request,
-                    start=False,
-                    on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
-                        exc,
-                        generation=generation,
-                    ),
-                )
+                try:
+                    result = await self._provider.replace(
+                        request,
+                        start=False,
+                        on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
+                            exc,
+                            attachment_token=attachment_token,
+                        ),
+                    )
+                except BaseException:
+                    self._pending_provider_failures.pop(attachment_token, None)
+                    raise
                 if result.status is PeerCaptureProviderMutationStatus.PENDING:
+                    self._pending_provider_failures.pop(attachment_token, None)
                     self._state = PeerCaptureSessionState.PROVIDER_PENDING
                     self._provider_status = PeerCaptureProviderStatus.PENDING
                     self._admission_reason = result.reason
                     self._notify_state_changed()
                     return
                 if result.status is PeerCaptureProviderMutationStatus.SUPERSEDED:
+                    self._pending_provider_failures.pop(attachment_token, None)
                     self._state = PeerCaptureSessionState.STOPPED
                     self._provider_status = PeerCaptureProviderStatus.DETACHED
                     self._desired_active = False
                     self._notify_state_changed()
                     return
                 if result.status is not PeerCaptureProviderMutationStatus.APPLIED:
+                    self._pending_provider_failures.pop(attachment_token, None)
                     raise RuntimeError("owned Peer STT replacement failed")
             provider_ready = True
+            pending_failure = (
+                self._pending_provider_failures.pop(attachment_token, None)
+                if not reusable
+                else None
+            )
+            if not reusable:
+                self._commit_provider_attachment(attachment_token)
             self._provider_status = PeerCaptureProviderStatus.READY
             self._emit_event(PeerCaptureDiagnosticEvent.PROVIDER_CHANGED)
+            if pending_failure is not None:
+                await self._fault_current_generation_locked(
+                    generation,
+                    config=config,
+                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                )
+                self._emit_local_asr_diagnostic(
+                    config,
+                    outcome="failed",
+                    load_started_at=load_started_at,
+                    failure_type=type(pending_failure).__name__,
+                )
+                return
             if self._is_superseded(generation):
                 await self._provider.release(mode="abort")
                 return
@@ -727,31 +869,34 @@ class PeerCaptureSessionOwner:
         self,
         exc: Exception,
         *,
-        generation: int | None = None,
+        attachment_token: object | None,
     ) -> None:
-        _ = exc
-        target_generation = self._generation if generation is None else generation
-        config = self._config
-        async with self._lock:
-            if self._is_superseded(target_generation):
+        if attachment_token is None:
+            return
+        if attachment_token in self._pending_provider_failures:
+            self._pending_provider_failures[attachment_token] = exc
+            return
+        async with self._activation_lock:
+            async with self._lock:
+                if (
+                    self._closed
+                    or attachment_token is not self._provider_attachment_token
+                    or self._provider_status
+                    in {
+                        PeerCaptureProviderStatus.DETACHED,
+                        PeerCaptureProviderStatus.RELEASING,
+                    }
+                ):
+                    return
+                target_generation = self._generation
+                config = self._config
+            if config is None:
                 return
-            if (
-                self._desired_active
-                and self._state is PeerCaptureSessionState.RUNNING
-                and config is not None
-                and self._provider.is_ready(config)
-                and (config is None or config.capture_target.kind != "process")
-            ):
-                return
-        await self._fault_current_generation(
-            target_generation,
-            config=config,
-            reason=(
-                PeerRuntimeFailureReason.PROCESS_PROVIDER_FAILED
-                if config is not None and config.capture_target.kind == "process"
-                else PeerRuntimeFailureReason.PEER_RUNTIME_FAILED
-            ),
-        )
+            await self._fault_current_generation_locked(
+                target_generation,
+                config=config,
+                reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+            )
 
     async def _fault_current_generation(
         self,
@@ -846,6 +991,8 @@ class PeerCaptureSessionOwner:
         await self._retry_retired_cleanup_debt(failures, prior_cleanup_debt)
         if release_provider:
             self._provider_status = PeerCaptureProviderStatus.RELEASING
+            if release_mode == "abort":
+                self._retire_provider_attachment()
             await self._attempt_cleanup(
                 failures,
                 lambda: self._provider.release(
@@ -865,6 +1012,23 @@ class PeerCaptureSessionOwner:
                 self._target_status = None
                 self._notify_state_changed()
         self._raise_cleanup_failures("peer owned runtime teardown failed", failures)
+
+    def _commit_provider_attachment(
+        self,
+        attachment_token: object | None,
+        *,
+        recovery_handler: PeerCaptureTerminalFailureHandler | None = None,
+    ) -> None:
+        self._provider_attachment_token = attachment_token
+        if recovery_handler is None:
+            for pending in self._pending_provider_recoveries.values():
+                self._pending_provider_failures.pop(pending[1], None)
+            self._pending_provider_recoveries.clear()
+        else:
+            self._pending_provider_recoveries.pop(recovery_handler, None)
+
+    def _retire_provider_attachment(self) -> None:
+        self._commit_provider_attachment(None)
 
     def _create_task(self, coroutine: Awaitable[None], *, task_name: str) -> asyncio.Task[None]:
         return asyncio.create_task(coroutine, name=f"PeerCaptureSessionOwner:{task_name}")
