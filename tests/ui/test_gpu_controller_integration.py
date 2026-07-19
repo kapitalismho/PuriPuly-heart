@@ -124,6 +124,39 @@ class ReadyProvisioningPort:
         return
 
 
+class RecordingSelfRecoveryOwner:
+    def __init__(self) -> None:
+        self.prepared_handlers = []
+        self.aborted_handlers = []
+        self.adopted_handlers = []
+        self.pending_handlers = set()
+
+    def prepare_provider_recovery(self, _config):
+        async def on_terminal_failure(_exc: Exception) -> None:
+            return
+
+        self.prepared_handlers.append(on_terminal_failure)
+        self.pending_handlers.add(on_terminal_failure)
+        return on_terminal_failure
+
+    def abort_provider_recovery(self, handler) -> bool:
+        if handler not in self.pending_handlers:
+            return False
+        self.pending_handlers.remove(handler)
+        self.aborted_handlers.append(handler)
+        return True
+
+    async def adopt_recovered_provider(self, _config, *, on_terminal_failure):
+        if on_terminal_failure not in self.pending_handlers:
+            raise RuntimeError("unexpected recovery callback")
+        self.pending_handlers.remove(on_terminal_failure)
+        self.adopted_handlers.append(on_terminal_failure)
+        return SimpleNamespace()
+
+    async def suspend_provider_consumer(self):
+        return SimpleNamespace()
+
+
 def _controller() -> tuple[GuiController, CapturingGpuSettingsView]:
     view = CapturingGpuSettingsView()
     controller = GuiController(
@@ -195,9 +228,7 @@ async def test_gpu_settings_receive_hardware_name_separately_from_vulkan_slot() 
     )
 
 
-async def test_public_self_gpu_toggle_surfaces_provider_teardown_failure(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_public_self_gpu_toggle_surfaces_provider_teardown_failure() -> None:
     controller, _view = _controller()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
     controller._stt_desired = True
@@ -209,11 +240,7 @@ async def test_public_self_gpu_toggle_surfaces_provider_teardown_failure(
         abort_calls += 1
         raise failure
 
-    async def stop_mic_loop(_self: GuiController) -> None:
-        return None
-
     controller.hub = SimpleNamespace(abort_self_stt_for_toggle_off=abort_self_stt_for_toggle_off)
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", stop_mic_loop)
 
     with pytest.raises(RuntimeError, match="provider teardown failed") as exc_info:
         await controller.set_stt_enabled(False)
@@ -399,6 +426,7 @@ async def test_valid_device_change_quiesces_both_before_either_restore(
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.stt.gpu_device_id = "vk:1"
     controller._stt_desired = True
+    controller._peer_runtime = RecordingSelfRecoveryOwner()
     events: list[str] = []
 
     class Owner:
@@ -452,6 +480,7 @@ async def test_unavailable_device_change_retains_selection_and_stops_both(
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.stt.gpu_device_id = "vk:missing"
     controller._stt_desired = True
+    controller._peer_runtime = RecordingSelfRecoveryOwner()
     suspend = AsyncMock()
     resume = AsyncMock()
 
@@ -475,6 +504,8 @@ async def test_unavailable_device_change_retains_selection_and_stops_both(
             return self.snapshot
 
     controller.hub = SimpleNamespace(local_asr_provider_runtime=Owner())
+    self_owner = RecordingSelfRecoveryOwner()
+    controller._self_capture_owner = self_owner
     monkeypatch.setattr(
         GuiController,
         "_suspend_gpu_provider_consumers",
@@ -490,6 +521,7 @@ async def test_unavailable_device_change_retains_selection_and_stops_both(
 
     suspend.assert_awaited_once_with(("self", "peer"))
     resume.assert_not_awaited()
+    assert self_owner.aborted_handlers == self_owner.prepared_handlers
     assert controller.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
     assert controller.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
     assert controller.settings.stt.gpu_device_id == "vk:missing"
@@ -503,6 +535,7 @@ async def test_device_activation_failure_releases_both_and_requires_manual_retry
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
     controller.settings.stt.gpu_device_id = "vk:1"
     controller._stt_desired = True
+    controller._peer_runtime = RecordingSelfRecoveryOwner()
     suspend = AsyncMock()
 
     class Owner:
@@ -517,6 +550,8 @@ async def test_device_activation_failure_releases_both_and_requires_manual_retry
             raise RuntimeError("activation failed")
 
     controller.hub = SimpleNamespace(local_asr_provider_runtime=Owner())
+    self_owner = RecordingSelfRecoveryOwner()
+    controller._self_capture_owner = self_owner
     monkeypatch.setattr(
         GuiController,
         "_suspend_gpu_provider_consumers",
@@ -530,6 +565,204 @@ async def test_device_activation_failure_releases_both_and_requires_manual_retry
     assert controller.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
     assert controller.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
     assert controller.settings.stt.gpu_device_id == "vk:1"
+    assert self_owner.aborted_handlers == self_owner.prepared_handlers
+
+
+async def test_cancelled_device_recovery_aborts_pending_self_callback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller, _view = _controller()
+    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    controller.settings.stt.gpu_device_id = "vk:1"
+    controller._stt_desired = True
+    self_owner = RecordingSelfRecoveryOwner()
+    controller._self_capture_owner = self_owner
+
+    class Owner:
+        snapshot = _owned_gpu_snapshot(
+            phase="ready",
+            active_channels=frozenset({"self"}),
+            attached_channels=frozenset({"self"}),
+        )
+
+        async def recover_gpu(self, _request, *, quiesce):
+            await quiesce(("self",))
+            raise asyncio.CancelledError
+
+    controller.hub = SimpleNamespace(local_asr_provider_runtime=Owner())
+    suspend = AsyncMock()
+    monkeypatch.setattr(
+        GuiController,
+        "_suspend_gpu_provider_consumers",
+        lambda _self, channels: suspend(channels),
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await controller._apply_gpu_runtime_owner_recovery(
+            controller.settings,
+            _gpu_restart_plan(),
+        )
+
+    suspend.assert_awaited_once_with(("self",))
+    assert self_owner.aborted_handlers == self_owner.prepared_handlers
+
+
+async def test_recovery_request_build_failure_aborts_pending_self_callback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller, _view = _controller()
+    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN_GPU
+    controller._stt_desired = True
+    self_owner = RecordingSelfRecoveryOwner()
+    controller._self_capture_owner = self_owner
+    controller._peer_runtime = RecordingSelfRecoveryOwner()
+
+    def fail_peer_request(*_args, **_kwargs):
+        raise RuntimeError("peer recovery request failed")
+
+    monkeypatch.setattr(GuiController, "_peer_stt_provider_request", fail_peer_request)
+
+    with pytest.raises(RuntimeError, match="peer recovery request failed"):
+        controller._build_gpu_recovery_request(
+            controller.settings,
+            frozenset({"self", "peer"}),
+            reason="settings_restart",
+        )
+
+    assert self_owner.aborted_handlers == self_owner.prepared_handlers
+
+
+async def test_overlapping_manual_and_settings_recovery_adopt_exact_callbacks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller, _view = _controller()
+    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    controller._stt_desired = False
+    self_owner = RecordingSelfRecoveryOwner()
+    controller._self_capture_owner = self_owner
+    monkeypatch.setattr(
+        GuiController,
+        "_on_self_capture_state_changed",
+        lambda _self, _snapshot: None,
+    )
+
+    manual_recovery, manual_peer_config = controller._build_gpu_recovery_request(
+        controller.settings,
+        frozenset({"self"}),
+        reason="manual_retry",
+    )
+    settings_recovery, settings_peer_config = controller._build_gpu_recovery_request(
+        controller.settings,
+        frozenset({"self"}),
+        reason="settings_restart",
+    )
+    manual_handler = manual_recovery.channels[0].on_terminal_failure
+    settings_handler = settings_recovery.channels[0].on_terminal_failure
+
+    await controller._resume_gpu_provider_consumers(
+        settings=controller.settings,
+        channels=frozenset({"self"}),
+        peer_config=manual_peer_config,
+        recovery=manual_recovery,
+    )
+    await controller._resume_gpu_provider_consumers(
+        settings=controller.settings,
+        channels=frozenset({"self"}),
+        peer_config=settings_peer_config,
+        recovery=settings_recovery,
+    )
+
+    assert manual_handler is not None
+    assert settings_handler is not None
+    assert manual_handler is not settings_handler
+    assert self_owner.adopted_handlers == [manual_handler, settings_handler]
+    assert self_owner.pending_handlers == set()
+
+
+async def test_manual_and_settings_recovery_serialize_through_adoption(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller, _view = _controller()
+    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    controller._stt_desired = False
+    events = []
+    first_adoption_started = asyncio.Event()
+    release_first_adoption = asyncio.Event()
+
+    class BarrierSelfOwner(RecordingSelfRecoveryOwner):
+        async def adopt_recovered_provider(self, config, *, on_terminal_failure):
+            result = await super().adopt_recovered_provider(
+                config,
+                on_terminal_failure=on_terminal_failure,
+            )
+            adoption_number = len(self.adopted_handlers)
+            events.append(f"adopt_{adoption_number}_start")
+            if adoption_number == 1:
+                first_adoption_started.set()
+                await release_first_adoption.wait()
+            events.append(f"adopt_{adoption_number}_end")
+            return result
+
+    self_owner = BarrierSelfOwner()
+    controller._self_capture_owner = self_owner
+    monkeypatch.setattr(
+        GuiController,
+        "_on_self_capture_state_changed",
+        lambda _self, _snapshot: None,
+    )
+
+    class Owner:
+        def __init__(self) -> None:
+            self.recovery_calls = 0
+            self.snapshot = _owned_gpu_snapshot(
+                phase="ready",
+                active_channels=frozenset({"self"}),
+                attached_channels=frozenset({"self"}),
+            )
+
+        async def recover_gpu(self, _request, *, quiesce):
+            self.recovery_calls += 1
+            recovery_number = self.recovery_calls
+            events.append(f"recover_{recovery_number}_start")
+            await quiesce(("self",))
+            events.append(f"recover_{recovery_number}_end")
+            return self.snapshot
+
+    owner = Owner()
+    controller.hub = SimpleNamespace(local_asr_provider_runtime=owner)
+    plan = _ProviderRuntimeApplyPlan(
+        should_rebuild_llm=False,
+        should_refresh_peer=False,
+        should_refresh_self_stt=False,
+        coordinated_gpu_restart=True,
+    )
+
+    manual_task = asyncio.create_task(controller.retry_gpu_activation())
+    await first_adoption_started.wait()
+    settings_task = asyncio.create_task(
+        controller._apply_gpu_runtime_owner_recovery(controller.settings, plan)
+    )
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert owner.recovery_calls == 1
+    assert events == ["recover_1_start", "recover_1_end", "adopt_1_start"]
+
+    release_first_adoption.set()
+    await asyncio.wait_for(asyncio.gather(manual_task, settings_task), timeout=1.0)
+
+    assert events == [
+        "recover_1_start",
+        "recover_1_end",
+        "adopt_1_start",
+        "adopt_1_end",
+        "recover_2_start",
+        "recover_2_end",
+        "adopt_2_start",
+        "adopt_2_end",
+    ]
+    assert self_owner.pending_handlers == set()
 
 
 async def test_gpu_consumer_suspension_does_not_detach_unrelated_non_gpu_self_channel() -> None:
@@ -612,6 +845,8 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
 
     owner = Owner()
     controller.hub = SimpleNamespace(local_asr_provider_runtime=owner)
+    if "peer" in channels:
+        controller._peer_runtime = RecordingSelfRecoveryOwner()
 
     await controller.retry_gpu_activation()
 
@@ -622,6 +857,12 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
         channel for channel in ("self", "peer") if channel in channels
     )
     assert all(item.request.warmup for item in recovery.channels)
+    self_target = next(
+        (item for item in recovery.channels if item.request.channel == "self"),
+        None,
+    )
+    if self_target is not None:
+        assert callable(self_target.on_terminal_failure)
     assert owner.snapshot.gpu.active_channels == channels
     assert controller.settings.stt.gpu_device_id == device.device_id
     assert controller._gpu_ui_state == "ready"

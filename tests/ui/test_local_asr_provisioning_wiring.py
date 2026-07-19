@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -24,6 +25,14 @@ from puripuly_heart.core.local_stt_assets import (
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
 from puripuly_heart.ui.controller import GuiController
+
+
+async def _wait_until(predicate: Callable[[], bool]) -> None:
+    for _ in range(100):
+        if predicate():
+            return
+        await asyncio.sleep(0)
+    raise AssertionError("timed out waiting for condition")
 
 
 def _snapshot(
@@ -303,10 +312,15 @@ async def test_successful_manual_repair_resumes_only_current_self_generation(
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     rebuilds: list[str] = []
     switches: list[str] = []
+
+    async def rebuild_with_owner_generation(self) -> None:
+        rebuilds.append("rebuild")
+        self._stt_activation_generation += 1
+
     monkeypatch.setattr(
         GuiController,
         "_rebuild_stt_provider",
-        lambda self: asyncio.sleep(0, result=rebuilds.append("rebuild")),
+        rebuild_with_owner_generation,
     )
     monkeypatch.setattr(
         GuiController,
@@ -314,11 +328,19 @@ async def test_successful_manual_repair_resumes_only_current_self_generation(
         lambda self: asyncio.sleep(0, result=switches.append("switch")),
     )
 
-    await controller.set_stt_enabled(True)
+    controller._stt_desired = True
+    controller._stt_activation_generation = 7
+    assert (
+        controller._request_unavailable_local_asr_repair(
+            "missing",
+            channel="self",
+            activation_generation=7,
+        )
+        is False
+    )
     release.set()
     await asyncio.gather(*port.tasks)
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
+    await _wait_until(lambda: bool(rebuilds))
 
     assert rebuilds == ["rebuild"]
     assert switches == ["switch"]

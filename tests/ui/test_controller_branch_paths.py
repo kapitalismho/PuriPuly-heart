@@ -107,6 +107,12 @@ from puripuly_heart.core.runtime_logging import (
     SessionLoggingMode,
     SessionRuntimeLoggingService,
 )
+from puripuly_heart.core.self_capture import (
+    SelfCaptureFailureReason,
+    SelfCaptureProviderStatus,
+    SelfCaptureSessionSnapshot,
+    SelfCaptureSessionState,
+)
 from puripuly_heart.core.stt.controller import FinalTranscriptSuppressedNotification
 from puripuly_heart.domain.models import Transcript
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
@@ -1337,11 +1343,16 @@ def _patch_init_pipeline_dependencies(monkeypatch: pytest.MonkeyPatch) -> dict[s
         def has_stt_provider(channel: str) -> bool:
             return hub.stt is not None if channel == "self" else hub.peer_stt is not None
 
-        async def replace_stt_provider_request(request, *, start):
-            _ = start
+        async def replace_stt_provider_request(
+            request,
+            *,
+            start,
+            on_terminal_failure,
+        ):
+            _ = start, on_terminal_failure
             created["stt_request"] = request
             hub.stt = "owned-stt"
-            return SimpleNamespace(status="applied")
+            return SimpleNamespace(status="applied", failure_type=None)
 
         hub.has_stt_provider = has_stt_provider
         hub.replace_stt_provider_request = replace_stt_provider_request
@@ -1369,6 +1380,14 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
     app = SimpleNamespace(debug_ui_preview=True)
     controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
     controller.settings = AppSettings()
+    prior_owner_closed: list[str] = []
+
+    class PriorOwner:
+        async def close(self) -> None:
+            prior_owner_closed.append("closed")
+
+    prior_owner = PriorOwner()
+    controller._self_capture_owner = prior_owner
     monkeypatch.setattr(
         controller_module,
         "ManagedSTTProviderFactory",
@@ -1384,6 +1403,8 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
     await controller._init_pipeline()
 
     provider = stt_calls[0]["fault_profile_provider"]
+    assert prior_owner_closed == ["closed"]
+    assert controller._self_capture_owner is not prior_owner
     assert created["stt_request"].provider_id == controller.settings.provider.stt.value
     assert controller._hub_has_stt_provider("self")
     assert callable(stt_calls[0]["on_final_transcript_suppressed"])
@@ -1401,23 +1422,48 @@ async def test_rebuild_stt_provider_delegates_immutable_owner_request() -> None:
     controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
     controller._runtime_logging = RuntimeLoggingSpy()
     controller.settings = AppSettings()
-    requests: list[tuple[object, bool]] = []
+    configs: list[object] = []
 
-    async def replace_stt_provider_request(request: object, *, start: bool):
-        requests.append((request, start))
-        return SimpleNamespace(status="applied")
+    class FakeOwner:
+        loop_task = None
+        source = None
+        cleanup_source = None
+        vad = None
+        last_cleanup_exception = None
 
-    controller.hub = SimpleNamespace(
-        replace_stt_provider_request=replace_stt_provider_request,
-    )
+        async def prepare_provider(self, config):
+            configs.append(config)
+            return SelfCaptureSessionSnapshot(
+                state=SelfCaptureSessionState.STOPPED,
+                provider_status=SelfCaptureProviderStatus.READY,
+                desired_active=False,
+                effective_active=False,
+                generation=1,
+                provider_id=config.provider_id,
+                runtime_signature=config.runtime_signature,
+                failure_reason=None,
+                admission_reason=None,
+                has_source=False,
+                has_vad=False,
+                has_loop_task=False,
+                cleanup_debt=0,
+                closed=False,
+            )
+
+    controller.hub = SimpleNamespace()
+    controller._self_capture_owner = FakeOwner()
     controller._debug_stt_fault_profile = "stt_input_low_snr_vad_pass"
 
     await controller._rebuild_stt_provider()
 
-    request, start = requests[0]
+    config = configs[0]
+    request = controller._self_capture_provider_request(config, False)
     assert request.provider_id == controller.settings.provider.stt.value
     assert request.config.source_language == controller.settings.languages.source_language
-    assert start is False
+    assert (
+        config.provider_signature
+        == controller._build_self_capture_session_config(controller.settings).provider_signature
+    )
 
 
 def test_peer_stt_provider_request_preserves_resolved_runtime_config() -> None:
@@ -10197,6 +10243,70 @@ def _self_mic_decision(
     )
 
 
+def _create_self_capture_source_for_test(controller: GuiController) -> object:
+    assert controller.settings is not None
+    source = controller._create_self_capture_source(
+        controller._build_self_capture_session_config(controller.settings)
+    )
+    controller._audio_source = source
+    return source
+
+
+class MicTestSelfCaptureOwner:
+    def __init__(self, *, source: object, task: asyncio.Task[None]) -> None:
+        self.source = source
+        self.cleanup_source = None
+        self.loop_task = task
+        self.vad = object()
+        self.last_cleanup_exception = None
+        self.generation = 0
+
+    async def apply_intent(self, config, *, enabled: bool, **kwargs):
+        _ = config, kwargs
+        assert enabled is False
+        self.generation += 1
+        if self.loop_task is not None:
+            self.loop_task.cancel()
+            await asyncio.gather(self.loop_task, return_exceptions=True)
+            self.loop_task = None
+        source = self.source if self.source is not None else self.cleanup_source
+        self.source = None
+        self.vad = None
+        failure = None
+        if source is not None:
+            try:
+                await getattr(source, "close")()
+            except Exception as exc:
+                failure = exc
+                self.cleanup_source = source
+                self.last_cleanup_exception = exc
+            else:
+                self.cleanup_source = None
+                self.last_cleanup_exception = None
+        return SelfCaptureSessionSnapshot(
+            state=(
+                SelfCaptureSessionState.FAULTED
+                if failure is not None
+                else SelfCaptureSessionState.STOPPED
+            ),
+            provider_status=SelfCaptureProviderStatus.DETACHED,
+            desired_active=False,
+            effective_active=False,
+            generation=self.generation,
+            provider_id=None,
+            runtime_signature=None,
+            failure_reason=(
+                SelfCaptureFailureReason.CLEANUP_FAILED if failure is not None else None
+            ),
+            admission_reason=None,
+            has_source=False,
+            has_vad=False,
+            has_loop_task=False,
+            cleanup_debt=1 if failure is not None else 0,
+            closed=False,
+        )
+
+
 def _mic_test_route_observation(
     *,
     should_attempt_open: bool = True,
@@ -10725,8 +10835,11 @@ async def test_start_microphone_test_disables_self_stt_before_capture(
         async def close(self) -> None:
             source_closed.append("closed")
 
-    controller._audio_source = FakeSelfSource()
-    controller._mic_task = asyncio.create_task(asyncio.sleep(3600))
+    source = FakeSelfSource()
+    task = asyncio.create_task(asyncio.sleep(3600))
+    controller._audio_source = source
+    controller._mic_task = task
+    controller._self_capture_owner = MicTestSelfCaptureOwner(source=source, task=task)
 
     async def fake_capture(self, **_kwargs) -> None:
         capture_preflight_state.append(
@@ -10892,7 +11005,9 @@ async def test_start_microphone_test_source_close_exception_retains_source_until
 
     source = FailingSelfSource()
     controller._audio_source = source
-    controller._mic_task = asyncio.create_task(asyncio.sleep(3600))
+    task = asyncio.create_task(asyncio.sleep(3600))
+    controller._mic_task = task
+    controller._self_capture_owner = MicTestSelfCaptureOwner(source=source, task=task)
     monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
 
     first_started = await controller.start_microphone_test()
@@ -10947,7 +11062,9 @@ async def test_start_microphone_test_retry_after_source_close_exception_still_sk
 
     source = FailingSelfSource()
     controller._audio_source = source
-    controller._mic_task = asyncio.create_task(asyncio.sleep(3600))
+    task = asyncio.create_task(asyncio.sleep(3600))
+    controller._mic_task = task
+    controller._self_capture_owner = MicTestSelfCaptureOwner(source=source, task=task)
     monkeypatch.setattr(GuiController, "run_microphone_test_capture", unexpected_capture)
 
     try:
@@ -11607,61 +11724,7 @@ async def test_controller_stop_cancels_active_microphone_test(
 
 
 @pytest.mark.asyncio
-async def test_start_mic_loop_registers_named_self_audio_runtime_owner(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.audio.input_host_api = WINDOWS_WASAPI_COMPATIBILITY_HOST_API
-    controller.settings.audio.input_device = "Compat Mic"
-    controller.hub = DummyHub()
-    controller._runtime_logging = RuntimeLoggingSpy()
-
-    class FakeSource:
-        async def close(self) -> None:
-            return None
-
-    async def fake_run_mic_loop(self) -> None:
-        _ = self
-        await asyncio.sleep(3600)
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", lambda **kwargs: 7)
-    monkeypatch.setattr(
-        controller_module,
-        "determine_self_mic_capture_channels",
-        lambda *, device_idx, internal_channels: _self_mic_decision(
-            device_idx=device_idx,
-            preferred_channels=1,
-        ),
-    )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", lambda *a, **k: FakeSource())
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
-
-    await controller._start_mic_loop()
-    owner = getattr(controller, "_self_audio_runtime", None)
-
-    assert owner is not None
-    snapshot = owner.lifecycle_owner_snapshot()
-    assert snapshot["owner"] == "SelfAudioRuntime"
-    assert snapshot["resource_fields"] == (
-        "_audio_source",
-        "_vad",
-        "_loop_task",
-        "_generation",
-        "_last_close_exception",
-    )
-    assert controller._mic_task is owner.loop_task
-    assert controller._audio_source is owner.audio_source
-    assert "toggle-off drains STT separately" in snapshot["toggle_off_policy"]
-
-    await controller._stop_mic_loop()
-
-
-@pytest.mark.asyncio
-async def test_start_mic_loop_normalizes_wasapi_compatibility_mode(
+async def test_self_capture_source_normalizes_wasapi_compatibility_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -11685,7 +11748,7 @@ async def test_start_mic_loop_normalizes_wasapi_compatibility_mode(
         source_calls.append(dict(kwargs))
         return FakeSource()
 
-    async def fake_run_mic_loop(self) -> None:
+    async def fake_run_self_capture_loop(self) -> None:
         _ = self
         return None
 
@@ -11702,9 +11765,9 @@ async def test_start_mic_loop_normalizes_wasapi_compatibility_mode(
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
+    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    await controller._start_mic_loop()
+    _create_self_capture_source_for_test(controller)
     await asyncio.sleep(0)
 
     assert resolve_calls == [{"host_api": WINDOWS_WASAPI_HOST_API, "device": "Compat Mic"}]
@@ -11715,82 +11778,7 @@ async def test_start_mic_loop_normalizes_wasapi_compatibility_mode(
 
 
 @pytest.mark.asyncio
-async def test_start_mic_loop_retries_retained_source_close_before_opening_new_source(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.audio.input_host_api = WINDOWS_WASAPI_COMPATIBILITY_HOST_API
-    controller.settings.audio.input_device = "Compat Mic"
-    controller.hub = DummyHub()
-    controller._runtime_logging = RuntimeLoggingSpy()
-    raw_message = "retained source still busy"
-    close_calls: list[str] = []
-    source_calls: list[dict[str, object]] = []
-
-    class RetainedSource:
-        async def close(self) -> None:
-            close_calls.append("retained")
-            if len(close_calls) == 1:
-                raise RuntimeError(raw_message)
-
-    class NewSource:
-        actual_sample_rate_hz = 48000
-        requested_channels = 1
-        opened_channels = 1
-        frame_channels = 1
-
-        async def close(self) -> None:
-            return None
-
-    retained_source = RetainedSource()
-    controller._audio_source = retained_source
-    controller._last_mic_loop_close_exception = RuntimeError(raw_message)
-
-    def fake_source(*_args, **kwargs) -> NewSource:
-        source_calls.append(dict(kwargs))
-        return NewSource()
-
-    async def fake_run_mic_loop(self) -> None:
-        _ = self
-        return None
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", lambda **kwargs: 7)
-    monkeypatch.setattr(
-        controller_module,
-        "determine_self_mic_capture_channels",
-        lambda *, device_idx, internal_channels: _self_mic_decision(
-            device_idx=device_idx,
-            preferred_channels=1,
-        ),
-    )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
-
-    await controller._start_mic_loop()
-
-    assert close_calls == ["retained"]
-    assert source_calls == []
-    assert controller._audio_source is retained_source
-    assert isinstance(controller._last_mic_loop_close_exception, RuntimeError)
-    assert controller._mic_task is None
-
-    await controller._start_mic_loop()
-    await asyncio.sleep(0)
-
-    assert close_calls == ["retained", "retained"]
-    assert len(source_calls) == 1
-    assert source_calls[0]["device"] == 7
-    assert controller._audio_source is not retained_source
-    assert controller._last_mic_loop_close_exception is None
-    assert controller._mic_task is not None
-
-
-@pytest.mark.asyncio
-async def test_start_mic_loop_wires_self_vad_diagnostics(
+async def test_self_capture_source_wires_self_vad_diagnostics(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -11814,7 +11802,7 @@ async def test_start_mic_loop_wires_self_vad_diagnostics(
         vad_calls.append(dict(kwargs))
         return SimpleNamespace()
 
-    async def fake_run_mic_loop(self) -> None:
+    async def fake_run_self_capture_loop(self) -> None:
         _ = self
         return None
 
@@ -11831,9 +11819,12 @@ async def test_start_mic_loop_wires_self_vad_diagnostics(
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", lambda *a, **k: FakeSource())
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
+    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    await controller._start_mic_loop()
+    controller._vad = controller._create_self_capture_vad(
+        controller._build_self_capture_session_config(controller.settings)
+    )
+    _create_self_capture_source_for_test(controller)
     await asyncio.sleep(0)
 
     assert vad_calls[0].get("max_segment_ms") is None
@@ -11855,7 +11846,7 @@ async def test_start_mic_loop_wires_self_vad_diagnostics(
 
 
 @pytest.mark.asyncio
-async def test_start_mic_loop_requests_two_channel_capture_from_metadata(
+async def test_self_capture_source_requests_two_channel_capture_from_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -11879,7 +11870,7 @@ async def test_start_mic_loop_requests_two_channel_capture_from_metadata(
         source_calls.append(dict(kwargs))
         return FakeSource()
 
-    async def fake_run_mic_loop(self) -> None:
+    async def fake_run_self_capture_loop(self) -> None:
         _ = self
         return None
 
@@ -11897,9 +11888,9 @@ async def test_start_mic_loop_requests_two_channel_capture_from_metadata(
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
+    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    await controller._start_mic_loop()
+    _create_self_capture_source_for_test(controller)
     await asyncio.sleep(0)
 
     detailed_logs = [message for _level, message in controller._runtime_logging.detailed_messages]
@@ -11919,7 +11910,7 @@ async def test_start_mic_loop_requests_two_channel_capture_from_metadata(
 
 
 @pytest.mark.asyncio
-async def test_start_mic_loop_retries_same_device_with_mono_after_two_channel_failure(
+async def test_self_capture_source_retries_same_device_with_mono_after_two_channel_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -11950,7 +11941,7 @@ async def test_start_mic_loop_retries_same_device_with_mono_after_two_channel_fa
             raise RuntimeError("2ch rejected")
         return FakeSource()
 
-    async def fake_run_mic_loop(self) -> None:
+    async def fake_run_self_capture_loop(self) -> None:
         _ = self
         return None
 
@@ -11967,9 +11958,9 @@ async def test_start_mic_loop_retries_same_device_with_mono_after_two_channel_fa
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
+    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    await controller._start_mic_loop()
+    _create_self_capture_source_for_test(controller)
     await asyncio.sleep(0)
 
     detailed_logs = [message for _level, message in controller._runtime_logging.detailed_messages]
@@ -11987,7 +11978,7 @@ async def test_start_mic_loop_retries_same_device_with_mono_after_two_channel_fa
 
 
 @pytest.mark.asyncio
-async def test_start_mic_loop_recomputes_capture_channels_for_name_fallback(
+async def test_self_capture_source_recomputes_capture_channels_for_name_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12025,7 +12016,7 @@ async def test_start_mic_loop_recomputes_capture_channels_for_name_fallback(
             raise RuntimeError("primary failed")
         return FakeSource()
 
-    async def fake_run_mic_loop(self) -> None:
+    async def fake_run_self_capture_loop(self) -> None:
         _ = self
         return None
 
@@ -12039,9 +12030,9 @@ async def test_start_mic_loop_recomputes_capture_channels_for_name_fallback(
         fake_decision,
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
+    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    await controller._start_mic_loop()
+    _create_self_capture_source_for_test(controller)
     await asyncio.sleep(0)
 
     assert [(call["device"], call["channels"]) for call in source_calls] == [(7, 1), (8, 2)]
@@ -12050,7 +12041,7 @@ async def test_start_mic_loop_recomputes_capture_channels_for_name_fallback(
 
 
 @pytest.mark.asyncio
-async def test_start_mic_loop_uses_default_metadata_for_system_default_fallback(
+async def test_self_capture_source_uses_default_metadata_for_system_default_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12088,7 +12079,7 @@ async def test_start_mic_loop_uses_default_metadata_for_system_default_fallback(
             )
         return _self_mic_decision(device_idx=device_idx, preferred_channels=1)
 
-    async def fake_run_mic_loop(self) -> None:
+    async def fake_run_self_capture_loop(self) -> None:
         _ = self
         return None
 
@@ -12102,9 +12093,9 @@ async def test_start_mic_loop_uses_default_metadata_for_system_default_fallback(
         fake_decision,
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
+    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    await controller._start_mic_loop()
+    _create_self_capture_source_for_test(controller)
     await asyncio.sleep(0)
 
     assert [(call["device"], call["channels"]) for call in source_calls] == [(7, 1), (None, 2)]
@@ -12113,7 +12104,7 @@ async def test_start_mic_loop_uses_default_metadata_for_system_default_fallback(
 
 
 @pytest.mark.asyncio
-async def test_start_mic_loop_suppresses_capture_format_diagnostics_in_basic_mode(
+async def test_self_capture_source_suppresses_capture_format_diagnostics_in_basic_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12137,7 +12128,7 @@ async def test_start_mic_loop_suppresses_capture_format_diagnostics_in_basic_mod
         source_calls.append(dict(kwargs))
         return FakeSource()
 
-    async def fake_run_mic_loop(self) -> None:
+    async def fake_run_self_capture_loop(self) -> None:
         _ = self
         return None
 
@@ -12155,9 +12146,9 @@ async def test_start_mic_loop_suppresses_capture_format_diagnostics_in_basic_mod
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
+    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    await controller._start_mic_loop()
+    _create_self_capture_source_for_test(controller)
     await asyncio.sleep(0)
 
     all_messages = [
@@ -12263,7 +12254,7 @@ def test_controller_runtime_logging_uses_injected_main_sinks(
 
 
 @pytest.mark.asyncio
-async def test_start_mic_loop_does_not_apply_wasapi_flags_to_name_fallback(
+async def test_self_capture_source_does_not_apply_wasapi_flags_to_name_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12293,7 +12284,7 @@ async def test_start_mic_loop_does_not_apply_wasapi_flags_to_name_fallback(
             raise RuntimeError("first open failed")
         return FakeSource()
 
-    async def fake_run_mic_loop(self) -> None:
+    async def fake_run_self_capture_loop(self) -> None:
         _ = self
         return None
 
@@ -12310,9 +12301,9 @@ async def test_start_mic_loop_does_not_apply_wasapi_flags_to_name_fallback(
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
+    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    await controller._start_mic_loop()
+    _create_self_capture_source_for_test(controller)
     await asyncio.sleep(0)
 
     assert resolve_calls == [
@@ -12327,7 +12318,7 @@ async def test_start_mic_loop_does_not_apply_wasapi_flags_to_name_fallback(
 
 
 @pytest.mark.asyncio
-async def test_start_mic_loop_retries_same_device_name_fallback_without_wasapi_flags(
+async def test_self_capture_source_retries_same_device_name_fallback_without_wasapi_flags(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12353,7 +12344,7 @@ async def test_start_mic_loop_retries_same_device_name_fallback_without_wasapi_f
             raise RuntimeError("first open failed")
         return FakeSource()
 
-    async def fake_run_mic_loop(self) -> None:
+    async def fake_run_self_capture_loop(self) -> None:
         _ = self
         return None
 
@@ -12370,9 +12361,9 @@ async def test_start_mic_loop_retries_same_device_name_fallback_without_wasapi_f
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
+    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    await controller._start_mic_loop()
+    _create_self_capture_source_for_test(controller)
     await asyncio.sleep(0)
 
     assert resolve_calls == [
@@ -12390,7 +12381,7 @@ async def test_start_mic_loop_retries_same_device_name_fallback_without_wasapi_f
 
 
 @pytest.mark.asyncio
-async def test_start_mic_loop_does_not_apply_wasapi_flags_to_system_default_fallback(
+async def test_self_capture_source_does_not_apply_wasapi_flags_to_system_default_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12418,7 +12409,7 @@ async def test_start_mic_loop_does_not_apply_wasapi_flags_to_system_default_fall
             raise RuntimeError("first open failed")
         return FakeSource()
 
-    async def fake_run_mic_loop(self) -> None:
+    async def fake_run_self_capture_loop(self) -> None:
         _ = self
         return None
 
@@ -12435,9 +12426,9 @@ async def test_start_mic_loop_does_not_apply_wasapi_flags_to_system_default_fall
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_mic_loop", fake_run_mic_loop)
+    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    await controller._start_mic_loop()
+    _create_self_capture_source_for_test(controller)
     await asyncio.sleep(0)
 
     assert resolve_calls == [{"host_api": WINDOWS_WASAPI_HOST_API, "device": ""}]
@@ -12446,32 +12437,6 @@ async def test_start_mic_loop_does_not_apply_wasapi_flags_to_system_default_fall
     assert source_calls[1].get("wasapi_auto_convert") is False
     assert source_calls[1].get("wasapi_exclusive") is False
     assert [call["channels"] for call in source_calls] == [1, 1]
-
-
-@pytest.mark.asyncio
-async def test_stop_mic_loop_cancels_task_closes_audio_source_and_resets_gate() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    task = asyncio.create_task(asyncio.sleep(3600))
-    close_calls: list[str] = []
-    gate = DummyGate()
-
-    class FakeAudioSource:
-        async def close(self) -> None:
-            close_calls.append("closed")
-
-    controller._mic_task = task
-    controller._audio_source = FakeAudioSource()
-    controller._vad = object()
-    controller.vrc_mic_audio_gate = gate
-
-    await controller._stop_mic_loop()
-
-    assert task.cancelled() is True
-    assert close_calls == ["closed"]
-    assert controller._mic_task is None
-    assert controller._audio_source is None
-    assert controller._vad is None
-    assert gate.reset_calls == 1
 
 
 @pytest.mark.asyncio
@@ -14622,7 +14587,7 @@ async def test_local_stt_button_stays_starting_until_activation_completes(
 
 
 @pytest.mark.asyncio
-async def test_ensure_stt_switch_creates_task_when_missing(
+async def test_ensure_stt_switch_delegates_to_owner_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -14637,40 +14602,61 @@ async def test_ensure_stt_switch_creates_task_when_missing(
     await controller._ensure_stt_switch()
 
     assert run_calls == ["run"]
-    assert controller._stt_switch_task is not None
-    assert controller._stt_switch_task.done() is True
 
 
 @pytest.mark.asyncio
-async def test_run_stt_switch_stop_path_drains_self_ingress_without_touching_peer(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_run_stt_switch_stop_path_drains_self_ingress_without_touching_peer() -> None:
     controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
     controller._stt_desired = False
-    stop_calls: list[str] = []
-    backend_calls: list[str] = []
+    apply_calls: list[dict[str, object]] = []
     peer_calls: list[str] = []
-
-    class FakeStt:
-        async def close(self) -> None:
-            backend_calls.append("close")
 
     class FakePeerStt:
         async def close(self) -> None:
             peer_calls.append("close")
 
-    async def fake_stop_mic_loop(self) -> None:
-        _ = self
-        stop_calls.append("stop_mic")
+    class FakeOwner:
+        loop_task = None
+        source = None
+        cleanup_source = None
+        vad = None
+        last_cleanup_exception = None
 
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", fake_stop_mic_loop)
-    controller.hub = DummyHub(stt=FakeStt(), peer_stt=FakePeerStt())
+        async def apply_intent(self, config, **kwargs):
+            _ = config
+            apply_calls.append(kwargs)
+            return SelfCaptureSessionSnapshot(
+                state=SelfCaptureSessionState.STOPPED,
+                provider_status=SelfCaptureProviderStatus.DETACHED,
+                desired_active=False,
+                effective_active=False,
+                generation=1,
+                provider_id=None,
+                runtime_signature=None,
+                failure_reason=None,
+                admission_reason=None,
+                has_source=False,
+                has_vad=False,
+                has_loop_task=False,
+                cleanup_debt=0,
+                closed=False,
+            )
+
+    controller.hub = DummyHub(peer_stt=FakePeerStt())
+    controller._self_capture_owner = FakeOwner()
 
     await controller._run_stt_switch()
 
-    assert stop_calls == ["stop_mic"]
-    assert backend_calls == []
-    assert controller.hub.drain_self_stt_calls == [None]
+    assert apply_calls == [
+        {
+            "enabled": False,
+            "restart": False,
+            "force_immediate": False,
+            "explicit_toggle_off": True,
+        }
+    ]
+    assert controller.hub.drain_self_stt_calls == []
     assert peer_calls == []
 
 
@@ -14689,21 +14675,13 @@ async def test_run_stt_switch_warns_when_hub_missing() -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_stt_switch_restart_path_drains_and_warms_through_hub_owner(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_run_stt_switch_restart_path_drains_and_warms_through_hub_owner() -> None:
     controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
     controller._stt_desired = True
     controller._stt_restart_requested = True
-    calls: list[str] = []
+    apply_calls: list[dict[str, object]] = []
     peer_calls: list[str] = []
-
-    class FakeStt:
-        async def close(self) -> None:
-            calls.append("close")
-
-        async def warmup(self) -> None:
-            calls.append("warmup")
 
     class FakePeerStt:
         async def close(self) -> None:
@@ -14712,23 +14690,48 @@ async def test_run_stt_switch_restart_path_drains_and_warms_through_hub_owner(
         async def warmup(self) -> None:
             peer_calls.append("warmup")
 
-    async def fake_stop_mic_loop(self) -> None:
-        _ = self
-        calls.append("stop_mic")
+    class FakeOwner:
+        loop_task = None
+        source = None
+        cleanup_source = None
+        vad = None
+        last_cleanup_exception = None
 
-    async def fake_start_mic_loop(self) -> None:
-        _ = self
-        calls.append("start_mic")
+        async def apply_intent(self, config, **kwargs):
+            _ = config
+            apply_calls.append(kwargs)
+            return SelfCaptureSessionSnapshot(
+                state=SelfCaptureSessionState.RUNNING,
+                provider_status=SelfCaptureProviderStatus.READY,
+                desired_active=True,
+                effective_active=True,
+                generation=1,
+                provider_id="deepgram",
+                runtime_signature=("runtime",),
+                failure_reason=None,
+                admission_reason=None,
+                has_source=True,
+                has_vad=True,
+                has_loop_task=True,
+                cleanup_debt=0,
+                closed=False,
+            )
 
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", fake_stop_mic_loop)
-    monkeypatch.setattr(GuiController, "_start_mic_loop", fake_start_mic_loop)
-    controller.hub = DummyHub(stt=FakeStt(), peer_stt=FakePeerStt())
+    controller.hub = DummyHub(peer_stt=FakePeerStt())
+    controller._self_capture_owner = FakeOwner()
 
     await controller._run_stt_switch()
 
-    assert calls == ["stop_mic", "start_mic"]
-    assert controller.hub.drain_self_stt_calls == [None]
-    assert controller.hub.warmup_stt_calls == ["self"]
+    assert apply_calls == [
+        {
+            "enabled": True,
+            "restart": True,
+            "force_immediate": False,
+            "explicit_toggle_off": False,
+        }
+    ]
+    assert controller.hub.drain_self_stt_calls == []
+    assert controller.hub.warmup_stt_calls == []
     assert peer_calls == []
 
 
@@ -15654,10 +15657,6 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
     async def fake_rebuild_llm_provider(self) -> None:
         rebuild_llm_calls.append("rebuild_llm")
 
-    async def fake_stop_mic_loop(self) -> None:
-        _ = self
-        switch_calls.append("stop_mic")
-
     async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
         receiver_calls.append(enabled)
 
@@ -15674,16 +15673,13 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
         *,
         smooth_local: bool = False,
     ) -> None:
-        _ = smooth_local
-        await self._stop_mic_loop()
-        await self._rebuild_stt_provider()
-        await self._ensure_stt_switch()
+        _ = self, smooth_local
+        switch_calls.append("replace_stt")
 
     monkeypatch.setattr(controller_module, "get_locale", lambda: "en")
     monkeypatch.setattr(controller_module, "set_locale", lambda locale: locale_calls.append(locale))
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", fake_stop_mic_loop)
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -15703,7 +15699,7 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
     assert rebuild_llm_calls == ["rebuild_llm"]
     assert receiver_calls == [True]
     assert controller._stt_restart_requested is False
-    assert switch_calls == ["stop_mic", "rebuild_stt", "switch"]
+    assert switch_calls == ["replace_stt"]
     assert locale_calls == ["ko"]
     assert controller.hub.low_latency_mode is True
     assert "Failed to apply locale" in errors
@@ -15721,7 +15717,33 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
     controller.settings = settings
 
-    switch_calls: list[str] = []
+    prepared_configs: list[object] = []
+
+    class FakeOwner:
+        loop_task = None
+        source = None
+        cleanup_source = None
+        vad = None
+        last_cleanup_exception = None
+
+        async def prepare_provider(self, config):
+            prepared_configs.append(config)
+            return SelfCaptureSessionSnapshot(
+                state=SelfCaptureSessionState.STOPPED,
+                provider_status=SelfCaptureProviderStatus.READY,
+                desired_active=False,
+                effective_active=False,
+                generation=1,
+                provider_id=config.provider_id,
+                runtime_signature=config.runtime_signature,
+                failure_reason=None,
+                admission_reason=None,
+                has_source=False,
+                has_vad=False,
+                has_loop_task=False,
+                cleanup_debt=0,
+                closed=False,
+            )
 
     controller.hub = DummyHub(stt=object())
     controller.hub.source_language = settings.languages.source_language
@@ -15734,6 +15756,7 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
     controller._stt_desired = False
     controller._mic_task = None
+    controller._self_capture_owner = FakeOwner()
 
     settings.stt.custom_vocabulary_enabled = True
     settings.stt.custom_terms = {"ko": ["Puripuly"]}
@@ -15741,25 +15764,19 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
         _ = (self, enabled)
 
-    async def fake_ensure_stt_switch(self) -> None:
-        _ = self
-        switch_calls.append("switch")
-
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
         fake_configure_vrc_mic_receiver,
     )
-    monkeypatch.setattr(GuiController, "_ensure_stt_switch", fake_ensure_stt_switch)
     await controller.apply_settings(settings)
 
-    request, start = controller.hub.replace_stt_request_calls[-1]
+    request = controller._self_capture_provider_request(prepared_configs[-1], False)
     assert request.config.source_language == "ko"
     assert request.config.custom_vocabulary_enabled is True
     assert request.config.custom_terms == {"ko": ("Puripuly",)}
-    assert start is False
-    assert switch_calls == []
+    assert controller.hub.replace_stt_request_calls == []
     assert dash.stt_needs_key is False
 
 
@@ -15782,32 +15799,43 @@ async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabular
     controller.hub.hangover_s = 1.1
     controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
     controller._stt_desired = True
-    controller._mic_task = object()
 
     settings.stt.custom_vocabulary_enabled = True
     settings.stt.custom_terms = {"ko": ["Puripuly", "VRChat"]}
 
-    calls: list[str] = []
+    apply_calls: list[dict[str, object]] = []
 
-    async def fake_stop_mic_loop(self) -> None:
-        _ = self
-        calls.append("stop_mic")
+    class FakeOwner:
+        loop_task = object()
+        source = object()
+        cleanup_source = None
+        vad = object()
+        last_cleanup_exception = None
 
-    async def fake_rebuild_stt_provider(self) -> None:
-        _ = self
-        calls.append("rebuild_stt")
-
-    async def fake_ensure_stt_switch(self) -> None:
-        _ = self
-        calls.append("switch")
+        async def apply_intent(self, config, **kwargs):
+            apply_calls.append(kwargs)
+            return SelfCaptureSessionSnapshot(
+                state=SelfCaptureSessionState.RUNNING,
+                provider_status=SelfCaptureProviderStatus.READY,
+                desired_active=True,
+                effective_active=True,
+                generation=1,
+                provider_id=config.provider_id,
+                runtime_signature=config.runtime_signature,
+                failure_reason=None,
+                admission_reason=None,
+                has_source=True,
+                has_vad=True,
+                has_loop_task=True,
+                cleanup_debt=0,
+                closed=False,
+            )
 
     async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
         _ = (self, enabled)
 
+    controller._self_capture_owner = FakeOwner()
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_stop_mic_loop", fake_stop_mic_loop)
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
-    monkeypatch.setattr(GuiController, "_ensure_stt_switch", fake_ensure_stt_switch)
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -15816,7 +15844,13 @@ async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabular
 
     await controller.apply_settings(settings)
 
-    assert calls == ["stop_mic", "rebuild_stt", "switch"]
+    assert apply_calls == [
+        {
+            "enabled": True,
+            "restart": False,
+            "explicit_toggle_off": False,
+        }
+    ]
     assert controller._stt_restart_requested is False
 
 
@@ -20297,50 +20331,6 @@ async def test_apply_settings_pushes_updated_overlay_snapshot_to_bridge_and_rest
 
     restarted_bridge = FakeOverlayBridge.instances[1]
     assert restarted_bridge.initial_snapshot.blocks[0].secondary_enabled is False
-
-
-@pytest.mark.asyncio
-async def test_self_local_qwen_toggle_off_schedules_ten_minute_release() -> None:
-    release_delays: list[float | None] = []
-
-    class Hub:
-        async def drain_self_stt_for_toggle_off(
-            self,
-            *,
-            release_backend_after: float | None = None,
-        ) -> None:
-            release_delays.append(release_backend_after)
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
-    controller.hub = Hub()
-
-    await controller._drain_self_stt_for_toggle_off()
-
-    assert release_delays == [600.0]
-
-
-@pytest.mark.asyncio
-async def test_self_non_local_provider_toggle_off_does_not_schedule_release() -> None:
-    release_delays: list[float | None] = []
-
-    class Hub:
-        async def drain_self_stt_for_toggle_off(
-            self,
-            *,
-            release_backend_after: float | None = None,
-        ) -> None:
-            release_delays.append(release_backend_after)
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.provider.stt = STTProviderName.DEEPGRAM
-    controller.hub = Hub()
-
-    await controller._drain_self_stt_for_toggle_off()
-
-    assert release_delays == [None]
 
 
 @pytest.mark.asyncio

@@ -1021,6 +1021,7 @@ class ClientHub:
         request: ProviderRuntimeBuildRequest,
         *,
         start: bool | None = None,
+        on_terminal_failure=None,
     ) -> ProviderRuntimeMutationResult:
         runtime = self._require_local_asr_provider_runtime()
         await self.reset_overlay_preview()
@@ -1030,6 +1031,7 @@ class ClientHub:
         return await runtime.replace_provider(
             request,
             start=self._running if start is None else start,
+            on_terminal_failure=on_terminal_failure,
         )
 
     async def handoff_stt_provider_request(
@@ -1037,10 +1039,12 @@ class ClientHub:
         request: ProviderRuntimeBuildRequest,
         *,
         start: bool | None = None,
+        on_terminal_failure=None,
     ) -> ProviderRuntimeMutationResult:
         return await self._require_local_asr_provider_runtime().handoff_provider(
             request,
             start=self._running if start is None else start,
+            on_terminal_failure=on_terminal_failure,
         )
 
     async def cancel_stt_provider_request_handoff(self) -> bool:
