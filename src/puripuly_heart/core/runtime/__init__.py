@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         SpeechChannelRuntime,
     )
     from puripuly_heart.core.runtime.receiver import OscReceiverRuntime, VrcMicReceiverRuntime
+    from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 
 __all__ = [
     "PeerChannelRuntime",
@@ -31,6 +32,7 @@ __all__ = [
     "OutputRuntime",
     "RuntimeLoggingCloseError",
     "RuntimeLoggingService",
+    "SelfCaptureSessionOwner",
     "SpeechChannelRuntime",
     "VrcMicReceiverRuntime",
 ]
@@ -70,6 +72,10 @@ def __getattr__(name: str) -> object:
             from puripuly_heart.core.runtime import receiver
 
             return getattr(receiver, name)
+        if name == "SelfCaptureSessionOwner":
+            from puripuly_heart.core.runtime import self_capture
+
+            return getattr(self_capture, name)
         from puripuly_heart.core.runtime import peer_channel
 
         return getattr(peer_channel, name)
