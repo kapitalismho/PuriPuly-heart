@@ -16,7 +16,7 @@ from puripuly_heart.core.orchestrator.hub import (
     ContextEntry,
 )
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
-from puripuly_heart.domain.models import Transcript
+from puripuly_heart.domain.models import Transcript, Translation
 
 # ── Mock classes ──────────────────────────────────────────────────────────────
 
@@ -856,6 +856,56 @@ class TestContextLogging:
         assert len(hub.llm.calls) == 1
         assert hub.translation_turns.is_parent_closed(transcript.utterance_id)
         assert hub._translation_tasks == {}
+
+    @pytest.mark.asyncio
+    async def test_in_flight_duplicate_peer_final_preserves_original_parent_cleanup(self):
+        started = asyncio.Event()
+        release = asyncio.Event()
+        call_count = 0
+        hub = ClientHub(
+            stt=None,
+            llm=FakeLLMProvider(),
+            osc=FakeOscQueue(),
+            clock=FakeClock(initial_time=12.0),
+            peer_translation_enabled=True,
+        )
+
+        async def blocking_translate(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            started.set()
+            await release.wait()
+            return Translation(utterance_id=kwargs["utterance_id"], text="translated")
+
+        hub.llm.translate = blocking_translate
+        parent_id = uuid4()
+        hub.peer_runtime.utterance_start_times[parent_id] = 12.0
+        hub.peer_runtime.speech_ended_ids.add(parent_id)
+        hub._peer_parent_speech_end_times[parent_id] = 12.0
+        transcript = Transcript(
+            utterance_id=parent_id,
+            text="peer hello",
+            is_final=True,
+            channel="peer",
+        )
+        event = STTFinalEvent(utterance_id=parent_id, transcript=transcript)
+
+        await hub._handle_stt_event(event)
+        await asyncio.wait_for(started.wait(), timeout=1.0)
+        await hub._handle_stt_event(event)
+        assert hub.translation_turns.is_parent_active(parent_id)
+
+        release.set()
+        await hub.translation_turns.wait_for_idle()
+
+        assert call_count == 1
+        assert hub.translation_turns.is_parent_closed(parent_id)
+        assert not hub.translation_turns.is_parent_active(parent_id)
+        assert parent_id not in hub._peer_translation_parent_ids
+        assert parent_id not in hub._peer_parent_speech_end_times
+        assert parent_id not in hub._peer_parent_turn_ids
+        assert parent_id not in hub.peer_runtime.utterance_start_times
+        assert parent_id not in hub.peer_runtime.speech_ended_ids
 
     @pytest.mark.asyncio
     async def test_submit_text_translation_success_updates_bundle_and_events(self):

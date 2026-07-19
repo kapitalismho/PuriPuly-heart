@@ -176,6 +176,9 @@ class TranslationTurnLifecycleOwner:
     def is_parent_closed(self, parent_utterance_id: UUID) -> bool:
         return parent_utterance_id in self._closed_parent_ids
 
+    def is_parent_active(self, parent_utterance_id: UUID) -> bool:
+        return parent_utterance_id in self._parents
+
     def is_child_cancellation_requested(self, child: TranslationTurnChild) -> bool:
         return (
             self._closed

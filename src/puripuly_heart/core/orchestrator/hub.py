@@ -1720,7 +1720,8 @@ class ClientHub:
             try:
                 await self._publish_peer_chatbox_candidate(parent_utterance_id)
             finally:
-                self._peer_translation_parent_ids.discard(parent_utterance_id)
+                if not self.translation_turns.is_parent_active(parent_utterance_id):
+                    self._peer_translation_parent_ids.discard(parent_utterance_id)
 
     async def _emit_final_transcript_to_overlay(self, transcript: Transcript) -> None:
         if not self.output_runtime.has_overlay_destination:
