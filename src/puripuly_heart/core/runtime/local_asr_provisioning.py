@@ -268,10 +268,10 @@ class LocalASRProvisioningOwner:
         await self._runtime_for(backend).cancel()
 
     async def close(self) -> None:
-        if self._closed and not self._activities:
+        if self._closed and not self._has_resources():
             return
         async with self._close_lock:
-            if self._closed and not self._activities:
+            if self._closed and not self._has_resources():
                 return
             self._closing = True
             self._closed = True
@@ -281,7 +281,6 @@ class LocalASRProvisioningOwner:
                 self._gpu_install_runtime.close(),
                 return_exceptions=True,
             )
-            self._activities.clear()
             self._closing = False
             await self._publish_state()
             failures = [result for result in results if isinstance(result, BaseException)]
@@ -289,6 +288,12 @@ class LocalASRProvisioningOwner:
                 raise failures[0]
             if failures:
                 raise ExceptionGroup("Local ASR provisioning close failed", failures)
+
+    def _has_resources(self) -> bool:
+        return bool(self._activities) or any(
+            runtime.download_task is not None or runtime.cancel_event is not None
+            for runtime in (self._cpu_install_runtime, self._gpu_install_runtime)
+        )
 
     async def _run_install(
         self,

@@ -24,6 +24,7 @@ from puripuly_heart.core.local_stt_catalog import (
 )
 from puripuly_heart.core.local_stt_runtime_installer import RuntimeLocalSTTStatusUpdate
 from puripuly_heart.core.runtime.local_asr_provisioning import LocalASRProvisioningOwner
+from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime
 
 
 def _installed(model_id: str) -> InstalledLocalSTTManifest:
@@ -422,6 +423,67 @@ async def test_owner_can_hold_independent_cpu_and_gpu_install_activities() -> No
                 origin="manual",
             )
         )
+
+
+@pytest.mark.asyncio
+async def test_owner_close_retains_timed_out_install_cleanup_for_retry() -> None:
+    states = _all_states()
+    states[LOCAL_STT_MODEL_ID] = _state("missing", LOCAL_STT_MODEL_ID)
+    backend = MutableProvisioningBackend(states)
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def cancellation_resistant_install(**kwargs) -> InstalledLocalSTTManifest:
+        started.set()
+        while not release.is_set():
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                continue
+        return _installed(kwargs["model_id"])
+
+    owner = LocalASRProvisioningOwner(
+        cpu_model_inspector=backend.inspect_cpu,
+        gpu_model_inspector=backend.inspect_gpu,
+        installer=cancellation_resistant_install,
+        download_runtime_factory=lambda: LocalSTTDownloadRuntime(cancel_timeout_s=0.01),
+    )
+    task = owner.start_install(
+        LocalASRInstallRequest(
+            backend="cpu",
+            model_ids=(LOCAL_STT_MODEL_ID,),
+            locale="en",
+            origin="manual",
+        )
+    )
+    await started.wait()
+
+    with pytest.raises(TimeoutError, match="cancellation timed out"):
+        await owner.close()
+
+    assert task.done() is False
+    assert task in asyncio.all_tasks()
+    assert owner.snapshot.closed is True
+    assert owner.snapshot.activity_for("cpu") is not None
+    assert owner._cpu_install_runtime.download_task is task
+    with pytest.raises(RuntimeError, match="closed"):
+        owner.start_install(
+            LocalASRInstallRequest(
+                backend="cpu",
+                model_ids=(LOCAL_STT_MODEL_ID,),
+                locale="en",
+                origin="manual",
+            )
+        )
+
+    release.set()
+    await owner.close()
+    result = await task
+
+    assert result.cancelled is True
+    assert task.done() is True
+    assert owner.snapshot.activities == ()
+    assert owner._cpu_install_runtime.download_task is None
 
 
 def test_owner_lifecycle_inventory_names_all_provisioning_resources() -> None:

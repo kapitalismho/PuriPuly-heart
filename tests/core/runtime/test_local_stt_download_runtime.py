@@ -53,6 +53,43 @@ async def test_local_stt_download_runtime_close_sets_cancel_event_and_cancels_ta
 
 
 @pytest.mark.asyncio
+async def test_close_retains_timed_out_download_task_for_retry() -> None:
+    runtime = LocalSTTDownloadRuntime(cancel_timeout_s=0.01)
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def run_download(_cancel_event: threading.Event, _generation: int) -> object:
+        started.set()
+        while not release.is_set():
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                continue
+        return object()
+
+    task = runtime.start(origin="manual", run_download=run_download)
+    await started.wait()
+
+    with pytest.raises(TimeoutError, match="cancellation timed out"):
+        await runtime.close()
+
+    assert task.done() is False
+    assert runtime.download_task is task
+    assert runtime.cancel_event is not None
+    assert runtime.cancel_event.is_set() is True
+    assert runtime.origin == "manual"
+    assert runtime.is_closed is True
+
+    release.set()
+    await runtime.close()
+    await task
+
+    assert runtime.download_task is None
+    assert runtime.cancel_event is None
+    assert runtime.origin is None
+
+
+@pytest.mark.asyncio
 async def test_local_stt_download_runtime_rejects_start_while_closing_or_closed() -> None:
     runtime = LocalSTTDownloadRuntime(cancel_timeout_s=0.01)
     await runtime.close()
