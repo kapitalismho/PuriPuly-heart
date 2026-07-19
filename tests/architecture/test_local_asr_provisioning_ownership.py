@@ -56,6 +56,11 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
     assert "_peer_local_stt_probe_task" not in source
     assert "_run_peer_local_stt_runtime_probe" not in source
     assert "_probe_peer_local_stt_runtime_load" not in source
+    assert "_refresh_local_stt_runtime_state" not in source
+    assert "_record_strict_local_stt_ready" not in source
+    assert "_cancel_local_stt_download" not in source
+    assert "_start_local_stt_download" not in source
+    assert "_handle_local_stt_unavailable" not in source
 
 
 def test_provider_wiring_consumes_only_installed_path_contract() -> None:

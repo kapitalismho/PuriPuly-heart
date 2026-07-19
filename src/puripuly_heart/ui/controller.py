@@ -4925,7 +4925,7 @@ class GuiController:
         await self._close_clipboard_runtime()
         await self._close_app_oauth_runtime_for_release(cleanup_failures)
         await self._close_oauth_runtime_for_release(cleanup_failures)
-        await self._cancel_local_stt_download()
+        await self._close_local_asr_provisioning()
         gpu_discovery_task = self._gpu_discovery_task
         if gpu_discovery_task is not None and gpu_discovery_task is not asyncio.current_task():
             gpu_discovery_task.cancel()
@@ -5793,7 +5793,7 @@ class GuiController:
                 self._sync_local_stt_notice()
                 return
             if current_status in ("missing", "invalid", "download_failed"):
-                self._handle_local_stt_unavailable(
+                self._request_unavailable_local_asr_repair(
                     current_status,
                     channel="self",
                     activation_generation=activation_generation,
@@ -6187,11 +6187,6 @@ class GuiController:
                 f"model={decision.model_id or 'unknown'} reason=preferred_model_unavailable"
             )
 
-    def _refresh_local_stt_runtime_state(self) -> None:
-        self._on_local_asr_provisioning_state_changed(
-            self._get_local_asr_provisioning_owner().snapshot
-        )
-
     def _required_local_stt_model_ids_for_provider(self, provider: str) -> tuple[str, ...]:
         if provider == LOCAL_CPU_AUTO_PROVIDER:
             return REQUIRED_CPU_LOCAL_STT_MODEL_IDS
@@ -6314,7 +6309,7 @@ class GuiController:
                 ),
             )
 
-    def _start_local_stt_download(
+    def _request_local_asr_install(
         self,
         *,
         origin: str,
@@ -6419,7 +6414,7 @@ class GuiController:
             self._reset_local_stt_pending_peer_enable_after_install()
             await self._refresh_overlay_runtime_dependencies()
 
-    def _handle_local_stt_unavailable(
+    def _request_unavailable_local_asr_repair(
         self,
         status: str,
         *,
@@ -6460,14 +6455,11 @@ class GuiController:
             dash.set_stt_enabled(False)
             dash.set_stt_needs_key(False)
         self._sync_local_stt_notice()
-        self._start_local_stt_download(
+        self._request_local_asr_install(
             origin="manual",
             model_ids=affected_model_ids,
         )
         return False
-
-    async def _record_strict_local_stt_ready(self, model_ids: tuple[str, ...]) -> None:
-        await self._get_local_asr_provisioning_owner().inspect_cpu(model_ids)
 
     @staticmethod
     def _snapshot_unavailable_status(
@@ -6537,7 +6529,7 @@ class GuiController:
             self._show_short_stt_message("local_stt.download_in_progress")
             return False
         if current_status in ("missing", "invalid", "download_failed"):
-            return self._handle_local_stt_unavailable(
+            return self._request_unavailable_local_asr_repair(
                 current_status,
                 channel="self",
                 activation_generation=activation_generation,
@@ -6572,7 +6564,7 @@ class GuiController:
                     outcome="ready",
                     load_seconds=time.monotonic() - load_started_at,
                 )
-            await self._record_strict_local_stt_ready(
+            await self._get_local_asr_provisioning_owner().inspect_cpu(
                 self._required_local_stt_model_ids_for_provider(self.settings.provider.stt.value)
             )
             self._sync_local_stt_notice()
@@ -6594,7 +6586,7 @@ class GuiController:
                 return await self._ensure_local_stt_ready(
                     activation_generation=activation_generation
                 )
-            return self._handle_local_stt_unavailable(
+            return self._request_unavailable_local_asr_repair(
                 self._snapshot_unavailable_status(snapshot, required_model_ids),
                 channel="self",
                 model_ids=self._snapshot_unavailable_model_ids(snapshot, required_model_ids),
@@ -6609,7 +6601,7 @@ class GuiController:
                 load_seconds=time.monotonic() - load_started_at,
                 failure_type=type(exc).__name__,
             )
-            return self._handle_local_stt_unavailable(
+            return self._request_unavailable_local_asr_repair(
                 "missing",
                 channel="self",
                 model_ids=((decision.model_id,) if decision.model_id is not None else None),
@@ -6633,7 +6625,7 @@ class GuiController:
                     decision.model_id,
                     failure_type=type(exc).__name__,
                 )
-            return self._handle_local_stt_unavailable(
+            return self._request_unavailable_local_asr_repair(
                 "invalid",
                 channel="self",
                 model_ids=((decision.model_id,) if decision.model_id is not None else None),
@@ -6683,7 +6675,7 @@ class GuiController:
             self._sync_local_stt_notice()
             return False
         if current_status in ("missing", "invalid", "download_failed"):
-            return self._handle_local_stt_unavailable(
+            return self._request_unavailable_local_asr_repair(
                 current_status,
                 channel="peer",
                 activation_generation=activation_generation,
@@ -6701,7 +6693,7 @@ class GuiController:
             required_model_ids,
         )
         if unavailable_model_ids:
-            return self._handle_local_stt_unavailable(
+            return self._request_unavailable_local_asr_repair(
                 self._snapshot_unavailable_status(strict_snapshot, required_model_ids),
                 channel="peer",
                 model_ids=unavailable_model_ids,
@@ -6710,7 +6702,7 @@ class GuiController:
         self._sync_local_stt_notice()
         return True
 
-    async def _cancel_local_stt_download(self) -> None:
+    async def _close_local_asr_provisioning(self) -> None:
         self._reset_local_stt_pending_enable_after_install()
         self._reset_local_stt_pending_peer_enable_after_install()
         if self.local_asr_provisioning is not None:

@@ -69,7 +69,7 @@ async def _async_noop(*_args: object, **_kwargs: object) -> None:
 
 def _patch_stop_side_effects(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(GuiController, "_stop_clipboard_watcher", _async_noop)
-    monkeypatch.setattr(GuiController, "_cancel_local_stt_download", _async_noop)
+    monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", _async_noop)
     monkeypatch.setattr(GuiController, "set_stt_enabled", _async_noop)
     monkeypatch.setattr(GuiController, "_configure_vrc_mic_receiver", _async_noop)
     monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", _async_noop)

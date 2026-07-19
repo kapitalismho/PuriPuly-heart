@@ -12656,7 +12656,7 @@ async def test_controller_stop_closes_vrc_mic_receiver_before_hub_shutdown(
     monkeypatch.setattr(GuiController, "_close_clipboard_runtime", fake_noop)
     monkeypatch.setattr(GuiController, "_close_app_oauth_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_close_oauth_runtime", fake_noop)
-    monkeypatch.setattr(GuiController, "_cancel_local_stt_download", fake_noop)
+    monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", fake_noop)
     monkeypatch.setattr(GuiController, "_close_microphone_test_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay)
     monkeypatch.setattr(GuiController, "_close_peer_runtime_for_release", fake_noop)
@@ -12716,7 +12716,7 @@ async def test_controller_stop_uses_bounded_prompt_runtime_close_and_still_stops
     monkeypatch.setattr(GuiController, "_close_clipboard_runtime", fake_noop)
     monkeypatch.setattr(GuiController, "_close_app_oauth_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_close_oauth_runtime", fake_noop)
-    monkeypatch.setattr(GuiController, "_cancel_local_stt_download", fake_noop)
+    monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", fake_noop)
     monkeypatch.setattr(GuiController, "_close_microphone_test_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay)
     monkeypatch.setattr(GuiController, "_close_peer_runtime_for_release", fake_noop)
@@ -14882,7 +14882,6 @@ async def test_apply_settings_target_only_change_clears_self_language_runtime_st
 
     monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -14937,7 +14936,6 @@ async def test_apply_settings_self_target_change_clears_peer_runtime_when_peer_t
 
     monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -14992,7 +14990,6 @@ async def test_apply_settings_self_source_change_clears_peer_runtime_when_peer_s
 
     monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -15046,7 +15043,6 @@ async def test_apply_settings_logs_and_continues_when_language_cleanup_fails(
 
     monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -15096,7 +15092,6 @@ async def test_order22_language_runtime_clear_failure_degrades_without_raw_log_t
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17403,7 +17398,6 @@ async def test_order22_apply_settings_routes_stt_language_audio_patch_through_de
     monkeypatch.setattr(controller_module, "save_settings", record_saved_settings)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17478,7 +17472,6 @@ async def test_order22_apply_settings_runtime_failure_degrades_without_rollback_
     monkeypatch.setattr(controller_module, "save_settings", record_saved_settings)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17588,7 +17581,6 @@ async def test_order22_apply_settings_self_stt_provider_specific_change_restarts
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17651,7 +17643,6 @@ async def test_order22_apply_settings_mixed_draft_applies_audio_runtime_and_pres
     monkeypatch.setattr(controller_module, "save_settings", record_saved_settings)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17742,7 +17733,6 @@ async def test_mixed_order22_order23_order24_fallback_save_failure_restores_comm
     monkeypatch.setattr(controller_module, "save_settings", fail_uncommitted_full_draft_save)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -17831,7 +17821,6 @@ async def test_order22_apply_settings_mixed_full_draft_save_failure_degrades_and
     monkeypatch.setattr(controller_module, "save_settings", fail_third_save)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -18424,7 +18413,6 @@ async def test_order22_mixed_settings_direct_fallback_degrades_when_stt_unavaila
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -18483,7 +18471,6 @@ async def test_order22_qwen_low_latency_rebuild_unavailable_llm_degrades_default
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -18543,7 +18530,6 @@ async def test_order22_qwen_low_latency_unavailable_preserves_retry_marker(
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -19231,7 +19217,6 @@ async def test_dashboard_peer_language_change_refreshes_peer_translation_pipelin
     refreshed: list[str] = []
 
     monkeypatch.setattr(controller_module, "save_settings", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(GuiController, "_refresh_local_stt_runtime_state", lambda self: None)
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
