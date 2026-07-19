@@ -563,6 +563,54 @@ async def test_retired_provider_terminal_failure_cannot_fault_handoff_session() 
 
 
 @pytest.mark.asyncio
+async def test_reused_provider_signature_rejects_retired_attachment_failure() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+
+    await owner.apply_intent(config("one"), enabled=True)
+    retired_handler = provider.terminal_failure_handler
+    assert retired_handler is not None
+    await owner.apply_intent(config("two"), enabled=True)
+    await owner.apply_intent(config("one"), enabled=True)
+    current_handler = provider.terminal_failure_handler
+    assert current_handler is not None
+    assert current_handler is not retired_handler
+    await retired_handler(RuntimeError("retired reused-signature provider failure"))
+
+    assert owner.snapshot.state is SelfCaptureSessionState.RUNNING
+    assert owner.snapshot.provider_id == "provider-one"
+    assert owner.snapshot.failure_reason is None
+    assert sources[0].close_calls == 0
+    assert provider.release_calls == []
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_same_signature_release_and_rebuild_rejects_retired_attachment_failure() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+    session_config = config()
+
+    await owner.apply_intent(session_config, enabled=True)
+    retired_handler = provider.terminal_failure_handler
+    assert retired_handler is not None
+    await owner.apply_intent(session_config, enabled=False)
+    await owner.apply_intent(session_config, enabled=True)
+    current_handler = provider.terminal_failure_handler
+    assert current_handler is not None
+    assert current_handler is not retired_handler
+    await retired_handler(RuntimeError("released provider terminal failure"))
+
+    assert owner.snapshot.state is SelfCaptureSessionState.RUNNING
+    assert owner.snapshot.provider_id == session_config.provider_id
+    assert owner.snapshot.failure_reason is None
+    assert sources[0].close_calls == 1
+    assert sources[1].close_calls == 0
+    assert provider.release_calls == [("drain", None)]
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_provider_ingress_start_failure_completes_and_releases_owned_resources() -> None:
     provider = RecordingProvider()
     provider.start_failure = RuntimeError("provider ingress failed")

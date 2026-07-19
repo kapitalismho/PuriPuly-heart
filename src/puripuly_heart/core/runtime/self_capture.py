@@ -94,6 +94,7 @@ class SelfCaptureSessionOwner:
         self._generation = 0
         self._config: SelfCaptureSessionConfig | None = None
         self._provider_signature: tuple[object, ...] | None = None
+        self._provider_attachment_token: object | None = None
         self._source: object | None = None
         self._vad: object | None = None
         self._loop_task: asyncio.Task[None] | None = None
@@ -248,17 +249,19 @@ class SelfCaptureSessionOwner:
         async with self._activation_lock:
             if self._is_superseded(generation):
                 return self.snapshot
+            attachment_token = self._provider_attachment_token
             if self._provider.is_ready(config):
                 result_status = SelfCaptureProviderMutationStatus.APPLIED
                 failure_reason = None
             else:
+                attachment_token = object()
                 try:
                     result = await self._provider.replace(
                         self._provider_request_factory(config, False),
                         start=False,
                         on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                             exc,
-                            provider_signature=config.provider_signature,
+                            attachment_token=attachment_token,
                         ),
                     )
                 except asyncio.CancelledError:
@@ -273,6 +276,7 @@ class SelfCaptureSessionOwner:
                 return self.snapshot
             if result_status is SelfCaptureProviderMutationStatus.APPLIED:
                 self._provider_signature = config.provider_signature
+                self._provider_attachment_token = attachment_token
                 self._provider_status = SelfCaptureProviderStatus.READY
                 self._state = SelfCaptureSessionState.STOPPED
                 self._emit(SelfCaptureDiagnosticEvent.PROVIDER_CHANGED, generation=generation)
@@ -484,7 +488,9 @@ class SelfCaptureSessionOwner:
             )
             return
 
+        attachment_token = self._provider_attachment_token
         if not self._provider.is_ready(config):
+            attachment_token = object()
             self._provider_status = SelfCaptureProviderStatus.PENDING
             self._notify_state_changed()
             try:
@@ -493,7 +499,7 @@ class SelfCaptureSessionOwner:
                     start=False,
                     on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                         exc,
-                        provider_signature=config.provider_signature,
+                        attachment_token=attachment_token,
                     ),
                 )
             except asyncio.CancelledError:
@@ -529,6 +535,7 @@ class SelfCaptureSessionOwner:
                 return
         self._provider_status = SelfCaptureProviderStatus.READY
         self._provider_signature = config.provider_signature
+        self._provider_attachment_token = attachment_token
         self._emit(SelfCaptureDiagnosticEvent.PROVIDER_CHANGED, generation=generation)
 
         try:
@@ -605,6 +612,7 @@ class SelfCaptureSessionOwner:
         config: SelfCaptureSessionConfig,
     ) -> None:
         previous_config = self._config
+        attachment_token = self._provider_attachment_token
         self._provider_status = SelfCaptureProviderStatus.PENDING
         self._notify_state_changed()
         try:
@@ -613,12 +621,13 @@ class SelfCaptureSessionOwner:
                     await self._provider.reconfigure(config.session_options)
                 result_status = SelfCaptureProviderMutationStatus.APPLIED
             else:
+                attachment_token = object()
                 result = await self._provider.handoff(
                     self._provider_request_factory(config, True),
                     start=True,
                     on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                         exc,
-                        provider_signature=config.provider_signature,
+                        attachment_token=attachment_token,
                     ),
                 )
                 result_status = result.status
@@ -644,6 +653,7 @@ class SelfCaptureSessionOwner:
         if result_status is SelfCaptureProviderMutationStatus.APPLIED:
             self._config = config
             self._provider_signature = config.provider_signature
+            self._provider_attachment_token = attachment_token
             self._provider_status = SelfCaptureProviderStatus.READY
             self._failure_reason = None
             self._emit(SelfCaptureDiagnosticEvent.PROVIDER_CHANGED, generation=generation)
@@ -710,12 +720,12 @@ class SelfCaptureSessionOwner:
         self,
         exc: Exception,
         *,
-        provider_signature: tuple[object, ...],
+        attachment_token: object,
     ) -> None:
         async with self._activation_lock:
             if (
                 self._closed
-                or provider_signature != self._provider_signature
+                or attachment_token is not self._provider_attachment_token
                 or self._provider_status
                 in {
                     SelfCaptureProviderStatus.DETACHED,
@@ -865,6 +875,7 @@ class SelfCaptureSessionOwner:
                 failures.append(exc)
             else:
                 self._provider_status = SelfCaptureProviderStatus.DETACHED
+                self._provider_attachment_token = None
                 if release_mode == "abort":
                     self._provider_signature = None
         if not preserve_intent:
@@ -902,6 +913,7 @@ class SelfCaptureSessionOwner:
             )
         finally:
             self._provider_status = SelfCaptureProviderStatus.DETACHED
+            self._provider_attachment_token = None
             if mode == "abort":
                 self._provider_signature = None
 
