@@ -908,6 +908,82 @@ class TestContextLogging:
         assert parent_id not in hub.peer_runtime.speech_ended_ids
 
     @pytest.mark.asyncio
+    async def test_closed_translation_owner_rejection_clears_peer_parent_marker(self):
+        hub = ClientHub(
+            stt=None,
+            llm=FakeLLMProvider(),
+            osc=FakeOscQueue(),
+            clock=FakeClock(),
+            peer_translation_enabled=True,
+        )
+        await hub.translation_turns.close()
+        parent_id = uuid4()
+        transcript = Transcript(
+            utterance_id=parent_id,
+            text="peer hello",
+            is_final=True,
+            channel="peer",
+        )
+
+        await hub._ensure_translation(transcript)
+
+        assert not hub.translation_turns.is_parent_active(parent_id)
+        assert not hub.translation_turns.is_parent_closed(parent_id)
+        assert parent_id not in hub._peer_translation_parent_ids
+
+    @pytest.mark.asyncio
+    async def test_non_accepting_translation_owner_rejection_clears_peer_parent_marker(self):
+        hub = ClientHub(
+            stt=None,
+            llm=FakeLLMProvider(),
+            osc=FakeOscQueue(),
+            clock=FakeClock(),
+            peer_translation_enabled=True,
+        )
+        parent_id = uuid4()
+        transcript = Transcript(
+            utterance_id=parent_id,
+            text="peer hello",
+            is_final=True,
+            channel="peer",
+        )
+        hub.translation_turns._accepting = False
+        try:
+            await hub._ensure_translation(transcript)
+        finally:
+            hub.translation_turns._accepting = True
+
+        assert not hub.translation_turns.is_parent_active(parent_id)
+        assert not hub.translation_turns.is_parent_closed(parent_id)
+        assert parent_id not in hub._peer_translation_parent_ids
+
+    @pytest.mark.asyncio
+    async def test_blocked_peer_rejection_clears_peer_parent_marker(self):
+        hub = ClientHub(
+            stt=None,
+            llm=FakeLLMProvider(),
+            osc=FakeOscQueue(),
+            clock=FakeClock(),
+            peer_translation_enabled=True,
+        )
+        parent_id = uuid4()
+        transcript = Transcript(
+            utterance_id=parent_id,
+            text="peer hello",
+            is_final=True,
+            channel="peer",
+        )
+        hub.translation_turns._blocked_channels.add("peer")
+        try:
+            await hub._ensure_translation(transcript)
+        finally:
+            hub.translation_turns._blocked_channels.discard("peer")
+
+        assert not hub.translation_turns.is_parent_active(parent_id)
+        assert not hub.translation_turns.is_parent_closed(parent_id)
+        assert parent_id not in hub._peer_translation_parent_ids
+
+    @pytest.mark.asyncio
     async def test_submit_text_translation_success_updates_bundle_and_events(self):
         hub = ClientHub(
             stt=None,

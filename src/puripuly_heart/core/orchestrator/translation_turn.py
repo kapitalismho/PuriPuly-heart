@@ -215,16 +215,14 @@ class TranslationTurnLifecycleOwner:
     ) -> tuple[UUID, ...]:
         parent_id = request.transcript.utterance_id
         if parent_id in self._closed_parent_ids or parent_id in self._parents:
-            try:
-                await self.on_parent_rejected(parent_id)
-            except Exception:
-                logger.exception("translation parent rejection adapter failed")
+            await self._reject_parent(parent_id)
             return ()
         if (
             not self._accepting
             or self._closed
             or request.transcript.channel in self._blocked_channels
         ):
+            await self._reject_parent(parent_id)
             return ()
         children = self._build_children(request)
         parent = _TranslationTurnParent(
@@ -259,6 +257,12 @@ class TranslationTurnLifecycleOwner:
         if wait_for_parent:
             await parent.closed_event.wait()
         return parent.child_ids
+
+    async def _reject_parent(self, parent_utterance_id: UUID) -> None:
+        try:
+            await self.on_parent_rejected(parent_utterance_id)
+        except Exception:
+            logger.exception("translation parent rejection adapter failed")
 
     async def submit_parent(
         self,
