@@ -746,6 +746,46 @@ async def test_close_cancels_pending_handoff_and_awaits_all_owned_resources() ->
 
 
 @pytest.mark.asyncio
+async def test_close_retains_failed_pending_candidate_cleanup_for_retry() -> None:
+    owner, _provisioning, _gpu_factory, provider_factory = _owner()
+    old_request = ProviderRuntimeBuildRequest(config=_resolved_config("peer", "deepgram"))
+    next_request = ProviderRuntimeBuildRequest(config=_resolved_config("peer", "soniox"))
+    await owner.replace_provider(old_request, start=False)
+    provider_factory.providers[0].is_at_utterance_boundary = False
+    handoff = asyncio.create_task(owner.handoff_provider(next_request, start=False))
+    await _wait_until(lambda: owner.snapshot.channel_for("peer").pending_handoff)
+    candidate = provider_factory.providers[1]
+    close_allowed = False
+    original_close_backend = candidate.close_backend
+
+    async def failing_close_backend() -> None:
+        if not close_allowed:
+            candidate.close_backend_calls += 1
+            raise RuntimeError("pending candidate close failed")
+        await original_close_backend()
+
+    candidate.close_backend = failing_close_backend
+
+    with pytest.raises(ExceptionGroup, match="provider runtime close failed"):
+        await owner.close()
+
+    assert handoff.done()
+    assert owner._close_complete is False
+    assert owner._pending_candidates == {"peer": candidate}
+    assert owner._pending_requests == {"peer": next_request}
+    with pytest.raises(RuntimeError, match="closed"):
+        await owner.start()
+
+    close_allowed = True
+    await owner.close()
+
+    assert owner._close_complete is True
+    assert owner._pending_candidates == {}
+    assert owner._pending_requests == {}
+    assert candidate.close_backend_calls >= 3
+
+
+@pytest.mark.asyncio
 async def test_close_cancels_in_flight_provider_execution() -> None:
     owner, _provisioning, _gpu_factory, provider_factory = _owner()
     request = ProviderRuntimeBuildRequest(config=_resolved_config("self", "deepgram"))

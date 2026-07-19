@@ -687,14 +687,31 @@ class LocalASRProviderRuntimeOwner:
                 and not discovery_task.done()
             ):
                 discovery_task.cancel()
-            if operation_tasks:
-                await asyncio.gather(*operation_tasks, return_exceptions=True)
-            if discovery_task is not None and discovery_task is not current:
-                await asyncio.gather(discovery_task, return_exceptions=True)
             failures: list[Exception] = []
+            if operation_tasks:
+                operation_results = await asyncio.gather(
+                    *operation_tasks,
+                    return_exceptions=True,
+                )
+                failures.extend(
+                    result for result in operation_results if isinstance(result, Exception)
+                )
+            if discovery_task is not None and discovery_task is not current:
+                discovery_results = await asyncio.gather(
+                    discovery_task,
+                    return_exceptions=True,
+                )
+                failures.extend(
+                    result for result in discovery_results if isinstance(result, Exception)
+                )
             for channel in _CHANNELS:
                 try:
                     await self._handles[channel].close()
+                except Exception as exc:
+                    failures.append(exc)
+            for channel, provider in tuple(self._pending_candidates.items()):
+                try:
+                    await self._discard_pending_candidate(channel, provider)
                 except Exception as exc:
                     failures.append(exc)
             try:
@@ -828,9 +845,10 @@ class LocalASRProviderRuntimeOwner:
     ) -> None:
         if self._pending_candidates.get(channel) is not provider:
             return
-        self._pending_candidates.pop(channel, None)
-        self._pending_requests.pop(channel, None)
         await _close_provider_for_discard(provider)
+        if self._pending_candidates.get(channel) is provider:
+            self._pending_candidates.pop(channel, None)
+            self._pending_requests.pop(channel, None)
 
     async def _on_gpu_diagnostic(
         self,

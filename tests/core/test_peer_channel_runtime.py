@@ -540,6 +540,57 @@ async def test_terminal_provider_failure_faults_current_generation() -> None:
     assert diagnostics[-1].reason is PeerRuntimeFailureReason.PROCESS_PROVIDER_FAILED
 
 
+async def test_terminal_managed_stt_failure_auto_recovers_without_policy_reapply() -> None:
+    hub = FakeOwnedPeerHub()
+    diagnostics = []
+    sinks = []
+
+    async def capture_loop(**kwargs) -> None:
+        sinks.append(kwargs["sink"])
+        await asyncio.Event().wait()
+
+    runtime = make_runtime(
+        hub,
+        source_factory=lambda _config: DummySource(),
+        run_audio_loop=capture_loop,
+        diagnostics=diagnostics.append,
+    )
+
+    await runtime.apply_policy(config=make_peer_runtime_config(), desired_active=True)
+    await wait_until(lambda: bool(sinks))
+    await hub.terminal_failure(RuntimeError("provider reconnecting"))
+    await sinks[0].handle_vad_event("next ingress")
+
+    assert runtime.state is PeerChannelRuntimeState.RUNNING
+    assert hub.local_asr_provider_runtime.releases == []
+    assert hub.vad_events == ["next ingress"]
+    assert diagnostics == []
+
+    await runtime.close()
+
+
+async def test_same_signature_reapply_still_auto_recovers_late_terminal_failure() -> None:
+    hub = FakeOwnedPeerHub()
+    diagnostics = []
+    runtime = make_runtime(
+        hub,
+        source_factory=lambda _config: DummySource(),
+        diagnostics=diagnostics.append,
+    )
+    config = make_peer_runtime_config()
+
+    await runtime.apply_policy(config=config, desired_active=True)
+    await hub.terminal_failure(RuntimeError("provider reconnecting"))
+    await runtime.apply_policy(config=config, desired_active=True)
+
+    assert runtime.state is PeerChannelRuntimeState.RUNNING
+    assert len(hub.requests) == 1
+    assert hub.local_asr_provider_runtime.releases == []
+    assert diagnostics == []
+
+    await runtime.close()
+
+
 async def test_close_retries_source_cleanup_debt_and_releases_owner() -> None:
     hub = FakeOwnedPeerHub()
     source = FailingCloseSource()

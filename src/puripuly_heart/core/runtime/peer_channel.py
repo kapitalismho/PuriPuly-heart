@@ -544,6 +544,19 @@ class PeerChannelRuntime:
         _ = exc
         target_generation = self._generation if generation is None else generation
         config = self._config
+        async with self._lock:
+            if self._is_superseded(target_generation):
+                return
+            owner = self.hub.local_asr_provider_runtime
+            current = owner.snapshot.channel_for("peer") if owner is not None else None
+            if (
+                self._desired_active
+                and self._state == PeerChannelRuntimeState.RUNNING
+                and current is not None
+                and current.has_resources
+                and (config is None or config.capture_target.kind != "process")
+            ):
+                return
         await self._fault_current_generation(
             target_generation,
             config=config,
