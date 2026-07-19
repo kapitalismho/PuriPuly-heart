@@ -64,6 +64,9 @@ def test_production_controller_composes_one_peer_owner_through_ports() -> None:
         "state_changed",
         "diagnostic_sink",
     }.issubset(keywords)
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    assert "PeerChannelRuntime" not in source
+    assert "PeerRuntimeConfig" not in source
 
 
 def test_controller_does_not_construct_peer_owner_resources_outside_adapters() -> None:
