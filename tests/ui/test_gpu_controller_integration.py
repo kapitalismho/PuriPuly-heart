@@ -128,17 +128,30 @@ class RecordingSelfRecoveryOwner:
     def __init__(self) -> None:
         self.prepared_handlers = []
         self.aborted_handlers = []
+        self.adopted_handlers = []
+        self.pending_handlers = set()
 
     def prepare_provider_recovery(self, _config):
         async def on_terminal_failure(_exc: Exception) -> None:
             return
 
         self.prepared_handlers.append(on_terminal_failure)
+        self.pending_handlers.add(on_terminal_failure)
         return on_terminal_failure
 
     def abort_provider_recovery(self, handler) -> bool:
+        if handler not in self.pending_handlers:
+            return False
+        self.pending_handlers.remove(handler)
         self.aborted_handlers.append(handler)
         return True
+
+    async def adopt_recovered_provider(self, _config, *, on_terminal_failure):
+        if on_terminal_failure not in self.pending_handlers:
+            raise RuntimeError("unexpected recovery callback")
+        self.pending_handlers.remove(on_terminal_failure)
+        self.adopted_handlers.append(on_terminal_failure)
+        return SimpleNamespace()
 
 
 def _controller() -> tuple[GuiController, CapturingGpuSettingsView]:
@@ -611,6 +624,53 @@ async def test_recovery_request_build_failure_aborts_pending_self_callback(
         )
 
     assert self_owner.aborted_handlers == self_owner.prepared_handlers
+
+
+async def test_overlapping_manual_and_settings_recovery_adopt_exact_callbacks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller, _view = _controller()
+    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    controller._stt_desired = False
+    self_owner = RecordingSelfRecoveryOwner()
+    controller._self_capture_owner = self_owner
+    monkeypatch.setattr(
+        GuiController,
+        "_on_self_capture_state_changed",
+        lambda _self, _snapshot: None,
+    )
+
+    manual_recovery, manual_peer_config = controller._build_gpu_recovery_request(
+        controller.settings,
+        frozenset({"self"}),
+        reason="manual_retry",
+    )
+    settings_recovery, settings_peer_config = controller._build_gpu_recovery_request(
+        controller.settings,
+        frozenset({"self"}),
+        reason="settings_restart",
+    )
+    manual_handler = manual_recovery.channels[0].on_terminal_failure
+    settings_handler = settings_recovery.channels[0].on_terminal_failure
+
+    await controller._resume_gpu_provider_consumers(
+        settings=controller.settings,
+        channels=frozenset({"self"}),
+        peer_config=manual_peer_config,
+        recovery=manual_recovery,
+    )
+    await controller._resume_gpu_provider_consumers(
+        settings=controller.settings,
+        channels=frozenset({"self"}),
+        peer_config=settings_peer_config,
+        recovery=settings_recovery,
+    )
+
+    assert manual_handler is not None
+    assert settings_handler is not None
+    assert manual_handler is not settings_handler
+    assert self_owner.adopted_handlers == [manual_handler, settings_handler]
+    assert self_owner.pending_handlers == set()
 
 
 async def test_gpu_consumer_suspension_does_not_detach_unrelated_non_gpu_self_channel() -> None:

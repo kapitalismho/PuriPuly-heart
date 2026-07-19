@@ -1758,6 +1758,7 @@ class GuiController:
                 settings=self.settings,
                 channels=recovered_channels,
                 peer_config=peer_config,
+                recovery=recovery,
             )
             self._gpu_pending_enable_channels = frozenset(
                 channel
@@ -8506,6 +8507,7 @@ class GuiController:
                 settings=next_settings,
                 channels=recovered_channels,
                 peer_config=peer_config,
+                recovery=recovery,
             )
             if plan.should_refresh_self_stt and "self" not in recovered_channels:
                 if self._stt_desired:
@@ -8620,6 +8622,7 @@ class GuiController:
         settings: AppSettings,
         channels: frozenset[GpuASRChannel],
         peer_config: PeerRuntimeConfig | None,
+        recovery: ProviderRuntimeGpuRecoveryRequest,
     ) -> None:
         if "peer" in channels and self._peer_runtime is not None:
             if peer_config is None:
@@ -8630,8 +8633,14 @@ class GuiController:
             self._refresh_overlay_peer_consumers()
         if "self" in channels:
             if self._self_capture_owner is not None:
+                self_target = next(
+                    item for item in recovery.channels if item.request.channel == "self"
+                )
+                if self_target.on_terminal_failure is None:
+                    raise RuntimeError("Self recovery requires an owner failure callback")
                 snapshot = await self._self_capture_owner.adopt_recovered_provider(
-                    self._build_self_capture_session_config(settings)
+                    self._build_self_capture_session_config(settings),
+                    on_terminal_failure=self_target.on_terminal_failure,
                 )
                 self._on_self_capture_state_changed(snapshot)
             if self._stt_desired:

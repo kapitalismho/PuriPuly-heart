@@ -96,10 +96,10 @@ class SelfCaptureSessionOwner:
         self._config: SelfCaptureSessionConfig | None = None
         self._provider_signature: tuple[object, ...] | None = None
         self._provider_attachment_token: object | None = None
-        self._pending_provider_recovery: (
-            tuple[tuple[object, ...], object, SelfCaptureTerminalFailureHandler] | None
-        ) = None
-        self._pending_provider_recovery_failure: Exception | None = None
+        self._pending_provider_recoveries: dict[
+            SelfCaptureTerminalFailureHandler,
+            tuple[tuple[object, ...], object, Exception | None],
+        ] = {}
         self._source: object | None = None
         self._vad: object | None = None
         self._loop_task: asyncio.Task[None] | None = None
@@ -362,37 +362,36 @@ class SelfCaptureSessionOwner:
                 attachment_token=attachment_token,
             )
 
-        self._pending_provider_recovery = (
+        self._pending_provider_recoveries[on_terminal_failure] = (
             config.provider_signature,
             attachment_token,
-            on_terminal_failure,
+            None,
         )
-        self._pending_provider_recovery_failure = None
         return on_terminal_failure
 
     def abort_provider_recovery(
         self,
         on_terminal_failure: SelfCaptureTerminalFailureHandler,
     ) -> bool:
-        pending = self._pending_provider_recovery
-        if pending is None or pending[2] is not on_terminal_failure:
-            return False
-        self._pending_provider_recovery = None
-        self._pending_provider_recovery_failure = None
-        return True
+        return self._pending_provider_recoveries.pop(on_terminal_failure, None) is not None
 
     async def adopt_recovered_provider(
         self,
         config: SelfCaptureSessionConfig,
+        *,
+        on_terminal_failure: SelfCaptureTerminalFailureHandler,
     ) -> SelfCaptureSessionSnapshot:
         async with self._activation_lock:
-            if not self._provider.is_ready(config):
-                raise RuntimeError("recovered Self provider is not attached")
-            pending = self._pending_provider_recovery
+            pending = self._pending_provider_recoveries.get(on_terminal_failure)
             if pending is None or pending[0] != config.provider_signature:
+                if self._provider.is_ready(config):
+                    await self._release_provider(mode="abort")
                 raise RuntimeError("recovered Self provider has no matching owner callback")
+            if not self._provider.is_ready(config):
+                self.abort_provider_recovery(on_terminal_failure)
+                raise RuntimeError("recovered Self provider is not attached")
             attachment_token = pending[1]
-            pending_failure = self._pending_provider_recovery_failure
+            pending_failure = pending[2]
             async with self._state_lock:
                 if self._closed:
                     raise RuntimeError("SelfCaptureSessionOwner is closed")
@@ -400,7 +399,10 @@ class SelfCaptureSessionOwner:
                     raise RuntimeError("Self provider recovery requires suspended capture")
                 self._config = config
                 self._provider_signature = config.provider_signature
-                self._commit_provider_attachment(attachment_token)
+                self._commit_provider_attachment(
+                    attachment_token,
+                    recovery_handler=on_terminal_failure,
+                )
                 self._provider_status = SelfCaptureProviderStatus.READY
                 self._state = SelfCaptureSessionState.STOPPED
                 self._notify_state_changed()
@@ -552,7 +554,8 @@ class SelfCaptureSessionOwner:
             return
 
         attachment_token = self._provider_attachment_token
-        if not self._provider.is_ready(config):
+        provider_was_ready = self._provider.is_ready(config)
+        if not provider_was_ready:
             attachment_token = object()
             self._provider_status = SelfCaptureProviderStatus.PENDING
             self._notify_state_changed()
@@ -598,7 +601,8 @@ class SelfCaptureSessionOwner:
                 return
         self._provider_status = SelfCaptureProviderStatus.READY
         self._provider_signature = config.provider_signature
-        self._commit_provider_attachment(attachment_token)
+        if not provider_was_ready:
+            self._commit_provider_attachment(attachment_token)
         self._emit(SelfCaptureDiagnosticEvent.PROVIDER_CHANGED, generation=generation)
 
         try:
@@ -786,10 +790,13 @@ class SelfCaptureSessionOwner:
         attachment_token: object,
     ) -> None:
         async with self._activation_lock:
-            pending = self._pending_provider_recovery
-            if pending is not None:
+            for handler, pending in tuple(self._pending_provider_recoveries.items()):
                 if attachment_token is pending[1]:
-                    self._pending_provider_recovery_failure = exc
+                    self._pending_provider_recoveries[handler] = (
+                        pending[0],
+                        pending[1],
+                        exc,
+                    )
                     return
             if (
                 self._closed
@@ -985,10 +992,17 @@ class SelfCaptureSessionOwner:
             if mode == "abort":
                 self._provider_signature = None
 
-    def _commit_provider_attachment(self, attachment_token: object | None) -> None:
+    def _commit_provider_attachment(
+        self,
+        attachment_token: object | None,
+        *,
+        recovery_handler: SelfCaptureTerminalFailureHandler | None = None,
+    ) -> None:
         self._provider_attachment_token = attachment_token
-        self._pending_provider_recovery = None
-        self._pending_provider_recovery_failure = None
+        if recovery_handler is None:
+            self._pending_provider_recoveries.clear()
+        else:
+            self._pending_provider_recoveries.pop(recovery_handler, None)
 
     def _retire_provider_attachment(self) -> None:
         self._commit_provider_attachment(None)

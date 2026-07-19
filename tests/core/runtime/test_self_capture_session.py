@@ -726,7 +726,10 @@ async def test_suspend_and_recovery_preserve_intent_without_releasing_provider()
 
     recovered_handler = owner.prepare_provider_recovery(session_config)
     provider.terminal_failure_handler = recovered_handler
-    recovered = await owner.adopt_recovered_provider(session_config)
+    recovered = await owner.adopt_recovered_provider(
+        session_config,
+        on_terminal_failure=recovered_handler,
+    )
     resumed = await owner.apply_intent(session_config, enabled=True)
     await retired_handler(RuntimeError("retired pre-recovery provider failure"))
 
@@ -756,7 +759,10 @@ async def test_recovered_provider_failure_before_adoption_is_contained_on_commit
     provider.terminal_failure_handler = recovered_handler
     await recovered_handler(RuntimeError("recovered provider failed before adoption"))
 
-    snapshot = await owner.adopt_recovered_provider(session_config)
+    snapshot = await owner.adopt_recovered_provider(
+        session_config,
+        on_terminal_failure=recovered_handler,
+    )
 
     assert snapshot.state is SelfCaptureSessionState.FAULTED
     assert snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
@@ -784,6 +790,17 @@ async def test_current_provider_failure_during_recovery_preparation_is_contained
     assert provider.release_calls == [("abort", None)]
     assert owner.abort_provider_recovery(pending_handler) is False
 
+    provider.ready = True
+    provider.terminal_failure_handler = pending_handler
+    with pytest.raises(RuntimeError, match="no matching owner callback"):
+        await owner.adopt_recovered_provider(
+            session_config,
+            on_terminal_failure=pending_handler,
+        )
+
+    assert provider.ready is False
+    assert provider.release_calls == [("abort", None), ("abort", None)]
+
 
 @pytest.mark.asyncio
 async def test_aborted_provider_recovery_retains_current_failure_callback() -> None:
@@ -802,4 +819,40 @@ async def test_aborted_provider_recovery_retains_current_failure_callback() -> N
     assert owner.snapshot.state is SelfCaptureSessionState.FAULTED
     assert owner.snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
     assert sources[0].close_calls == 1
+    assert provider.release_calls == [("abort", None)]
+
+
+@pytest.mark.asyncio
+async def test_overlapping_recoveries_adopt_their_exact_provider_callbacks() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+    session_config = config(local_gpu=True)
+
+    await owner.apply_intent(session_config, enabled=True)
+    await owner.suspend_provider_consumer()
+    first_handler = owner.prepare_provider_recovery(session_config)
+    second_handler = owner.prepare_provider_recovery(session_config)
+
+    provider.terminal_failure_handler = first_handler
+    await owner.adopt_recovered_provider(
+        session_config,
+        on_terminal_failure=first_handler,
+    )
+    await owner.apply_intent(session_config, enabled=True)
+    await owner.suspend_provider_consumer()
+    provider.terminal_failure_handler = second_handler
+    await owner.adopt_recovered_provider(
+        session_config,
+        on_terminal_failure=second_handler,
+    )
+    await owner.apply_intent(session_config, enabled=True)
+    await first_handler(RuntimeError("first recovered provider retired"))
+
+    assert owner.snapshot.state is SelfCaptureSessionState.RUNNING
+    assert sources[2].close_calls == 0
+
+    await second_handler(RuntimeError("second recovered provider failed"))
+
+    assert owner.snapshot.state is SelfCaptureSessionState.FAULTED
+    assert owner.snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
+    assert sources[2].close_calls == 1
     assert provider.release_calls == [("abort", None)]
