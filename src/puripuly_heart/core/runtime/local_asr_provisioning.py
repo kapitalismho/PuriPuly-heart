@@ -59,7 +59,7 @@ GPUModelInspector = Callable[..., LocalGPUInstallSnapshot]
 ManifestLoader = Callable[[str], LocalSTTAssetManifest]
 GPUManifestLoader = Callable[[], LocalSTTAssetManifest]
 ProvisioningInstaller = Callable[..., Awaitable[InstalledLocalSTTManifest]]
-ProvisioningResidueCleaner = Callable[..., tuple[Path, ...]]
+ProvisioningResidueCleaner = Callable[..., tuple[Path, ...] | None]
 DownloadRuntimeFactory = Callable[[], LocalSTTDownloadRuntime]
 
 
@@ -70,6 +70,7 @@ class LocalASRProvisioningOwner:
         "installer cancel events",
         "Xet helper processes",
         "staging and backup directories",
+        "model-root cross-process provisioning lease",
     )
     stop_ingress = "reject new inspect and install commands"
     shutdown_policy = "cancel CPU and GPU install tasks, signal installers, and await close"
@@ -168,7 +169,7 @@ class LocalASRProvisioningOwner:
         verify_checksums: bool = False,
     ) -> LocalASRProvisioningSnapshot:
         self._require_open("inspect CPU assets")
-        await self._ensure_startup_cleanup()
+        await self._ensure_startup_cleanup(wait_for_lease=False)
         requested = model_ids or REQUIRED_CPU_LOCAL_STT_MODEL_IDS
         self._validate_model_ids("cpu", requested)
         installs = await asyncio.to_thread(
@@ -195,7 +196,7 @@ class LocalASRProvisioningOwner:
         verify_checksums: bool = False,
     ) -> LocalASRProvisioningSnapshot:
         self._require_open("inspect GPU assets")
-        await self._ensure_startup_cleanup()
+        await self._ensure_startup_cleanup(wait_for_lease=False)
         if not explicit_intent:
             self._models[LOCAL_QWEN_GPU_MODEL_ID] = LocalASRModelProvisioningState(
                 model_id=LOCAL_QWEN_GPU_MODEL_ID,
@@ -296,7 +297,10 @@ class LocalASRProvisioningOwner:
         cancel_event: threading.Event,
         generation: int,
     ) -> LocalASRInstallResult:
-        await self._ensure_startup_cleanup()
+        await self._ensure_startup_cleanup(
+            wait_for_lease=True,
+            cancel_event=cancel_event,
+        )
         runtime = self._runtime_for(request.backend)
         installed: list[str] = []
         failed: list[str] = []
@@ -441,13 +445,19 @@ class LocalASRProvisioningOwner:
             snapshot=self.snapshot,
         )
 
-    async def _ensure_startup_cleanup(self) -> None:
+    async def _ensure_startup_cleanup(
+        self,
+        *,
+        wait_for_lease: bool,
+        cancel_event: threading.Event | None = None,
+    ) -> None:
         if self._startup_cleanup_complete:
             return
         async with self._cleanup_lock:
             if self._startup_cleanup_complete:
                 return
             started_at = time.monotonic()
+            cleanup_finished = False
             try:
                 manifests = tuple(
                     self._manifest_loader(model_id) for model_id in REQUIRED_CPU_LOCAL_STT_MODEL_IDS
@@ -456,7 +466,12 @@ class LocalASRProvisioningOwner:
                     self._residue_cleaner,
                     model_root=self._model_root,
                     install_dirnames=tuple(manifest.install_dirname for manifest in manifests),
+                    wait_for_lease=wait_for_lease,
+                    cancel_event=cancel_event,
                 )
+                if removed is None:
+                    return
+                cleanup_finished = True
                 await self._emit_diagnostic(
                     LocalASRProvisioningDiagnostic(
                         event="cleanup",
@@ -468,6 +483,7 @@ class LocalASRProvisioningOwner:
                 if removed:
                     await self._publish_state()
             except Exception as exc:
+                cleanup_finished = True
                 await self._emit_diagnostic(
                     LocalASRProvisioningDiagnostic(
                         event="cleanup",
@@ -478,7 +494,8 @@ class LocalASRProvisioningOwner:
                     )
                 )
             finally:
-                self._startup_cleanup_complete = True
+                if cleanup_finished:
+                    self._startup_cleanup_complete = True
 
     async def _handle_install_status(
         self,

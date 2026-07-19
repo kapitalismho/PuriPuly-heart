@@ -202,6 +202,29 @@ async def test_cleanup_failure_is_safely_diagnosed_without_blocking_availability
 
 
 @pytest.mark.asyncio
+async def test_owner_retries_startup_cleanup_after_another_process_holds_lease() -> None:
+    cleanup_calls = 0
+
+    def cleanup(**_kwargs):
+        nonlocal cleanup_calls
+        cleanup_calls += 1
+        return None if cleanup_calls == 1 else ()
+
+    owner = _owner(
+        MutableProvisioningBackend(_all_states()),
+        residue_cleaner=cleanup,
+    )
+
+    await owner.inspect_cpu()
+    await owner.inspect_cpu()
+
+    assert cleanup_calls == 2
+    assert [item.event for item in owner.diagnostics] == ["cleanup"]
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_targeted_cpu_repair_preserves_valid_models_and_reports_progress() -> None:
     states = _all_states()
     states[PARAKEET_JAPANESE_MODEL_ID] = _state("invalid", PARAKEET_JAPANESE_MODEL_ID)
@@ -413,6 +436,7 @@ def test_owner_lifecycle_inventory_names_all_provisioning_resources() -> None:
         "installer cancel events",
         "Xet helper processes",
         "staging and backup directories",
+        "model-root cross-process provisioning lease",
     )
     assert "cancel CPU and GPU install tasks" in snapshot["shutdown_policy"]
     assert snapshot["late_callback_rule"] == (

@@ -4,10 +4,14 @@ import asyncio
 import hashlib
 import http.server
 import json
+import os
 import shutil
 import socketserver
+import subprocess
+import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -74,6 +78,72 @@ def test_cleanup_rejects_unsafe_install_directory_names(tmp_path: Path) -> None:
         )
 
     assert sentinel.exists()
+
+
+def test_second_process_cleanup_cannot_disturb_active_provisioning_lease(
+    tmp_path: Path,
+) -> None:
+    staging = tmp_path / "known-model.staging-active"
+    backup = tmp_path / "known-model.backup"
+    ready = tmp_path / "lease-ready"
+    release = tmp_path / "lease-release"
+    staging.mkdir()
+    backup.mkdir()
+    script = "\n".join(
+        (
+            "import pathlib, sys, time",
+            "from puripuly_heart.core.local_stt_runtime_installer import "
+            "LocalSTTProvisioningLease",
+            "root = pathlib.Path(sys.argv[1])",
+            "ready = pathlib.Path(sys.argv[2])",
+            "release = pathlib.Path(sys.argv[3])",
+            "lease = LocalSTTProvisioningLease.acquire(model_root=root, wait=True)",
+            "ready.write_text('ready')",
+            "while not release.exists():",
+            "    time.sleep(0.01)",
+            "lease.close()",
+        )
+    )
+    child_environment = os.environ.copy()
+    source_root = Path(__file__).resolve().parents[2] / "src"
+    child_environment["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(source_root), child_environment.get("PYTHONPATH", "")) if part
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", script, str(tmp_path), str(ready), str(release)],
+        env=child_environment,
+    )
+    try:
+        deadline = time.monotonic() + 5
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert ready.exists()
+
+        reconciled = cleanup_local_stt_install_residue(
+            model_root=tmp_path,
+            install_dirnames=("known-model",),
+        )
+
+        assert reconciled is None
+        assert staging.exists()
+        assert backup.exists()
+    finally:
+        release.touch()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+
+    reconciled = cleanup_local_stt_install_residue(
+        model_root=tmp_path,
+        install_dirnames=("known-model",),
+    )
+
+    assert reconciled is not None
+    assert not staging.exists()
+    assert not backup.exists()
+    assert (tmp_path / "known-model").exists()
 
 
 @pytest.fixture()
