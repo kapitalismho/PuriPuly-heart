@@ -786,6 +786,20 @@ def _patch_settings_save(
     monkeypatch.setattr(canonical_persistence_adapter_module, "save_vnext_settings", save)
 
 
+def _controller_with_persisted_settings(
+    tmp_path: Path,
+    settings: AppSettings,
+) -> tuple[GuiController, Path]:
+    path = tmp_path / "settings.json"
+    save_settings(path, settings)
+    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
+    controller.config_path = path
+    controller.settings = controller._load_or_init_settings(path)
+    controller._vnext_settings_authoritative = True
+    controller._remember_canonical_legacy_projection(controller.settings)
+    return controller, path
+
+
 def _language_selection_change(
     *,
     source_code: str,
@@ -16906,6 +16920,88 @@ async def test_order21_snapshot_full_repository_save_offloads_persistence_thread
 
 
 @pytest.mark.asyncio
+async def test_order21_validation_failure_does_not_leak_rejected_canonical_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    baseline = AppSettings()
+    baseline.llm.concurrency_limit = 2
+    controller, path = _controller_with_persisted_settings(tmp_path, baseline)
+    pending = copy.deepcopy(controller.settings)
+    pending.llm.concurrency_limit = 3
+
+    class RejectingValidator:
+        async def validate(self, request):
+            _ = request
+            return settings_mutation.SettingsMutationValidationResult(
+                succeeded=False,
+                message=None,
+                diagnostics=None,
+            )
+
+    monkeypatch.setattr(
+        controller_module,
+        "settings_path_mutation_validator_for_command",
+        lambda _command: RejectingValidator(),
+    )
+
+    await controller.apply_providers(pending)
+
+    assert controller.last_settings_mutation_result is not None
+    assert (
+        controller.last_settings_mutation_result.status
+        == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
+    )
+    assert controller.settings.llm.concurrency_limit == 2
+    assert controller.vnext_settings is not None
+    assert controller.vnext_settings.intent.translation.concurrency_limit == 2
+
+    controller.settings.ui.locale = "ja"
+    assert controller._save_settings() is True
+    persisted = (
+        canonical_persistence_adapter_module.SettingsVNextCanonicalPersistenceAdapter().load_active(
+            path
+        )
+    )
+    assert persisted.canonical_settings.intent.translation.concurrency_limit == 2
+    assert persisted.canonical_settings.intent.ui.locale == "ja"
+
+
+@pytest.mark.asyncio
+async def test_order21_plan_failure_does_not_leak_rejected_canonical_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    baseline = AppSettings()
+    baseline.llm.concurrency_limit = 2
+    controller, path = _controller_with_persisted_settings(tmp_path, baseline)
+    pending = copy.deepcopy(controller.settings)
+    pending.llm.concurrency_limit = 3
+
+    def fail_plan(*_args, **_kwargs):
+        raise RuntimeError("injected provider plan failure")
+
+    monkeypatch.setattr(GuiController, "_build_provider_runtime_apply_plan", fail_plan)
+
+    with pytest.raises(RuntimeError, match="injected provider plan failure"):
+        await controller.apply_providers(pending)
+
+    assert controller.settings.llm.concurrency_limit == 2
+    assert controller.vnext_settings is not None
+    assert controller.vnext_settings.intent.translation.concurrency_limit == 2
+
+    controller.settings.ui.locale = "ko"
+    assert controller._save_settings() is True
+    persisted = (
+        canonical_persistence_adapter_module.SettingsVNextCanonicalPersistenceAdapter().load_active(
+            path
+        )
+    )
+    assert persisted.canonical_settings.intent.translation.concurrency_limit == 2
+    assert persisted.canonical_settings.intent.ui.locale == "ko"
+
+
+@pytest.mark.asyncio
 async def test_managed_auth_repository_persists_pending_delivery_ack_patch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -17590,6 +17686,47 @@ async def test_order22_save_failure_surface_is_stt_language_audio(
     )
     assert raw_failure_text not in repr(result)
     assert raw_failure_text not in repr(controller._runtime_logging.basic_messages)
+
+
+@pytest.mark.asyncio
+async def test_order22_save_failure_does_not_leak_rejected_canonical_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    baseline = AppSettings()
+    baseline.provider.stt = STTProviderName.DEEPGRAM
+    controller, path = _controller_with_persisted_settings(tmp_path, baseline)
+    pending = copy.deepcopy(controller.settings)
+    pending.provider.stt = STTProviderName.SONIOX
+    adapter_type = canonical_persistence_adapter_module.SettingsVNextCanonicalPersistenceAdapter
+    original_persist = adapter_type.persist
+    persist_calls = 0
+
+    def fail_once(self, incoming_path, canonical) -> None:
+        nonlocal persist_calls
+        persist_calls += 1
+        if persist_calls == 1:
+            raise OSError("injected order22 save failure")
+        original_persist(self, incoming_path, canonical)
+
+    monkeypatch.setattr(adapter_type, "persist", fail_once)
+
+    await controller.apply_settings(pending)
+
+    assert controller.last_settings_mutation_result is not None
+    assert (
+        controller.last_settings_mutation_result.status
+        == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
+    )
+    assert controller.settings.provider.stt == STTProviderName.DEEPGRAM
+    assert controller.vnext_settings is not None
+    assert controller.vnext_settings.intent.stt.provider == STTProviderName.DEEPGRAM.value
+
+    controller.settings.ui.locale = "ja"
+    assert controller._save_settings() is True
+    persisted = adapter_type().load_active(path)
+    assert persisted.canonical_settings.intent.stt.provider == STTProviderName.DEEPGRAM.value
+    assert persisted.canonical_settings.intent.ui.locale == "ja"
 
 
 @pytest.mark.asyncio

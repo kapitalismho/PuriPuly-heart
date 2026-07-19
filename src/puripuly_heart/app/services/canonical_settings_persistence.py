@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -115,6 +116,19 @@ class SettingsOwner:
             next_settings=next_settings,
         )
         return self.canonical
+
+    def project_legacy_delta(
+        self,
+        base_settings: AppSettings | None,
+        next_settings: AppSettings,
+    ) -> AppSettingsVNext:
+        normalized = copy.deepcopy(next_settings)
+        self.normalize_compatibility(normalized)
+        return self.persistence.apply_legacy_delta(
+            canonical=self.canonical,
+            base_settings=base_settings,
+            next_settings=normalized,
+        )
 
     def normalize_compatibility(self, settings: AppSettings) -> None:
         settings.stt.low_latency_mode = self.policy.fast_translation_enabled

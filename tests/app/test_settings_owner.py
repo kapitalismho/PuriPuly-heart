@@ -169,3 +169,21 @@ def test_owner_failed_save_keeps_last_persisted_state(
     assert path.read_bytes() == original
     assert owner.canonical is not None
     assert owner.canonical.intent.ui.locale == "en"
+
+
+def test_owner_legacy_delta_projection_is_side_effect_free(tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+    _write_json(path, serialization.to_dict(AppSettingsVNext()))
+    owner = compose_settings_owner(path)
+    loaded = owner.start()
+    original_canonical = copy.deepcopy(owner.canonical)
+    candidate = copy.deepcopy(loaded.settings)
+    candidate.llm.concurrency_limit = 3
+    candidate.stt.low_latency_mode = False
+
+    projected = owner.project_legacy_delta(loaded.settings, candidate)
+
+    assert owner.canonical == original_canonical
+    assert candidate.stt.low_latency_mode is False
+    assert projected.intent.translation.concurrency_limit == 3
+    assert projected.intent.stt.low_latency_mode is True

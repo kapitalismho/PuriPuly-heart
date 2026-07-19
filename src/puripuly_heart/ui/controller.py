@@ -8791,7 +8791,7 @@ class GuiController:
         base_settings: AppSettings | None,
         next_settings: AppSettings,
     ) -> AppSettingsVNext:
-        return self._get_settings_owner().apply_legacy_delta(base_settings, next_settings)
+        return self._get_settings_owner().project_legacy_delta(base_settings, next_settings)
 
     def _provider_verification_binding(
         self,
