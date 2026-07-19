@@ -90,6 +90,14 @@ def build_parser() -> argparse.ArgumentParser:
     hf_xet_worker = sub.add_parser("hf-xet-download-worker", help=argparse.SUPPRESS)
     hf_xet_worker.add_argument("--request-file", type=Path, required=True)
     hf_xet_worker.add_argument("--event-file", type=Path, required=True)
+    local_asr_production_evidence = sub.add_parser(
+        "local-asr-production-composition-evidence",
+        help=argparse.SUPPRESS,
+    )
+    local_asr_production_evidence.add_argument("--audio", type=Path, required=True)
+    local_asr_production_evidence.add_argument("--report", type=Path, required=True)
+    local_asr_production_evidence.add_argument("--candidate", required=True)
+    local_asr_production_evidence.add_argument("--expected-gpu-name", required=True)
     run_gui = sub.add_parser("run-gui", help="Run the Graphical User Interface (Flet)")
     run_gui.add_argument(
         "--debug-ui-preview",
@@ -111,6 +119,25 @@ def run_soxr_runtime_check() -> int:
     from puripuly_heart.app.soxr_runtime_check import run_soxr_runtime_check as run
 
     return run()
+
+
+def run_local_asr_production_composition_evidence(
+    *,
+    audio_path: Path,
+    report_path: Path,
+    candidate: str,
+    expected_gpu_name: str,
+) -> int:
+    from puripuly_heart.release_evidence.local_asr_production_composition import (
+        run_local_asr_production_composition,
+    )
+
+    return run_local_asr_production_composition(
+        audio_path=audio_path,
+        report_path=report_path,
+        candidate=candidate,
+        expected_gpu_name=expected_gpu_name,
+    )
 
 
 def run_hf_xet_runtime_check() -> int:
@@ -338,6 +365,14 @@ def main(argv: list[str] | None = None) -> int:
                 model_root=args.model_root,
                 audio_root=args.audio_root,
                 report_path=args.report,
+            )
+
+        if args.command == "local-asr-production-composition-evidence":
+            return run_local_asr_production_composition_evidence(
+                audio_path=args.audio,
+                report_path=args.report,
+                candidate=args.candidate,
+                expected_gpu_name=args.expected_gpu_name,
             )
 
         # Default: run GUI when no command specified (e.g., double-clicking EXE)

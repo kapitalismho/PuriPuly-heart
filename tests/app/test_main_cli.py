@@ -416,6 +416,47 @@ def test_main_soxr_runtime_check_dispatches_runner(monkeypatch, tmp_path) -> Non
     assert calls["called"] is True
 
 
+def test_main_local_asr_production_composition_evidence_dispatches_paths(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    calls: dict[str, object] = {}
+
+    def run_evidence(**kwargs) -> int:
+        calls.update(kwargs)
+        return 0
+
+    monkeypatch.setattr(
+        main_module,
+        "run_local_asr_production_composition_evidence",
+        run_evidence,
+    )
+    audio = tmp_path / "speech.wav"
+    report = tmp_path / "result.json"
+
+    result = main_module.main(
+        [
+            "local-asr-production-composition-evidence",
+            "--audio",
+            str(audio),
+            "--report",
+            str(report),
+            "--candidate",
+            "candidate-sha",
+            "--expected-gpu-name",
+            "RX 7900 XTX",
+        ]
+    )
+
+    assert result == 0
+    assert calls == {
+        "audio_path": audio,
+        "report_path": report,
+        "candidate": "candidate-sha",
+        "expected_gpu_name": "RX 7900 XTX",
+    }
+
+
 def test_main_local_cpu_real_model_check_dispatches_isolated_paths(monkeypatch, tmp_path) -> None:
     calls: dict[str, Path] = {}
 
