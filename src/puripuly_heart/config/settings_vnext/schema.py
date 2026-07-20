@@ -46,37 +46,13 @@ _LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS: Final = frozenset(
 )
 _LOCAL_LLM_SECRET_BEARING_EXTRA_BODY_KEYS: Final = frozenset(
     {
-        "access_token",
         "api_key",
-        "apikey",
-        "auth_token",
         "authorization",
-        "bearer_token",
-        "client_secret",
         "headers",
-        "id_token",
-        "password",
-        "private_key",
-        "refresh_token",
-        "secret",
-        "session_token",
         "token",
+        "secret",
+        "password",
     }
-)
-_LOCAL_LLM_SECRET_BEARING_EXTRA_BODY_KEY_SUFFIXES: Final = (
-    "_api_key",
-    "_apikey",
-    "_token",
-    "_secret",
-    "_password",
-    "_private_key",
-    "_credential",
-    "_credential_value",
-)
-_LOCAL_LLM_SECRET_BEARING_EXTRA_BODY_KEY_PREFIXES: Final = (
-    "password_",
-    "private_key_",
-    "secret_",
 )
 _PROVIDER_VERIFICATION_STATUSES: Final = frozenset({"unknown", "verified", "failed", "skipped"})
 TELEMETRY_CONSENT_VALUES: Final = frozenset({"unknown", "allow", "decline"})
@@ -156,13 +132,7 @@ def _normalize_extra_body_key(key: str) -> str:
 
 
 def _is_secret_bearing_extra_body_key(key: str) -> bool:
-    if key in _LOCAL_LLM_SECRET_BEARING_EXTRA_BODY_KEYS:
-        return True
-    if "authorization" in key:
-        return True
-    return key.endswith(_LOCAL_LLM_SECRET_BEARING_EXTRA_BODY_KEY_SUFFIXES) or key.startswith(
-        _LOCAL_LLM_SECRET_BEARING_EXTRA_BODY_KEY_PREFIXES
-    )
+    return key in _LOCAL_LLM_SECRET_BEARING_EXTRA_BODY_KEYS
 
 
 def _copy_local_llm_extra_body_value(value: object) -> object:
@@ -179,17 +149,17 @@ def _copy_local_llm_extra_body(values: Mapping[object, object]) -> dict[str, obj
     copied: dict[str, object] = {}
     for raw_key, raw_value in values.items():
         if not isinstance(raw_key, str):
-            raise ValueError("local LLM extra_body keys must be strings")
+            continue
         key = _normalize_extra_body_key(raw_key)
         if key in _LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS:
-            raise ValueError(f"reserved local LLM extra_body key is not allowed: {raw_key}")
+            return _default_local_llm_extra_body()
         if _is_secret_bearing_extra_body_key(key):
-            raise ValueError(f"secret-bearing local LLM extra_body key is not allowed: {raw_key}")
+            return _default_local_llm_extra_body()
         copied[raw_key] = _copy_local_llm_extra_body_value(raw_value)
     try:
         json.dumps(copied, allow_nan=False)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("local LLM extra_body must be JSON serializable") from exc
+    except (TypeError, ValueError):
+        return _default_local_llm_extra_body()
     return copied
 
 

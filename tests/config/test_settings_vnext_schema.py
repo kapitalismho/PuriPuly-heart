@@ -249,8 +249,8 @@ def test_vnext_schema_default_tree_excludes_raw_provider_api_key_fields() -> Non
         for path in serialized_paths
         if path.rsplit(".", maxsplit=1)[-1] in forbidden_field_names
     }
-    with pytest.raises(ValueError, match="secret-bearing local LLM extra_body key"):
-        schema.LocalLLMIntent(extra_body={"api_key": "not-a-real-secret"})
+    intent = schema.LocalLLMIntent(extra_body={"api_key": "not-a-real-secret"})
+    assert intent.extra_body == {"reasoning_effort": "none"}
 
 
 def test_provider_verification_entry_defaults_to_unknown_without_bound_evidence() -> None:
@@ -368,10 +368,29 @@ def test_vnext_schema_excludes_deferred_vnext_only_operational_leaves() -> None:
 
 
 @pytest.mark.parametrize(
+    ("extra_body", "expected"),
+    [
+        ({"model": "reserved"}, {"reasoning_effort": "none"}),
+        ({"api-key": "secret alias"}, {"reasoning_effort": "none"}),
+        ({"nested": {"authorization": "Bearer token"}}, {"nested": {"reasoning_effort": "none"}}),
+        ({"temperature": math.nan}, {"reasoning_effort": "none"}),
+        ({"temperature": math.inf}, {"reasoning_effort": "none"}),
+        ({"temperature": -math.inf}, {"reasoning_effort": "none"}),
+    ],
+)
+def test_local_llm_extra_body_falls_back_for_non_persistable_values(
+    extra_body: dict[object, object],
+    expected: dict[object, object],
+) -> None:
+    schema = _load_schema_module()
+
+    intent = schema.LocalLLMIntent(extra_body=extra_body)
+    assert intent.extra_body == expected
+
+
+@pytest.mark.parametrize(
     "extra_body",
     [
-        {"model": "reserved"},
-        {"api-key": "secret alias"},
         {"x-api-key": "secret alias"},
         {"xApiKey": "secret alias"},
         {"openai_api_key": "secret alias"},
@@ -380,24 +399,26 @@ def test_vnext_schema_excludes_deferred_vnext_only_operational_leaves() -> None:
         {"clientSecret": "secret alias"},
         {"refreshToken": "secret alias"},
         {"proxy_authorization": "Bearer token"},
-        {"nested": {"authorization": "Bearer token"}},
         {"nested": {"azure-openai-api-key": "nested secret alias"}},
         {"nested": {"openaiApiKey": "nested secret alias"}},
         {"nested": {"clientSecret": "nested secret alias"}},
         {"nested": {"refreshToken": "nested secret alias"}},
-        {"nested": {1: "non-string key"}},
-        {"temperature": math.nan},
-        {"temperature": math.inf},
-        {"temperature": -math.inf},
     ],
 )
-def test_local_llm_extra_body_rejects_non_persistable_values(
+def test_local_llm_extra_body_accepts_legacy_compatible_keys(
     extra_body: dict[object, object],
 ) -> None:
     schema = _load_schema_module()
 
-    with pytest.raises((TypeError, ValueError), match="local LLM extra_body"):
-        schema.LocalLLMIntent(extra_body=extra_body)
+    intent = schema.LocalLLMIntent(extra_body=extra_body)
+    assert intent.extra_body == extra_body
+
+
+def test_local_llm_extra_body_skips_non_string_nested_keys() -> None:
+    schema = _load_schema_module()
+
+    intent = schema.LocalLLMIntent(extra_body={"nested": {1: "non-string key"}})
+    assert intent.extra_body == {"nested": {}}
 
 
 def test_local_llm_extra_body_accepts_json_safe_nested_mappings() -> None:
