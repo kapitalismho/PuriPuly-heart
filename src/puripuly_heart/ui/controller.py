@@ -2164,28 +2164,24 @@ class GuiController:
     def _managed_openrouter_release_settings(self) -> AppSettings | None:
         if self.settings is None:
             return None
-        branches = self._managed_openrouter_branch_settings_for(self.settings)
-        for branch in branches:
-            if branch.translation.connection == TranslationConnection.MANAGED_CHINA:
-                return branch
-        return branches[0] if branches else None
+        if not self._managed_openrouter_selected():
+            return None
+        return self.settings
 
     def _should_show_managed_auth_pending_before_prepare(self) -> bool:
         if self.settings is None:
             return False
+        if not self._managed_openrouter_selected():
+            return False
         try:
             secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
-            branches = self._managed_openrouter_branch_settings_for(self.settings)
-            if not branches:
-                return False
-            for branch in branches:
-                resolution = resolve_openrouter_credentials(
-                    build_openrouter_credential_runtime_config(branch),
-                    secrets=secrets,
-                    request_intent="TRANS",
-                )
-                if resolution.api_key is None:
-                    return True
+            resolution = resolve_openrouter_credentials(
+                build_openrouter_credential_runtime_config(self.settings),
+                secrets=secrets,
+                request_intent="TRANS",
+            )
+            if resolution.api_key is None:
+                return True
         except Exception:
             return True
         return False
@@ -2193,25 +2189,25 @@ class GuiController:
     def _managed_openrouter_selected(self) -> bool:
         return bool(
             self.settings is not None
-            and self._managed_openrouter_branch_settings_for(self.settings)
+            and self.settings.provider.llm == LLMProviderName.OPENROUTER
+            and self.settings.translation.connection in _MANAGED_OPENROUTER_CONNECTIONS
+            and self.settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
         )
 
     def _managed_openrouter_local_key_available(self) -> bool:
         if self.settings is None:
             return False
+        if not self._managed_openrouter_selected():
+            return False
         try:
             secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
-            branches = self._managed_openrouter_branch_settings_for(self.settings)
-            if not branches:
+            resolution = resolve_openrouter_credentials(
+                build_openrouter_credential_runtime_config(self.settings),
+                secrets=secrets,
+                request_intent="TRANS",
+            )
+            if resolution.api_key is None:
                 return False
-            for branch in branches:
-                resolution = resolve_openrouter_credentials(
-                    build_openrouter_credential_runtime_config(branch),
-                    secrets=secrets,
-                    request_intent="TRANS",
-                )
-                if resolution.api_key is None:
-                    return False
         except Exception:
             return False
         return True
@@ -2233,10 +2229,7 @@ class GuiController:
     def _managed_china_auth_relevant_for_translation_enable(self) -> bool:
         if self.settings is None:
             return False
-        return any(
-            branch.translation.connection == TranslationConnection.MANAGED_CHINA
-            for branch in self._managed_openrouter_branch_settings_for(self.settings)
-        )
+        return self.settings.translation.connection == TranslationConnection.MANAGED_CHINA
 
     def _show_qq_managed_auth_dialog(self) -> None:
         if not self._managed_china_auth_relevant_for_translation_enable():
@@ -3135,7 +3128,7 @@ class GuiController:
     def _managed_key_card_visible_from_settings(self) -> bool:
         if self.settings is None:
             return False
-        return bool(self._managed_openrouter_branch_settings_for(self.settings))
+        return self._managed_openrouter_selected()
 
     async def _refresh_managed_status_best_effort(
         self,
@@ -5732,7 +5725,7 @@ class GuiController:
     async def _handle_managed_translation_enable(self, request_generation: int) -> bool:
         if self.settings is None or self.hub is None:
             return True
-        if not self._managed_openrouter_branch_settings_for(self.settings):
+        if not self._managed_openrouter_selected():
             return True
         if await self._should_route_managed_trans_to_founder_letter():
             return False
