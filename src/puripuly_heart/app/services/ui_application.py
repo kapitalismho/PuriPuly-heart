@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import functools
 import inspect
 import logging
 from collections.abc import Awaitable, Callable, Sequence
@@ -18,10 +19,86 @@ from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRunti
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.updater import check_for_update
 
+UI_APPLICATION_USER_INTENT_METHODS = frozenset(
+    {
+        "accept_peer_translation_eula_and_enable",
+        "apply_loopback_capture_option",
+        "apply_overlay_calibration",
+        "apply_providers",
+        "apply_settings",
+        "apply_telemetry_consent",
+        "begin_overlay_calibration",
+        "cancel_discord_managed_auth",
+        "cancel_overlay_calibration",
+        "capture_settings_view_change",
+        "check_for_update",
+        "clear_debug_audio_fault_profiles",
+        "clear_managed_auth_pending_state",
+        "clear_provider_verification",
+        "connect_openrouter_via_pkce",
+        "cycle_debug_capture_fault_profile",
+        "cycle_debug_stt_fault_profile",
+        "ensure_gpu_device_discovery",
+        "handle_gpu_notice_action",
+        "install_selected_gpu_model_if_needed",
+        "on_dashboard_language_change",
+        "persist_api_key_verification",
+        "persist_github_star_prompt_clicked",
+        "persist_github_star_prompt_eligible_launch",
+        "persist_github_star_prompt_opened",
+        "persist_provider_secret_change",
+        "prepare_runtime_after_launch",
+        "record_telemetry_translation_success_day",
+        "refresh_openrouter_usage_after_launch",
+        "reopen_discord_managed_auth_browser",
+        "reopen_openrouter_pkce_authorization_url",
+        "reset_desktop_overlay_position",
+        "retry_peer_process_capture",
+        "schedule_github_star_prompt_translation_success_observed",
+        "set_desktop_overlay_captions_locked",
+        "set_desktop_overlay_size_preset",
+        "set_manual_input_activity",
+        "set_overlay_calibration_field",
+        "set_overlay_enabled",
+        "set_peer_translation_enabled",
+        "set_runtime_logging_mode",
+        "set_stt_enabled",
+        "set_translation_enabled",
+        "start",
+        "start_discord_managed_auth_from_dialog",
+        "start_github_star_prompt",
+        "start_managed_auth_task",
+        "start_microphone_test",
+        "start_qq_managed_auth_from_dialog",
+        "stop_microphone_test",
+        "submit_text",
+        "verify_api_key",
+    }
+)
+
+
+def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
+    if inspect.iscoroutinefunction(method):
+
+        @functools.wraps(method)
+        async def invoke_async(self, *args: Any, **kwargs: Any) -> Any:
+            self._admit_application_intent(method.__name__)
+            return await method(self, *args, **kwargs)
+
+        return invoke_async
+
+    @functools.wraps(method)
+    def invoke_sync(self, *args: Any, **kwargs: Any) -> Any:
+        self._admit_application_intent(method.__name__)
+        return method(self, *args, **kwargs)
+
+    return invoke_sync
+
 
 class UiApplicationBoundary:
     def __init__(self, backend: object) -> None:
         self._backend = backend
+        self._application_lifecycle: ApplicationShutdownCoordinator | None = None
         self._github_star_prompt_runtime = GithubStarPromptRuntime(
             diagnostics_sink=self._github_star_prompt_runtime_diagnostics_sink,
         )
@@ -86,9 +163,15 @@ class UiApplicationBoundary:
         return callbacks() if callable(callbacks) else ()
 
     def bind_application_lifecycle(self, lifecycle: ApplicationShutdownCoordinator) -> None:
+        self._application_lifecycle = lifecycle
         bind = getattr(self._backend, "bind_application_lifecycle", None)
         if callable(bind):
             bind(lifecycle)
+
+    def _admit_application_intent(self, intent_name: str) -> None:
+        lifecycle = self._application_lifecycle
+        if lifecycle is not None:
+            lifecycle.admit_intent(intent_name)
 
     def emit_application_shutdown_diagnostic(
         self,
@@ -438,6 +521,14 @@ class UiApplicationBoundary:
         return self._backend.handle_gpu_notice_action()
 
 
+for _intent_method_name in UI_APPLICATION_USER_INTENT_METHODS:
+    setattr(
+        UiApplicationBoundary,
+        _intent_method_name,
+        _guard_application_intent(getattr(UiApplicationBoundary, _intent_method_name)),
+    )
+
+
 def _accepts_keyword(callable_obj: object, keyword: str) -> bool:
     try:
         parameters = inspect.signature(callable_obj).parameters
@@ -448,4 +539,4 @@ def _accepts_keyword(callable_obj: object, keyword: str) -> bool:
     )
 
 
-__all__ = ["UiApplicationBoundary"]
+__all__ = ["UI_APPLICATION_USER_INTENT_METHODS", "UiApplicationBoundary"]

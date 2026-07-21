@@ -28,6 +28,7 @@ ApplicationShutdownDiagnosticsSink: TypeAlias = Callable[
 
 DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS: Final = 30.0
 DEFAULT_APPLICATION_SHUTDOWN_DIAGNOSTIC_TIMEOUT_SECONDS: Final = 1.0
+DEFAULT_APPLICATION_SHUTDOWN_TASK_SETTLE_TIMEOUT_SECONDS: Final = 0.05
 
 
 class ApplicationIntentRejectedError(RuntimeError):
@@ -68,6 +69,7 @@ class ApplicationLifecycleSnapshot:
     failure_count: int
     failures: tuple[ApplicationShutdownFailure, ...]
     phase_history: tuple[LifecycleShutdownPhase, ...]
+    outstanding_task_names: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,12 +113,16 @@ class ApplicationShutdownCoordinator:
         *,
         diagnostics_sink: ApplicationShutdownDiagnosticsSink | None = None,
         diagnostics_timeout_seconds: float = DEFAULT_APPLICATION_SHUTDOWN_DIAGNOSTIC_TIMEOUT_SECONDS,
+        task_settle_timeout_seconds: float = DEFAULT_APPLICATION_SHUTDOWN_TASK_SETTLE_TIMEOUT_SECONDS,
     ) -> None:
         if diagnostics_timeout_seconds <= 0:
             raise ValueError("Application shutdown diagnostics_timeout_seconds must be positive")
+        if task_settle_timeout_seconds <= 0:
+            raise ValueError("Application shutdown task_settle_timeout_seconds must be positive")
         self._callbacks = list(callbacks)
         self._diagnostics_sink = diagnostics_sink
         self._diagnostics_timeout_seconds = diagnostics_timeout_seconds
+        self._task_settle_timeout_seconds = task_settle_timeout_seconds
         self._state: ApplicationLifecycleState = "running"
         self._phase: LifecycleShutdownPhase | None = None
         self._phase_history: list[LifecycleShutdownPhase] = []
@@ -124,6 +130,7 @@ class ApplicationShutdownCoordinator:
         self._shutdown_task: asyncio.Task[ApplicationLifecycleSnapshot] | None = None
         self._terminal_exception: BaseException | None = None
         self._timed_out_callback_tasks: set[asyncio.Task[None]] = set()
+        self._shutdown_phases_completed = False
 
     @property
     def accepting_intents(self) -> bool:
@@ -143,6 +150,9 @@ class ApplicationShutdownCoordinator:
             failure_count=len(self._failures),
             failures=tuple(failure.summary for failure in self._failures),
             phase_history=tuple(self._phase_history),
+            outstanding_task_names=tuple(
+                sorted(task.get_name() for task in self._timed_out_callback_tasks)
+            ),
         )
 
     def admit_intent(self, intent_name: str) -> None:
@@ -182,9 +192,10 @@ class ApplicationShutdownCoordinator:
                 await self._run_callback(callback)
 
         self._phase = None
-        self._state = "completed_with_failures" if self._failures else "completed"
+        self._shutdown_phases_completed = True
         if self._failures:
             self._terminal_exception = _terminal_exception(self._failures)
+        self._finalize_if_settled()
         return self.snapshot
 
     async def _run_callback(self, callback: ApplicationShutdownCallback) -> None:
@@ -210,9 +221,10 @@ class ApplicationShutdownCoordinator:
                 return_when=asyncio.ALL_COMPLETED,
             )
             if task not in done:
-                task.cancel()
-                self._timed_out_callback_tasks.add(task)
-                task.add_done_callback(self._on_timed_out_callback_done)
+                await self._cancel_and_settle_timed_out_task(
+                    task,
+                    timeout_seconds=callback.timeout_seconds,
+                )
                 raise TimeoutError(
                     "Application shutdown callback exceeded its coordinator deadline"
                 )
@@ -236,14 +248,44 @@ class ApplicationShutdownCoordinator:
     async def _await_callback(self, result: Awaitable[None]) -> None:
         await result
 
+    async def _cancel_and_settle_timed_out_task(
+        self,
+        task: asyncio.Task[None],
+        *,
+        timeout_seconds: float,
+    ) -> None:
+        settle_timeout = min(self._task_settle_timeout_seconds, timeout_seconds)
+        for _attempt in range(2):
+            task.cancel()
+            done, _pending = await asyncio.wait(
+                {task},
+                timeout=settle_timeout,
+                return_when=asyncio.ALL_COMPLETED,
+            )
+            if task in done:
+                self._consume_task_result(task)
+                return
+        self._timed_out_callback_tasks.add(task)
+        task.add_done_callback(self._on_timed_out_callback_done)
+
     def _on_timed_out_callback_done(self, task: asyncio.Task[None]) -> None:
         self._timed_out_callback_tasks.discard(task)
+        self._consume_task_result(task)
+        self._finalize_if_settled()
+
+    @staticmethod
+    def _consume_task_result(task: asyncio.Task[None]) -> None:
         if task.cancelled():
             return
         try:
             task.exception()
         except asyncio.CancelledError:
             return
+
+    def _finalize_if_settled(self) -> None:
+        if not self._shutdown_phases_completed or self._timed_out_callback_tasks:
+            return
+        self._state = "completed_with_failures" if self._failures else "completed"
 
     async def _emit_diagnostic(self, failure: ApplicationShutdownFailure) -> None:
         if self._diagnostics_sink is None:
@@ -268,9 +310,10 @@ class ApplicationShutdownCoordinator:
                     return_when=asyncio.ALL_COMPLETED,
                 )
                 if task not in done:
-                    task.cancel()
-                    self._timed_out_callback_tasks.add(task)
-                    task.add_done_callback(self._on_timed_out_callback_done)
+                    await self._cancel_and_settle_timed_out_task(
+                        task,
+                        timeout_seconds=self._diagnostics_timeout_seconds,
+                    )
                     raise TimeoutError(
                         "Application shutdown diagnostic delivery exceeded its coordinator deadline"
                     )
@@ -336,5 +379,6 @@ __all__ = [
     "ApplicationShutdownRegistrationError",
     "DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS",
     "DEFAULT_APPLICATION_SHUTDOWN_DIAGNOSTIC_TIMEOUT_SECONDS",
+    "DEFAULT_APPLICATION_SHUTDOWN_TASK_SETTLE_TIMEOUT_SECONDS",
     "application_shutdown_callback",
 ]

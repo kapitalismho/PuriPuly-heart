@@ -110,7 +110,6 @@ async def test_application_shutdown_times_out_one_callback_and_continues() -> No
     calls: list[str] = []
     suppressed = asyncio.Event()
     released = asyncio.Event()
-    late_returned = asyncio.Event()
 
     async def blocked() -> None:
         try:
@@ -118,8 +117,6 @@ async def test_application_shutdown_times_out_one_callback_and_continues() -> No
         except asyncio.CancelledError:
             suppressed.set()
             await released.wait()
-            calls.append("late-return")
-            late_returned.set()
 
     coordinator = ApplicationShutdownCoordinator(
         (
@@ -148,9 +145,15 @@ async def test_application_shutdown_times_out_one_callback_and_continues() -> No
     assert elapsed < 0.1
     assert coordinator.snapshot.failures[0].timed_out is True
     await suppressed.wait()
+    assert coordinator.snapshot.terminal is True
+    assert coordinator.snapshot.outstanding_task_names == ()
+    assert not any(
+        task.get_name().startswith("application-shutdown:")
+        for task in asyncio.all_tasks()
+        if task is not asyncio.current_task()
+    )
     released.set()
-    await late_returned.wait()
-    assert calls == ["continued", "late-return"]
+    assert calls == ["continued"]
 
 
 @pytest.mark.asyncio
@@ -200,8 +203,59 @@ async def test_application_shutdown_bounds_stalled_diagnostic_delivery_and_conti
     ]
     assert coordinator.snapshot.failures[-1].timed_out is True
     await diagnostic_cancelled.wait()
+    assert coordinator.snapshot.outstanding_task_names == ()
+    assert not any(
+        task.get_name() == "application-shutdown:emit-diagnostic" for task in asyncio.all_tasks()
+    )
     release_diagnostic.set()
     await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_terminal_waits_for_repeated_cancellation_suppression_to_settle() -> None:
+    release = asyncio.Event()
+    stopped = asyncio.Event()
+    cancellation_count = 0
+
+    async def stubborn() -> None:
+        nonlocal cancellation_count
+        while not release.is_set():
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                cancellation_count += 1
+        stopped.set()
+
+    coordinator = ApplicationShutdownCoordinator(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="StubbornOwner",
+                callback_name="close",
+                callback=stubborn,
+                timeout_seconds=0.01,
+            ),
+        ),
+        task_settle_timeout_seconds=0.01,
+    )
+
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(coordinator.shutdown(), timeout=0.1)
+
+    assert cancellation_count == 2
+    assert coordinator.snapshot.state == "shutting_down"
+    assert coordinator.snapshot.terminal is False
+    assert coordinator.snapshot.outstanding_task_names == (
+        "application-shutdown:stop_external_producers:StubbornOwner:close",
+    )
+
+    release.set()
+    await stopped.wait()
+    await asyncio.sleep(0)
+
+    assert coordinator.snapshot.state == "completed_with_failures"
+    assert coordinator.snapshot.terminal is True
+    assert coordinator.snapshot.outstanding_task_names == ()
 
 
 @pytest.mark.asyncio

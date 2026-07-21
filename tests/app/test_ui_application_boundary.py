@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from puripuly_heart.app.services.ui_application import UiApplicationBoundary
+from puripuly_heart.app.services.application_shutdown import (
+    ApplicationIntentRejectedError,
+    ApplicationShutdownCoordinator,
+    application_shutdown_callback,
+)
+from puripuly_heart.app.services.ui_application import (
+    UI_APPLICATION_USER_INTENT_METHODS,
+    UiApplicationBoundary,
+)
+from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FREEZE_INGRESS
 
 
 class RecordingBackend:
@@ -278,6 +288,50 @@ async def test_lifecycle_callbacks_diagnostics_and_logging_stay_behind_boundary(
         ("log-basic", "basic", 10),
         ("log-detailed", "detailed", 20),
     ]
+
+
+@pytest.mark.asyncio
+async def test_every_user_intent_is_rejected_after_freeze_without_backend_invocation() -> None:
+    backend = RecordingBackend()
+    boundary = UiApplicationBoundary(backend)
+    freeze_started = asyncio.Event()
+    release_freeze = asyncio.Event()
+
+    async def freeze() -> None:
+        freeze_started.set()
+        await release_freeze.wait()
+
+    lifecycle = ApplicationShutdownCoordinator(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="Application",
+                callback_name="freeze",
+                callback=freeze,
+            ),
+        )
+    )
+    boundary.bind_application_lifecycle(lifecycle)
+    shutdown_task = asyncio.create_task(lifecycle.shutdown())
+    await freeze_started.wait()
+    backend.events.clear()
+
+    for intent_name in sorted(UI_APPLICATION_USER_INTENT_METHODS):
+        intent = getattr(boundary, intent_name)
+        with pytest.raises(ApplicationIntentRejectedError) as exc_info:
+            if inspect.iscoroutinefunction(intent):
+                await intent()
+            else:
+                intent()
+        assert exc_info.value.intent_name == intent_name
+
+    assert backend.events == []
+    release_freeze.set()
+    await shutdown_task
+
+    with pytest.raises(ApplicationIntentRejectedError):
+        await boundary.submit_text("late")
+    assert backend.events == []
 
 
 @pytest.mark.asyncio

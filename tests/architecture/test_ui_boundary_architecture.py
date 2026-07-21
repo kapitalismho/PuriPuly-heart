@@ -6,12 +6,51 @@ from pathlib import Path
 
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
-from puripuly_heart.app.services.ui_application import UiApplicationBoundary
+from puripuly_heart.app.services.ui_application import (
+    UI_APPLICATION_USER_INTENT_METHODS,
+    UiApplicationBoundary,
+)
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_PATH = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "app.py"
 CONTROLLER_PATH = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+
+UI_APPLICATION_NON_INTENT_MEMBERS = {
+    "application_shutdown_callbacks",
+    "bind_application_lifecycle",
+    "build_managed_openrouter_byok_target_settings",
+    "build_overlay_peer_consumer_contract",
+    "cancel_managed_auth_task",
+    "clear_managed_auth_task",
+    "close_github_star_prompt_runtime",
+    "close_managed_auth_tasks",
+    "compatibility_settings",
+    "current_loopback_capture_option_value",
+    "dashboard_managed_auth_action",
+    "dashboard_managed_auth_prompt_kind",
+    "emit_application_shutdown_diagnostic",
+    "get_event_language_codes",
+    "is_current_github_star_prompt_generation",
+    "list_loopback_capture_options",
+    "list_loopback_device_options",
+    "list_loopback_process_options",
+    "local_llm_selected",
+    "log_basic",
+    "log_detailed",
+    "loopback_capture_summary",
+    "managed_auth_task_names",
+    "managed_auth_tasks_open",
+    "merge_settings_tab_apply_with_current_languages",
+    "merge_settings_view_change_with_current",
+    "overlay_calibration",
+    "should_show_github_star_prompt",
+    "state",
+    "stop",
+    "stop_github_star_prompt_ingress",
+    "supports_discord_managed_auth_reopen",
+    "translation_enable_succeeded",
+}
 
 
 def _contract_members(contract: type[object]) -> set[str]:
@@ -70,6 +109,17 @@ def test_ui_application_contract_covers_every_translator_app_boundary_access() -
 def test_ui_boundary_implementations_match_every_declared_contract_signature() -> None:
     _assert_contract_signatures(UiApplicationPort, UiApplicationBoundary)
     _assert_contract_signatures(UiPresentationPort, FletUiPresentationAdapter)
+
+
+def test_every_ui_application_member_is_classified_as_guarded_intent_or_safe_operation() -> None:
+    contract = _contract_members(UiApplicationPort)
+
+    assert UI_APPLICATION_USER_INTENT_METHODS.isdisjoint(UI_APPLICATION_NON_INTENT_MEMBERS)
+    assert contract == UI_APPLICATION_USER_INTENT_METHODS | UI_APPLICATION_NON_INTENT_MEMBERS
+    assert all(
+        hasattr(getattr(UiApplicationBoundary, name), "__wrapped__")
+        for name in UI_APPLICATION_USER_INTENT_METHODS
+    )
 
 
 def test_production_gui_constructor_wires_one_explicit_boundary_in_each_direction() -> None:
