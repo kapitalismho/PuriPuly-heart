@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 
@@ -31,7 +32,7 @@ class FletUiPresentationAdapter:
     def apply_locale(self) -> None:
         self._app.apply_locale()
 
-    def add_history_entry(self, *args, **kwargs) -> None:
+    def add_history_entry(self, *args: Any, **kwargs: Any) -> None:
         self._app.add_history_entry(*args, **kwargs)
 
     def get_event_language_codes(self) -> tuple[str | None, str | None]:
@@ -46,7 +47,7 @@ class FletUiPresentationAdapter:
     def clear_managed_auth_pending_state(self) -> None:
         self._app.clear_managed_auth_pending_state()
 
-    def show_snackbar(self, *args, **kwargs) -> None:
+    def show_snackbar(self, *args: Any, **kwargs: Any) -> None:
         self._app.show_snackbar(*args, **kwargs)
 
     def on_github_star_translation_success(self) -> None:
@@ -55,10 +56,10 @@ class FletUiPresentationAdapter:
     def on_telemetry_translation_success(self) -> None:
         self._app.on_telemetry_translation_success()
 
-    def on_overlay_state_changed(self, **kwargs) -> None:
+    def on_overlay_state_changed(self, **kwargs: Any) -> None:
         self._app.on_overlay_state_changed(**kwargs)
 
-    def on_desktop_overlay_state_changed(self, *args, **kwargs) -> None:
+    def on_desktop_overlay_state_changed(self, *args: Any, **kwargs: Any) -> None:
         self._app.on_desktop_overlay_state_changed(*args, **kwargs)
 
     def show_qq_managed_auth_dialog(self) -> None:

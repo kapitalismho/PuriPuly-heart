@@ -32,6 +32,20 @@ def _imports(path: Path) -> set[str]:
     return imports
 
 
+def _assert_contract_signatures(contract: type[object], implementation: type[object]) -> None:
+    for name, contract_member in contract.__dict__.items():
+        if name.startswith("_"):
+            continue
+        implementation_member = inspect.getattr_static(implementation, name)
+        if isinstance(contract_member, property):
+            assert isinstance(implementation_member, property)
+            assert inspect.signature(contract_member.fget) == inspect.signature(
+                implementation_member.fget
+            )
+        elif inspect.isfunction(contract_member):
+            assert inspect.signature(contract_member) == inspect.signature(implementation_member)
+
+
 def test_ui_application_contract_covers_every_translator_app_boundary_access() -> None:
     tree = ast.parse(APP_PATH.read_text(encoding="utf-8"))
     accessed = {
@@ -51,6 +65,40 @@ def test_ui_application_contract_covers_every_translator_app_boundary_access() -
     assert contract <= implementation
     assert "__getattr__" not in UiApplicationBoundary.__dict__
     assert not hasattr(UiApplicationBoundary, "backend")
+
+
+def test_ui_boundary_implementations_match_every_declared_contract_signature() -> None:
+    _assert_contract_signatures(UiApplicationPort, UiApplicationBoundary)
+    _assert_contract_signatures(UiPresentationPort, FletUiPresentationAdapter)
+
+
+def test_production_gui_constructor_wires_one_explicit_boundary_in_each_direction() -> None:
+    source = APP_PATH.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    translator = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "TranslatorApp"
+    )
+    initializer = next(
+        node
+        for node in translator.body
+        if isinstance(node, ast.FunctionDef) and node.name == "__init__"
+    )
+    main_gui = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "main_gui"
+    )
+    initializer_source = ast.get_source_segment(source, initializer)
+    main_gui_source = ast.get_source_segment(source, main_gui)
+
+    assert initializer_source.count("FletUiPresentationAdapter(self)") == 1
+    assert '"app": self._presentation_adapter' in initializer_source
+    assert initializer_source.count("GuiController(**controller_kwargs)") == 1
+    assert initializer_source.count("UiApplicationBoundary(self.controller)") == 1
+    assert 'application = getattr(app, "application", None)' in main_gui_source
+    assert "await application.start()" in main_gui_source
 
 
 def test_translator_app_has_no_operational_controller_or_hub_reach_through() -> None:

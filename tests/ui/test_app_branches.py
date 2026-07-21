@@ -12,6 +12,7 @@ pytest.importorskip("flet")
 import flet as ft
 
 import puripuly_heart.ui.app as app_module
+from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -30,6 +31,7 @@ from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatu
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
 from puripuly_heart.ui.controller import GuiController
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 MISSING = object()
 
@@ -239,6 +241,10 @@ class ConstructionDummyController:
         self.runtime_logging_mode = "detailed"
         self.basic_messages: list[str] = []
         self.detailed_messages: list[str] = []
+        self.start_calls = 0
+
+    async def start(self) -> None:
+        self.start_calls += 1
 
     def set_runtime_logging_mode(self, mode: str) -> None:
         self.runtime_logging_mode = mode
@@ -407,6 +413,42 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_settings.runtime_log_detailed == app.application.log_detailed
     assert app.view_logs.on_mode_change == app._on_runtime_logging_mode_change
     assert app.view_logs.runtime_logging_mode == "detailed"
+    assert isinstance(app.application, UiApplicationBoundary)
+    assert app.application.wraps(app.controller)
+    assert isinstance(app.controller.app, FletUiPresentationAdapter)
+    assert app.controller.app is app._presentation_adapter
+
+
+@pytest.mark.asyncio
+async def test_main_gui_constructs_the_real_application_and_presentation_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_app_construction(monkeypatch)
+    constructed: dict[str, object] = {}
+
+    def controller_factory(**kwargs):
+        controller = ConstructionDummyController(
+            page=kwargs["page"],
+            app=kwargs["app"],
+            config_path=kwargs["config_path"],
+        )
+        constructed["controller"] = controller
+        return controller
+
+    monkeypatch.setattr(app_module, "GuiController", controller_factory)
+    monkeypatch.setattr(TranslatorApp, "schedule_after_launch_tasks", lambda self: None)
+
+    page = DummyPage()
+    await app_module.main_gui(page, config_path=Path("settings.json"))
+
+    controller = constructed["controller"]
+    assert isinstance(controller, ConstructionDummyController)
+    assert isinstance(controller.app, FletUiPresentationAdapter)
+    translator_app = controller.app._app
+    assert isinstance(translator_app, TranslatorApp)
+    assert isinstance(translator_app.application, UiApplicationBoundary)
+    assert translator_app.application.wraps(controller)
+    assert controller.start_calls == 1
 
 
 @pytest.mark.asyncio

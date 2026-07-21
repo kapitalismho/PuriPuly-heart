@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -93,7 +93,7 @@ class UiApplicationBoundary:
     def emit_application_shutdown_diagnostic(
         self,
         diagnostic: ApplicationShutdownDiagnostic,
-    ) -> object:
+    ) -> Awaitable[None] | None:
         emit = getattr(self._backend, "emit_application_shutdown_diagnostic", None)
         return emit(diagnostic) if callable(emit) else None
 
@@ -222,7 +222,7 @@ class UiApplicationBoundary:
     def begin_overlay_calibration(self) -> object:
         return self._backend.begin_overlay_calibration()
 
-    def set_overlay_calibration_field(self, *args, **kwargs) -> object:
+    def set_overlay_calibration_field(self, *args: Any, **kwargs: Any) -> object:
         return self._backend.set_overlay_calibration_field(*args, **kwargs)
 
     def apply_overlay_calibration(self) -> object:
@@ -291,10 +291,10 @@ class UiApplicationBoundary:
         if callable(clear):
             clear(provider)
 
-    async def start_qq_managed_auth_from_dialog(self, **kwargs) -> object:
+    async def start_qq_managed_auth_from_dialog(self, **kwargs: Any) -> object:
         return await self._backend.start_qq_managed_auth_from_dialog(**kwargs)
 
-    async def start_discord_managed_auth_from_dialog(self, **kwargs) -> object:
+    async def start_discord_managed_auth_from_dialog(self, **kwargs: Any) -> object:
         return await self._backend.start_discord_managed_auth_from_dialog(**kwargs)
 
     def reopen_discord_managed_auth_browser(self) -> object:
@@ -353,8 +353,8 @@ class UiApplicationBoundary:
 
     def start_github_star_prompt(
         self,
-        run_prompt: Callable[[int], Any],
-    ) -> object:
+        run_prompt: Callable[[int], Awaitable[bool]],
+    ) -> Awaitable[bool]:
         return self._github_star_prompt_runtime.start_launch_prompt(run_prompt)
 
     def is_current_github_star_prompt_generation(self, generation: int) -> bool:
@@ -369,8 +369,8 @@ class UiApplicationBoundary:
     def start_managed_auth_task(
         self,
         *,
-        task_runner: Callable[[Callable[[], Any]], object],
-        task_factory: Callable[[], Any],
+        task_runner: Callable[[Callable[[], Awaitable[Any]]], object],
+        task_factory: Callable[[], Awaitable[Any]],
         task_name: str,
         generation: int,
     ) -> object:
@@ -412,7 +412,11 @@ class UiApplicationBoundary:
             level=logging.WARNING,
         )
 
-    async def persist_github_star_prompt_opened(self, *, should_open: bool) -> bool:
+    async def persist_github_star_prompt_opened(
+        self,
+        *,
+        should_open: Callable[[], bool] | None = None,
+    ) -> bool:
         persist = getattr(self._backend, "persist_github_star_prompt_opened", None)
         return bool(await persist(should_open=should_open)) if callable(persist) else False
 
