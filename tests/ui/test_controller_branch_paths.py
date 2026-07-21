@@ -2516,6 +2516,88 @@ def test_on_managed_trial_delegate_ready_clears_dashboard_pending_notice() -> No
 
 
 @pytest.mark.asyncio
+async def test_managed_trial_delegate_refresh_is_cancelled_by_ui_background_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dash = DummyDashboard()
+    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def blocked_refresh(self) -> None:
+        _ = self
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    monkeypatch.setattr(
+        GuiController,
+        "_refresh_managed_trial_usage_state_best_effort",
+        blocked_refresh,
+    )
+
+    controller._on_managed_trial_delegate_ready()
+    await entered.wait()
+
+    assert controller._ui_background_scope.active_task_names
+    controller._freeze_application_ingress()
+    await controller._ui_background_scope.close()
+
+    assert cancelled.is_set()
+    assert controller._ui_background_scope.active_task_names == ()
+
+    controller._on_managed_trial_delegate_ready()
+    assert controller._ui_background_scope.active_task_names == ()
+
+
+@pytest.mark.asyncio
+async def test_blocked_provider_verifier_cannot_publish_after_shutdown_freeze(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dash = DummyDashboard()
+    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.GEMINI
+    controller.hub = DummyHub(llm=object())
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    class BlockedVerifier:
+        async def verify_api_key(self, *_args, **_kwargs) -> bool:
+            entered.set()
+            await release.wait()
+            return False
+
+    monkeypatch.setattr(
+        controller_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets({"google_api_key": "secret"}),
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_get_provider_verifier",
+        lambda self: BlockedVerifier(),
+    )
+
+    task = controller._start_ui_background_task(
+        controller._verify_and_update_status(),
+        name="provider-status-verification",
+    )
+    await entered.wait()
+    controller._freeze_application_ingress()
+    release.set()
+    await task
+
+    assert dash.translation_needs_key is None
+    assert dash.translation_enabled is None
+    assert controller.hub.translation_enabled is True
+    await controller._ui_background_scope.close()
+
+
+@pytest.mark.asyncio
 async def test_set_translation_enabled_false_clears_dashboard_managed_auth_pending() -> None:
     dash = DummyDashboard()
     controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
@@ -13490,15 +13572,6 @@ async def test_status_refresh_drops_stale_pass_status_when_identity_scope_change
                 succeeded=True,
             )
 
-    scheduled_tasks: list[asyncio.Task[object]] = []
-    loop = asyncio.get_running_loop()
-
-    class CapturingLoop:
-        def create_task(self, coro):  # noqa: ANN001
-            task = loop.create_task(coro)
-            scheduled_tasks.append(task)
-            return task
-
     settings_view = CapturingManagedKeySettingsView()
     status_service = SlowManagedStatusRefreshService()
     controller = _make_managed_usage_controller(
@@ -13508,15 +13581,13 @@ async def test_status_refresh_drops_stale_pass_status_when_identity_scope_change
     )
     controller.settings.managed_identity.active_managed_credential_ref = "old-ref"
 
-    monkeypatch.setattr(controller_module.asyncio, "get_running_loop", lambda: CapturingLoop())
-
     await controller._refresh_managed_trial_usage_state()
     await asyncio.wait_for(status_service.started.wait(), timeout=1.0)
 
     controller.settings.managed_identity.active_managed_credential_ref = "new-ref"
     status_service.release.set()
     await asyncio.wait_for(status_service.finished.wait(), timeout=1.0)
-    await asyncio.wait_for(scheduled_tasks[-1], timeout=1.0)
+    await _wait_until(lambda: not controller._ui_background_scope.active_task_names)
 
     assert status_service.calls == 1
     assert settings_view.managed_key_state_calls
@@ -13905,8 +13976,6 @@ async def test_status_refresh_background_view_update_error_is_logged_not_left_on
 ) -> None:
     dash = DummyDashboard()
     log_messages: list[tuple[str, int]] = []
-    scheduled_tasks: list[asyncio.Task[object]] = []
-    loop = asyncio.get_running_loop()
 
     class FailingManagedKeySettingsView(DummySettingsView):
         def set_managed_key_state(
@@ -13929,12 +13998,6 @@ async def test_status_refresh_background_view_update_error_is_logged_not_left_on
         async def refresh_owned_referral_id_from_status(self) -> str | None:
             return "7KQ9M2"
 
-    class CapturingLoop:
-        def create_task(self, coro):  # noqa: ANN001
-            task = loop.create_task(coro)
-            scheduled_tasks.append(task)
-            return task
-
     def fake_log_basic(
         _self: GuiController,
         message: str,
@@ -13953,7 +14016,6 @@ async def test_status_refresh_background_view_update_error_is_logged_not_left_on
     controller.hub = DummyHub(llm=object())
     controller._managed_openrouter_release_service = FakeStatusRefreshService()  # noqa: SLF001
 
-    monkeypatch.setattr(controller_module.asyncio, "get_running_loop", lambda: CapturingLoop())
     monkeypatch.setattr(GuiController, "log_basic", fake_log_basic)
     monkeypatch.setattr(
         controller_module,
@@ -13975,9 +14037,10 @@ async def test_status_refresh_background_view_update_error_is_logged_not_left_on
     )
 
     await controller._refresh_managed_trial_usage_state()
-    await _wait_until(lambda: bool(scheduled_tasks) and scheduled_tasks[-1].done())
+    await _wait_until(lambda: bool(log_messages))
+    await _wait_until(lambda: not controller._ui_background_scope.active_task_names)
 
-    assert scheduled_tasks[-1].exception() is None
+    assert controller._ui_background_scope.active_task_names == ()
     assert any(
         "Referral ID status refresh failed" in message
         and "managed key repaint failed" in message
@@ -20030,11 +20093,6 @@ async def test_rebuild_pipeline_restarts_runtime_and_schedules_verify(
     async def fake_verify_and_update_status(self) -> None:
         events.append("verify_run")
 
-    original_create_task = asyncio.create_task
-
-    def wrapped_create_task(coro):
-        return original_create_task(coro)
-
     monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
     monkeypatch.setattr(
         GuiController,
@@ -20044,8 +20102,6 @@ async def test_rebuild_pipeline_restarts_runtime_and_schedules_verify(
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
     monkeypatch.setattr(GuiController, "_verify_and_update_status", fake_verify_and_update_status)
     monkeypatch.setattr(controller_module, "UIEventBridge", FakeBridge)
-    monkeypatch.setattr(controller_module.asyncio, "create_task", wrapped_create_task)
-
     await controller._rebuild_pipeline(rebuild_stt=True)
     await asyncio.sleep(0)
 

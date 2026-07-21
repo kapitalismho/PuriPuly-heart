@@ -27,6 +27,7 @@ ApplicationShutdownDiagnosticsSink: TypeAlias = Callable[
 ]
 
 DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS: Final = 30.0
+DEFAULT_APPLICATION_SHUTDOWN_DIAGNOSTIC_TIMEOUT_SECONDS: Final = 1.0
 
 
 class ApplicationIntentRejectedError(RuntimeError):
@@ -109,9 +110,13 @@ class ApplicationShutdownCoordinator:
         callbacks: Sequence[ApplicationShutdownCallback] = (),
         *,
         diagnostics_sink: ApplicationShutdownDiagnosticsSink | None = None,
+        diagnostics_timeout_seconds: float = DEFAULT_APPLICATION_SHUTDOWN_DIAGNOSTIC_TIMEOUT_SECONDS,
     ) -> None:
+        if diagnostics_timeout_seconds <= 0:
+            raise ValueError("Application shutdown diagnostics_timeout_seconds must be positive")
         self._callbacks = list(callbacks)
         self._diagnostics_sink = diagnostics_sink
+        self._diagnostics_timeout_seconds = diagnostics_timeout_seconds
         self._state: ApplicationLifecycleState = "running"
         self._phase: LifecycleShutdownPhase | None = None
         self._phase_history: list[LifecycleShutdownPhase] = []
@@ -253,7 +258,23 @@ class ApplicationShutdownCoordinator:
         try:
             result = self._diagnostics_sink(diagnostic)
             if inspect.isawaitable(result):
-                await result
+                task = asyncio.create_task(
+                    self._await_callback(result),
+                    name="application-shutdown:emit-diagnostic",
+                )
+                done, _pending = await asyncio.wait(
+                    {task},
+                    timeout=self._diagnostics_timeout_seconds,
+                    return_when=asyncio.ALL_COMPLETED,
+                )
+                if task not in done:
+                    task.cancel()
+                    self._timed_out_callback_tasks.add(task)
+                    task.add_done_callback(self._on_timed_out_callback_done)
+                    raise TimeoutError(
+                        "Application shutdown diagnostic delivery exceeded its coordinator deadline"
+                    )
+                await task
         except BaseException as exc:
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                 raise
@@ -264,7 +285,7 @@ class ApplicationShutdownCoordinator:
                         owner_name=self.owner_name,
                         callback_name="emit_diagnostic",
                         exception_class=type(exc).__name__,
-                        timed_out=False,
+                        timed_out=isinstance(exc, TimeoutError),
                     ),
                     exception=exc,
                 )
@@ -314,5 +335,6 @@ __all__ = [
     "ApplicationShutdownFailure",
     "ApplicationShutdownRegistrationError",
     "DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS",
+    "DEFAULT_APPLICATION_SHUTDOWN_DIAGNOSTIC_TIMEOUT_SECONDS",
     "application_shutdown_callback",
 ]

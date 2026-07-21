@@ -13,7 +13,7 @@ import secrets
 import sys
 import time
 import traceback
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -1186,6 +1186,7 @@ class GuiController:
         default_factory=lambda: LifecycleScope("gui-controller-background"),
         repr=False,
     )
+    _ui_background_task_sequence: int = field(init=False, default=0, repr=False)
     _overlay_session_fallback_generation: int = field(init=False, default=0)
     _vrchat_osc_notice_active: bool = field(init=False, default=False)
     _vrchat_osc_probe_task: asyncio.Task[None] | None = field(
@@ -1873,6 +1874,23 @@ class GuiController:
         assert self.hub is not None
         self._ui_event_bridge = bridge
         self._bridge_task = self.hub.output_runtime.start_ui_event_bridge(bridge)
+
+    def _start_ui_background_task(
+        self,
+        coroutine: Coroutine[Any, Any, None],
+        *,
+        name: str,
+    ) -> asyncio.Task[None]:
+        self._ui_background_task_sequence += 1
+        try:
+            return start_lifecycle_task(
+                self._ui_background_scope,
+                coroutine,
+                name=f"{name}-{self._ui_background_task_sequence}",
+            )
+        except RuntimeError:
+            coroutine.close()
+            raise
 
     async def _wait_for_ui_event_bridge_started(self, bridge: UIEventBridge) -> None:
         bridge_task = self._bridge_task
@@ -3214,6 +3232,8 @@ class GuiController:
         remaining_percent: int | None,
         current_referral_id: str | None,
     ) -> None:
+        if self._shutdown_ingress_frozen:
+            return
         service = self._managed_openrouter_release_service
         if service is None:
             return
@@ -3231,6 +3251,8 @@ class GuiController:
                 result = await self._refresh_managed_status_best_effort(
                     service=service,
                 )
+                if self._shutdown_ingress_frozen:
+                    return
                 if service is not self._managed_openrouter_release_service:
                     return
                 if (
@@ -3274,16 +3296,27 @@ class GuiController:
                 )
 
         with contextlib.suppress(RuntimeError):
-            asyncio.get_running_loop().create_task(_run_status_refresh())
+            self._start_ui_background_task(
+                _run_status_refresh(),
+                name="managed-status-refresh",
+            )
 
     def _schedule_managed_trial_usage_refresh(self) -> None:
+        if self._shutdown_ingress_frozen:
+            return
+
         async def _run_refresh() -> None:
             await self._refresh_managed_trial_usage_state_best_effort()
 
         with contextlib.suppress(RuntimeError):
-            asyncio.get_running_loop().create_task(_run_refresh())
+            self._start_ui_background_task(
+                _run_refresh(),
+                name="managed-trial-usage-refresh",
+            )
 
     def _on_managed_trial_delegate_ready(self) -> None:
+        if self._shutdown_ingress_frozen:
+            return
         self._set_managed_trial_pending_auth(False)
         self._schedule_managed_trial_usage_refresh()
 
@@ -3318,6 +3351,8 @@ class GuiController:
         *,
         auto_show_founder_letter: bool,
     ) -> None:
+        if self._shutdown_ingress_frozen:
+            return
         view_settings = getattr(self.app, "view_settings", None)
         if self.settings is None:
             self._clear_managed_trial_usage_metadata_cache()
@@ -3369,6 +3404,8 @@ class GuiController:
             usage_metadata = await self._get_provider_verifier().fetch_openrouter_key_metadata(
                 api_key
             )
+            if self._shutdown_ingress_frozen:
+                return
 
         self._managed_trial_usage_metadata = usage_metadata
         self._managed_trial_usage_metadata_entitlement_ref = entitlement_ref
@@ -10311,8 +10348,10 @@ class GuiController:
         if restore_stt_enabled:
             await self.set_stt_enabled(True)
 
-        # Trigger background verification to sync button colors
-        asyncio.create_task(self._verify_and_update_status())
+        self._start_ui_background_task(
+            self._verify_and_update_status(),
+            name="provider-status-verification",
+        )
 
     async def _init_pipeline(self) -> None:
         assert self.settings is not None
@@ -12036,7 +12075,7 @@ class GuiController:
 
     async def _verify_and_update_status(self) -> None:
         """Background task to verify keys and update dashboard status."""
-        if self.settings is None:
+        if self._shutdown_ingress_frozen or self.settings is None:
             return
 
         dash = getattr(self.app, "view_dashboard", None)
@@ -12152,6 +12191,9 @@ class GuiController:
             except Exception:
                 llm_valid = False
 
+        if self._shutdown_ingress_frozen:
+            return
+
         llm_requires_secret = self._llm_provider_requires_secret(self.settings.provider.llm)
         # If LLM verification failed, only key-backed providers should show needs-key state.
         if not llm_valid:
@@ -12194,6 +12236,9 @@ class GuiController:
             except Exception:
                 stt_valid = False
 
+        if self._shutdown_ingress_frozen:
+            return
+
         if not stt_valid:
             dash.set_stt_needs_key(stt_requires_secret)
             if self.hub:
@@ -12203,4 +12248,5 @@ class GuiController:
         else:
             dash.set_stt_needs_key(False)
 
-        await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=False)
+        if not self._shutdown_ingress_frozen:
+            await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=False)

@@ -154,6 +154,57 @@ async def test_application_shutdown_times_out_one_callback_and_continues() -> No
 
 
 @pytest.mark.asyncio
+async def test_application_shutdown_bounds_stalled_diagnostic_delivery_and_continues() -> None:
+    calls: list[str] = []
+    diagnostic_cancelled = asyncio.Event()
+    release_diagnostic = asyncio.Event()
+
+    async def fail_owner() -> None:
+        raise RuntimeError("owner failed")
+
+    async def stalled_diagnostic(_diagnostic) -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            diagnostic_cancelled.set()
+            await release_diagnostic.wait()
+
+    coordinator = ApplicationShutdownCoordinator(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="BlockedOwner",
+                callback_name="close",
+                callback=fail_owner,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
+                owner_name="RuntimeLoggingService",
+                callback_name="close",
+                callback=lambda: calls.append("logging-closed"),
+            ),
+        ),
+        diagnostics_sink=stalled_diagnostic,
+        diagnostics_timeout_seconds=0.01,
+    )
+
+    with pytest.raises(ExceptionGroup):
+        await asyncio.wait_for(coordinator.shutdown(), timeout=0.1)
+
+    assert calls == ["logging-closed"]
+    assert coordinator.snapshot.state == "completed_with_failures"
+    assert coordinator.snapshot.terminal is True
+    assert [failure.callback_name for failure in coordinator.snapshot.failures] == [
+        "close",
+        "emit_diagnostic",
+    ]
+    assert coordinator.snapshot.failures[-1].timed_out is True
+    await diagnostic_cancelled.wait()
+    release_diagnostic.set()
+    await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
 async def test_application_shutdown_invokes_sync_ingress_before_awaiting_cleanup() -> None:
     ingress_stopped = False
     release = asyncio.Event()
