@@ -13318,7 +13318,7 @@ async def test_status_refresh_updates_pass_status_when_referral_id_is_unchanged(
 
 
 @pytest.mark.asyncio
-async def test_status_refresh_updates_pass_status_for_fallback_only_managed_branch(
+async def test_status_refresh_skips_fallback_only_managed_branch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     pass_status = TalkTogetherPassStatus(
@@ -13352,13 +13352,7 @@ async def test_status_refresh_updates_pass_status_for_fallback_only_managed_bran
 
     await controller._refresh_managed_trial_usage_state()
 
-    await _wait_until(lambda: status_service.calls == 1)
-    assert settings_view.managed_key_state_calls[-1] == {
-        "visible": True,
-        "remaining_percent": 71,
-        "referral_id": "7KQ9M2",
-        "pass_status": pass_status,
-    }
+    assert status_service.calls == 0
 
 
 @pytest.mark.asyncio
@@ -17303,7 +17297,7 @@ async def test_apply_providers_broker_base_url_rebuilds_managed_broker_service(
     assert service.client.base_url == "https://new-broker.example.test"
 
 
-def test_create_managed_openrouter_release_service_uses_managed_fallback_branch() -> None:
+def test_create_managed_openrouter_release_service_skips_managed_fallback_branch() -> None:
     controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
     controller.settings = AppSettings()
     controller.settings.provider.llm = LLMProviderName.GEMINI
@@ -17317,20 +17311,11 @@ def test_create_managed_openrouter_release_service_uses_managed_fallback_branch(
 
     service = controller._create_managed_openrouter_release_service(secrets=DummySecrets({}))
 
-    assert isinstance(service, ManagedOpenRouterReleaseService)
-    assert service.openrouter_config.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-    assert service.openrouter_config.selected_source == OpenRouterCredentialSource.MANAGED
-    assert (
-        service.openrouter_config.selection_alias
-        == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-    )
-    assert service.openrouter_config.managed_credential_kind == "qq"
-    service.managed_state.verified_hardware_hash = "fallback-hash"
-    assert controller.settings.managed_identity.verified_hardware_hash == "fallback-hash"
+    assert service is None
 
 
 @pytest.mark.asyncio
-async def test_handle_managed_translation_enable_runs_for_managed_fallback_branch(
+async def test_handle_managed_translation_enable_skips_managed_fallback_branch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
@@ -17370,8 +17355,8 @@ async def test_handle_managed_translation_enable_runs_for_managed_fallback_branc
     result = await controller._handle_managed_translation_enable(generation)
 
     assert result is True
-    assert service.prepare_calls == 1
-    assert controller._managed_china_auth_relevant_for_translation_enable() is True
+    assert service.prepare_calls == 0
+    assert controller._managed_china_auth_relevant_for_translation_enable() is False
 
 
 @pytest.mark.asyncio
