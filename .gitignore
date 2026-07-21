@@ -201,6 +201,9 @@ cython_debug/
 node_modules/
 .pnpm-store/
 broker/worker-configuration.d.ts
+broker/wrangler.production.jsonc
+broker-d1-backup-*.sql
+qq-orphan-child-keys-*.json
 
 
 # PyPI configuration file
