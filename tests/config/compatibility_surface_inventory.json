@@ -1153,6 +1153,14 @@
       "rationale": "Event mapping and projection modules are internal Gate 4 UI/application boundary contracts. The inventoried public import path remains puripuly_heart.ui.event_bridge unless separately approved."
     },
     {
+      "surface": "puripuly_heart.ui presentation adapter",
+      "classification": "internal_ui_application_boundary_adapter",
+      "modules": [
+        "puripuly_heart.ui.presentation_adapter"
+      ],
+      "rationale": "The Flet presentation adapter is the internal G10 production composition boundary passed to GuiController. It is not an external import compatibility surface."
+    },
+    {
       "surface": "puripuly_heart.core.orchestrator implementation modules",
       "classification": "internal_orchestration_runtime",
       "module_prefixes": [

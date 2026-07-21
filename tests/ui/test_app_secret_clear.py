@@ -24,7 +24,8 @@ class DummyDashboard:
 
 def _make_app_with_verified_state(save_settings=None) -> TranslatorApp:
     app = TranslatorApp.__new__(TranslatorApp)
-    app.controller = SimpleNamespace(
+    save = save_settings or (lambda: None)
+    controller = SimpleNamespace(
         settings=SimpleNamespace(
             api_key_verified=SimpleNamespace(
                 deepgram=True,
@@ -37,9 +38,16 @@ def _make_app_with_verified_state(save_settings=None) -> TranslatorApp:
             )
         ),
         config_path=Path("settings.json"),
-        _save_settings=save_settings or (lambda: None),
-        persist_settings=save_settings or (lambda: None),
+        _save_settings=save,
+        persist_settings=save,
     )
+
+    def clear_provider_verification(provider: str) -> None:
+        setattr(controller.settings.api_key_verified, provider, False)
+        save()
+
+    controller.clear_provider_verification = clear_provider_verification
+    app.controller = controller
     app.view_dashboard = DummyDashboard()
     return app
 

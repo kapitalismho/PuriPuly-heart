@@ -417,14 +417,6 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
         ),
         ImportViolation(
             rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/app.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="UI adapters/renderers",
-            imported_layer="migration/serialization",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
             importer="src/puripuly_heart/ui/controller.py",
             imported="puripuly_heart.app.wiring",
             importer_layer="UI adapters/renderers",
@@ -594,12 +586,6 @@ UNKNOWN_SETTINGS_RUNTIME_CONFINEMENT_RATIONALE = "unclassified order-11 settings
 
 KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementViolation] = frozenset(
     {
-        SettingsRuntimeConfinementViolation(
-            "legacy-settings-api-import",
-            "src/puripuly_heart/ui/app.py",
-            "AppSettings",
-            "UI app imports AppSettings only for public compatibility type annotations and BYOK target wrapper handoff; active provider apply runtime behavior is owned by controller/app services.",
-        ),
         SettingsRuntimeConfinementViolation(
             "legacy-settings-api-import",
             "src/puripuly_heart/ui/controller.py",

@@ -10,6 +10,7 @@ import pytest
 pytest.importorskip("flet")
 import flet as ft
 
+from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.config.settings import (
     AppSettings,
     STTProviderName,
@@ -935,7 +936,9 @@ async def test_after_launch_close_cancels_owner_before_prompt_runtime_close() ->
             events.append("prompt-runtime-closed")
 
     app._after_launch_task_handle = asyncio.create_task(after_launch())
-    app._github_star_prompt_runtime = Runtime()
+    app.controller = SimpleNamespace()
+    app._ui_application = UiApplicationBoundary(app.controller)
+    app._ui_application._github_star_prompt_runtime = Runtime()
     await asyncio.sleep(0)
 
     await app.close_after_launch_tasks()
@@ -955,7 +958,6 @@ async def test_update_notification_marks_launch_high_priority_feedback(
     async def has_update():
         return update_info
 
-    monkeypatch.setattr(app_module, "check_for_update", has_update)
     monkeypatch.setattr(
         app_module.ft, "Icon", lambda *args, **kwargs: SimpleNamespace(args=args, kwargs=kwargs)
     )
@@ -968,6 +970,7 @@ async def test_update_notification_marks_launch_high_priority_feedback(
     await _check_and_notify_update(
         page,
         on_launch_snackbar_shown=lambda snackbar: marked.append(snackbar),
+        load_update_info=has_update,
     )
 
     assert marked == [page.opened[0]]

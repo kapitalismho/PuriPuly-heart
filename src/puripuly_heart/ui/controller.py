@@ -40,6 +40,7 @@ from puripuly_heart.app.ports.settings_repository import (
     SettingsCommitResult,
     SettingsSnapshot,
 )
+from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
@@ -171,6 +172,7 @@ from puripuly_heart.config.settings import (
     TranslationConnection,
     TranslationModel,
     normalize_owned_referral_id,
+    with_telemetry_consent,
 )
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
@@ -994,7 +996,7 @@ class _ControllerProviderVerifier(Protocol):
 @dataclass(slots=True)
 class GuiController:
     page: ft.Page
-    app: object
+    app: UiPresentationPort
     config_path: Path
     allow_stable_settings_import: bool = False
     runtime_logging_sinks: RuntimeLoggingSinks | None = field(default=None, repr=False)
@@ -5991,7 +5993,9 @@ class GuiController:
 
     def _show_short_message(self, message_key: str, **message_kwargs: object) -> None:
         message = t(message_key, **message_kwargs)
-        show_snackbar = getattr(self.app, "_show_snackbar", None)
+        show_snackbar = getattr(self.app, "show_snackbar", None)
+        if not callable(show_snackbar):
+            show_snackbar = getattr(self.app, "_show_snackbar", None)
         if callable(show_snackbar):
             with contextlib.suppress(Exception):
                 show_snackbar(message, ft.Colors.ORANGE_700)
@@ -7433,6 +7437,12 @@ class GuiController:
             fallback_channels,
             installation_fallback=installation_fallback,
         )
+
+    async def apply_telemetry_consent(self, consent: str) -> AppSettings | None:
+        if self.settings is None:
+            return None
+        await self.apply_settings(with_telemetry_consent(self.settings, consent))
+        return self.settings
 
     async def _apply_settings_direct(
         self,
@@ -9239,6 +9249,9 @@ class GuiController:
             raise
         self._remember_canonical_legacy_projection(self.settings)
         self._complete_canonical_mutation()
+
+    def clear_provider_verification(self, provider: str) -> None:
+        self.persist_api_key_verification(provider, "", False)
 
     def _update_canonical_settings_from_compatibility_mutation(
         self,

@@ -24,9 +24,9 @@ from puripuly_heart.config.settings import (
     TranslationConnection,
     TranslationModel,
     TranslationSettings,
+    with_telemetry_consent,
 )
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
-from puripuly_heart.core.runtime import OAuthRuntime
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
 from puripuly_heart.ui.controller import GuiController
@@ -123,6 +123,10 @@ class TelemetryController:
     async def apply_settings(self, settings: AppSettings) -> None:
         self.settings = settings
         self.applied.append(settings)
+
+    async def apply_telemetry_consent(self, consent: str) -> AppSettings:
+        await self.apply_settings(with_telemetry_consent(self.settings, consent))
+        return self.settings
 
     async def record_telemetry_translation_success_day(self) -> None:
         self.telemetry_success_recorded = True
@@ -399,8 +403,8 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_settings.on_view_logs == app._open_logs_tab
     assert not hasattr(app.view_settings, "on_overlay_toggle")
     assert not hasattr(app.view_settings, "on_peer_translation_toggle")
-    assert app.view_settings.runtime_log_basic == app.controller.log_basic
-    assert app.view_settings.runtime_log_detailed == app.controller.log_detailed
+    assert app.view_settings.runtime_log_basic == app.application.log_basic
+    assert app.view_settings.runtime_log_detailed == app.application.log_detailed
     assert app.view_logs.on_mode_change == app._on_runtime_logging_mode_change
     assert app.view_logs.runtime_logging_mode == "detailed"
 
@@ -943,7 +947,12 @@ def test_translator_app_keeps_debug_ui_preview_out_of_controller(
     )
 
     assert app.debug_ui_preview is True
-    assert seen["controller_args"] == (app.page, app, Path("settings.json"))
+    assert seen["controller_args"] == (
+        app.page,
+        app._presentation_adapter,
+        Path("settings.json"),
+    )
+    assert not hasattr(app._presentation_adapter, "app")
 
 
 def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_path(
@@ -1875,11 +1884,9 @@ def test_start_discord_managed_auth_registers_page_task_with_oauth_runtime() -> 
         start_discord_managed_auth_from_dialog=lambda **_kwargs: False,
         set_translation_enabled=lambda _enabled: None,
     )
-    app._oauth_runtime = OAuthRuntime()
-
     app._start_discord_managed_auth()
 
-    assert app._oauth_runtime.external_task_names == ("discord-managed-auth-dialog",)
+    assert app.application.managed_auth_task_names() == ("discord-managed-auth-dialog",)
     assert len(app.page.tasks) == 1
 
 
@@ -1888,7 +1895,6 @@ async def test_start_discord_managed_auth_skips_controller_start_for_stale_gener
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
     app._discord_managed_auth_dialog = SimpleNamespace(referral_id="", set_waiting=lambda: None)
-    app._oauth_runtime = OAuthRuntime()
     start_calls: list[str] = []
 
     async def fake_start_discord_managed_auth_from_dialog(**_kwargs) -> bool:
@@ -1913,7 +1919,6 @@ async def test_close_oauth_runtime_blocks_late_discord_auth_ui_mutation() -> Non
     dialog = SimpleNamespace(referral_id="", close_calls=0, set_waiting=lambda: None)
     dialog.close = lambda: setattr(dialog, "close_calls", dialog.close_calls + 1)
     app._discord_managed_auth_dialog = dialog
-    app._oauth_runtime = OAuthRuntime()
     app._discord_managed_auth_generation = 0
     app._discord_managed_auth_cancelled = False
     app._discord_managed_auth_task_handle = None
@@ -1950,7 +1955,7 @@ async def test_close_oauth_runtime_blocks_late_discord_auth_ui_mutation() -> Non
     release_start.set()
     await auth_task
 
-    assert app._oauth_runtime.is_closed is True
+    assert app.application.managed_auth_tasks_open() is False
     assert app._discord_managed_auth_cancelled is True
     assert app._discord_managed_auth_task_handle is None
     assert snackbar_calls == []
@@ -3948,8 +3953,7 @@ async def test_check_and_notify_update_handles_none_and_available(
     async def no_update():
         return None
 
-    monkeypatch.setattr(app_module, "check_for_update", no_update)
-    await _check_and_notify_update(page)
+    await _check_and_notify_update(page, load_update_info=no_update)
     assert page.opened == []
 
     update_info = SimpleNamespace(version="9.9.9", download_url="https://example.com")
@@ -3957,7 +3961,6 @@ async def test_check_and_notify_update_handles_none_and_available(
     async def has_update():
         return update_info
 
-    monkeypatch.setattr(app_module, "check_for_update", has_update)
     opened_urls: list[str] = []
     monkeypatch.setattr(app_module.webbrowser, "open", lambda url: opened_urls.append(url))
     monkeypatch.setattr(
@@ -3968,7 +3971,7 @@ async def test_check_and_notify_update_handles_none_and_available(
         "TextButton",
         lambda *args, **kwargs: SimpleNamespace(on_click=kwargs.get("on_click")),
     )
-    await _check_and_notify_update(page)
+    await _check_and_notify_update(page, load_update_info=has_update)
 
     assert len(page.opened) == 1
     snackbar = page.opened[0]
@@ -3987,8 +3990,11 @@ async def test_check_and_notify_update_swallows_exceptions(monkeypatch: pytest.M
     async def raise_error():
         raise RuntimeError("network down")
 
-    monkeypatch.setattr(app_module, "check_for_update", raise_error)
-    await _check_and_notify_update(page, log_detailed=app._log_detailed)
+    await _check_and_notify_update(
+        page,
+        log_detailed=app._log_detailed,
+        load_update_info=raise_error,
+    )
     assert page.opened == []
     assert app.controller.basic_messages == []
     assert app.controller.detailed_messages == ["[Update] Check notification failed: network down"]

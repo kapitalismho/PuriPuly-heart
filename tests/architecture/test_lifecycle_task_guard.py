@@ -36,8 +36,8 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/ui/components/settings/api_key_field.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/dashboard.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/settings.py", RUN_TASK): 1,
-        ("src/puripuly_heart/ui/controller.py", ASYNCIO_CREATE_TASK): 2,
-        ("src/puripuly_heart/ui/controller.py", LOOP_CREATE_TASK): 5,
+        ("src/puripuly_heart/ui/controller.py", ASYNCIO_CREATE_TASK): 1,
+        ("src/puripuly_heart/ui/controller.py", LOOP_CREATE_TASK): 3,
         ("src/puripuly_heart/ui/controller.py", BARE_RUN_TASK): 5,
         ("src/puripuly_heart/ui/desktop_overlay.py", ASYNCIO_CREATE_TASK): 11,
         ("src/puripuly_heart/ui/desktop_overlay.py", BARE_RUN_TASK): 1,
@@ -61,6 +61,10 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
         ("src/puripuly_heart/core/runtime/local_stt_download.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/mic_test.py", ASYNCIO_CREATE_TASK): 2,
         ("src/puripuly_heart/core/runtime/receiver.py", ASYNCIO_CREATE_TASK): 1,
+        (
+            "src/puripuly_heart/app/services/application_shutdown.py",
+            ASYNCIO_CREATE_TASK,
+        ): 3,
         ("src/puripuly_heart/providers/stt/local_gpu.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/ui/desktop_overlay_repro.py", ASYNCIO_CREATE_TASK): 3,
     }
@@ -118,11 +122,11 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     (
         "src/puripuly_heart/ui/controller.py",
         ASYNCIO_CREATE_TASK,
-    ): "controller has exactly two bounded UI task handles for status refresh and desktop-bounds persistence",
+    ): "controller retains one bounded UI task handle for desktop-bounds persistence after G09 moved other task families behind lifecycle scopes",
     (
         "src/puripuly_heart/ui/controller.py",
         LOOP_CREATE_TASK,
-    ): "controller has exactly five loop-bound UI scheduling call sites for overlay state/logging updates, fallback task dispatch, and the owner-scoped manual typing idle timeout",
+    ): "controller retains three loop-bound UI scheduling call sites for overlay updates and owner-scoped manual typing idle timeout after G09 lifecycle cutover",
     (
         "src/puripuly_heart/ui/controller.py",
         BARE_RUN_TASK,
@@ -183,6 +187,10 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         "src/puripuly_heart/core/runtime/receiver.py",
         ASYNCIO_CREATE_TASK,
     ): "VrcMicReceiverRuntime is the named lifecycle owner for receiver tasks",
+    (
+        "src/puripuly_heart/app/services/application_shutdown.py",
+        ASYNCIO_CREATE_TASK,
+    ): "ApplicationShutdownCoordinator owns bounded callback and diagnostic tasks, cancels them on deadlines, and awaits terminal cleanup",
     (
         "src/puripuly_heart/providers/stt/local_gpu.py",
         ASYNCIO_CREATE_TASK,
