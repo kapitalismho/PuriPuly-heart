@@ -499,8 +499,13 @@ class UIEventBridge:
                 event = await self.event_queue.get()
                 try:
                     await self._handle_event(event)
-                except Exception:
-                    logger.error("Error handling UI event")
+                except Exception as exc:
+                    logger.error(
+                        "Error handling UI event: event_type=%s channel=%s exception_type=%s",
+                        event.type.value,
+                        event.channel,
+                        type(exc).__name__,
+                    )
                 finally:
                     self.event_queue.task_done()
         except asyncio.CancelledError:

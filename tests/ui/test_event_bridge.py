@@ -365,6 +365,40 @@ async def test_event_bridge_reports_started_only_after_run_loop_entry() -> None:
     await asyncio.gather(run_task, return_exceptions=True)
 
 
+@pytest.mark.asyncio
+async def test_event_bridge_failure_log_identifies_event_without_payload(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    app = DummyApp()
+    queue: asyncio.Queue[UIEvent] = asyncio.Queue()
+    bridge = make_bridge(app, event_queue=queue)
+
+    def fail_history(*_args: object, **_kwargs: object) -> None:
+        raise AttributeError("private transcript text")
+
+    bridge.history_destination = AppHistoryEventDestination(fail_history)
+    event = UIEvent(
+        type=UIEventType.TRANSCRIPT_FINAL,
+        payload=Transcript(utterance_id=uuid4(), text="secret", is_final=True),
+        channel="self",
+    )
+    task = asyncio.create_task(bridge.run())
+    await bridge.wait_started()
+    await queue.put(event)
+    await queue.join()
+    bridge.close()
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+
+    message = caplog.messages[-1]
+    assert message == (
+        "Error handling UI event: event_type=TRANSCRIPT_FINAL "
+        "channel=self exception_type=AttributeError"
+    )
+    assert "secret" not in message
+    assert "private transcript text" not in message
+
+
 def test_event_mapping_is_testable_without_view_mutation() -> None:
     transcript = Transcript(utterance_id=uuid4(), text="partial", is_final=False)
     mapped = map_ui_event(

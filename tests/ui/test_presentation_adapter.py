@@ -76,6 +76,12 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
     assert not hasattr(adapter, "settings")
 
 
+def test_presentation_adapter_preserves_missing_optional_history_destination() -> None:
+    adapter = FletUiPresentationAdapter(SimpleNamespace())
+
+    adapter.add_history_entry("Mic", "hello", language_code="en")
+
+
 @pytest.mark.asyncio
 async def test_presentation_adapter_awaits_ui_owned_shutdown_hooks() -> None:
     events: list[str] = []
