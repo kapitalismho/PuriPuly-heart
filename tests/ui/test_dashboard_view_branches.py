@@ -58,6 +58,7 @@ class FakeDisplayCard:
         self.translation_metadata_calls: list[dict[str, object]] = []
         self.notice_calls: list[tuple[str | None, str | None]] = []
         self.notice_actions: list[tuple[str | None, object | None]] = []
+        self.notice_yields: list[bool] = []
         self.input_fonts: list[str | None] = []
         self.locale_calls: list[tuple[str | None, str | None]] = []
         self.input_is_focused = False
@@ -92,9 +93,11 @@ class FakeDisplayCard:
         *,
         action_label: str | None = None,
         on_action=None,
+        yields_to_content: bool = False,
     ) -> None:
         self.notice_calls.append((text, tone))
         self.notice_actions.append((action_label, on_action))
+        self.notice_yields.append(bool(yields_to_content))
 
     def set_input_font(self, font_family: str | None) -> None:
         self.input_fonts.append(font_family)
@@ -950,6 +953,45 @@ def test_dashboard_steamvr_overlay_failure_notice_uses_actionable_reason_without
     )
 
     assert view.display_card.notice_calls[-1] == (expected_notice, "error")
+    assert view.display_card.notice_yields[-1] is True
+
+
+def test_dashboard_overlay_notices_yield_to_content_while_others_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fallback_view = _make_dashboard(monkeypatch)
+    fallback_view.set_overlay_session_fallback_notice(True)
+    assert fallback_view.display_card.notice_yields[-1] is True
+
+    failure_view = _make_dashboard(monkeypatch)
+    failure_view.set_overlay_peer_contract(
+        OverlayPeerConsumerContract(
+            overlay=OverlayPeerToggleContract(
+                intent_enabled=True,
+                effective_enabled=False,
+                action_enabled=True,
+                state="warning",
+                status_text="stale contract literal",
+                failure_reason="steamvr_not_running",
+            ),
+            peer=OverlayPeerToggleContract(
+                intent_enabled=False,
+                effective_enabled=False,
+                action_enabled=True,
+                state="off",
+                status_text="Off",
+            ),
+        )
+    )
+    assert failure_view.display_card.notice_yields[-1] is True
+
+    gpu_view = _make_dashboard(monkeypatch)
+    gpu_view.set_gpu_notice(GpuDashboardNotice(status="install_failed"))
+    assert gpu_view.display_card.notice_yields[-1] is False
+
+    osc_view = _make_dashboard(monkeypatch)
+    osc_view.set_vrchat_osc_notice(True)
+    assert osc_view.display_card.notice_yields[-1] is False
 
 
 def test_dashboard_overlay_failure_notice_relocalizes_on_apply_locale(

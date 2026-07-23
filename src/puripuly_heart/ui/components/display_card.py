@@ -75,6 +75,7 @@ class DisplayCard(ft.Container):
         self._notice_value: str | None = None
         self._notice_tone: str | None = None
         self._notice_action: Callable[[], None] | None = None
+        self._notice_yields_to_content = False
         self.input_is_focused = False
 
         self._display_primary = ft.Text(
@@ -332,9 +333,11 @@ class DisplayCard(ft.Container):
         *,
         action_label: str | None = None,
         on_action: Callable[[], None] | None = None,
+        yields_to_content: bool = False,
     ) -> None:
         self._notice_value = text or None
         self._notice_tone = tone if self._notice_value else None
+        self._notice_yields_to_content = bool(yields_to_content) if self._notice_value else False
         self._notice_action = on_action if self._notice_value and action_label else None
         self._notice_action_button.text = action_label or ""
         self._notice_action_button.visible = self._notice_action is not None
@@ -489,12 +492,18 @@ class DisplayCard(ft.Container):
     def _sync_display(
         self, *, is_error: bool = False, measure_flet_update: bool = False
     ) -> tuple[bool, bool, int | None]:
-        primary_text = self._notice_value or _apply_debug_prefix(
-            self._primary_value or "", self._debug_prefix
+        notice_blocks = self._notice_value is not None and (
+            not self._notice_yields_to_content or self._showing_status
+        )
+        notice_text = self._notice_value if notice_blocks else None
+        primary_text = (
+            notice_text
+            if notice_text is not None
+            else _apply_debug_prefix(self._primary_value or "", self._debug_prefix)
         )
         secondary_text = (
             ""
-            if self._notice_value
+            if notice_text is not None
             else _apply_debug_prefix(self._secondary_value or "", self._debug_prefix)
         )
         max_len = max(_weighted_len(primary_text), _weighted_len(secondary_text))

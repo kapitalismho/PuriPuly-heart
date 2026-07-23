@@ -340,14 +340,16 @@ def test_display_card_visual_commit_is_suppressed_in_basic_mode(
     assert runtime_logging.detailed_messages == []
 
 
-def test_display_card_visual_commit_is_suppressed_when_notice_hides_translation(
+def test_display_card_notice_yields_to_live_translation_content(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
     runtime_logging = RuntimeLoggingCapture()
 
     card.set_display("source text")
-    card.set_notice("STT files are missing", tone="warning")
+    card.set_notice(
+        "SteamVR isn't on. Ran the desktop overlay instead.", tone="info", yields_to_content=True
+    )
     attach_dummy_page(monkeypatch, card._display_primary)
     attach_dummy_page(monkeypatch, card._display_secondary)
     monkeypatch.setattr(type(card._display_primary), "update", lambda self: None)
@@ -364,6 +366,63 @@ def test_display_card_visual_commit_is_suppressed_when_notice_hides_translation(
         source_text_hash="src-hash-notice-1",
         source_text_len=11,
         logical_turn_key="self:utt-notice-1",
+    )
+
+    assert card._display_primary.value == "source text"
+    assert card._display_secondary.value == "translated text"
+    assert card._display_secondary.visible is True
+    assert len(runtime_logging.detailed_messages) == 1
+
+
+def test_display_card_yielding_notice_shows_while_idle_and_returns_after_status_reset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    card = DisplayCard(on_submit=lambda _text: None)
+    monkeypatch.setattr(type(card._display_primary), "update", lambda self: None)
+    monkeypatch.setattr(type(card._display_secondary), "update", lambda self: None)
+
+    card.set_status("connected")
+    card.set_notice(
+        "SteamVR isn't on. Ran the desktop overlay instead.",
+        tone="info",
+        yields_to_content=True,
+    )
+    assert card._display_primary.value == "SteamVR isn't on. Ran the desktop overlay instead."
+
+    card.set_display("source text")
+    card.set_display_translation("translated text")
+    assert card._display_primary.value == "source text"
+    assert card._display_secondary.value == "translated text"
+
+    card.set_status("connected")
+    assert card._display_primary.value == "SteamVR isn't on. Ran the desktop overlay instead."
+    assert card._display_secondary.visible is False
+
+
+def test_display_card_non_yielding_notice_still_blocks_translation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    card = DisplayCard(on_submit=lambda _text: None)
+    runtime_logging = RuntimeLoggingCapture()
+
+    card.set_display("source text")
+    card.set_notice("STT files are missing", tone="warning")
+    attach_dummy_page(monkeypatch, card._display_primary)
+    attach_dummy_page(monkeypatch, card._display_secondary)
+    monkeypatch.setattr(type(card._display_primary), "update", lambda self: None)
+    monkeypatch.setattr(type(card._display_secondary), "update", lambda self: None)
+
+    card.set_display_translation(
+        "translated text",
+        runtime_log_detailed=runtime_logging.emit_detailed,
+        update_id="upd-notice-2",
+        origin_wall_clock_ms=1500,
+        utterance_id="utt-notice-2",
+        channel="self",
+        session_scope="session-notice-2",
+        source_text_hash="src-hash-notice-2",
+        source_text_len=11,
+        logical_turn_key="self:utt-notice-2",
     )
 
     assert card._display_primary.value == "STT files are missing"
