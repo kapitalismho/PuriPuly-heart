@@ -7,6 +7,7 @@ import pytest
 
 ft = pytest.importorskip("flet")
 
+from puripuly_heart.ui.dashboard import renderer as dashboard_renderer_module
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice
 from puripuly_heart.ui.overlay_peer_contract import (
     OverlayPeerConsumerContract,
@@ -176,7 +177,9 @@ def _make_dashboard(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(dashboard_module, "DisplayCard", FakeDisplayCard)
     monkeypatch.setattr(dashboard_module, "LanguageCard", FakeLanguageCard)
     monkeypatch.setattr(dashboard_module, "LanguageModal", FakeLanguageModal)
-    monkeypatch.setattr(dashboard_module, "create_background_glow_stack", lambda content: content)
+    monkeypatch.setattr(
+        dashboard_renderer_module, "create_background_glow_stack", lambda content: content
+    )
     monkeypatch.setattr(dashboard_module, "font_for_language", lambda code: f"font-{code}")
     monkeypatch.setattr(dashboard_module, "language_name", lambda code: f"name-{code}")
     monkeypatch.setattr(dashboard_module, "get_locale", lambda: "en")

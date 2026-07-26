@@ -6,10 +6,25 @@ import flet as ft
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.core.language import get_all_language_options
 from puripuly_heart.ui.components.display_card import DisplayCard
-from puripuly_heart.ui.components.glow import create_background_glow_stack
 from puripuly_heart.ui.components.language_card import LanguageCard
 from puripuly_heart.ui.components.language_modal import LanguageModal
 from puripuly_heart.ui.components.power_button import PowerButton
+from puripuly_heart.ui.dashboard.contract import (
+    DashboardCaptureIntents,
+    DashboardSurfaceSlots,
+    DashboardTranslationIntents,
+)
+from puripuly_heart.ui.dashboard.renderer import (
+    DASHBOARD_CONTROL_REGION_EXPAND,
+    DASHBOARD_DISPLAY_CARD_EXPAND,
+    DASHBOARD_INFO_REGION_EXPAND,
+    DASHBOARD_LANGUAGE_CARD_EXPAND,
+    DASHBOARD_LAYOUT_GAP,
+    DASHBOARD_POWER_BUTTON_ICON_SIZE,
+    DASHBOARD_POWER_BUTTON_LABEL_SIZE,
+    DASHBOARD_SHELL_SPACING,
+    compose_dashboard_surface,
+)
 from puripuly_heart.ui.flet_runtime import control_page
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice, GpuNoticeAction
@@ -19,14 +34,19 @@ from puripuly_heart.ui.overlay_peer_contract import (
     is_process_capture_warning_reason,
 )
 
-DASHBOARD_LAYOUT_GAP = 12
-DASHBOARD_CONTROL_REGION_EXPAND = 45
-DASHBOARD_INFO_REGION_EXPAND = 55
-DASHBOARD_DISPLAY_CARD_EXPAND = 1
-DASHBOARD_LANGUAGE_CARD_EXPAND = 1
-DASHBOARD_POWER_BUTTON_ICON_SIZE = 80
-DASHBOARD_POWER_BUTTON_LABEL_SIZE = 32
 OVERLAY_FAILURE_REASON_ONLY_NOTICE_REASONS = {"steamvr_not_running"}
+
+__all__ = [
+    "DASHBOARD_CONTROL_REGION_EXPAND",
+    "DASHBOARD_DISPLAY_CARD_EXPAND",
+    "DASHBOARD_INFO_REGION_EXPAND",
+    "DASHBOARD_LANGUAGE_CARD_EXPAND",
+    "DASHBOARD_LAYOUT_GAP",
+    "DASHBOARD_POWER_BUTTON_ICON_SIZE",
+    "DASHBOARD_POWER_BUTTON_LABEL_SIZE",
+    "DASHBOARD_SHELL_SPACING",
+    "DashboardView",
+]
 OVERLAY_YIELDING_NOTICE_SOURCES = {"overlay_fallback", "overlay_failure"}
 PEER_SOURCE_MODE_AUTO = "auto"
 _LOCAL_STT_MODEL_LABEL_KEYS = {
@@ -74,7 +94,7 @@ class DashboardView(ft.Column):
     _LANG_OPTIONS = get_all_language_options()
 
     def __init__(self):
-        super().__init__(expand=True, spacing=16)
+        super().__init__(expand=True, spacing=DASHBOARD_SHELL_SPACING)
 
         # State
         self.is_connected = False
@@ -192,68 +212,50 @@ class DashboardView(ft.Column):
         self._refresh_language_card()
         self._update_input_font()
 
-        self.top_controls = ft.Row(
-            [
-                ft.Container(content=self.stt_button, expand=True),
-                ft.Container(content=self.peer_button, expand=True),
-            ],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
+        surface = compose_dashboard_surface(
+            DashboardSurfaceSlots.from_capture_provider(
+                self,
+                translation=self.trans_button,
+                display=self.display_card,
+                language=self.language_card,
+            )
         )
-        self.bottom_controls = ft.Row(
-            [
-                ft.Container(content=self.trans_button, expand=True),
-                ft.Container(content=self.overlay_button, expand=True),
-            ],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
-        )
+        self.top_controls = surface.top_controls
+        self.bottom_controls = surface.bottom_controls
+        self.control_grid = surface.control_grid
+        self.display_card_slot = surface.display_card_slot
+        self.language_card_slot = surface.language_card_slot
+        self.info_stack = surface.info_stack
+        self.control_region = surface.control_region
+        self.info_region = surface.info_region
+        self.main_surface = surface.main_surface
+        self.shell_content = surface.shell_content
+        self.controls = [surface.root]
 
-        self.control_grid = ft.Column(
-            [self.top_controls, self.bottom_controls],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
-        )
-        self.display_card_slot = ft.Container(
-            content=self.display_card,
-            expand=DASHBOARD_DISPLAY_CARD_EXPAND,
-        )
-        self.language_card_slot = ft.Container(
-            content=self.language_card,
-            expand=DASHBOARD_LANGUAGE_CARD_EXPAND,
-        )
-        self.info_stack = ft.Column(
-            [
-                self.display_card_slot,
-                self.language_card_slot,
-            ],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
-        )
+    def self_capture_control(self) -> ft.Control:
+        return self.stt_button
 
-        self.control_region = ft.Container(
-            content=self.control_grid,
-            expand=DASHBOARD_CONTROL_REGION_EXPAND,
-        )
-        self.info_region = ft.Container(
-            content=self.info_stack,
-            expand=DASHBOARD_INFO_REGION_EXPAND,
-        )
-        self.main_surface = ft.Row(
-            [
-                self.control_region,
-                self.info_region,
-            ],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
-        )
+    def peer_capture_control(self) -> ft.Control:
+        return self.peer_button
 
-        self.shell_content = ft.Column(
-            [self.main_surface],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
-        )
-        self.controls = [create_background_glow_stack(self.shell_content)]
+    def overlay_control(self) -> ft.Control:
+        return self.overlay_button
+
+    def bind_dashboard_intents(
+        self,
+        *,
+        translation: DashboardTranslationIntents,
+        capture: DashboardCaptureIntents,
+    ) -> None:
+        self.on_send_message = translation.submit_message
+        self.on_toggle_translation = translation.toggle_translation
+        self.on_language_change = translation.change_language
+        self.on_message_input_activity = translation.report_input_activity
+        self.on_toggle_stt = capture.toggle_self_capture
+        self.on_toggle_peer_translation = capture.toggle_peer_capture
+        self.on_toggle_overlay = capture.toggle_overlay
+        self.on_retry_peer_process_capture = capture.retry_peer_process_capture
+        self.on_gpu_notice_action = capture.run_gpu_notice_action
 
     def _toggle_overlay(self) -> None:
         enabled = True

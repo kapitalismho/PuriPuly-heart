@@ -308,6 +308,17 @@ class ConstructionDummyDashboardView(ft.Container):
         self.overlay_peer_contract = None
         self.runtime_log_detailed = None
 
+    def bind_dashboard_intents(self, *, translation, capture) -> None:
+        self.on_send_message = translation.submit_message
+        self.on_toggle_translation = translation.toggle_translation
+        self.on_language_change = translation.change_language
+        self.on_message_input_activity = translation.report_input_activity
+        self.on_toggle_stt = capture.toggle_self_capture
+        self.on_toggle_peer_translation = capture.toggle_peer_capture
+        self.on_toggle_overlay = capture.toggle_overlay
+        self.on_retry_peer_process_capture = capture.retry_peer_process_capture
+        self.on_gpu_notice_action = capture.run_gpu_notice_action
+
     def set_overlay_peer_contract(self, contract) -> None:
         self.overlay_peer_contract = contract
 
@@ -1086,6 +1097,17 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
             self.on_toggle_peer_translation = None
             self.on_language_change = None
             self.runtime_log_detailed = None
+
+        def bind_dashboard_intents(self, *, translation, capture) -> None:
+            self.on_send_message = translation.submit_message
+            self.on_toggle_translation = translation.toggle_translation
+            self.on_language_change = translation.change_language
+            self.on_message_input_activity = translation.report_input_activity
+            self.on_toggle_stt = capture.toggle_self_capture
+            self.on_toggle_peer_translation = capture.toggle_peer_capture
+            self.on_toggle_overlay = capture.toggle_overlay
+            self.on_retry_peer_process_capture = capture.retry_peer_process_capture
+            self.on_gpu_notice_action = capture.run_gpu_notice_action
 
         def apply_locale(self) -> None:
             return None
