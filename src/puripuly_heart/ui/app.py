@@ -873,7 +873,7 @@ class TranslatorApp:
             bgcolor=COLOR_BACKGROUND,
         )
         self._foundation_preview_dialog = dialog
-        self.page.open(dialog)
+        self.page.show_dialog(dialog)
 
     def _show_peer_translation_eula(self, on_accept) -> None:
         dialog = PeerTranslationEulaDialog(

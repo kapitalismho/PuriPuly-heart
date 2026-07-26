@@ -290,7 +290,10 @@ def test_foundation_preview_surface_is_deterministic_and_static() -> None:
 
 def test_foundation_preview_action_is_hidden_without_flag_and_has_no_external_calls() -> None:
     app = app_module.TranslatorApp.__new__(app_module.TranslatorApp)
-    app.page = SimpleNamespace(opened=[], open=lambda dialog: app.page.opened.append(dialog))
+    app.page = SimpleNamespace(
+        opened=[],
+        show_dialog=lambda dialog: app.page.opened.append(dialog),
+    )
     app._foundation_adapter = SimpleNamespace(debug_preview_enabled=False)
 
     app._preview_foundation_primitives()
@@ -303,6 +306,8 @@ def test_foundation_preview_action_is_hidden_without_flag_and_has_no_external_ca
     assert len(app.page.opened) == 1
     assert isinstance(app.page.opened[0].content, FoundationPreviewSurface)
     method_source = inspect.getsource(app_module.TranslatorApp._preview_foundation_primitives)
+    assert ".show_dialog(dialog)" in method_source
+    assert ".open(dialog)" not in method_source
     assert "self.application" not in method_source
     assert "self.controller" not in method_source
 
