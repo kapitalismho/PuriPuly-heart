@@ -13,6 +13,11 @@ from puripuly_heart.ui.dashboard.capture import (
     DashboardCaptureControls,
     capture_presentation_from_contract,
 )
+from puripuly_heart.ui.dashboard.capture_notices import (
+    gpu_capture_action_label,
+    gpu_capture_notice,
+    local_asr_capture_notice,
+)
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
     DashboardSurfaceSlots,
@@ -50,43 +55,6 @@ __all__ = [
 ]
 OVERLAY_YIELDING_NOTICE_SOURCES = {"overlay_fallback", "overlay_failure"}
 PEER_SOURCE_MODE_AUTO = "auto"
-_LOCAL_STT_MODEL_LABEL_KEYS = {
-    "parakeet-tdt-0.6b-v3-int8-sherpa": "local_stt.model.parakeet-tdt-0.6b-v3-int8-sherpa",
-    "parakeet-tdt-ctc-0.6b-ja-int8-sherpa": "local_stt.model.parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
-    "qwen3-asr-0.6b-int8-sherpa": "local_stt.model.qwen3-asr-0.6b-int8-sherpa",
-}
-_LOCAL_STT_TARGETED_NOTICE_KEYS = {
-    "missing": "dashboard.local_stt_notice_missing_model",
-    "invalid": "dashboard.local_stt_notice_invalid_model",
-    "downloading": "dashboard.local_stt_notice_downloading_model",
-    "download_failed": "dashboard.local_stt_notice_download_failed_model",
-}
-_GPU_NOTICE_KEYS = {
-    "discovery_failed": "dashboard.gpu_notice.discovery_failed",
-    "unsupported": "dashboard.gpu_notice.unsupported",
-    "unavailable_device": "dashboard.gpu_notice.unavailable_device",
-    "not_installed": "dashboard.gpu_notice.not_installed",
-    "invalid": "dashboard.gpu_notice.invalid",
-    "installing": "dashboard.gpu_notice.installing",
-    "install_failed": "dashboard.gpu_notice.install_failed",
-    "activation_failed": "dashboard.gpu_notice.activation_failed",
-}
-_GPU_NOTICE_TONES = {
-    "discovery_failed": "error",
-    "unsupported": "warning",
-    "unavailable_device": "warning",
-    "not_installed": "warning",
-    "invalid": "warning",
-    "install_failed": "error",
-    "activation_failed": "error",
-}
-_GPU_ACTION_KEYS = {
-    "install": "dashboard.gpu_action.install",
-    "repair": "dashboard.gpu_action.repair",
-    "reinstall": "dashboard.gpu_action.reinstall",
-    "rediscover": "dashboard.gpu_action.rediscover",
-    "restart": "dashboard.gpu_action.restart",
-}
 
 
 class DashboardView(ft.Column):
@@ -721,61 +689,14 @@ class DashboardView(ft.Column):
         self._sync_notice()
 
     def _current_local_stt_notice(self) -> tuple[str | None, str | None]:
-        status = self._local_stt_notice_status
-        if status is None:
+        notice = local_asr_capture_notice(
+            status=self._local_stt_notice_status,
+            percent=self._local_stt_notice_percent,
+            model_id=self._local_stt_notice_model_id,
+        )
+        if notice is None:
             return None, None
-
-        notice_key_by_status = {
-            "starting": "dashboard.local_stt_notice_starting",
-            "self_loading": "dashboard.local_stt_notice_self_loading",
-            "peer_loading": "dashboard.local_stt_notice_peer_loading",
-            "start_failed": "dashboard.local_stt_notice_start_failed",
-            "missing": "dashboard.local_stt_notice_missing",
-            "invalid": "dashboard.local_stt_notice_invalid",
-            "downloading": "dashboard.local_stt_notice_downloading",
-            "download_failed": "dashboard.local_stt_notice_download_failed",
-        }
-        tone_by_status = {
-            "starting": "info",
-            "self_loading": "info",
-            "peer_loading": "info",
-            "start_failed": "error",
-            "missing": "warning",
-            "invalid": "warning",
-            "downloading": "info",
-            "download_failed": "error",
-        }
-        notice_key = notice_key_by_status.get(status)
-        if notice_key is None:
-            return None, None
-        model_id = self._local_stt_notice_model_id
-        if model_id is not None and status in {
-            "missing",
-            "invalid",
-            "downloading",
-            "download_failed",
-        }:
-            model = t(_LOCAL_STT_MODEL_LABEL_KEYS.get(model_id, ""), default=model_id)
-            targeted_key = _LOCAL_STT_TARGETED_NOTICE_KEYS[status]
-            notice_text = (
-                t(
-                    "dashboard.local_stt_notice_downloading_progress_model",
-                    model=model,
-                    percent=self._local_stt_notice_percent,
-                )
-                if status == "downloading" and self._local_stt_notice_percent is not None
-                else t(targeted_key, model=model)
-            )
-        else:
-            notice_text = (
-                t(
-                    "dashboard.local_stt_notice_downloading_progress",
-                    percent=self._local_stt_notice_percent,
-                )
-                if status == "downloading" and self._local_stt_notice_percent is not None
-                else t(notice_key)
-            )
-        return notice_text, tone_by_status.get(status)
+        return notice.text, notice.tone
 
     def _current_overlay_failure_notice(self) -> tuple[str | None, str | None]:
         contract = self._overlay_peer_contract
@@ -810,19 +731,9 @@ class DashboardView(ft.Column):
         notice_text, tone = self._current_local_stt_notice()
         if notice_text is not None:
             candidates["local_stt"] = (notice_text, tone, None)
-        gpu_notice = self._gpu_notice
-        if gpu_notice is not None and gpu_notice.status in _GPU_NOTICE_KEYS:
-            key = _GPU_NOTICE_KEYS[gpu_notice.status]
-            text = (
-                t(key, percent=gpu_notice.progress_percent or 0)
-                if gpu_notice.status == "installing"
-                else t(key)
-            )
-            candidates["gpu"] = (
-                text,
-                _GPU_NOTICE_TONES.get(gpu_notice.status, "info"),
-                gpu_notice.action,
-            )
+        gpu_notice = gpu_capture_notice(self._gpu_notice)
+        if gpu_notice is not None:
+            candidates["gpu"] = (gpu_notice.text, gpu_notice.tone, gpu_notice.action)
         if self._overlay_session_fallback_notice_active:
             candidates["overlay_fallback"] = (
                 t("dashboard.overlay_session_fallback_desktop"),
@@ -864,7 +775,7 @@ class DashboardView(ft.Column):
             self.display_card.set_notice(None, None)
             return
         text, tone, action = candidates[selected]
-        action_label = t(_GPU_ACTION_KEYS[action]) if action is not None else None
+        action_label = gpu_capture_action_label(action)
         yields_to_content = selected in OVERLAY_YIELDING_NOTICE_SOURCES
         try:
             self.display_card.set_notice(

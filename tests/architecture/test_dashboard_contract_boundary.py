@@ -29,8 +29,14 @@ def _imported_modules(path: pathlib.Path) -> set[str]:
 
 def test_dashboard_contract_and_renderer_stay_above_backend_owners() -> None:
     from puripuly_heart.ui.dashboard import capture as dashboard_capture
+    from puripuly_heart.ui.dashboard import capture_notices as dashboard_capture_notices
 
-    for module in (dashboard_contract, dashboard_renderer, dashboard_capture):
+    for module in (
+        dashboard_contract,
+        dashboard_renderer,
+        dashboard_capture,
+        dashboard_capture_notices,
+    ):
         path = pathlib.Path(module.__file__)
         for imported in _imported_modules(path):
             assert not imported.startswith(
@@ -40,9 +46,11 @@ def test_dashboard_contract_and_renderer_stay_above_backend_owners() -> None:
 
 def test_capture_controls_consume_the_contract_without_dashboard_view_access() -> None:
     from puripuly_heart.ui.dashboard import capture as dashboard_capture
+    from puripuly_heart.ui.dashboard import capture_notices as dashboard_capture_notices
 
-    imported = _imported_modules(pathlib.Path(dashboard_capture.__file__))
-    assert not any(module.startswith("puripuly_heart.ui.views") for module in imported)
+    for module in (dashboard_capture, dashboard_capture_notices):
+        imported = _imported_modules(pathlib.Path(module.__file__))
+        assert not any(name.startswith("puripuly_heart.ui.views") for name in imported)
 
 
 def test_production_dashboard_uses_an_external_capture_slot_provider() -> None:
