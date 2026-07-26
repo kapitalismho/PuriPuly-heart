@@ -31,12 +31,45 @@ class SettingsProviderIntents:
     gpu_discovery_requested: Callable[[], object]
 
 
+@dataclass(frozen=True, slots=True)
+class SettingsGeneralIntents:
+    start_microphone_test: Callable[[], None]
+    telemetry_consent_change: Callable[[str], None]
+    list_loopback_capture_options: Callable[[], object]
+    list_loopback_process_options: Callable[[], object]
+    list_loopback_device_options: Callable[[], object]
+    current_loopback_capture_option: Callable[[], str]
+    apply_loopback_capture_option: Callable[[str], None]
+    loopback_capture_summary: Callable[[], str]
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsPromptIntents:
+    prompt_apply_settings: Callable[[SettingsSnapshot], None]
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsOverlayIntents:
+    desktop_overlay_lock_change: Callable[[bool], None]
+    desktop_overlay_size_change: Callable[[str], None]
+    desktop_overlay_recovery_action: Callable[[str], None]
+    desktop_overlay_position_reset: Callable[[], None]
+    view_logs: Callable[[], None]
+    calibration_begin: Callable[[], object] | None = None
+    calibration_change: Callable[[str, object], object] | None = None
+    calibration_apply: Callable[[], object] | None = None
+    calibration_cancel: Callable[[], object] | None = None
+
+
 class SettingsIntentConsumer(Protocol):
     def bind_settings_intents(
         self,
         *,
         surface: SettingsSurfaceIntents,
         provider: SettingsProviderIntents,
+        general: SettingsGeneralIntents,
+        prompt: SettingsPromptIntents,
+        overlay: SettingsOverlayIntents,
     ) -> None: ...
 
 
@@ -148,11 +181,88 @@ class SettingsApiSurfaceRegions:
     gpu_device_placeholders: tuple[ft.Control, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class SettingsGeneralSurfaceSlots:
+    ui: ft.Control
+    chatbox_source: ft.Control
+    audio_host_api: ft.Control
+    microphone: ft.Control
+    loopback: ft.Control
+    microphone_test: ft.Control
+    self_vad: ft.Control
+    peer_vad: ft.Control
+    clipboard_auto_translate: ft.Control
+    vrchat_mic_intercept: ft.Control
+    telemetry_consent: ft.Control
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsPromptSurfaceSlots:
+    custom_vocabulary: ft.Control
+    persona: ft.Control
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsOverlaySurfaceSlots:
+    overlay_target: ft.Control
+    overlay_translation: ft.Control
+    overlay_peer_original: ft.Control
+    anchor: ft.Control
+    distance: ft.Control
+    offset_x: ft.Control
+    offset_y: ft.Control
+    text_scale: ft.Control
+    vr_reset: ft.Control
+    desktop_size: ft.Control
+    desktop_lock: ft.Control
+    desktop_background_alpha: ft.Control
+    desktop_reset: ft.Control
+    desktop_reset_spacer_a: ft.Control
+    desktop_reset_spacer_b: ft.Control
+    desktop_status: ft.Control
+    desktop_status_trailing: ft.Control
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsGeneralSurfaceRegions:
+    rows: tuple[ft.Control, ...]
+    primary_row: ft.Container
+    audio_row: ft.Container
+    vad_row: ft.Container
+    clipboard_row: ft.Container
+    primary_row_placeholder: ft.Control
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsPromptSurfaceRegions:
+    rows: tuple[ft.Control, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsOverlaySurfaceRegions:
+    rows: tuple[ft.Control, ...]
+    target_row: ft.Container
+    vr_rows: tuple[ft.Container, ...]
+    desktop_rows: tuple[ft.Container, ...]
+    desktop_controls_row: ft.Container
+    recovery_row: ft.Container
+    recovery_row_placeholder: ft.Control
+
+
 __all__ = [
     "SettingsApiSlotProvider",
     "SettingsApiSurfaceRegions",
     "SettingsApiSurfaceSlots",
+    "SettingsGeneralIntents",
+    "SettingsGeneralSurfaceRegions",
+    "SettingsGeneralSurfaceSlots",
     "SettingsIntentConsumer",
+    "SettingsOverlayIntents",
+    "SettingsOverlaySurfaceRegions",
+    "SettingsOverlaySurfaceSlots",
+    "SettingsPromptIntents",
+    "SettingsPromptSurfaceRegions",
+    "SettingsPromptSurfaceSlots",
     "SettingsProviderIntents",
     "SettingsProviderStateSink",
     "SettingsSnapshot",

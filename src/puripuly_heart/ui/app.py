@@ -58,6 +58,9 @@ from puripuly_heart.ui.i18n import (
 )
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.settings.contract import (
+    SettingsGeneralIntents,
+    SettingsOverlayIntents,
+    SettingsPromptIntents,
     SettingsProviderIntents,
     SettingsSurfaceIntents,
 )
@@ -216,6 +219,10 @@ class TranslatorApp:
 
         runtime_log_basic = self.application.log_basic
         runtime_log_detailed = self.application.log_detailed
+        calibration_begin = self.application.begin_overlay_calibration
+        calibration_change = self.application.set_overlay_calibration_field
+        calibration_apply = self.application.apply_overlay_calibration
+        calibration_cancel = self.application.cancel_overlay_calibration
         self.view_settings.bind_settings_intents(
             surface=SettingsSurfaceIntents(
                 settings_changed=self._on_settings_changed,
@@ -234,51 +241,42 @@ class TranslatorApp:
                 local_llm_secret_changed=self._on_local_llm_secret_changed,
                 gpu_discovery_requested=self._on_gpu_discovery_requested,
             ),
+            general=SettingsGeneralIntents(
+                start_microphone_test=self._on_start_microphone_test,
+                telemetry_consent_change=self._on_telemetry_consent_change,
+                list_loopback_capture_options=(
+                    lambda: self.application.list_loopback_capture_options()
+                ),
+                list_loopback_process_options=(
+                    lambda: self.application.list_loopback_process_options()
+                ),
+                list_loopback_device_options=(
+                    lambda: self.application.list_loopback_device_options()
+                ),
+                current_loopback_capture_option=(
+                    lambda: self.application.current_loopback_capture_option_value()
+                ),
+                apply_loopback_capture_option=self._on_apply_loopback_capture_option,
+                loopback_capture_summary=(lambda: self.application.loopback_capture_summary()),
+            ),
+            prompt=SettingsPromptIntents(
+                prompt_apply_settings=self._on_prompt_apply_settings,
+            ),
+            overlay=SettingsOverlayIntents(
+                desktop_overlay_lock_change=self._on_desktop_overlay_lock_change,
+                desktop_overlay_size_change=self._on_desktop_overlay_size_change,
+                desktop_overlay_recovery_action=self._on_desktop_overlay_recovery_action,
+                desktop_overlay_position_reset=self._on_desktop_overlay_position_reset,
+                view_logs=self._open_logs_tab,
+                calibration_begin=(calibration_begin if callable(calibration_begin) else None),
+                calibration_change=(calibration_change if callable(calibration_change) else None),
+                calibration_apply=(calibration_apply if callable(calibration_apply) else None),
+                calibration_cancel=(calibration_cancel if callable(calibration_cancel) else None),
+            ),
         )
-        self.view_settings.on_prompt_apply_settings = self._on_prompt_apply_settings
-        self.view_settings.on_start_microphone_test = self._on_start_microphone_test
-        self.view_settings.on_telemetry_consent_change = self._on_telemetry_consent_change
-        self.view_settings.on_list_loopback_capture_options = (
-            lambda: self.application.list_loopback_capture_options()
-        )
-        self.view_settings.on_list_loopback_process_options = (
-            lambda: self.application.list_loopback_process_options()
-        )
-        self.view_settings.on_list_loopback_device_options = (
-            lambda: self.application.list_loopback_device_options()
-        )
-        self.view_settings.on_current_loopback_capture_option = (
-            lambda: self.application.current_loopback_capture_option_value()
-        )
-        self.view_settings.on_apply_loopback_capture_option = self._on_apply_loopback_capture_option
-        self.view_settings.on_loopback_capture_summary = (
-            lambda: self.application.loopback_capture_summary()
-        )
-        self.view_settings.on_desktop_overlay_lock_change = self._on_desktop_overlay_lock_change
-        self.view_settings.on_desktop_overlay_size_change = self._on_desktop_overlay_size_change
-        self.view_settings.on_desktop_overlay_recovery_action = (
-            self._on_desktop_overlay_recovery_action
-        )
-        self.view_settings.on_desktop_overlay_position_reset = (
-            self._on_desktop_overlay_position_reset
-        )
-        self.view_settings.on_view_logs = self._open_logs_tab
         self.view_logs.on_mode_change = self._on_runtime_logging_mode_change
         self.view_logs.set_runtime_logging_mode(self.application.state().runtime_logging_mode)
         self.view_dashboard.runtime_log_detailed = self._log_detailed
-
-        calibration_begin = self.application.begin_overlay_calibration
-        calibration_change = self.application.set_overlay_calibration_field
-        calibration_apply = self.application.apply_overlay_calibration
-        calibration_cancel = self.application.cancel_overlay_calibration
-        if callable(calibration_begin):
-            self.view_settings.on_overlay_calibration_begin = calibration_begin
-        if callable(calibration_change):
-            self.view_settings.on_overlay_calibration_change = calibration_change
-        if callable(calibration_apply):
-            self.view_settings.on_overlay_calibration_apply = calibration_apply
-        if callable(calibration_cancel):
-            self.view_settings.on_overlay_calibration_cancel = calibration_cancel
 
         set_overlay_calibration = getattr(self.view_settings, "set_overlay_calibration", None)
         overlay_calibration = self.application.overlay_calibration

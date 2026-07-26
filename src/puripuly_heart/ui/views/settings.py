@@ -83,10 +83,21 @@ from puripuly_heart.ui.i18n import (
 from puripuly_heart.ui.overlay_peer_contract import OverlayPeerConsumerContract
 from puripuly_heart.ui.settings.contract import (
     SettingsApiSurfaceSlots,
+    SettingsGeneralIntents,
+    SettingsGeneralSurfaceSlots,
+    SettingsOverlayIntents,
+    SettingsOverlaySurfaceSlots,
+    SettingsPromptIntents,
+    SettingsPromptSurfaceSlots,
     SettingsProviderIntents,
     SettingsSurfaceIntents,
 )
-from puripuly_heart.ui.settings.renderer import compose_settings_api_surface
+from puripuly_heart.ui.settings.renderer import (
+    compose_settings_api_surface,
+    compose_settings_general_surface,
+    compose_settings_overlay_surface,
+    compose_settings_prompt_surface,
+)
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
     COLOR_NEUTRAL,
@@ -417,6 +428,9 @@ class SettingsView(ft.Column):
         *,
         surface: SettingsSurfaceIntents,
         provider: SettingsProviderIntents,
+        general: SettingsGeneralIntents,
+        prompt: SettingsPromptIntents,
+        overlay: SettingsOverlayIntents,
     ) -> None:
         self.on_settings_changed = surface.settings_changed
         self.show_snackbar = surface.show_snackbar
@@ -431,6 +445,28 @@ class SettingsView(ft.Column):
         self.on_secret_cleared = provider.secret_cleared
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
+        self.on_start_microphone_test = general.start_microphone_test
+        self.on_telemetry_consent_change = general.telemetry_consent_change
+        self.on_list_loopback_capture_options = general.list_loopback_capture_options
+        self.on_list_loopback_process_options = general.list_loopback_process_options
+        self.on_list_loopback_device_options = general.list_loopback_device_options
+        self.on_current_loopback_capture_option = general.current_loopback_capture_option
+        self.on_apply_loopback_capture_option = general.apply_loopback_capture_option
+        self.on_loopback_capture_summary = general.loopback_capture_summary
+        self.on_prompt_apply_settings = prompt.prompt_apply_settings
+        self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
+        self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
+        self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
+        self.on_desktop_overlay_position_reset = overlay.desktop_overlay_position_reset
+        self.on_view_logs = overlay.view_logs
+        if overlay.calibration_begin is not None:
+            self.on_overlay_calibration_begin = overlay.calibration_begin
+        if overlay.calibration_change is not None:
+            self.on_overlay_calibration_change = overlay.calibration_change
+        if overlay.calibration_apply is not None:
+            self.on_overlay_calibration_apply = overlay.calibration_apply
+        if overlay.calibration_cancel is not None:
+            self.on_overlay_calibration_cancel = overlay.calibration_cancel
 
     # --- Card Wrapper (About page pattern) ---
     def _wrap_card(
@@ -1313,17 +1349,8 @@ class SettingsView(ft.Column):
             value=self._microphone_test_text,
         )
 
-        general_primary_row = ft.Container(
-            content=ft.Row(
-                [
-                    ui_card,
-                    chatbox_source_card,
-                    self._wrap_empty_unit_card(),
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
+        self._general_ui_card = ui_card
+        self._general_chatbox_source_card = chatbox_source_card
 
         # === General Tab Row 2: Host API / Microphone Audio / Loopback Audio ===
         self._mic_audio_text = self._build_clickable_text(
@@ -1369,13 +1396,9 @@ class SettingsView(ft.Column):
             title=self._loopback_audio_title,
             value=self._loopback_audio_text,
         )
-        general_audio_row = ft.Container(
-            content=ft.Row(
-                [host_api_card, mic_audio_card, loopback_audio_card],
-                spacing=16,
-                expand=True,
-            ),
-        )
+        self._general_host_api_card = host_api_card
+        self._general_mic_audio_card = mic_audio_card
+        self._general_loopback_audio_card = loopback_audio_card
 
         # === General Tab Row 3: VRChat Mute Sync / Self VAD / Peer VAD ===
         self._self_vad_title = ft.Text(
@@ -1438,23 +1461,21 @@ class SettingsView(ft.Column):
                 expand=True,
             ),
         )
-        general_vad_row = ft.Container(
-            content=ft.Row(
-                [microphone_test_card, self._self_vad_card, self._peer_vad_card],
-                spacing=16,
-                expand=True,
+        self._general_surface = compose_settings_general_surface(
+            SettingsGeneralSurfaceSlots(
+                ui=self._general_ui_card,
+                chatbox_source=self._general_chatbox_source_card,
+                audio_host_api=self._general_host_api_card,
+                microphone=self._general_mic_audio_card,
+                loopback=self._general_loopback_audio_card,
+                microphone_test=microphone_test_card,
+                self_vad=self._self_vad_card,
+                peer_vad=self._peer_vad_card,
+                clipboard_auto_translate=clipboard_auto_translate_card,
+                vrchat_mic_intercept=vrc_mic_card,
+                telemetry_consent=self._telemetry_consent_card,
             ),
-        )
-        general_clipboard_row = ft.Container(
-            content=ft.Row(
-                [
-                    clipboard_auto_translate_card,
-                    vrc_mic_card,
-                    self._telemetry_consent_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
+            placeholder_factory=self._wrap_empty_unit_card,
         )
 
         # === Peer STT card ===
@@ -1840,77 +1861,32 @@ class SettingsView(ft.Column):
         self._overlay_desktop_reset_spacer_a = self._wrap_empty_unit_card()
         self._overlay_desktop_reset_spacer_b = self._wrap_empty_unit_card()
 
-        overlay_row1 = ft.Container(
-            content=ft.Row(
-                [
-                    self._overlay_target_card,
-                    self._overlay_translation_card,
-                    self._overlay_peer_original_card,
-                ],
-                spacing=16,
-                expand=True,
+        self._overlay_surface = compose_settings_overlay_surface(
+            SettingsOverlaySurfaceSlots(
+                overlay_target=self._overlay_target_card,
+                overlay_translation=self._overlay_translation_card,
+                overlay_peer_original=self._overlay_peer_original_card,
+                anchor=self._overlay_anchor_card,
+                distance=self._overlay_distance_card,
+                offset_x=self._overlay_offset_x_card,
+                offset_y=self._overlay_offset_y_card,
+                text_scale=self._overlay_text_scale_card,
+                vr_reset=self._overlay_vr_reset_card,
+                desktop_size=self._desktop_overlay_size_card,
+                desktop_lock=self._desktop_overlay_lock_card,
+                desktop_background_alpha=self._desktop_overlay_background_alpha_card,
+                desktop_reset=self._overlay_desktop_reset_card,
+                desktop_reset_spacer_a=self._overlay_desktop_reset_spacer_a,
+                desktop_reset_spacer_b=self._overlay_desktop_reset_spacer_b,
+                desktop_status=self._desktop_overlay_status_card,
+                desktop_status_trailing=self._overlay_empty_card,
             ),
+            placeholder_factory=self._wrap_empty_unit_card,
         )
-        overlay_row2 = ft.Container(
-            content=ft.Row(
-                [
-                    self._overlay_anchor_card,
-                    self._overlay_distance_card,
-                    self._overlay_offset_x_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
-        overlay_row3 = ft.Container(
-            content=ft.Row(
-                [
-                    self._overlay_offset_y_card,
-                    self._overlay_text_scale_card,
-                    self._overlay_vr_reset_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
-        overlay_row4 = ft.Container(
-            content=ft.Row(
-                [
-                    self._desktop_overlay_size_card,
-                    self._desktop_overlay_lock_card,
-                    self._desktop_overlay_background_alpha_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
-        overlay_row5 = ft.Container(
-            content=ft.Row(
-                [
-                    self._overlay_desktop_reset_card,
-                    self._overlay_desktop_reset_spacer_a,
-                    self._overlay_desktop_reset_spacer_b,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
-        overlay_row6 = ft.Container(
-            content=ft.Row(
-                [
-                    self._desktop_overlay_status_card,
-                    self._wrap_empty_unit_card(),
-                    self._overlay_empty_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-            visible=False,
-        )
-        self._overlay_vr_rows = (overlay_row2, overlay_row3)
-        self._overlay_desktop_rows = (overlay_row4, overlay_row5)
-        self._desktop_overlay_controls_row = overlay_row4
-        self._desktop_overlay_recovery_row = overlay_row6
+        self._overlay_vr_rows = self._overlay_surface.vr_rows
+        self._overlay_desktop_rows = self._overlay_surface.desktop_rows
+        self._desktop_overlay_controls_row = self._overlay_surface.desktop_controls_row
+        self._desktop_overlay_recovery_row = self._overlay_surface.recovery_row
         self._sync_overlay_target_specific_visibility()
 
         self._translation_connection_title = ft.Text(
@@ -2150,24 +2126,16 @@ class SettingsView(ft.Column):
         self._openrouter_routing_row = self._translation_connection_row
         self._gpu_device_row = self._api_surface.gpu_device_row
 
+        self._prompt_surface = compose_settings_prompt_surface(
+            SettingsPromptSurfaceSlots(custom_vocabulary=row7, persona=persona_card)
+        )
+
         self._settings_subtab_shell = self._build_settings_subtab_shell(
             {
                 "api": list(self._api_surface.rows),
-                "general": [
-                    general_primary_row,
-                    general_audio_row,
-                    general_vad_row,
-                    general_clipboard_row,
-                ],
-                "prompt": [row7, persona_card],
-                "overlay": [
-                    overlay_row1,
-                    overlay_row2,
-                    overlay_row3,
-                    overlay_row4,
-                    overlay_row5,
-                    overlay_row6,
-                ],
+                "general": list(self._general_surface.rows),
+                "prompt": list(self._prompt_surface.rows),
+                "overlay": list(self._overlay_surface.rows),
             }
         )
         self.controls = [self._settings_subtab_shell]

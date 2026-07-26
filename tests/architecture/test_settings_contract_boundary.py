@@ -49,6 +49,48 @@ G14_OWNED_VIEW_SINKS = (
     "runtime_log_basic",
     "runtime_log_detailed",
 )
+G15_GENERAL_INTENT_FIELDS = (
+    "start_microphone_test",
+    "telemetry_consent_change",
+    "list_loopback_capture_options",
+    "list_loopback_process_options",
+    "list_loopback_device_options",
+    "current_loopback_capture_option",
+    "apply_loopback_capture_option",
+    "loopback_capture_summary",
+)
+G15_PROMPT_INTENT_FIELDS = ("prompt_apply_settings",)
+G15_OVERLAY_INTENT_FIELDS = (
+    "desktop_overlay_lock_change",
+    "desktop_overlay_size_change",
+    "desktop_overlay_recovery_action",
+    "desktop_overlay_position_reset",
+    "view_logs",
+    "calibration_begin",
+    "calibration_change",
+    "calibration_apply",
+    "calibration_cancel",
+)
+G15_OWNED_VIEW_CALLBACKS = (
+    "on_prompt_apply_settings",
+    "on_start_microphone_test",
+    "on_telemetry_consent_change",
+    "on_list_loopback_capture_options",
+    "on_list_loopback_process_options",
+    "on_list_loopback_device_options",
+    "on_current_loopback_capture_option",
+    "on_apply_loopback_capture_option",
+    "on_loopback_capture_summary",
+    "on_desktop_overlay_lock_change",
+    "on_desktop_overlay_size_change",
+    "on_desktop_overlay_recovery_action",
+    "on_desktop_overlay_position_reset",
+    "on_view_logs",
+    "on_overlay_calibration_begin",
+    "on_overlay_calibration_change",
+    "on_overlay_calibration_apply",
+    "on_overlay_calibration_cancel",
+)
 
 
 def _imported_modules(path: pathlib.Path) -> set[str]:
@@ -131,17 +173,76 @@ def test_production_settings_surface_uses_an_external_slot_provider() -> None:
     assert "placeholder_factory=self._wrap_empty_unit_card" in source
 
 
-def test_translator_app_wires_g14_settings_intents_through_one_path() -> None:
+def test_translator_app_wires_every_settings_intent_through_one_path() -> None:
     assigned = set(_settings_view_attribute_assignments("view_settings"))
-    for owned in (*G14_OWNED_VIEW_CALLBACKS, *G14_OWNED_VIEW_SINKS):
+    for owned in (
+        *G14_OWNED_VIEW_CALLBACKS,
+        *G14_OWNED_VIEW_SINKS,
+        *G15_OWNED_VIEW_CALLBACKS,
+    ):
         assert owned not in assigned, f"{owned} must be bound through bind_settings_intents"
+    assert not any(name.startswith("on_") for name in assigned)
 
     app_source = (SOURCE_ROOT / "ui" / "app.py").read_text(encoding="utf-8")
     assert app_source.count("bind_settings_intents(") == 1
 
 
 def test_settings_intent_groups_expose_the_accepted_field_sets() -> None:
-    surface_fields = tuple(settings_contract.SettingsSurfaceIntents.__dataclass_fields__)
-    provider_fields = tuple(settings_contract.SettingsProviderIntents.__dataclass_fields__)
-    assert surface_fields == G14_SURFACE_INTENT_FIELDS
-    assert provider_fields == G14_PROVIDER_INTENT_FIELDS
+    assert (
+        tuple(settings_contract.SettingsSurfaceIntents.__dataclass_fields__)
+        == G14_SURFACE_INTENT_FIELDS
+    )
+    assert (
+        tuple(settings_contract.SettingsProviderIntents.__dataclass_fields__)
+        == G14_PROVIDER_INTENT_FIELDS
+    )
+    assert (
+        tuple(settings_contract.SettingsGeneralIntents.__dataclass_fields__)
+        == G15_GENERAL_INTENT_FIELDS
+    )
+    assert (
+        tuple(settings_contract.SettingsPromptIntents.__dataclass_fields__)
+        == G15_PROMPT_INTENT_FIELDS
+    )
+    assert (
+        tuple(settings_contract.SettingsOverlayIntents.__dataclass_fields__)
+        == G15_OVERLAY_INTENT_FIELDS
+    )
+
+
+def test_g15_surfaces_consume_the_shared_renderer_without_private_g14_access() -> None:
+    import inspect
+
+    source = (SOURCE_ROOT / "ui" / "views" / "settings.py").read_text(encoding="utf-8")
+    for call in (
+        "compose_settings_general_surface(",
+        "compose_settings_prompt_surface(",
+        "compose_settings_overlay_surface(",
+    ):
+        assert call in source
+
+    expected = {
+        settings_renderer.compose_settings_general_surface: "SettingsGeneralSurfaceSlots",
+        settings_renderer.compose_settings_prompt_surface: "SettingsPromptSurfaceSlots",
+        settings_renderer.compose_settings_overlay_surface: "SettingsOverlaySurfaceSlots",
+    }
+    for function, slot_type in expected.items():
+        parameters = inspect.signature(function).parameters
+        assert parameters["slots"].annotation == slot_type
+        assert not any("Api" in str(parameter.annotation) for parameter in parameters.values())
+
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id
+            in {
+                "compose_settings_general_surface",
+                "compose_settings_prompt_surface",
+                "compose_settings_overlay_surface",
+            }
+        ):
+            rendered = ast.dump(node)
+            assert "_api_surface" not in rendered
+            assert "_self_stt_card" not in rendered

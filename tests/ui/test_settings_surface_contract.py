@@ -12,6 +12,12 @@ import puripuly_heart
 from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 from puripuly_heart.ui.settings.contract import (
     SettingsApiSurfaceSlots,
+    SettingsGeneralIntents,
+    SettingsGeneralSurfaceSlots,
+    SettingsOverlayIntents,
+    SettingsOverlaySurfaceSlots,
+    SettingsPromptIntents,
+    SettingsPromptSurfaceSlots,
     SettingsProviderIntents,
     SettingsSurfaceIntents,
 )
@@ -19,6 +25,9 @@ from puripuly_heart.ui.settings.renderer import (
     SETTINGS_API_GPU_PLACEHOLDER_COUNT,
     SETTINGS_ROW_SPACING,
     compose_settings_api_surface,
+    compose_settings_general_surface,
+    compose_settings_overlay_surface,
+    compose_settings_prompt_surface,
 )
 from puripuly_heart.ui.views import settings as settings_view_module
 
@@ -194,8 +203,36 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
         local_llm_secret_changed=make("local_llm_secret_changed"),
         gpu_discovery_requested=make("gpu_discovery_requested"),
     )
+    general = SettingsGeneralIntents(
+        start_microphone_test=make("start_microphone_test"),
+        telemetry_consent_change=make("telemetry_consent_change"),
+        list_loopback_capture_options=make("list_loopback_capture_options"),
+        list_loopback_process_options=make("list_loopback_process_options"),
+        list_loopback_device_options=make("list_loopback_device_options"),
+        current_loopback_capture_option=make("current_loopback_capture_option"),
+        apply_loopback_capture_option=make("apply_loopback_capture_option"),
+        loopback_capture_summary=make("loopback_capture_summary"),
+    )
+    prompt = SettingsPromptIntents(prompt_apply_settings=make("prompt_apply_settings"))
+    overlay = SettingsOverlayIntents(
+        desktop_overlay_lock_change=make("desktop_overlay_lock_change"),
+        desktop_overlay_size_change=make("desktop_overlay_size_change"),
+        desktop_overlay_recovery_action=make("desktop_overlay_recovery_action"),
+        desktop_overlay_position_reset=make("desktop_overlay_position_reset"),
+        view_logs=make("view_logs"),
+        calibration_begin=make("calibration_begin"),
+        calibration_change=make("calibration_change"),
+        calibration_apply=make("calibration_apply"),
+        calibration_cancel=make("calibration_cancel"),
+    )
 
-    view.bind_settings_intents(surface=surface, provider=provider)
+    view.bind_settings_intents(
+        surface=surface,
+        provider=provider,
+        general=general,
+        prompt=prompt,
+        overlay=overlay,
+    )
 
     assert view.on_settings_changed is surface.settings_changed
     assert view.show_snackbar is surface.show_snackbar
@@ -208,6 +245,24 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     assert view.on_secret_cleared is provider.secret_cleared
     assert view.on_local_llm_secret_changed is provider.local_llm_secret_changed
     assert view.on_gpu_discovery_requested is provider.gpu_discovery_requested
+    assert view.on_start_microphone_test is general.start_microphone_test
+    assert view.on_telemetry_consent_change is general.telemetry_consent_change
+    assert view.on_list_loopback_capture_options is general.list_loopback_capture_options
+    assert view.on_list_loopback_process_options is general.list_loopback_process_options
+    assert view.on_list_loopback_device_options is general.list_loopback_device_options
+    assert view.on_current_loopback_capture_option is general.current_loopback_capture_option
+    assert view.on_apply_loopback_capture_option is general.apply_loopback_capture_option
+    assert view.on_loopback_capture_summary is general.loopback_capture_summary
+    assert view.on_prompt_apply_settings is prompt.prompt_apply_settings
+    assert view.on_desktop_overlay_lock_change is overlay.desktop_overlay_lock_change
+    assert view.on_desktop_overlay_size_change is overlay.desktop_overlay_size_change
+    assert view.on_desktop_overlay_recovery_action is overlay.desktop_overlay_recovery_action
+    assert view.on_desktop_overlay_position_reset is overlay.desktop_overlay_position_reset
+    assert view.on_view_logs is overlay.view_logs
+    assert view.on_overlay_calibration_begin is overlay.calibration_begin
+    assert view.on_overlay_calibration_change is overlay.calibration_change
+    assert view.on_overlay_calibration_apply is overlay.calibration_apply
+    assert view.on_overlay_calibration_cancel is overlay.calibration_cancel
 
 
 def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
@@ -226,6 +281,7 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
     view = settings_view_module.SettingsView()
     existing_basic = view.runtime_log_basic
     existing_detailed = view.runtime_log_detailed
+    existing_calibration_begin = view.on_overlay_calibration_begin
 
     view.bind_settings_intents(
         surface=SettingsSurfaceIntents(
@@ -241,10 +297,143 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
             local_llm_secret_changed=lambda *_a, **_k: None,
             gpu_discovery_requested=lambda *_a, **_k: None,
         ),
+        general=SettingsGeneralIntents(
+            start_microphone_test=lambda *_a, **_k: None,
+            telemetry_consent_change=lambda *_a, **_k: None,
+            list_loopback_capture_options=lambda *_a, **_k: None,
+            list_loopback_process_options=lambda *_a, **_k: None,
+            list_loopback_device_options=lambda *_a, **_k: None,
+            current_loopback_capture_option=lambda *_a, **_k: "",
+            apply_loopback_capture_option=lambda *_a, **_k: None,
+            loopback_capture_summary=lambda *_a, **_k: "",
+        ),
+        prompt=SettingsPromptIntents(prompt_apply_settings=lambda *_a, **_k: None),
+        overlay=SettingsOverlayIntents(
+            desktop_overlay_lock_change=lambda *_a, **_k: None,
+            desktop_overlay_size_change=lambda *_a, **_k: None,
+            desktop_overlay_recovery_action=lambda *_a, **_k: None,
+            desktop_overlay_position_reset=lambda *_a, **_k: None,
+            view_logs=lambda *_a, **_k: None,
+        ),
     )
 
     assert view.runtime_log_basic is existing_basic
     assert view.runtime_log_detailed is existing_detailed
+    assert view.on_overlay_calibration_begin is existing_calibration_begin
+
+
+def _general_slots() -> SettingsGeneralSurfaceSlots:
+    return SettingsGeneralSurfaceSlots(
+        **{
+            name: ft.Text(name)
+            for name in SettingsGeneralSurfaceSlots.__dataclass_fields__  # noqa: F821
+        }
+    )
+
+
+def _overlay_slots() -> SettingsOverlaySurfaceSlots:
+    return SettingsOverlaySurfaceSlots(
+        **{name: ft.Text(name) for name in SettingsOverlaySurfaceSlots.__dataclass_fields__}
+    )
+
+
+def test_general_surface_preserves_the_accepted_row_order_and_spacing() -> None:
+    placeholders: list[ft.Control] = []
+    slots = _general_slots()
+    surface = compose_settings_general_surface(
+        slots,
+        placeholder_factory=lambda: _track(placeholders),
+    )
+
+    assert len(placeholders) == 1
+    assert surface.rows == (
+        surface.primary_row,
+        surface.audio_row,
+        surface.vad_row,
+        surface.clipboard_row,
+    )
+    assert surface.primary_row.content.controls == [
+        slots.ui,
+        slots.chatbox_source,
+        surface.primary_row_placeholder,
+    ]
+    assert surface.audio_row.content.controls == [
+        slots.audio_host_api,
+        slots.microphone,
+        slots.loopback,
+    ]
+    assert surface.vad_row.content.controls == [
+        slots.microphone_test,
+        slots.self_vad,
+        slots.peer_vad,
+    ]
+    assert surface.clipboard_row.content.controls == [
+        slots.clipboard_auto_translate,
+        slots.vrchat_mic_intercept,
+        slots.telemetry_consent,
+    ]
+    for row in surface.rows:
+        assert row.visible is True
+        assert row.content.spacing == FOUNDATION_DESIGN_TOKENS.spacing.page
+        assert row.content.expand is True
+
+
+def test_prompt_surface_preserves_the_accepted_two_card_order() -> None:
+    vocabulary = ft.Text("vocabulary")
+    persona = ft.Text("persona")
+    surface = compose_settings_prompt_surface(
+        SettingsPromptSurfaceSlots(custom_vocabulary=vocabulary, persona=persona)
+    )
+    assert surface.rows == (vocabulary, persona)
+
+
+def test_overlay_surface_preserves_the_accepted_six_rows_and_recovery_visibility() -> None:
+    placeholders: list[ft.Control] = []
+    slots = _overlay_slots()
+    surface = compose_settings_overlay_surface(
+        slots,
+        placeholder_factory=lambda: _track(placeholders),
+    )
+
+    assert len(surface.rows) == 6
+    assert len(placeholders) == 1
+    assert surface.rows[0] is surface.target_row
+    assert surface.vr_rows == (surface.rows[1], surface.rows[2])
+    assert surface.desktop_rows == (surface.rows[3], surface.rows[4])
+    assert surface.desktop_controls_row is surface.rows[3]
+    assert surface.recovery_row is surface.rows[5]
+    assert surface.recovery_row.visible is False
+    for row in surface.rows[:5]:
+        assert row.visible is True
+
+    assert surface.target_row.content.controls == [
+        slots.overlay_target,
+        slots.overlay_translation,
+        slots.overlay_peer_original,
+    ]
+    assert surface.rows[1].content.controls == [slots.anchor, slots.distance, slots.offset_x]
+    assert surface.rows[2].content.controls == [slots.offset_y, slots.text_scale, slots.vr_reset]
+    assert surface.rows[3].content.controls == [
+        slots.desktop_size,
+        slots.desktop_lock,
+        slots.desktop_background_alpha,
+    ]
+    assert surface.rows[4].content.controls == [
+        slots.desktop_reset,
+        slots.desktop_reset_spacer_a,
+        slots.desktop_reset_spacer_b,
+    ]
+    assert surface.recovery_row.content.controls == [
+        slots.desktop_status,
+        surface.recovery_row_placeholder,
+        slots.desktop_status_trailing,
+    ]
+
+
+def _track(bucket: list[ft.Control]) -> ft.Control:
+    control = ft.Container()
+    bucket.append(control)
+    return control
 
 
 def _attribute_calls(source: str, owner_names: tuple[str, ...]) -> set[str]:

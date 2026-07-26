@@ -348,7 +348,7 @@ class ConstructionDummySettingsView(ft.Container):
         self.has_pending_prompt_changes = False
         self.synced_desktop_settings: list[AppSettings] = []
 
-    def bind_settings_intents(self, *, surface, provider) -> None:
+    def bind_settings_intents(self, *, surface, provider, general, prompt, overlay) -> None:
         self.on_settings_changed = surface.settings_changed
         self.show_snackbar = surface.show_snackbar
         if surface.runtime_log_basic is not None:
@@ -362,6 +362,24 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_secret_cleared = provider.secret_cleared
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
+        self.on_start_microphone_test = general.start_microphone_test
+        self.on_telemetry_consent_change = general.telemetry_consent_change
+        self.on_list_loopback_capture_options = general.list_loopback_capture_options
+        self.on_list_loopback_process_options = general.list_loopback_process_options
+        self.on_list_loopback_device_options = general.list_loopback_device_options
+        self.on_current_loopback_capture_option = general.current_loopback_capture_option
+        self.on_apply_loopback_capture_option = general.apply_loopback_capture_option
+        self.on_loopback_capture_summary = general.loopback_capture_summary
+        self.on_prompt_apply_settings = prompt.prompt_apply_settings
+        self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
+        self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
+        self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
+        self.on_desktop_overlay_position_reset = overlay.desktop_overlay_position_reset
+        self.on_view_logs = overlay.view_logs
+        self.on_overlay_calibration_begin = overlay.calibration_begin
+        self.on_overlay_calibration_change = overlay.calibration_change
+        self.on_overlay_calibration_apply = overlay.calibration_apply
+        self.on_overlay_calibration_cancel = overlay.calibration_cancel
 
     def set_overlay_runtime_state(self, *_args, **_kwargs) -> None:
         return None
@@ -1137,7 +1155,7 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
             self.on_secret_cleared = None
             self.show_snackbar = None
 
-        def bind_settings_intents(self, *, surface, provider) -> None:
+        def bind_settings_intents(self, *, surface, provider, general, prompt, overlay) -> None:
             self.on_settings_changed = surface.settings_changed
             self.show_snackbar = surface.show_snackbar
             self.on_providers_changed = provider.providers_changed
@@ -1147,6 +1165,9 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
             self.on_secret_cleared = provider.secret_cleared
             self.on_local_llm_secret_changed = provider.local_llm_secret_changed
             self.on_gpu_discovery_requested = provider.gpu_discovery_requested
+            self.on_start_microphone_test = general.start_microphone_test
+            self.on_prompt_apply_settings = prompt.prompt_apply_settings
+            self.on_view_logs = overlay.view_logs
 
         def set_overlay_runtime_state(self, *_args, **_kwargs) -> None:
             return None
