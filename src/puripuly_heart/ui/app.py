@@ -39,6 +39,10 @@ from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDia
 from puripuly_heart.ui.components.telemetry_consent_dialog import TelemetryConsentDialog
 from puripuly_heart.ui.components.title_bar import TitleBar
 from puripuly_heart.ui.controller import GuiController
+from puripuly_heart.ui.dashboard.contract import (
+    DashboardCaptureIntents,
+    DashboardTranslationIntents,
+)
 from puripuly_heart.ui.fonts import font_for_language, register_fonts
 from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
 from puripuly_heart.ui.foundation.preview import FoundationPreviewSurface
@@ -190,15 +194,21 @@ class TranslatorApp:
         self._build_layout()
 
         # Link Dashboard callbacks
-        self.view_dashboard.on_send_message = self._on_manual_submit
-        self.view_dashboard.on_message_input_activity = self._on_message_input_activity
-        self.view_dashboard.on_toggle_translation = self._on_translation_toggle
-        self.view_dashboard.on_toggle_stt = self._on_stt_toggle
-        self.view_dashboard.on_toggle_overlay = self._on_overlay_toggle
-        self.view_dashboard.on_toggle_peer_translation = self._on_peer_translation_toggle
-        self.view_dashboard.on_retry_peer_process_capture = self._on_retry_peer_process_capture
-        self.view_dashboard.on_language_change = self._on_language_change
-        self.view_dashboard.on_gpu_notice_action = self.application.handle_gpu_notice_action
+        self.view_dashboard.bind_dashboard_intents(
+            translation=DashboardTranslationIntents(
+                submit_message=self._on_manual_submit,
+                toggle_translation=self._on_translation_toggle,
+                change_language=self._on_language_change,
+                report_input_activity=self._on_message_input_activity,
+            ),
+            capture=DashboardCaptureIntents(
+                toggle_self_capture=self._on_stt_toggle,
+                toggle_peer_capture=self._on_peer_translation_toggle,
+                toggle_overlay=self._on_overlay_toggle,
+                retry_peer_process_capture=self._on_retry_peer_process_capture,
+                run_gpu_notice_action=self.application.handle_gpu_notice_action,
+            ),
+        )
 
         self.view_settings.on_settings_changed = self._on_settings_changed
         self.view_settings.on_prompt_apply_settings = self._on_prompt_apply_settings

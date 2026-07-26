@@ -6,66 +6,55 @@ import flet as ft
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.core.language import get_all_language_options
 from puripuly_heart.ui.components.display_card import DisplayCard
-from puripuly_heart.ui.components.glow import create_background_glow_stack
 from puripuly_heart.ui.components.language_card import LanguageCard
 from puripuly_heart.ui.components.language_modal import LanguageModal
 from puripuly_heart.ui.components.power_button import PowerButton
+from puripuly_heart.ui.dashboard.capture import (
+    DashboardCaptureControls,
+    capture_presentation_from_contract,
+)
+from puripuly_heart.ui.dashboard.capture_notices import (
+    gpu_capture_action_label,
+    gpu_capture_notice,
+    local_asr_capture_notice,
+)
+from puripuly_heart.ui.dashboard.contract import (
+    DashboardCaptureIntents,
+    DashboardSurfaceSlots,
+    DashboardTranslationIntents,
+)
+from puripuly_heart.ui.dashboard.renderer import (
+    DASHBOARD_CONTROL_REGION_EXPAND,
+    DASHBOARD_DISPLAY_CARD_EXPAND,
+    DASHBOARD_INFO_REGION_EXPAND,
+    DASHBOARD_LANGUAGE_CARD_EXPAND,
+    DASHBOARD_LAYOUT_GAP,
+    DASHBOARD_POWER_BUTTON_ICON_SIZE,
+    DASHBOARD_POWER_BUTTON_LABEL_SIZE,
+    DASHBOARD_SHELL_SPACING,
+    compose_dashboard_surface,
+)
 from puripuly_heart.ui.flet_runtime import control_page
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice, GpuNoticeAction
 from puripuly_heart.ui.i18n import get_locale, language_name, t
-from puripuly_heart.ui.overlay_peer_contract import (
-    OverlayPeerConsumerContract,
-    is_process_capture_warning_reason,
-)
+from puripuly_heart.ui.overlay_peer_contract import OverlayPeerConsumerContract
 
-DASHBOARD_LAYOUT_GAP = 12
-DASHBOARD_CONTROL_REGION_EXPAND = 45
-DASHBOARD_INFO_REGION_EXPAND = 55
-DASHBOARD_DISPLAY_CARD_EXPAND = 1
-DASHBOARD_LANGUAGE_CARD_EXPAND = 1
-DASHBOARD_POWER_BUTTON_ICON_SIZE = 80
-DASHBOARD_POWER_BUTTON_LABEL_SIZE = 32
 OVERLAY_FAILURE_REASON_ONLY_NOTICE_REASONS = {"steamvr_not_running"}
+
+__all__ = [
+    "DASHBOARD_CONTROL_REGION_EXPAND",
+    "DASHBOARD_DISPLAY_CARD_EXPAND",
+    "DASHBOARD_INFO_REGION_EXPAND",
+    "DASHBOARD_LANGUAGE_CARD_EXPAND",
+    "DASHBOARD_LAYOUT_GAP",
+    "DASHBOARD_POWER_BUTTON_ICON_SIZE",
+    "DASHBOARD_POWER_BUTTON_LABEL_SIZE",
+    "DASHBOARD_SHELL_SPACING",
+    "DashboardView",
+]
 OVERLAY_YIELDING_NOTICE_SOURCES = {"overlay_fallback", "overlay_failure"}
 PEER_SOURCE_MODE_AUTO = "auto"
-_LOCAL_STT_MODEL_LABEL_KEYS = {
-    "parakeet-tdt-0.6b-v3-int8-sherpa": "local_stt.model.parakeet-tdt-0.6b-v3-int8-sherpa",
-    "parakeet-tdt-ctc-0.6b-ja-int8-sherpa": "local_stt.model.parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
-    "qwen3-asr-0.6b-int8-sherpa": "local_stt.model.qwen3-asr-0.6b-int8-sherpa",
-}
-_LOCAL_STT_TARGETED_NOTICE_KEYS = {
-    "missing": "dashboard.local_stt_notice_missing_model",
-    "invalid": "dashboard.local_stt_notice_invalid_model",
-    "downloading": "dashboard.local_stt_notice_downloading_model",
-    "download_failed": "dashboard.local_stt_notice_download_failed_model",
-}
-_GPU_NOTICE_KEYS = {
-    "discovery_failed": "dashboard.gpu_notice.discovery_failed",
-    "unsupported": "dashboard.gpu_notice.unsupported",
-    "unavailable_device": "dashboard.gpu_notice.unavailable_device",
-    "not_installed": "dashboard.gpu_notice.not_installed",
-    "invalid": "dashboard.gpu_notice.invalid",
-    "installing": "dashboard.gpu_notice.installing",
-    "install_failed": "dashboard.gpu_notice.install_failed",
-    "activation_failed": "dashboard.gpu_notice.activation_failed",
-}
-_GPU_NOTICE_TONES = {
-    "discovery_failed": "error",
-    "unsupported": "warning",
-    "unavailable_device": "warning",
-    "not_installed": "warning",
-    "invalid": "warning",
-    "install_failed": "error",
-    "activation_failed": "error",
-}
-_GPU_ACTION_KEYS = {
-    "install": "dashboard.gpu_action.install",
-    "repair": "dashboard.gpu_action.repair",
-    "reinstall": "dashboard.gpu_action.reinstall",
-    "rediscover": "dashboard.gpu_action.rediscover",
-    "restart": "dashboard.gpu_action.restart",
-}
 
 
 class DashboardView(ft.Column):
@@ -74,7 +63,7 @@ class DashboardView(ft.Column):
     _LANG_OPTIONS = get_all_language_options()
 
     def __init__(self):
-        super().__init__(expand=True, spacing=16)
+        super().__init__(expand=True, spacing=DASHBOARD_SHELL_SPACING)
 
         # State
         self.is_connected = False
@@ -139,31 +128,15 @@ class DashboardView(ft.Column):
 
     def _build_ui(self):
         # Left-side control grid
-        self.stt_button = PowerButton(
-            label=t("dashboard.stt_label"),
-            icon=ft.Icons.MIC,
-            on_click=self._toggle_stt,
-            icon_size=DASHBOARD_POWER_BUTTON_ICON_SIZE,
-            label_size=DASHBOARD_POWER_BUTTON_LABEL_SIZE,
-        )
-        self.peer_button = PowerButton(
-            label=t("dashboard.peer_label"),
-            icon=ft.Icons.RECORD_VOICE_OVER,
-            on_click=self._toggle_peer_translation,
-            icon_size=DASHBOARD_POWER_BUTTON_ICON_SIZE,
-            label_size=DASHBOARD_POWER_BUTTON_LABEL_SIZE,
+        self._capture_controls = DashboardCaptureControls(
+            on_self_capture_click=self._toggle_stt,
+            on_peer_capture_click=self._toggle_peer_translation,
+            on_overlay_click=self._toggle_overlay,
         )
         self.trans_button = PowerButton(
             label=t("dashboard.trans_label"),
             icon=ft.Icons.TRANSLATE,
             on_click=self._toggle_translation,
-            icon_size=DASHBOARD_POWER_BUTTON_ICON_SIZE,
-            label_size=DASHBOARD_POWER_BUTTON_LABEL_SIZE,
-        )
-        self.overlay_button = PowerButton(
-            label=t("dashboard.overlay_label"),
-            icon=ft.Icons.SUBTITLES,
-            on_click=self._toggle_overlay,
             icon_size=DASHBOARD_POWER_BUTTON_ICON_SIZE,
             label_size=DASHBOARD_POWER_BUTTON_LABEL_SIZE,
         )
@@ -192,68 +165,62 @@ class DashboardView(ft.Column):
         self._refresh_language_card()
         self._update_input_font()
 
-        self.top_controls = ft.Row(
-            [
-                ft.Container(content=self.stt_button, expand=True),
-                ft.Container(content=self.peer_button, expand=True),
-            ],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
+        surface = compose_dashboard_surface(
+            DashboardSurfaceSlots.from_capture_provider(
+                self._capture_controls,
+                translation=self.trans_button,
+                display=self.display_card,
+                language=self.language_card,
+            )
         )
-        self.bottom_controls = ft.Row(
-            [
-                ft.Container(content=self.trans_button, expand=True),
-                ft.Container(content=self.overlay_button, expand=True),
-            ],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
-        )
+        self.top_controls = surface.top_controls
+        self.bottom_controls = surface.bottom_controls
+        self.control_grid = surface.control_grid
+        self.display_card_slot = surface.display_card_slot
+        self.language_card_slot = surface.language_card_slot
+        self.info_stack = surface.info_stack
+        self.control_region = surface.control_region
+        self.info_region = surface.info_region
+        self.main_surface = surface.main_surface
+        self.shell_content = surface.shell_content
+        self.controls = [surface.root]
 
-        self.control_grid = ft.Column(
-            [self.top_controls, self.bottom_controls],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
-        )
-        self.display_card_slot = ft.Container(
-            content=self.display_card,
-            expand=DASHBOARD_DISPLAY_CARD_EXPAND,
-        )
-        self.language_card_slot = ft.Container(
-            content=self.language_card,
-            expand=DASHBOARD_LANGUAGE_CARD_EXPAND,
-        )
-        self.info_stack = ft.Column(
-            [
-                self.display_card_slot,
-                self.language_card_slot,
-            ],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
-        )
+    @property
+    def stt_button(self) -> ft.Control:
+        return self._capture_controls.self_capture_control()
 
-        self.control_region = ft.Container(
-            content=self.control_grid,
-            expand=DASHBOARD_CONTROL_REGION_EXPAND,
-        )
-        self.info_region = ft.Container(
-            content=self.info_stack,
-            expand=DASHBOARD_INFO_REGION_EXPAND,
-        )
-        self.main_surface = ft.Row(
-            [
-                self.control_region,
-                self.info_region,
-            ],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
-        )
+    @property
+    def peer_button(self) -> ft.Control:
+        return self._capture_controls.peer_capture_control()
 
-        self.shell_content = ft.Column(
-            [self.main_surface],
-            spacing=DASHBOARD_LAYOUT_GAP,
-            expand=True,
-        )
-        self.controls = [create_background_glow_stack(self.shell_content)]
+    @property
+    def overlay_button(self) -> ft.Control:
+        return self._capture_controls.overlay_control()
+
+    def self_capture_control(self) -> ft.Control:
+        return self._capture_controls.self_capture_control()
+
+    def peer_capture_control(self) -> ft.Control:
+        return self._capture_controls.peer_capture_control()
+
+    def overlay_control(self) -> ft.Control:
+        return self._capture_controls.overlay_control()
+
+    def bind_dashboard_intents(
+        self,
+        *,
+        translation: DashboardTranslationIntents,
+        capture: DashboardCaptureIntents,
+    ) -> None:
+        self.on_send_message = translation.submit_message
+        self.on_toggle_translation = translation.toggle_translation
+        self.on_language_change = translation.change_language
+        self.on_message_input_activity = translation.report_input_activity
+        self.on_toggle_stt = capture.toggle_self_capture
+        self.on_toggle_peer_translation = capture.toggle_peer_capture
+        self.on_toggle_overlay = capture.toggle_overlay
+        self.on_retry_peer_process_capture = capture.retry_peer_process_capture
+        self.on_gpu_notice_action = capture.run_gpu_notice_action
 
     def _toggle_overlay(self) -> None:
         enabled = True
@@ -271,10 +238,10 @@ class DashboardView(ft.Column):
             self.on_toggle_peer_translation(enabled)
 
     def _sync_stt_button_state(self) -> None:
-        self.stt_button.set_state(
-            self.is_stt_on,
-            needs_key=self._stt_showing_warning,
-            is_starting=self._stt_is_starting,
+        self._capture_controls.apply_self_capture_state(
+            enabled=self.is_stt_on,
+            starting=self._stt_is_starting,
+            warning=self._stt_showing_warning,
         )
 
     def _sync_translation_button_state(self) -> None:
@@ -284,21 +251,8 @@ class DashboardView(ft.Column):
         )
 
     def _sync_overlay_peer_buttons(self) -> None:
-        contract = self._overlay_peer_contract
-        if contract is None:
-            self.peer_button.set_state(False)
-            self.overlay_button.set_state(False)
-            self._sync_notice()
-            return
-
-        self.peer_button.set_state(
-            contract.peer.state == "on",
-            needs_key=contract.peer.state == "warning",
-            is_starting=contract.peer.state == "starting",
-        )
-        self.overlay_button.set_state(
-            contract.overlay.state == "on",
-            needs_key=contract.overlay.state == "warning",
+        self._capture_controls.apply_presentation(
+            capture_presentation_from_contract(self._overlay_peer_contract)
         )
         self._sync_notice()
 
@@ -583,26 +537,23 @@ class DashboardView(ft.Column):
     def set_overlay_peer_contract(self, contract: OverlayPeerConsumerContract) -> None:
         self._overlay_peer_contract = contract
         self._sync_overlay_peer_buttons()
-        process_warning = (
-            contract.peer.state == "warning"
-            and is_process_capture_warning_reason(contract.peer.warning_reason)
-            and bool(contract.peer.helper_text)
-        )
-        if process_warning:
+        presentation = capture_presentation_from_contract(contract)
+        if presentation.process_capture_warning_active:
             warning_changed = (
                 not self._process_capture_warning_active
-                or self._process_capture_warning_reason != contract.peer.warning_reason
+                or self._process_capture_warning_reason
+                != presentation.process_capture_warning_reason
                 or (
-                    self._process_capture_warning_text != contract.peer.helper_text
+                    self._process_capture_warning_text != presentation.process_capture_warning_text
                     and self._process_capture_warning_locale == get_locale()
                 )
             )
             self._process_capture_warning_active = True
-            self._process_capture_warning_reason = contract.peer.warning_reason
+            self._process_capture_warning_reason = presentation.process_capture_warning_reason
             if warning_changed:
-                self._process_capture_warning_text = contract.peer.helper_text
+                self._process_capture_warning_text = presentation.process_capture_warning_text
                 self._process_capture_warning_locale = get_locale()
-                self.set_display_text(contract.peer.helper_text)
+                self.set_display_text(presentation.process_capture_warning_text)
                 self._process_capture_warning_display_revision = self._primary_display_revision
             return
         if self._process_capture_warning_active:
@@ -738,61 +689,14 @@ class DashboardView(ft.Column):
         self._sync_notice()
 
     def _current_local_stt_notice(self) -> tuple[str | None, str | None]:
-        status = self._local_stt_notice_status
-        if status is None:
+        notice = local_asr_capture_notice(
+            status=self._local_stt_notice_status,
+            percent=self._local_stt_notice_percent,
+            model_id=self._local_stt_notice_model_id,
+        )
+        if notice is None:
             return None, None
-
-        notice_key_by_status = {
-            "starting": "dashboard.local_stt_notice_starting",
-            "self_loading": "dashboard.local_stt_notice_self_loading",
-            "peer_loading": "dashboard.local_stt_notice_peer_loading",
-            "start_failed": "dashboard.local_stt_notice_start_failed",
-            "missing": "dashboard.local_stt_notice_missing",
-            "invalid": "dashboard.local_stt_notice_invalid",
-            "downloading": "dashboard.local_stt_notice_downloading",
-            "download_failed": "dashboard.local_stt_notice_download_failed",
-        }
-        tone_by_status = {
-            "starting": "info",
-            "self_loading": "info",
-            "peer_loading": "info",
-            "start_failed": "error",
-            "missing": "warning",
-            "invalid": "warning",
-            "downloading": "info",
-            "download_failed": "error",
-        }
-        notice_key = notice_key_by_status.get(status)
-        if notice_key is None:
-            return None, None
-        model_id = self._local_stt_notice_model_id
-        if model_id is not None and status in {
-            "missing",
-            "invalid",
-            "downloading",
-            "download_failed",
-        }:
-            model = t(_LOCAL_STT_MODEL_LABEL_KEYS.get(model_id, ""), default=model_id)
-            targeted_key = _LOCAL_STT_TARGETED_NOTICE_KEYS[status]
-            notice_text = (
-                t(
-                    "dashboard.local_stt_notice_downloading_progress_model",
-                    model=model,
-                    percent=self._local_stt_notice_percent,
-                )
-                if status == "downloading" and self._local_stt_notice_percent is not None
-                else t(targeted_key, model=model)
-            )
-        else:
-            notice_text = (
-                t(
-                    "dashboard.local_stt_notice_downloading_progress",
-                    percent=self._local_stt_notice_percent,
-                )
-                if status == "downloading" and self._local_stt_notice_percent is not None
-                else t(notice_key)
-            )
-        return notice_text, tone_by_status.get(status)
+        return notice.text, notice.tone
 
     def _current_overlay_failure_notice(self) -> tuple[str | None, str | None]:
         contract = self._overlay_peer_contract
@@ -827,19 +731,9 @@ class DashboardView(ft.Column):
         notice_text, tone = self._current_local_stt_notice()
         if notice_text is not None:
             candidates["local_stt"] = (notice_text, tone, None)
-        gpu_notice = self._gpu_notice
-        if gpu_notice is not None and gpu_notice.status in _GPU_NOTICE_KEYS:
-            key = _GPU_NOTICE_KEYS[gpu_notice.status]
-            text = (
-                t(key, percent=gpu_notice.progress_percent or 0)
-                if gpu_notice.status == "installing"
-                else t(key)
-            )
-            candidates["gpu"] = (
-                text,
-                _GPU_NOTICE_TONES.get(gpu_notice.status, "info"),
-                gpu_notice.action,
-            )
+        gpu_notice = gpu_capture_notice(self._gpu_notice)
+        if gpu_notice is not None:
+            candidates["gpu"] = (gpu_notice.text, gpu_notice.tone, gpu_notice.action)
         if self._overlay_session_fallback_notice_active:
             candidates["overlay_fallback"] = (
                 t("dashboard.overlay_session_fallback_desktop"),
@@ -881,7 +775,7 @@ class DashboardView(ft.Column):
             self.display_card.set_notice(None, None)
             return
         text, tone, action = candidates[selected]
-        action_label = t(_GPU_ACTION_KEYS[action]) if action is not None else None
+        action_label = gpu_capture_action_label(action)
         yields_to_content = selected in OVERLAY_YIELDING_NOTICE_SOURCES
         try:
             self.display_card.set_notice(
@@ -895,10 +789,8 @@ class DashboardView(ft.Column):
             self.display_card.set_notice(text, tone)
 
     def apply_locale(self) -> None:
-        self.stt_button.set_label(t("dashboard.stt_label"))
-        self.peer_button.set_label(t("dashboard.peer_label"))
+        self._capture_controls.apply_locale()
         self.trans_button.set_label(t("dashboard.trans_label"))
-        self.overlay_button.set_label(t("dashboard.overlay_label"))
         self._sync_stt_button_state()
         self._sync_translation_button_state()
         self._sync_overlay_peer_buttons()

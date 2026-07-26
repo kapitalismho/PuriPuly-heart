@@ -1467,10 +1467,8 @@ def test_dashboard_process_warning_does_not_clear_after_status_transition() -> N
     view._refresh_language_card = lambda: None  # type: ignore[method-assign]
     view._ui_font = lambda: None  # type: ignore[method-assign]
     view._source_lang_code = "en"
-    view.stt_button = SimpleNamespace(set_label=lambda _label: None)
-    view.peer_button = SimpleNamespace(set_label=lambda _label: None)
+    view._capture_controls = SimpleNamespace(apply_locale=lambda: None)
     view.trans_button = SimpleNamespace(set_label=lambda _label: None)
-    view.overlay_button = SimpleNamespace(set_label=lambda _label: None)
     view.language_card = SimpleNamespace(set_row_labels=lambda *_labels: None)
     view.display_card = SimpleNamespace(
         set_status=lambda status, **_kwargs: statuses.append(status),
@@ -1532,10 +1530,8 @@ def test_dashboard_unchanged_process_warning_does_not_reacquire_invalidated_prim
     view._refresh_language_card = lambda: None  # type: ignore[method-assign]
     view._ui_font = lambda: None  # type: ignore[method-assign]
     view._source_lang_code = "en"
-    view.stt_button = SimpleNamespace(set_label=lambda _label: None)
-    view.peer_button = SimpleNamespace(set_label=lambda _label: None)
+    view._capture_controls = SimpleNamespace(apply_locale=lambda: None)
     view.trans_button = SimpleNamespace(set_label=lambda _label: None)
-    view.overlay_button = SimpleNamespace(set_label=lambda _label: None)
     view.language_card = SimpleNamespace(set_row_labels=lambda *_labels: None)
     view.display_card = SimpleNamespace(
         set_status=lambda status, **_kwargs: statuses.append(status),
