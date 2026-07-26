@@ -390,7 +390,9 @@ async def test_event_bridge_failure_log_identifies_event_without_payload(
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
 
-    message = caplog.messages[-1]
+    message = next(
+        record.getMessage() for record in caplog.records if record.levelno == logging.ERROR
+    )
     assert message == (
         "Error handling UI event: event_type=TRANSCRIPT_FINAL "
         "channel=self exception_type=AttributeError"
