@@ -68,7 +68,7 @@ class MicrophoneTestDialog:
         self._close_notified = False
         self._dialog = self._build_dialog()
         self._is_open = True
-        self._page.open(self._dialog)
+        self._page.show_dialog(self._dialog)
 
     def close(self, *, notify: bool = False) -> None:
         dialog = self._dialog
@@ -82,9 +82,9 @@ class MicrophoneTestDialog:
         else:
             self._close_notified = True
         if was_open:
-            close = getattr(self._page, "close", None)
-            if callable(close):
-                close(dialog)
+            pop_dialog = getattr(self._page, "pop_dialog", None)
+            if callable(pop_dialog):
+                pop_dialog()
 
     def reset(self) -> None:
         self._level = 0.0

@@ -688,7 +688,7 @@ class TranslatorApp:
 
         snackbar = self._build_github_star_prompt_snackbar(_open_repository)
         self._github_star_prompt_shown_this_launch = True
-        self.page.open(snackbar)
+        self.page.show_dialog(snackbar)
         return True
 
     def _build_github_star_prompt_snackbar(self, on_click) -> ft.SnackBar:  # noqa: ANN001
@@ -727,38 +727,14 @@ class TranslatorApp:
         )
 
     def _close_github_star_prompt_snackbar(self, snackbar: ft.SnackBar) -> None:
-        close = getattr(self.page, "close", None)
-        if callable(close):
+        pop_dialog = getattr(self.page, "pop_dialog", None)
+        if callable(pop_dialog):
             with contextlib.suppress(Exception):
-                close(snackbar)
+                pop_dialog()
         else:
             snackbar.open = False
             with contextlib.suppress(Exception):
                 self.page.update()
-        self._displace_current_snackbar_for_flet_028()
-
-    def _displace_current_snackbar_for_flet_028(self) -> None:
-        """Force-dismiss the visible SnackBar on Flet 0.28.x.
-
-        Flet 0.28.3 updates the Python-side ``SnackBar.open`` flag on
-        ``page.close(snackbar)`` but the Flutter-side snackbar remains visible
-        until its duration expires. Opening another SnackBar first removes the
-        current one, so use a transparent 1 ms replacement as a narrow shim.
-        """
-
-        open_control = getattr(self.page, "open", None)
-        if not callable(open_control):
-            return
-        dismissor = ft.SnackBar(
-            content=ft.Text("", size=0),
-            bgcolor=ft.Colors.TRANSPARENT,
-            duration=1,
-            behavior=ft.SnackBarBehavior.FLOATING,
-            margin=ft.Margin.only(bottom=90),
-            padding=0,
-        )
-        with contextlib.suppress(Exception):
-            open_control(dismissor)
 
     def _preview_github_star_snackbar(self) -> None:
         snackbar = None
@@ -769,7 +745,7 @@ class TranslatorApp:
                 self._close_github_star_prompt_snackbar(snackbar)
 
         snackbar = self._build_github_star_prompt_snackbar(_open_repository)
-        self.page.open(snackbar)
+        self.page.show_dialog(snackbar)
 
     def _preview_telemetry_consent(self) -> None:
         dialog = TelemetryConsentDialog(
@@ -926,12 +902,11 @@ class TranslatorApp:
             microphone_test_dialog.close(notify=True)
             return
 
-        dialog = getattr(self.page, "dialog", None)
-        close_dialog = getattr(self.page, "close", None)
-        if dialog is None or not callable(close_dialog):
+        pop_dialog = getattr(self.page, "pop_dialog", None)
+        if not callable(pop_dialog):
             return
         try:
-            close_dialog(dialog)
+            pop_dialog()
         except Exception:
             logger.exception("Failed to close dialog during navigation")
 
@@ -1365,7 +1340,7 @@ class TranslatorApp:
                 padding=20,
             )
             self._mark_launch_high_priority_feedback_shown("stt_compatibility", snackbar)
-            self.page.open(snackbar)
+            self.page.show_dialog(snackbar)
 
         async def _task():
             await self.application.on_dashboard_language_change(change)
@@ -1938,7 +1913,7 @@ class TranslatorApp:
             padding=20,
         )
         self._mark_launch_high_priority_feedback_shown("snackbar", snackbar)
-        self.page.open(snackbar)
+        self.page.show_dialog(snackbar)
 
     def show_snackbar(self, message: str, bgcolor) -> None:
         self._show_snackbar(message, bgcolor)
@@ -2092,7 +2067,7 @@ async def _check_and_notify_update(
             show_close_icon=True,
             close_icon_color=ft.Colors.WHITE,
         )
-        page.open(snackbar)
+        page.show_dialog(snackbar)
         if callable(on_launch_snackbar_shown):
             on_launch_snackbar_shown(snackbar)
 

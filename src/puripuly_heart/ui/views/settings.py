@@ -3512,7 +3512,7 @@ class SettingsView(ft.Column):
         if self.show_snackbar:
             self.show_snackbar(message, ft.Colors.ORANGE_700)
         elif is_control_mounted(self):
-            self.page.open(
+            self.page.show_dialog(
                 ft.SnackBar(
                     ft.Text(message, color=ft.Colors.WHITE),
                     bgcolor=ft.Colors.ORANGE_700,

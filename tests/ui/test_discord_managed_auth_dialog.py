@@ -32,14 +32,17 @@ class DummyPage:
         self.opened: list[object] = []
         self.closed: list[object] = []
 
-    def open(self, dialog) -> None:
+    def show_dialog(self, dialog) -> None:
         self.dialog = dialog
         self.opened.append(dialog)
 
-    def close(self, dialog) -> None:
+    def pop_dialog(self):
+        dialog = self.dialog
+        if dialog is None:
+            return None
         self.closed.append(dialog)
-        if self.dialog is dialog:
-            self.dialog = None
+        self.dialog = None
+        return dialog
 
 
 class SnapshotOpenPage(DummyPage):
@@ -47,13 +50,13 @@ class SnapshotOpenPage(DummyPage):
         super().__init__()
         self.body_control_classes_at_open: list[str] = []
 
-    def open(self, dialog) -> None:
+    def show_dialog(self, dialog) -> None:
         modal_content = dialog.content
         body_column = modal_content.content.controls[0]
         self.body_control_classes_at_open = [
             control.__class__.__name__ for control in body_column.controls
         ]
-        super().open(dialog)
+        super().show_dialog(dialog)
 
 
 def _dialog(

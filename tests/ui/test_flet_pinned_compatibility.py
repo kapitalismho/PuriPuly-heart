@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sys
 import tomllib
 from importlib.metadata import version
@@ -9,6 +10,8 @@ from types import SimpleNamespace
 import pytest
 
 pytest.importorskip("flet")
+
+import flet as ft
 
 from puripuly_heart.ui.components.settings import api_key_field as api_key_field_module
 from puripuly_heart.ui.views import settings as settings_view
@@ -45,6 +48,28 @@ def test_gate_a_windows_runtime_uses_python_312() -> None:
     if sys.platform != "win32":
         pytest.skip("Gate A runtime version is verified on Windows")
     assert sys.version_info[:2] == (3, 12)
+
+
+def test_ui_uses_flet_0861_dialog_api() -> None:
+    assert hasattr(ft.Page, "show_dialog")
+    assert hasattr(ft.Page, "pop_dialog")
+    assert not hasattr(ft.Page, "open")
+    assert not hasattr(ft.Page, "close")
+
+    removed_api = re.compile(
+        r"(?:\bpage|self\.page|self\._page)\.(?:open|close)\(|"
+        r"getattr\((?:self\.)?_?page,\s*[\"'](?:open|close)[\"']"
+    )
+    violations = []
+    for path in sorted((ROOT / "src" / "puripuly_heart" / "ui").rglob("*.py")):
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(),
+            start=1,
+        ):
+            if removed_api.search(line):
+                violations.append(f"{path.relative_to(ROOT)}:{line_number}:{line.strip()}")
+
+    assert violations == []
 
 
 def test_api_key_field_uses_flet_086_icon_api(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -187,8 +212,8 @@ def test_attach_dummy_page_uses_explicit_dummy_page(monkeypatch: pytest.MonkeyPa
     page = DummyPage()
 
     returned = attach_dummy_page(monkeypatch, control, page)
-    returned.open("dialog")
-    returned.close("dialog")
+    returned.show_dialog("dialog")
+    returned.pop_dialog()
 
     assert returned is page
     assert control.page is page

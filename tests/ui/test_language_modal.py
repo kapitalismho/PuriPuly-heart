@@ -17,11 +17,15 @@ class DummyPage:
         self.opened: list[object] = []
         self.closed: list[object] = []
 
-    def open(self, dialog) -> None:
+    def show_dialog(self, dialog) -> None:
         self.opened.append(dialog)
 
-    def close(self, dialog) -> None:
+    def pop_dialog(self):
+        if not self.opened:
+            return None
+        dialog = self.opened[-1]
         self.closed.append(dialog)
+        return dialog
 
 
 def test_language_modal_open_builds_dialog_and_recent_grid() -> None:

@@ -35,15 +35,19 @@ class DummyPage:
         self.tasks: list[object] = []
         self.updated = 0
 
-    def open(self, control) -> None:  # noqa: ANN001
+    def show_dialog(self, control) -> None:  # noqa: ANN001
         if hasattr(control, "open"):
             control.open = True
         self.opened.append(control)
 
-    def close(self, control) -> None:  # noqa: ANN001
+    def pop_dialog(self):
+        if not self.opened:
+            return None
+        control = self.opened[-1]
         if hasattr(control, "open"):
             control.open = False
         self.closed.append(control)
+        return control
 
     def run_task(self, task_factory) -> None:  # noqa: ANN001
         self.tasks.append(task_factory)
@@ -57,29 +61,6 @@ def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:
         callback(owner.path, owner.compatibility_projection())
 
     monkeypatch.setattr(controller_module.SettingsOwner, "persist", persist)
-
-
-class Flet028SnackBarPage(DummyPage):
-    """Model Flet 0.28.3's state-only SnackBar close behavior.
-
-    Flet 0.28.3 sets the Python-side ``open`` flag to false on ``page.close()``,
-    but the visible Flutter SnackBar is not removed until another SnackBar is
-    opened or the duration expires.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.visible_snackbar: ft.SnackBar | None = None
-
-    def open(self, control) -> None:  # noqa: ANN001
-        super().open(control)
-        if isinstance(control, ft.SnackBar):
-            self.visible_snackbar = control
-
-    def close(self, control) -> None:  # noqa: ANN001
-        if hasattr(control, "open"):
-            control.open = False
-        self.closed.append(control)
 
 
 def _settings_for_connection(connection: TranslationConnection) -> AppSettings:
@@ -555,11 +536,10 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
 
 
 @pytest.mark.asyncio
-async def test_github_star_action_displaces_visible_snackbar_when_page_close_is_state_only(
+async def test_github_star_action_pops_visible_snackbar(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    flet028_page = Flet028SnackBarPage()
-    app, page, _controller = _eligible_app(flet028_page)
+    app, page, _controller = _eligible_app()
     opened_urls: list[str] = []
 
     _patch_settings_save(monkeypatch, lambda _path, _updated: None)
@@ -569,13 +549,13 @@ async def test_github_star_action_displaces_visible_snackbar_when_page_close_is_
 
     assert shown is True
     snackbar = page.opened[0]
-    assert flet028_page.visible_snackbar is snackbar
 
     action = snackbar.content.controls[1]
     action.on_click(None)
 
     assert opened_urls == ["https://github.com/kapitalismho/PuriPuly-heart"]
-    assert flet028_page.visible_snackbar is not snackbar
+    assert page.closed == [snackbar]
+    assert snackbar.open is False
 
 
 @pytest.mark.asyncio

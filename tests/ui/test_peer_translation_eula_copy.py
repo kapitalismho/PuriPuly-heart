@@ -81,11 +81,13 @@ def test_peer_translation_eula_dialog_renders_single_full_body_key(
         def __init__(self) -> None:
             self.dialog = None
 
-        def open(self, dialog) -> None:
+        def show_dialog(self, dialog) -> None:
             self.dialog = dialog
 
-        def close(self, dialog) -> None:
-            _ = dialog
+        def pop_dialog(self):
+            dialog = self.dialog
+            self.dialog = None
+            return dialog
 
     monkeypatch.setattr(dialog_module, "t", fake_t)
     monkeypatch.setattr(dialog_module, "create_glow_stack", lambda content: content)

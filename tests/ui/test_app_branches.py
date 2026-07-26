@@ -74,13 +74,21 @@ class DummyPage:
         )
         self.dialog = None
 
-    def open(self, control) -> None:
+    def show_dialog(self, control) -> None:
+        if hasattr(control, "open"):
+            control.open = True
         self.opened.append(control)
+        self.dialog = control
 
-    def close(self, control) -> None:
+    def pop_dialog(self):
+        control = self.dialog
+        if control is None:
+            return None
+        if hasattr(control, "open"):
+            control.open = False
         self.closed.append(control)
-        if self.dialog is control:
-            self.dialog = None
+        self.dialog = None
+        return control
 
     def run_task(self, coro_fn) -> None:
         self.tasks.append(coro_fn)
@@ -3472,13 +3480,14 @@ def test_on_nav_change_closes_open_dialog_before_switching_tabs() -> None:
     dialog = object()
     app.page.dialog = dialog
 
-    def fake_close(control) -> None:
+    def fake_pop_dialog():
+        control = app.page.dialog
         events.append(("close", control))
         app.page.closed.append(control)
-        if app.page.dialog is control:
-            app.page.dialog = None
+        app.page.dialog = None
+        return control
 
-    app.page.close = fake_close
+    app.page.pop_dialog = fake_pop_dialog
     app._current_tab = 0
     app.view_dashboard = object()
     app.view_settings = SimpleNamespace(

@@ -124,7 +124,7 @@ class SettingsModal:
             bgcolor=ft.Colors.TRANSPARENT,
         )
 
-        self._page.open(self._dialog)
+        self._page.show_dialog(self._dialog)
 
     def replace_options(self, options: Sequence[OptionItem]) -> None:
         """Replace the option list after the modal is open.
@@ -404,5 +404,5 @@ class SettingsModal:
     def _select(self, value: str) -> None:
         """Handle option selection."""
         if self._dialog:
-            self._page.close(self._dialog)
+            self._page.pop_dialog()
         self._on_select(value)

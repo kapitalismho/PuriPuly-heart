@@ -252,7 +252,7 @@ class ApiKeyField(ft.Row):
             page = control_page(self)
             if page is None:
                 return
-            page.open(
+            page.show_dialog(
                 ft.SnackBar(
                     ft.Text(message, size=18, color=ft.Colors.WHITE),
                     bgcolor=bgcolor,

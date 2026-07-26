@@ -6000,10 +6000,10 @@ class GuiController:
             with contextlib.suppress(Exception):
                 show_snackbar(message, ft.Colors.ORANGE_700)
                 return
-        opener = getattr(self.page, "open", None)
-        if callable(opener):
+        show_dialog = getattr(self.page, "show_dialog", None)
+        if callable(show_dialog):
             with contextlib.suppress(Exception):
-                opener(
+                show_dialog(
                     ft.SnackBar(
                         ft.Text(message, color=ft.Colors.WHITE),
                         bgcolor=ft.Colors.ORANGE_700,

@@ -24,14 +24,17 @@ class DummyPage:
         self.closed: list[object] = []
         self.updated = 0
 
-    def open(self, dialog) -> None:
+    def show_dialog(self, dialog) -> None:
         self.dialog = dialog
         self.opened.append(dialog)
 
-    def close(self, dialog) -> None:
+    def pop_dialog(self):
+        dialog = self.dialog
+        if dialog is None:
+            return None
         self.closed.append(dialog)
-        if self.dialog is dialog:
-            self.dialog = None
+        self.dialog = None
+        return dialog
 
     def update(self) -> None:
         self.updated += 1

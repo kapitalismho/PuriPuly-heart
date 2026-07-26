@@ -132,7 +132,7 @@ class LanguageModal:
             bgcolor=ft.Colors.TRANSPARENT,
         )
 
-        self._page.open(self._dialog)
+        self._page.show_dialog(self._dialog)
 
     def _build_recent_grid(self, recent: list[str], current: str) -> ft.Control | None:
         """Build grid controls for recent languages (up to 6)."""
@@ -330,5 +330,5 @@ class LanguageModal:
         """Handle language selection."""
         logger.info("[LanguageModal] Selection requested: %s", name)
         if self._dialog:
-            self._page.close(self._dialog)
+            self._page.pop_dialog()
         self._on_select(name)

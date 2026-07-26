@@ -31,13 +31,16 @@ class FakePage:
         self.dialog = None
         self.closed: list[object] = []
 
-    def open(self, dialog) -> None:
+    def show_dialog(self, dialog) -> None:
         self.dialog = dialog
 
-    def close(self, dialog) -> None:
+    def pop_dialog(self):
+        dialog = self.dialog
+        if dialog is None:
+            return None
         self.closed.append(dialog)
-        if self.dialog is dialog:
-            self.dialog = None
+        self.dialog = None
+        return dialog
 
 
 def _open_founder_letter(monkeypatch: pytest.MonkeyPatch) -> tuple[FakePage, list[str]]:

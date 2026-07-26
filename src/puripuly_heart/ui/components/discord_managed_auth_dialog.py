@@ -215,7 +215,7 @@ class DiscordManagedAuthDialog:
     def close(self) -> None:
         if self._dialog is None or not self._is_open:
             return
-        self._page.close(self._dialog)
+        self._page.pop_dialog()
         self._is_open = False
 
     def _build_waiting_actions(self) -> list[WarmDocumentDialogAction]:

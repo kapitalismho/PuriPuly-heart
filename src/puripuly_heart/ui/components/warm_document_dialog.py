@@ -97,7 +97,7 @@ def open_warm_document_dialog(
 
     def select(action: WarmDocumentDialogAction) -> None:
         if action.close_before_action and dialog is not None:
-            page.close(dialog)
+            page.pop_dialog()
         if action.on_select is not None:
             action.on_select()
 
@@ -212,7 +212,7 @@ def open_warm_document_dialog(
         content_padding=0,
         bgcolor=ft.Colors.TRANSPARENT,
     )
-    page.open(dialog)
+    page.show_dialog(dialog)
     return WarmDocumentDialogResult(
         dialog=dialog,
         primary_button=primary_button,
