@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 import flet as ft
 
+from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
     COLOR_NEUTRAL,
@@ -25,13 +26,7 @@ _TOKEN_SPLIT_RE = re.compile(r"\s+")
 
 
 def _update_control_if_mounted(control: ft.Control) -> None:
-    if getattr(control, "page", None) is None:
-        return
-    try:
-        control.update()
-    except AssertionError as exc:
-        if "Control must be added" not in str(exc):
-            raise
+    update_control_if_mounted(control)
 
 
 class CustomVocabularyTagEditor(ft.Column):
@@ -146,9 +141,9 @@ class CustomVocabularyTagEditor(ft.Column):
         return ft.Container(
             data=term,
             bgcolor=COLOR_PRIMARY_CONTAINER,
-            border=ft.border.all(1, COLOR_DIVIDER),
+            border=ft.Border.all(1, COLOR_DIVIDER),
             border_radius=_CHIP_RADIUS,
-            padding=ft.padding.only(
+            padding=ft.Padding.only(
                 left=_CHIP_HORIZONTAL_PADDING,
                 right=_CHIP_HORIZONTAL_PADDING,
                 top=_CHIP_VERTICAL_PADDING,
@@ -165,7 +160,7 @@ class CustomVocabularyTagEditor(ft.Column):
         term_text = chip.content
         hovered = event.data == "true"
         chip.bgcolor = COLOR_PRIMARY if hovered else COLOR_PRIMARY_CONTAINER
-        chip.border = ft.border.all(1, COLOR_PRIMARY if hovered else COLOR_DIVIDER)
+        chip.border = ft.Border.all(1, COLOR_PRIMARY if hovered else COLOR_DIVIDER)
         term_text.color = ft.Colors.WHITE if hovered else COLOR_ON_PRIMARY_CONTAINER
         _update_control_if_mounted(chip)
 

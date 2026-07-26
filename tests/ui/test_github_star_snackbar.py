@@ -526,7 +526,7 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
     message = snackbar.content.controls[0]
     action = snackbar.content.controls[1]
     assert message.value == "PuriPuly가 도움이 됐다면 GitHub에서 Star를 눌러주세요! 큰 힘이 되어요!"
-    assert action.text == "이동"
+    assert action.content == "이동"
 
     in_click_callback = True
     click_callback_save_calls: list[dict[str, object]] = []
@@ -1046,7 +1046,7 @@ def test_debug_preview_panel_includes_github_star_snackbar_action() -> None:
     )
 
     action = panel._action_buttons["github_star_snackbar"]  # noqa: SLF001
-    assert action.text == "GitHub Star"
+    assert action.content == "GitHub Star"
 
     action.on_click(None)
 
@@ -1084,7 +1084,7 @@ def test_debug_preview_github_star_snackbar_opens_without_mutating_prompt_state(
     message = snackbar.content.controls[0]
     action = snackbar.content.controls[1]
     assert message.value == "PuriPuly가 도움이 됐다면 GitHub에서 Star를 눌러주세요! 큰 힘이 되어요!"
-    assert action.text == "이동"
+    assert action.content == "이동"
 
     action.on_click(None)
 

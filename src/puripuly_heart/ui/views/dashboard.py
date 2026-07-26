@@ -10,6 +10,7 @@ from puripuly_heart.ui.components.glow import create_background_glow_stack
 from puripuly_heart.ui.components.language_card import LanguageCard
 from puripuly_heart.ui.components.language_modal import LanguageModal
 from puripuly_heart.ui.components.power_button import PowerButton
+from puripuly_heart.ui.flet_runtime import control_page
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice, GpuNoticeAction
 from puripuly_heart.ui.i18n import get_locale, language_name, t
@@ -715,7 +716,7 @@ class DashboardView(ft.Column):
 
     def _run_gpu_notice_action(self, action: GpuNoticeAction) -> None:
         callback = self.on_gpu_notice_action
-        page = getattr(self, "page", None)
+        page = control_page(self)
         run_task = getattr(page, "run_task", None)
         if callback is None or not callable(run_task):
             return

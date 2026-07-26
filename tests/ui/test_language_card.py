@@ -57,14 +57,14 @@ def test_language_card_rows_use_top_left_caption_with_centered_pair_layout(
 
     caption_control = row.content.controls[0]
     assert isinstance(caption_control, ft.Container)
-    assert caption_control.alignment == ft.alignment.top_left
+    assert caption_control.alignment == ft.Alignment.TOP_LEFT
     assert _unwrap_container_content(caption_control) is row._label_text
     assert row._label_text.value == expected_label
     assert row._label_text.size == 16
 
     pair_control = row.content.controls[1]
     assert isinstance(pair_control, ft.Container)
-    assert pair_control.alignment == ft.alignment.center
+    assert pair_control.alignment == ft.Alignment.CENTER
     pair_row = _unwrap_container_content(pair_control)
     assert isinstance(pair_row, ft.Row)
     assert pair_row.alignment == ft.MainAxisAlignment.CENTER
@@ -168,5 +168,5 @@ def test_language_card_uses_unified_row_size_for_self_and_peer_visual_balance() 
 def test_language_card_uses_single_direction_arrow_icon() -> None:
     card = _build_language_card()
 
-    assert card._self_row._arrow_icon.name == ft.Icons.ARROW_RIGHT_ALT
-    assert card._peer_row._arrow_icon.name == ft.Icons.ARROW_RIGHT_ALT
+    assert card._self_row._arrow_icon.icon == ft.Icons.ARROW_RIGHT_ALT
+    assert card._peer_row._arrow_icon.icon == ft.Icons.ARROW_RIGHT_ALT

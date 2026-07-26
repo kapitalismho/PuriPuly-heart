@@ -59,11 +59,11 @@ def test_qq_managed_auth_dialog_renders_inputs_and_actions() -> None:
     assert dialog._qq_identity_field is not None
     assert dialog._credential_field is not None
     assert dialog._qq_identity_field.label == t("qq_auth.qq_identity.label")
-    assert dialog._qq_identity_field.helper_text == t("qq_auth.qq_identity.helper")
+    assert dialog._qq_identity_field.helper == t("qq_auth.qq_identity.helper")
     assert dialog._credential_field.label == t("qq_auth.credential.label")
-    assert dialog._credential_field.helper_text == t("qq_auth.credential.helper")
+    assert dialog._credential_field.helper == t("qq_auth.credential.helper")
     assert dialog._credential_field.password is True
-    assert [control.text for control in dialog._actions.controls] == [
+    assert [control.content for control in dialog._actions.controls] == [
         t("qq_auth.close"),
         t("qq_auth.submit"),
     ]
@@ -100,7 +100,7 @@ def test_qq_managed_auth_dialog_submit_waiting_error_and_cancel_states() -> None
     assert dialog.is_waiting is True
     assert dialog._qq_identity_field.disabled is True
     assert dialog._credential_field.disabled is True
-    assert [control.text for control in dialog._actions.controls] == [t("qq_auth.cancel")]
+    assert [control.content for control in dialog._actions.controls] == [t("qq_auth.cancel")]
 
     dialog.set_error("qq_auth.error.credential_mismatch")
     assert dialog.is_waiting is False

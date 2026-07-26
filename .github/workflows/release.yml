@@ -127,6 +127,11 @@ jobs:
         run: |
           ./scripts/ci/prepare-soxr-release-inputs.ps1
 
+      - name: Prepare Flet desktop runtime
+        shell: pwsh
+        run: |
+          ./scripts/ci/prepare-flet-runtime.ps1
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 

@@ -452,8 +452,8 @@ def _control_labels(control: ft.Control) -> list[str]:
             labels.append(node.value)
         elif isinstance(node, ft.TextField) and node.label:
             labels.append(node.label)
-        elif isinstance(node, ft.TextButton) and node.text:
-            labels.append(node.text)
+        elif isinstance(node, ft.TextButton) and node.content:
+            labels.append(node.content)
     return labels
 
 
@@ -492,7 +492,7 @@ def _subtab_label(button: ft.Control) -> ft.Text:
 
 def _subtab_text_value(button: ft.Control) -> str:
     if isinstance(button, ft.TextButton):
-        return button.text
+        return button.content
     return _subtab_label(button).value
 
 
@@ -1902,7 +1902,7 @@ def test_local_llm_invalid_base_url_shows_error_without_saving(
     assert pending.local_llm.base_url == "http://127.0.0.1:11434/v1"
     assert view.has_provider_changes is False
     assert view._local_llm_base_url.value == "ftp://127.0.0.1:11434/v1"
-    assert view._local_llm_base_url.error_text == t("settings.local_llm.base_url.invalid")
+    assert view._local_llm_base_url.error == t("settings.local_llm.base_url.invalid")
 
 
 def test_local_llm_empty_model_shows_error_without_saving(
@@ -1919,7 +1919,7 @@ def test_local_llm_empty_model_shows_error_without_saving(
     assert pending.local_llm.model == "llama3.1:8b"
     assert view.has_provider_changes is False
     assert view._local_llm_model.value == "   "
-    assert view._local_llm_model.error_text == t("settings.local_llm.model.required")
+    assert view._local_llm_model.error == t("settings.local_llm.model.required")
 
 
 def test_local_llm_settings_survive_provider_draft_copy(
@@ -2196,7 +2196,7 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
     settings = AppSettings()
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.page = object()
+    attach_dummy_page(monkeypatch, view)
 
     captured: dict[str, object] = {}
 
@@ -3298,7 +3298,7 @@ def test_openrouter_key_field_and_pkce_button_are_visible_for_byok_without_break
     assert view._api_keys_column.controls.index(
         view._openrouter_key
     ) < view._api_keys_column.controls.index(view._openrouter_pkce_button_row)
-    assert view._openrouter_pkce_button.text == t("settings.openrouter_authenticate")
+    assert view._openrouter_pkce_button.content == t("settings.openrouter_authenticate")
     assert view._openrouter_pkce_button.disabled is False
     assert view._openrouter_pkce_button.style.color[ft.ControlState.DEFAULT] == COLOR_NEUTRAL_DARK
     assert view._openrouter_pkce_button.style.color[ft.ControlState.DISABLED] == COLOR_NEUTRAL_DARK
@@ -3320,7 +3320,7 @@ def test_openrouter_pkce_button_shows_authenticated_state_after_verified_key(
 
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
-    assert view._openrouter_pkce_button.text == t("settings.openrouter_authenticated")
+    assert view._openrouter_pkce_button.content == t("settings.openrouter_authenticated")
     assert view._openrouter_pkce_button.disabled is True
     assert view._openrouter_pkce_button.style.color[ft.ControlState.DEFAULT] == COLOR_NEUTRAL_DARK
 
@@ -3340,7 +3340,7 @@ def test_openrouter_pkce_button_returns_to_authenticate_when_key_is_cleared(
     view._openrouter_key.value = ""
     view._on_secret_change("openrouter_api_key", "")
 
-    assert view._openrouter_pkce_button.text == t("settings.openrouter_authenticate")
+    assert view._openrouter_pkce_button.content == t("settings.openrouter_authenticate")
     assert view._openrouter_pkce_button.disabled is False
     assert view._openrouter_pkce_button.style.color[ft.ControlState.DEFAULT] == COLOR_NEUTRAL_DARK
 
@@ -3369,7 +3369,7 @@ async def test_openrouter_pkce_button_disables_after_manual_key_verification(
         view._openrouter_key._get_key_hash("sk-or-v1-manual"),
     )
 
-    assert view._openrouter_pkce_button.text == t("settings.openrouter_authenticated")
+    assert view._openrouter_pkce_button.content == t("settings.openrouter_authenticated")
     assert view._openrouter_pkce_button.disabled is True
 
 
@@ -3400,7 +3400,7 @@ async def test_openrouter_pkce_button_reenables_after_manual_key_verification_fa
         view._openrouter_key._get_key_hash("invalid-openrouter-key"),
     )
 
-    assert view._openrouter_pkce_button.text == t("settings.openrouter_authenticate")
+    assert view._openrouter_pkce_button.content == t("settings.openrouter_authenticate")
     assert view._openrouter_pkce_button.disabled is False
 
 
@@ -3991,7 +3991,7 @@ def test_peer_vad_slider_change_skips_hidden_field_update_when_view_is_mounted(
     view.on_settings_changed = lambda incoming: changed.append(incoming)
     attach_dummy_page(monkeypatch, view)
     slider_page = UpdateRecorder()
-    view._peer_vad_slider.page = slider_page
+    attach_dummy_page(monkeypatch, view._peer_vad_slider, slider_page)
 
     view._handle_peer_vad_change(SimpleNamespace(control=SimpleNamespace(value=0.77)))
 
@@ -4384,7 +4384,7 @@ def test_peer_stt_local_qwen_explanatory_copy_renders_from_i18n(
         settings.ui.locale = locale
         view, _ = _make_settings_view(monkeypatch)
         view.load_from_settings(settings, config_path=Path("settings.json"))
-        view.page = object()
+        attach_dummy_page(monkeypatch, view)
 
         captured: dict[str, object] = {}
 
@@ -4441,7 +4441,7 @@ def test_peer_local_qwen_load_preserves_display_and_modal_current(
 
     assert view._peer_stt_text.content.value == t("provider.local_qwen")
 
-    view.page = object()
+    attach_dummy_page(monkeypatch, view)
     captured: dict[str, object] = {}
 
     class DummyModal:
@@ -6302,9 +6302,9 @@ def test_overlay_distance_card_uses_inline_minus_value_plus_layout(
     assert view._overlay_distance_increase_button.width is None
     assert view._overlay_distance_increase_button.height is None
     assert distance_value_row.controls[0].content.value == "－"
-    assert distance_value_row.controls[0].alignment == ft.alignment.center_right
+    assert distance_value_row.controls[0].alignment == ft.Alignment.CENTER_RIGHT
     assert distance_value_row.controls[2].content.value == "＋"
-    assert distance_value_row.controls[2].alignment == ft.alignment.center_left
+    assert distance_value_row.controls[2].alignment == ft.Alignment.CENTER_LEFT
     assert distance_value_container.width == 84
     assert view._overlay_distance_value_text.size == 28
     assert distance_value_row.controls[0].content.size == 22
@@ -6352,9 +6352,9 @@ def test_overlay_offset_cards_use_inline_arrow_value_arrow_layout(
     assert view._overlay_offset_x_increase_button.width is None
     assert view._overlay_offset_x_increase_button.height is None
     assert offset_x_value_row.controls[0].content.value == "◀"
-    assert offset_x_value_row.controls[0].alignment == ft.alignment.center_right
+    assert offset_x_value_row.controls[0].alignment == ft.Alignment.CENTER_RIGHT
     assert offset_x_value_row.controls[2].content.value == "▶"
-    assert offset_x_value_row.controls[2].alignment == ft.alignment.center_left
+    assert offset_x_value_row.controls[2].alignment == ft.Alignment.CENTER_LEFT
 
     assert isinstance(offset_y_card_stack, ft.Stack)
     assert offset_y_card_stack.fit == ft.StackFit.EXPAND
@@ -6383,9 +6383,9 @@ def test_overlay_offset_cards_use_inline_arrow_value_arrow_layout(
     assert view._overlay_offset_y_increase_button.width is None
     assert view._overlay_offset_y_increase_button.height is None
     assert offset_y_value_row.controls[0].content.value == "▲"
-    assert offset_y_value_row.controls[0].alignment == ft.alignment.center_right
+    assert offset_y_value_row.controls[0].alignment == ft.Alignment.CENTER_RIGHT
     assert offset_y_value_row.controls[2].content.value == "▼"
-    assert offset_y_value_row.controls[2].alignment == ft.alignment.center_left
+    assert offset_y_value_row.controls[2].alignment == ft.Alignment.CENTER_LEFT
 
     assert view._overlay_offset_x_value_text.size == 28
     assert view._overlay_offset_y_value_text.size == 28
@@ -6648,7 +6648,7 @@ def test_apply_locale_and_refresh_prompt_if_empty(monkeypatch: pytest.MonkeyPatc
     view.refresh_prompt_if_empty()
 
     assert view._stt_title.value == t("settings.section.stt")
-    assert view._reset_prompt_btn.text == t("settings.reset_prompt")
+    assert view._reset_prompt_btn.content == t("settings.reset_prompt")
     assert bool(view._prompt_editor.value.strip())
     assert view._translation_connection_title.value == t("settings.translation_connection")
 
@@ -7491,7 +7491,7 @@ def test_settings_view_uses_generic_subtab_shell(monkeypatch: pytest.MonkeyPatch
     assert view._settings_subtab_shell.title_region is None
     assert isinstance(view._settings_subtab_shell.body_region, ft.Container)
     assert view._settings_subtab_shell.body_region.content is view._settings_subtab_shell.body_host
-    assert view._settings_subtab_shell.body_region.padding == ft.padding.only(
+    assert view._settings_subtab_shell.body_region.padding == ft.Padding.only(
         left=16, top=16, right=16
     )
     assert view._settings_subtab_shell.controls == [
@@ -7571,7 +7571,7 @@ def test_settings_subtab_bar_matches_bottom_nav_family_structure(
     assert shell.subtab_row.spacing == 0
     assert all(isinstance(button, ft.Container) for button in buttons)
     assert all(button.expand is True for button in buttons)
-    assert all(button.alignment == ft.alignment.center for button in buttons)
+    assert all(button.alignment == ft.Alignment.CENTER for button in buttons)
     assert all(callable(button.on_click) for button in buttons)
     assert all(callable(button.on_hover) for button in buttons)
     assert all(isinstance(button.content, ft.Text) for button in buttons)
@@ -7581,9 +7581,9 @@ def test_settings_subtab_bar_matches_bottom_nav_family_structure(
     assert shell.subtab_bar.border_radius is None
     assert border.top.width == main_nav.border.top.width
     assert border.top.color == main_nav.border.top.color
-    assert border.left is None
-    assert border.right is None
-    assert border.bottom is None
+    assert border.left.style == ft.BorderStyle.NONE
+    assert border.right.style == ft.BorderStyle.NONE
+    assert border.bottom.style == ft.BorderStyle.NONE
     assert shell.subtab_bar.padding is None
     assert len(nav_dividers) == len(dividers)
     assert all(divider.width == nav_dividers[0].width for divider in dividers)

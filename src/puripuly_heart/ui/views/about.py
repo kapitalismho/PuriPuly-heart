@@ -16,7 +16,7 @@ from puripuly_heart.ui.theme import (
     COLOR_SURFACE,
 )
 
-_CENTER_ALIGNMENT = ft.alignment.Alignment(0, 0)
+_CENTER_ALIGNMENT = ft.Alignment(0, 0)
 
 
 def _load_third_party_notices() -> str:
@@ -134,7 +134,7 @@ class AboutView(ft.Column):
                     src=profile_path,
                     width=160,
                     height=160,
-                    fit=ft.ImageFit.COVER,
+                    fit=ft.BoxFit.COVER,
                     border_radius=100,
                 )
                 if profile_path
@@ -300,7 +300,7 @@ class AboutView(ft.Column):
                         selectable=True,
                     ),
                     width=float("inf"),
-                    border=ft.border.all(1, COLOR_DIVIDER),
+                    border=ft.Border.all(1, COLOR_DIVIDER),
                     border_radius=12,
                     padding=16,
                     bgcolor=COLOR_SURFACE,

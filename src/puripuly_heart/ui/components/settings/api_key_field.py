@@ -10,6 +10,7 @@ import flet as ft
 from flet import Colors as colors
 from flet import Icons as icons
 
+from puripuly_heart.ui.flet_runtime import control_page, update_control_if_mounted
 from puripuly_heart.ui.i18n import provider_label, t
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
@@ -40,7 +41,7 @@ class ApiKeyField(ft.Row):
         self._on_save = on_save
         self._show_snackbar_cb = show_snackbar
         self._show_status = show_status
-        self._dirty = False
+        self._value_dirty = False
         self._last_verified_hash = ""
         self._is_verifying = False
 
@@ -70,7 +71,7 @@ class ApiKeyField(ft.Row):
 
         self._current_status = "idle"
         self._status_icon = ft.Icon(
-            name=icons.HELP_OUTLINE_ROUNDED,
+            icon=icons.HELP_OUTLINE_ROUNDED,
             color=COLOR_NEUTRAL,
             size=36,
             tooltip=t("api_key.status.idle"),
@@ -94,9 +95,8 @@ class ApiKeyField(ft.Row):
     def value(self, val: str) -> None:
         """Set field value."""
         self._text_field.value = val
-        self._dirty = False
-        if self._text_field.page:
-            self._text_field.update()
+        self._value_dirty = False
+        update_control_if_mounted(self._text_field)
 
     def _get_key_hash(self, key: str) -> str:
         """Get SHA-256 hash of the key."""
@@ -110,14 +110,13 @@ class ApiKeyField(ft.Row):
         self._reveal_button.icon = (
             icons.VISIBILITY_OFF_ROUNDED if self._text_field.password else icons.VISIBILITY_ROUNDED
         )
-        if self._text_field.page:
-            self._text_field.update()
-            self._reveal_button.update()
+        update_control_if_mounted(self._text_field)
+        update_control_if_mounted(self._reveal_button)
 
     def _handle_change(self, e) -> None:
         """Mark the field dirty after user edits."""
         _ = e
-        self._dirty = True
+        self._value_dirty = True
 
     def _set_status(self, status: str) -> None:
         """Update status icon based on verification state."""
@@ -132,19 +131,18 @@ class ApiKeyField(ft.Row):
         }
         icon, color, tooltip_key = icon_map.get(status, icon_map["idle"])
         self._current_status = status
-        self._status_icon.name = icon
+        self._status_icon.icon = icon
         self._status_icon.color = color
         self._status_icon.tooltip = t(tooltip_key)
-        if self._status_icon.page:
-            self._status_icon.update()
+        update_control_if_mounted(self._status_icon)
 
     def _handle_blur(self, e) -> None:
         """Handle blur event - save and verify."""
         key = self.value
 
-        needs_save = self._dirty
+        needs_save = self._value_dirty
         if needs_save:
-            self._dirty = False
+            self._value_dirty = False
         elif not self._show_status:
             return
 
@@ -165,8 +163,9 @@ class ApiKeyField(ft.Row):
         if self._is_verifying:
             return
 
-        if self.page:
-            self.page.run_task(self._run_verification)
+        page = control_page(self)
+        if page is not None:
+            page.run_task(self._run_verification)
 
     async def _run_verification(self) -> None:
         """Wrapper for run_task compatibility."""
@@ -249,14 +248,17 @@ class ApiKeyField(ft.Row):
         """Show a toast via App-level callback or fallback to page."""
         if self._show_snackbar_cb:
             self._show_snackbar_cb(message, bgcolor)
-        elif self.page:
-            self.page.open(
+        else:
+            page = control_page(self)
+            if page is None:
+                return
+            page.open(
                 ft.SnackBar(
                     ft.Text(message, size=18, color=ft.Colors.WHITE),
                     bgcolor=bgcolor,
                     duration=4000,
                     behavior=ft.SnackBarBehavior.FLOATING,
-                    margin=ft.margin.only(bottom=90),
+                    margin=ft.Margin.only(bottom=90),
                     padding=20,
                 )
             )
@@ -290,7 +292,6 @@ class ApiKeyField(ft.Row):
             }
             tooltip_key = tooltip_keys.get(self._current_status, "api_key.status.idle")
             self._status_icon.tooltip = t(tooltip_key)
-        if self.page:
-            self._text_field.update()
-            if self._show_status:
-                self._status_icon.update()
+        update_control_if_mounted(self._text_field)
+        if self._show_status:
+            update_control_if_mounted(self._status_icon)

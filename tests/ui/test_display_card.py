@@ -202,11 +202,11 @@ def test_display_card_display_text_is_always_selectable() -> None:
 def test_display_card_primary_and_secondary_wrap_to_two_lines() -> None:
     card = DisplayCard(on_submit=lambda _text: None)
 
-    assert card._display_primary._get_attr("nowrap") is False
+    assert card._display_primary.no_wrap is False
     assert card._display_primary.max_lines == 2
     assert card._display_primary.overflow == display_card_module.ft.TextOverflow.ELLIPSIS
 
-    assert card._display_secondary._get_attr("nowrap") is False
+    assert card._display_secondary.no_wrap is False
     assert card._display_secondary.max_lines == 2
     assert card._display_secondary.overflow == display_card_module.ft.TextOverflow.ELLIPSIS
 

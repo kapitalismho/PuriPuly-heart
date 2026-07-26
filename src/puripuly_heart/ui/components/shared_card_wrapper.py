@@ -30,7 +30,7 @@ class SharedCardWrapper(ft.Container):
             content=content_with_glow,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
-            border=ft.border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
             expand=resolved_expand,
             height=resolved_height,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,

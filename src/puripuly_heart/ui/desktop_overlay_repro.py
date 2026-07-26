@@ -107,7 +107,7 @@ class StaticCheckerboardBackdrop:
             page.add(ft.GridView(controls=tiles, runs_count=8, spacing=0, run_spacing=0))
             self._ready.set()
 
-        self._task = asyncio.create_task(ft.app_async(target=target))
+        self._task = asyncio.create_task(ft.run_async(main=target))
         try:
             await asyncio.wait_for(self._ready.wait(), timeout=_RENDER_ACK_TIMEOUT_S)
         except TimeoutError as exc:

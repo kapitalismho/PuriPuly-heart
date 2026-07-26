@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import argparse
 import inspect
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
     from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
+
+logger = logging.getLogger(__name__)
 
 
 def configure_main_logging(*, log_dir: Path | None = None):
@@ -199,9 +202,25 @@ def _run_gui(
             parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
         ):
             gui_kwargs["vrchat_osc_presence"] = vrchat_osc_presence
-        return await main_gui(page, **gui_kwargs)
+        try:
+            return await main_gui(page, **gui_kwargs)
+        except Exception as exc:
+            logger.exception(
+                "GUI startup failed: exception_type=%s exception_message=%s",
+                type(exc).__name__,
+                str(exc),
+            )
+            raise
 
-    ft.app(target=_target, assets_dir=str(assets_dir()))
+    try:
+        ft.run(main=_target, assets_dir=str(assets_dir()))
+    except Exception as exc:
+        logger.exception(
+            "Flet GUI runtime failed: exception_type=%s exception_message=%s",
+            type(exc).__name__,
+            str(exc),
+        )
+        raise
     return 0
 
 

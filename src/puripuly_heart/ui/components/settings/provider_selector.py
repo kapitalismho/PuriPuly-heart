@@ -7,6 +7,7 @@ from typing import Callable, TypeVar
 
 import flet as ft
 
+from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import provider_label, t
 from puripuly_heart.ui.theme import COLOR_NEUTRAL_DARK
 
@@ -32,7 +33,7 @@ class ProviderSelector(ft.Dropdown):
         super().__init__(
             label=t(label_key),
             options=options,
-            on_change=self._handle_change,
+            on_select=self._handle_change,
             border_radius=12,
             text_size=28,
             label_style=ft.TextStyle(size=20, weight=ft.FontWeight.BOLD),
@@ -63,8 +64,7 @@ class ProviderSelector(ft.Dropdown):
     def selected_provider(self, provider: T) -> None:
         """Set the selected provider."""
         self.value = provider.value
-        if self.page:
-            self.update()
+        update_control_if_mounted(self)
 
     def _handle_change(self, e) -> None:
         if self._on_change_callback and self.value:
@@ -76,5 +76,4 @@ class ProviderSelector(ft.Dropdown):
         """Update labels when locale changes."""
         self.label = t(self._label_key)
         self.options = self._build_options()
-        if self.page:
-            self.update()
+        update_control_if_mounted(self)

@@ -38,6 +38,9 @@ MISSING = object()
 
 class DummyPage:
     def __init__(self) -> None:
+        async def destroy_window() -> None:
+            self.window.destroy_calls += 1
+
         self.opened: list[object] = []
         self.closed: list[object] = []
         self.tasks: list[object] = []
@@ -51,10 +54,17 @@ class DummyPage:
         self.window = SimpleNamespace(
             frameless=False,
             resizable=False,
+            maximizable=True,
             width=0,
             height=0,
             min_width=0,
+            max_width=0,
             min_height=0,
+            max_height=0,
+            prevent_close=False,
+            on_event=None,
+            destroy_calls=0,
+            destroy=destroy_window,
             icon="",
             center_calls=0,
             center=lambda: None,
@@ -382,13 +392,16 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.controller.config_path == Path("settings.json")
     assert page.title == app_module.t("app.title")
     assert page.window.frameless is True
-    assert page.window.resizable is True
+    assert page.window.resizable is False
+    assert page.window.maximizable is False
     assert page.window.width == app_module.DEFAULT_WINDOW_WIDTH
     assert page.window.height == app_module.DEFAULT_WINDOW_HEIGHT
-    assert page.window.min_width == app_module.MIN_WINDOW_WIDTH
-    assert page.window.min_height == app_module.MIN_WINDOW_HEIGHT
-    assert page.window.width >= page.window.min_width
-    assert page.window.height >= page.window.min_height
+    assert page.window.min_width == app_module.DEFAULT_WINDOW_WIDTH
+    assert page.window.max_width == app_module.DEFAULT_WINDOW_WIDTH
+    assert page.window.min_height == app_module.DEFAULT_WINDOW_HEIGHT
+    assert page.window.max_height == app_module.DEFAULT_WINDOW_HEIGHT
+    assert page.window.prevent_close is True
+    assert page.window.on_event == app._on_window_event
     assert page.window.center_calls == 0
     assert page.added
     assert app.view_dashboard.on_send_message == app._on_manual_submit
@@ -417,6 +430,37 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.application.wraps(app.controller)
     assert isinstance(app.controller.app, FletUiPresentationAdapter)
     assert app.controller.app is app._presentation_adapter
+
+
+@pytest.mark.asyncio
+async def test_window_close_awaits_application_shutdown_before_destroy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_app_construction(monkeypatch)
+    page = DummyPage()
+    app = TranslatorApp(page, config_path=Path("settings.json"))
+    transitions: list[str] = []
+
+    async def shutdown() -> None:
+        transitions.append("shutdown")
+
+    async def destroy() -> None:
+        transitions.append("destroy")
+
+    app.shutdown = shutdown
+    page.window.destroy = destroy
+
+    app._on_window_event(SimpleNamespace(type=ft.WindowEventType.RESIZE))
+    assert page.tasks == []
+
+    app._on_window_event(SimpleNamespace(type=ft.WindowEventType.CLOSE))
+    assert len(page.tasks) == 1
+    app._on_window_event(SimpleNamespace(type=ft.WindowEventType.CLOSE))
+    assert len(page.tasks) == 1
+
+    await page.tasks[0]()
+
+    assert transitions == ["shutdown", "destroy"]
 
 
 @pytest.mark.asyncio
@@ -2264,7 +2308,7 @@ def test_discord_managed_auth_waiting_hides_reopen_when_controller_cannot_reopen
     dialog.set_waiting()
 
     assert dialog._reopen_browser_button is None
-    assert [control.text for control in dialog._actions.controls] == [
+    assert [control.content for control in dialog._actions.controls] == [
         app_module.t("discord_auth.cancel")
     ]
 

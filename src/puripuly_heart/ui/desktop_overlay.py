@@ -9,7 +9,6 @@ import logging
 import math
 import os
 import re
-import subprocess
 import sys
 import time
 import traceback
@@ -60,6 +59,7 @@ from puripuly_heart.ui.desktop_window_zorder import (
     WindowZOrderPort,
     create_window_z_order_port,
 )
+from puripuly_heart.ui.flet_desktop_runtime import patch_hidden_view_launcher
 from puripuly_heart.ui.fonts import assets_dir
 from puripuly_heart.ui.i18n import t_for_locale
 
@@ -579,7 +579,7 @@ def build_desktop_empty_lock_action(
         decoration=None,
     )
     return ft.TextButton(
-        text=label,
+        content=label,
         tooltip=label,
         on_click=on_click,
         width=_desktop_empty_lock_action_width(label, font_size),
@@ -596,7 +596,7 @@ def build_desktop_empty_lock_action(
             bgcolor=ft.Colors.TRANSPARENT,
             overlay_color=ft.Colors.TRANSPARENT,
             elevation=0,
-            padding=ft.padding.symmetric(
+            padding=ft.Padding.symmetric(
                 horizontal=_DESKTOP_EMPTY_LOCK_ACTION_HORIZONTAL_PADDING,
                 vertical=_DESKTOP_EMPTY_LOCK_ACTION_VERTICAL_PADDING,
             ),
@@ -618,7 +618,7 @@ def build_desktop_caption_surface(plan: DesktopCaptionPlan) -> Any:
             ft.Container(
                 bgcolor=plan.background_color,
                 border_radius=plan.border_radius,
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment.CENTER,
                 left=0,
                 top=0,
                 right=0,
@@ -651,7 +651,7 @@ def build_desktop_caption_surface(plan: DesktopCaptionPlan) -> Any:
         height=plan.window_height,
         bgcolor=ft.Colors.TRANSPARENT,
         border_radius=plan.border_radius,
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment.CENTER,
         visible=plan.surface_visible,
     )
 
@@ -665,7 +665,7 @@ def build_desktop_transparent_sizing_host(plan: DesktopCaptionPlan) -> Any:
         width=plan.window_width,
         height=plan.window_height,
         bgcolor=ft.Colors.TRANSPARENT,
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment.CENTER,
     )
 
 
@@ -1510,7 +1510,7 @@ def _build_flet_caption_slot(ft: Any, plan: DesktopCaptionPlan, slot: DesktopCap
         alignment=(
             ft.Alignment(0, _DESKTOP_CAPTION_TEXT_STACK_ALIGNMENT_Y)
             if has_secondary_region
-            else ft.alignment.center
+            else ft.Alignment.CENTER
         ),
     )
     inner_card = ft.Container(
@@ -1521,18 +1521,18 @@ def _build_flet_caption_slot(ft: Any, plan: DesktopCaptionPlan, slot: DesktopCap
             ft.Colors.TRANSPARENT if plan.full_window_background_visible else plan.background_color
         ),
         border_radius=plan.border_radius,
-        padding=ft.padding.symmetric(
+        padding=ft.Padding.symmetric(
             horizontal=plan.padding_horizontal,
             vertical=plan.padding_vertical,
         ),
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment.CENTER,
     )
     return ft.Container(
         content=inner_card,
         width=plan.window_width,
         height=plan.slot_height,
         bgcolor=ft.Colors.TRANSPARENT,
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment.CENTER,
     )
 
 
@@ -1566,9 +1566,9 @@ def _caption_line_region_alignment(
 ) -> Any:
     if line.slot == "primary":
         if center_primary_region:
-            return ft.alignment.center
+            return ft.Alignment.CENTER
         return ft.Alignment(0, _DESKTOP_CAPTION_PRIMARY_REGION_ALIGNMENT_Y)
-    return ft.alignment.center
+    return ft.Alignment.CENTER
 
 
 def _slot_lines_with_reserved_regions(
@@ -1944,7 +1944,7 @@ def _build_retained_desktop_caption_surface(
         top=0,
         right=0,
         bottom=0,
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment.CENTER,
     )
     slot_containers: list[Any] = []
     cards: list[Any] = []
@@ -1966,11 +1966,11 @@ def _build_retained_desktop_caption_surface(
             scroll=None,
         )
         text_layer = ft.Container(content=column, bgcolor=ft.Colors.TRANSPARENT)
-        card = ft.Container(content=text_layer, alignment=ft.alignment.center)
+        card = ft.Container(content=text_layer, alignment=ft.Alignment.CENTER)
         slot_container = ft.Container(
             content=card,
             bgcolor=ft.Colors.TRANSPARENT,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
         slot_containers.append(slot_container)
         cards.append(card)
@@ -1987,12 +1987,12 @@ def _build_retained_desktop_caption_surface(
     )
     caption_stack = ft.Stack(
         controls=[full_background, slot_column],
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment.CENTER,
     )
     caption_surface = ft.Container(
         content=caption_stack,
         bgcolor=ft.Colors.TRANSPARENT,
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment.CENTER,
     )
     empty_lock_action = build_desktop_empty_lock_action(
         plan,
@@ -2005,19 +2005,19 @@ def _build_retained_desktop_caption_surface(
         drag_content_host = ft.Container(
             content=caption_surface,
             bgcolor=ft.Colors.TRANSPARENT,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
             visible=True,
         )
         caption_content = ft.WindowDragArea(content=drag_content_host, maximizable=False)
     surface_host = ft.Stack(
         controls=[caption_content, empty_lock_action],
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment.CENTER,
     )
     root = ft.Container(
         content=surface_host,
         padding=0,
         bgcolor=ft.Colors.TRANSPARENT,
-        alignment=ft.alignment.center,
+        alignment=ft.Alignment.CENTER,
     )
     model = _RetainedDesktopCaptionSurface(
         root=root,
@@ -2094,7 +2094,7 @@ def _apply_retained_desktop_caption_plan(
             ft.Colors.TRANSPARENT if plan.full_window_background_visible else plan.background_color
         )
         card.border_radius = plan.border_radius
-        card.padding = ft.padding.symmetric(
+        card.padding = ft.Padding.symmetric(
             horizontal=plan.padding_horizontal,
             vertical=plan.padding_vertical,
         )
@@ -2111,7 +2111,7 @@ def _apply_retained_desktop_caption_plan(
         text_layer.alignment = (
             ft.Alignment(0, _DESKTOP_CAPTION_TEXT_STACK_ALIGNMENT_Y)
             if reserve_secondary
-            else ft.alignment.center
+            else ft.Alignment.CENTER
         )
         _apply_retained_caption_line(
             ft,
@@ -2236,80 +2236,25 @@ async def _default_flet_app_runner(
 ) -> None:
     import flet as ft
 
-    with _patch_flet_view_hidden_launcher(on_process_started=on_process_started):
-        await ft.app_async(
-            target=target,
+    with patch_hidden_view_launcher(on_process_started=on_process_started):
+        await ft.run_async(
+            main=target,
             view=ft.AppView.FLET_APP_HIDDEN,
             assets_dir=str(assets_dir()),
         )
 
 
-@contextlib.contextmanager
-def _patch_flet_view_hidden_launcher(
-    *,
-    on_process_started: Callable[[int, str | None], None] | None = None,
-):
-    import flet_desktop
-
-    async def launch(
-        page_url: str,
-        assets_dir: str | None,
-        hidden: bool,
-    ) -> tuple[asyncio.subprocess.Process, str | None]:
-        process, pid_file = await _open_flet_view_hidden_without_startup_flash(
-            page_url,
-            assets_dir,
-            hidden,
-        )
-        if on_process_started is not None and process.pid is not None:
-            on_process_started(int(process.pid), pid_file)
-        return process, pid_file
-
-    original = flet_desktop.open_flet_view_async
-    flet_desktop.open_flet_view_async = launch
-    try:
-        yield
-    finally:
-        flet_desktop.open_flet_view_async = original
-
-
-async def _open_flet_view_hidden_without_startup_flash(
-    page_url: str,
-    assets_dir: str | None,
-    hidden: bool,
-) -> tuple[asyncio.subprocess.Process, str | None]:
-    import flet_desktop
-
-    args, flet_env, pid_file = flet_desktop.__locate_and_unpack_flet_view(
-        page_url,
-        assets_dir,
-        hidden,
-    )
-    kwargs: dict[str, object] = {"env": flet_env}
-    if os.name == "nt":
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = subprocess.SW_HIDE
-        kwargs["startupinfo"] = startupinfo
-        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-
-    return (
-        await asyncio.create_subprocess_exec(args[0], *args[1:], **kwargs),
-        pid_file,
-    )
-
-
 def _default_preview_app_runner(target: Callable[[Any], object]) -> None:
     import flet as ft
 
-    ft.app(target=target)
+    ft.run(main=target)
 
 
 _REAL_DEFAULT_PREVIEW_APP_RUNNER = _default_preview_app_runner
 
 
 class FletDesktopRendererWindow:
-    """Flet 0.28.3 transparent desktop overlay window boundary.
+    """Flet 0.86.1 transparent desktop overlay window boundary.
 
     The renderer remains persistence-free: this class only applies runtime
     controls to the Flet page/window and emits renderer-originated overlay
@@ -2864,13 +2809,13 @@ class FletDesktopRendererWindow:
         )
         self._preview_stage = ft.Stack(
             controls=[self._preview_busy_background, self._retained_caption_surface.surface_host],
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
         self._preview_backdrop = ft.Container(
             content=self._preview_stage,
             padding=24,
             border_radius=20,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
         root = ft.Container(
             content=ft.Column(
@@ -2884,7 +2829,7 @@ class FletDesktopRendererWindow:
             ),
             padding=16,
             bgcolor="#101827",
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
         self._apply_preview_surface(ft, plan)
         return root
@@ -2996,7 +2941,7 @@ class FletDesktopRendererWindow:
         buttons = []
         for value, text, selected in items:
             button = ft.ElevatedButton(
-                text=text,
+                content=text,
                 on_click=lambda _event, selected_value=value: self._select_preview(
                     selected_value,
                     on_select,
@@ -3033,7 +2978,7 @@ class FletDesktopRendererWindow:
                 controls=controls,
                 width=size_preset.window_width,
                 height=size_preset.window_height,
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment.CENTER,
             )
         return ft.Container(
             content=content,
@@ -3042,7 +2987,7 @@ class FletDesktopRendererWindow:
             bgcolor=surface.bgcolor,
             padding=24,
             border_radius=20,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
 
     def _build_preview_busy_background(
@@ -3084,7 +3029,7 @@ class FletDesktopRendererWindow:
             ),
             width=size_preset.window_width,
             height=size_preset.window_height,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
 
     def _select_preview(self, value: str, on_select: Callable[[str], None]) -> None:

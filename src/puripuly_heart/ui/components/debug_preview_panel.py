@@ -19,18 +19,10 @@ DEBUG_PREVIEW_PANEL_DATA_KEY = "debug-preview-panel"
 
 
 def _make_text_button(label: str, **kwargs) -> ft.TextButton:
-    try:
-        return ft.TextButton(text=label, **kwargs)
-    except TypeError as exc:
-        if "unexpected keyword argument 'text'" not in str(exc):
-            raise
-        return ft.TextButton(content=label, **kwargs)
+    return ft.TextButton(content=label, **kwargs)
 
 
 def _set_text_button_label(button: ft.TextButton, label: str) -> None:
-    if hasattr(button, "text"):
-        button.text = label
-        return
     button.content = label
 
 
@@ -154,9 +146,9 @@ class DebugPreviewPanel(ft.Container):
         self._popover = ft.Container(
             visible=False,
             bgcolor=COLOR_SURFACE,
-            border=ft.border.all(1, ft.Colors.with_opacity(0.75, COLOR_DIVIDER)),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.75, COLOR_DIVIDER)),
             border_radius=14,
-            padding=ft.padding.symmetric(horizontal=8, vertical=8),
+            padding=ft.Padding.symmetric(horizontal=8, vertical=8),
             shadow=get_card_shadow(),
             content=ft.Column(
                 controls=list(self._action_buttons.values()),
@@ -185,7 +177,7 @@ class DebugPreviewPanel(ft.Container):
             },
             bgcolor=COLOR_SURFACE,
             text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD),
-            padding=ft.padding.symmetric(horizontal=10, vertical=8),
+            padding=ft.Padding.symmetric(horizontal=10, vertical=8),
             shape=ft.RoundedRectangleBorder(radius=12),
             overlay_color=ft.Colors.TRANSPARENT,
             animation_duration=0,
@@ -199,7 +191,7 @@ class DebugPreviewPanel(ft.Container):
             },
             bgcolor=ft.Colors.TRANSPARENT,
             text_style=ft.TextStyle(size=12, weight=ft.FontWeight.W_600),
-            padding=ft.padding.symmetric(horizontal=10, vertical=7),
+            padding=ft.Padding.symmetric(horizontal=10, vertical=7),
             shape=ft.RoundedRectangleBorder(radius=10),
             overlay_color=ft.Colors.with_opacity(0.08, COLOR_PRIMARY),
             animation_duration=0,

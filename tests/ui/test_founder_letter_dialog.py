@@ -89,8 +89,8 @@ def test_founder_letter_dialog_opens_with_two_actions() -> None:
     assert dialog._acknowledge_button is not None
     assert dialog._cancel_button is not None
     assert len(page.opened) == 1
-    assert dialog._cancel_button.text == "닫기"
-    assert dialog._acknowledge_button.text == "README 열기"
+    assert dialog._cancel_button.content == "닫기"
+    assert dialog._acknowledge_button.content == "README 열기"
 
 
 def test_founder_letter_dialog_uses_requested_letter_copy() -> None:

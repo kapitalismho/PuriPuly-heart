@@ -3,6 +3,7 @@
 import flet as ft
 
 from puripuly_heart.ui.components.glow import GLOW_CARD, create_glow_stack
+from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL,
@@ -54,7 +55,7 @@ class SettingsSection(ft.Container):
             content=content_with_glow,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
-            border=ft.border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
             expand=expand,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
             shadow=get_card_shadow(),
@@ -63,5 +64,4 @@ class SettingsSection(ft.Container):
     def apply_locale(self) -> None:
         """Update title text when locale changes."""
         self._title.value = t(self._title_key)
-        if self._title.page:
-            self._title.update()
+        update_control_if_mounted(self._title)

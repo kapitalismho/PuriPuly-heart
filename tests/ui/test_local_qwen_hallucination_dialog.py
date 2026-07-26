@@ -193,7 +193,7 @@ def test_local_qwen_guidance_dialog_renders_large_readable_two_action_modal(
         "TextButton",
         "TextButton",
     ]
-    assert [button.text for button in action_row.controls] == [
+    assert [button.content for button in action_row.controls] == [
         "Close",
         "Open guide",
     ]

@@ -63,8 +63,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_WINDOW_WIDTH = 1136
 DEFAULT_WINDOW_HEIGHT = 850
-MIN_WINDOW_WIDTH = 1024
-MIN_WINDOW_HEIGHT = 760
 APP_CONTENT_PADDING = 16
 FOUNDER_CONTACT_URL = "https://x.com/kapitalismho"
 FOUNDER_README_BASE_URL = "https://github.com/kapitalismho/PuriPuly-heart/blob/main"
@@ -153,6 +151,7 @@ class TranslatorApp:
         self._shutdown_lock: asyncio.Lock | None = None
         self._shutdown_complete = False
         self._shutting_down = False
+        self._window_close_requested = False
         self.overlay_state = "off"
         self.overlay_failure_reason: str | None = None
         self.overlay_peer_contract = None
@@ -378,6 +377,23 @@ class TranslatorApp:
     async def _on_page_lifecycle_end(self, _event=None) -> None:
         await self.shutdown()
 
+    def _on_window_event(self, event) -> None:
+        event_type = getattr(event, "type", getattr(event, "data", None))
+        if event_type not in {ft.WindowEventType.CLOSE, ft.WindowEventType.CLOSE.value}:
+            return
+        if self._window_close_requested:
+            return
+        self._window_close_requested = True
+        self._run_page_task(self._close_after_window_request)
+
+    async def _close_after_window_request(self) -> None:
+        try:
+            await self.shutdown()
+        finally:
+            destroy_result = self.page.window.destroy()
+            if inspect.isawaitable(destroy_result):
+                await destroy_result
+
     def _setup_page(self):
         self.page.title = t("app.title")
         self.page.theme_mode = ft.ThemeMode.LIGHT
@@ -386,11 +402,16 @@ class TranslatorApp:
         self.page.bgcolor = COLOR_BACKGROUND
         self.page.padding = 0
         self.page.window.frameless = True
-        self.page.window.resizable = True  # Ensure resizing is allowed
+        self.page.window.resizable = False
+        self.page.window.maximizable = False
         self.page.window.width = DEFAULT_WINDOW_WIDTH
         self.page.window.height = DEFAULT_WINDOW_HEIGHT
-        self.page.window.min_width = MIN_WINDOW_WIDTH
-        self.page.window.min_height = MIN_WINDOW_HEIGHT
+        self.page.window.min_width = DEFAULT_WINDOW_WIDTH
+        self.page.window.max_width = DEFAULT_WINDOW_WIDTH
+        self.page.window.min_height = DEFAULT_WINDOW_HEIGHT
+        self.page.window.max_height = DEFAULT_WINDOW_HEIGHT
+        self.page.window.prevent_close = True
+        self.page.window.on_event = self._on_window_event
         self.page.window.icon = "icons/icon.ico"
         self.page.on_keyboard_event = self._on_keyboard_event
 
@@ -677,7 +698,7 @@ class TranslatorApp:
                         expand=True,
                     ),
                     ft.TextButton(
-                        text=t("github_star.snackbar.action"),
+                        content=t("github_star.snackbar.action"),
                         on_click=on_click,
                         style=ft.ButtonStyle(
                             color=ft.Colors.WHITE,
@@ -696,7 +717,7 @@ class TranslatorApp:
             bgcolor=COLOR_SUCCESS,
             duration=GITHUB_STAR_PROMPT_DURATION_MS,
             behavior=ft.SnackBarBehavior.FLOATING,
-            margin=ft.margin.only(bottom=90),
+            margin=ft.Margin.only(bottom=90),
             padding=20,
         )
 
@@ -728,7 +749,7 @@ class TranslatorApp:
             bgcolor=ft.Colors.TRANSPARENT,
             duration=1,
             behavior=ft.SnackBarBehavior.FLOATING,
-            margin=ft.margin.only(bottom=90),
+            margin=ft.Margin.only(bottom=90),
             padding=0,
         )
         with contextlib.suppress(Exception):
@@ -1321,7 +1342,7 @@ class TranslatorApp:
                 bgcolor=ft.Colors.ORANGE_700,
                 duration=4000,
                 behavior=ft.SnackBarBehavior.FLOATING,
-                margin=ft.margin.only(bottom=90),
+                margin=ft.Margin.only(bottom=90),
                 padding=20,
             )
             self._mark_launch_high_priority_feedback_shown("stt_compatibility", snackbar)
@@ -1894,7 +1915,7 @@ class TranslatorApp:
             bgcolor=bgcolor,
             duration=duration,
             behavior=ft.SnackBarBehavior.FLOATING,
-            margin=ft.margin.only(bottom=90),
+            margin=ft.Margin.only(bottom=90),
             padding=20,
         )
         self._mark_launch_high_priority_feedback_shown("snackbar", snackbar)
@@ -2016,7 +2037,7 @@ async def _check_and_notify_update(
             content=ft.Row(
                 controls=[
                     ft.Icon(
-                        name=ft.Icons.SYSTEM_UPDATE,
+                        icon=ft.Icons.SYSTEM_UPDATE,
                         color=ft.Colors.WHITE,
                         size=28,
                     ),
@@ -2028,7 +2049,7 @@ async def _check_and_notify_update(
                         expand=True,
                     ),
                     ft.TextButton(
-                        text=t("update.download"),
+                        content=t("update.download"),
                         on_click=_open_download,
                         style=ft.ButtonStyle(
                             color=ft.Colors.WHITE,
@@ -2046,7 +2067,7 @@ async def _check_and_notify_update(
             ),
             bgcolor=COLOR_SUCCESS,
             behavior=ft.SnackBarBehavior.FLOATING,
-            margin=ft.margin.only(bottom=90),
+            margin=ft.Margin.only(bottom=90),
             padding=20,
             duration=30000,  # 30초
             show_close_icon=True,

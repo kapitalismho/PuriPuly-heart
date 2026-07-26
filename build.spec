@@ -5,17 +5,20 @@
 Direct Windows PyInstaller packaging (executable-only / manual installer packaging):
     This direct path is not the release-complete compliance-packaging path and requires the staged overlay executable at build/overlay/PuriPulyHeartOverlay.exe plus the vendored OpenVR bundle under third_party/openvr/ (enforced below).
     pwsh -File scripts/ci/prepare-soxr-release-inputs.ps1
+    pwsh -File scripts/ci/prepare-flet-runtime.ps1
     pyinstaller build.spec
     ISCC installer.iss
 
 Full release-complete compliance packaging requires scripts/ci/prepare-soxr-release-inputs.ps1 before scripts/ci/build-release-artifacts.ps1:
     pwsh -File scripts/ci/prepare-soxr-release-inputs.ps1
+    pwsh -File scripts/ci/prepare-flet-runtime.ps1
     pwsh -File scripts/ci/build-release-artifacts.ps1 -AppVersion <version> -InnoSetupVersion <version>
 
 Output:
     dist/PuriPulyHeart/  (folder with all files)
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -61,12 +64,29 @@ from puripuly_heart.core.overlay.openvr_vendor import collect_vendored_openvr_ru
 block_cipher = None
 SOXR_RELEASE_INPUTS_MANIFEST_PATH = Path("build/soxr-release-inputs/manifest.json").resolve()
 SOXR_PACKAGED_RUNTIME_RELATIVE_DIR = Path("soxr")
+FLET_WINDOWS_RUNTIME_ARCHIVE_PATH = Path("build/flet/flet-windows.zip").resolve()
+FLET_WINDOWS_RUNTIME_SHA256 = "2cf0865b31bd0e394a24a6c2d270e084cf9dad9c711e0b5d0cf9fa9bfac31e14"
 NOTO_CJK_SOURCE_FONT_PATH = src_path / "puripuly_heart" / "data" / "fonts" / "NotoSansCJK-Medium.ttc"
 NOTO_CJK_PROVENANCE_DIR = Path("third_party/noto-sans-cjk").resolve()
 NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR = Path("third_party/noto-sans-cjk")
 
 if not NOTO_CJK_SOURCE_FONT_PATH.is_file():
     raise SystemExit(f"Noto Sans CJK Medium TTC not found: {NOTO_CJK_SOURCE_FONT_PATH}")
+
+if not FLET_WINDOWS_RUNTIME_ARCHIVE_PATH.is_file():
+    raise SystemExit(
+        "Pinned Flet Windows runtime archive not found at "
+        f"{FLET_WINDOWS_RUNTIME_ARCHIVE_PATH}. "
+        "Run scripts/ci/prepare-flet-runtime.ps1 before PyInstaller packaging."
+    )
+flet_windows_runtime_sha256 = hashlib.sha256(
+    FLET_WINDOWS_RUNTIME_ARCHIVE_PATH.read_bytes()
+).hexdigest()
+if flet_windows_runtime_sha256 != FLET_WINDOWS_RUNTIME_SHA256:
+    raise SystemExit(
+        "Pinned Flet Windows runtime checksum mismatch: expected "
+        f"{FLET_WINDOWS_RUNTIME_SHA256}, found {flet_windows_runtime_sha256}"
+    )
 
 
 def get_prepared_soxr_runtime_paths() -> tuple[Path, Path]:
@@ -139,7 +159,9 @@ datas = [
     (str(NOTO_CJK_PROVENANCE_DIR / "OFL.txt"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
     (str(NOTO_CJK_PROVENANCE_DIR / "README.md"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
     (str(NOTO_CJK_PROVENANCE_DIR / "SHA256SUMS.txt"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
-] + collect_data_files("flet_desktop") + collect_data_files("huggingface_hub")
+] + collect_data_files("flet_desktop") + collect_data_files("huggingface_hub") + [
+    (str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH), "flet_desktop/app"),
+]
 
 runtime_binaries = collect_dynamic_libs(
     "onnxruntime", destdir=LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR.as_posix()

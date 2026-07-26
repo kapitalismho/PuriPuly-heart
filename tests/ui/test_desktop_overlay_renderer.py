@@ -23,7 +23,7 @@ from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationCalibration,
     OverlayPresentationSnapshot,
 )
-from puripuly_heart.ui import desktop_overlay, desktop_window_zorder
+from puripuly_heart.ui import desktop_overlay, desktop_window_zorder, flet_desktop_runtime
 from puripuly_heart.ui.fonts import assets_dir
 
 
@@ -718,21 +718,21 @@ def test_desktop_overlay_slots_reserve_stable_line_regions() -> None:
     second_inner_card = second_slot.content
     first_text_layer = first_inner_card.content
     second_text_layer = second_inner_card.content
-    assert first_inner_card.alignment == ft.alignment.center
-    assert first_text_layer.alignment == ft.alignment.center
+    assert first_inner_card.alignment == ft.Alignment.CENTER
+    assert first_text_layer.alignment == ft.Alignment.CENTER
     assert second_text_layer.alignment.y == pytest.approx(-0.08)
 
     first_column = first_text_layer.content
     (first_primary_region,) = first_column.controls
     assert first_primary_region.height == pytest.approx(expected_primary_height)
-    assert first_primary_region.alignment == ft.alignment.center
+    assert first_primary_region.alignment == ft.Alignment.CENTER
 
     second_column = second_text_layer.content
     second_primary_region, second_secondary_region = second_column.controls
     assert second_primary_region.height == pytest.approx(expected_primary_height)
     assert second_primary_region.alignment.y == pytest.approx(-0.5)
     assert second_secondary_region.height == pytest.approx(expected_secondary_height)
-    assert second_secondary_region.alignment == ft.alignment.center
+    assert second_secondary_region.alignment == ft.Alignment.CENTER
     assert second_secondary_region.content.value == "original peer utterance"
 
 
@@ -765,11 +765,11 @@ def test_desktop_overlay_secondary_disabled_slots_do_not_reserve_secondary_regio
     outer_slot = slot_column.controls[0]
     inner_card = outer_slot.content
     text_layer = inner_card.content
-    assert inner_card.alignment == ft.alignment.center
-    assert text_layer.alignment == ft.alignment.center
+    assert inner_card.alignment == ft.Alignment.CENTER
+    assert text_layer.alignment == ft.Alignment.CENTER
     text_column = text_layer.content
     (primary_region,) = text_column.controls
-    assert primary_region.alignment == ft.alignment.center
+    assert primary_region.alignment == ft.Alignment.CENTER
     assert primary_region.content.value == "말하는 중인 원문"
 
 
@@ -802,14 +802,14 @@ def test_desktop_overlay_secondary_enabled_empty_slots_reserve_secondary_region(
     outer_slot = slot_column.controls[0]
     inner_card = outer_slot.content
     text_layer = inner_card.content
-    assert inner_card.alignment == ft.alignment.center
+    assert inner_card.alignment == ft.Alignment.CENTER
     assert text_layer.alignment.y == pytest.approx(-0.08)
     text_column = text_layer.content
     primary_region, reserved_secondary_region = text_column.controls
     assert primary_region.alignment.y == pytest.approx(-0.5)
     assert primary_region.content.value == "말하는 중인 원문"
     assert reserved_secondary_region.height == pytest.approx(plan.secondary_region_height)
-    assert reserved_secondary_region.alignment == ft.alignment.center
+    assert reserved_secondary_region.alignment == ft.Alignment.CENTER
     assert reserved_secondary_region.content.value == ""
     assert reserved_secondary_region.content.max_lines == 1
 
@@ -860,11 +860,11 @@ def test_desktop_overlay_secondary_only_promoted_lines_do_not_reserve_secondary_
     ):
         inner_card = outer_slot.content
         text_layer = inner_card.content
-        assert inner_card.alignment == ft.alignment.center
-        assert text_layer.alignment == ft.alignment.center
+        assert inner_card.alignment == ft.Alignment.CENTER
+        assert text_layer.alignment == ft.Alignment.CENTER
         text_column = text_layer.content
         (primary_region,) = text_column.controls
-        assert primary_region.alignment == ft.alignment.center
+        assert primary_region.alignment == ft.Alignment.CENTER
         assert primary_region.content.value == expected_text
 
 
@@ -1396,19 +1396,21 @@ def _page_text_values(page: FakeFletPage) -> set[str]:
     values: set[str] = set()
     for control in page.controls:
         for item in _walk_control_tree(control):
+            if getattr(item, "visible", True) is False:
+                continue
             value = getattr(item, "value", None)
             if isinstance(value, str) and value:
                 values.add(value)
-            text = getattr(item, "text", None)
-            if isinstance(text, str) and text:
-                values.add(text)
+            content = getattr(item, "content", None)
+            if isinstance(content, str) and content:
+                values.add(content)
     return values
 
 
 def _find_control_with_text(page: FakeFletPage, text: str) -> object:
     for control in page.controls:
         for item in _walk_control_tree(control):
-            if getattr(item, "text", None) == text or getattr(item, "value", None) == text:
+            if getattr(item, "content", None) == text or getattr(item, "value", None) == text:
                 return item
     raise AssertionError(f"control text not found: {text}")
 
@@ -1416,7 +1418,7 @@ def _find_control_with_text(page: FakeFletPage, text: str) -> object:
 def _find_text_button(page: FakeFletPage, text: str) -> ft.TextButton:
     for control in page.controls:
         for item in _walk_control_tree(control):
-            if isinstance(item, ft.TextButton) and getattr(item, "text", None) == text:
+            if isinstance(item, ft.TextButton) and getattr(item, "content", None) == text:
                 return item
     raise AssertionError(f"text button not found: {text}")
 
@@ -2169,19 +2171,19 @@ async def test_default_flet_app_runner_starts_hidden_to_prevent_startup_flash(
 ) -> None:
     calls: list[dict[str, object]] = []
 
-    async def fake_app_async(**kwargs: object) -> None:
+    async def fake_run_async(**kwargs: object) -> None:
         calls.append(dict(kwargs))
 
     def target(_page: object) -> None:
         return None
 
-    monkeypatch.setattr(ft, "app_async", fake_app_async)
+    monkeypatch.setattr(ft, "run_async", fake_run_async)
 
     await desktop_overlay._default_flet_app_runner(target)  # noqa: SLF001 - verify runner policy
 
     assert calls == [
         {
-            "target": target,
+            "main": target,
             "view": ft.AppView.FLET_APP_HIDDEN,
             "assets_dir": str(assets_dir()),
         }
@@ -2206,12 +2208,12 @@ async def test_flet_launcher_patch_reports_started_process_pid(
         return fake_process, "pid-file"
 
     monkeypatch.setattr(
-        desktop_overlay,
-        "_open_flet_view_hidden_without_startup_flash",
+        flet_desktop_runtime,
+        "open_hidden_view",
         fake_hidden_launcher,
     )
 
-    with desktop_overlay._patch_flet_view_hidden_launcher(
+    with flet_desktop_runtime.patch_hidden_view_launcher(
         on_process_started=lambda pid, pid_file: started_processes.append((pid, pid_file))
     ):
         process, pid_file = await flet_desktop.open_flet_view_async(
@@ -2279,12 +2281,10 @@ async def test_hidden_flet_view_launcher_uses_windows_startup_hide_before_flet_e
     )
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
 
-    process, pid_file = (
-        await desktop_overlay._open_flet_view_hidden_without_startup_flash(  # noqa: SLF001 - verify launch boundary
-            "flet://desktop-overlay",
-            "assets",
-            True,
-        )
+    process, pid_file = await flet_desktop_runtime.open_hidden_view(
+        "flet://desktop-overlay",
+        "assets",
+        True,
     )
 
     assert process is fake_process
@@ -2735,7 +2735,7 @@ async def test_desktop_overlay_flet_window_starts_frameless_transparent_moving_e
 
         assert _page_text_values(page) == {"Lock"}
         _assert_no_overlay_local_renderer_text(page)
-        assert [button.text for button in _text_buttons(page)] == ["Lock"]
+        assert [button.content for button in _text_buttons(page)] == ["Lock"]
         assert _page_contains_control_type(page, ft.WindowDragArea)
         cards = _caption_card_controls(page)
         assert len(cards) == 1
@@ -2808,7 +2808,7 @@ async def test_desktop_overlay_empty_moving_state_renders_text_only_lock_action(
         assert action.style.color[ft.ControlState.DEFAULT] == "#FFF8F4"
         assert action.style.color[ft.ControlState.FOCUSED] == "#FF6B6B"
         assert action.style.color[ft.ControlState.HOVERED] == "#FF6B6B"
-        action_text_style = action.style.text_style[ft.ControlState.DEFAULT]
+        action_text_style = action.style.text_style
         assert isinstance(action_text_style.shadow, list)
         assert len(action_text_style.shadow) == 2
         contact_shadow, ambient_shadow = action_text_style.shadow
@@ -2818,7 +2818,7 @@ async def test_desktop_overlay_empty_moving_state_renders_text_only_lock_action(
         assert ambient_shadow.color == "#66000000"
         assert ambient_shadow.offset == (0, 0)
         assert ambient_shadow.blur_radius == pytest.approx(3.0)
-        action_padding = action.style.padding[ft.ControlState.DEFAULT]
+        action_padding = action.style.padding
         required_label_width = desktop_overlay._estimated_caption_line_width(
             "고정하기",
             int(action_text_style.size),
@@ -3275,7 +3275,7 @@ async def test_desktop_overlay_shipping_surface_has_no_overlay_local_controls() 
         assert sink.events == []
         _assert_no_overlay_local_renderer_text(app.page)
         buttons = _text_buttons(app.page)
-        assert [button.text for button in buttons] == ["Lock"]
+        assert [button.content for button in buttons] == ["Lock"]
         assert not any(
             isinstance(item, ft.ElevatedButton)
             for control in app.page.controls

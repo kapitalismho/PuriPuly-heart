@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import flet as ft
 
+from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
@@ -18,13 +19,7 @@ _TEXT_HORIZONTAL_PADDING = 16
 
 
 def _update_control_if_mounted(control: ft.Control) -> None:
-    if getattr(control, "page", None) is None:
-        return
-    try:
-        control.update()
-    except AssertionError as exc:
-        if "Control must be added" not in str(exc):
-            raise
+    update_control_if_mounted(control)
 
 
 class ManagedTrialUsageBar(ft.Row):
@@ -57,7 +52,7 @@ class ManagedTrialUsageBar(ft.Row):
             expand=True,
             height=_FIELD_HEIGHT,
             bgcolor=COLOR_SURFACE,
-            border=ft.border.all(1, COLOR_DIVIDER),
+            border=ft.Border.all(1, COLOR_DIVIDER),
             border_radius=_TRACK_RADIUS,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
             content=ft.Stack(
@@ -72,8 +67,8 @@ class ManagedTrialUsageBar(ft.Row):
                     ),
                     ft.Container(
                         content=self._remaining_text,
-                        alignment=ft.alignment.center_right,
-                        padding=ft.padding.symmetric(horizontal=_TEXT_HORIZONTAL_PADDING),
+                        alignment=ft.Alignment.CENTER_RIGHT,
+                        padding=ft.Padding.symmetric(horizontal=_TEXT_HORIZONTAL_PADDING),
                         left=0,
                         right=0,
                         top=0,

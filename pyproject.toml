@@ -31,8 +31,8 @@ dependencies = [
   "deepgram-sdk>=5.0.0,<6.0.0",
   "sherpa-onnx>=1.12.36",
   "keyring>=25.0",
-  "flet==0.28.3",
-  "flet-desktop==0.28.3",
+  "flet==0.86.1",
+  "flet-desktop==0.86.1",
   "httpx>=0.27",
   "huggingface-hub==1.23.0",
   "hf-xet==1.5.2",
@@ -50,6 +50,7 @@ dev = [
 ]
 build = [
   "cmake>=3.31",
+  "flet-cli==0.86.1",
   "libclang>=18.1",
   "pyinstaller>=6.0",
   "scikit-build-core>=0.10",

@@ -35,7 +35,7 @@ def _action_button_style() -> ft.ButtonStyle:
             ft.ControlState.HOVERED: COLOR_PRIMARY,
         },
         bgcolor=ft.Colors.TRANSPARENT,
-        padding=ft.padding.symmetric(
+        padding=ft.Padding.symmetric(
             horizontal=BUTTON_HORIZONTAL_PADDING,
             vertical=BUTTON_VERTICAL_PADDING,
         ),
@@ -47,15 +47,7 @@ def _action_button_style() -> ft.ButtonStyle:
 
 
 def _make_text_button(label: str, **kwargs) -> ft.TextButton:
-    try:
-        return ft.TextButton(text=label, **kwargs)
-    except TypeError as exc:
-        if "unexpected keyword argument 'text'" not in str(exc):
-            raise
-        button = ft.TextButton(content=label, **kwargs)
-        if hasattr(button, "text"):
-            button.text = label
-        return button
+    return ft.TextButton(content=label, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -194,13 +186,13 @@ def open_warm_document_dialog(
 
     modal_content = ft.Container(
         width=DIALOG_WIDTH,
-        padding=ft.padding.symmetric(
+        padding=ft.Padding.symmetric(
             horizontal=DIALOG_HORIZONTAL_PADDING,
             vertical=DIALOG_VERTICAL_PADDING,
         ),
         bgcolor=COLOR_SURFACE,
         border_radius=30,
-        border=ft.border.all(1, ft.Colors.with_opacity(0.35, COLOR_DIVIDER)),
+        border=ft.Border.all(1, ft.Colors.with_opacity(0.35, COLOR_DIVIDER)),
         shadow=get_card_shadow(),
         content=ft.Column(
             controls=[
@@ -219,7 +211,6 @@ def open_warm_document_dialog(
         content=glow_factory(modal_content),
         content_padding=0,
         bgcolor=ft.Colors.TRANSPARENT,
-        surface_tint_color=ft.Colors.TRANSPARENT,
     )
     page.open(dialog)
     return WarmDocumentDialogResult(
