@@ -27,6 +27,7 @@ DASHBOARD_LANGUAGE_CARD_EXPAND = 1
 DASHBOARD_POWER_BUTTON_ICON_SIZE = 80
 DASHBOARD_POWER_BUTTON_LABEL_SIZE = 32
 OVERLAY_FAILURE_REASON_ONLY_NOTICE_REASONS = {"steamvr_not_running"}
+OVERLAY_YIELDING_NOTICE_SOURCES = {"overlay_fallback", "overlay_failure"}
 PEER_SOURCE_MODE_AUTO = "auto"
 _LOCAL_STT_MODEL_LABEL_KEYS = {
     "parakeet-tdt-0.6b-v3-int8-sherpa": "local_stt.model.parakeet-tdt-0.6b-v3-int8-sherpa",
@@ -881,12 +882,14 @@ class DashboardView(ft.Column):
             return
         text, tone, action = candidates[selected]
         action_label = t(_GPU_ACTION_KEYS[action]) if action is not None else None
+        yields_to_content = selected in OVERLAY_YIELDING_NOTICE_SOURCES
         try:
             self.display_card.set_notice(
                 text,
                 tone,
                 action_label=action_label,
                 on_action=(None if action is None else lambda: self._run_gpu_notice_action(action)),
+                yields_to_content=yields_to_content,
             )
         except TypeError:
             self.display_card.set_notice(text, tone)

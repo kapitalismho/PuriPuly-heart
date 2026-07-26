@@ -33,7 +33,9 @@ class FletUiPresentationAdapter:
         self._app.apply_locale()
 
     def add_history_entry(self, *args: Any, **kwargs: Any) -> None:
-        self._app.add_history_entry(*args, **kwargs)
+        callback = getattr(self._app, "add_history_entry", None)
+        if callable(callback):
+            callback(*args, **kwargs)
 
     def get_event_language_codes(self) -> tuple[str | None, str | None]:
         return self._app.get_event_language_codes()
