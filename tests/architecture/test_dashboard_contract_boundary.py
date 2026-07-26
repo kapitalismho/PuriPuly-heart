@@ -28,12 +28,28 @@ def _imported_modules(path: pathlib.Path) -> set[str]:
 
 
 def test_dashboard_contract_and_renderer_stay_above_backend_owners() -> None:
-    for module in (dashboard_contract, dashboard_renderer):
+    from puripuly_heart.ui.dashboard import capture as dashboard_capture
+
+    for module in (dashboard_contract, dashboard_renderer, dashboard_capture):
         path = pathlib.Path(module.__file__)
         for imported in _imported_modules(path):
             assert not imported.startswith(
                 FORBIDDEN_IMPORT_PREFIXES
             ), f"{path.name} must not import backend implementation: {imported}"
+
+
+def test_capture_controls_consume_the_contract_without_dashboard_view_access() -> None:
+    from puripuly_heart.ui.dashboard import capture as dashboard_capture
+
+    imported = _imported_modules(pathlib.Path(dashboard_capture.__file__))
+    assert not any(module.startswith("puripuly_heart.ui.views") for module in imported)
+
+
+def test_production_dashboard_uses_an_external_capture_slot_provider() -> None:
+    source = (SOURCE_ROOT / "ui" / "views" / "dashboard.py").read_text(encoding="utf-8")
+    assert "from_capture_provider(" in source
+    assert "self._capture_controls," in source
+    assert "DashboardCaptureControls(" in source
 
 
 def test_dashboard_view_implements_the_explicit_contract() -> None:

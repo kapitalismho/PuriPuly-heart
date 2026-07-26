@@ -7,6 +7,7 @@ import pytest
 
 ft = pytest.importorskip("flet")
 
+from puripuly_heart.ui.dashboard import capture as dashboard_capture_module
 from puripuly_heart.ui.dashboard import renderer as dashboard_renderer_module
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
@@ -178,6 +179,7 @@ class FakeLanguageModal:
 
 def _make_dashboard(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(dashboard_module, "PowerButton", FakePowerButton)
+    monkeypatch.setattr(dashboard_capture_module, "PowerButton", FakePowerButton)
     monkeypatch.setattr(dashboard_module, "DisplayCard", FakeDisplayCard)
     monkeypatch.setattr(dashboard_module, "LanguageCard", FakeLanguageCard)
     monkeypatch.setattr(dashboard_module, "LanguageModal", FakeLanguageModal)
@@ -1198,6 +1200,7 @@ def test_dashboard_peer_and_overlay_button_labels_render_from_i18n(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(dashboard_module, "t", lambda key, **_kwargs: f"i18n:{key}")
+    monkeypatch.setattr(dashboard_capture_module, "t", lambda key, **_kwargs: f"i18n:{key}")
     view = _make_dashboard(monkeypatch)
 
     assert view.peer_button.label == "i18n:dashboard.peer_label"

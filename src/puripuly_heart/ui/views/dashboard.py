@@ -9,6 +9,7 @@ from puripuly_heart.ui.components.display_card import DisplayCard
 from puripuly_heart.ui.components.language_card import LanguageCard
 from puripuly_heart.ui.components.language_modal import LanguageModal
 from puripuly_heart.ui.components.power_button import PowerButton
+from puripuly_heart.ui.dashboard.capture import DashboardCaptureControls
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
     DashboardSurfaceSlots,
@@ -159,31 +160,15 @@ class DashboardView(ft.Column):
 
     def _build_ui(self):
         # Left-side control grid
-        self.stt_button = PowerButton(
-            label=t("dashboard.stt_label"),
-            icon=ft.Icons.MIC,
-            on_click=self._toggle_stt,
-            icon_size=DASHBOARD_POWER_BUTTON_ICON_SIZE,
-            label_size=DASHBOARD_POWER_BUTTON_LABEL_SIZE,
-        )
-        self.peer_button = PowerButton(
-            label=t("dashboard.peer_label"),
-            icon=ft.Icons.RECORD_VOICE_OVER,
-            on_click=self._toggle_peer_translation,
-            icon_size=DASHBOARD_POWER_BUTTON_ICON_SIZE,
-            label_size=DASHBOARD_POWER_BUTTON_LABEL_SIZE,
+        self._capture_controls = DashboardCaptureControls(
+            on_self_capture_click=self._toggle_stt,
+            on_peer_capture_click=self._toggle_peer_translation,
+            on_overlay_click=self._toggle_overlay,
         )
         self.trans_button = PowerButton(
             label=t("dashboard.trans_label"),
             icon=ft.Icons.TRANSLATE,
             on_click=self._toggle_translation,
-            icon_size=DASHBOARD_POWER_BUTTON_ICON_SIZE,
-            label_size=DASHBOARD_POWER_BUTTON_LABEL_SIZE,
-        )
-        self.overlay_button = PowerButton(
-            label=t("dashboard.overlay_label"),
-            icon=ft.Icons.SUBTITLES,
-            on_click=self._toggle_overlay,
             icon_size=DASHBOARD_POWER_BUTTON_ICON_SIZE,
             label_size=DASHBOARD_POWER_BUTTON_LABEL_SIZE,
         )
@@ -214,7 +199,7 @@ class DashboardView(ft.Column):
 
         surface = compose_dashboard_surface(
             DashboardSurfaceSlots.from_capture_provider(
-                self,
+                self._capture_controls,
                 translation=self.trans_button,
                 display=self.display_card,
                 language=self.language_card,
@@ -232,14 +217,26 @@ class DashboardView(ft.Column):
         self.shell_content = surface.shell_content
         self.controls = [surface.root]
 
+    @property
+    def stt_button(self) -> ft.Control:
+        return self._capture_controls.self_capture_control()
+
+    @property
+    def peer_button(self) -> ft.Control:
+        return self._capture_controls.peer_capture_control()
+
+    @property
+    def overlay_button(self) -> ft.Control:
+        return self._capture_controls.overlay_control()
+
     def self_capture_control(self) -> ft.Control:
-        return self.stt_button
+        return self._capture_controls.self_capture_control()
 
     def peer_capture_control(self) -> ft.Control:
-        return self.peer_button
+        return self._capture_controls.peer_capture_control()
 
     def overlay_control(self) -> ft.Control:
-        return self.overlay_button
+        return self._capture_controls.overlay_control()
 
     def bind_dashboard_intents(
         self,
@@ -273,10 +270,10 @@ class DashboardView(ft.Column):
             self.on_toggle_peer_translation(enabled)
 
     def _sync_stt_button_state(self) -> None:
-        self.stt_button.set_state(
-            self.is_stt_on,
-            needs_key=self._stt_showing_warning,
-            is_starting=self._stt_is_starting,
+        self._capture_controls.apply_self_capture_state(
+            enabled=self.is_stt_on,
+            starting=self._stt_is_starting,
+            warning=self._stt_showing_warning,
         )
 
     def _sync_translation_button_state(self) -> None:
@@ -288,19 +285,19 @@ class DashboardView(ft.Column):
     def _sync_overlay_peer_buttons(self) -> None:
         contract = self._overlay_peer_contract
         if contract is None:
-            self.peer_button.set_state(False)
-            self.overlay_button.set_state(False)
+            self._capture_controls.apply_peer_capture_state(enabled=False)
+            self._capture_controls.apply_overlay_state(enabled=False)
             self._sync_notice()
             return
 
-        self.peer_button.set_state(
-            contract.peer.state == "on",
-            needs_key=contract.peer.state == "warning",
-            is_starting=contract.peer.state == "starting",
+        self._capture_controls.apply_peer_capture_state(
+            enabled=contract.peer.state == "on",
+            warning=contract.peer.state == "warning",
+            starting=contract.peer.state == "starting",
         )
-        self.overlay_button.set_state(
-            contract.overlay.state == "on",
-            needs_key=contract.overlay.state == "warning",
+        self._capture_controls.apply_overlay_state(
+            enabled=contract.overlay.state == "on",
+            warning=contract.overlay.state == "warning",
         )
         self._sync_notice()
 
@@ -897,10 +894,8 @@ class DashboardView(ft.Column):
             self.display_card.set_notice(text, tone)
 
     def apply_locale(self) -> None:
-        self.stt_button.set_label(t("dashboard.stt_label"))
-        self.peer_button.set_label(t("dashboard.peer_label"))
+        self._capture_controls.apply_locale()
         self.trans_button.set_label(t("dashboard.trans_label"))
-        self.overlay_button.set_label(t("dashboard.overlay_label"))
         self._sync_stt_button_state()
         self._sync_translation_button_state()
         self._sync_overlay_peer_buttons()
