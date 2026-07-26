@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import flet as ft
 
@@ -10,6 +11,60 @@ from puripuly_heart.ui.dashboard.renderer import (
     DASHBOARD_POWER_BUTTON_LABEL_SIZE,
 )
 from puripuly_heart.ui.i18n import t
+from puripuly_heart.ui.overlay_peer_contract import (
+    OverlayPeerConsumerContract,
+    is_process_capture_warning_reason,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class CaptureChannelPresentation:
+    enabled: bool
+    starting: bool = False
+    warning: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class DashboardCapturePresentation:
+    peer: CaptureChannelPresentation
+    overlay: CaptureChannelPresentation
+    process_capture_warning_active: bool = False
+    process_capture_warning_reason: str | None = None
+    process_capture_warning_text: str = ""
+
+
+CAPTURE_PRESENTATION_IDLE = DashboardCapturePresentation(
+    peer=CaptureChannelPresentation(enabled=False),
+    overlay=CaptureChannelPresentation(enabled=False),
+)
+
+
+def capture_presentation_from_contract(
+    contract: OverlayPeerConsumerContract | None,
+) -> DashboardCapturePresentation:
+    if contract is None:
+        return CAPTURE_PRESENTATION_IDLE
+    peer = contract.peer
+    overlay = contract.overlay
+    process_warning = (
+        peer.state == "warning"
+        and is_process_capture_warning_reason(peer.warning_reason)
+        and bool(peer.helper_text)
+    )
+    return DashboardCapturePresentation(
+        peer=CaptureChannelPresentation(
+            enabled=peer.state == "on",
+            starting=peer.state == "starting",
+            warning=peer.state == "warning",
+        ),
+        overlay=CaptureChannelPresentation(
+            enabled=overlay.state == "on",
+            warning=overlay.state == "warning",
+        ),
+        process_capture_warning_active=process_warning,
+        process_capture_warning_reason=peer.warning_reason if process_warning else None,
+        process_capture_warning_text=peer.helper_text if process_warning else "",
+    )
 
 
 class DashboardCaptureControls:
@@ -72,10 +127,27 @@ class DashboardCaptureControls:
     def apply_overlay_state(self, *, enabled: bool, warning: bool = False) -> None:
         self._overlay_button.set_state(enabled, needs_key=warning)
 
+    def apply_presentation(self, presentation: DashboardCapturePresentation) -> None:
+        self.apply_peer_capture_state(
+            enabled=presentation.peer.enabled,
+            starting=presentation.peer.starting,
+            warning=presentation.peer.warning,
+        )
+        self.apply_overlay_state(
+            enabled=presentation.overlay.enabled,
+            warning=presentation.overlay.warning,
+        )
+
     def apply_locale(self) -> None:
         self._self_button.set_label(t("dashboard.stt_label"))
         self._peer_button.set_label(t("dashboard.peer_label"))
         self._overlay_button.set_label(t("dashboard.overlay_label"))
 
 
-__all__ = ["DashboardCaptureControls"]
+__all__ = [
+    "CAPTURE_PRESENTATION_IDLE",
+    "CaptureChannelPresentation",
+    "DashboardCaptureControls",
+    "DashboardCapturePresentation",
+    "capture_presentation_from_contract",
+]

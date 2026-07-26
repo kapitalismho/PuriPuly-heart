@@ -9,7 +9,10 @@ from puripuly_heart.ui.components.display_card import DisplayCard
 from puripuly_heart.ui.components.language_card import LanguageCard
 from puripuly_heart.ui.components.language_modal import LanguageModal
 from puripuly_heart.ui.components.power_button import PowerButton
-from puripuly_heart.ui.dashboard.capture import DashboardCaptureControls
+from puripuly_heart.ui.dashboard.capture import (
+    DashboardCaptureControls,
+    capture_presentation_from_contract,
+)
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
     DashboardSurfaceSlots,
@@ -30,10 +33,7 @@ from puripuly_heart.ui.flet_runtime import control_page
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice, GpuNoticeAction
 from puripuly_heart.ui.i18n import get_locale, language_name, t
-from puripuly_heart.ui.overlay_peer_contract import (
-    OverlayPeerConsumerContract,
-    is_process_capture_warning_reason,
-)
+from puripuly_heart.ui.overlay_peer_contract import OverlayPeerConsumerContract
 
 OVERLAY_FAILURE_REASON_ONLY_NOTICE_REASONS = {"steamvr_not_running"}
 
@@ -283,21 +283,8 @@ class DashboardView(ft.Column):
         )
 
     def _sync_overlay_peer_buttons(self) -> None:
-        contract = self._overlay_peer_contract
-        if contract is None:
-            self._capture_controls.apply_peer_capture_state(enabled=False)
-            self._capture_controls.apply_overlay_state(enabled=False)
-            self._sync_notice()
-            return
-
-        self._capture_controls.apply_peer_capture_state(
-            enabled=contract.peer.state == "on",
-            warning=contract.peer.state == "warning",
-            starting=contract.peer.state == "starting",
-        )
-        self._capture_controls.apply_overlay_state(
-            enabled=contract.overlay.state == "on",
-            warning=contract.overlay.state == "warning",
+        self._capture_controls.apply_presentation(
+            capture_presentation_from_contract(self._overlay_peer_contract)
         )
         self._sync_notice()
 
@@ -582,26 +569,23 @@ class DashboardView(ft.Column):
     def set_overlay_peer_contract(self, contract: OverlayPeerConsumerContract) -> None:
         self._overlay_peer_contract = contract
         self._sync_overlay_peer_buttons()
-        process_warning = (
-            contract.peer.state == "warning"
-            and is_process_capture_warning_reason(contract.peer.warning_reason)
-            and bool(contract.peer.helper_text)
-        )
-        if process_warning:
+        presentation = capture_presentation_from_contract(contract)
+        if presentation.process_capture_warning_active:
             warning_changed = (
                 not self._process_capture_warning_active
-                or self._process_capture_warning_reason != contract.peer.warning_reason
+                or self._process_capture_warning_reason
+                != presentation.process_capture_warning_reason
                 or (
-                    self._process_capture_warning_text != contract.peer.helper_text
+                    self._process_capture_warning_text != presentation.process_capture_warning_text
                     and self._process_capture_warning_locale == get_locale()
                 )
             )
             self._process_capture_warning_active = True
-            self._process_capture_warning_reason = contract.peer.warning_reason
+            self._process_capture_warning_reason = presentation.process_capture_warning_reason
             if warning_changed:
-                self._process_capture_warning_text = contract.peer.helper_text
+                self._process_capture_warning_text = presentation.process_capture_warning_text
                 self._process_capture_warning_locale = get_locale()
-                self.set_display_text(contract.peer.helper_text)
+                self.set_display_text(presentation.process_capture_warning_text)
                 self._process_capture_warning_display_revision = self._primary_display_revision
             return
         if self._process_capture_warning_active:
