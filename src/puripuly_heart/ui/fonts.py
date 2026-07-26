@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from puripuly_heart.core.language import get_language_info
+from puripuly_heart.ui.foundation.resources import DEFAULT_FOUNDATION_RESOURCES
+from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 
 if TYPE_CHECKING:
     import flet as ft
@@ -13,7 +15,7 @@ FONT_FAMILY_NANUM = "NanumSquareRound"
 FONT_FAMILY_MPLUS = "MPLUSRounded1c"
 FONT_FAMILY_RESOURCE_HAN_CN = "ResourceHanRoundedCN"
 
-DEFAULT_FONT_FAMILY = FONT_FAMILY_NANUM
+DEFAULT_FONT_FAMILY = FOUNDATION_DESIGN_TOKENS.default_font_family
 
 _FONT_FILE_CANDIDATES: dict[str, tuple[str, ...]] = {
     FONT_FAMILY_NANUM: (
@@ -30,7 +32,7 @@ _FONT_FILE_CANDIDATES: dict[str, tuple[str, ...]] = {
 
 
 def assets_dir() -> Path:
-    return Path(__file__).resolve().parents[1] / "data"
+    return DEFAULT_FOUNDATION_RESOURCES.assets_root
 
 
 def fonts_dir() -> Path:
@@ -51,7 +53,7 @@ def font_asset_path(font_family: str) -> str | None:
     filename = _resolve_font_file(font_family)
     if not filename:
         return None
-    return f"/fonts/{filename}"
+    return f"/{DEFAULT_FOUNDATION_RESOURCES.asset_url(f'fonts/{filename}')}"
 
 
 def default_font_family() -> str | None:

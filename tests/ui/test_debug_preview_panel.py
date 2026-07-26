@@ -38,6 +38,12 @@ DEBUG_PREVIEW_I18N_KEYS = {
     "debug_preview.stt_loading_button_cycle",
     "debug_preview.audio_fault_clear",
     "debug_preview.gpu_state_cycle",
+    "debug_preview.foundation_primitives",
+    "foundation.preview.title",
+    "foundation.preview.body",
+    "foundation.preview.ready",
+    "foundation.preview.action",
+    "foundation.preview.unavailable",
     "debug_preview.capture_fault_snackbar",
     "debug_preview.stt_fault_snackbar",
     "peer_translation_eula.body",
@@ -65,6 +71,7 @@ ACTION_KEYS = [
     "stt_fault_cycle",
     "audio_fault_clear",
     "gpu_state_cycle",
+    "foundation_primitives",
     "stt_loading_button_cycle",
 ]
 
@@ -91,6 +98,7 @@ def _callbacks(seen: list[str]):
         "on_stt_fault_cycle": lambda: seen.append("stt_fault_cycle"),
         "on_audio_fault_clear": lambda: seen.append("audio_fault_clear"),
         "on_gpu_state_cycle": lambda: seen.append("gpu_state_cycle"),
+        "on_foundation_primitives": lambda: seen.append("foundation_primitives"),
         "on_stt_loading_button_cycle": lambda: seen.append("stt_loading_button_cycle"),
     }
 
@@ -230,6 +238,7 @@ def test_debug_preview_panel_uses_flet_086_text_button_content_api(
         "Cycle STT fault",
         "Clear audio faults",
         "Cycle GPU state",
+        "Foundation primitives",
         "Cycle STT loading button",
     ]
 

@@ -648,6 +648,7 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_stt_fault_cycle",
         "on_audio_fault_clear",
         "on_gpu_state_cycle",
+        "on_foundation_primitives",
         "on_stt_loading_button_cycle",
     }
     discord_callback = seen["callbacks"]["on_discord_auth"]
@@ -4112,18 +4113,20 @@ async def test_shutdown_is_idempotent_and_cancels_tracked_page_tasks() -> None:
             background_cancelled.set()
 
     app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
     app.controller = Controller()
-    app._tracked_page_tasks = {asyncio.create_task(background())}
     app._shutdown_lock = None
     app._shutdown_complete = False
     app._shutting_down = False
     app._settings_mutation_queue = [object()]
+    foundation_runtime = app._ensure_foundation_runtime()
+    foundation_runtime._tracked_tasks = {asyncio.create_task(background())}
 
     await asyncio.gather(app.shutdown(), app.shutdown())
 
     assert stop_calls == 1
     assert background_cancelled.is_set()
-    assert app._tracked_page_tasks == set()
+    assert foundation_runtime.snapshot.tracked_task_count == 0
     assert app._settings_mutation_queue == []
 
 

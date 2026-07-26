@@ -32,7 +32,6 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/core/overlay/presenter.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/overlay/process.py", ASYNCIO_CREATE_TASK): 2,
         ("src/puripuly_heart/providers/stt/soniox.py", ASYNCIO_CREATE_TASK): 3,
-        ("src/puripuly_heart/ui/app.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/components/subtab_shell.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/flet_runtime.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/components/settings/api_key_field.py", RUN_TASK): 1,
@@ -69,6 +68,7 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
         ): 3,
         ("src/puripuly_heart/providers/stt/local_gpu.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/ui/desktop_overlay_repro.py", ASYNCIO_CREATE_TASK): 3,
+        ("src/puripuly_heart/ui/foundation/runtime.py", RUN_TASK): 1,
     }
 )
 
@@ -106,9 +106,9 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         ASYNCIO_CREATE_TASK,
     ): "Soniox session owns send/receive/keepalive tasks under provider session close semantics",
     (
-        "src/puripuly_heart/ui/app.py",
+        "src/puripuly_heart/ui/foundation/runtime.py",
         RUN_TASK,
-    ): "TranslatorApp funnels Flet async callbacks through one tracked page.run_task helper and cancels them during shutdown",
+    ): "FletFoundationRuntime funnels UI callbacks through the owning page task runner and cancels them through application shutdown",
     (
         "src/puripuly_heart/ui/components/subtab_shell.py",
         BARE_RUN_TASK,
@@ -318,7 +318,10 @@ def test_order37_named_owner_allowlist_preserves_remaining_legacy_ui_task_debt()
         "src/puripuly_heart/ui/controller.py",
         ASYNCIO_CREATE_TASK,
     ) in LEGACY_TASK_CREATION_ALLOWLIST
-    assert ("src/puripuly_heart/ui/app.py", RUN_TASK) in LEGACY_TASK_CREATION_ALLOWLIST
+    assert (
+        "src/puripuly_heart/ui/foundation/runtime.py",
+        RUN_TASK,
+    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
     assert (
         "src/puripuly_heart/core/managed_openrouter_release.py",
         ASYNCIO_CREATE_TASK,
@@ -361,4 +364,7 @@ def test_order39_named_owner_allowlist_adds_receiver_and_prompt_owners() -> None
         "src/puripuly_heart/ui/controller.py",
         ASYNCIO_CREATE_TASK,
     ) in LEGACY_TASK_CREATION_ALLOWLIST
-    assert ("src/puripuly_heart/ui/app.py", RUN_TASK) in LEGACY_TASK_CREATION_ALLOWLIST
+    assert (
+        "src/puripuly_heart/ui/foundation/runtime.py",
+        RUN_TASK,
+    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST

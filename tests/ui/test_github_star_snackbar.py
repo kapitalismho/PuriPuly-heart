@@ -1041,6 +1041,7 @@ def test_debug_preview_panel_includes_github_star_snackbar_action() -> None:
         on_stt_fault_cycle=noop,
         on_audio_fault_clear=noop,
         on_gpu_state_cycle=noop,
+        on_foundation_primitives=noop,
         on_github_star_snackbar=lambda: invoked.append("github-star"),
         on_telemetry_consent=noop,
     )

@@ -55,6 +55,7 @@ class DebugPreviewPanel(ft.Container):
         on_gpu_state_cycle: Callable[[], None],
         on_github_star_snackbar: Callable[[], None],
         on_telemetry_consent: Callable[[], None],
+        on_foundation_primitives: Callable[[], None],
         on_stt_loading_button_cycle: Callable[[], None] | None = None,
     ) -> None:
         actions = [
@@ -123,6 +124,11 @@ class DebugPreviewPanel(ft.Container):
                 "gpu_state_cycle",
                 "debug_preview.gpu_state_cycle",
                 on_gpu_state_cycle,
+            ),
+            _PreviewAction(
+                "foundation_primitives",
+                "debug_preview.foundation_primitives",
+                on_foundation_primitives,
             ),
         ]
         if on_stt_loading_button_cycle is not None:

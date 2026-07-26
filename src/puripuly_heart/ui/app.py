@@ -40,6 +40,11 @@ from puripuly_heart.ui.components.telemetry_consent_dialog import TelemetryConse
 from puripuly_heart.ui.components.title_bar import TitleBar
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.fonts import font_for_language, register_fonts
+from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
+from puripuly_heart.ui.foundation.preview import FoundationPreviewSurface
+from puripuly_heart.ui.foundation.resources import DEFAULT_FOUNDATION_RESOURCES
+from puripuly_heart.ui.foundation.runtime import FletFoundationRuntime
+from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice
 from puripuly_heart.ui.i18n import (
@@ -61,9 +66,9 @@ from puripuly_heart.ui.views.settings import SettingsView
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_WINDOW_WIDTH = 1136
-DEFAULT_WINDOW_HEIGHT = 850
-APP_CONTENT_PADDING = 16
+DEFAULT_WINDOW_WIDTH = FOUNDATION_DESIGN_TOKENS.window.width
+DEFAULT_WINDOW_HEIGHT = FOUNDATION_DESIGN_TOKENS.window.height
+APP_CONTENT_PADDING = FOUNDATION_DESIGN_TOKENS.spacing.page
 FOUNDER_CONTACT_URL = "https://x.com/kapitalismho"
 FOUNDER_README_BASE_URL = "https://github.com/kapitalismho/PuriPuly-heart/blob/main"
 FOUNDER_README_PATH_BY_LOCALE = {
@@ -147,7 +152,6 @@ class TranslatorApp:
             controller_kwargs["vrchat_osc_presence"] = vrchat_osc_presence
         self.controller = GuiController(**controller_kwargs)
         self._ui_application = UiApplicationBoundary(self.controller)
-        self._tracked_page_tasks: set[object] = set()
         self._shutdown_lock: asyncio.Lock | None = None
         self._shutdown_complete = False
         self._shutting_down = False
@@ -172,6 +176,15 @@ class TranslatorApp:
         self._github_star_prompt_shown_this_launch = False
         self._microphone_test_dialog: MicrophoneTestDialog | None = None
         self._telemetry_consent_dialog: TelemetryConsentDialog | None = None
+        self._foundation_preview_dialog: ft.AlertDialog | None = None
+        self._foundation_adapter = FletFoundationAdapter(
+            self.application,
+            self._presentation_adapter,
+        )
+        self._foundation_runtime = FletFoundationRuntime(
+            self.page,
+            self._foundation_adapter,
+        )
         self._application_lifecycle = self._compose_application_lifecycle()
         self._setup_page()
         self._build_layout()
@@ -262,24 +275,29 @@ class TranslatorApp:
         return boundary
 
     def _run_page_task(self, coroutine, *args):
-        lifecycle = getattr(self, "_application_lifecycle", None)
-        if getattr(self, "_shutting_down", False) or (
-            lifecycle is not None and not lifecycle.accepting_intents
-        ):
+        if getattr(self, "_shutting_down", False):
             close = getattr(coroutine, "close", None)
             if callable(close):
                 close()
             return None
-        task = self.page.run_task(coroutine, *args)
-        tracked = getattr(self, "_tracked_page_tasks", None)
-        if tracked is None:
-            tracked = set()
-            self._tracked_page_tasks = tracked
-        tracked.add(task)
-        add_done_callback = getattr(task, "add_done_callback", None)
-        if callable(add_done_callback):
-            add_done_callback(tracked.discard)
-        return task
+        runtime = self._ensure_foundation_runtime()
+        if not runtime.snapshot.lifecycle_bound:
+            runtime.bind_application_lifecycle(self._get_application_lifecycle())
+        return runtime.run_page_task(coroutine, *args)
+
+    def _ensure_foundation_runtime(self) -> FletFoundationRuntime:
+        runtime = getattr(self, "_foundation_runtime", None)
+        if runtime is not None:
+            return runtime
+        presentation = getattr(self, "_presentation_adapter", None)
+        if presentation is None:
+            presentation = FletUiPresentationAdapter(self)
+            self._presentation_adapter = presentation
+        adapter = FletFoundationAdapter(self.application, presentation)
+        runtime = FletFoundationRuntime(self.page, adapter)
+        self._foundation_adapter = adapter
+        self._foundation_runtime = runtime
+        return runtime
 
     async def shutdown(self) -> None:
         lifecycle = self._get_application_lifecycle()
@@ -289,6 +307,7 @@ class TranslatorApp:
             self._shutdown_complete = lifecycle.is_terminal
 
     def _compose_application_lifecycle(self) -> ApplicationShutdownCoordinator:
+        foundation_runtime = self._ensure_foundation_runtime()
         callbacks = list(self._application_shutdown_callbacks())
         controller_callbacks = self.application.application_shutdown_callbacks()
         if controller_callbacks:
@@ -307,6 +326,7 @@ class TranslatorApp:
             diagnostics_sink=self.application.emit_application_shutdown_diagnostic,
         )
         self.application.bind_application_lifecycle(lifecycle)
+        foundation_runtime.bind_application_lifecycle(lifecycle)
         return lifecycle
 
     def _get_application_lifecycle(self) -> ApplicationShutdownCoordinator:
@@ -317,6 +337,7 @@ class TranslatorApp:
         return lifecycle
 
     def _application_shutdown_callbacks(self) -> tuple[ApplicationShutdownCallback, ...]:
+        foundation_runtime = self._ensure_foundation_runtime()
         return (
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
@@ -330,12 +351,7 @@ class TranslatorApp:
                 callback_name="stop_app_ingress",
                 callback=self._stop_after_launch_ingress,
             ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="TranslatorApp",
-                callback_name="cancel_tracked_page_tasks",
-                callback=self._cancel_tracked_page_tasks,
-            ),
+            *foundation_runtime.application_shutdown_callbacks(),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
                 owner_name="GithubStarPromptRuntime",
@@ -356,23 +372,6 @@ class TranslatorApp:
 
     def _stop_after_launch_ingress(self) -> None:
         self.application.stop_github_star_prompt_ingress()
-
-    async def _cancel_tracked_page_tasks(self) -> None:
-        current_task = asyncio.current_task()
-        tracked = getattr(self, "_tracked_page_tasks", set())
-        tasks = tuple(
-            task
-            for task in tracked
-            if task is not current_task and not getattr(task, "done", lambda: True)()
-        )
-        for task in tasks:
-            cancel = getattr(task, "cancel", None)
-            if callable(cancel):
-                cancel()
-        awaitables = tuple(task for task in tasks if inspect.isawaitable(task))
-        if awaitables:
-            await asyncio.gather(*awaitables, return_exceptions=True)
-        tracked.difference_update(tasks)
 
     async def _on_page_lifecycle_end(self, _event=None) -> None:
         await self.shutdown()
@@ -404,9 +403,9 @@ class TranslatorApp:
         self.page.theme = get_app_theme(font_family=font_for_language(get_locale()))
         self.page.bgcolor = COLOR_BACKGROUND
         self.page.padding = 0
-        self.page.window.frameless = True
-        self.page.window.resizable = False
-        self.page.window.maximizable = False
+        self.page.window.frameless = FOUNDATION_DESIGN_TOKENS.window.frameless
+        self.page.window.resizable = FOUNDATION_DESIGN_TOKENS.window.resizable
+        self.page.window.maximizable = FOUNDATION_DESIGN_TOKENS.window.maximizable
         self.page.window.width = DEFAULT_WINDOW_WIDTH
         self.page.window.height = DEFAULT_WINDOW_HEIGHT
         self.page.window.min_width = DEFAULT_WINDOW_WIDTH
@@ -415,7 +414,9 @@ class TranslatorApp:
         self.page.window.max_height = DEFAULT_WINDOW_HEIGHT
         self.page.window.prevent_close = True
         self.page.window.on_event = self._on_window_event
-        self.page.window.icon = "icons/icon.ico"
+        self.page.window.icon = DEFAULT_FOUNDATION_RESOURCES.asset_url(
+            FOUNDATION_DESIGN_TOKENS.icon_asset
+        )
         self.page.on_keyboard_event = self._on_keyboard_event
 
     def _build_layout(self):
@@ -489,6 +490,7 @@ class TranslatorApp:
             on_github_star_snackbar=self._preview_github_star_snackbar,
             on_telemetry_consent=self._preview_telemetry_consent,
             on_stt_loading_button_cycle=self._cycle_debug_preview_stt_loading_button,
+            on_foundation_primitives=self._preview_foundation_primitives,
         )
 
     def _mark_launch_high_priority_feedback_shown(
@@ -862,6 +864,17 @@ class TranslatorApp:
         self.application.clear_debug_audio_fault_profiles()
         self._show_snackbar(t("debug_preview.audio_fault_clear"), ft.Colors.GREEN_700)
 
+    def _preview_foundation_primitives(self) -> None:
+        if not self._foundation_adapter.debug_preview_enabled:
+            return
+        dialog = ft.AlertDialog(
+            modal=False,
+            content=FoundationPreviewSurface(get_locale()),
+            bgcolor=COLOR_BACKGROUND,
+        )
+        self._foundation_preview_dialog = dialog
+        self.page.open(dialog)
+
     def _show_peer_translation_eula(self, on_accept) -> None:
         dialog = PeerTranslationEulaDialog(
             self.page,
@@ -1038,6 +1051,9 @@ class TranslatorApp:
         apply_debug_locale = getattr(debug_preview_panel, "apply_locale", None)
         if callable(apply_debug_locale):
             apply_debug_locale()
+        foundation_preview_dialog = getattr(self, "_foundation_preview_dialog", None)
+        if foundation_preview_dialog is not None:
+            foundation_preview_dialog.content = FoundationPreviewSurface(get_locale())
         self.page.update()
 
     def _cycle_debug_preview_stt_loading_button(self) -> None:
