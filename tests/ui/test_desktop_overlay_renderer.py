@@ -1257,11 +1257,11 @@ class FakeFletWindow:
             self.protected_writes.append(name)
         super().__setattr__(name, value)
 
-    def close(self) -> None:
+    async def close(self) -> None:
         self.close_calls += 1
         self._app.closed.set()
 
-    def destroy(self) -> None:
+    async def destroy(self) -> None:
         self.destroy_calls += 1
         self._app.closed.set()
 
@@ -2500,7 +2500,7 @@ async def test_desktop_overlay_rejects_late_page_after_close() -> None:
     )
 
     await window.close()
-    window._handle_page(app.page)
+    await window._handle_page(app.page)
 
     assert window._page is None
     assert app.page.window.close_calls == 1

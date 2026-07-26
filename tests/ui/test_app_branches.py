@@ -373,7 +373,11 @@ def _patch_app_construction(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(app_module, "SettingsView", ConstructionDummySettingsView)
     monkeypatch.setattr(app_module, "LogsView", ConstructionDummyLogsView)
     monkeypatch.setattr(app_module, "AboutView", lambda: ft.Container())
-    monkeypatch.setattr(app_module, "TitleBar", lambda _page: ft.Container())
+    monkeypatch.setattr(
+        app_module,
+        "TitleBar",
+        lambda _page, *, on_close: ft.Container(data=on_close),
+    )
     monkeypatch.setattr(app_module, "BottomNavBar", lambda on_change: ft.Container(data=on_change))
     monkeypatch.setattr(app_module, "register_fonts", lambda _page: None)
     monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")
@@ -453,7 +457,7 @@ async def test_window_close_awaits_application_shutdown_before_destroy(
     app._on_window_event(SimpleNamespace(type=ft.WindowEventType.RESIZE))
     assert page.tasks == []
 
-    app._on_window_event(SimpleNamespace(type=ft.WindowEventType.CLOSE))
+    app.title_bar.data()
     assert len(page.tasks) == 1
     app._on_window_event(SimpleNamespace(type=ft.WindowEventType.CLOSE))
     assert len(page.tasks) == 1
@@ -1112,7 +1116,11 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
     monkeypatch.setattr(app_module, "SettingsView", DummySettingsView)
     monkeypatch.setattr(app_module, "LogsView", DummyLogsView)
     monkeypatch.setattr(app_module, "AboutView", lambda: ft.Container())
-    monkeypatch.setattr(app_module, "TitleBar", lambda _page: ft.Container())
+    monkeypatch.setattr(
+        app_module,
+        "TitleBar",
+        lambda _page, *, on_close: ft.Container(data=on_close),
+    )
     monkeypatch.setattr(app_module, "BottomNavBar", lambda on_change: ft.Container(data=on_change))
     monkeypatch.setattr(app_module, "register_fonts", lambda _page: None)
     monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")

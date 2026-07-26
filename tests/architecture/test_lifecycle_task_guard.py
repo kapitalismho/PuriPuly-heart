@@ -34,6 +34,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/providers/stt/soniox.py", ASYNCIO_CREATE_TASK): 3,
         ("src/puripuly_heart/ui/app.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/components/subtab_shell.py", BARE_RUN_TASK): 1,
+        ("src/puripuly_heart/ui/flet_runtime.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/components/settings/api_key_field.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/dashboard.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/settings.py", RUN_TASK): 1,
@@ -112,6 +113,10 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         "src/puripuly_heart/ui/components/subtab_shell.py",
         BARE_RUN_TASK,
     ): "Flet subtab shell uses the page task runner for one bounded scroll restoration callback required by the asynchronous scroll API",
+    (
+        "src/puripuly_heart/ui/flet_runtime.py",
+        BARE_RUN_TASK,
+    ): "Flet runtime helper schedules bounded control coroutines such as focus through the owning page task runner",
     (
         "src/puripuly_heart/ui/components/settings/api_key_field.py",
         RUN_TASK,

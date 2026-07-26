@@ -381,6 +381,9 @@ class TranslatorApp:
         event_type = getattr(event, "type", getattr(event, "data", None))
         if event_type not in {ft.WindowEventType.CLOSE, ft.WindowEventType.CLOSE.value}:
             return
+        self._request_window_close()
+
+    def _request_window_close(self) -> None:
         if self._window_close_requested:
             return
         self._window_close_requested = True
@@ -423,7 +426,7 @@ class TranslatorApp:
         self.view_settings.set_overlay_runtime_state(self.overlay_state)
 
         # Custom title bar
-        self.title_bar = TitleBar(self.page)
+        self.title_bar = TitleBar(self.page, on_close=self._request_window_close)
 
         # Bottom navigation (order: Home, Settings, Logs, About)
         self.bottom_nav = BottomNavBar(on_change=self._on_nav_change)

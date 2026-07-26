@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 
 def control_page(control: object) -> object | None:
     try:
@@ -24,4 +26,29 @@ def update_control_if_mounted(control: object) -> bool:
         if "Control must be added" not in str(exc):
             raise
         return False
+    return True
+
+
+async def invoke_control_method(
+    control: object,
+    method_name: str,
+    *args: object,
+) -> object:
+    method = getattr(control, method_name)
+    result = method(*args)
+    if inspect.isawaitable(result):
+        return await result
+    return result
+
+
+def run_control_method(
+    control: object,
+    method_name: str,
+    *args: object,
+) -> bool:
+    page = control_page(control)
+    run_task = getattr(page, "run_task", None)
+    if not callable(run_task):
+        return False
+    run_task(invoke_control_method, control, method_name, *args)
     return True

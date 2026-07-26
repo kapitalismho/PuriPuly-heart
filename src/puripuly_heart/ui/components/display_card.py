@@ -5,7 +5,11 @@ from typing import Callable
 import flet as ft
 
 from puripuly_heart.ui.components.glow import create_glow_stack
-from puripuly_heart.ui.flet_runtime import is_control_mounted, update_control_if_mounted
+from puripuly_heart.ui.flet_runtime import (
+    is_control_mounted,
+    run_control_method,
+    update_control_if_mounted,
+)
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL,
@@ -209,7 +213,7 @@ class DisplayCard(ft.Container):
             self._on_submit(text)
             e.control.value = ""
             e.control.update()
-            e.control.focus()
+            run_control_method(e.control, "focus")
 
     def _handle_input_change(self, e) -> None:
         self._emit_input_activity(bool((e.control.value or "").strip()))
@@ -231,7 +235,7 @@ class DisplayCard(ft.Container):
             self._on_input_activity(bool(has_text))
 
     def focus_input(self) -> None:
-        self._input_field.focus()
+        run_control_method(self._input_field, "focus")
 
     def set_display(
         self,

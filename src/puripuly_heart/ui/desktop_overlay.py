@@ -60,6 +60,7 @@ from puripuly_heart.ui.desktop_window_zorder import (
     create_window_z_order_port,
 )
 from puripuly_heart.ui.flet_desktop_runtime import patch_hidden_view_launcher
+from puripuly_heart.ui.flet_runtime import invoke_control_method
 from puripuly_heart.ui.fonts import assets_dir
 from puripuly_heart.ui.i18n import t_for_locale
 
@@ -2445,12 +2446,12 @@ class FletDesktopRendererWindow:
         if page is not None:
             window = page.window
             try:
-                window.close()
+                await invoke_control_method(window, "close")
             except Exception:
                 destroy = getattr(window, "destroy", None)
                 if callable(destroy):
                     with contextlib.suppress(Exception):
-                        destroy()
+                        await invoke_control_method(window, "destroy")
 
         task = self._app_task
         if task is not None and not task.done():
@@ -2461,7 +2462,7 @@ class FletDesktopRendererWindow:
                     destroy = getattr(page.window, "destroy", None)
                     if callable(destroy):
                         with contextlib.suppress(Exception):
-                            destroy()
+                            await invoke_control_method(page.window, "destroy")
                     try:
                         await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
                     except TimeoutError:
@@ -2586,18 +2587,10 @@ class FletDesktopRendererWindow:
             return
         logger.warning("[DesktopOverlay] Ignoring unsupported desktop runtime control: %r", command)
 
-    def _handle_page(self, page: Any) -> None:
+    def _handle_page(self, page: Any) -> Awaitable[None] | None:
         if self._closed.is_set():
-            window = page.window
-            try:
-                window.close()
-            except Exception:
-                destroy = getattr(window, "destroy", None)
-                if callable(destroy):
-                    with contextlib.suppress(Exception):
-                        destroy()
             self._page_ready.set()
-            return
+            return self._close_late_page(page)
         self._page = page
         try:
             self._bind_window_z_order_process()
@@ -2608,6 +2601,17 @@ class FletDesktopRendererWindow:
             self._page_start_error = exc
             self._page_ready.set()
             raise
+        return None
+
+    async def _close_late_page(self, page: Any) -> None:
+        window = page.window
+        try:
+            await invoke_control_method(window, "close")
+        except Exception:
+            destroy = getattr(window, "destroy", None)
+            if callable(destroy):
+                with contextlib.suppress(Exception):
+                    await invoke_control_method(window, "destroy")
 
     def _record_flet_process(self, pid: int, pid_file: str | None) -> None:
         if self._closed.is_set():

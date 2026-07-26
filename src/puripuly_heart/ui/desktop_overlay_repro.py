@@ -28,6 +28,7 @@ from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationBlock,
     OverlayPresentationSnapshot,
 )
+from puripuly_heart.ui.flet_runtime import invoke_control_method
 
 DEFAULT_CYCLES = 100
 DEFAULT_DWELL_MS = 150
@@ -117,7 +118,7 @@ class StaticCheckerboardBackdrop:
         self._closed = True
         if self._page is not None:
             with contextlib.suppress(Exception):
-                self._page.window.close()
+                await invoke_control_method(self._page.window, "close")
         await _finish_owned_task(self._task, cancel=True)
 
 

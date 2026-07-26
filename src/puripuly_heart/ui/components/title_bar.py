@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import flet as ft
 
 from puripuly_heart.ui.flet_runtime import update_control_if_mounted
@@ -12,8 +14,9 @@ from puripuly_heart.ui.theme import (
 class TitleBar(ft.Container):
     """Custom draggable title bar with window controls."""
 
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, *, on_close: Callable[[], None]):
         self._page = page
+        self._on_close = on_close
 
         self._title_text = ft.Text(
             "PuriPuly Heart",
@@ -32,13 +35,12 @@ class TitleBar(ft.Container):
             on_hover=self._on_btn_hover,
         )
 
-        maximize_btn = ft.Container(
+        self._maximize_btn = ft.Container(
             content=ft.Icon(ft.Icons.CROP_SQUARE, size=16, color=COLOR_NEUTRAL),
             width=40,
             height=40,
             alignment=ft.Alignment.CENTER,
-            on_click=self._maximize,
-            on_hover=self._on_btn_hover,
+            disabled=True,
         )
 
         self._close_btn = ft.Container(
@@ -52,7 +54,7 @@ class TitleBar(ft.Container):
         )
 
         window_controls = ft.Row(
-            [minimize_btn, maximize_btn, self._close_btn],
+            [minimize_btn, self._maximize_btn, self._close_btn],
             spacing=0,
         )
 
@@ -86,12 +88,8 @@ class TitleBar(ft.Container):
         self._page.window.minimized = True
         self._page.update()
 
-    def _maximize(self, _):
-        self._page.window.maximized = not self._page.window.maximized
-        self._page.update()
-
     def _close(self, _):
-        self._page.window.close()
+        self._on_close()
 
     def _on_btn_hover(self, e):
         container = e.control
