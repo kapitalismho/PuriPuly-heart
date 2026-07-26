@@ -2,6 +2,19 @@ from __future__ import annotations
 
 import inspect
 
+_HOVER_ENTER_TOKENS = frozenset({"true", "1"})
+
+FILL_PARENT_WIDTH: float = float("inf")
+
+
+def is_hover_active(event: object) -> bool:
+    data = getattr(event, "data", None)
+    if isinstance(data, bool):
+        return data
+    if isinstance(data, str):
+        return data.strip().lower() in _HOVER_ENTER_TOKENS
+    return bool(data)
+
 
 def control_page(control: object) -> object | None:
     try:

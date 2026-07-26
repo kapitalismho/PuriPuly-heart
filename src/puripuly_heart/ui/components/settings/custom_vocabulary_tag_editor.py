@@ -5,7 +5,11 @@ from collections.abc import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.flet_runtime import update_control_if_mounted
+from puripuly_heart.ui.flet_runtime import (
+    FILL_PARENT_WIDTH,
+    is_hover_active,
+    update_control_if_mounted,
+)
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
     COLOR_NEUTRAL,
@@ -65,7 +69,7 @@ class CustomVocabularyTagEditor(ft.Column):
             hint_text="",
             multiline=False,
             max_lines=1,
-            width=float("inf"),
+            width=FILL_PARENT_WIDTH,
             border_radius=_INPUT_FIELD_RADIUS,
             border_color=COLOR_DIVIDER,
             focused_border_color=COLOR_PRIMARY,
@@ -158,7 +162,7 @@ class CustomVocabularyTagEditor(ft.Column):
     def _handle_chip_hover(self, event: ft.ControlEvent) -> None:
         chip = event.control
         term_text = chip.content
-        hovered = event.data == "true"
+        hovered = is_hover_active(event)
         chip.bgcolor = COLOR_PRIMARY if hovered else COLOR_PRIMARY_CONTAINER
         chip.border = ft.Border.all(1, COLOR_PRIMARY if hovered else COLOR_DIVIDER)
         term_text.color = ft.Colors.WHITE if hovered else COLOR_ON_PRIMARY_CONTAINER

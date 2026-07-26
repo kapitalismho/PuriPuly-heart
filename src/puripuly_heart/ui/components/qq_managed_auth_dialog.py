@@ -14,6 +14,7 @@ from puripuly_heart.ui.components.warm_document_dialog import (
     open_warm_document_dialog,
     split_body_paragraphs,
 )
+from puripuly_heart.ui.flet_runtime import FILL_PARENT_WIDTH
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import COLOR_DIVIDER, COLOR_ON_BACKGROUND, COLOR_PRIMARY
 
@@ -193,6 +194,7 @@ class QqManagedAuthDialog:
             content_padding=ft.Padding.symmetric(horizontal=16, vertical=20),
             text_size=22,
             color=COLOR_ON_BACKGROUND,
+            width=FILL_PARENT_WIDTH,
             password=password,
             on_submit=lambda _: self._submit(),
         )

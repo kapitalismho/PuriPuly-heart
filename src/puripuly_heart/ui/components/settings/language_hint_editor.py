@@ -6,7 +6,11 @@ import flet as ft
 
 from puripuly_heart.core.language import get_all_language_options
 from puripuly_heart.ui.components.language_modal import LanguageModal
-from puripuly_heart.ui.flet_runtime import control_page, update_control_if_mounted
+from puripuly_heart.ui.flet_runtime import (
+    control_page,
+    is_hover_active,
+    update_control_if_mounted,
+)
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import get_locale, language_name, t
 from puripuly_heart.ui.theme import (
@@ -141,7 +145,7 @@ class LanguageHintEditor(ft.Column):
     def _handle_chip_hover(self, event: ft.ControlEvent) -> None:
         chip = event.control
         term_text = chip.content
-        hovered = event.data == "true"
+        hovered = is_hover_active(event)
         chip.bgcolor = COLOR_PRIMARY if hovered else COLOR_PRIMARY_CONTAINER
         chip.border = ft.Border.all(1, COLOR_PRIMARY if hovered else COLOR_DIVIDER)
         term_text.color = ft.Colors.WHITE if hovered else COLOR_ON_PRIMARY_CONTAINER

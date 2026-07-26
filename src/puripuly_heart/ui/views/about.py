@@ -7,6 +7,7 @@ import flet as ft
 
 from puripuly_heart import __version__
 from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
+from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
@@ -324,25 +325,25 @@ class AboutView(ft.Column):
     def _on_name_hover(self, e):
         """Handle hover on name link."""
         text = e.control.content
-        text.color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+        text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         text.update()
 
     def _on_link_hover(self, e):
         """Handle hover on project links."""
         text = e.control.content
-        text.color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+        text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         text.update()
 
     def _on_version_hover(self, e):
         """Handle hover on version link."""
         text = e.control.content
-        text.color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+        text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         text.update()
 
     def _on_thanks_hover(self, e):
         """Handle hover on thanks text."""
         text = e.control.content
-        text.color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+        text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         text.update()
 
     def apply_locale(self) -> None:

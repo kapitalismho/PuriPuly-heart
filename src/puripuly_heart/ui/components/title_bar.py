@@ -2,7 +2,7 @@ from collections.abc import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.flet_runtime import update_control_if_mounted
+from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_DIVIDER,
@@ -94,7 +94,7 @@ class TitleBar(ft.Container):
     def _on_btn_hover(self, e):
         container = e.control
         icon = container.content
-        if e.data == "true":
+        if is_hover_active(e):
             icon.color = COLOR_NEUTRAL_DARK
         else:
             icon.color = COLOR_NEUTRAL
@@ -103,7 +103,7 @@ class TitleBar(ft.Container):
     def _on_close_hover(self, e):
         container = e.control
         icon = container.content
-        if e.data == "true":
+        if is_hover_active(e):
             container.bgcolor = ft.Colors.RED_400
             icon.color = ft.Colors.WHITE
         else:

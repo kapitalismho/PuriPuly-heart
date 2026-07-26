@@ -9,6 +9,7 @@ import flet as ft
 
 from puripuly_heart.ui.flet_runtime import (
     control_page,
+    is_hover_active,
     update_control_if_mounted,
 )
 from puripuly_heart.ui.theme import (
@@ -113,7 +114,7 @@ class _BottomDockedTextTab(ft.Container):
     def _handle_hover(self, e) -> None:
         if self._active:
             return
-        self.label.color = COLOR_PRIMARY if e.data == "true" else COLOR_NEUTRAL
+        self.label.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_NEUTRAL
         self._refresh()
 
     def _refresh(self) -> None:

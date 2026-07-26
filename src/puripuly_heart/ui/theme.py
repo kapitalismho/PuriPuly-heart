@@ -26,7 +26,17 @@ COLOR_NEUTRAL_DARK = FOUNDATION_DESIGN_TOKENS.palette.neutral_dark
 COLOR_SURFACE_TONAL = FOUNDATION_DESIGN_TOKENS.palette.surface_tonal
 
 
+def _clickable_button_style() -> ft.ButtonStyle:
+    return ft.ButtonStyle(
+        mouse_cursor={
+            ft.ControlState.DISABLED: ft.MouseCursor.BASIC,
+            ft.ControlState.DEFAULT: ft.MouseCursor.CLICK,
+        }
+    )
+
+
 def get_app_theme(font_family: str | None = None) -> ft.Theme:
+    clickable = _clickable_button_style()
     return ft.Theme(
         color_scheme=ft.ColorScheme(
             surface=COLOR_SURFACE,
@@ -40,6 +50,11 @@ def get_app_theme(font_family: str | None = None) -> ft.Theme:
         ),
         font_family=font_family,
         visual_density=ft.VisualDensity.COMPACT,
+        button_theme=ft.ButtonTheme(style=clickable),
+        text_button_theme=ft.TextButtonTheme(style=clickable),
+        outlined_button_theme=ft.OutlinedButtonTheme(style=clickable),
+        filled_button_theme=ft.FilledButtonTheme(style=clickable),
+        icon_button_theme=ft.IconButtonTheme(style=clickable),
         page_transitions=ft.PageTransitionsTheme(
             windows=ft.PageTransitionTheme.NONE,
             macos=ft.PageTransitionTheme.NONE,

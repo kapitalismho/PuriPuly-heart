@@ -15,7 +15,7 @@ from puripuly_heart.config.audio_host_api import (
     normalize_input_host_api,
 )
 from puripuly_heart.ui.components.settings.settings_modal import OptionItem, SettingsModal
-from puripuly_heart.ui.flet_runtime import is_control_mounted
+from puripuly_heart.ui.flet_runtime import is_control_mounted, is_hover_active
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import COLOR_ON_BACKGROUND, COLOR_PRIMARY
 
@@ -140,7 +140,7 @@ class AudioSettings(ft.Column):
         """Handle hover effect on clickable text."""
         container = e.control
         text_control = container.content
-        if e.data == "true":
+        if is_hover_active(e):
             text_control.color = COLOR_PRIMARY
         else:
             text_control.color = COLOR_ON_BACKGROUND

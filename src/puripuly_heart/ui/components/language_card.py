@@ -3,7 +3,7 @@ from typing import Callable
 import flet as ft
 
 from puripuly_heart.ui.components.glow import create_glow_stack
-from puripuly_heart.ui.flet_runtime import update_control_if_mounted
+from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
 from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
@@ -137,15 +137,15 @@ class _LanguageRow(ft.Container):
         )
 
     def _on_source_hover(self, e):
-        self._source_text.color = COLOR_PRIMARY if e.data == "true" else COLOR_NEUTRAL_DARK
+        self._source_text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_NEUTRAL_DARK
         self._source_text.update()
 
     def _on_target_hover(self, e):
-        self._target_text.color = COLOR_PRIMARY if e.data == "true" else COLOR_NEUTRAL_DARK
+        self._target_text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_NEUTRAL_DARK
         self._target_text.update()
 
     def _on_arrow_hover(self, e):
-        self._arrow_icon.color = COLOR_PRIMARY if e.data == "true" else COLOR_SECONDARY
+        self._arrow_icon.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_SECONDARY
         self._arrow_icon.update()
 
     def set_label(self, label: str) -> None:

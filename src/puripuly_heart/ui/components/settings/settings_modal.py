@@ -12,6 +12,7 @@ from typing import Callable, Sequence
 import flet as ft
 
 from puripuly_heart.ui.components.glow import create_glow_stack
+from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL,
@@ -374,7 +375,7 @@ class SettingsModal:
         container = e.control
         content = container.content
 
-        is_hovering = e.data == "true"
+        is_hovering = is_hover_active(e)
 
         # Get text control (could be Text or Column with Text)
         if isinstance(content, ft.Text):

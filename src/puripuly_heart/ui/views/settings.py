@@ -65,7 +65,11 @@ from puripuly_heart.ui.components.settings import (
 )
 from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 from puripuly_heart.ui.components.subtab_shell import TextSubtab, TextSubtabShell
-from puripuly_heart.ui.flet_runtime import is_control_mounted, update_control_if_mounted
+from puripuly_heart.ui.flet_runtime import (
+    is_control_mounted,
+    is_hover_active,
+    update_control_if_mounted,
+)
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 from puripuly_heart.ui.i18n import (
@@ -555,7 +559,7 @@ class SettingsView(ft.Column):
         """Handle hover effect on clickable text."""
         container = e.control
         text_control = container.content
-        next_color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+        next_color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         if text_control.color == next_color:
             return
         text_control.color = next_color
@@ -563,7 +567,7 @@ class SettingsView(ft.Column):
 
     def _make_overlay_step_hover_handler(self, text_control: ft.Text):
         def _on_hover(e: ft.ControlEvent) -> None:
-            next_color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+            next_color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
             if text_control.color == next_color:
                 return
             text_control.color = next_color

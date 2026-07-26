@@ -10,6 +10,7 @@ from typing import Callable, Sequence
 import flet as ft
 
 from puripuly_heart.ui.components.glow import create_glow_stack
+from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.i18n import language_name, t
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
@@ -289,7 +290,7 @@ class LanguageModal:
         if text_control.color == ft.Colors.WHITE:
             return
 
-        if e.data == "true":
+        if is_hover_active(e):
             text_control.color = COLOR_PRIMARY
             # container.bgcolor = ft.Colors.with_opacity(0.05, COLOR_PRIMARY) # Removed per user request
         else:
@@ -303,7 +304,7 @@ class LanguageModal:
         container = e.control
         content = container.content
 
-        is_hovering = e.data == "true"
+        is_hovering = is_hover_active(e)
         # If text is white, it's selected. Don't hover.
         if isinstance(content, ft.Column) and content.controls:
             text_control = content.controls[0]
