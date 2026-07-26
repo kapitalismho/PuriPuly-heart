@@ -1169,6 +1169,14 @@
       "rationale": "The dashboard surface slot/intent contract and renderer are internal UI composition boundaries consumed by DashboardView and the later capture-control Goal, not external import compatibility surfaces."
     },
     {
+      "surface": "puripuly_heart.ui.settings modules",
+      "classification": "internal_ui_settings_surface",
+      "module_prefixes": [
+        "puripuly_heart.ui.settings"
+      ],
+      "rationale": "The settings surface slot/intent contract and renderer are internal UI composition boundaries consumed by SettingsView and the later settings-migration gates, not external import compatibility surfaces."
+    },
+    {
       "surface": "puripuly_heart.ui.foundation modules",
       "classification": "internal_ui_foundation",
       "module_prefixes": [

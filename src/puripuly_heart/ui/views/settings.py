@@ -81,6 +81,12 @@ from puripuly_heart.ui.i18n import (
     t,
 )
 from puripuly_heart.ui.overlay_peer_contract import OverlayPeerConsumerContract
+from puripuly_heart.ui.settings.contract import (
+    SettingsApiSurfaceSlots,
+    SettingsProviderIntents,
+    SettingsSurfaceIntents,
+)
+from puripuly_heart.ui.settings.renderer import compose_settings_api_surface
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
     COLOR_NEUTRAL,
@@ -375,6 +381,56 @@ class SettingsView(ft.Column):
 
     def set_local_cpu_auto_available(self, available: bool) -> None:
         self._local_cpu_auto_available = bool(available)
+
+    def self_stt_control(self) -> ft.Control:
+        return self._self_stt_card
+
+    def peer_stt_control(self) -> ft.Control:
+        return self._peer_stt_card
+
+    def translation_provider_control(self) -> ft.Control:
+        return self._translation_provider_card
+
+    def translation_connection_control(self) -> ft.Control:
+        return self._translation_connection_card
+
+    def translation_fallback_control(self) -> ft.Control:
+        return self._openrouter_fallback_card
+
+    def gpu_device_control(self) -> ft.Control:
+        return self._gpu_device_card
+
+    def local_llm_connection_control(self) -> ft.Control:
+        return self._local_llm_connection_card
+
+    def managed_key_control(self) -> ft.Control:
+        return self._managed_key_card
+
+    def peer_expected_language_control(self) -> ft.Control:
+        return self._peer_auto_languages_card
+
+    def api_keys_control(self) -> ft.Control:
+        return self._api_keys_card
+
+    def bind_settings_intents(
+        self,
+        *,
+        surface: SettingsSurfaceIntents,
+        provider: SettingsProviderIntents,
+    ) -> None:
+        self.on_settings_changed = surface.settings_changed
+        self.show_snackbar = surface.show_snackbar
+        if surface.runtime_log_basic is not None:
+            self.runtime_log_basic = surface.runtime_log_basic
+        if surface.runtime_log_detailed is not None:
+            self.runtime_log_detailed = surface.runtime_log_detailed
+        self.on_providers_changed = provider.providers_changed
+        self.on_request_openrouter_pkce = provider.request_openrouter_pkce
+        self.on_verify_api_key = provider.verify_api_key
+        self.on_provider_secret_change = provider.provider_secret_change
+        self.on_secret_cleared = provider.secret_cleared
+        self.on_local_llm_secret_changed = provider.local_llm_secret_changed
+        self.on_gpu_discovery_requested = provider.gpu_discovery_requested
 
     # --- Card Wrapper (About page pattern) ---
     def _wrap_card(
@@ -877,7 +933,7 @@ class SettingsView(ft.Column):
         self._stt_provider_label = ft.Text(
             t("settings.self_stt_provider"), size=16, color=COLOR_ON_BACKGROUND
         )
-        stt_card = self._wrap_unit_card(
+        self._self_stt_card = self._wrap_unit_card(
             title=self._stt_title,
             value=self._stt_text,
         )
@@ -895,7 +951,7 @@ class SettingsView(ft.Column):
         self._translation_provider_label = ft.Text(
             t("settings.shared_translation_provider"), size=16, color=COLOR_ON_BACKGROUND
         )
-        trans_card = self._wrap_unit_card(
+        self._translation_provider_card = self._wrap_unit_card(
             title=self._trans_title,
             value=self._llm_text,
         )
@@ -1156,7 +1212,7 @@ class SettingsView(ft.Column):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
-        api_card = self._wrap_card(
+        self._api_keys_card = self._wrap_card(
             ft.Column(
                 [
                     api_header,
@@ -1167,7 +1223,6 @@ class SettingsView(ft.Column):
             ),
             height=None,
         )
-        api_keys_row = api_card
 
         # === General Tab Row 1 ===
         self._ui_text = self._build_clickable_text(
@@ -1423,12 +1478,9 @@ class SettingsView(ft.Column):
             size=16,
             color=COLOR_ON_BACKGROUND,
         )
-        peer_stt_card = self._wrap_unit_card(
+        self._peer_stt_card = self._wrap_unit_card(
             title=self._peer_provider_title,
             value=self._peer_stt_text,
-        )
-        row1 = ft.Container(
-            content=ft.Row([stt_card, peer_stt_card, trans_card], spacing=16, expand=True),
         )
 
         self._gpu_device_title = ft.Text(
@@ -1448,20 +1500,6 @@ class SettingsView(ft.Column):
             value=self._gpu_device_text,
         )
         self._gpu_device_card.visible = False
-        gpu_placeholder_1 = self._wrap_empty_unit_card()
-        gpu_placeholder_2 = self._wrap_empty_unit_card()
-        self._gpu_device_row = ft.Container(
-            content=ft.Row(
-                [
-                    self._gpu_device_card,
-                    gpu_placeholder_1,
-                    gpu_placeholder_2,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
-        self._gpu_device_row.visible = False
 
         self._overlay_translation_title = ft.Text(
             t("settings.overlay.show_translation"),
@@ -1908,19 +1946,6 @@ class SettingsView(ft.Column):
             title=self._openrouter_fallback_title,
             value=self._openrouter_fallback_text,
         )
-        self._translation_connection_row = ft.Container(
-            content=ft.Row(
-                [
-                    self._wrap_empty_unit_card(),
-                    self._translation_connection_card,
-                    self._openrouter_fallback_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-            visible=True,
-        )
-        self._openrouter_routing_row = self._translation_connection_row
 
         self._local_llm_connection_title = ft.Text(
             t("settings.local_llm.connection"),
@@ -2117,17 +2142,17 @@ class SettingsView(ft.Column):
             expand=False,
         )
 
+        self._api_surface = compose_settings_api_surface(
+            SettingsApiSurfaceSlots.from_slot_provider(self),
+            placeholder_factory=self._wrap_empty_unit_card,
+        )
+        self._translation_connection_row = self._api_surface.translation_connection_row
+        self._openrouter_routing_row = self._translation_connection_row
+        self._gpu_device_row = self._api_surface.gpu_device_row
+
         self._settings_subtab_shell = self._build_settings_subtab_shell(
             {
-                "api": [
-                    row1,
-                    self._translation_connection_row,
-                    self._gpu_device_row,
-                    self._local_llm_connection_card,
-                    self._managed_key_card,
-                    self._peer_auto_languages_card,
-                    api_keys_row,
-                ],
+                "api": list(self._api_surface.rows),
                 "general": [
                     general_primary_row,
                     general_audio_row,

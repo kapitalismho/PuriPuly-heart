@@ -57,6 +57,10 @@ from puripuly_heart.ui.i18n import (
     t,
 )
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from puripuly_heart.ui.settings.contract import (
+    SettingsProviderIntents,
+    SettingsSurfaceIntents,
+)
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_PRIMARY,
@@ -210,16 +214,29 @@ class TranslatorApp:
             ),
         )
 
-        self.view_settings.on_settings_changed = self._on_settings_changed
+        runtime_log_basic = self.application.log_basic
+        runtime_log_detailed = self.application.log_detailed
+        self.view_settings.bind_settings_intents(
+            surface=SettingsSurfaceIntents(
+                settings_changed=self._on_settings_changed,
+                show_snackbar=self._show_snackbar,
+                runtime_log_basic=(runtime_log_basic if callable(runtime_log_basic) else None),
+                runtime_log_detailed=(
+                    runtime_log_detailed if callable(runtime_log_detailed) else None
+                ),
+            ),
+            provider=SettingsProviderIntents(
+                providers_changed=self._on_providers_changed,
+                request_openrouter_pkce=self._on_request_openrouter_pkce,
+                verify_api_key=self._on_verify_api_key,
+                provider_secret_change=self._on_provider_secret_change,
+                secret_cleared=self._on_secret_cleared,
+                local_llm_secret_changed=self._on_local_llm_secret_changed,
+                gpu_discovery_requested=self._on_gpu_discovery_requested,
+            ),
+        )
         self.view_settings.on_prompt_apply_settings = self._on_prompt_apply_settings
-        self.view_settings.on_providers_changed = self._on_providers_changed
-        self.view_settings.on_request_openrouter_pkce = self._on_request_openrouter_pkce
-        self.view_settings.on_verify_api_key = self._on_verify_api_key
-        self.view_settings.on_provider_secret_change = self._on_provider_secret_change
-        self.view_settings.on_secret_cleared = self._on_secret_cleared
-        self.view_settings.on_local_llm_secret_changed = self._on_local_llm_secret_changed
         self.view_settings.on_start_microphone_test = self._on_start_microphone_test
-        self.view_settings.on_gpu_discovery_requested = self._on_gpu_discovery_requested
         self.view_settings.on_telemetry_consent_change = self._on_telemetry_consent_change
         self.view_settings.on_list_loopback_capture_options = (
             lambda: self.application.list_loopback_capture_options()
@@ -246,15 +263,8 @@ class TranslatorApp:
             self._on_desktop_overlay_position_reset
         )
         self.view_settings.on_view_logs = self._open_logs_tab
-        self.view_settings.show_snackbar = self._show_snackbar
         self.view_logs.on_mode_change = self._on_runtime_logging_mode_change
         self.view_logs.set_runtime_logging_mode(self.application.state().runtime_logging_mode)
-        runtime_log_basic = self.application.log_basic
-        runtime_log_detailed = self.application.log_detailed
-        if callable(runtime_log_basic):
-            self.view_settings.runtime_log_basic = runtime_log_basic
-        if callable(runtime_log_detailed):
-            self.view_settings.runtime_log_detailed = runtime_log_detailed
         self.view_dashboard.runtime_log_detailed = self._log_detailed
 
         calibration_begin = self.application.begin_overlay_calibration
