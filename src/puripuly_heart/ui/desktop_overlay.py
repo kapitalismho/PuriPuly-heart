@@ -2245,10 +2245,10 @@ async def _default_flet_app_runner(
         )
 
 
-def _default_preview_app_runner(target: Callable[[Any], object]) -> None:
+def _default_preview_app_runner(target: Callable[[Any], object]) -> object:
     import flet as ft
 
-    ft.run(main=target)
+    return ft.run_async(main=target)
 
 
 _REAL_DEFAULT_PREVIEW_APP_RUNNER = _default_preview_app_runner
@@ -2643,11 +2643,7 @@ class FletDesktopRendererWindow:
         import flet as ft
 
         window = page.window
-        page.title = t_for_locale(
-            self._locale,
-            "desktop_overlay.window.title",
-            default="PuriPuly Overlay",
-        )
+        page.title = self._window_title()
         window.icon = "icons/icon.ico"
         window.frameless = True
         window.always_on_top = True
@@ -2798,6 +2794,46 @@ class FletDesktopRendererWindow:
         window = page.window
         if hasattr(window, "visible"):
             window.visible = True
+        if self._preview_catalog is None:
+            self._run_page_task(self._reveal_window_through_platform_port)
+
+    async def _reveal_window_through_platform_port(self) -> None:
+        title = self._window_title()
+        try:
+            result = await self._window_z_order_port.reveal_window(title)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self._emit_detailed_log(
+                f"window_reveal reason=port_error exception_type={type(exc).__name__}"
+            )
+            if self._window_z_order_required:
+                logger.warning(
+                    "[DesktopOverlay] Desktop overlay window reveal failed: "
+                    "reason=port_error exception_type=%s",
+                    type(exc).__name__,
+                )
+            return
+        self._emit_detailed_log(
+            "window_reveal "
+            f"reason={result.reason} applied={result.applied} "
+            f"title_confirmed={result.title_confirmed} "
+            f"visible_confirmed={result.visible_confirmed} "
+            f"win32_error={result.win32_error}"
+        )
+        if self._window_z_order_required and not result.applied:
+            logger.warning(
+                "[DesktopOverlay] Desktop overlay window reveal failed: reason=%s win32_error=%s",
+                result.reason,
+                result.win32_error,
+            )
+
+    def _window_title(self) -> str:
+        return t_for_locale(
+            self._locale,
+            "desktop_overlay.window.title",
+            default="PuriPuly Overlay",
+        )
 
     def _build_preview_root(self, ft: Any, plan: DesktopCaptionPlan) -> Any:
         self._retained_caption_surface = _build_retained_desktop_caption_surface(

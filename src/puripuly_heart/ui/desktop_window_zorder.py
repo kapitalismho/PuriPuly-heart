@@ -15,6 +15,8 @@ _SWP_NOSIZE = 0x0001
 _SWP_NOMOVE = 0x0002
 _SWP_NOACTIVATE = 0x0010
 _SWP_ASYNCWINDOWPOS = 0x4000
+_SW_SHOWNOACTIVATE = 4
+_WINDOW_TITLE_MAX_CHARS = 512
 _WS_EX_TOPMOST = 0x00000008
 _WS_EX_TRANSPARENT = 0x00000020
 
@@ -34,10 +36,22 @@ class WindowEnumerationResult:
     win32_error: int | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class WindowRevealResult:
+    applied: bool
+    reason: str
+    hwnd: int | None = None
+    title_confirmed: bool = False
+    visible_confirmed: bool = False
+    win32_error: int | None = None
+
+
 class WindowZOrderPort(Protocol):
     def bind_process(self, pid: int) -> None: ...
 
     async def reassert_topmost_after_click_through(self) -> WindowZOrderResult: ...
+
+    async def reveal_window(self, expected_title: str) -> WindowRevealResult: ...
 
     def close(self) -> None: ...
 
@@ -45,7 +59,15 @@ class WindowZOrderPort(Protocol):
 class Win32WindowApi(Protocol):
     def top_level_windows_for_process(self, pid: int) -> WindowEnumerationResult: ...
 
+    def all_top_level_windows_for_process(self, pid: int) -> WindowEnumerationResult: ...
+
     def is_window(self, hwnd: int) -> bool: ...
+
+    def is_window_visible(self, hwnd: int) -> bool: ...
+
+    def window_title(self, hwnd: int) -> str: ...
+
+    def show_window_no_activate(self, hwnd: int) -> tuple[bool, int | None]: ...
 
     def process_id(self, hwnd: int) -> int | None: ...
 
@@ -61,6 +83,9 @@ class NoopWindowZOrderPort:
     async def reassert_topmost_after_click_through(self) -> WindowZOrderResult:
         return WindowZOrderResult(applied=False, reason="unsupported_platform")
 
+    async def reveal_window(self, expected_title: str) -> WindowRevealResult:
+        return WindowRevealResult(applied=False, reason="unsupported_platform")
+
     def close(self) -> None:
         return None
 
@@ -72,15 +97,105 @@ class WindowsWindowZOrderPort:
         api: Win32WindowApi | None = None,
         timeout_s: float = 0.5,
         poll_interval_s: float = 0.01,
+        reveal_timeout_s: float = 5.0,
+        reveal_retain_s: float = 0.6,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._api = api or _CtypesWin32WindowApi()
         self._timeout_s = max(0.0, float(timeout_s))
         self._poll_interval_s = max(0.001, float(poll_interval_s))
+        self._reveal_timeout_s = max(0.0, float(reveal_timeout_s))
+        self._reveal_retain_s = max(0.0, float(reveal_retain_s))
         self._sleep = sleep
         self._pid: int | None = None
         self._binding_generation = 0
         self._closed = False
+
+    async def reveal_window(self, expected_title: str) -> WindowRevealResult:
+        pid = self._pid
+        generation = self._binding_generation
+        if self._closed:
+            return WindowRevealResult(applied=False, reason="closed")
+        if pid is None:
+            return WindowRevealResult(applied=False, reason="process_unbound")
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._reveal_timeout_s
+        hwnd: int | None = None
+        title_confirmed = False
+        while True:
+            if not self._binding_is_current(pid, generation):
+                return WindowRevealResult(applied=False, reason="binding_changed")
+            enumeration = self._api.all_top_level_windows_for_process(pid)
+            if enumeration.win32_error is not None:
+                return WindowRevealResult(
+                    applied=False,
+                    reason="enum_windows_failed",
+                    win32_error=enumeration.win32_error,
+                )
+            candidates = tuple(
+                candidate
+                for candidate in enumeration.windows
+                if self._window_belongs_to_process(candidate, pid)
+            )
+            titled = tuple(
+                candidate
+                for candidate in candidates
+                if self._api.window_title(candidate) == expected_title
+            )
+            if len(titled) == 1:
+                hwnd = titled[0]
+                title_confirmed = True
+                break
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                if len(candidates) == 1:
+                    hwnd = candidates[0]
+                break
+            await self._sleep(min(self._poll_interval_s, remaining))
+
+        if hwnd is None:
+            return WindowRevealResult(applied=False, reason="window_not_found")
+        if not self._window_belongs_to_process(hwnd, pid):
+            return WindowRevealResult(applied=False, reason="window_changed")
+
+        show_calls = 0
+        win32_error: int | None = None
+        visible_since: float | None = None
+        deadline = loop.time() + self._reveal_timeout_s
+        while True:
+            if not self._binding_is_current(pid, generation):
+                return WindowRevealResult(applied=False, reason="binding_changed", hwnd=hwnd)
+            if not self._window_belongs_to_process(hwnd, pid):
+                return WindowRevealResult(applied=False, reason="window_changed", hwnd=hwnd)
+            now = loop.time()
+            if self._api.is_window_visible(hwnd):
+                if visible_since is None:
+                    visible_since = now
+                elif now - visible_since >= self._reveal_retain_s:
+                    return WindowRevealResult(
+                        applied=True,
+                        reason="applied" if show_calls else "already_visible",
+                        hwnd=hwnd,
+                        title_confirmed=title_confirmed,
+                        visible_confirmed=True,
+                    )
+            else:
+                visible_since = None
+                applied, error = self._api.show_window_no_activate(hwnd)
+                show_calls += 1
+                win32_error = None if applied else error
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                return WindowRevealResult(
+                    applied=False,
+                    reason="visibility_not_retained",
+                    hwnd=hwnd,
+                    title_confirmed=title_confirmed,
+                    visible_confirmed=visible_since is not None,
+                    win32_error=win32_error,
+                )
+            await self._sleep(min(self._poll_interval_s, remaining))
 
     def bind_process(self, pid: int) -> None:
         if self._closed:
@@ -222,6 +337,45 @@ class _CtypesWin32WindowApi:
             wintypes.UINT,
         ]
         self._user32.SetWindowPos.restype = wintypes.BOOL
+        self._user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+        self._user32.ShowWindow.restype = wintypes.BOOL
+        self._user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        self._user32.GetWindowTextW.restype = ctypes.c_int
+
+    def all_top_level_windows_for_process(self, pid: int) -> WindowEnumerationResult:
+        windows: list[int] = []
+
+        def collect(hwnd: int, _lparam: int) -> bool:
+            if self.process_id(hwnd) != pid:
+                return True
+            if self._user32.GetWindow(hwnd, _GW_OWNER):
+                return True
+            windows.append(int(hwnd))
+            return True
+
+        callback = self._enum_proc_type(collect)
+        ctypes.set_last_error(0)
+        if not self._user32.EnumWindows(callback, 0):
+            return WindowEnumerationResult(
+                windows=(),
+                win32_error=ctypes.get_last_error(),
+            )
+        return WindowEnumerationResult(windows=tuple(windows))
+
+    def is_window_visible(self, hwnd: int) -> bool:
+        return bool(self._user32.IsWindowVisible(hwnd))
+
+    def window_title(self, hwnd: int) -> str:
+        buffer = ctypes.create_unicode_buffer(_WINDOW_TITLE_MAX_CHARS)
+        self._user32.GetWindowTextW(hwnd, buffer, _WINDOW_TITLE_MAX_CHARS)
+        return buffer.value
+
+    def show_window_no_activate(self, hwnd: int) -> tuple[bool, int | None]:
+        ctypes.set_last_error(0)
+        applied = bool(self._user32.ShowWindow(hwnd, _SW_SHOWNOACTIVATE))
+        if self._user32.IsWindowVisible(hwnd):
+            return True, None
+        return applied, None if applied else ctypes.get_last_error()
 
     def top_level_windows_for_process(self, pid: int) -> WindowEnumerationResult:
         windows: list[int] = []

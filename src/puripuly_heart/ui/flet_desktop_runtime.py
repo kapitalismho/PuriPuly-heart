@@ -15,7 +15,7 @@ async def open_hidden_view(
     import flet_desktop
 
     locate_view = getattr(flet_desktop, "__locate_and_unpack_flet_view")
-    args, flet_env, pid_file = locate_view(page_url, assets_dir, hidden)
+    args, flet_env, pid_file = locate_view(page_url, assets_dir, hidden and os.name != "nt")
     kwargs: dict[str, object] = {"env": flet_env}
     if os.name == "nt":
         startupinfo = subprocess.STARTUPINFO()
