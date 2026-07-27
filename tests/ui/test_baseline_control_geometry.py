@@ -23,7 +23,7 @@ def _padding_values(padding: object) -> tuple[float, float, float, float]:
     )
 
 
-def test_text_button_padding_token_matches_baseline_geometry() -> None:
+def test_text_button_padding_token_is_pinned_to_the_measured_baseline_value() -> None:
     assert _padding_values(TEXT_BUTTON_PADDING) == (8.0, 8.0, 8.0, 8.0)
 
 
@@ -47,7 +47,7 @@ def test_logs_header_buttons_set_no_padding_override_so_the_theme_applies() -> N
     assert style.padding is None
 
 
-def test_prompt_field_content_padding_matches_baseline_geometry() -> None:
+def test_prompt_field_content_padding_token_is_pinned_to_the_measured_baseline_value() -> None:
     assert _padding_values(PROMPT_FIELD_CONTENT_PADDING) == (8.0, 16.0, 8.0, 16.0)
 
 
