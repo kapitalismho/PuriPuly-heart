@@ -37,3 +37,23 @@ def test_flet_desktop_private_hook_inventory_is_exact_and_explicit() -> None:
     assert source.count("open_flet_view_async") == 3
     assert "patch_hidden_view_launcher" in source
     assert "open_hidden_view" in source
+
+
+def test_the_private_hooks_the_adapter_depends_on_exist_in_the_installed_runtime() -> None:
+    """The adapter reaches two `flet_desktop` internals. This fails at import time on a runtime that
+    renames or removes them, instead of failing when the overlay is first revealed."""
+    import flet_desktop
+
+    assert callable(getattr(flet_desktop, "__locate_and_unpack_flet_view"))
+    assert callable(flet_desktop.open_flet_view_async)
+
+
+def test_the_launcher_patch_restores_the_original_hook() -> None:
+    import flet_desktop
+
+    from puripuly_heart.ui.flet_desktop_runtime import patch_hidden_view_launcher
+
+    original = flet_desktop.open_flet_view_async
+    with patch_hidden_view_launcher():
+        assert flet_desktop.open_flet_view_async is not original
+    assert flet_desktop.open_flet_view_async is original
