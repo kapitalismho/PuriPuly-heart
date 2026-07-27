@@ -8,6 +8,8 @@ from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.ui.flet_runtime import FILL_PARENT_WIDTH, update_control_if_mounted
 from puripuly_heart.ui.theme import COLOR_DIVIDER, COLOR_NEUTRAL_DARK, COLOR_PRIMARY
 
+PROMPT_FIELD_CONTENT_PADDING = ft.Padding.symmetric(horizontal=8, vertical=16)
+
 
 class PromptEditor(ft.Column):
     """System prompt editor component."""
@@ -27,6 +29,7 @@ class PromptEditor(ft.Column):
             on_change=self._handle_change,
             on_blur=self._handle_blur,
             width=FILL_PARENT_WIDTH,
+            content_padding=PROMPT_FIELD_CONTENT_PADDING,
             border_radius=12,
             border_color=COLOR_DIVIDER,
             focused_border_color=COLOR_PRIMARY,

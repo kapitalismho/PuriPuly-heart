@@ -26,12 +26,16 @@ COLOR_NEUTRAL_DARK = FOUNDATION_DESIGN_TOKENS.palette.neutral_dark
 COLOR_SURFACE_TONAL = FOUNDATION_DESIGN_TOKENS.palette.surface_tonal
 
 
+TEXT_BUTTON_PADDING = ft.Padding.symmetric(horizontal=8, vertical=8)
+
+
 def _clickable_button_style() -> ft.ButtonStyle:
     return ft.ButtonStyle(
+        padding=TEXT_BUTTON_PADDING,
         mouse_cursor={
             ft.ControlState.DISABLED: ft.MouseCursor.BASIC,
             ft.ControlState.DEFAULT: ft.MouseCursor.CLICK,
-        }
+        },
     )
 
 
