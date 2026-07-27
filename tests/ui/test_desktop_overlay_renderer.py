@@ -1870,7 +1870,7 @@ def test_desktop_overlay_preview_fixture_data_packaging_readiness_is_embedded() 
     assert sources == (
         desktop_overlay.DesktopOverlayPreviewFixtureDataSource(
             source_kind="embedded_python_module",
-            module="puripuly_heart.ui.desktop_overlay",
+            module="puripuly_heart.ui.desktop_overlay_surface.renderer",
             package_data_globs=(),
             hiddenimports=(),
         ),

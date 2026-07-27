@@ -1201,6 +1201,14 @@
       "rationale": "The application shell slot contract and renderer are internal UI composition boundaries consumed by TranslatorApp, not external import compatibility surfaces."
     },
     {
+      "surface": "puripuly_heart.ui.desktop_overlay_surface modules",
+      "classification": "internal_ui_desktop_overlay_surface",
+      "module_prefixes": [
+        "puripuly_heart.ui.desktop_overlay_surface"
+      ],
+      "rationale": "The desktop overlay caption plan/slot contract and its Flet renderer are internal UI composition boundaries consumed by the desktop overlay renderer window, not external import compatibility surfaces."
+    },
+    {
       "surface": "puripuly_heart.ui.foundation modules",
       "classification": "internal_ui_foundation",
       "module_prefixes": [

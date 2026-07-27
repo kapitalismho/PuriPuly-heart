@@ -481,6 +481,22 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
         ),
         ImportViolation(
             rule_id="ui-adapters-avoid-provider-construction",
+            importer="src/puripuly_heart/ui/desktop_overlay_surface/contract.py",
+            imported="puripuly_heart.config.settings",
+            importer_layer="UI adapters/renderers",
+            imported_layer="migration/serialization",
+            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
+        ),
+        ImportViolation(
+            rule_id="ui-adapters-avoid-provider-construction",
+            importer="src/puripuly_heart/ui/desktop_overlay_surface/renderer.py",
+            imported="puripuly_heart.config.settings",
+            importer_layer="UI adapters/renderers",
+            imported_layer="migration/serialization",
+            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
+        ),
+        ImportViolation(
+            rule_id="ui-adapters-avoid-provider-construction",
             importer="src/puripuly_heart/ui/views/settings.py",
             imported="puripuly_heart.app.wiring",
             importer_layer="UI adapters/renderers",
