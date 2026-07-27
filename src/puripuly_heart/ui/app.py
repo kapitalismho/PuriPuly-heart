@@ -56,6 +56,7 @@ from puripuly_heart.ui.i18n import (
     language_name,
     t,
 )
+from puripuly_heart.ui.logs.contract import LogsIntents
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.settings.contract import (
     SettingsGeneralIntents,
@@ -274,7 +275,9 @@ class TranslatorApp:
                 calibration_cancel=(calibration_cancel if callable(calibration_cancel) else None),
             ),
         )
-        self.view_logs.on_mode_change = self._on_runtime_logging_mode_change
+        self.view_logs.bind_logs_intents(
+            LogsIntents(runtime_logging_mode_change=self._on_runtime_logging_mode_change)
+        )
         self.view_logs.set_runtime_logging_mode(self.application.state().runtime_logging_mode)
         self.view_dashboard.runtime_log_detailed = self._log_detailed
 

@@ -1177,6 +1177,22 @@
       "rationale": "The settings surface slot/intent contract and renderer are internal UI composition boundaries consumed by SettingsView and the later settings-migration gates, not external import compatibility surfaces."
     },
     {
+      "surface": "puripuly_heart.ui.logs modules",
+      "classification": "internal_ui_logs_surface",
+      "module_prefixes": [
+        "puripuly_heart.ui.logs"
+      ],
+      "rationale": "The logs surface slot/intent contract and renderer are internal UI composition boundaries consumed by LogsView and TranslatorApp, not external import compatibility surfaces."
+    },
+    {
+      "surface": "puripuly_heart.ui.about modules",
+      "classification": "internal_ui_about_surface",
+      "module_prefixes": [
+        "puripuly_heart.ui.about"
+      ],
+      "rationale": "The about surface slot contract and renderer are internal UI composition boundaries consumed by AboutView, not external import compatibility surfaces."
+    },
+    {
       "surface": "puripuly_heart.ui.foundation modules",
       "classification": "internal_ui_foundation",
       "module_prefixes": [

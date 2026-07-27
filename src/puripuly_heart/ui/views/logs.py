@@ -13,16 +13,15 @@ from typing import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import GLOW_CARD, create_glow_stack
 from puripuly_heart.ui.flet_runtime import control_page, update_control_if_mounted
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import get_locale, source_label, t
+from puripuly_heart.ui.logs.contract import LogsIntents, LogsSurfaceSlots
+from puripuly_heart.ui.logs.renderer import compose_logs_surface
 from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
-    COLOR_SURFACE,
-    get_card_shadow,
 )
 
 MAX_LOG_ENTRIES = 4000
@@ -238,25 +237,6 @@ class LogsView(ft.Column):
             on_click=self._on_conversation_button_click,
         )
 
-        # Header rows
-        self._header_button_row = ft.Row(
-            controls=[self._folder_button, self._mode_button, self._conversation_button],
-            spacing=4,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-        header = ft.Container(
-            content=ft.Row(
-                controls=[
-                    self._title_text,
-                    ft.Container(expand=True),
-                    self._header_button_row,
-                ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            ),
-            padding=ft.Padding.only(left=16, right=8, top=8, bottom=0),
-        )
-
         # Single selectable text for all logs (enables multi-line drag selection)
         self._log_text = ft.Text(
             "",
@@ -266,43 +246,22 @@ class LogsView(ft.Column):
             selectable=True,
         )
 
-        # Scrollable container for log text
-        self._log_scroll = ft.Column(
-            controls=[
-                ft.Container(
-                    content=self._log_text,
-                    padding=ft.Padding.only(left=16, right=16, top=8, bottom=16),
-                )
-            ],
-            expand=True,
-            scroll=ft.ScrollMode.AUTO,
+        # Header rows
+        regions = compose_logs_surface(
+            LogsSurfaceSlots(
+                title=self._title_text,
+                folder_button=self._folder_button,
+                mode_button=self._mode_button,
+                conversation_button=self._conversation_button,
+                log_text=self._log_text,
+            )
         )
+        self._header_button_row = regions.header_button_row
+        self._log_scroll = regions.log_scroll
+        self.controls = [regions.root]
 
-        # Card content
-        card_content = ft.Column(
-            controls=[header, self._log_scroll],
-            spacing=0,
-            expand=True,
-        )
-
-        # Wrap in glow stack
-        content_with_glow = create_glow_stack(
-            ft.Container(content=card_content, expand=True),
-            config=GLOW_CARD,
-        )
-
-        # Outer card container
-        card = ft.Container(
-            content=content_with_glow,
-            bgcolor=COLOR_SURFACE,
-            border_radius=16,
-            border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
-            expand=True,
-            clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            shadow=get_card_shadow(),
-        )
-
-        self.controls = [card]
+    def bind_logs_intents(self, intents: LogsIntents) -> None:
+        self.on_mode_change = intents.runtime_logging_mode_change
 
     def attach_log_handler(self) -> None:
         """Attach this view as a logging handler to capture app logs."""

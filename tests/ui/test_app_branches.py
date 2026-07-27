@@ -401,7 +401,12 @@ class ConstructionDummyLogsView(ft.Container):
     def __init__(self) -> None:
         super().__init__()
         self.on_mode_change = None
+        self.bound_logs_intents: list[object] = []
         self.runtime_logging_mode = "basic"
+
+    def bind_logs_intents(self, intents: object) -> None:
+        self.bound_logs_intents.append(intents)
+        self.on_mode_change = getattr(intents, "runtime_logging_mode_change", None)
 
     def set_runtime_logging_mode(self, mode: str) -> None:
         self.runtime_logging_mode = mode
@@ -1179,6 +1184,9 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
         def __init__(self) -> None:
             super().__init__()
             self.on_mode_change = None
+
+        def bind_logs_intents(self, intents: object) -> None:
+            self.on_mode_change = getattr(intents, "runtime_logging_mode_change", None)
 
         def set_runtime_logging_mode(self, mode: str) -> None:
             _ = mode
