@@ -65,6 +65,8 @@ from puripuly_heart.ui.settings.contract import (
     SettingsProviderIntents,
     SettingsSurfaceIntents,
 )
+from puripuly_heart.ui.shell.contract import AppShellSlots
+from puripuly_heart.ui.shell.renderer import compose_app_shell
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_PRIMARY,
@@ -453,40 +455,21 @@ class TranslatorApp:
         # Bottom navigation (order: Home, Settings, Logs, About)
         self.bottom_nav = BottomNavBar(on_change=self._on_nav_change)
 
-        # Content area
-        self.content_area = ft.Container(
-            expand=True,
-            padding=APP_CONTENT_PADDING,
-            content=self.view_dashboard,
+        self.debug_preview_panel = (
+            self._build_debug_preview_panel() if self.debug_ui_preview else None
         )
-
-        # Main layout: TitleBar -> Content -> BottomNav
-        self.layout = ft.Column(
-            controls=[
-                self.title_bar,
-                self.content_area,
-                self.bottom_nav,
-            ],
-            expand=True,
-            spacing=0,
-        )
-
-        root_content = ft.Container(content=self.layout, expand=True, padding=0)
-        if self.debug_ui_preview:
-            self.debug_preview_panel = self._build_debug_preview_panel()
-            self.page.add(
-                ft.Container(
-                    content=ft.Stack(
-                        controls=[root_content, self.debug_preview_panel],
-                        fit=ft.StackFit.EXPAND,
-                        expand=True,
-                    ),
-                    expand=True,
-                    padding=0,
-                )
+        shell = compose_app_shell(
+            AppShellSlots(
+                title_bar=self.title_bar,
+                content=self.view_dashboard,
+                bottom_nav=self.bottom_nav,
+                content_padding=APP_CONTENT_PADDING,
+                debug_panel=self.debug_preview_panel,
             )
-        else:
-            self.page.add(root_content)
+        )
+        self.content_area = shell.content_area
+        self.layout = shell.layout
+        self.page.add(shell.root)
 
     def _build_debug_preview_panel(self) -> DebugPreviewPanel:
         return DebugPreviewPanel(
