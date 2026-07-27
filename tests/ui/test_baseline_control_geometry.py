@@ -41,7 +41,7 @@ def test_app_theme_pins_text_button_padding() -> None:
         assert _padding_values(button_theme.style.padding) == (8.0, 8.0, 8.0, 8.0)
 
 
-def test_logs_header_buttons_inherit_the_pinned_padding() -> None:
+def test_logs_header_buttons_set_no_padding_override_so_the_theme_applies() -> None:
     view = LogsView.__new__(LogsView)
     style = LogsView._get_button_style(view, "Arial")
     assert style.padding is None

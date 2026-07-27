@@ -125,11 +125,6 @@ class DebugPreviewPanel(ft.Container):
                 "debug_preview.gpu_state_cycle",
                 on_gpu_state_cycle,
             ),
-            _PreviewAction(
-                "foundation_primitives",
-                "debug_preview.foundation_primitives",
-                on_foundation_primitives,
-            ),
         ]
         if on_stt_loading_button_cycle is not None:
             actions.append(
@@ -139,6 +134,13 @@ class DebugPreviewPanel(ft.Container):
                     on_stt_loading_button_cycle,
                 )
             )
+        actions.append(
+            _PreviewAction(
+                "foundation_primitives",
+                "debug_preview.foundation_primitives",
+                on_foundation_primitives,
+            )
+        )
         self._actions = tuple(actions)
         self._toggle_button = _make_text_button(
             t("debug_preview.button"),

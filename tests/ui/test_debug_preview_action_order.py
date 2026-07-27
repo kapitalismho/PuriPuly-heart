@@ -45,14 +45,14 @@ def _keys(panel: DebugPreviewPanel) -> tuple[str, ...]:
 
 def test_action_order_is_the_baseline_order_plus_the_single_approved_extra() -> None:
     keys = _keys(_panel())
-    assert [key for key in keys if key != APPROVED_EXTRA_ACTION] == list(BASELINE_ACTION_KEYS)
-    assert keys.count(APPROVED_EXTRA_ACTION) == 1
+    assert keys == BASELINE_ACTION_KEYS + (APPROVED_EXTRA_ACTION,)
 
 
-def test_the_approved_extra_sits_directly_after_the_last_shared_action() -> None:
+def test_every_baseline_row_keeps_its_exact_index() -> None:
     keys = _keys(_panel())
-    assert keys.index(APPROVED_EXTRA_ACTION) == keys.index("gpu_state_cycle") + 1
-    assert keys[-1] == "stt_loading_button_cycle"
+    for index, key in enumerate(BASELINE_ACTION_KEYS):
+        assert keys[index] == key
+    assert keys.index(APPROVED_EXTRA_ACTION) == len(BASELINE_ACTION_KEYS)
 
 
 def test_the_optional_stt_loading_action_is_omitted_without_a_callback() -> None:

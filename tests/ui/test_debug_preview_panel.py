@@ -71,8 +71,8 @@ ACTION_KEYS = [
     "stt_fault_cycle",
     "audio_fault_clear",
     "gpu_state_cycle",
-    "foundation_primitives",
     "stt_loading_button_cycle",
+    "foundation_primitives",
 ]
 
 
@@ -238,8 +238,8 @@ def test_debug_preview_panel_uses_flet_086_text_button_content_api(
         "Cycle STT fault",
         "Clear audio faults",
         "Cycle GPU state",
-        "Foundation primitives",
         "Cycle STT loading button",
+        "Foundation primitives",
     ]
 
     monkeypatch.setattr(panel_module, "t", lambda key: f"label:{key}")
