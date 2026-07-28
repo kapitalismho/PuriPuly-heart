@@ -3576,9 +3576,6 @@ class GuiController:
     ) -> None:
         self._get_desktop_overlay_bounds_owner().schedule_persistence(bounds)
 
-    async def _persist_desktop_bounds_after_debounce(self) -> None:
-        await self._get_desktop_overlay_bounds_owner().persist_after_debounce()
-
     async def _persist_desktop_bounds(self, bounds: dict[str, int | float]) -> None:
         if self.settings is None or self._active_overlay_target != OVERLAY_TARGET_DESKTOP:
             return
@@ -3680,23 +3677,6 @@ class GuiController:
 
     def _discard_pending_desktop_bounds_persistence(self) -> None:
         self._get_desktop_overlay_bounds_owner().discard()
-
-    @property
-    def _desktop_bounds_persist_task(self) -> asyncio.Task[None] | None:
-        owner = self._desktop_overlay_bounds_owner
-        return owner.persist_task if owner is not None else None
-
-    @property
-    def _pending_desktop_bounds(self) -> dict[str, int | float] | None:
-        owner = self._desktop_overlay_bounds_owner
-        return owner.pending_bounds if owner is not None else None
-
-    @_pending_desktop_bounds.setter
-    def _pending_desktop_bounds(
-        self,
-        bounds: dict[str, int | float] | None,
-    ) -> None:
-        self._get_desktop_overlay_bounds_owner().replace_pending_bounds(bounds)
 
     def _get_desktop_overlay_bounds_owner(self) -> DesktopOverlayBoundsOwner:
         owner = self._desktop_overlay_bounds_owner

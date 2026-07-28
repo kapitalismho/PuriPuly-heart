@@ -6878,8 +6878,7 @@ async def test_stale_desktop_renderer_event_is_ignored_after_overlay_instance_ch
         overlay_instance_id="overlay-old",
     )
 
-    assert controller._pending_desktop_bounds is None
-    assert controller._desktop_bounds_persist_task is None
+    assert controller._desktop_overlay_bounds_owner is None
 
 
 @pytest.mark.asyncio
@@ -7281,14 +7280,17 @@ async def test_desktop_bounds_debounce_routes_position_through_order23_service(
 
     _patch_settings_save(monkeypatch, fail_direct_save)
     monkeypatch.setattr(controller_module, "DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S", 0)
-    controller._pending_desktop_bounds = {
-        "x": 321,
-        "y": 654,
-        "width": 1152,
-        "height": 288,
-    }
+    bounds_owner = controller._get_desktop_overlay_bounds_owner()
+    bounds_owner.replace_pending_bounds(
+        {
+            "x": 321,
+            "y": 654,
+            "width": 1152,
+            "height": 288,
+        }
+    )
 
-    await controller._persist_desktop_bounds_after_debounce()
+    await bounds_owner.persist_after_debounce()
 
     assert len(service.requests) == 1
     request = service.requests[0]
@@ -7610,9 +7612,9 @@ async def test_desktop_size_preset_change_supersedes_pending_user_position_debou
             },
         }
     )
+    bounds_owner = controller._get_desktop_overlay_bounds_owner()
     await _wait_until(
-        lambda: controller._desktop_bounds_persist_task is not None
-        and controller._pending_desktop_bounds is not None
+        lambda: bounds_owner.persist_task is not None and bounds_owner.pending_bounds is not None
     )
 
     updated = copy.deepcopy(controller.settings)
@@ -7672,9 +7674,9 @@ async def test_desktop_size_preset_change_cancels_pending_bounds_before_order23_
             },
         }
     )
+    bounds_owner = controller._get_desktop_overlay_bounds_owner()
     await _wait_until(
-        lambda: controller._desktop_bounds_persist_task is not None
-        and controller._pending_desktop_bounds is not None
+        lambda: bounds_owner.persist_task is not None and bounds_owner.pending_bounds is not None
     )
 
     class InspectingOrder23Service(RecordingSettingsMutationService):
@@ -7683,9 +7685,9 @@ async def test_desktop_size_preset_change_cancels_pending_bounds_before_order23_
             request: settings_mutation.SettingsMutationRequest,
         ) -> messages.TransactionResult:
             if request.reason == settings_mutation.SETTINGS_MUTATION_SURFACE_OVERLAY_OSC_OUTPUT:
-                task = controller._desktop_bounds_persist_task
+                task = bounds_owner.persist_task
                 assert task is None or task.cancelled() or task.done()
-                assert controller._pending_desktop_bounds is None
+                assert bounds_owner.pending_bounds is None
             return await super().mutate(request)
 
     controller.settings_mutation_service = InspectingOrder23Service()
@@ -8009,9 +8011,9 @@ async def test_desktop_reset_persistence_cancels_pending_user_position_debounce(
         }
     )
 
+    bounds_owner = controller._get_desktop_overlay_bounds_owner()
     await _wait_until(
-        lambda: controller._desktop_bounds_persist_task is None
-        and controller._pending_desktop_bounds is None,
+        lambda: bounds_owner.persist_task is None and bounds_owner.pending_bounds is None,
         attempts=20,
         delay_s=0.02,
     )
@@ -8156,9 +8158,9 @@ async def test_desktop_source_reset_ignores_event_size_and_cancels_pending_user_
         }
     )
 
+    bounds_owner = controller._get_desktop_overlay_bounds_owner()
     await _wait_until(
-        lambda: controller._desktop_bounds_persist_task is None
-        and controller._pending_desktop_bounds is None,
+        lambda: bounds_owner.persist_task is None and bounds_owner.pending_bounds is None,
         attempts=20,
         delay_s=0.02,
     )
