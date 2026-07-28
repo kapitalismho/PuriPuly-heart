@@ -84,6 +84,7 @@ from puripuly_heart.app.services.managed_connection_auth import (
     ManagedConnectionAuthService,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.openrouter_pkce_flow import OpenRouterPkceFlowOwner
 from puripuly_heart.app.services.overlay_calibration import OverlayCalibrationOwner
 from puripuly_heart.app.services.peer_capture_target import PeerCaptureTargetResolutionService
 from puripuly_heart.app.services.provider_runtime_apply import (
@@ -1000,8 +1001,11 @@ class GuiController:
     )
     clock: SystemClock = SystemClock()
     _managed_openrouter_release_service: ManagedOpenRouterReleaseService | None = None
-    _openrouter_pkce_client: OpenRouterPKCEClient | None = None
-    _oauth_runtime: OAuthRuntime | None = field(init=False, default=None)
+    _openrouter_pkce_flow_owner: OpenRouterPkceFlowOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
 
     sender: VrchatOscUdpSender | None = None
     osc: ChatboxPaginator | None = None
@@ -9849,15 +9853,39 @@ class GuiController:
         )
 
     def _get_oauth_runtime(self) -> OAuthRuntime:
-        if self._oauth_runtime is None:
-            self._oauth_runtime = OAuthRuntime()
-        return self._oauth_runtime
+        return self._get_openrouter_pkce_flow_owner().get_runtime()
+
+    @property
+    def _oauth_runtime(self) -> OAuthRuntime | None:
+        owner = self._openrouter_pkce_flow_owner
+        return owner.runtime if owner is not None else None
+
+    @_oauth_runtime.setter
+    def _oauth_runtime(self, runtime: OAuthRuntime | None) -> None:
+        self._get_openrouter_pkce_flow_owner().runtime = runtime
+
+    @property
+    def _openrouter_pkce_client(self) -> object | None:
+        owner = self._openrouter_pkce_flow_owner
+        return owner.active_client if owner is not None else None
+
+    @_openrouter_pkce_client.setter
+    def _openrouter_pkce_client(self, client: object | None) -> None:
+        self._get_openrouter_pkce_flow_owner().active_client = client
+
+    def _get_openrouter_pkce_flow_owner(self) -> OpenRouterPkceFlowOwner:
+        owner = self._openrouter_pkce_flow_owner
+        if owner is None:
+            owner = OpenRouterPkceFlowOwner(
+                client_factory=lambda: self._create_openrouter_pkce_client(),
+            )
+            self._openrouter_pkce_flow_owner = owner
+        return owner
 
     async def _close_oauth_runtime(self) -> None:
-        runtime = self._oauth_runtime
-        if runtime is None:
-            return
-        await runtime.close()
+        owner = self._openrouter_pkce_flow_owner
+        if owner is not None:
+            await owner.close()
 
     async def _close_oauth_runtime_for_release(self, failures: list[Exception]) -> None:
         try:
@@ -10886,14 +10914,8 @@ class GuiController:
         return OpenRouterPKCEClient(callback_origin="http://localhost:3000")
 
     def reopen_openrouter_pkce_authorization_url(self) -> bool:
-        if (
-            self._oauth_runtime is not None
-            and self._oauth_runtime.reopen_openrouter_pkce_authorization_url()
-        ):
-            return True
-        if self._openrouter_pkce_client is None:
-            return False
-        return self._openrouter_pkce_client.reopen_authorization_url()
+        owner = self._openrouter_pkce_flow_owner
+        return owner.reopen_authorization_url() if owner is not None else False
 
     def build_managed_openrouter_byok_target_settings(self) -> AppSettings | None:
         """Build a BYOK OpenRouter target settings draft from the current managed state.
@@ -10959,12 +10981,7 @@ class GuiController:
             raise ValueError("PKCE connection requires a BYOK OpenRouter model")
 
         try:
-            pkce_client = self._create_openrouter_pkce_client()
-            self._openrouter_pkce_client = pkce_client
-            try:
-                result = await self._get_oauth_runtime().run_openrouter_pkce_flow(pkce_client)
-            finally:
-                self._openrouter_pkce_client = None
+            result = await self._get_openrouter_pkce_flow_owner().run_flow()
         except Exception:
             self._show_short_message("openrouter.pkce.failed")
             self._log_error("OpenRouter PKCE flow failed")
