@@ -14,7 +14,6 @@ import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -29,11 +28,7 @@ from puripuly_heart.app.ports.microphone_test import (
 )
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
-from puripuly_heart.app.ports.settings_repository import (
-    SettingsCommitRequest,
-    SettingsCommitResult,
-    SettingsSnapshot,
-)
+from puripuly_heart.app.ports.settings_repository import CommittedSettingsRepositoryPort
 from puripuly_heart.app.ports.ui_models import (
     GpuDashboardNotice,
     GpuDeviceOption,
@@ -111,7 +106,6 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _ProviderRuntimeApplyPlan,
     _runtime_apply_failed_result,
     _runtime_apply_result_as_degraded_transaction,
-    _settings_mutation_diagnostics,
     _stt_language_audio_runtime_degraded_transaction_result,
     _stt_language_audio_runtime_unavailable_result,
     _stt_language_audio_save_failed_transaction_result,
@@ -491,24 +485,6 @@ def _canonical_json_signature(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def _settings_snapshot_value(value: object) -> object:
-    if isinstance(value, Enum):
-        return value.value
-    if isinstance(value, Mapping):
-        return {
-            str(key): _settings_snapshot_value(nested_value) for key, nested_value in value.items()
-        }
-    if isinstance(value, tuple):
-        return [_settings_snapshot_value(item) for item in value]
-    if isinstance(value, list):
-        return [_settings_snapshot_value(item) for item in value]
-    return copy.deepcopy(value)
-
-
-def _settings_snapshot_values(settings: AppSettings) -> dict[str, Any]:
-    return cast(dict[str, Any], _settings_snapshot_value(asdict(settings)))
-
-
 def _managed_connection_auth_settings_values(settings: AppSettings) -> dict[str, Any]:
     managed = settings.managed_identity
     selection_alias = settings.openrouter.selection_alias
@@ -571,116 +547,6 @@ class _StrictSettingsSaveFailed(Exception):
 
 class _LocalASRTransitionSuperseded(Exception):
     pass
-
-
-@dataclass(slots=True)
-class _ControllerSettingsPatchRepository:
-    controller: GuiController
-    committed_settings: AppSettings
-    base_settings: AppSettings | None = None
-    surface: str = "translation_provider"
-    provider_verification_binding: ProviderVerificationBinding | None = None
-
-    async def load(self) -> SettingsSnapshot:
-        settings = self.controller.settings or self.committed_settings
-        return SettingsSnapshot(values=_settings_snapshot_values(settings), revision=None)
-
-    async def save(self, request: SettingsCommitRequest) -> SettingsCommitResult:
-        base_settings = self.base_settings
-        next_settings = copy.deepcopy(base_settings or self.committed_settings)
-        if (
-            base_settings is None
-            and "state" not in request.values
-            and "intent" not in request.values
-        ):
-            next_settings = copy.deepcopy(self.committed_settings)
-        elif all(isinstance(path, str) and "." in path for path in request.values):
-            _apply_settings_path_patch(next_settings, request.values)
-        elif "state" in request.values or "intent" in request.values:
-            _apply_managed_pending_delivery_ack_patch(next_settings, request.values)
-        else:
-            next_settings = copy.deepcopy(self.committed_settings)
-        self.controller._begin_canonical_mutation()
-        try:
-            self.controller._update_canonical_settings_from_legacy_delta(
-                self.controller._canonical_legacy_projection_snapshot
-                or base_settings
-                or next_settings,
-                next_settings,
-            )
-            if self.provider_verification_binding is not None:
-                self.controller._bind_provider_verification(self.provider_verification_binding)
-            await asyncio.to_thread(
-                self.controller._persist_settings_at_controller_boundary,
-                next_settings,
-            )
-        except Exception:
-            self.controller._rollback_canonical_mutation()
-            self.controller._log_error("Failed to save settings mutation")
-            return SettingsCommitResult(
-                succeeded=False,
-                snapshot=None,
-                message=None,
-                diagnostics=_settings_mutation_diagnostics(
-                    component="settings_repository",
-                    operation="save",
-                    code="settings_save_failed",
-                    surface=self.surface,
-                ),
-            )
-        self.committed_settings = next_settings
-        self.controller._remember_canonical_legacy_projection(next_settings)
-        return SettingsCommitResult(
-            succeeded=True,
-            snapshot=SettingsSnapshot(
-                values=_settings_snapshot_values(self.committed_settings),
-                revision=None,
-            ),
-            message=None,
-            diagnostics=None,
-        )
-
-
-def _apply_managed_pending_delivery_ack_patch(
-    settings: AppSettings,
-    values: Mapping[str, object],
-) -> None:
-    state = values.get("state")
-    if not isinstance(state, Mapping):
-        return
-    managed = state.get("managed_connection")
-    if not isinstance(managed, Mapping):
-        return
-    field_map = {
-        "installation_id": "installation_id",
-        "release_token": "release_token",
-        "release_token_expires_at": "release_token_expires_at",
-        "verified_hardware_hash": "verified_hardware_hash",
-        "verified_hardware_hash_salt_version": "verified_hardware_hash_salt_version",
-        "active_managed_credential_ref": "active_managed_credential_ref",
-        "active_managed_expires_at": "active_managed_expires_at",
-        "founder_letter_seen_credential_ref": "founder_letter_seen_credential_ref",
-        "referral_id": "referral_id",
-        "local_managed_claim_sources": "local_managed_claim_sources",
-        "pending_delivery_ack_source": "pending_delivery_ack_source",
-        "pending_delivery_ack_delivery_id": "pending_delivery_ack_delivery_id",
-        "pending_delivery_ack_managed_credential_ref": "pending_delivery_ack_managed_credential_ref",
-        "pending_delivery_ack_expires_at": "pending_delivery_ack_expires_at",
-    }
-    for source_key, attr_name in field_map.items():
-        if source_key not in managed:
-            continue
-        value = managed[source_key]
-        if attr_name == "local_managed_claim_sources":
-            setattr(
-                settings.managed_identity,
-                attr_name,
-                tuple(value) if isinstance(value, list) else (),
-            )
-        elif attr_name == "verified_hardware_hash_salt_version":
-            setattr(settings.managed_identity, attr_name, value if type(value) is int else None)
-        else:
-            setattr(settings.managed_identity, attr_name, value if isinstance(value, str) else None)
 
 
 def _managed_identity_delta(baseline: object, current: object) -> dict[str, object]:
@@ -1102,6 +968,30 @@ class GuiController:
         if self.settings_owner is None:
             self.settings_owner = compose_settings_owner(self.config_path)
         return self.settings_owner
+
+    def _legacy_settings_patch_repository(
+        self,
+        *,
+        committed_settings: AppSettings,
+        base_settings: AppSettings | None = None,
+        surface: str = "translation_provider",
+        provider_verification_binding: ProviderVerificationBinding | None = None,
+    ) -> CommittedSettingsRepositoryPort[AppSettings]:
+        return self._get_settings_owner().create_legacy_patch_repository(
+            current_settings=lambda: self.settings,
+            canonical_projection_snapshot=lambda: self._canonical_legacy_projection_snapshot,
+            begin_canonical_mutation=self._begin_canonical_mutation,
+            update_canonical_from_legacy_delta=(self._update_canonical_settings_from_legacy_delta),
+            bind_provider_verification=self._bind_provider_verification,
+            persist_settings=self._persist_settings_at_controller_boundary,
+            rollback_canonical_mutation=self._rollback_canonical_mutation,
+            save_failure_sink=self._log_error,
+            remember_canonical_projection=self._remember_canonical_legacy_projection,
+            committed_settings=committed_settings,
+            base_settings=base_settings,
+            surface=surface,
+            provider_verification_binding=provider_verification_binding,
+        )
 
     @property
     def vnext_settings(self) -> AppSettingsVNext | None:
@@ -2158,8 +2048,7 @@ class GuiController:
                 discord_auth=discord_auth,
                 broker_client=broker,
                 secret_store=secret_store_port,
-                settings_repository=_ControllerSettingsPatchRepository(
-                    controller=self,
+                settings_repository=self._legacy_settings_patch_repository(
                     base_settings=self.settings,
                     committed_settings=updated,
                     surface="managed_connection_auth",
@@ -6994,9 +6883,9 @@ class GuiController:
         committed_settings_before_full_draft = (
             copy.deepcopy(self.settings) if self.settings is not None else None
         )
-        if self.settings is not None and _settings_snapshot_values(
+        if self.settings is not None and self._get_settings_owner().legacy_snapshot_values(
             self.settings
-        ) != _settings_snapshot_values(next_settings):
+        ) != self._get_settings_owner().legacy_snapshot_values(next_settings):
             try:
                 await self._apply_settings_direct(
                     next_settings,
@@ -7054,11 +6943,10 @@ class GuiController:
 
         committed_settings = copy.deepcopy(base_settings)
         _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = _settings_snapshot_values(
+        has_out_of_scope_draft = self._get_settings_owner().legacy_snapshot_values(
             committed_settings
-        ) != _settings_snapshot_values(next_settings)
-        repository = _ControllerSettingsPatchRepository(
-            controller=self,
+        ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
+        repository = self._legacy_settings_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
             surface="stt_language_audio",
@@ -7169,11 +7057,10 @@ class GuiController:
         )
         committed_settings = copy.deepcopy(base_settings)
         _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = _settings_snapshot_values(
+        has_out_of_scope_draft = self._get_settings_owner().legacy_snapshot_values(
             committed_settings
-        ) != _settings_snapshot_values(next_settings)
-        repository = _ControllerSettingsPatchRepository(
-            controller=self,
+        ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
+        repository = self._legacy_settings_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
             surface="overlay_osc_output",
@@ -7239,8 +7126,7 @@ class GuiController:
         committed_settings: AppSettings,
         runtime_apply,
     ) -> TransactionResult:
-        repository = _ControllerSettingsPatchRepository(
-            controller=self,
+        repository = self._legacy_settings_patch_repository(
             base_settings=self.settings or committed_settings,
             committed_settings=committed_settings,
             surface="ui_prompt_clipboard_state",
@@ -7272,9 +7158,9 @@ class GuiController:
 
         committed_settings = copy.deepcopy(base_settings)
         _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = _settings_snapshot_values(
+        has_out_of_scope_draft = self._get_settings_owner().legacy_snapshot_values(
             committed_settings
-        ) != _settings_snapshot_values(next_settings)
+        ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
         runtime_settings = copy.deepcopy(next_settings)
         runtime_apply = (
             _ControllerNoopRuntimeApply()
@@ -7558,9 +7444,9 @@ class GuiController:
         committed_settings_before_full_draft = (
             copy.deepcopy(self.settings) if self.settings is not None else None
         )
-        if self.settings is not None and _settings_snapshot_values(
+        if self.settings is not None and self._get_settings_owner().legacy_snapshot_values(
             self.settings
-        ) != _settings_snapshot_values(next_settings):
+        ) != self._get_settings_owner().legacy_snapshot_values(next_settings):
             try:
                 await self._apply_providers_direct(
                     next_settings,
@@ -7622,9 +7508,9 @@ class GuiController:
 
         committed_settings = copy.deepcopy(base_settings)
         _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = _settings_snapshot_values(
+        has_out_of_scope_draft = self._get_settings_owner().legacy_snapshot_values(
             committed_settings
-        ) != _settings_snapshot_values(next_settings)
+        ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
         plan = self._build_provider_runtime_apply_plan(
             committed_settings,
             force_rebuild_llm=False,
@@ -7633,8 +7519,7 @@ class GuiController:
                 committed_settings,
             ),
         )
-        repository = _ControllerSettingsPatchRepository(
-            controller=self,
+        repository = self._legacy_settings_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
         )
@@ -7730,9 +7615,9 @@ class GuiController:
 
         committed_settings = copy.deepcopy(base_settings)
         _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = _settings_snapshot_values(
+        has_out_of_scope_draft = self._get_settings_owner().legacy_snapshot_values(
             committed_settings
-        ) != _settings_snapshot_values(next_settings)
+        ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
         plan = self._build_provider_runtime_apply_plan(
             committed_settings,
             force_rebuild_llm=False,
@@ -7741,8 +7626,7 @@ class GuiController:
                 committed_settings,
             ),
         )
-        repository = _ControllerSettingsPatchRepository(
-            controller=self,
+        repository = self._legacy_settings_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
             surface="stt_language_audio",
@@ -8275,8 +8159,7 @@ class GuiController:
             self.settings.secrets,
             config_path=self.config_path,
         )
-        repository = _ControllerSettingsPatchRepository(
-            controller=self,
+        repository = self._legacy_settings_patch_repository(
             base_settings=self.settings,
             committed_settings=updated,
             surface="provider_secret_change",
@@ -8285,7 +8168,7 @@ class GuiController:
             secret_store=create_sync_secret_store_adapter(secret_store),
             settings_repository=repository,
         )
-        settings_values = _settings_snapshot_values(updated)
+        settings_values = self._get_settings_owner().legacy_snapshot_values(updated)
         scope = LifecycleScope(f"provider-secret-change:{provider}")
         if value:
             operation = start_lifecycle_task(
@@ -10570,8 +10453,7 @@ class GuiController:
         plan = self._build_provider_runtime_apply_plan(updated, force_rebuild_llm=True)
         secret_store = create_secret_store(self.settings.secrets, config_path=self.config_path)
         secret_store_port = create_sync_secret_store_adapter(secret_store)
-        settings_repository = _ControllerSettingsPatchRepository(
-            controller=self,
+        settings_repository = self._legacy_settings_patch_repository(
             base_settings=self.settings,
             committed_settings=updated,
             surface="openrouter_pkce",
@@ -10598,7 +10480,7 @@ class GuiController:
             SecretSetRequest(
                 secret_key=OPENROUTER_BYOK_API_KEY_SECRET,
                 secret_value=result.api_key,
-                settings_values=_settings_snapshot_values(updated),
+                settings_values=self._get_settings_owner().legacy_snapshot_values(updated),
                 expected_settings_revision=None,
                 reason="openrouter_pkce",
                 correlation_id=None,
@@ -10614,7 +10496,7 @@ class GuiController:
 
         runtime_result = await runtime_apply_port.apply_runtime(
             RuntimeApplyRequest(
-                settings_values=_settings_snapshot_values(updated),
+                settings_values=self._get_settings_owner().legacy_snapshot_values(updated),
                 reason="openrouter_pkce",
                 correlation_id=None,
             )

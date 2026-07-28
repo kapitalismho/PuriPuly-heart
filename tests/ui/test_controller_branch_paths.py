@@ -26,8 +26,12 @@ from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestCaptureRequest,
     MicrophoneTestRuntimePort,
 )
+from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
 from puripuly_heart.app.services import provider_runtime_apply as provider_runtime_apply_module
 from puripuly_heart.app.services import settings_mutation
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    legacy_settings_snapshot_values,
+)
 from puripuly_heart.config.audio_host_api import (
     WINDOWS_MME_HOST_API,
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,
@@ -3125,7 +3129,7 @@ def test_managed_connection_auth_settings_values_are_service_safe() -> None:
     values = controller_module._managed_connection_auth_settings_values(settings)
 
     assert managed_connection_auth._caller_settings_values_are_unsafe(
-        controller_module._settings_snapshot_values(settings)
+        legacy_settings_snapshot_values(settings)
     )
     assert not managed_connection_auth._caller_settings_values_are_unsafe(values)
 
@@ -4568,15 +4572,14 @@ async def test_settings_repository_commits_only_scoped_delta_to_canonical_vnext(
         "save_vnext_settings",
         lambda _path, settings: saved.append(settings) or SimpleNamespace(ok=True),
     )
-    repository = controller_module._ControllerSettingsPatchRepository(
-        controller=controller,
+    repository = controller._legacy_settings_patch_repository(
         base_settings=legacy,
         committed_settings=stale_full_draft,
         surface="ui_prompt_clipboard_state",
     )
 
     result = await repository.save(
-        controller_module.SettingsCommitRequest(
+        SettingsCommitRequest(
             values={"ui.locale": "ja"},
             expected_revision=None,
             reason="settings.ui_prompt_clipboard_state",
@@ -17135,13 +17138,12 @@ async def test_order21_snapshot_full_repository_save_offloads_persistence_thread
         save_thread_ids.append(threading.get_ident())
 
     _patch_settings_save(monkeypatch, record_save_thread)
-    repository = controller_module._ControllerSettingsPatchRepository(
-        controller=controller,
+    repository = controller._legacy_settings_patch_repository(
         committed_settings=committed,
     )
 
     result = await repository.save(
-        controller_module.SettingsCommitRequest(
+        SettingsCommitRequest(
             values={
                 "provider.llm": LLMProviderName.OPENROUTER,
                 "translation.fallback": {
@@ -17265,14 +17267,13 @@ async def test_managed_auth_repository_persists_pending_delivery_ack_patch(
         saved.append(copy.deepcopy(settings))
 
     _patch_settings_save(monkeypatch, record_saved)
-    repository = controller_module._ControllerSettingsPatchRepository(
-        controller=controller,
+    repository = controller._legacy_settings_patch_repository(
         committed_settings=committed,
         surface="managed_connection_auth",
     )
 
     result = await repository.save(
-        controller_module.SettingsCommitRequest(
+        SettingsCommitRequest(
             values={
                 "state": {
                     "managed_connection": {

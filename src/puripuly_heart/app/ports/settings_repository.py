@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 from puripuly_heart.app.ports._settings_values import freeze_settings_values
 from puripuly_heart.core.messages import ErrorDiagnostics, UserMessageRef
@@ -41,7 +41,19 @@ class SettingsRepositoryPort(Protocol):
     async def save(self, request: SettingsCommitRequest) -> SettingsCommitResult: ...
 
 
+CommittedSettingsT = TypeVar("CommittedSettingsT")
+
+
+class CommittedSettingsRepositoryPort(
+    SettingsRepositoryPort,
+    Protocol[CommittedSettingsT],
+):
+    @property
+    def committed_settings(self) -> CommittedSettingsT: ...
+
+
 __all__ = [
+    "CommittedSettingsRepositoryPort",
     "SettingsCommitRequest",
     "SettingsCommitResult",
     "SettingsRepositoryPort",
