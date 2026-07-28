@@ -38,7 +38,10 @@ from puripuly_heart.config.settings import (
 )
 from puripuly_heart.core import messages
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
-from puripuly_heart.core.runtime_logging import RealtimeLogHandler
+from puripuly_heart.core.runtime_logging import (
+    RealtimeLogHandler,
+    SessionRuntimeLoggingService,
+)
 from puripuly_heart.ui import controller as controller_module
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.components import subtab_shell as subtab_shell_module
@@ -1632,7 +1635,7 @@ async def test_order22_live_settings_view_audio_change_save_failure_restores_con
         app=FletUiPresentationAdapter(SimpleNamespace(view_dashboard=None, view_settings=view)),
         config_path=Path("settings.json"),
     )
-    controller._runtime_logging = controller_module.SessionRuntimeLoggingService(
+    controller._runtime_logging = SessionRuntimeLoggingService(
         ui_handler_factory=RealtimeLogHandler
     )
     controller.settings = AppSettings()

@@ -12,7 +12,6 @@ import os
 import secrets
 import sys
 import time
-import traceback
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timedelta, timezone
@@ -47,6 +46,9 @@ from puripuly_heart.app.ports.ui_models import (
 )
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
+from puripuly_heart.app.services.application_runtime_logging import (
+    ApplicationRuntimeLoggingOwner,
+)
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownContext,
@@ -1218,7 +1220,11 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _runtime_logging: RuntimeLoggingService | None = field(init=False, default=None)
+    _runtime_logging_owner: ApplicationRuntimeLoggingOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _application_lifecycle: ApplicationShutdownCoordinator | None = field(
         init=False,
         default=None,
@@ -4941,43 +4947,23 @@ class GuiController:
         self,
         context: ApplicationShutdownContext,
     ) -> None:
-        if self._runtime_logging is None:
-            return
-        emit_persisted = getattr(self._runtime_logging, "emit_persisted", None)
-        if not callable(emit_persisted):
-            return
-        emit_persisted(
-            "[Lifecycle][Shutdown] coordinator_terminal "
-            "owner=ApplicationShutdownCoordinator "
-            f"failure_count={len(context.failures)}",
-            level=logging.INFO,
-        )
+        owner = self._runtime_logging_owner
+        if owner is not None:
+            owner.emit_terminal_summary(context)
 
     def _close_runtime_logging(self, context: ApplicationShutdownContext) -> None:
-        if self._runtime_logging is None:
-            return
-        self._runtime_logging.close_after_producers_stop(
-            cleanup_failures=context.cleanup_exceptions,
-        )
+        owner = self._runtime_logging_owner
+        if owner is not None:
+            owner.close_after_producers_stop(context)
 
     def emit_application_shutdown_diagnostic(
         self,
         diagnostic: ApplicationShutdownDiagnostic,
     ) -> None:
-        message = (
-            "[Lifecycle][Shutdown] callback_failed "
-            f"phase={diagnostic.phase} "
-            f"owner={diagnostic.owner_name} "
-            f"callback={diagnostic.callback_name} "
-            f"exception_class={diagnostic.exception_class} "
-            f"timed_out={str(diagnostic.timed_out).lower()}"
-        )
-        if self._runtime_logging is not None:
-            emit_persisted = getattr(self._runtime_logging, "emit_persisted", None)
-            if callable(emit_persisted):
-                emit_persisted(message, level=logging.ERROR)
-                return
-        logger.error(message)
+        owner = self._runtime_logging_owner
+        if owner is None:
+            owner = self._get_runtime_logging_owner()
+        owner.emit_shutdown_diagnostic(diagnostic)
 
     async def set_overlay_enabled(self, enabled: bool) -> None:
         if self.settings is None:
@@ -11532,39 +11518,55 @@ class GuiController:
 
         self._refresh_overlay_peer_consumers()
 
-    @property
-    def runtime_logging(self) -> RuntimeLoggingService:
-        if self._runtime_logging is None:
-            self._runtime_logging = RuntimeLoggingService(
-                session_factory=lambda: SessionRuntimeLoggingService(
-                    sinks=self.runtime_logging_sinks,
-                    ui_handler_factory=RealtimeLogHandler,
+    def _get_runtime_logging_owner(self) -> ApplicationRuntimeLoggingOwner:
+        owner = self._runtime_logging_owner
+        if owner is None:
+            owner = ApplicationRuntimeLoggingOwner(
+                presentation=self.app,
+                service_factory=lambda: RuntimeLoggingService(
+                    session_factory=lambda: SessionRuntimeLoggingService(
+                        sinks=self.runtime_logging_sinks,
+                        ui_handler_factory=RealtimeLogHandler,
+                    ),
+                    fallback_logger=logger,
                 ),
                 fallback_logger=logger,
             )
-        self.app.attach_runtime_log_sink(self._runtime_logging)
-        return self._runtime_logging
+            self._runtime_logging_owner = owner
+        return owner
+
+    @property
+    def _runtime_logging(self) -> Any | None:
+        owner = self._runtime_logging_owner
+        return owner.installed_service if owner is not None else None
+
+    @_runtime_logging.setter
+    def _runtime_logging(self, service: Any | None) -> None:
+        self._get_runtime_logging_owner().install_service(service)
+
+    @property
+    def runtime_logging(self) -> Any:
+        return self._get_runtime_logging_owner().service
 
     @property
     def runtime_logging_mode(self) -> str:
-        return self.runtime_logging.mode.value
+        return self._get_runtime_logging_owner().mode
 
     def set_runtime_logging_mode(self, mode: SessionLoggingMode | str) -> None:
-        previous_mode = self.runtime_logging.mode
-        self.runtime_logging.set_mode(mode)
-        normalized_mode = self.runtime_logging.mode.value
-        if (
-            previous_mode is not SessionLoggingMode.DETAILED
-            and self.runtime_logging.mode is SessionLoggingMode.DETAILED
-        ):
-            self._schedule_audio_environment_snapshot()
-        runtime = self._overlay_runtime
-        manager = runtime.process_manager if runtime is not None else None
-        if manager is not None:
-            set_logging_mode = getattr(manager, "set_logging_mode", None)
-            if callable(set_logging_mode):
-                set_logging_mode(normalized_mode)
-        self._schedule_overlay_runtime_logging_mode_update()
+        def mode_changed(normalized_mode: str) -> None:
+            runtime = self._overlay_runtime
+            manager = runtime.process_manager if runtime is not None else None
+            if manager is not None:
+                set_logging_mode = getattr(manager, "set_logging_mode", None)
+                if callable(set_logging_mode):
+                    set_logging_mode(normalized_mode)
+            self._schedule_overlay_runtime_logging_mode_update()
+
+        self._get_runtime_logging_owner().set_mode(
+            mode,
+            detailed_enabled=self._schedule_audio_environment_snapshot,
+            mode_changed=mode_changed,
+        )
 
     def _schedule_audio_environment_snapshot(self) -> None:
         if self._shutdown_ingress_frozen:
@@ -11649,11 +11651,7 @@ class GuiController:
             )
 
     def log_basic(self, message: str, *, level: int = logging.INFO) -> None:
-        try:
-            self.runtime_logging.emit_basic(message, level=level)
-            return
-        except Exception:
-            logger.log(level, message)
+        self._get_runtime_logging_owner().emit_basic(message, level=level)
 
     def log_detailed(
         self,
@@ -11662,18 +11660,11 @@ class GuiController:
         level: int = logging.INFO,
         exception: BaseException | None = None,
     ) -> bool:
-        rendered_message = message
-        exc_info = None
-        if exception is not None:
-            exc_info = (type(exception), exception, exception.__traceback__)
-            rendered_message = (
-                f"{message}\n{''.join(traceback.format_exception(*exc_info)).rstrip()}"
-            )
-        try:
-            return self.runtime_logging.emit_detailed(rendered_message, level=level)
-        except Exception:
-            logger.log(level, message, exc_info=exc_info)
-            return True
+        return self._get_runtime_logging_owner().emit_detailed(
+            message,
+            level=level,
+            exception=exception,
+        )
 
     def log_detailed_lazy(
         self,
@@ -11682,21 +11673,11 @@ class GuiController:
         level: int = logging.INFO,
         exception: BaseException | None = None,
     ) -> bool:
-        exc_info = None
-        if exception is not None:
-            exc_info = (type(exception), exception, exception.__traceback__)
-
-        def render_message() -> str:
-            rendered_message = build_message()
-            if exc_info is None:
-                return rendered_message
-            return f"{rendered_message}\n{''.join(traceback.format_exception(*exc_info)).rstrip()}"
-
-        try:
-            return self.runtime_logging.emit_detailed_lazy(render_message, level=level)
-        except Exception:
-            logger.log(level, build_message(), exc_info=exc_info)
-            return True
+        return self._get_runtime_logging_owner().emit_detailed_lazy(
+            build_message,
+            level=level,
+            exception=exception,
+        )
 
     def _log_error(self, message: str) -> None:
         self.log_basic(message, level=logging.ERROR)

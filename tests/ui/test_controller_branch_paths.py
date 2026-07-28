@@ -12365,7 +12365,11 @@ def test_controller_runtime_logging_uses_injected_main_sinks(
         captured.update(kwargs)
         return FakeSessionRuntimeLoggingService()
 
-    monkeypatch.setattr(controller_module, "SessionRuntimeLoggingService", create_session)
+    monkeypatch.setattr(
+        controller_module,
+        "SessionRuntimeLoggingService",
+        create_session,
+    )
     controller = GuiController(
         page=SimpleNamespace(),
         app=_presentation(SimpleNamespace()),
