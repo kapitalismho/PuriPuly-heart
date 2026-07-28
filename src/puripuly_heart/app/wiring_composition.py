@@ -14,6 +14,7 @@ from puripuly_heart.core.runtime.peer_channel import (
     PeerCaptureVadFactory,
 )
 from puripuly_heart.core.runtime.self_capture import (
+    SelfCaptureAudioLoop,
     SelfCaptureSourceFactory,
     SelfCaptureVadFactory,
 )
@@ -84,6 +85,25 @@ def create_self_capture_vad_adapter(
         gating_factory=VadGating,
         log_detailed=log_detailed,
         diagnostics_enabled=diagnostics_enabled,
+    )
+
+
+def create_self_capture_audio_loop_adapter(
+    *,
+    audio_gate_provider: Callable[[], object | None],
+    log_detailed: Callable[[str], object],
+    is_detailed_enabled: Callable[[], bool],
+) -> SelfCaptureAudioLoop:
+    from puripuly_heart.app.adapters.self_capture_audio_loop import (
+        SelfCaptureAudioLoopAdapter,
+    )
+    from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
+
+    return SelfCaptureAudioLoopAdapter(
+        runner=run_audio_vad_loop,
+        audio_gate_provider=audio_gate_provider,
+        log_detailed=log_detailed,
+        is_detailed_enabled=is_detailed_enabled,
     )
 
 

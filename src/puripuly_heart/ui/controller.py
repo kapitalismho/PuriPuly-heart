@@ -188,6 +188,7 @@ from puripuly_heart.app.wiring import (
     create_peer_capture_vad_adapter,
     create_provider_verifier,
     create_secret_store,
+    create_self_capture_audio_loop_adapter,
     create_self_capture_source_adapter,
     create_self_capture_vad_adapter,
     create_sync_secret_store_adapter,
@@ -9807,7 +9808,11 @@ class GuiController:
                 log_detailed=self.log_detailed,
                 diagnostics_enabled=self._detailed_audio_diag_enabled,
             ),
-            run_audio_loop=self._run_self_capture_audio_loop,
+            run_audio_loop=create_self_capture_audio_loop_adapter(
+                audio_gate_provider=lambda: self.vrc_mic_audio_gate,
+                log_detailed=self.log_detailed,
+                is_detailed_enabled=self._detailed_audio_diag_enabled,
+            ),
             vad_sink=_SelfCaptureVadSink(lambda: self.hub),
             state_changed=self._on_self_capture_state_changed,
             diagnostic_sink=self._on_self_capture_diagnostic,
@@ -9861,17 +9866,6 @@ class GuiController:
         if diagnostic.detail is not None:
             fields.append(f"detail={diagnostic.detail}")
         self.log_detailed(f"[SelfCapture] {' '.join(fields)}")
-
-    async def _run_self_capture_audio_loop(self, **kwargs: object) -> None:
-        from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
-
-        await run_audio_vad_loop(
-            **kwargs,
-            audio_gate=self.vrc_mic_audio_gate,
-            channel_label="self",
-            is_detailed_enabled=self._detailed_audio_diag_enabled,
-            log_detailed=lambda message: self.log_detailed(message),
-        )
 
     def _create_vrc_osc_receiver_for_runtime(self, **kwargs: object) -> VrcOscReceiver:
         return VrcOscReceiver(**kwargs)  # type: ignore[arg-type]

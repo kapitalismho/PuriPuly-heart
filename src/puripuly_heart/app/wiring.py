@@ -18,6 +18,7 @@ from puripuly_heart.app.wiring_composition import (
     create_peer_capture_target_resolver_adapter,
     create_peer_capture_vad_adapter,
     create_provider_verifier,
+    create_self_capture_audio_loop_adapter,
     create_self_capture_source_adapter,
     create_self_capture_vad_adapter,
 )
@@ -221,6 +222,7 @@ __all__ = (
     "create_peer_stt_backend_from_resolved_config",
     "create_provider_verifier",
     "create_secret_store",
+    "create_self_capture_audio_loop_adapter",
     "create_self_capture_source_adapter",
     "create_self_capture_vad_adapter",
     "create_sync_secret_store_adapter",

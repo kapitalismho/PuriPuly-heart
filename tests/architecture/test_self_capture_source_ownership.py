@@ -7,6 +7,9 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
 ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_source.py"
 VAD_ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_vad.py"
+AUDIO_LOOP_ADAPTER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_audio_loop.py"
+)
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
 
 
@@ -93,3 +96,36 @@ def test_self_capture_session_owner_remains_vad_and_loop_lifecycle_owner() -> No
     assert "vad = self._vad_factory(config)" in source
     assert "run_audio_loop: SelfCaptureAudioLoop" in source
     assert '"_loop_task"' in source
+
+
+def test_controller_composes_self_audio_loop_adapter_without_loop_method() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    composition = _controller_method_source("_get_self_capture_owner")
+
+    assert "run_audio_loop=create_self_capture_audio_loop_adapter(" in composition
+    assert "audio_gate_provider=lambda: self.vrc_mic_audio_gate" in composition
+    assert "_run_self_capture_audio_loop" not in source
+
+
+def test_self_audio_loop_adapter_has_no_ui_task_or_gate_lifecycle_ownership() -> None:
+    source = AUDIO_LOOP_ADAPTER_PATH.read_text(encoding="utf-8")
+
+    assert "puripuly_heart.ui" not in source
+    assert "GuiController" not in source
+    assert "AppSettings" not in source
+    assert "VrcMicSyncOwner" not in source
+    assert "asyncio.create_task" not in source
+    assert "async def close(" not in source
+    assert 'channel_label="self"' in source
+    assert "audio_gate=self.audio_gate_provider()" in source
+
+
+def test_self_capture_session_owner_remains_loop_task_and_cancellation_owner() -> None:
+    source = OWNER_PATH.read_text(encoding="utf-8")
+
+    assert "run_audio_loop: SelfCaptureAudioLoop" in source
+    assert '"_loop_task"' in source
+    assert "loop_task = asyncio.create_task(" in source
+    assert "loop_task.cancel()" in source
+    assert "await asyncio.gather(loop_task, return_exceptions=True)" in source
+    assert "await self._run_audio_loop(" in source
