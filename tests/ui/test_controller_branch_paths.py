@@ -12568,24 +12568,24 @@ async def test_self_capture_source_does_not_apply_wasapi_flags_to_system_default
 
 
 @pytest.mark.asyncio
-async def test_configure_vrc_mic_receiver_disabled_stops_receiver(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_configure_vrc_mic_receiver_disabled_stops_receiver() -> None:
     controller = _make_controller(app=SimpleNamespace())
     gate = DummyGate()
     stop_calls: list[str] = []
 
-    def fake_stop_vrc_mic_receiver(self) -> None:
-        _ = self
-        stop_calls.append("stopped")
+    class Receiver:
+        def stop(self) -> None:
+            stop_calls.append("stopped")
 
     controller.vrc_mic_audio_gate = gate
-    monkeypatch.setattr(GuiController, "_stop_vrc_mic_receiver", fake_stop_vrc_mic_receiver)
+    controller.receiver = Receiver()
 
     await controller._configure_vrc_mic_receiver(enabled=False)
 
     assert gate.enabled_calls == [False]
+    assert gate.receiver_active_calls == [False]
     assert stop_calls == ["stopped"]
+    assert controller.receiver is None
 
 
 @pytest.mark.parametrize(

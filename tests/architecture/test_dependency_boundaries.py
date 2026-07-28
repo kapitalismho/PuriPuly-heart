@@ -1515,6 +1515,10 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "_strict_runtime_errors_for_clipboard_watcher",
             "_oauth_runtime: OAuthRuntime",
             "_openrouter_pkce_client: OpenRouterPKCEClient",
+            "receiver: VrcOscReceiver",
+            "_vrc_mic_receiver_runtime: VrcMicReceiverRuntime",
+            "_vrc_receiver_lock:",
+            "_last_vrc_mic_sync_enabled:",
             "_microphone_test_task",
         ),
         "src/puripuly_heart/ui/app.py": (

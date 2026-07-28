@@ -132,6 +132,7 @@ from puripuly_heart.app.services.settings_projection import (
     SettingsProjectionOwner,
     SettingsViewSettingsChange,
 )
+from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.app.wiring import (
     DiscordManagedBrokerClientAdapter,
     DiscordOAuthAuthAdapter,
@@ -1022,8 +1023,7 @@ class GuiController:
         repr=False,
     )
     _peer_runtime: PeerCaptureSessionOwner | None = None
-    receiver: VrcOscReceiver | None = None
-    _vrc_mic_receiver_runtime: VrcMicReceiverRuntime | None = field(
+    _vrc_mic_sync_owner: VrcMicSyncOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -1091,13 +1091,11 @@ class GuiController:
     )
     _process_idle_preparation_scheduled: bool = field(init=False, default=False)
     _peer_process_warning_reason: str | None = field(init=False, default=None)
-    _last_vrc_mic_sync_enabled: bool | None = None
     _settings_projection_owner: SettingsProjectionOwner | None = field(
         init=False,
         default=None,
         repr=False,
     )
-    _vrc_receiver_lock: asyncio.Lock | None = None
     _ui_event_bridge: object | None = None
     _clipboard_auto_translation_owner: ClipboardAutoTranslationOwner | None = field(
         init=False,
@@ -4346,34 +4344,10 @@ class GuiController:
         self,
         failures: list[Exception],
     ) -> None:
-        self._last_vrc_mic_sync_enabled = False
-        if self.vrc_mic_audio_gate is not None:
-            self.vrc_mic_audio_gate.set_enabled(False)
-            self.vrc_mic_audio_gate.set_receiver_active(False)
-
-        runtime = self._vrc_mic_receiver_runtime
-        if runtime is None:
-            receiver = self.receiver
-            if receiver is not None:
-                try:
-                    receiver.stop()
-                except Exception as exc:
-                    failures.append(exc)
-                    return
-                self.receiver = None
-            return
-
         try:
-            await runtime.close()
+            await self._get_vrc_mic_sync_owner().close()
         except Exception as exc:
             failures.append(exc)
-            remaining_receiver = getattr(runtime, "receiver", self.receiver)
-            self.receiver = remaining_receiver
-            return
-
-        if self._vrc_mic_receiver_runtime is runtime:
-            self._vrc_mic_receiver_runtime = None
-        self.receiver = None
 
     async def _close_self_capture_owner_for_release(
         self,
@@ -10825,26 +10799,56 @@ class GuiController:
     def _create_vrc_osc_receiver_for_runtime(self, **kwargs: object) -> VrcOscReceiver:
         return VrcOscReceiver(**kwargs)  # type: ignore[arg-type]
 
-    def _get_vrc_mic_receiver_runtime(self) -> VrcMicReceiverRuntime | None:
-        if self.vrc_mic_state is None:
-            return None
-        if self._vrc_mic_receiver_runtime is None:
-            self._vrc_mic_receiver_runtime = VrcMicReceiverRuntime(
-                state=self.vrc_mic_state,
-                host=VRC_OSC_RECEIVER_HOST,
-                port=VRC_OSC_RECEIVER_PORT,
+    @property
+    def receiver(self) -> object | None:
+        owner = self._vrc_mic_sync_owner
+        return owner.receiver if owner is not None else None
+
+    @receiver.setter
+    def receiver(self, receiver: object | None) -> None:
+        self._get_vrc_mic_sync_owner().receiver = receiver
+
+    @property
+    def _vrc_mic_receiver_runtime(self) -> VrcMicReceiverRuntime | None:
+        owner = self._vrc_mic_sync_owner
+        return owner.runtime if owner is not None else None
+
+    @_vrc_mic_receiver_runtime.setter
+    def _vrc_mic_receiver_runtime(self, runtime: VrcMicReceiverRuntime | None) -> None:
+        self._get_vrc_mic_sync_owner().runtime = runtime
+
+    @property
+    def _last_vrc_mic_sync_enabled(self) -> bool | None:
+        owner = self._vrc_mic_sync_owner
+        return owner.last_enabled if owner is not None else None
+
+    @_last_vrc_mic_sync_enabled.setter
+    def _last_vrc_mic_sync_enabled(self, enabled: bool | None) -> None:
+        self._get_vrc_mic_sync_owner().last_enabled = enabled
+
+    def _get_vrc_mic_sync_owner(self) -> VrcMicSyncOwner:
+        owner = self._vrc_mic_sync_owner
+        if owner is None:
+            owner = VrcMicSyncOwner(
+                state_provider=lambda: self.vrc_mic_state,
+                gate_provider=lambda: self.vrc_mic_audio_gate,
                 receiver_factory=self._create_vrc_osc_receiver_for_runtime,
                 diagnostics_sink=self._vrc_mic_receiver_runtime_diagnostics_sink,
-                state_changed=self._sync_vrc_mic_receiver_runtime_aliases,
+                error_sink=self._log_error,
+                host=VRC_OSC_RECEIVER_HOST,
+                port=VRC_OSC_RECEIVER_PORT,
             )
-        return self._vrc_mic_receiver_runtime
+            self._vrc_mic_sync_owner = owner
+        return owner
+
+    def _get_vrc_mic_receiver_runtime(self) -> VrcMicReceiverRuntime | None:
+        return self._get_vrc_mic_sync_owner().get_runtime()
 
     def _sync_vrc_mic_receiver_runtime_aliases(
         self,
         runtime: VrcMicReceiverRuntime | None = None,
     ) -> None:
-        owner = runtime or self._vrc_mic_receiver_runtime
-        self.receiver = getattr(owner, "receiver", None) if owner is not None else None
+        self._get_vrc_mic_sync_owner().sync_runtime_receiver(runtime)
 
     def _vrc_mic_receiver_runtime_diagnostics_sink(
         self,
@@ -10857,58 +10861,10 @@ class GuiController:
         )
 
     async def _configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
-        if self._vrc_receiver_lock is None:
-            self._vrc_receiver_lock = asyncio.Lock()
-
-        async with self._vrc_receiver_lock:
-            self._last_vrc_mic_sync_enabled = enabled
-            if self.vrc_mic_audio_gate is not None:
-                self.vrc_mic_audio_gate.set_enabled(enabled)
-
-            if not enabled:
-                stop_result = self._stop_vrc_mic_receiver()
-                if inspect.isawaitable(stop_result):
-                    await stop_result
-                return
-
-            if self.receiver is not None or self.vrc_mic_state is None:
-                if self.vrc_mic_audio_gate is not None:
-                    self.vrc_mic_audio_gate.set_receiver_active(self.receiver is not None)
-                return
-
-            runtime = self._get_vrc_mic_receiver_runtime()
-            if runtime is None:
-                if self.vrc_mic_audio_gate is not None:
-                    self.vrc_mic_audio_gate.set_receiver_active(False)
-                return
-            try:
-                receiver = await runtime.start()
-            except OSError as exc:
-                if self.vrc_mic_audio_gate is not None:
-                    self.vrc_mic_audio_gate.set_receiver_active(False)
-                self._log_error(
-                    "VRChat mic sync receiver unavailable on "
-                    f"{VRC_OSC_RECEIVER_HOST}:{VRC_OSC_RECEIVER_PORT}: {exc}"
-                )
-                return
-
-            self.receiver = receiver  # type: ignore[assignment]
-            if self.vrc_mic_audio_gate is not None:
-                self.vrc_mic_audio_gate.set_receiver_active(True)
-                self.vrc_mic_audio_gate.reset()
+        await self._get_vrc_mic_sync_owner().configure(enabled=enabled)
 
     async def _stop_vrc_mic_receiver(self) -> None:
-        runtime = self._vrc_mic_receiver_runtime
-        if runtime is not None:
-            with contextlib.suppress(Exception):
-                await runtime.stop(strict_runtime_errors=False)
-            self._sync_vrc_mic_receiver_runtime_aliases(runtime)
-        elif self.receiver is not None:
-            with contextlib.suppress(Exception):
-                self.receiver.stop()
-            self.receiver = None
-        if self.vrc_mic_audio_gate is not None:
-            self.vrc_mic_audio_gate.set_receiver_active(False)
+        await self._get_vrc_mic_sync_owner().stop()
 
     def _create_openrouter_pkce_client(self) -> OpenRouterPKCEClient:
         return OpenRouterPKCEClient(callback_origin="http://localhost:3000")
