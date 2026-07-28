@@ -209,8 +209,8 @@ class UiApplicationBoundary:
     async def set_overlay_enabled(self, enabled: bool) -> object:
         return await self._backend.set_overlay_enabled(enabled)
 
-    async def retry_peer_process_capture(self) -> None:
-        await self._backend.retry_peer_process_capture()
+    async def retry_peer_process_capture(self) -> bool:
+        return bool(await self._backend.retry_peer_process_capture())
 
     async def apply_loopback_capture_option(self, value: str) -> None:
         await self._backend.apply_loopback_capture_option(value)

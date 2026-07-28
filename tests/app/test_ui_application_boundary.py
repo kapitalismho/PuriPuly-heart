@@ -38,6 +38,7 @@ class RecordingBackend:
         self.microphone_test_active = True
         self.desktop_overlay_captions_locked = True
         self.last_discord_managed_auth_referral_bonus_applied = True
+        self.peer_retry_result = True
         self.events: list[tuple[object, ...]] = []
 
     async def start(self) -> None:
@@ -81,8 +82,9 @@ class RecordingBackend:
         self.events.append(("overlay", enabled))
         return enabled
 
-    async def retry_peer_process_capture(self) -> None:
+    async def retry_peer_process_capture(self) -> bool:
         self.events.append(("peer-retry",))
+        return self.peer_retry_result
 
     async def apply_settings(self, settings: object) -> None:
         self.settings = settings
@@ -376,7 +378,7 @@ async def test_self_peer_overlay_and_retry_intents_preserve_channel_results() ->
     assert await boundary.set_stt_enabled(False) is False
     assert await boundary.set_peer_translation_enabled(True) is True
     assert await boundary.set_overlay_enabled(True) is True
-    await boundary.retry_peer_process_capture()
+    assert await boundary.retry_peer_process_capture() is True
 
     assert backend.events == [
         ("self", False),
@@ -384,6 +386,16 @@ async def test_self_peer_overlay_and_retry_intents_preserve_channel_results() ->
         ("overlay", True),
         ("peer-retry",),
     ]
+
+
+@pytest.mark.asyncio
+async def test_retry_intent_preserves_false_backend_result_exactly_once() -> None:
+    backend = RecordingBackend()
+    backend.peer_retry_result = False
+    boundary = UiApplicationBoundary(backend)
+
+    assert await boundary.retry_peer_process_capture() is False
+    assert backend.events == [("peer-retry",)]
 
 
 @pytest.mark.asyncio

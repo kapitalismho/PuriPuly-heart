@@ -22,12 +22,14 @@ from typing import Literal
 
 import numpy as np
 
+from puripuly_heart.app.services.peer_process_capture_retry import (
+    PeerProcessCaptureRetryOwner,
+)
 from puripuly_heart.config.process_capture_platform import (
     PROCESS_CAPTURE_MIN_WINDOWS_BUILD,
     get_process_capture_platform_availability,
 )
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
-from puripuly_heart.ui.controller import GuiController
 
 EVIDENCE_SCHEMA = "puripuly-heart/windows-process-isolation/v1"
 SAMPLE_RATE_HZ = 48000
@@ -38,7 +40,7 @@ EMITTER_AMPLITUDE = 0.18
 CAPTURE_SECONDS = 3.0
 PROTOCOL_VERSION = 1
 WORKER_MODULE = "puripuly_heart.release_evidence.windows_process_isolation"
-GUI_PROCESS_RETRY_ACTION = GuiController.retry_peer_process_capture
+GUI_PROCESS_RETRY_ACTION = PeerProcessCaptureRetryOwner.retry
 
 EvidenceStatus = Literal["passed", "failed", "blocked"]
 
@@ -797,27 +799,18 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
         second_pid = current_root.ready.pid
         retry_root_ready_s = current_root.ready_monotonic_s - fixture_started
 
-        class GuiRetryAction:
-            settings = object()
-            _peer_runtime = runtime
-            _peer_process_warning_reason = "process_target_exited"
-
-            def _peer_runtime_should_be_active(self, _settings) -> bool:  # noqa: ANN001
-                return True
-
-            async def _ensure_peer_local_stt_ready(self) -> bool:
-                return True
-
-            def _build_peer_runtime_config(self, _settings) -> PeerRuntimeConfig:  # noqa: ANN001
-                return config
-
-            def _sync_effective_hub_flags(self, _settings) -> None:  # noqa: ANN001
-                return None
-
-            def _refresh_overlay_peer_consumers(self) -> None:
-                return None
-
-        gui_action = GuiRetryAction()
+        retry_settings = object()
+        retry_warning = ["process_target_exited"]
+        gui_action = PeerProcessCaptureRetryOwner(
+            settings_provider=lambda: retry_settings,
+            runtime_provider=lambda: runtime,
+            should_be_active=lambda _settings: True,
+            ensure_ready=lambda: asyncio.sleep(0, result=True),
+            build_config=lambda _settings: config,
+            on_retry_succeeded=lambda: retry_warning.__setitem__(0, None),
+            sync_effective_flags=lambda _settings: None,
+            refresh_consumers=lambda: None,
+        )
         retried = await invoke_gui_process_retry(gui_action)
         await asyncio.sleep(0.1)
         lifecycle_passed_result = lifecycle_passes(
@@ -835,7 +828,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
             retry_pid=second_pid,
             no_automatic_reconnect=no_automatic_reconnect,
             gui_retry_succeeded=retried,
-            gui_warning_cleared=gui_action._peer_process_warning_reason is None,
+            gui_warning_cleared=retry_warning[0] is None,
         )
         passed = isolation_passes(measurements, thresholds) and lifecycle_passed_result
         activation_order_verified = (
@@ -929,7 +922,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
                     loop_task_at_warning and loop_task_at_warning[-1]
                 ),
                 "automatic_reconnect": not no_automatic_reconnect,
-                "retry_action": "GuiController.retry_peer_process_capture",
+                "retry_action": "PeerProcessCaptureRetryOwner.retry",
                 "retry_succeeded": retried,
                 "fresh_pid": first_pid != second_pid,
             },

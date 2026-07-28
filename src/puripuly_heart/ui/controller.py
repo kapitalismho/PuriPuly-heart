@@ -107,6 +107,9 @@ from puripuly_heart.app.services.overlay_session_transition import (
     OverlaySessionTransitionOwner,
 )
 from puripuly_heart.app.services.peer_capture_target import PeerCaptureTargetResolutionService
+from puripuly_heart.app.services.peer_process_capture_retry import (
+    PeerProcessCaptureRetryOwner,
+)
 from puripuly_heart.app.services.provider_credential_verification import (
     PROVIDER_CREDENTIAL_EMPTY,
     PROVIDER_CREDENTIAL_ERROR,
@@ -713,6 +716,11 @@ class GuiController:
         repr=False,
     )
     _peer_runtime: PeerCaptureSessionOwner | None = None
+    _peer_process_capture_retry_owner: PeerProcessCaptureRetryOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _vrc_mic_sync_owner: VrcMicSyncOwner | None = field(
         init=False,
         default=None,
@@ -4441,21 +4449,27 @@ class GuiController:
         self._refresh_overlay_peer_consumers()
 
     async def retry_peer_process_capture(self) -> bool:
-        if (
-            self.settings is None
-            or self._peer_runtime is None
-            or not self._peer_runtime_should_be_active(self.settings)
-        ):
-            return False
-        if not await self._ensure_peer_local_stt_ready():
-            return False
-        config = self._build_peer_runtime_config(self.settings)
-        retried = await self._peer_runtime.retry_process_capture(config=config)
-        if retried:
-            self._peer_process_warning_reason = None
-        self._sync_effective_hub_flags(self.settings)
-        self._refresh_overlay_peer_consumers()
-        return retried
+        return await self._get_peer_process_capture_retry_owner().retry()
+
+    def _get_peer_process_capture_retry_owner(self) -> PeerProcessCaptureRetryOwner:
+        owner = self._peer_process_capture_retry_owner
+        if owner is None:
+            owner = PeerProcessCaptureRetryOwner(
+                settings_provider=lambda: self.settings,
+                runtime_provider=lambda: self._peer_runtime,
+                should_be_active=lambda settings: self._peer_runtime_should_be_active(settings),
+                ensure_ready=lambda: self._ensure_peer_local_stt_ready(),
+                build_config=lambda settings: self._build_peer_runtime_config(settings),
+                on_retry_succeeded=lambda: setattr(
+                    self,
+                    "_peer_process_warning_reason",
+                    None,
+                ),
+                sync_effective_flags=lambda settings: self._sync_effective_hub_flags(settings),
+                refresh_consumers=lambda: self._refresh_overlay_peer_consumers(),
+            )
+            self._peer_process_capture_retry_owner = owner
+        return owner
 
     def _enqueue_peer_translation_disclosure(self) -> None:
         hub = self.hub
