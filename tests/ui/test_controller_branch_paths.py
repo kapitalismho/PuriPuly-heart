@@ -6709,11 +6709,11 @@ async def test_closing_overlay_runtime_rejects_direct_presenter_commands() -> No
         assert runtime.is_closing is True
         assert _overlay_runtime(controller).presenter is presenter
 
-        controller._schedule_overlay_calibration_emit()
+        controller._get_overlay_calibration_owner().schedule_emit()
 
         assert page.tasks == []
 
-        await controller._emit_overlay_calibration_update()
+        await controller._get_overlay_calibration_owner().emit_current()
 
         assert presenter.calibration_updates == []
 
@@ -20639,7 +20639,7 @@ def test_schedule_overlay_calibration_emit_preserves_traceback_in_detailed_log()
     controller.overlay_state = "connected"
     _attach_overlay_presenter(controller, object())
 
-    controller._schedule_overlay_calibration_emit()
+    controller._get_overlay_calibration_owner().schedule_emit()
 
     assert controller._runtime_logging.basic_messages == []
     assert len(controller._runtime_logging.detailed_messages) == 1

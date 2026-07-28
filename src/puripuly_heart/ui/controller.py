@@ -4879,12 +4879,6 @@ class GuiController:
     def apply_overlay_calibration(self) -> OverlayCalibration:
         return self._get_overlay_calibration_owner().apply()
 
-    async def _apply_overlay_calibration_persistence(
-        self,
-        calibration: OverlayCalibration,
-    ) -> None:
-        await self._get_overlay_calibration_owner().persist_calibration(calibration)
-
     async def _persist_overlay_calibration(
         self,
         calibration: OverlayCalibration,
@@ -4895,12 +4889,6 @@ class GuiController:
         next_settings.overlay.calibration = calibration.copy()
         await self._apply_overlay_osc_output_settings_via_mutation_service(next_settings)
 
-    def _schedule_overlay_calibration_persistence(
-        self,
-        calibration: OverlayCalibration,
-    ) -> None:
-        self._get_overlay_calibration_owner().schedule_persistence(calibration)
-
     def cancel_overlay_calibration(self) -> OverlayCalibration:
         return self._get_overlay_calibration_owner().cancel()
 
@@ -4910,9 +4898,6 @@ class GuiController:
             return
         self._get_overlay_calibration_owner().replace_current(resolved_settings.overlay.calibration)
 
-    async def _emit_overlay_calibration_update(self) -> None:
-        await self._get_overlay_calibration_owner().emit_current()
-
     async def _emit_overlay_calibration_to_runtime(
         self,
         calibration: OverlayCalibration,
@@ -4921,9 +4906,6 @@ class GuiController:
         if presenter is None:
             return
         await presenter.update_calibration(calibration.copy())
-
-    def _schedule_overlay_calibration_emit(self) -> None:
-        self._get_overlay_calibration_owner().schedule_emit()
 
     def _get_overlay_calibration_owner(self) -> OverlayCalibrationOwner:
         owner = self._overlay_calibration_owner
