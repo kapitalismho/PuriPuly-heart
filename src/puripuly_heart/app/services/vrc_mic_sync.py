@@ -122,7 +122,8 @@ class VrcMicSyncOwner:
 
     def sync_runtime_receiver(self, runtime: object | None = None) -> None:
         owner = runtime or self._runtime
-        self._receiver = getattr(owner, "receiver", None) if owner is not None else None
+        receiver = getattr(owner, "receiver", None) if owner is not None else None
+        self.receiver = receiver
 
     async def configure(self, *, enabled: bool) -> None:
         async with self.lock:
@@ -158,6 +159,9 @@ class VrcMicSyncOwner:
                 )
                 return
 
+            if not self._accepting_ingress:
+                await self._close_locked()
+                return
             self._receiver = receiver
             if gate is not None:
                 gate.set_receiver_active(True)
@@ -184,8 +188,8 @@ class VrcMicSyncOwner:
             gate.set_receiver_active(False)
 
     async def close(self) -> None:
+        self.stop_ingress()
         async with self.lock:
-            self.stop_ingress()
             await self._close_locked()
 
     async def _close_locked(self) -> None:

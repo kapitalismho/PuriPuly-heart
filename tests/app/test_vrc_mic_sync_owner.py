@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 
 import pytest
@@ -178,3 +179,45 @@ async def test_owner_rejects_runtime_resurrection_after_close() -> None:
     assert factory_calls == 1
     assert gate.enabled == [True, False]
     assert gate.active == [True, False]
+
+
+@pytest.mark.asyncio
+async def test_owner_disposes_inflight_receiver_when_ingress_freezes() -> None:
+    gate = RecordingGate()
+    start_entered = asyncio.Event()
+    finish_start = asyncio.Event()
+    receivers: list[RecordingReceiver] = []
+
+    class BlockingReceiver(RecordingReceiver):
+        async def start(self) -> None:
+            start_entered.set()
+            await finish_start.wait()
+            self.started = True
+
+    def receiver_factory(**kwargs: object) -> RecordingReceiver:
+        receiver = BlockingReceiver(**kwargs)
+        receivers.append(receiver)
+        return receiver
+
+    owner, _, _ = _owner(
+        state=VrcMicState(),
+        gate=gate,
+        receiver_factory=receiver_factory,
+    )
+    configure_task = asyncio.create_task(owner.configure(enabled=True))
+    await start_entered.wait()
+
+    owner.stop_ingress()
+    close_task = asyncio.create_task(owner.close())
+    finish_start.set()
+    await asyncio.gather(configure_task, close_task)
+
+    assert owner.accepting_ingress is False
+    assert owner.runtime is None
+    assert owner.receiver is None
+    assert len(receivers) == 1
+    assert receivers[0].started is True
+    assert receivers[0].stopped is True
+    assert gate.enabled == [True, False, False]
+    assert gate.active == [False, False]
+    assert gate.reset_calls == 0
