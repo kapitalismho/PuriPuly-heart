@@ -4675,11 +4675,6 @@ class GuiController:
     def _schedule_overlay_session_desktop_fallback_start(self) -> None:
         self._get_overlay_session_fallback_owner().schedule()
 
-    @property
-    def _overlay_session_desktop_fallback_active(self) -> bool:
-        owner = self._overlay_session_fallback_owner
-        return owner.active if owner is not None else False
-
     def _get_overlay_session_fallback_owner(self) -> OverlaySessionFallbackOwner:
         owner = self._overlay_session_fallback_owner
         if owner is None:

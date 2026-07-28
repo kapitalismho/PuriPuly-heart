@@ -1518,6 +1518,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "def _desktop_bounds_persist_task(",
             "def _pending_desktop_bounds(",
             "@_pending_desktop_bounds.setter",
+            "def _overlay_session_desktop_fallback_active(",
             "def _sync_local_stt_download_runtime_aliases",
             "def _sync_clipboard_runtime_aliases",
             "def _sync_microphone_test_runtime_aliases",

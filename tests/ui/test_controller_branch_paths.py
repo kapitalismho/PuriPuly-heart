@@ -6971,14 +6971,14 @@ async def test_overlay_session_fallback_to_desktop_when_steamvr_unavailable(
     second = FakeOverlayProcessManager.instances[1]
     assert isinstance(second.process_runner, FakeDesktopRunner)
     assert controller.settings.overlay.target == "steamvr"
-    assert controller._overlay_session_desktop_fallback_active is True
+    assert controller._get_overlay_session_fallback_owner().active is True
     assert True in notices
     second.complete_startup()
     await _wait_until(lambda: controller.overlay_state == "connected")
     assert controller._active_overlay_target == "desktop"
 
     await controller.set_overlay_enabled(False)
-    assert controller._overlay_session_desktop_fallback_active is False
+    assert controller._get_overlay_session_fallback_owner().active is False
     assert False in notices
 
 
