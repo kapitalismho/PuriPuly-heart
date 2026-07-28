@@ -17,12 +17,22 @@ VrchatOscProbeDiagnosticsSink = Callable[
 ]
 
 
+def _create_vrchat_osc_probe_task(
+    coroutine: Coroutine[Any, Any, None],
+    name: str,
+) -> asyncio.Task[None]:
+    return asyncio.create_task(
+        coroutine,
+        name=f"VrchatOscPresenceProbeOwner:{name}",
+    )
+
+
 @dataclass(slots=True)
 class VrchatOscPresenceProbeOwner:
     presence_provider: Callable[[], VrchatOscPresencePort | None]
     port_provider: Callable[[], int]
     publish_notice: Callable[[bool], None]
-    task_factory: VrchatOscProbeTaskFactory
+    task_factory: VrchatOscProbeTaskFactory = _create_vrchat_osc_probe_task
     diagnostics_sink: VrchatOscProbeDiagnosticsSink | None = None
     interval_seconds: float = 30.0
     _notice_active: bool = field(init=False, default=False, repr=False)

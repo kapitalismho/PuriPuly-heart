@@ -37,7 +37,6 @@ def _owner(
         presence_provider=lambda: presence,
         port_provider=lambda: 9001,
         publish_notice=notices.append,
-        task_factory=lambda coroutine, name: asyncio.create_task(coroutine, name=name),
         diagnostics_sink=lambda event, metadata, exception: diagnostics.append(
             (event, dict(metadata), exception)
         ),
@@ -60,6 +59,7 @@ async def test_owner_publishes_probe_result_and_cancels_owned_task() -> None:
     assert presence.ports == [9001]
     assert notices == [True]
     assert owner.task is not None
+    assert owner.task.get_name() == "VrchatOscPresenceProbeOwner:vrchat-osc-presence-1"
 
     await owner.cancel()
 

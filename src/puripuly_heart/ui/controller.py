@@ -5493,11 +5493,6 @@ class GuiController:
                 presence_provider=lambda: self.vrchat_osc_presence,
                 port_provider=self._vrchat_osc_probe_port,
                 publish_notice=self.app.set_dashboard_vrchat_osc_notice,
-                task_factory=lambda coroutine, name: start_lifecycle_task(
-                    self._ui_background_scope,
-                    coroutine,
-                    name=name,
-                ),
                 diagnostics_sink=lambda _event, _metadata, exception: self.log_detailed(
                     "[OSC] VRChat OSC presence probe failed",
                     level=logging.WARNING,

@@ -62,6 +62,10 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
             ASYNCIO_CREATE_TASK,
         ): 1,
         (
+            "src/puripuly_heart/core/runtime/vrchat_osc_presence.py",
+            ASYNCIO_CREATE_TASK,
+        ): 1,
+        (
             "src/puripuly_heart/core/runtime/github_star_prompt.py",
             ASYNCIO_CREATE_TASK,
         ): 2,
@@ -172,6 +176,10 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         "src/puripuly_heart/core/runtime/overlay_session_fallback.py",
         ASYNCIO_CREATE_TASK,
     ): "OverlaySessionFallbackOwner owns its named deferred fallback task and cancels and awaits it during close",
+    (
+        "src/puripuly_heart/core/runtime/vrchat_osc_presence.py",
+        ASYNCIO_CREATE_TASK,
+    ): "VrchatOscPresenceProbeOwner owns its named probe task and cancels and awaits it during close",
     (
         "src/puripuly_heart/core/runtime/output.py",
         ASYNCIO_CREATE_TASK,
@@ -382,4 +390,11 @@ def test_order39_named_owner_allowlist_adds_receiver_prompt_and_bounds_owners() 
     assert (
         "src/puripuly_heart/ui/foundation/runtime.py",
         RUN_TASK,
+    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
+
+
+def test_order40_named_owner_allowlist_adds_vrchat_osc_presence_owner() -> None:
+    assert (
+        "src/puripuly_heart/core/runtime/vrchat_osc_presence.py",
+        ASYNCIO_CREATE_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
