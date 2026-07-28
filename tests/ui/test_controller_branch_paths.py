@@ -144,7 +144,6 @@ from puripuly_heart.core.self_capture import (
 from puripuly_heart.core.stt.controller import FinalTranscriptSuppressedNotification
 from puripuly_heart.domain.models import Transcript
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
-from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.llm.qwen import QwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
@@ -157,9 +156,6 @@ from puripuly_heart.ui.i18n import set_locale, t
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.fakes import FakeSender
-from tests.helpers.provider_status import (
-    run_configured_provider_status_verification as _run_configured_provider_status_verification,
-)
 
 PEER_DISCLOSURE_KEY = "peer_translation.disclosure"
 
@@ -2000,144 +1996,6 @@ async def test_start_local_llm_without_runtime_does_not_show_api_key_warning(
     assert dash.translation_enabled is False
 
 
-@pytest.mark.asyncio
-async def test_scheduled_provider_status_trusts_local_llm_runtime_without_probe(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.LOCAL_LLM
-    settings.translation = TranslationSettings(
-        model=TranslationModel.LOCAL_LLM,
-        connection=TranslationConnection.OLLAMA,
-    )
-
-    dash = DummyDashboard()
-    app = SimpleNamespace(view_dashboard=dash)
-    controller = _make_controller(app=app)
-    controller.settings = settings
-    controller.hub = DummyHub(llm=object(), stt=object())
-
-    probe_calls = 0
-
-    async def fake_verify_connection(*_args, **_kwargs) -> bool:
-        nonlocal probe_calls
-        probe_calls += 1
-        return False
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    monkeypatch.setattr(
-        LocalOpenAICompatibleLLMProvider,
-        "verify_connection",
-        staticmethod(fake_verify_connection),
-    )
-
-    await _run_configured_provider_status_verification(controller)
-
-    assert probe_calls == 0
-    assert dash.translation_needs_key is False
-    assert dash.translation_enabled is True
-    assert controller.hub.translation_enabled is True
-
-
-@pytest.mark.asyncio
-async def test_scheduled_provider_status_handles_mixed_provider_failures(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.QWEN
-    settings.provider.stt = STTProviderName.QWEN_ASR
-    settings.qwen.llm_model = QwenLLMModel.QWEN_35_FLASH
-
-    dash = DummyDashboard()
-    app = SimpleNamespace(view_dashboard=dash)
-    controller = _make_controller(app=app)
-    controller.settings = settings
-    controller.hub = DummyHub(llm=object(), stt=object())
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({"alibaba_api_key": "secret"}),
-    )
-
-    models_seen: list[str] = []
-
-    async def fake_verify_qwen(
-        api_key: str,
-        *,
-        base_url: str,
-        model: str | None,
-        low_latency: bool,
-    ) -> bool:
-        _ = (api_key, base_url)
-        assert low_latency is True
-        assert model is not None
-        models_seen.append(model)
-        return model == QwenLLMModel.QWEN_35_PLUS.value
-
-    controller.provider_verifier = SimpleNamespace(
-        verify_qwen_llm_api_key=fake_verify_qwen,
-    )
-
-    await _run_configured_provider_status_verification(controller)
-
-    assert models_seen == ["qwen3.5-flash", "qwen3.5-plus"]
-    assert dash.translation_needs_key is True
-    assert dash.translation_enabled is False
-    assert dash.stt_needs_key is False
-    assert controller.hub.translation_enabled is False
-
-
-@pytest.mark.asyncio
-async def test_scheduled_provider_status_marks_needs_key_when_secret_store_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.GEMINI
-    settings.provider.stt = STTProviderName.DEEPGRAM
-
-    dash = DummyDashboard()
-    app = SimpleNamespace(view_dashboard=dash)
-    controller = _make_controller(app=app)
-    controller.settings = settings
-    controller.hub = DummyHub(llm=object(), stt=object())
-
-    def raise_secret_store(*_args, **_kwargs):
-        raise RuntimeError("secret store broken")
-
-    async def always_false(*_args, **_kwargs) -> bool:
-        return False
-
-    monkeypatch.setattr(controller_module, "create_secret_store", raise_secret_store)
-    monkeypatch.setattr(GeminiLLMProvider, "verify_api_key", staticmethod(always_false))
-    monkeypatch.setattr(DeepgramRealtimeSTTBackend, "verify_api_key", staticmethod(always_false))
-
-    await _run_configured_provider_status_verification(controller)
-
-    assert dash.translation_needs_key is True
-    assert dash.translation_enabled is False
-    assert dash.stt_needs_key is True
-    assert dash.stt_enabled is False
-
-
-def test_get_qwen_key_and_base_url_migrates_legacy_secret() -> None:
-    settings = AppSettings()
-    settings.qwen.region = QwenRegion.SINGAPORE
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = settings
-
-    secrets = DummySecrets({"alibaba_api_key": "legacy"})
-    key, base_url = controller._get_qwen_key_and_base_url(secrets)
-
-    assert key == "legacy"
-    assert base_url == settings.qwen.get_llm_base_url()
-    assert ("alibaba_api_key_singapore", "legacy") in secrets.set_calls
-
-
 @pytest.mark.parametrize(
     ("result_map", "expected"),
     [
@@ -2815,49 +2673,6 @@ def test_application_ingress_freeze_is_terminal_for_late_work_owners() -> None:
     assert overlay_owner.accepting_ingress is False
     assert osc_owner.accepting_ingress is False
     assert mic_owner.accepting_ingress is False
-
-
-@pytest.mark.asyncio
-async def test_blocked_provider_verifier_cannot_publish_after_shutdown_freeze(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.GEMINI
-    controller.hub = DummyHub(llm=object())
-    entered = asyncio.Event()
-    release = asyncio.Event()
-
-    class BlockedVerifier:
-        async def verify_api_key(self, *_args, **_kwargs) -> bool:
-            entered.set()
-            await release.wait()
-            return False
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({"google_api_key": "secret"}),
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_get_provider_verifier",
-        lambda self: BlockedVerifier(),
-    )
-
-    controller._schedule_provider_status_verification()
-    owner = controller._provider_status_verification_owner
-    assert owner is not None
-    await entered.wait()
-    controller._freeze_application_ingress()
-    release.set()
-    await _wait_until(lambda: not owner.active_task_names)
-
-    assert dash.translation_needs_key is None
-    assert dash.translation_enabled is None
-    assert controller.hub.translation_enabled is True
-    await owner.close()
 
 
 @pytest.mark.asyncio
@@ -5262,94 +5077,6 @@ async def test_set_peer_translation_enabled_enqueues_peer_disclosure_once(
 
 
 @pytest.mark.asyncio
-async def test_rebuild_pipeline_closes_previous_peer_runtime_before_replacement(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-    old_runtime = DummyPeerRuntime()
-    controller._peer_runtime = old_runtime
-
-    new_runtime = DummyPeerRuntime()
-    new_hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-
-    class FakeUIEventBridge:
-        def __init__(self, **kwargs) -> None:
-            self.event_queue = kwargs["event_queue"]
-
-        async def run(self) -> None:
-            return None
-
-    async def fake_init_pipeline(self: GuiController) -> None:
-        assert old_runtime.closed is True
-        controller.hub = new_hub
-        controller._peer_runtime = new_runtime
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
-    monkeypatch.setattr(
-        GuiController,
-        "_schedule_provider_status_verification",
-        lambda self: None,
-    )
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-
-    await controller._rebuild_pipeline(rebuild_stt=True)
-
-    assert controller._peer_runtime is new_runtime
-    assert controller._peer_runtime.closed is False
-
-
-@pytest.mark.asyncio
-async def test_rebuild_pipeline_retires_old_owner_typing_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    sender = FakeSender()
-    chatbox = ChatboxPaginator(sender=sender, clock=FakeClock())
-    old_hub = ClientHub(stt=None, llm=None, osc=chatbox)
-    controller.hub = old_hub
-    controller.osc = chatbox
-    new_hub = DummyHub(llm=None, stt=None)
-
-    class FakeUIEventBridge:
-        def __init__(self, **kwargs) -> None:
-            self.event_queue = kwargs["event_queue"]
-
-        async def run(self) -> None:
-            return None
-
-    async def fake_init_pipeline(self: GuiController) -> None:
-        self.hub = new_hub
-
-    old_hub.set_self_chatbox_typing_reason("manual_input", True)
-    assert sender.typing == [True]
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-
-    await controller._rebuild_pipeline(rebuild_stt=True)
-
-    assert old_hub.output_runtime.state == "closed"
-    assert sender.typing == [True, False]
-    assert not chatbox._is_typing_active()
-    assert controller.hub is new_hub
-
-
-@pytest.mark.asyncio
 async def test_overlay_composition_replacement_cancels_old_owner_delivery() -> None:
     class BlockingOverlaySink:
         def __init__(self) -> None:
@@ -5413,305 +5140,6 @@ async def test_overlay_composition_replacement_cancels_old_owner_delivery() -> N
     ]
 
     await hub.stop()
-
-
-@pytest.mark.asyncio
-async def test_rebuild_pipeline_preserves_hub_when_hub_stop_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    old_hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-    stop_failure = RuntimeError("hub stop failed")
-
-    async def failing_stop() -> None:
-        old_hub.stop_calls += 1
-        raise stop_failure
-
-    async def fake_init_pipeline(self: GuiController) -> None:
-        self.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-
-    old_hub.stop = failing_stop  # type: ignore[method-assign]
-    controller.hub = old_hub
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-
-    with pytest.raises(RuntimeError, match="hub stop failed"):
-        await controller._rebuild_pipeline(rebuild_stt=True)
-
-    assert controller.hub is old_hub
-    assert old_hub.stop_calls == 1
-
-
-@pytest.mark.asyncio
-async def test_rebuild_pipeline_aggregates_self_disable_and_hub_stop_failures(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    old_hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-    self_failure = RuntimeError("self mic close failed")
-    hub_failure = RuntimeError("hub stop failed")
-    vrc_disable_calls: list[bool] = []
-
-    async def failing_set_stt_enabled(self: GuiController, value: bool) -> None:
-        assert value is False
-        raise self_failure
-
-    async def fake_configure_vrc(self: GuiController, *, enabled: bool) -> None:
-        vrc_disable_calls.append(enabled)
-
-    async def failing_stop() -> None:
-        old_hub.stop_calls += 1
-        raise hub_failure
-
-    old_hub.stop = failing_stop  # type: ignore[method-assign]
-    controller.hub = old_hub
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", failing_set_stt_enabled)
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        fake_configure_vrc,
-    )
-
-    with pytest.raises(ExceptionGroup) as excinfo:
-        await controller._rebuild_pipeline(rebuild_stt=True)
-
-    assert {str(exc) for exc in excinfo.value.exceptions} == {
-        "self mic close failed",
-        "hub stop failed",
-    }
-    assert vrc_disable_calls == [False]
-    assert old_hub.stop_calls == 1
-    assert controller.hub is old_hub
-
-
-@pytest.mark.asyncio
-async def test_rebuild_pipeline_local_llm_without_runtime_does_not_show_api_key_warning(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.LOCAL_LLM
-    controller.hub = DummyHub(llm=object(), stt=object())
-    new_hub = DummyHub(llm=None, stt=object())
-
-    class FakeUIEventBridge:
-        def __init__(self, **kwargs) -> None:
-            _ = kwargs
-
-        async def run(self) -> None:
-            return None
-
-    async def fake_init_pipeline(self: GuiController) -> None:
-        self.hub = new_hub
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, *, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
-    monkeypatch.setattr(
-        GuiController,
-        "_schedule_provider_status_verification",
-        lambda self: None,
-    )
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-
-    await controller._rebuild_pipeline(rebuild_stt=True)
-
-    assert dash.translation_needs_key is False
-    assert dash.translation_enabled is False
-
-
-@pytest.mark.asyncio
-async def test_rebuild_pipeline_rebinds_overlay_presenter_to_new_hub(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.overlay_state = "connected"
-
-    presenter = OverlayPresenter(
-        calibration=controller.overlay_calibration.copy(),
-        clock=controller.clock,
-    )
-    old_hub = DummyHub(llm=object(), stt=object())
-    old_hub.overlay_sink = presenter
-    controller.hub = old_hub
-    _attach_overlay_presenter(controller, presenter)
-
-    new_hub = DummyHub(llm=object(), stt=object())
-
-    class FakeUIEventBridge:
-        def __init__(self, **kwargs) -> None:
-            self.event_queue = kwargs["event_queue"]
-
-        async def run(self) -> None:
-            return None
-
-    async def fake_init_pipeline(self: GuiController) -> None:
-        self.hub = new_hub
-        self.sender = object()
-        self.osc = object()
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, *, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_refresh_overlay_runtime_dependencies",
-        lambda self: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
-    monkeypatch.setattr(
-        GuiController,
-        "_schedule_provider_status_verification",
-        lambda self: None,
-    )
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-
-    await controller._rebuild_pipeline(rebuild_stt=True)
-
-    assert getattr(new_hub, "overlay_sink", None) is presenter
-
-
-@pytest.mark.asyncio
-async def test_rebuild_pipeline_keeps_preserved_presenter_detached_when_overlay_failed(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.overlay_state = "failed"
-
-    presenter = OverlayPresenter(
-        calibration=controller.overlay_calibration.copy(),
-        clock=controller.clock,
-    )
-    old_hub = DummyHub(llm=object(), stt=object())
-    old_hub.overlay_sink = presenter
-    controller.hub = old_hub
-    _attach_overlay_presenter(controller, presenter)
-    runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
-    runtime.attach_presenter(presenter)
-    controller._overlay_runtime = runtime
-    await runtime.close(
-        preserve_presenter_state=True,
-        hub=old_hub,
-        emit_shutdown=False,
-    )
-    assert runtime.is_closed is True
-    assert old_hub.overlay_sink is None
-
-    new_hub = DummyHub(llm=object(), stt=object())
-
-    class FakeUIEventBridge:
-        def __init__(self, **kwargs) -> None:
-            self.event_queue = kwargs["event_queue"]
-
-        async def run(self) -> None:
-            return None
-
-    async def fake_init_pipeline(self: GuiController) -> None:
-        self.hub = new_hub
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, *, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
-    monkeypatch.setattr(
-        GuiController,
-        "_schedule_provider_status_verification",
-        lambda self: None,
-    )
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-
-    await controller._rebuild_pipeline(rebuild_stt=True)
-
-    assert getattr(new_hub, "overlay_sink", None) is None
-
-
-@pytest.mark.asyncio
-async def test_rebuild_pipeline_refreshes_overlay_dependencies_without_overlay_restart(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.overlay_state = "connected"
-
-    presenter = OverlayPresenter(
-        calibration=controller.overlay_calibration.copy(),
-        clock=controller.clock,
-    )
-    old_hub = DummyHub(llm=object(), stt=object())
-    old_hub.overlay_sink = presenter
-    controller.hub = old_hub
-    _attach_overlay_presenter(controller, presenter)
-
-    new_hub = DummyHub(llm=object(), stt=object())
-    events: list[tuple[str, object]] = []
-
-    class FakeUIEventBridge:
-        def __init__(self, **kwargs) -> None:
-            events.append(("bridge_init", kwargs["event_queue"]))
-
-        async def run(self) -> None:
-            events.append(("bridge_run", True))
-
-    async def fake_init_pipeline(self: GuiController) -> None:
-        self.hub = new_hub
-        self.sender = object()
-        self.osc = object()
-        events.append(("init_pipeline", True))
-
-    async def fail_set_overlay_enabled(self: GuiController, enabled: bool) -> None:
-        raise AssertionError(f"unexpected overlay restart: {enabled}")
-
-    async def fake_refresh_overlay_runtime_dependencies(self: GuiController) -> None:
-        events.append(("refresh_overlay_dependencies", self.overlay_state))
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, *, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(GuiController, "set_overlay_enabled", fail_set_overlay_enabled)
-    monkeypatch.setattr(
-        GuiController,
-        "_refresh_overlay_runtime_dependencies",
-        fake_refresh_overlay_runtime_dependencies,
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_schedule_provider_status_verification",
-        lambda self: None,
-    )
-    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
-
-    await controller._rebuild_pipeline(rebuild_stt=True)
-    await asyncio.sleep(0)
-
-    assert events.count(("refresh_overlay_dependencies", "connected")) == 1
 
 
 @pytest.mark.asyncio
@@ -13570,7 +12998,7 @@ async def test_start_keeps_managed_openrouter_dashboard_toggle_available_without
 
 
 @pytest.mark.asyncio
-async def test_exhausted_managed_start_and_background_verify_do_not_auto_show_founder_letter(
+async def test_exhausted_managed_start_does_not_auto_show_founder_letter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
@@ -13639,8 +13067,6 @@ async def test_exhausted_managed_start_and_background_verify_do_not_auto_show_fo
 
     await controller.start()
     await asyncio.sleep(0)
-    await _run_configured_provider_status_verification(controller)
-
     assert shown == []
 
 
@@ -15204,15 +14630,11 @@ async def test_apply_settings_replaces_stt_provider_when_source_language_changes
     controller.hub.source_language = "en"
     saved: list[str] = []
     replace_calls: list[str] = []
-    pipeline_calls: list[bool] = []
     locale_calls: list[str] = []
 
     async def fake_replace_runtime_stt_provider(self) -> None:
         _ = self
         replace_calls.append("replace")
-
-    async def fake_rebuild_pipeline(self, *, rebuild_stt: bool) -> None:
-        pipeline_calls.append(rebuild_stt)
 
     monkeypatch.setattr(
         presentation_adapter_module,
@@ -15224,14 +14646,12 @@ async def test_apply_settings_replaces_stt_provider_when_source_language_changes
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
-    monkeypatch.setattr(GuiController, "_rebuild_pipeline", fake_rebuild_pipeline)
     controller._last_stt_runtime_signature = ("old",)
 
     await controller.apply_settings(settings)
 
     assert saved == ["saved"]
     assert replace_calls == ["replace"]
-    assert pipeline_calls == []
     assert locale_calls == ["ja"]
 
 
@@ -19569,16 +18989,11 @@ async def test_apply_providers_rebuilds_only_llm_for_translation_fallback_branch
     async def fake_replace_runtime_stt_provider(self) -> None:
         calls.append("replace")
 
-    async def fake_rebuild_pipeline(self, *, rebuild_stt: bool) -> None:
-        calls.append(f"pipeline:{rebuild_stt}")
-
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
-    monkeypatch.setattr(GuiController, "_rebuild_pipeline", fake_rebuild_pipeline)
-
     await controller.apply_providers(updated)
 
     assert controller.settings.translation.fallback == TranslationFallbackSettings(
@@ -19616,17 +19031,12 @@ async def test_apply_providers_replaces_runtime_self_stt_once_when_enabled(
     async def fake_rebuild_llm_provider(self) -> None:
         calls.append("llm")
 
-    async def fake_rebuild_pipeline(self, *, rebuild_stt: bool) -> None:
-        calls.append(f"pipeline:{rebuild_stt}")
-
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
     monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-    monkeypatch.setattr(GuiController, "_rebuild_pipeline", fake_rebuild_pipeline)
-
     await controller.apply_providers(updated)
 
     assert controller.settings.provider.stt == STTProviderName.SONIOX
@@ -19857,15 +19267,10 @@ async def test_apply_providers_rebuilds_self_stt_only_when_disabled(
     async def fake_rebuild_stt_provider(self) -> None:
         calls.append("rebuild_stt")
 
-    async def fake_rebuild_pipeline(self, *, rebuild_stt: bool) -> None:
-        calls.append(f"pipeline:{rebuild_stt}")
-
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
     monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
-    monkeypatch.setattr(GuiController, "_rebuild_pipeline", fake_rebuild_pipeline)
-
     await controller.apply_providers(updated)
 
     assert calls == ["rebuild_stt"]
@@ -19894,16 +19299,11 @@ async def test_apply_providers_refreshes_only_peer_runtime_for_peer_provider_dra
     async def fake_rebuild_llm_provider(self) -> None:
         calls.append("llm")
 
-    async def fake_rebuild_pipeline(self, *, rebuild_stt: bool) -> None:
-        calls.append(f"pipeline:{rebuild_stt}")
-
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-    monkeypatch.setattr(GuiController, "_rebuild_pipeline", fake_rebuild_pipeline)
-
     await controller.apply_providers(updated)
 
     assert calls == ["peer"]
@@ -19972,16 +19372,11 @@ async def test_apply_providers_rebuilds_only_llm_for_openrouter_provider_routing
     async def fake_replace_runtime_stt_provider(self) -> None:
         calls.append("replace")
 
-    async def fake_rebuild_pipeline(self, *, rebuild_stt: bool) -> None:
-        calls.append(f"pipeline:{rebuild_stt}")
-
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
-    monkeypatch.setattr(GuiController, "_rebuild_pipeline", fake_rebuild_pipeline)
-
     await controller.apply_providers(updated)
 
     assert calls == ["llm"]
@@ -20013,16 +19408,11 @@ async def test_apply_providers_rebuilds_only_llm_for_openrouter_selected_source_
     async def fake_replace_runtime_stt_provider(self) -> None:
         calls.append("replace")
 
-    async def fake_rebuild_pipeline(self, *, rebuild_stt: bool) -> None:
-        calls.append(f"pipeline:{rebuild_stt}")
-
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
-    monkeypatch.setattr(GuiController, "_rebuild_pipeline", fake_rebuild_pipeline)
-
     await controller.apply_providers(updated)
 
     assert calls == ["llm"]
@@ -20122,16 +19512,11 @@ async def test_apply_providers_splits_qwen_region_refresh_by_active_consumers(
     async def fake_replace_runtime_stt_provider(self) -> None:
         calls.append("replace")
 
-    async def fake_rebuild_pipeline(self, *, rebuild_stt: bool) -> None:
-        calls.append(f"pipeline:{rebuild_stt}")
-
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
-    monkeypatch.setattr(GuiController, "_rebuild_pipeline", fake_rebuild_pipeline)
-
     await controller.apply_providers(updated)
 
     assert calls.count("llm") == 1
@@ -20403,131 +19788,6 @@ async def test_stop_closes_managed_openrouter_release_service() -> None:
 
     assert service.close_calls == 1
     assert controller._managed_openrouter_release_service is None
-
-
-@pytest.mark.asyncio
-async def test_rebuild_pipeline_restarts_runtime_and_schedules_verify(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    dash.is_translation_on = False
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    events: list[object] = []
-
-    class OldSender:
-        def close(self) -> None:
-            events.append("old_sender_close")
-
-    class NewHub(DummyHub):
-        async def start(self, *, auto_flush_osc: bool) -> None:
-            events.append(("new_hub_start", auto_flush_osc))
-
-    class FakeBridge:
-        def __init__(self, **kwargs) -> None:
-            events.append(("bridge_init", kwargs["event_queue"], kwargs.get("runtime_logging")))
-
-        async def run(self) -> None:
-            events.append("bridge_run")
-
-    old_bridge_task = asyncio.create_task(asyncio.sleep(3600))
-    controller._bridge_task = old_bridge_task
-    controller.hub = DummyHub(llm=object(), stt=object())
-    controller.sender = OldSender()
-    new_hub = NewHub(llm=object(), stt=object())
-
-    async def fake_set_stt_enabled(self, enabled: bool) -> None:
-        _ = self
-        events.append(("set_stt", enabled))
-
-    async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
-        events.append(("configure_receiver", enabled))
-
-    async def fake_init_pipeline(self) -> None:
-        self.hub = new_hub
-        self.sender = object()
-        self.osc = object()
-        events.append("init_pipeline")
-
-    def fake_schedule_provider_status_verification(self) -> None:
-        events.append("verify_run")
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        fake_configure_vrc_mic_receiver,
-    )
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(
-        GuiController,
-        "_schedule_provider_status_verification",
-        fake_schedule_provider_status_verification,
-    )
-    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
-    await controller._rebuild_pipeline(rebuild_stt=True)
-    await asyncio.sleep(0)
-
-    assert ("set_stt", False) in events
-    assert ("configure_receiver", False) in events
-    assert "old_sender_close" in events
-    assert "init_pipeline" in events
-    assert dash.translation_needs_key is False
-    assert dash.stt_needs_key is False
-    assert dash.translation_enabled is False
-    assert ("new_hub_start", True) in events
-    assert any(item[0] == "bridge_init" for item in events if isinstance(item, tuple))
-    assert "bridge_run" in events
-    assert new_hub.output_runtime.started_bridges == [controller._ui_event_bridge]
-    assert controller._bridge_task in new_hub.output_runtime.bridge_tasks
-    assert "verify_run" in events
-
-
-@pytest.mark.asyncio
-async def test_rebuild_pipeline_restores_stt_when_it_was_previously_enabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.hub = DummyHub(llm=object(), stt=object())
-    controller.sender = object()
-    controller.osc = object()
-    controller._stt_desired = True
-    calls: list[bool] = []
-
-    async def fake_set_stt_enabled(self, enabled: bool) -> None:
-        self._stt_desired = enabled
-        calls.append(enabled)
-
-    async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
-        _ = (self, enabled)
-
-    async def fake_init_pipeline(self) -> None:
-        self.hub = DummyHub(llm=object(), stt=object())
-        self.sender = object()
-        self.osc = object()
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        fake_configure_vrc_mic_receiver,
-    )
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(
-        GuiController,
-        "_schedule_provider_status_verification",
-        lambda self: None,
-    )
-    monkeypatch.setattr(
-        presentation_adapter_module,
-        "UIEventBridge",
-        lambda **kwargs: SimpleNamespace(run=lambda: asyncio.sleep(0)),
-    )
-
-    await controller._rebuild_pipeline(rebuild_stt=True)
-
-    assert calls == [False, True]
 
 
 def test_overlay_calibration_controls_follow_apply_cancel_contract() -> None:

@@ -1549,6 +1549,16 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "def _microphone_test_meter_level(",
             "@_microphone_test_meter_level.setter",
             "def microphone_test_meter_level(",
+            "def _verify_and_update_status(",
+            "def _rebuild_pipeline(",
+            "def _get_provider_status_verification_owner(",
+            "def _schedule_provider_status_verification(",
+            "def _build_provider_status_verification_request(",
+            "def _apply_provider_status_verification_result(",
+            "def _close_provider_status_verification_owner(",
+            "def _get_qwen_key_and_base_url(",
+            "_provider_status_verification_owner:",
+            'owner_name="ProviderStatusVerificationOwner"',
             "_self_local_asr_transition:",
             "_self_asr_model_loading:",
             "class _LocalASRTransitionSuperseded(",
@@ -1650,6 +1660,9 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
                         f"field {target.id} at line {target.lineno}"
                     )
 
+    assert not (
+        REPO_ROOT / "src/puripuly_heart/app/services/provider_status_verification.py"
+    ).exists()
     assert offenders == []
 
 

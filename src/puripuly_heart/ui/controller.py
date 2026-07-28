@@ -7,7 +7,6 @@ import hashlib
 import inspect
 import json
 import logging
-import os
 import sys
 import time
 from collections.abc import Callable, Mapping
@@ -160,11 +159,6 @@ from puripuly_heart.app.services.provider_secret_change import (
     ProviderSecretChangeOwner,
     ProviderSecretChangeRequest,
 )
-from puripuly_heart.app.services.provider_status_verification import (
-    ConfiguredProviderStatusVerificationRequest,
-    ConfiguredProviderStatusVerificationResult,
-    ProviderStatusVerificationOwner,
-)
 from puripuly_heart.app.services.qq_managed_auth import QqManagedAuthRequest, QqManagedAuthService
 from puripuly_heart.app.services.secret_settings_transaction import (
     SecretSetRequest,
@@ -259,7 +253,6 @@ from puripuly_heart.config.settings import (
     OpenRouterProviderRouting,
     OpenRouterSelectionAlias,
     QwenLLMModel,
-    QwenRegion,
     STTProviderName,
     TranslationConnection,
     build_managed_openrouter_byok_target_settings,
@@ -854,11 +847,6 @@ class GuiController:
         repr=False,
     )
     _managed_status_refresh_owner: ManagedStatusRefreshOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _provider_status_verification_owner: ProviderStatusVerificationOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -3953,12 +3941,6 @@ class GuiController:
                 callback=self._close_managed_status_refresh_owner,
             ),
             application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="ProviderStatusVerificationOwner",
-                callback_name="close",
-                callback=self._close_provider_status_verification_owner,
-            ),
-            application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
                 owner_name="ClientHub",
                 callback_name="stop_owned_runtimes",
@@ -4046,9 +4028,6 @@ class GuiController:
         managed_status_owner = self._managed_status_refresh_owner
         if managed_status_owner is not None:
             managed_status_owner.stop_ingress()
-        provider_status_owner = self._provider_status_verification_owner
-        if provider_status_owner is not None:
-            provider_status_owner.stop_ingress()
 
     def _stop_github_star_prompt_ingress(self) -> None:
         owner = self._github_star_prompt_owner
@@ -4077,11 +4056,6 @@ class GuiController:
 
     async def _close_managed_status_refresh_owner(self) -> None:
         owner = self._managed_status_refresh_owner
-        if owner is not None:
-            await owner.close()
-
-    async def _close_provider_status_verification_owner(self) -> None:
-        owner = self._provider_status_verification_owner
         if owner is not None:
             await owner.close()
 
@@ -7867,113 +7841,6 @@ class GuiController:
             self._provider_credential_verification_owner = owner
         return owner
 
-    def _get_provider_status_verification_owner(self) -> ProviderStatusVerificationOwner:
-        owner = self._provider_status_verification_owner
-        if owner is None:
-            owner = ProviderStatusVerificationOwner(
-                verifier=self._get_provider_verifier(),
-                diagnostics_sink=lambda event, metadata, exception: self.log_detailed(
-                    "[ProviderVerification] Background status verification failed "
-                    f"event={event} error_type={metadata.get('error_type')}",
-                    level=logging.WARNING,
-                    exception=exception,
-                ),
-            )
-            self._provider_status_verification_owner = owner
-        return owner
-
-    def _schedule_provider_status_verification(self) -> None:
-        if self._shutdown_ingress_frozen:
-            return
-        self._get_provider_status_verification_owner().schedule(
-            request_factory=self._build_provider_status_verification_request,
-            result_handler=self._apply_provider_status_verification_result,
-        )
-
-    def _build_provider_status_verification_request(
-        self,
-    ) -> ConfiguredProviderStatusVerificationRequest | None:
-        settings = self.settings
-        if settings is None:
-            return None
-
-        secrets = None
-        with contextlib.suppress(Exception):
-            secrets = create_secret_store(settings.secrets, config_path=self.config_path)
-
-        def secret_value(secret_key: str) -> str:
-            if secrets is None:
-                return ""
-            try:
-                return secrets.get(secret_key) or ""
-            except Exception:
-                return ""
-
-        qwen_api_key = ""
-        qwen_base_url = settings.qwen.get_llm_base_url()
-        if secrets is not None:
-            with contextlib.suppress(Exception):
-                qwen_api_key, qwen_base_url = self._get_qwen_key_and_base_url(secrets)
-
-        openrouter_api_key = ""
-        if secrets is not None:
-            with contextlib.suppress(Exception):
-                resolution = resolve_openrouter_credentials(
-                    build_openrouter_credential_runtime_config(settings),
-                    secrets=secrets,
-                )
-                openrouter_api_key = resolution.api_key or ""
-
-        managed_openrouter_can_attempt = False
-        with contextlib.suppress(Exception):
-            managed_openrouter_can_attempt = self._managed_openrouter_can_attempt_translation()
-
-        llm_provider = getattr(settings.provider.llm, "value", settings.provider.llm)
-        stt_provider = getattr(settings.provider.stt, "value", settings.provider.stt)
-        return ConfiguredProviderStatusVerificationRequest(
-            llm_runtime_present=bool(self.hub is not None and self.hub.llm),
-            stt_runtime_present=bool(self.hub is not None and self._hub_has_stt_provider("self")),
-            llm_provider=str(llm_provider),
-            stt_provider=str(stt_provider),
-            llm_requires_secret=self._llm_provider_requires_secret(settings.provider.llm),
-            stt_requires_secret=self._stt_provider_requires_secret(settings.provider.stt),
-            runtime_translation_enabled=bool(self.hub is not None and self.hub.translation_enabled),
-            managed_openrouter_can_attempt=managed_openrouter_can_attempt,
-            openrouter_managed_selected=(
-                settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-            ),
-            gemini_model=settings.gemini.llm_model.value,
-            qwen_selected_model=settings.qwen.llm_model.value,
-            qwen_fallback_models=tuple(model.value for model in QwenLLMModel),
-            qwen_base_url=qwen_base_url,
-            fast_translation_enabled=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
-            google_api_key=secret_value("google_api_key"),
-            openrouter_api_key=openrouter_api_key,
-            deepseek_api_key=secret_value("deepseek_api_key")
-            or os.getenv("DEEPSEEK_API_KEY")
-            or "",
-            qwen_api_key=qwen_api_key,
-            deepgram_api_key=secret_value("deepgram_api_key"),
-            soniox_api_key=secret_value("soniox_api_key"),
-        )
-
-    async def _apply_provider_status_verification_result(
-        self,
-        result: ConfiguredProviderStatusVerificationResult,
-    ) -> None:
-        if self._shutdown_ingress_frozen:
-            return
-        self.app.set_dashboard_translation_needs_key(result.translation_needs_key)
-        if result.translation_enabled_update is not None:
-            if not result.translation_enabled_update and self.hub is not None:
-                self.hub.translation_enabled = False
-            self.app.set_dashboard_translation_enabled(result.translation_enabled_update)
-        self.app.set_dashboard_stt_needs_key(result.stt_needs_key)
-        if result.stt_enabled_update is not None:
-            self.app.set_dashboard_stt_enabled(result.stt_enabled_update)
-        if not self._shutdown_ingress_frozen:
-            await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=False)
-
     async def _rebuild_llm_provider(self) -> None:
         """Rebuild only the LLM provider without tearing down the entire pipeline."""
         if self.hub is None or self.settings is None:
@@ -8593,66 +8460,6 @@ class GuiController:
                 self._refresh_overlay_peer_consumers()
         self._last_peer_stt_runtime_signature = config.runtime_signature
         self._sync_effective_hub_flags(self.settings)
-
-    async def _rebuild_pipeline(self, *, rebuild_stt: bool) -> None:
-        self.log_detailed(
-            f"[Settings] Rebuilding pipeline detail: rebuild_stt={rebuild_stt} overlay_state={self.overlay_state}"
-        )
-        _ = rebuild_stt
-        cleanup_failures: list[Exception] = []
-        restore_stt_enabled = self._stt_desired
-
-        await self._close_peer_runtime_for_release(cleanup_failures)
-
-        try:
-            await self.set_stt_enabled(False)
-        except Exception as exc:
-            cleanup_failures.append(exc)
-        await self._close_self_capture_owner_for_release(cleanup_failures)
-        await self._configure_vrc_mic_receiver(enabled=False)
-        await self._stop_hub_for_release(cleanup_failures)
-        if self.hub is None:
-            self._bridge_task = None
-            self._ui_event_bridge = None
-        if self.sender is not None:
-            with contextlib.suppress(Exception):
-                self.sender.close()
-        self.sender = None
-        self.osc = None
-        _raise_lifecycle_cleanup_failures(
-            "GUI controller pipeline rebuild cleanup failed",
-            cleanup_failures,
-        )
-        await self._init_pipeline()
-        assert self.hub is not None
-        presenter = self._current_overlay_presenter_for_direct_runtime_command()
-        if presenter is not None:
-            await self._replace_hub_overlay_sink(presenter)
-
-        self.app.set_dashboard_translation_needs_key(
-            (self.hub.llm is None)
-            and self._llm_provider_requires_secret(self.settings.provider.llm)
-        )
-        self.app.set_dashboard_stt_needs_key(
-            self._dashboard_stt_needs_key(stt_available=self._hub_has_stt_provider("self"))
-        )
-        self.hub.translation_enabled = (
-            self.app.dashboard_translation_enabled() and self.hub.llm is not None
-        )
-        self.app.set_dashboard_translation_enabled(self.hub.translation_enabled)
-
-        await self.hub.start(auto_flush_osc=True)
-
-        bridge = self._create_ui_event_bridge(runtime_logging=self.runtime_logging)
-        self._start_ui_event_bridge_task(bridge)
-
-        if self.overlay_state == "connected" and presenter is not None:
-            await self._refresh_overlay_runtime_dependencies()
-
-        if restore_stt_enabled:
-            await self.set_stt_enabled(True)
-
-        self._schedule_provider_status_verification()
 
     async def _init_pipeline(self) -> None:
         assert self.settings is not None
@@ -9546,26 +9353,3 @@ class GuiController:
 
     def _log_error(self, message: str) -> None:
         self.log_basic(message, level=logging.ERROR)
-
-    def _get_qwen_key_and_base_url(self, secrets) -> tuple[str, str]:
-        if self.settings is None:
-            return "", ""
-        if self.settings.qwen.region == QwenRegion.BEIJING:
-            target_key = "alibaba_api_key_beijing"
-        else:
-            target_key = "alibaba_api_key_singapore"
-
-        api_key = secrets.get(target_key) or ""
-        if api_key:
-            return api_key, self.settings.qwen.get_llm_base_url()
-
-        # Backward compatibility: legacy single-key storage from older versions.
-        legacy_key = secrets.get("alibaba_api_key") or ""
-        if legacy_key:
-            setter = getattr(secrets, "set", None)
-            if callable(setter):
-                with contextlib.suppress(Exception):
-                    setter(target_key, legacy_key)
-            return legacy_key, self.settings.qwen.get_llm_base_url()
-
-        return "", self.settings.qwen.get_llm_base_url()
