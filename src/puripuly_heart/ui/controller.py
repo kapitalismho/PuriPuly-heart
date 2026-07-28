@@ -328,6 +328,9 @@ from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.core.runtime.mic_test import MicTestRuntime
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
+from puripuly_heart.core.runtime.overlay_session_fallback import (
+    OverlaySessionFallbackOwner,
+)
 from puripuly_heart.core.runtime.peer_channel import (
     PeerCaptureSessionOwner,
     PeerLocalASRTransitionSuperseded,
@@ -1165,14 +1168,17 @@ class GuiController:
     _overlay_runtime: OverlayRuntimeHandle | None = None
     _overlay_lock: asyncio.Lock | None = None
     _active_overlay_target: str | None = field(init=False, default=None)
-    _overlay_session_desktop_fallback_active: bool = field(init=False, default=False)
+    _overlay_session_fallback_owner: OverlaySessionFallbackOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _ui_background_scope: LifecycleScope = field(
         init=False,
         default_factory=lambda: LifecycleScope("gui-controller-background"),
         repr=False,
     )
     _ui_background_task_sequence: int = field(init=False, default=0, repr=False)
-    _overlay_session_fallback_generation: int = field(init=False, default=0)
     _vrchat_osc_presence_owner: VrchatOscPresenceProbeOwner | None = field(
         init=False,
         default=None,
@@ -3622,28 +3628,25 @@ class GuiController:
         return self._normalized_overlay_target(resolved_settings.overlay.target)
 
     def _effective_overlay_target_for_start(self) -> str:
-        if self._overlay_session_desktop_fallback_active:
+        if self._get_overlay_session_fallback_owner().active:
             return OVERLAY_TARGET_DESKTOP
         return self._overlay_target_for_settings(self.settings)
 
     def _clear_overlay_session_desktop_fallback(self) -> None:
-        self._overlay_session_desktop_fallback_active = False
-        self._set_overlay_session_fallback_notice_active(False)
+        self._get_overlay_session_fallback_owner().clear()
 
     def _set_overlay_session_fallback_notice_active(self, active: bool) -> None:
-        with contextlib.suppress(Exception):
-            self.app.set_dashboard_overlay_session_fallback_notice(bool(active))
+        self._get_overlay_session_fallback_owner().publish(active)
 
     def _should_session_fallback_overlay_to_desktop(self, reason: str) -> bool:
-        if reason not in {"steamvr_not_running", "steamvr_not_installed"}:
-            return False
-        if self._overlay_session_desktop_fallback_active:
-            return False
-        if self._active_overlay_target == OVERLAY_TARGET_DESKTOP:
-            return False
-        if self.settings is None or not self.settings.ui.overlay_enabled:
-            return False
-        return self._overlay_target_for_settings(self.settings) == OVERLAY_TARGET_STEAMVR
+        return self._get_overlay_session_fallback_owner().should_fallback(
+            reason=reason,
+            active_target=self._active_overlay_target,
+            configured_enabled=bool(self.settings is not None and self.settings.ui.overlay_enabled),
+            configured_target=self._overlay_target_for_settings(self.settings),
+            desktop_target=OVERLAY_TARGET_DESKTOP,
+            steamvr_target=OVERLAY_TARGET_STEAMVR,
+        )
 
     def _new_overlay_runtime_handle(self) -> OverlayRuntimeHandle:
         runtime = OverlayRuntimeHandle(shutdown_grace_s=OVERLAY_SHUTDOWN_GRACE_S)
@@ -4712,6 +4715,12 @@ class GuiController:
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="OverlaySessionFallbackOwner",
+                callback_name="close",
+                callback=self._close_overlay_session_fallback_owner,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
                 owner_name="PeerCaptureSessionOwner",
                 callback_name="close",
                 callback=self._close_peer_runtime,
@@ -4840,6 +4849,9 @@ class GuiController:
         owner = self._vrchat_osc_presence_owner
         if owner is not None:
             owner.stop_ingress()
+        fallback_owner = self._overlay_session_fallback_owner
+        if fallback_owner is not None:
+            fallback_owner.stop_ingress()
 
     def _stop_github_star_prompt_ingress(self) -> None:
         runtime = self._github_star_prompt_runtime
@@ -4888,6 +4900,11 @@ class GuiController:
     async def _close_overlay_runtime(self) -> None:
         await self._shutdown_overlay_runtime(preserve_failure_reason=True)
         self._clear_overlay_session_desktop_fallback()
+
+    async def _close_overlay_session_fallback_owner(self) -> None:
+        owner = self._overlay_session_fallback_owner
+        if owner is not None:
+            await owner.close()
 
     async def _close_peer_runtime(self) -> None:
         failures: list[Exception] = []
@@ -5356,7 +5373,7 @@ class GuiController:
         reason = self._normalize_overlay_failure_reason(failure_reason)
         if self._should_session_fallback_overlay_to_desktop(reason):
             self.log_basic(f"[Overlay] Session fallback to desktop: reason={reason}")
-            self._overlay_session_desktop_fallback_active = True
+            self._get_overlay_session_fallback_owner().activate()
             await self._teardown_overlay_runtime(preserve_presenter_state=True)
             previous_state = self.overlay_state
             self.overlay_state = "off"
@@ -5374,31 +5391,37 @@ class GuiController:
         await self._refresh_overlay_runtime_dependencies()
 
     def _schedule_overlay_session_desktop_fallback_start(self) -> None:
-        self._overlay_session_fallback_generation += 1
-        generation = self._overlay_session_fallback_generation
+        self._get_overlay_session_fallback_owner().schedule()
 
-        async def _task() -> None:
-            await asyncio.sleep(0)
-            if self.settings is None or not self.settings.ui.overlay_enabled:
-                return
-            if not self._overlay_session_desktop_fallback_active:
-                return
-            if self.overlay_state in {"starting", "connected"}:
-                return
-            await self._begin_overlay_start()
+    @property
+    def _overlay_session_desktop_fallback_active(self) -> bool:
+        owner = self._overlay_session_fallback_owner
+        return owner.active if owner is not None else False
 
-        try:
-            start_lifecycle_task(
-                self._ui_background_scope,
-                _task(),
-                name=f"overlay-session-desktop-fallback-{generation}",
+    def _get_overlay_session_fallback_owner(self) -> OverlaySessionFallbackOwner:
+        owner = self._overlay_session_fallback_owner
+        if owner is None:
+            owner = OverlaySessionFallbackOwner(
+                can_start=lambda: bool(
+                    self.settings is not None
+                    and self.settings.ui.overlay_enabled
+                    and self.overlay_state not in {"starting", "connected"}
+                ),
+                start_overlay=self._begin_overlay_start,
+                publish_notice=self.app.set_dashboard_overlay_session_fallback_notice,
+                task_factory=lambda coroutine, name: start_lifecycle_task(
+                    self._ui_background_scope,
+                    coroutine,
+                    name=name,
+                ),
+                diagnostics_sink=lambda _event, _metadata, exception: self.log_detailed(
+                    "[Overlay] Failed to schedule session desktop fallback",
+                    level=logging.WARNING,
+                    exception=exception,
+                ),
             )
-        except RuntimeError as exc:
-            self.log_detailed(
-                "[Overlay] Failed to schedule session desktop fallback",
-                level=logging.WARNING,
-                exception=exc,
-            )
+            self._overlay_session_fallback_owner = owner
+        return owner
 
     async def _shutdown_overlay_runtime(self, *, preserve_failure_reason: bool) -> None:
         if self._overlay_lock is None:
@@ -7061,7 +7084,7 @@ class GuiController:
         )
         prev_settings_overlay_target = self._overlay_target_for_settings(self.settings)
         next_overlay_target = self._overlay_target_for_settings(settings)
-        if self._overlay_session_desktop_fallback_active:
+        if self._get_overlay_session_fallback_owner().active:
             # Session fallback keeps settings on SteamVR while runtime is desktop.
             # Compare settings targets so unrelated applies do not look like a switch.
             prev_overlay_target = prev_settings_overlay_target
