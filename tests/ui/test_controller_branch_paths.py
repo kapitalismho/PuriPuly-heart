@@ -1008,7 +1008,7 @@ def test_self_capture_admission_effects_preserve_controller_compatibility(
 
     assert controller._gpu_pending_enable_channels == frozenset({"peer", "self"})
     assert controller._local_stt_pending_enable_after_install is True
-    assert controller._local_stt_pending_enable_generation == 21
+    assert controller._get_local_asr_cpu_repair_owner().snapshot.self_activation_generation == 21
     assert dashboard.stt_enabled is False
     assert dashboard.stt_needs_key is False
     assert messages == [

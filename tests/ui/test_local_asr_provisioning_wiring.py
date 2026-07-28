@@ -291,23 +291,24 @@ def _controller(
 
 def test_cpu_repair_pending_compatibility_properties_preserve_independent_generation() -> None:
     controller = _controller(RecordingProvisioningPort(_snapshot()))
+    repair_owner = controller._get_local_asr_cpu_repair_owner()
 
-    controller._local_stt_pending_enable_generation = 17
+    repair_owner.set_self_activation_generation(17)
     controller._local_stt_pending_enable_after_install = True
     controller._local_stt_pending_enable_after_install = False
 
     assert controller._local_stt_pending_enable_after_install is False
-    assert controller._local_stt_pending_enable_generation == 17
+    assert repair_owner.snapshot.self_activation_generation == 17
 
     controller._local_stt_pending_enable_after_install = True
 
     assert controller._local_stt_pending_enable_after_install is True
-    assert controller._local_stt_pending_enable_generation == 17
+    assert repair_owner.snapshot.self_activation_generation == 17
 
     controller._reset_local_stt_pending_enable_after_install()
 
     assert controller._local_stt_pending_enable_after_install is False
-    assert controller._local_stt_pending_enable_generation is None
+    assert repair_owner.snapshot.self_activation_generation is None
 
 
 @pytest.mark.asyncio
@@ -420,7 +421,7 @@ async def test_cpu_repair_composition_routes_peer_resume_to_runtime_refresh(
     await _wait_until(lambda: bool(refreshes))
 
     assert refreshes == ["refresh"]
-    assert controller._local_stt_pending_peer_enable_after_install is False
+    assert controller._get_local_asr_cpu_repair_owner().snapshot.peer_pending is False
 
 
 @pytest.mark.asyncio

@@ -5439,22 +5439,6 @@ class GuiController:
     def _local_stt_pending_enable_after_install(self, pending: bool) -> None:
         self._get_local_asr_cpu_repair_owner().set_self_pending(pending)
 
-    @property
-    def _local_stt_pending_enable_generation(self) -> int | None:
-        return self._get_local_asr_cpu_repair_owner().snapshot.self_activation_generation
-
-    @_local_stt_pending_enable_generation.setter
-    def _local_stt_pending_enable_generation(self, generation: int | None) -> None:
-        self._get_local_asr_cpu_repair_owner().set_self_activation_generation(generation)
-
-    @property
-    def _local_stt_pending_peer_enable_after_install(self) -> bool:
-        return self._get_local_asr_cpu_repair_owner().snapshot.peer_pending
-
-    @_local_stt_pending_peer_enable_after_install.setter
-    def _local_stt_pending_peer_enable_after_install(self, pending: bool) -> None:
-        self._get_local_asr_cpu_repair_owner().set_peer_pending(pending)
-
     def _reset_local_stt_pending_enable_after_install(self) -> None:
         self._get_local_asr_cpu_repair_owner().reset_self()
 
