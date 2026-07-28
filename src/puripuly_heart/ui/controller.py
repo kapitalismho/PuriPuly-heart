@@ -9713,9 +9713,6 @@ class GuiController:
     def _schedule_audio_environment_snapshot(self) -> None:
         self._get_runtime_logging_owner().schedule_audio_environment_snapshot()
 
-    async def _log_audio_environment_snapshot_async(self) -> None:
-        await self._get_runtime_logging_owner().log_audio_environment_snapshot()
-
     async def _emit_overlay_runtime_logging_mode_update(self) -> None:
         bridge = self._current_overlay_bridge_for_direct_runtime_command()
         if bridge is None:
