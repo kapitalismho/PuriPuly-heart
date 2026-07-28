@@ -5064,22 +5064,11 @@ class GuiController:
         port = getattr(self.settings.osc, "port", 9000)
         return port if isinstance(port, int) and 0 < port <= 65535 else 9000
 
-    def _set_vrchat_osc_notice_active(self, active: bool) -> None:
-        self._get_vrchat_osc_presence_owner().publish(active)
-
     def _schedule_vrchat_osc_presence_probe(self, *, force: bool = False) -> None:
         self._get_vrchat_osc_presence_owner().schedule(force=force)
 
-    async def _run_vrchat_osc_presence_probe_loop(self, generation: int) -> None:
-        await self._get_vrchat_osc_presence_owner().run(generation)
-
     async def _cancel_vrchat_osc_presence_probe(self) -> None:
         await self._get_vrchat_osc_presence_owner().cancel()
-
-    @property
-    def _vrchat_osc_probe_task(self) -> asyncio.Task[None] | None:
-        owner = self._vrchat_osc_presence_owner
-        return owner.task if owner is not None else None
 
     def _get_vrchat_osc_presence_owner(self) -> VrchatOscPresenceProbeOwner:
         owner = self._vrchat_osc_presence_owner
