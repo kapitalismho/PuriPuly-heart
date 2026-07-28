@@ -183,6 +183,7 @@ def _run_gui(
     import flet as ft
 
     from puripuly_heart.app.adapters.vrchat_osc_presence import PsutilVrchatOscPresenceAdapter
+    from puripuly_heart.composition.ui_application import compose_ui_application
     from puripuly_heart.ui.app import main_gui
     from puripuly_heart.ui.fonts import assets_dir
 
@@ -194,6 +195,10 @@ def _run_gui(
             "debug_ui_preview": debug_ui_preview,
         }
         parameters = inspect.signature(main_gui).parameters
+        if "application_factory" in parameters or any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+        ):
+            gui_kwargs["application_factory"] = compose_ui_application
         if "runtime_logging_sinks" in parameters or any(
             parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
         ):

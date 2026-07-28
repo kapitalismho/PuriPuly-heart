@@ -185,6 +185,7 @@ def test_run_gui_forwards_main_logging_sinks_when_supported(monkeypatch, tmp_pat
         page,
         *,
         config_path,
+        application_factory=None,
         debug_ui_preview=False,
         runtime_logging_sinks=None,
         vrchat_osc_presence=None,
@@ -192,6 +193,7 @@ def test_run_gui_forwards_main_logging_sinks_when_supported(monkeypatch, tmp_pat
         calls.update(
             page=page,
             config_path=config_path,
+            application_factory=application_factory,
             debug_ui_preview=debug_ui_preview,
             runtime_logging_sinks=runtime_logging_sinks,
             vrchat_osc_presence=vrchat_osc_presence,
@@ -213,6 +215,9 @@ def test_run_gui_forwards_main_logging_sinks_when_supported(monkeypatch, tmp_pat
 
     assert result == 0
     assert calls["config_path"] == config_path
+    from puripuly_heart.composition.ui_application import compose_ui_application
+
+    assert calls["application_factory"] is compose_ui_application
     assert calls["runtime_logging_sinks"] is logging_sinks
     assert calls["vrchat_osc_presence"] is not None
 

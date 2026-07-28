@@ -9,7 +9,10 @@ from pathlib import Path
 import flet as ft
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
-from puripuly_heart.app.ports.ui_application import UiApplicationPort
+from puripuly_heart.app.ports.ui_application import (
+    UiApplicationFactoryPort,
+    UiApplicationPort,
+)
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
@@ -38,7 +41,6 @@ from puripuly_heart.ui.components.peer_translation_eula_dialog import PeerTransl
 from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog
 from puripuly_heart.ui.components.telemetry_consent_dialog import TelemetryConsentDialog
 from puripuly_heart.ui.components.title_bar import TitleBar
-from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
     DashboardTranslationIntents,
@@ -139,6 +141,7 @@ class TranslatorApp:
         page: ft.Page,
         *,
         config_path,
+        application_factory: UiApplicationFactoryPort,
         debug_ui_preview: bool = False,
         allow_stable_settings_import: bool = False,
         runtime_logging_sinks=None,
@@ -146,26 +149,16 @@ class TranslatorApp:
     ):
         self.page = page
         self._presentation_adapter = FletUiPresentationAdapter(self)
-        controller_kwargs = {
-            "page": page,
-            "app": self._presentation_adapter,
-            "config_path": config_path,
-        }
-        parameters = inspect.signature(GuiController).parameters
-        if "allow_stable_settings_import" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            controller_kwargs["allow_stable_settings_import"] = allow_stable_settings_import
-        if "runtime_logging_sinks" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            controller_kwargs["runtime_logging_sinks"] = runtime_logging_sinks
-        if "vrchat_osc_presence" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            controller_kwargs["vrchat_osc_presence"] = vrchat_osc_presence
-        self.controller = GuiController(**controller_kwargs)
-        self._ui_application = UiApplicationBoundary(self.controller)
+        application = application_factory(
+            presentation=self._presentation_adapter,
+            config_path=config_path,
+            allow_stable_settings_import=allow_stable_settings_import,
+            runtime_logging_sinks=runtime_logging_sinks,
+            vrchat_osc_presence=vrchat_osc_presence,
+        )
+        if application is None:
+            raise RuntimeError("Application factory did not compose an application boundary")
+        self._ui_application = application
         self._shutdown_lock: asyncio.Lock | None = None
         self._shutdown_complete = False
         self._shutting_down = False
@@ -290,11 +283,15 @@ class TranslatorApp:
 
     @property
     def application(self) -> UiApplicationPort:
-        backend = getattr(self, "controller", None)
         boundary = getattr(self, "_ui_application", None)
-        if boundary is None or not boundary.wraps(backend):
-            boundary = UiApplicationBoundary(backend)
-            self._ui_application = boundary
+        if hasattr(self, "controller"):
+            backend = self.controller
+            wraps = getattr(boundary, "wraps", None)
+            if boundary is None or not callable(wraps) or not wraps(backend):
+                boundary = UiApplicationBoundary(backend)
+                self._ui_application = boundary
+        if boundary is None:
+            raise RuntimeError("TranslatorApp application boundary is not composed")
         return boundary
 
     def _run_page_task(self, coroutine, *args):
@@ -1944,6 +1941,7 @@ async def main_gui(
     page: ft.Page,
     *,
     config_path,
+    application_factory: UiApplicationFactoryPort,
     debug_ui_preview: bool = False,
     allow_stable_settings_import: bool = False,
     runtime_logging_sinks=None,
@@ -1954,6 +1952,10 @@ async def main_gui(
         "debug_ui_preview": debug_ui_preview,
     }
     parameters = inspect.signature(TranslatorApp).parameters
+    if "application_factory" in parameters or any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+    ):
+        app_kwargs["application_factory"] = application_factory
     if "allow_stable_settings_import" in parameters or any(
         parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
     ):
@@ -1973,7 +1975,7 @@ async def main_gui(
         page.on_close = lifecycle_handler
     application = getattr(app, "application", None)
     if application is None:
-        application = UiApplicationBoundary(getattr(app, "controller", None))
+        raise RuntimeError("TranslatorApp did not expose an application boundary")
     try:
         await application.start()
     except BaseException:

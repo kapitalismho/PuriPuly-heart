@@ -159,11 +159,16 @@ def test_production_gui_constructor_wires_one_explicit_boundary_in_each_directio
     main_gui_source = ast.get_source_segment(source, main_gui)
 
     assert initializer_source.count("FletUiPresentationAdapter(self)") == 1
-    assert '"app": self._presentation_adapter' in initializer_source
-    assert initializer_source.count("GuiController(**controller_kwargs)") == 1
-    assert initializer_source.count("UiApplicationBoundary(self.controller)") == 1
+    assert initializer_source.count("application_factory(") == 1
+    assert "presentation=self._presentation_adapter" in initializer_source
+    assert "page=" not in initializer_source.split("application_factory(", 1)[1].split(")", 1)[0]
+    assert "from puripuly_heart.ui.controller import GuiController" not in source
+    assert not any(
+        isinstance(node, ast.Name) and node.id == "GuiController" for node in ast.walk(tree)
+    )
     assert 'application = getattr(app, "application", None)' in main_gui_source
     assert "await application.start()" in main_gui_source
+    assert 'UiApplicationBoundary(getattr(app, "controller", None))' not in main_gui_source
 
 
 def test_translator_app_has_no_operational_controller_or_hub_reach_through() -> None:

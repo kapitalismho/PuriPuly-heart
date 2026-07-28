@@ -736,6 +736,7 @@ async def test_main_gui_runs_github_star_prompt_after_update_check(
             _ = (incoming_page, config_path, debug_ui_preview)
             self.page = incoming_page
             self.controller = FakeController()
+            self.application = UiApplicationBoundary(self.controller)
 
         def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
@@ -763,7 +764,11 @@ async def test_main_gui_runs_github_star_prompt_after_update_check(
     monkeypatch.setattr(app_module, "TranslatorApp", FakeApp)
     monkeypatch.setattr(app_module, "_check_and_notify_update", fake_check_and_notify_update)
 
-    await app_module.main_gui(page, config_path=Path("settings.json"))
+    await app_module.main_gui(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=lambda **_kwargs: None,
+    )
     assert events == ["start"]
     assert not after_launch_tasks[0].done()
 
@@ -780,6 +785,7 @@ async def test_after_launch_update_failure_still_runs_github_star_prompt(
     events: list[str] = []
     logged: list[str] = []
     app = TranslatorApp.__new__(TranslatorApp)
+    app._ui_application = UiApplicationBoundary(None)
     app.page = DummyPage()
     app._log_detailed = lambda message, **_kwargs: logged.append(message)
 

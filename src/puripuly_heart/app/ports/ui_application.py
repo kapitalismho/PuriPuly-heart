@@ -8,6 +8,8 @@ from typing import Any, Protocol
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
+from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
@@ -27,6 +29,18 @@ class UiApplicationState:
     overlay_target: str | None
     desktop_overlay_captions_locked: bool
     managed_auth_referral_bonus_applied: bool
+
+
+class UiApplicationFactoryPort(Protocol):
+    def __call__(
+        self,
+        *,
+        presentation: UiPresentationPort,
+        config_path: Path,
+        allow_stable_settings_import: bool = False,
+        runtime_logging_sinks: object | None = None,
+        vrchat_osc_presence: VrchatOscPresencePort | None = None,
+    ) -> UiApplicationPort: ...
 
 
 class UiApplicationPort(Protocol):
