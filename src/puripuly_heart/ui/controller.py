@@ -119,6 +119,8 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
 from puripuly_heart.app.services.provider_status_verification import (
+    ConfiguredProviderStatusVerificationRequest,
+    ConfiguredProviderStatusVerificationResult,
     ProviderStatusVerificationOwner,
 )
 from puripuly_heart.app.services.qq_managed_auth import QqManagedAuthRequest, QqManagedAuthService
@@ -8631,12 +8633,13 @@ class GuiController:
         owner = self._provider_status_verification_owner
         if owner is None:
             owner = ProviderStatusVerificationOwner(
+                verifier=self._get_provider_verifier(),
                 diagnostics_sink=lambda event, metadata, exception: self.log_detailed(
                     "[ProviderVerification] Background status verification failed "
                     f"event={event} error_type={metadata.get('error_type')}",
                     level=logging.WARNING,
                     exception=exception,
-                )
+                ),
             )
             self._provider_status_verification_owner = owner
         return owner
@@ -8644,7 +8647,94 @@ class GuiController:
     def _schedule_provider_status_verification(self) -> None:
         if self._shutdown_ingress_frozen:
             return
-        self._get_provider_status_verification_owner().schedule(self._verify_and_update_status)
+        self._get_provider_status_verification_owner().schedule(
+            request_factory=self._build_provider_status_verification_request,
+            result_handler=self._apply_provider_status_verification_result,
+        )
+
+    def _build_provider_status_verification_request(
+        self,
+    ) -> ConfiguredProviderStatusVerificationRequest | None:
+        settings = self.settings
+        if settings is None:
+            return None
+
+        secrets = None
+        with contextlib.suppress(Exception):
+            secrets = create_secret_store(settings.secrets, config_path=self.config_path)
+
+        def secret_value(secret_key: str) -> str:
+            if secrets is None:
+                return ""
+            try:
+                return secrets.get(secret_key) or ""
+            except Exception:
+                return ""
+
+        qwen_api_key = ""
+        qwen_base_url = settings.qwen.get_llm_base_url()
+        if secrets is not None:
+            with contextlib.suppress(Exception):
+                qwen_api_key, qwen_base_url = self._get_qwen_key_and_base_url(secrets)
+
+        openrouter_api_key = ""
+        if secrets is not None:
+            with contextlib.suppress(Exception):
+                resolution = resolve_openrouter_credentials(
+                    build_openrouter_credential_runtime_config(settings),
+                    secrets=secrets,
+                )
+                openrouter_api_key = resolution.api_key or ""
+
+        managed_openrouter_can_attempt = False
+        with contextlib.suppress(Exception):
+            managed_openrouter_can_attempt = self._managed_openrouter_can_attempt_translation()
+
+        llm_provider = getattr(settings.provider.llm, "value", settings.provider.llm)
+        stt_provider = getattr(settings.provider.stt, "value", settings.provider.stt)
+        return ConfiguredProviderStatusVerificationRequest(
+            llm_runtime_present=bool(self.hub is not None and self.hub.llm),
+            stt_runtime_present=bool(self.hub is not None and self._hub_has_stt_provider("self")),
+            llm_provider=str(llm_provider),
+            stt_provider=str(stt_provider),
+            llm_requires_secret=self._llm_provider_requires_secret(settings.provider.llm),
+            stt_requires_secret=self._stt_provider_requires_secret(settings.provider.stt),
+            runtime_translation_enabled=bool(self.hub is not None and self.hub.translation_enabled),
+            managed_openrouter_can_attempt=managed_openrouter_can_attempt,
+            openrouter_managed_selected=(
+                settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
+            ),
+            gemini_model=settings.gemini.llm_model.value,
+            qwen_selected_model=settings.qwen.llm_model.value,
+            qwen_fallback_models=tuple(model.value for model in QwenLLMModel),
+            qwen_base_url=qwen_base_url,
+            fast_translation_enabled=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
+            google_api_key=secret_value("google_api_key"),
+            openrouter_api_key=openrouter_api_key,
+            deepseek_api_key=secret_value("deepseek_api_key")
+            or os.getenv("DEEPSEEK_API_KEY")
+            or "",
+            qwen_api_key=qwen_api_key,
+            deepgram_api_key=secret_value("deepgram_api_key"),
+            soniox_api_key=secret_value("soniox_api_key"),
+        )
+
+    async def _apply_provider_status_verification_result(
+        self,
+        result: ConfiguredProviderStatusVerificationResult,
+    ) -> None:
+        if self._shutdown_ingress_frozen:
+            return
+        self.app.set_dashboard_translation_needs_key(result.translation_needs_key)
+        if result.translation_enabled_update is not None:
+            if not result.translation_enabled_update and self.hub is not None:
+                self.hub.translation_enabled = False
+            self.app.set_dashboard_translation_enabled(result.translation_enabled_update)
+        self.app.set_dashboard_stt_needs_key(result.stt_needs_key)
+        if result.stt_enabled_update is not None:
+            self.app.set_dashboard_stt_enabled(result.stt_enabled_update)
+        if not self._shutdown_ingress_frozen:
+            await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=False)
 
     async def _rebuild_llm_provider(self) -> None:
         """Rebuild only the LLM provider without tearing down the entire pipeline."""
@@ -11215,169 +11305,10 @@ class GuiController:
         )
 
     async def _verify_and_update_status(self) -> None:
-        """Background task to verify keys and update dashboard status."""
-        if self._shutdown_ingress_frozen or self.settings is None:
-            return
-
-        secrets = None
-        with contextlib.suppress(Exception):
-            secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
-
-        alibaba_selected_valid_cache: bool | None = None
-        alibaba_any_valid_cache: bool | None = None
-
-        async def _verify_alibaba_selected() -> bool:
-            nonlocal alibaba_selected_valid_cache
-            if alibaba_selected_valid_cache is not None:
-                return alibaba_selected_valid_cache
-            if secrets is None:
-                alibaba_selected_valid_cache = False
-                return False
-            key, base_url = self._get_qwen_key_and_base_url(secrets)
-            selected_model = self.settings.qwen.llm_model.value
-            alibaba_selected_valid_cache = await self._verify_qwen_llm_api_key(
-                key,
-                base_url=base_url,
-                model=selected_model,
-            )
-            return alibaba_selected_valid_cache
-
-        async def _verify_alibaba_any_model() -> bool:
-            nonlocal alibaba_any_valid_cache
-            if alibaba_any_valid_cache is not None:
-                return alibaba_any_valid_cache
-            if await _verify_alibaba_selected():
-                alibaba_any_valid_cache = True
-                return True
-            if secrets is None:
-                alibaba_any_valid_cache = False
-                return False
-            key, base_url = self._get_qwen_key_and_base_url(secrets)
-            selected_model = self.settings.qwen.llm_model.value
-            for fallback_model in (
-                model.value for model in QwenLLMModel if model.value != selected_model
-            ):
-                if await self._verify_qwen_llm_api_key(
-                    key,
-                    base_url=base_url,
-                    model=fallback_model,
-                ):
-                    alibaba_any_valid_cache = True
-                    return True
-            alibaba_any_valid_cache = False
-            return False
-
-        # 1. Verify LLM
-        llm_valid = False
-        if self.hub and self.hub.llm:
-            # It was created, but is the key valid?
-            try:
-                provider_name = self.settings.provider.llm
-                key = ""
-                if provider_name == "gemini":
-                    key = secrets.get("google_api_key") or "" if secrets is not None else ""
-                    llm_valid = await self._get_provider_verifier().verify_api_key(
-                        "google",
-                        key,
-                        model=self.settings.gemini.llm_model.value,
-                    )
-                elif provider_name == LLMProviderName.OPENROUTER:
-                    resolution = (
-                        resolve_openrouter_credentials(
-                            build_openrouter_credential_runtime_config(self.settings),
-                            secrets=secrets,
-                        )
-                        if secrets is not None
-                        else None
-                    )
-                    if (
-                        self.settings.openrouter.selected_source
-                        == OpenRouterCredentialSource.MANAGED
-                        and (resolution is None or resolution.api_key is None)
-                    ):
-                        llm_valid = self._managed_openrouter_can_attempt_translation()
-                    else:
-                        key = (
-                            resolution.api_key
-                            if resolution is not None and resolution.api_key
-                            else ""
-                        )
-                        llm_valid = bool(
-                            key
-                        ) and await self._get_provider_verifier().verify_api_key(
-                            "openrouter",
-                            key,
-                        )
-                elif provider_name == LLMProviderName.DEEPSEEK:
-                    key = (
-                        (secrets.get("deepseek_api_key") if secrets is not None else None)
-                        or os.getenv("DEEPSEEK_API_KEY")
-                        or ""
-                    )
-                    llm_valid = bool(key) and await self._get_provider_verifier().verify_api_key(
-                        "deepseek",
-                        key,
-                    )
-                elif provider_name == "qwen":
-                    llm_valid = await _verify_alibaba_selected()
-                elif provider_name == LLMProviderName.LOCAL_LLM:
-                    llm_valid = True
-                else:
-                    # Assume valid for others or if no key usage known
-                    llm_valid = True
-            except Exception:
-                llm_valid = False
-
         if self._shutdown_ingress_frozen:
             return
-
-        llm_requires_secret = self._llm_provider_requires_secret(self.settings.provider.llm)
-        if not llm_valid:
-            self.app.set_dashboard_translation_needs_key(llm_requires_secret)
-            if self.hub:
-                self.hub.translation_enabled = False
-            self.app.set_dashboard_translation_enabled(False)
-        else:
-            self.app.set_dashboard_translation_needs_key(False)
-            if self.settings.provider.llm == LLMProviderName.LOCAL_LLM and self.hub is not None:
-                self.app.set_dashboard_translation_enabled(bool(self.hub.translation_enabled))
-
-        # 2. Verify STT
-        stt_requires_secret = self._stt_provider_requires_secret(self.settings.provider.stt)
-        stt_valid = not stt_requires_secret
-        if self.hub and self._hub_has_stt_provider("self") and stt_requires_secret:
-            try:
-                provider_name = self.settings.provider.stt
-
-                if provider_name == STTProviderName.DEEPGRAM:
-                    key = secrets.get("deepgram_api_key") or "" if secrets is not None else ""
-                    stt_valid = await self._get_provider_verifier().verify_api_key(
-                        "deepgram",
-                        key,
-                    )
-                elif provider_name == STTProviderName.QWEN_ASR:
-                    stt_valid = await _verify_alibaba_any_model()
-                elif provider_name == STTProviderName.SONIOX:
-                    key = secrets.get("soniox_api_key") or "" if secrets is not None else ""
-                    stt_valid = await self._get_provider_verifier().verify_api_key(
-                        "soniox",
-                        key,
-                    )
-                else:
-                    stt_valid = True
-            except Exception:
-                stt_valid = False
-
-        if self._shutdown_ingress_frozen:
+        request = self._build_provider_status_verification_request()
+        if request is None:
             return
-
-        if not stt_valid:
-            self.app.set_dashboard_stt_needs_key(stt_requires_secret)
-            if self.hub:
-                pass
-            self.app.set_dashboard_stt_enabled(False)
-        else:
-            self.app.set_dashboard_stt_needs_key(False)
-
-        if not self._shutdown_ingress_frozen:
-            await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=False)
+        result = await self._get_provider_status_verification_owner().verify(request)
+        await self._apply_provider_status_verification_result(result)

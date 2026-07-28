@@ -220,7 +220,14 @@ async def test_verify_and_update_status_uses_qwen_specific_verifiers(monkeypatch
 
     llm_seen: list[tuple[str, str]] = []
 
-    async def fake_verify_qwen_llm(self, api_key: str, *, base_url: str, model: str) -> bool:
+    async def fake_verify_qwen_llm(
+        api_key: str,
+        *,
+        base_url: str,
+        model: str,
+        low_latency: bool,
+    ) -> bool:
+        assert low_latency is True
         llm_seen.append((api_key, base_url))
         return True
 
@@ -230,7 +237,9 @@ async def test_verify_and_update_status_uses_qwen_specific_verifiers(monkeypatch
     async def fail_legacy_verify(*_args, **_kwargs) -> bool:
         raise AssertionError("legacy llm verifier path must not be called")
 
-    monkeypatch.setattr(GuiController, "_verify_qwen_llm_api_key", fake_verify_qwen_llm)
+    controller.provider_verifier = SimpleNamespace(
+        verify_qwen_llm_api_key=fake_verify_qwen_llm,
+    )
     monkeypatch.setattr(
         QwenASRRealtimeSTTBackend, "verify_api_key", staticmethod(fail_qwen_asr_verify)
     )
@@ -342,13 +351,22 @@ async def test_verify_and_update_status_uses_selected_qwen_model_for_both_llm_an
 
     seen_models: list[str] = []
 
-    async def fake_verify_qwen_llm(self, api_key: str, *, base_url: str, model: str) -> bool:
+    async def fake_verify_qwen_llm(
+        api_key: str,
+        *,
+        base_url: str,
+        model: str,
+        low_latency: bool,
+    ) -> bool:
         assert api_key == "secret"
         assert base_url == "https://dashscope-intl.aliyuncs.com/api/v1"
+        assert low_latency is True
         seen_models.append(model)
         return True
 
-    monkeypatch.setattr(GuiController, "_verify_qwen_llm_api_key", fake_verify_qwen_llm)
+    controller.provider_verifier = SimpleNamespace(
+        verify_qwen_llm_api_key=fake_verify_qwen_llm,
+    )
 
     await controller._verify_and_update_status()
 

@@ -1859,18 +1859,21 @@ async def test_verify_and_update_status_handles_mixed_provider_failures(
     models_seen: list[str] = []
 
     async def fake_verify_qwen(
-        self: GuiController,
         api_key: str,
         *,
         base_url: str,
-        model: str | None = None,
+        model: str | None,
+        low_latency: bool,
     ) -> bool:
-        _ = (self, api_key, base_url)
+        _ = (api_key, base_url)
+        assert low_latency is True
         assert model is not None
         models_seen.append(model)
         return model == QwenLLMModel.QWEN_35_PLUS.value
 
-    monkeypatch.setattr(GuiController, "_verify_qwen_llm_api_key", fake_verify_qwen)
+    controller.provider_verifier = SimpleNamespace(
+        verify_qwen_llm_api_key=fake_verify_qwen,
+    )
 
     await controller._verify_and_update_status()
 
@@ -5063,7 +5066,11 @@ async def test_rebuild_pipeline_closes_previous_peer_runtime_before_replacement(
         lambda self, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
-    monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        GuiController,
+        "_schedule_provider_status_verification",
+        lambda self: None,
+    )
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
 
     await controller._rebuild_pipeline(rebuild_stt=True)
@@ -5287,7 +5294,11 @@ async def test_rebuild_pipeline_local_llm_without_runtime_does_not_show_api_key_
         lambda self, *, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
-    monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        GuiController,
+        "_schedule_provider_status_verification",
+        lambda self: None,
+    )
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
 
     await controller._rebuild_pipeline(rebuild_stt=True)
@@ -5339,7 +5350,11 @@ async def test_rebuild_pipeline_rebinds_overlay_presenter_to_new_hub(
         lambda self: asyncio.sleep(0),
     )
     monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
-    monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        GuiController,
+        "_schedule_provider_status_verification",
+        lambda self: None,
+    )
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
 
     await controller._rebuild_pipeline(rebuild_stt=True)
@@ -5395,7 +5410,11 @@ async def test_rebuild_pipeline_keeps_preserved_presenter_detached_when_overlay_
         lambda self, *, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
-    monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        GuiController,
+        "_schedule_provider_status_verification",
+        lambda self: None,
+    )
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
 
     await controller._rebuild_pipeline(rebuild_stt=True)
@@ -5455,7 +5474,11 @@ async def test_rebuild_pipeline_refreshes_overlay_dependencies_without_overlay_r
         "_refresh_overlay_runtime_dependencies",
         fake_refresh_overlay_runtime_dependencies,
     )
-    monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        GuiController,
+        "_schedule_provider_status_verification",
+        lambda self: None,
+    )
     monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
 
     await controller._rebuild_pipeline(rebuild_stt=True)
@@ -20165,7 +20188,7 @@ async def test_rebuild_pipeline_restarts_runtime_and_schedules_verify(
         self.osc = object()
         events.append("init_pipeline")
 
-    async def fake_verify_and_update_status(self) -> None:
+    def fake_schedule_provider_status_verification(self) -> None:
         events.append("verify_run")
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
@@ -20175,7 +20198,11 @@ async def test_rebuild_pipeline_restarts_runtime_and_schedules_verify(
         fake_configure_vrc_mic_receiver,
     )
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(GuiController, "_verify_and_update_status", fake_verify_and_update_status)
+    monkeypatch.setattr(
+        GuiController,
+        "_schedule_provider_status_verification",
+        fake_schedule_provider_status_verification,
+    )
     monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
     await controller._rebuild_pipeline(rebuild_stt=True)
     await asyncio.sleep(0)
@@ -20227,7 +20254,11 @@ async def test_rebuild_pipeline_restores_stt_when_it_was_previously_enabled(
         fake_configure_vrc_mic_receiver,
     )
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        GuiController,
+        "_schedule_provider_status_verification",
+        lambda self: None,
+    )
     monkeypatch.setattr(
         presentation_adapter_module,
         "UIEventBridge",
