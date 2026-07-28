@@ -21,6 +21,7 @@ pytest.importorskip("flet")
 from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as canonical_persistence_adapter_module,
 )
+from puripuly_heart.app.adapters.peer_capture_source import PeerCaptureSourceAdapter
 from puripuly_heart.app.adapters.self_capture_source import SelfCaptureSourceAdapter
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.microphone_test import (
@@ -43,7 +44,6 @@ from puripuly_heart.config.audio_host_api import (
     normalize_input_host_api,
 )
 from puripuly_heart.config.prompts import load_prompt_for_provider
-from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import (
     DESKTOP_FLET_SIZE_PRESETS,
     OVERLAY_TARGET_DESKTOP,
@@ -114,6 +114,10 @@ from puripuly_heart.core.overlay.sink import (
     PeerTranscriptFinal,
     SelfTranscriptFinal,
     TranslationFinal,
+)
+from puripuly_heart.core.peer_capture import (
+    PeerCaptureResolvedTarget,
+    PeerCaptureTargetIntent,
 )
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.core.runtime.peer_channel import PeerRuntimeConfig
@@ -5853,10 +5857,7 @@ async def test_initial_peer_local_activation_publishes_starting_until_provider_a
     assert contracts[-1].peer.state == "on"
 
 
-@pytest.mark.asyncio
-async def test_create_peer_audio_source_from_runtime_config_uses_desktop_loopback_device(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_peer_capture_source_adapter_uses_desktop_loopback_device() -> None:
     controller = _make_controller(app=SimpleNamespace())
     config = controller._build_peer_runtime_config(AppSettings())
     opened: list[dict[str, object]] = []
@@ -5864,78 +5865,70 @@ async def test_create_peer_audio_source_from_runtime_config_uses_desktop_loopbac
     class FakePeerSource:
         pass
 
-    monkeypatch.setattr(
-        controller_module,
-        "DesktopLoopbackAudioSource",
-        lambda *args, **kwargs: opened.append(kwargs) or object(),
-    )
-    monkeypatch.setattr(
-        controller_module,
-        "DesktopPeerPipeline",
-        lambda *args, **kwargs: FakePeerSource(),
+    adapter = PeerCaptureSourceAdapter(
+        loopback_source_factory=lambda *args, **kwargs: opened.append(kwargs) or object(),
+        process_source_factory=lambda **kwargs: pytest.fail(
+            f"process source constructed: {kwargs}"
+        ),
+        process_watcher_factory=object,
+        pipeline_factory=lambda *args, **kwargs: FakePeerSource(),
+        log_detailed=controller.log_detailed,
+        wrap_source=lambda source: source,
+        is_detailed_enabled=controller._detailed_audio_diag_enabled,
     )
 
-    source = await controller._create_peer_audio_source_from_runtime_config(config)
+    source = adapter(config, PeerCaptureResolvedTarget(intent=config.capture_target))
 
     assert isinstance(source, FakePeerSource)
     assert opened == [{"device_name": config.output_device}]
 
 
-@pytest.mark.asyncio
-async def test_create_peer_audio_source_from_runtime_config_routes_process_to_strict_source(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_peer_capture_source_adapter_routes_process_to_strict_source() -> None:
     controller = _make_controller(app=SimpleNamespace())
-    target = ResolvedDesktopAudioCaptureTarget(
+    target = PeerCaptureTargetIntent(
         kind="process",
         process_kind="generic_executable",
         executable_identity=r"c:\apps\game\game.exe",
     )
-    config = PeerRuntimeConfig(
-        backend=SimpleNamespace(sample_rate_hz=16000),
-        output_device="",
-        vad_threshold=0.6,
-        vad_hangover_ms=900,
-        vad_pre_roll_ms=500,
-        provider_signature=(),
-        runtime_signature=(target,),
+    config = replace(
+        controller._build_peer_runtime_config(AppSettings()),
         capture_target=target,
+        runtime_signature=(target,),
     )
     created: dict[str, object] = {}
     identity = object()
-
-    class FakeResolver:
-        def __init__(self, *, snapshots: object) -> None:
-            created["snapshots"] = snapshots
-
-        def resolve_for_start(self, process_target: object) -> SimpleNamespace:
-            created["target"] = process_target
-            return SimpleNamespace(identity=identity, unavailable_reason=None)
 
     def fake_process_source(*, identity: object, watcher: object) -> object:
         created["identity"] = identity
         created["watcher"] = watcher
         return object()
 
-    monkeypatch.setattr(controller_module, "ProcessCaptureResolver", FakeResolver)
-    monkeypatch.setattr(controller_module, "ProcessAudioCaptureSource", fake_process_source)
-    monkeypatch.setattr(
-        controller_module,
-        "DesktopLoopbackAudioSource",
-        lambda **kwargs: pytest.fail(f"device fallback attempted: {kwargs}"),
+    adapter = PeerCaptureSourceAdapter(
+        loopback_source_factory=lambda **kwargs: pytest.fail(
+            f"device fallback attempted: {kwargs}"
+        ),
+        process_source_factory=fake_process_source,
+        process_watcher_factory=object,
+        pipeline_factory=lambda **kwargs: kwargs,
+        log_detailed=controller.log_detailed,
+        wrap_source=lambda source: SimpleNamespace(source=source),
+        is_detailed_enabled=controller._detailed_audio_diag_enabled,
     )
-    monkeypatch.setattr(controller_module, "DesktopPeerPipeline", lambda **kwargs: kwargs)
 
-    source = await controller._create_peer_audio_source_from_runtime_config(config)
+    source = adapter(
+        config,
+        PeerCaptureResolvedTarget(
+            intent=target,
+            capture_descriptor=SimpleNamespace(identity=identity),
+        ),
+    )
 
     assert created["identity"] is identity
     assert "watcher" in created
-    assert created["target"].kind == "generic_executable"
     assert getattr(source["source"], "source", None) is not None
 
 
-@pytest.mark.asyncio
-async def test_create_peer_audio_source_logs_loopback_resolution(monkeypatch) -> None:
+def test_peer_capture_source_adapter_logs_loopback_resolution() -> None:
     class FakeLoopbackSource:
         resolved_device_name = "Default Speakers [Loopback]"
         resolved_device_index = 10
@@ -5965,26 +5958,32 @@ async def test_create_peer_audio_source_logs_loopback_resolution(monkeypatch) ->
         created["pipeline_kwargs"] = kwargs
         return kwargs
 
-    monkeypatch.setattr(controller_module, "DesktopLoopbackAudioSource", fake_loopback_source)
-    monkeypatch.setattr(controller_module, "DesktopPeerPipeline", fake_peer_pipeline)
-
     controller = GuiController(
         page=SimpleNamespace(),
         app=_presentation(SimpleNamespace(debug_ui_preview=False)),
         config_path=Path("settings.json"),
     )
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
-    config = PeerRuntimeConfig(
-        backend=SimpleNamespace(sample_rate_hz=16000),
+    config = replace(
+        controller._build_peer_runtime_config(AppSettings()),
         output_device="Missing Speakers",
-        vad_threshold=0.6,
-        vad_hangover_ms=1100,
-        vad_pre_roll_ms=500,
-        provider_signature=(),
-        runtime_signature=(),
+    )
+    adapter = PeerCaptureSourceAdapter(
+        loopback_source_factory=fake_loopback_source,
+        process_source_factory=lambda **kwargs: pytest.fail(
+            f"process source constructed: {kwargs}"
+        ),
+        process_watcher_factory=object,
+        pipeline_factory=fake_peer_pipeline,
+        log_detailed=controller.log_detailed,
+        wrap_source=lambda source: controller._wrap_diagnostic_audio_source(
+            source,
+            channel_label="peer",
+        ),
+        is_detailed_enabled=controller._detailed_audio_diag_enabled,
     )
 
-    await controller._create_peer_audio_source_from_runtime_config(config)
+    adapter(config, PeerCaptureResolvedTarget(intent=config.capture_target))
 
     messages = [message for _level, message in controller._runtime_logging.detailed_messages]
     pipeline_source = created["pipeline_kwargs"]["source"]  # type: ignore[index]
@@ -5998,10 +5997,7 @@ async def test_create_peer_audio_source_logs_loopback_resolution(monkeypatch) ->
     assert any("used_default_fallback=True" in message for message in messages)
 
 
-@pytest.mark.asyncio
-async def test_create_peer_audio_source_wires_capture_fault_provider(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_peer_capture_source_adapter_wires_capture_fault_provider() -> None:
     class FakeLoopbackSource:
         async def frames(self):
             if False:
@@ -6020,9 +6016,6 @@ async def test_create_peer_audio_source_wires_capture_fault_provider(
         created["pipeline_kwargs"] = kwargs
         return kwargs
 
-    monkeypatch.setattr(controller_module, "DesktopLoopbackAudioSource", fake_loopback_source)
-    monkeypatch.setattr(controller_module, "DesktopPeerPipeline", fake_peer_pipeline)
-
     app = SimpleNamespace(debug_ui_preview=True)
     controller = GuiController(
         page=SimpleNamespace(),
@@ -6031,17 +6024,26 @@ async def test_create_peer_audio_source_wires_capture_fault_provider(
     )
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
     controller._debug_capture_fault_profile = "capture_attenuate_40db"
-    config = PeerRuntimeConfig(
-        backend=SimpleNamespace(sample_rate_hz=16000),
+    config = replace(
+        controller._build_peer_runtime_config(AppSettings()),
         output_device="Peer Speakers",
-        vad_threshold=0.6,
-        vad_hangover_ms=1100,
-        vad_pre_roll_ms=500,
-        provider_signature=(),
-        runtime_signature=(),
+    )
+    adapter = PeerCaptureSourceAdapter(
+        loopback_source_factory=fake_loopback_source,
+        process_source_factory=lambda **kwargs: pytest.fail(
+            f"process source constructed: {kwargs}"
+        ),
+        process_watcher_factory=object,
+        pipeline_factory=fake_peer_pipeline,
+        log_detailed=controller.log_detailed,
+        wrap_source=lambda source: controller._wrap_diagnostic_audio_source(
+            source,
+            channel_label="peer",
+        ),
+        is_detailed_enabled=controller._detailed_audio_diag_enabled,
     )
 
-    await controller._create_peer_audio_source_from_runtime_config(config)
+    adapter(config, PeerCaptureResolvedTarget(intent=config.capture_target))
 
     wrapped_source = created["pipeline_kwargs"]["source"]  # type: ignore[index]
     provider = getattr(wrapped_source, "fault_profile_provider")

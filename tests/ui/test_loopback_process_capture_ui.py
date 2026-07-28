@@ -11,9 +11,6 @@ from types import SimpleNamespace
 import flet as ft
 import pytest
 
-from puripuly_heart.config.process_capture_resolution import (
-    ProcessCaptureTargetUnavailableError,
-)
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.config.settings_vnext.facade import load_settings, save_settings_with_result
@@ -28,6 +25,12 @@ from puripuly_heart.core.local_stt_assets import (
     PARAKEET_JAPANESE_MODEL_ID,
     PARAKEET_V3_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
+)
+from puripuly_heart.core.peer_capture import (
+    PeerCaptureTargetIntent as CorePeerCaptureTargetIntent,
+)
+from puripuly_heart.core.peer_capture import (
+    PeerCaptureTargetStatus,
 )
 from puripuly_heart.core.runtime.peer_channel import (
     PeerRuntimeDiagnostic,
@@ -322,14 +325,10 @@ async def test_process_identity_resolution_is_fresh_and_does_not_block_heartbeat
         app=_presentation(SimpleNamespace()),
         config_path=Path("x"),
     )
-    target = ResolvedDesktopAudioCaptureTarget(
+    target = CorePeerCaptureTargetIntent(
         kind="process",
         process_kind="vrchat",
         executable_identity=r"c:\vrchat\vrchat.exe",
-    )
-    config = SimpleNamespace(
-        capture_target=target,
-        backend=SimpleNamespace(sample_rate_hz=16000),
     )
     calls: list[int] = []
     release = threading.Event()
@@ -344,20 +343,15 @@ async def test_process_identity_resolution_is_fresh_and_does_not_block_heartbeat
             return SimpleNamespace(identity=object(), unavailable_reason=None)
 
     monkeypatch.setattr(controller_module, "ProcessCaptureResolver", Resolver)
-    monkeypatch.setattr(
-        GuiController,
-        "_create_process_peer_audio_source",
-        lambda _self, _config, *, resolution: resolution.identity,
-    )
-    activation = asyncio.create_task(
-        controller._create_peer_audio_source_from_runtime_config(config)
-    )
+    activation = asyncio.create_task(controller._resolve_peer_capture_target_for_owner(target))
     await asyncio.sleep(0)
     heartbeat = False
     await asyncio.sleep(0)
     heartbeat = True
     release.set()
-    assert await activation is not None
+    resolution = await activation
+    assert resolution.target is not None
+    assert resolution.target.capture_descriptor.identity is not None
     assert heartbeat is True
     assert len(calls) == 1
     assert calls[0] != threading.get_ident()
@@ -400,20 +394,14 @@ async def test_idle_process_preparation_is_bounded_once_and_best_effort(
             fresh_resolutions += 1
             return SimpleNamespace(identity=object(), unavailable_reason=None)
 
-    target = ResolvedDesktopAudioCaptureTarget(
+    target = CorePeerCaptureTargetIntent(
         kind="process",
         process_kind="vrchat",
         executable_identity=r"c:\vrchat\vrchat.exe",
     )
     monkeypatch.setattr(controller_module, "ProcessCaptureResolver", FreshResolver)
-    monkeypatch.setattr(
-        GuiController,
-        "_create_process_peer_audio_source",
-        lambda _self, _config, *, resolution: resolution.identity,
-    )
-    await controller._create_peer_audio_source_from_runtime_config(
-        SimpleNamespace(capture_target=target, backend=SimpleNamespace(sample_rate_hz=16000))
-    )
+    resolution = await controller._resolve_peer_capture_target_for_owner(target)
+    assert resolution.target is not None
     assert calls == 1
     assert fresh_resolutions == 1
 
@@ -1181,11 +1169,6 @@ async def test_failed_process_warning_survives_unrelated_draft_apply_without_dev
     assert config.capture_target.kind == "process"
     assert controller._peer_process_warning_reason == warning_reason
     assert controller.peer_warning_action_is_retry() is True
-    monkeypatch.setattr(
-        controller_module,
-        "DesktopLoopbackAudioSource",
-        lambda **_kwargs: pytest.fail("device fallback constructed"),
-    )
 
     class UnavailableResolver:
         def __init__(self, *, snapshots):
@@ -1195,8 +1178,10 @@ async def test_failed_process_warning_survives_unrelated_draft_apply_without_dev
             return SimpleNamespace(identity=None, unavailable_reason="no_process")
 
     monkeypatch.setattr(controller_module, "ProcessCaptureResolver", UnavailableResolver)
-    with pytest.raises(ProcessCaptureTargetUnavailableError):
-        await controller._create_peer_audio_source_from_runtime_config(config)
+    resolution = await controller._resolve_peer_capture_target_for_owner(config.capture_target)
+    assert resolution.status is PeerCaptureTargetStatus.UNAVAILABLE
+    assert resolution.target is None
+    assert resolution.reason == "no_process"
 
 
 @pytest.mark.asyncio

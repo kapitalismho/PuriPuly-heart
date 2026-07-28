@@ -182,6 +182,7 @@ from puripuly_heart.app.wiring import (
     create_llm_provider,
     create_local_asr_provisioning_owner,
     create_microphone_test_capture_adapter,
+    create_peer_capture_source_adapter,
     create_provider_verifier,
     create_secret_store,
     create_self_capture_source_adapter,
@@ -199,7 +200,6 @@ from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.paths import user_config_dir
 from puripuly_heart.config.process_capture_resolution import (
     ProcessCaptureResolver,
-    ProcessCaptureTargetUnavailableError,
 )
 from puripuly_heart.config.resolved import (
     ResolvedDesktopAudioCaptureTarget,
@@ -234,14 +234,8 @@ from puripuly_heart.config.settings_vnext.schema import (
     ProcessCaptureTargetIntent,
 )
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
-from puripuly_heart.core.audio.desktop_pipeline import DesktopPeerPipeline
-from puripuly_heart.core.audio.desktop_source import DesktopLoopbackAudioSource
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
-from puripuly_heart.core.audio.process_identity import (
-    PsutilCurrentUserProcessSnapshots,
-    PsutilProcessIdentityWatcher,
-)
-from puripuly_heart.core.audio.process_source import ProcessAudioCaptureSource
+from puripuly_heart.core.audio.process_identity import PsutilCurrentUserProcessSnapshots
 from puripuly_heart.core.audio.source import (
     AudioSource,
     SoundDeviceAudioSource,
@@ -9045,69 +9039,6 @@ class GuiController:
             ),
         )
 
-    async def _create_peer_audio_source_from_runtime_config(
-        self,
-        config: PeerCaptureSessionConfig,
-        resolved_target: PeerCaptureResolvedTarget | None = None,
-    ) -> DesktopPeerPipeline:
-        if resolved_target is None:
-            resolution = await self._resolve_peer_capture_target_for_owner(config.capture_target)
-            if resolution.target is None:
-                raise ProcessCaptureTargetUnavailableError(
-                    cast(Any, resolution.reason or "no_process")
-                )
-            resolved_target = resolution.target
-        target = resolved_target.intent
-        if target.kind == "process":
-            return self._create_process_peer_audio_source(
-                config,
-                resolution=resolved_target.capture_descriptor,
-            )
-
-        device_name = target.device_name or config.output_device
-        raw_source = DesktopLoopbackAudioSource(device_name=device_name)
-        self.log_detailed(
-            "[AudioDiag][Loopback][peer] "
-            f"requested_device={device_name!r} "
-            f"resolved_device_name={getattr(raw_source, 'resolved_device_name', None)!r} "
-            f"resolved_device_index={getattr(raw_source, 'resolved_device_index', None)} "
-            f"resolved_channels={getattr(raw_source, 'resolved_channels', None)} "
-            f"actual_sample_rate_hz={getattr(raw_source, 'actual_sample_rate_hz', None)} "
-            f"used_default_fallback={getattr(raw_source, 'used_default_fallback', None)}"
-        )
-        wrapped_source = self._wrap_diagnostic_audio_source(raw_source, channel_label="peer")
-        return DesktopPeerPipeline(
-            source=wrapped_source,
-            target_sample_rate_hz=self._peer_capture_sample_rate(config),
-            is_detailed_enabled=self._detailed_audio_diag_enabled,
-            log_detailed=lambda message: self.log_detailed(message),
-        )
-
-    def _create_process_peer_audio_source(
-        self,
-        config: PeerCaptureSessionConfig,
-        *,
-        resolution: object,
-    ) -> DesktopPeerPipeline:
-        identity = getattr(resolution, "identity", resolution)
-        if identity is None:
-            raise RuntimeError("resolved process capture requires a process identity")
-        raw_source = ProcessAudioCaptureSource(
-            identity=identity,
-            watcher=PsutilProcessIdentityWatcher(),
-        )
-        self.log_detailed(
-            "[AudioDiag][ProcessCapture][peer] "
-            f"target_kind={config.capture_target.process_kind} capture=process"
-        )
-        wrapped_source = self._wrap_diagnostic_audio_source(raw_source, channel_label="peer")
-        return DesktopPeerPipeline(
-            source=wrapped_source,
-            target_sample_rate_hz=self._peer_capture_sample_rate(config),
-            is_detailed_enabled=self._detailed_audio_diag_enabled,
-            log_detailed=lambda message: self.log_detailed(message),
-        )
-
     @staticmethod
     def _process_target_from_capture_target(
         target: PeerCaptureTargetIntent,
@@ -9516,7 +9447,14 @@ class GuiController:
                 config,
                 warmup=warmup,
             ),
-            source_factory=self._create_peer_audio_source_from_runtime_config,
+            source_factory=create_peer_capture_source_adapter(
+                log_detailed=self.log_detailed,
+                wrap_source=lambda source: self._wrap_diagnostic_audio_source(
+                    cast(AudioSource, source),
+                    channel_label="peer",
+                ),
+                is_detailed_enabled=self._detailed_audio_diag_enabled,
+            ),
             vad_factory=self._create_peer_vad_from_runtime_config,
             run_audio_loop=self._run_peer_audio_vad_loop,
             vad_sink=_PeerCaptureVadSink(lambda: self.hub),

@@ -16,6 +16,9 @@ from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "peer_channel.py"
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+SOURCE_ADAPTER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_source.py"
+)
 
 
 def test_peer_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() -> None:
@@ -83,14 +86,45 @@ def test_controller_does_not_construct_peer_owner_resources_outside_adapters() -
         and node.name
         in {
             "_resolve_peer_capture_target_for_owner",
-            "_create_peer_audio_source_from_runtime_config",
             "_create_peer_vad_from_runtime_config",
             "_run_peer_audio_vad_loop",
         }
     }
     assert resource_methods == {
         "_resolve_peer_capture_target_for_owner",
-        "_create_peer_audio_source_from_runtime_config",
         "_create_peer_vad_from_runtime_config",
         "_run_peer_audio_vad_loop",
     }
+
+
+def test_controller_composes_peer_capture_source_adapter_without_source_algorithm() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    assert "source_factory=create_peer_capture_source_adapter(" in source
+    assert "_create_peer_audio_source_from_runtime_config" not in source
+    assert "_create_process_peer_audio_source" not in source
+    assert "DesktopLoopbackAudioSource" not in source
+    assert "ProcessAudioCaptureSource" not in source
+    assert "DesktopPeerPipeline" not in source
+
+
+def test_peer_capture_source_adapter_has_no_ui_resolution_or_lifecycle_ownership() -> None:
+    source = SOURCE_ADAPTER_PATH.read_text(encoding="utf-8")
+
+    assert "puripuly_heart.ui" not in source
+    assert "GuiController" not in source
+    assert "AppSettings" not in source
+    assert "ProcessCaptureResolver" not in source
+    assert "asyncio" not in source
+    assert "async def close(" not in source
+    assert "PeerCaptureSessionConfig" in source
+    assert "PeerCaptureResolvedTarget" in source
+
+
+def test_peer_capture_session_owner_remains_source_lifecycle_owner() -> None:
+    source = OWNER_PATH.read_text(encoding="utf-8")
+
+    assert '"_audio_source"' in source
+    assert "self._retired_sources" in source
+    assert "await self._close_if_possible(source)" in source
+    assert "source_factory: PeerCaptureSourceFactory" in source
