@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 
@@ -26,6 +26,7 @@ from puripuly_heart.app.ports.canonical_settings_persistence import (
     ProviderVerificationBinding,
 )
 from puripuly_heart.app.ports.gpu_worker import GpuWorkerDevice
+from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
 from puripuly_heart.app.ports.secret_store import (
     SecretReadResult,
@@ -88,6 +89,15 @@ from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.openrouter_pkce_flow import OpenRouterPkceFlowOwner
 from puripuly_heart.app.services.overlay_calibration import OverlayCalibrationOwner
 from puripuly_heart.app.services.peer_capture_target import PeerCaptureTargetResolutionService
+from puripuly_heart.app.services.provider_credential_verification import (
+    PROVIDER_CREDENTIAL_EMPTY,
+    PROVIDER_CREDENTIAL_ERROR,
+    PROVIDER_CREDENTIAL_MODEL_UNAVAILABLE,
+    PROVIDER_CREDENTIAL_UNKNOWN,
+    PROVIDER_CREDENTIAL_VERIFIED,
+    ProviderCredentialVerificationOwner,
+    ProviderCredentialVerificationRequest,
+)
 from puripuly_heart.app.services.provider_runtime_apply import (
     _ControllerNoopRuntimeApply,
     _ControllerOverlayOscOutputRuntimeApply,
@@ -924,32 +934,6 @@ class _PeerCaptureVadSink:
         await hub.handle_peer_vad_event(event)
 
 
-class _ControllerProviderVerifier(Protocol):
-    async def verify_api_key(
-        self,
-        provider: str,
-        api_key: str,
-        *,
-        model: str | None = None,
-        base_url: str | None = None,
-        low_latency: bool = False,
-    ) -> bool: ...
-
-    async def verify_qwen_llm_api_key(
-        self,
-        api_key: str,
-        *,
-        base_url: str,
-        model: str | None,
-        low_latency: bool,
-    ) -> bool: ...
-
-    async def fetch_openrouter_key_metadata(
-        self,
-        api_key: str,
-    ) -> OpenRouterKeyMetadata | None: ...
-
-
 @dataclass(slots=True)
 class GuiController:
     page: object
@@ -958,7 +942,7 @@ class GuiController:
     allow_stable_settings_import: bool = False
     runtime_logging_sinks: RuntimeLoggingSinks | None = field(default=None, repr=False)
     settings_mutation_service: SettingsMutationService | None = None
-    provider_verifier: _ControllerProviderVerifier | None = None
+    provider_verifier: ProviderVerifierPort | None = None
     telemetry_client: TranslationSuccessTelemetryClientPort | None = None
     vrchat_osc_presence: VrchatOscPresencePort | None = field(default=None, repr=False)
     local_asr_provisioning: LocalASRProvisioningPort | None = field(
@@ -1151,6 +1135,11 @@ class GuiController:
         repr=False,
     )
     _provider_status_verification_owner: ProviderStatusVerificationOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _provider_credential_verification_owner: ProviderCredentialVerificationOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -7462,60 +7451,36 @@ class GuiController:
         return True
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
-        """Verify API key using the respective provider's static check. Returns (success, error_msg)."""
-        if not key:
-            return False, "API Key is empty"
-
-        try:
-            success = False
-            verifier = self._get_provider_verifier()
+        selected_model = None
+        if self.settings is not None:
             if provider == "google":
-                success = await verifier.verify_api_key(
-                    provider,
-                    key,
-                    model=(
-                        self.settings.gemini.llm_model.value if self.settings is not None else None
-                    ),
-                )
-            elif provider == "openrouter":
-                success = await verifier.verify_api_key(provider, key)
-            elif provider == "deepseek":
-                success = await verifier.verify_api_key(provider, key)
+                selected_model = self.settings.gemini.llm_model.value
             elif provider == "cerebras":
-                success = await verifier.verify_api_key(
-                    provider,
-                    key,
-                    model=(
-                        self.settings.cerebras.llm_model.value
-                        if self.settings is not None
-                        else None
-                    ),
-                )
-            elif provider == "alibaba_beijing":
-                return await self._verify_qwen_key_with_model_fallback(
-                    key,
-                    base_url="https://dashscope.aliyuncs.com/api/v1",
-                )
-            elif provider == "alibaba_singapore":
-                return await self._verify_qwen_key_with_model_fallback(
-                    key,
-                    base_url="https://dashscope-intl.aliyuncs.com/api/v1",
-                )
-            elif provider == "deepgram":
-                success = await verifier.verify_api_key(provider, key)
-            elif provider == "soniox":
-                success = await verifier.verify_api_key(provider, key)
-            else:
-                return False, f"Unknown provider: {provider}"
-
-            if success:
-                return True, "Verification successful"
-            else:
-                return False, "Verification failed (check logs/console for details)"
-        except Exception as exc:
-            msg = f"Verification error for {provider}: {exc}"
-            self._log_error(msg)
-            return False, str(exc)
+                selected_model = self.settings.cerebras.llm_model.value
+            elif provider in {"alibaba_beijing", "alibaba_singapore"}:
+                selected_model = self.settings.qwen.llm_model.value
+        outcome = await self._get_provider_credential_verification_owner().verify(
+            ProviderCredentialVerificationRequest(
+                provider=provider,
+                api_key=key,
+                selected_model=selected_model,
+                fallback_models=tuple(model.value for model in QwenLLMModel),
+                low_latency=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
+            )
+        )
+        if outcome.status == PROVIDER_CREDENTIAL_VERIFIED:
+            return True, "Verification successful"
+        if outcome.status == PROVIDER_CREDENTIAL_EMPTY:
+            return False, "API Key is empty"
+        if outcome.status == PROVIDER_CREDENTIAL_UNKNOWN:
+            return False, f"Unknown provider: {provider}"
+        if outcome.status == PROVIDER_CREDENTIAL_MODEL_UNAVAILABLE:
+            return False, f"qwen_model_unavailable:{outcome.unavailable_model}"
+        if outcome.status == PROVIDER_CREDENTIAL_ERROR:
+            error_text = outcome.error_text or ""
+            self._log_error(f"Verification error for {provider}: {error_text}")
+            return False, error_text
+        return False, "Verification failed (check logs/console for details)"
 
     async def apply_providers(
         self,
@@ -8639,10 +8604,28 @@ class GuiController:
                 self.settings
             )
 
-    def _get_provider_verifier(self) -> _ControllerProviderVerifier:
+    def _get_provider_verifier(self) -> ProviderVerifierPort:
         if self.provider_verifier is None:
             self.provider_verifier = create_provider_verifier()
         return self.provider_verifier
+
+    def _get_provider_credential_verification_owner(
+        self,
+    ) -> ProviderCredentialVerificationOwner:
+        owner = self._provider_credential_verification_owner
+        if owner is None:
+            owner = ProviderCredentialVerificationOwner(
+                verifier=self._get_provider_verifier(),
+                diagnostics_sink=lambda event, metadata, exception: self.log_detailed(
+                    "[ProviderVerification] Credential verification failed "
+                    f"event={event} provider={metadata.get('provider')} "
+                    f"error_type={metadata.get('error_type')}",
+                    level=logging.WARNING,
+                    exception=exception,
+                ),
+            )
+            self._provider_credential_verification_owner = owner
+        return owner
 
     def _get_provider_status_verification_owner(self) -> ProviderStatusVerificationOwner:
         owner = self._provider_status_verification_owner
@@ -11213,31 +11196,6 @@ class GuiController:
             return legacy_key, self.settings.qwen.get_llm_base_url()
 
         return "", self.settings.qwen.get_llm_base_url()
-
-    async def _verify_qwen_key_with_model_fallback(
-        self,
-        api_key: str,
-        *,
-        base_url: str,
-    ) -> tuple[bool, str]:
-        if self.settings is None:
-            return False, "Verification failed (check logs/console for details)"
-
-        selected_model = self.settings.qwen.llm_model.value
-        if await self._verify_qwen_llm_api_key(api_key, base_url=base_url, model=selected_model):
-            return True, "Verification successful"
-
-        for fallback_model in (
-            model.value for model in QwenLLMModel if model.value != selected_model
-        ):
-            if await self._verify_qwen_llm_api_key(
-                api_key,
-                base_url=base_url,
-                model=fallback_model,
-            ):
-                return False, f"qwen_model_unavailable:{selected_model}"
-
-        return False, "Verification failed (check logs/console for details)"
 
     async def _verify_qwen_llm_api_key(
         self,

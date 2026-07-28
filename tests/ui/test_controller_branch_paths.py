@@ -1943,7 +1943,6 @@ def test_get_qwen_key_and_base_url_migrates_legacy_secret() -> None:
 )
 @pytest.mark.asyncio
 async def test_verify_qwen_key_with_model_fallback_paths(
-    monkeypatch: pytest.MonkeyPatch,
     result_map: dict[str, bool],
     expected: tuple[bool, str],
 ) -> None:
@@ -1953,22 +1952,21 @@ async def test_verify_qwen_key_with_model_fallback_paths(
     controller.settings = settings
 
     async def fake_verify_qwen(
-        self: GuiController,
         api_key: str,
         *,
         base_url: str,
-        model: str | None = None,
+        model: str | None,
+        low_latency: bool,
     ) -> bool:
-        _ = (self, api_key, base_url)
+        _ = (api_key, base_url, low_latency)
         assert model is not None
         return result_map.get(model, False)
 
-    monkeypatch.setattr(GuiController, "_verify_qwen_llm_api_key", fake_verify_qwen)
-
-    result = await controller._verify_qwen_key_with_model_fallback(
-        "secret",
-        base_url="https://dashscope.aliyuncs.com/api/v1",
+    controller.provider_verifier = SimpleNamespace(
+        verify_qwen_llm_api_key=fake_verify_qwen,
     )
+
+    result = await controller.verify_api_key("alibaba_beijing", "secret")
     assert result == expected
 
 
@@ -16181,24 +16179,36 @@ async def test_verify_api_key_success_and_failure_paths(
 
 
 @pytest.mark.asyncio
-async def test_verify_api_key_routes_alibaba_singapore_to_qwen_fallback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_verify_api_key_routes_alibaba_singapore_to_qwen_owner() -> None:
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
-    calls: list[tuple[str, str]] = []
+    calls: list[tuple[str, str, str | None, bool]] = []
 
-    async def fake_verify(self, key: str, *, base_url: str) -> tuple[bool, str]:
-        _ = self
-        calls.append((key, base_url))
-        return True, "Verification successful"
+    async def fake_verify(
+        key: str,
+        *,
+        base_url: str,
+        model: str | None,
+        low_latency: bool,
+    ) -> bool:
+        calls.append((key, base_url, model, low_latency))
+        return True
 
-    monkeypatch.setattr(GuiController, "_verify_qwen_key_with_model_fallback", fake_verify)
+    controller.provider_verifier = SimpleNamespace(
+        verify_qwen_llm_api_key=fake_verify,
+    )
 
     outcome = await controller.verify_api_key("alibaba_singapore", "secret")
 
     assert outcome == (True, "Verification successful")
-    assert calls == [("secret", "https://dashscope-intl.aliyuncs.com/api/v1")]
+    assert calls == [
+        (
+            "secret",
+            "https://dashscope-intl.aliyuncs.com/api/v1",
+            controller.settings.qwen.llm_model.value,
+            True,
+        )
+    ]
 
 
 @pytest.mark.asyncio
