@@ -3084,43 +3084,6 @@ class GuiController:
                 setattr(runner, "task_factory", task_factory)
             return runner
 
-    def _build_initial_desktop_runtime_controls(
-        self,
-        settings: AppSettings,
-    ) -> list[dict[str, object]]:
-        desktop_settings = copy.deepcopy(settings.overlay.desktop_flet)
-        desktop_settings.validate()
-        bounds = self._desktop_launch_bounds_for_current_launch(desktop_settings)
-        visual = desktop_settings.visual
-        interaction_mode = DESKTOP_INTERACTION_MODE_EDIT
-        self.log_detailed(
-            "[DesktopOverlay][Launch] "
-            f"target=desktop locked={desktop_settings.locked} "
-            f"interaction_mode={interaction_mode} "
-            f"size_preset={desktop_settings.size_preset} "
-            f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-            f"height={bounds['height']} "
-            f"text_scale={visual.text_scale} "
-            f"background_alpha={visual.background_alpha} "
-            f"outline_width={visual.outline_width}"
-        )
-        return [
-            {
-                "command": "apply_window_bounds",
-                "x": bounds["x"],
-                "y": bounds["y"],
-                "width": bounds["width"],
-                "height": bounds["height"],
-            },
-            {
-                "command": "apply_visual_config",
-                "text_scale": visual.text_scale,
-                "background_alpha": visual.background_alpha,
-                "outline_width": visual.outline_width,
-            },
-            {"command": "set_interaction_mode", "mode": interaction_mode},
-        ]
-
     def _build_initial_desktop_runtime_controls_from_resolved_config(
         self,
         config: ResolvedOverlayConfig,

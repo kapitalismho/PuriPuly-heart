@@ -8231,7 +8231,7 @@ def test_vr_overlay_calibration_reset_does_not_mutate_desktop_overlay_settings(
     assert controller.settings.overlay.desktop_flet.visual.background_alpha == 0.33
 
 
-def test_desktop_initial_controls_emit_launch_diagnostics_only_in_detailed_mode() -> None:
+def test_resolved_desktop_initial_controls_emit_launch_diagnostics_only_in_detailed_mode() -> None:
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.settings.overlay.target = "desktop"
@@ -8242,7 +8242,9 @@ def test_desktop_initial_controls_emit_launch_diagnostics_only_in_detailed_mode(
     controller.settings.overlay.desktop_flet.visual.background_alpha = 0.5
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
 
-    controls = controller._build_initial_desktop_runtime_controls(controller.settings)
+    controls = controller._build_initial_desktop_runtime_controls_from_resolved_config(
+        controller_module.resolve_overlay_config(controller.settings)
+    )
 
     assert controls[-1] == {"command": "set_interaction_mode", "mode": "edit"}
     assert "bounds_epoch" not in controls[0]
@@ -8265,7 +8267,9 @@ def test_desktop_initial_controls_emit_launch_diagnostics_only_in_detailed_mode(
     basic_controller.settings = copy.deepcopy(controller.settings)
     basic_controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=False)
 
-    basic_controller._build_initial_desktop_runtime_controls(basic_controller.settings)
+    basic_controller._build_initial_desktop_runtime_controls_from_resolved_config(
+        controller_module.resolve_overlay_config(basic_controller.settings)
+    )
 
     assert basic_controller._runtime_logging.detailed_messages == []
 

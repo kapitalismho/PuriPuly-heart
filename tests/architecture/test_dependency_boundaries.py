@@ -1543,6 +1543,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "def _update_canonical_settings_from_compatibility_mutation(",
             "def effective_context_mode(",
             "def peer_warning_action_is_retry(",
+            "def _build_initial_desktop_runtime_controls(",
             "_self_local_asr_transition:",
             "_self_asr_model_loading:",
             "class _LocalASRTransitionSuperseded(",
