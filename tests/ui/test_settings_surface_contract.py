@@ -463,19 +463,19 @@ def _attribute_calls(source: str, owner_names: tuple[str, ...]) -> set[str]:
 
 
 def test_both_drivers_reach_the_settings_view_without_an_orphaned_push() -> None:
-    controller_source = (SOURCE_ROOT / "ui" / "controller.py").read_text(encoding="utf-8")
+    adapter_source = (SOURCE_ROOT / "ui" / "presentation_adapter.py").read_text(encoding="utf-8")
     app_source = (SOURCE_ROOT / "ui" / "app.py").read_text(encoding="utf-8")
     driver_names = ("view_settings", "settings_view")
 
-    controller_attrs = _attribute_calls(controller_source, driver_names)
+    adapter_attrs = _attribute_calls(adapter_source, driver_names)
     app_attrs = _attribute_calls(app_source, driver_names)
 
     for name in GUI_CONTROLLER_ONLY_PUSHES:
-        assert name in controller_attrs, f"{name} lost its GuiController push site"
+        assert name in adapter_attrs, f"{name} lost its presentation adapter push site"
         assert callable(getattr(settings_view_module.SettingsView, name, None)), name
 
     for name in DUAL_DRIVER_PUSHES:
-        assert name in controller_attrs, f"{name} lost its GuiController push site"
+        assert name in adapter_attrs, f"{name} lost its presentation adapter push site"
 
     assert "load_from_settings" in app_attrs
     assert "consume_provider_apply_settings" in app_attrs

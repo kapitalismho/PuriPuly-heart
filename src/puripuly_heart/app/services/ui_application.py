@@ -10,6 +10,7 @@ from typing import Any
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_application import UiApplicationState
+from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
@@ -314,9 +315,9 @@ class UiApplicationBoundary:
     def cancel_overlay_calibration(self) -> object:
         return self._backend.cancel_overlay_calibration()
 
-    def build_overlay_peer_consumer_contract(self) -> object | None:
-        build = getattr(self._backend, "build_overlay_peer_consumer_contract", None)
-        return build() if callable(build) else None
+    def overlay_peer_presentation_state(self) -> OverlayPeerPresentationState | None:
+        state = getattr(self._backend, "overlay_peer_presentation_state", None)
+        return state() if callable(state) else None
 
     def dashboard_managed_auth_action(self) -> str:
         action = getattr(self._backend, "dashboard_managed_auth_action", None)

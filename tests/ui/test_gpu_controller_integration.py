@@ -29,6 +29,7 @@ from puripuly_heart.core.local_stt_assets import (
 )
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 pytestmark = pytest.mark.asyncio
 
@@ -157,11 +158,18 @@ class RecordingSelfRecoveryOwner:
         return SimpleNamespace()
 
 
-def _controller() -> tuple[GuiController, CapturingGpuSettingsView]:
+def _controller(
+    dashboard: object | None = None,
+) -> tuple[GuiController, CapturingGpuSettingsView]:
     view = CapturingGpuSettingsView()
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(view_settings=view),
+        app=FletUiPresentationAdapter(
+            SimpleNamespace(
+                view_settings=view,
+                view_dashboard=dashboard,
+            )
+        ),
         config_path=Path("settings.json"),
         local_asr_provisioning=ReadyProvisioningPort(),
     )
@@ -290,9 +298,8 @@ async def test_unavailable_saved_gpu_device_retains_gpu_without_runtime_start() 
 
 
 async def test_gpu_install_notices_have_no_install_action() -> None:
-    controller, _view = _controller()
     notices = []
-    controller.app.view_dashboard = SimpleNamespace(set_gpu_notice=notices.append)
+    controller, _view = _controller(SimpleNamespace(set_gpu_notice=notices.append))
 
     controller._set_gpu_ui_state("not_installed", publish_notice=True)
     controller._set_gpu_ui_state("invalid", publish_notice=True)
@@ -304,15 +311,16 @@ async def test_gpu_install_notices_have_no_install_action() -> None:
 async def test_missing_gpu_model_preserves_self_enable_intent_without_downloading(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    controller, _view = _controller()
-    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
     dashboard_enabled: list[bool] = []
-    controller.app.view_dashboard = SimpleNamespace(
-        set_stt_enabled=dashboard_enabled.append,
-        set_local_stt_notice=lambda *_args, **_kwargs: None,
-        set_local_stt_notice_model=lambda *_args, **_kwargs: None,
-        set_gpu_notice=lambda _notice: None,
+    controller, _view = _controller(
+        SimpleNamespace(
+            set_stt_enabled=dashboard_enabled.append,
+            set_local_stt_notice=lambda *_args, **_kwargs: None,
+            set_local_stt_notice_model=lambda *_args, **_kwargs: None,
+            set_gpu_notice=lambda _notice: None,
+        )
     )
+    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
     install = AsyncMock()
 
     async def unavailable(_self: GuiController) -> bool:

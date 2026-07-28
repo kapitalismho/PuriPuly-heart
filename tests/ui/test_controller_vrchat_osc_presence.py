@@ -8,6 +8,7 @@ import pytest
 
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.ui.controller import GuiController
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
 @pytest.mark.asyncio
@@ -23,7 +24,7 @@ async def test_controller_owns_injected_osc_presence_probe_until_cancel() -> Non
     dashboard = SimpleNamespace(set_vrchat_osc_notice=lambda active: notices.append(bool(active)))
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(view_dashboard=dashboard),
+        app=FletUiPresentationAdapter(SimpleNamespace(view_dashboard=dashboard)),
         config_path=Path("settings.json"),
         vrchat_osc_presence=PresencePort(),
     )

@@ -12,6 +12,7 @@ pytest.importorskip("flet")
 import flet as ft
 
 import puripuly_heart.ui.app as app_module
+from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.config.settings import (
     AppSettings,
@@ -3625,10 +3626,18 @@ def test_refresh_overlay_peer_contract_ignores_missing_controller() -> None:
 
 def test_on_overlay_state_changed_updates_settings_view_runtime_state() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    contract = object()
+    state = OverlayPeerPresentationState(
+        overlay_intent_enabled=True,
+        overlay_state="failed",
+        overlay_failure_reason="runtime_crashed",
+        peer_intent_enabled=True,
+        peer_effective_enabled=False,
+        peer_warning_reason="overlay_failed",
+        peer_activation_starting=False,
+    )
     seen: list[tuple[str, str | None, str | None, bool | None]] = []
     refreshed: list[object] = []
-    app.controller = SimpleNamespace(build_overlay_peer_consumer_contract=lambda: contract)
+    app.controller = SimpleNamespace(overlay_peer_presentation_state=lambda: state)
     app.view_dashboard = SimpleNamespace(
         set_overlay_peer_contract=lambda incoming: refreshed.append(("dashboard", incoming))
     )
@@ -3649,7 +3658,10 @@ def test_on_overlay_state_changed_updates_settings_view_runtime_state() -> None:
     assert app.overlay_state == "failed"
     assert app.overlay_failure_reason == "runtime_crashed"
     assert seen == [("failed", "runtime_crashed", None, False)]
-    assert refreshed == [("settings", contract), ("dashboard", contract)]
+    assert refreshed == [
+        ("settings", app.overlay_peer_contract),
+        ("dashboard", app.overlay_peer_contract),
+    ]
 
 
 @pytest.mark.asyncio

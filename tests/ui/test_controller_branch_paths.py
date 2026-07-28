@@ -124,10 +124,12 @@ from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 from puripuly_heart.ui import controller as controller_module
+from puripuly_heart.ui import presentation_adapter as presentation_adapter_module
 from puripuly_heart.ui.app import TranslatorApp
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.i18n import set_locale, t
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.fakes import FakeSender
 
 PEER_DISCLOSURE_KEY = "peer_translation.disclosure"
@@ -763,10 +765,20 @@ class ReadyProvisioningPort:
         return {"owner": "LocalASRProvisioningOwner"}
 
 
+def _presentation(
+    app: object,
+    *,
+    page: object | None = None,
+) -> FletUiPresentationAdapter:
+    if page is not None:
+        setattr(app, "page", page)
+    return FletUiPresentationAdapter(app)
+
+
 def _make_controller(*, app: object) -> GuiController:
     return GuiController(
         page=SimpleNamespace(),
-        app=app,
+        app=_presentation(app),
         config_path=Path("settings.json"),
         local_asr_provisioning=ReadyProvisioningPort(),
     )
@@ -1149,11 +1161,7 @@ def test_local_qwen_suppression_non_gui_callback_logs_only_without_modal_attempt
 
 
 def test_debug_capture_fault_is_disabled_without_debug_preview() -> None:
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=SimpleNamespace(debug_ui_preview=False),
-        config_path=Path("settings.json"),
-    )
+    controller = _make_controller(app=SimpleNamespace(debug_ui_preview=False))
     controller._debug_capture_fault_profile = "capture_attenuate_40db"
 
     assert controller.cycle_debug_capture_fault_profile() == "none"
@@ -1405,7 +1413,7 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
         return SimpleNamespace()
 
     app = SimpleNamespace(debug_ui_preview=True)
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = _make_controller(app=app)
     controller.settings = AppSettings()
     prior_owner_closed: list[str] = []
 
@@ -1446,7 +1454,7 @@ async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
 @pytest.mark.asyncio
 async def test_rebuild_stt_provider_delegates_immutable_owner_request() -> None:
     app = SimpleNamespace(debug_ui_preview=False)
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = _make_controller(app=app)
     controller._runtime_logging = RuntimeLoggingSpy()
     controller.settings = AppSettings()
     configs: list[object] = []
@@ -1495,7 +1503,7 @@ async def test_rebuild_stt_provider_delegates_immutable_owner_request() -> None:
 
 def test_peer_stt_provider_request_preserves_resolved_runtime_config() -> None:
     app = SimpleNamespace(debug_ui_preview=True)
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = _make_controller(app=app)
     controller.settings = AppSettings()
     config = controller._build_peer_runtime_config(controller.settings)
 
@@ -1508,17 +1516,14 @@ def test_peer_stt_provider_request_preserves_resolved_runtime_config() -> None:
 
 
 def test_cycle_debug_stt_fault_profile_requires_debug_preview() -> None:
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=SimpleNamespace(debug_ui_preview=False),
-        config_path=Path("settings.json"),
-    )
+    app = SimpleNamespace(debug_ui_preview=False)
+    controller = _make_controller(app=app)
     controller._debug_stt_fault_profile = "stt_input_low_snr_vad_pass"
 
     assert controller.cycle_debug_stt_fault_profile() == "none"
     assert controller.debug_stt_fault_profile == "stt_input_low_snr_vad_pass"
 
-    controller.app.debug_ui_preview = True
+    app.debug_ui_preview = True
     assert controller.cycle_debug_stt_fault_profile() == "none"
     assert controller.cycle_debug_stt_fault_profile() == "stt_input_low_snr_vad_pass"
 
@@ -1536,7 +1541,7 @@ def test_wrap_diagnostic_audio_source_wires_capture_fault_provider_with_debug_ga
             return None
 
     app = SimpleNamespace(debug_ui_preview=True)
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = _make_controller(app=app)
     controller._runtime_logging = RuntimeLoggingSpy()
     controller._debug_capture_fault_profile = "capture_attenuate_40db"
 
@@ -1572,7 +1577,7 @@ async def test_clipboard_watcher_starts_and_stops_from_settings(
 
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
     )
     controller.settings = AppSettings()
@@ -1607,7 +1612,7 @@ async def test_clipboard_watcher_submits_valid_text_through_existing_path(
 
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
     )
     controller.settings = AppSettings()
@@ -1638,7 +1643,7 @@ async def test_clipboard_watcher_does_not_block_manual_fallback_when_translation
 
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
     )
     controller.settings = AppSettings()
@@ -1670,7 +1675,7 @@ async def test_clipboard_watcher_ignores_empty_and_long_text(
 
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
     )
     controller.settings = AppSettings()
@@ -1703,7 +1708,7 @@ async def test_clipboard_watcher_not_started_on_non_windows(
 
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
     )
     controller.settings = AppSettings()
@@ -1743,8 +1748,8 @@ async def test_start_local_llm_without_runtime_does_not_show_api_key_warning(
     monkeypatch.setattr(GuiController, "_load_or_init_settings", lambda self, path: settings)
     monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(controller_module, "set_locale", lambda _locale: None)
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeBridge)
+    monkeypatch.setattr(presentation_adapter_module, "set_ui_locale", lambda _locale: None)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
     monkeypatch.setattr(
         controller_module, "create_secret_store", lambda *_a, **_k: DummySecrets({})
     )
@@ -3645,7 +3650,7 @@ async def test_start_discord_managed_auth_from_dialog_rebuild_failure_returns_fa
         self.hub.llm = None
 
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-    monkeypatch.setattr(controller_module, "t", lambda key, **_kwargs: key)
+    monkeypatch.setattr(presentation_adapter_module, "t", lambda key, **_kwargs: key)
 
     ok = await controller.start_discord_managed_auth_from_dialog()
 
@@ -3669,7 +3674,7 @@ async def test_start_discord_managed_auth_from_dialog_missing_service_shows_retr
     controller.settings.provider.llm = LLMProviderName.OPENROUTER
     controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     controller.hub = DummyHub(llm=object())
-    monkeypatch.setattr(controller_module, "t", lambda key, **_kwargs: key)
+    monkeypatch.setattr(presentation_adapter_module, "t", lambda key, **_kwargs: key)
 
     ok = await controller.start_discord_managed_auth_from_dialog()
 
@@ -3718,7 +3723,7 @@ async def test_start_discord_managed_auth_from_dialog_maps_error_subcodes_to_mes
             ),
         )
     )
-    monkeypatch.setattr(controller_module, "t", lambda key, **_kwargs: key)
+    monkeypatch.setattr(presentation_adapter_module, "t", lambda key, **_kwargs: key)
 
     ok = await controller.start_discord_managed_auth_from_dialog()
 
@@ -3756,7 +3761,7 @@ async def test_start_discord_managed_auth_from_dialog_does_not_log_raw_broker_di
             ),
         )
     )
-    monkeypatch.setattr(controller_module, "t", lambda key, **_kwargs: key)
+    monkeypatch.setattr(presentation_adapter_module, "t", lambda key, **_kwargs: key)
 
     ok = await controller.start_discord_managed_auth_from_dialog()
 
@@ -4883,9 +4888,16 @@ async def test_set_peer_translation_enabled_routes_through_controller_runtime_ru
     provider: STTProviderName,
 ) -> None:
     refresh_calls: list[str] = []
-    controller = _make_controller(
-        app=SimpleNamespace(refresh_overlay_peer_contract=lambda: refresh_calls.append("refresh"))
+    contracts = []
+    app = SimpleNamespace(
+        view_dashboard=SimpleNamespace(
+            set_overlay_peer_contract=lambda contract: (
+                refresh_calls.append("refresh"),
+                contracts.append(contract),
+            )
+        )
     )
+    controller = _make_controller(app=app)
     controller.settings = AppSettings()
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.settings.provider.peer_stt = provider
@@ -4914,8 +4926,7 @@ async def test_set_peer_translation_enabled_routes_through_controller_runtime_ru
     assert controller.overlay_state == "starting"
     assert refresh_calls == ["refresh", "refresh", "refresh"]
 
-    contract = controller.build_overlay_peer_consumer_contract()
-    assert contract is not None
+    contract = contracts[-1]
     assert contract.peer.state == "starting"
     assert contract.peer.helper_text == ""
 
@@ -4928,7 +4939,11 @@ async def test_set_peer_translation_enabled_requires_eula_acceptance_before_pers
     begin_calls: list[str] = []
     save_calls: list[str] = []
     controller = _make_controller(
-        app=SimpleNamespace(refresh_overlay_peer_contract=lambda: refresh_calls.append("refresh"))
+        app=SimpleNamespace(
+            view_dashboard=SimpleNamespace(
+                set_overlay_peer_contract=lambda _contract: refresh_calls.append("refresh")
+            )
+        )
     )
     controller.settings = AppSettings()
     controller.settings.ui.overlay_enabled = False
@@ -4965,9 +4980,7 @@ async def test_set_peer_translation_enabled_enqueues_peer_disclosure_once(
 ) -> None:
     set_locale("ko")
     try:
-        controller = _make_controller(
-            app=SimpleNamespace(refresh_overlay_peer_contract=lambda: None)
-        )
+        controller = _make_controller(app=SimpleNamespace())
         controller.settings = AppSettings()
         controller.settings.ui.peer_translation_eula_accepted = True
         controller.hub = DisclosureDummyHub(llm=object(), stt=object(), peer_stt=object())
@@ -5019,7 +5032,7 @@ async def test_rebuild_pipeline_closes_previous_peer_runtime_before_replacement(
         "_configure_vrc_mic_receiver",
         lambda self, enabled: asyncio.sleep(0),
     )
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeUIEventBridge)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
     monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
 
@@ -5061,7 +5074,7 @@ async def test_rebuild_pipeline_retires_old_owner_typing_state(
         "_configure_vrc_mic_receiver",
         lambda self, enabled: asyncio.sleep(0),
     )
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeUIEventBridge)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
 
     await controller._rebuild_pipeline(rebuild_stt=True)
@@ -5243,7 +5256,7 @@ async def test_rebuild_pipeline_local_llm_without_runtime_does_not_show_api_key_
         "_configure_vrc_mic_receiver",
         lambda self, *, enabled: asyncio.sleep(0),
     )
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeUIEventBridge)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
     monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
 
@@ -5295,7 +5308,7 @@ async def test_rebuild_pipeline_rebinds_overlay_presenter_to_new_hub(
         "_refresh_overlay_runtime_dependencies",
         lambda self: asyncio.sleep(0),
     )
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeUIEventBridge)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
     monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
 
@@ -5351,7 +5364,7 @@ async def test_rebuild_pipeline_keeps_preserved_presenter_detached_when_overlay_
         "_configure_vrc_mic_receiver",
         lambda self, *, enabled: asyncio.sleep(0),
     )
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeUIEventBridge)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
     monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
 
@@ -5413,7 +5426,7 @@ async def test_rebuild_pipeline_refreshes_overlay_dependencies_without_overlay_r
         fake_refresh_overlay_runtime_dependencies,
     )
     monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeUIEventBridge)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeUIEventBridge)
 
     await controller._rebuild_pipeline(rebuild_stt=True)
     await asyncio.sleep(0)
@@ -5723,11 +5736,12 @@ async def test_initial_peer_local_activation_publishes_starting_until_provider_a
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     contracts = []
-    app = SimpleNamespace()
-    controller = _make_controller(app=app)
-    app.refresh_overlay_peer_contract = lambda: contracts.append(
-        controller.build_overlay_peer_consumer_contract()
+    app = SimpleNamespace(
+        view_dashboard=SimpleNamespace(
+            set_overlay_peer_contract=contracts.append,
+        )
     )
+    controller = _make_controller(app=app)
     controller.settings = AppSettings()
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
     controller.settings.ui.peer_translation_enabled = True
@@ -5884,7 +5898,7 @@ async def test_create_peer_audio_source_logs_loopback_resolution(monkeypatch) ->
 
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(debug_ui_preview=False),
+        app=_presentation(SimpleNamespace(debug_ui_preview=False)),
         config_path=Path("settings.json"),
     )
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
@@ -5938,7 +5952,11 @@ async def test_create_peer_audio_source_wires_capture_fault_provider(
     monkeypatch.setattr(controller_module, "DesktopPeerPipeline", fake_peer_pipeline)
 
     app = SimpleNamespace(debug_ui_preview=True)
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=_presentation(app),
+        config_path=Path("settings.json"),
+    )
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
     controller._debug_capture_fault_profile = "capture_attenuate_40db"
     config = PeerRuntimeConfig(
@@ -6290,7 +6308,11 @@ async def test_closing_desktop_overlay_runtime_rejects_direct_bridge_commands() 
             self.tasks.append(coro_fn)
 
     page = FakePage()
-    controller = GuiController(page=page, app=SimpleNamespace(), config_path=Path("settings.json"))
+    controller = GuiController(
+        page=page,
+        app=_presentation(SimpleNamespace(), page=page),
+        config_path=Path("settings.json"),
+    )
     controller.settings = AppSettings()
     controller.settings.ui.overlay_enabled = True
     controller.settings.overlay.target = OVERLAY_TARGET_DESKTOP
@@ -6379,7 +6401,11 @@ async def test_closing_overlay_runtime_rejects_direct_presenter_commands() -> No
             self.tasks.append(coro_fn)
 
     page = FakePage()
-    controller = GuiController(page=page, app=SimpleNamespace(), config_path=Path("settings.json"))
+    controller = GuiController(
+        page=page,
+        app=_presentation(SimpleNamespace(), page=page),
+        config_path=Path("settings.json"),
+    )
     controller.settings = AppSettings()
     controller.overlay_state = "connected"
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -7881,7 +7907,11 @@ def test_vr_overlay_calibration_reset_does_not_mutate_desktop_overlay_settings(
     _patch_settings_save(monkeypatch, fail_direct_save)
 
     page = FakePage()
-    controller = GuiController(page=page, app=SimpleNamespace(), config_path=Path("settings.json"))
+    controller = GuiController(
+        page=page,
+        app=_presentation(SimpleNamespace(), page=page),
+        config_path=Path("settings.json"),
+    )
     controller.settings = AppSettings()
     service = RecordingSettingsMutationService()
     controller.settings_mutation_service = service
@@ -8456,7 +8486,7 @@ async def test_overlay_start_restores_compatibility_refresh_for_existing_present
 
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
     controller.settings = AppSettings()
@@ -8598,7 +8628,7 @@ async def test_desktop_overlay_start_disables_existing_peer_presentation_refresh
 
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
     controller.settings = AppSettings()
@@ -8827,20 +8857,17 @@ async def test_successful_overlay_start_refreshes_consumers_after_peer_runtime_b
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
 
     contracts = []
-    app = SimpleNamespace()
+    app = SimpleNamespace(
+        view_dashboard=SimpleNamespace(
+            set_overlay_peer_contract=contracts.append,
+        )
+    )
     controller = _make_controller(app=app)
-
-    def refresh_overlay_peer_contract() -> None:
-        contract = controller.build_overlay_peer_consumer_contract()
-        if contract is not None:
-            contracts.append(contract)
 
     def on_overlay_state_changed(*, state: str, failure_reason: str | None = None) -> None:
         app.overlay_state = state
         app.overlay_failure_reason = failure_reason
-        refresh_overlay_peer_contract()
 
-    app.refresh_overlay_peer_contract = refresh_overlay_peer_contract
     app.on_overlay_state_changed = on_overlay_state_changed
     controller._ui_event_bridge = SimpleNamespace(
         report_overlay_state=lambda state, failure_reason=None: on_overlay_state_changed(
@@ -11685,7 +11712,7 @@ async def test_audio_settings_change_stops_active_microphone_test_and_next_start
 ) -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
     )
     controller.settings = AppSettings()
@@ -11731,7 +11758,7 @@ async def test_audio_settings_change_stops_active_microphone_test_after_in_place
 ) -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
     )
     controller.settings = AppSettings()
@@ -12342,7 +12369,7 @@ def test_controller_runtime_logging_uses_injected_main_sinks(
     monkeypatch.setattr(controller_module, "SessionRuntimeLoggingService", create_session)
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
         runtime_logging_sinks=sinks,
     )
@@ -12904,8 +12931,12 @@ async def test_start_initializes_dashboard_and_bridge(
         lambda self: sync_calls.append("synced"),
     )
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(controller_module, "set_locale", lambda locale: locale_calls.append(locale))
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeBridge)
+    monkeypatch.setattr(
+        presentation_adapter_module,
+        "set_ui_locale",
+        lambda locale: locale_calls.append(locale),
+    )
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
     app = SimpleNamespace(
         view_dashboard=dash,
         view_logs=logs,
@@ -13020,8 +13051,8 @@ async def test_start_does_not_auto_restore_transient_overlay_or_peer_toggles(
     monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
     monkeypatch.setattr(GuiController, "set_overlay_enabled", fake_set_overlay_enabled)
-    monkeypatch.setattr(controller_module, "set_locale", lambda _locale: None)
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeBridge)
+    monkeypatch.setattr(presentation_adapter_module, "set_ui_locale", lambda _locale: None)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
 
     controller = _make_controller(
         app=SimpleNamespace(
@@ -13063,7 +13094,11 @@ async def test_set_runtime_logging_mode_emits_audio_snapshot_once_on_basic_to_de
 
     runtime = RuntimeLoggingSpy(detailed_enabled=False)
     page = FakePage()
-    controller = GuiController(page=page, app=SimpleNamespace(), config_path=Path("settings.json"))
+    controller = GuiController(
+        page=page,
+        app=_presentation(SimpleNamespace(), page=page),
+        config_path=Path("settings.json"),
+    )
     controller._runtime_logging = runtime
 
     controller.set_runtime_logging_mode("detailed")
@@ -13097,9 +13132,10 @@ async def test_set_runtime_logging_mode_audio_snapshot_run_task_failure_falls_ba
     )
 
     runtime = RuntimeLoggingSpy(detailed_enabled=False)
+    page = FailingPage()
     controller = GuiController(
-        page=FailingPage(),
-        app=SimpleNamespace(),
+        page=page,
+        app=_presentation(SimpleNamespace(), page=page),
         config_path=Path("settings.json"),
     )
     controller._runtime_logging = runtime
@@ -13136,7 +13172,11 @@ async def test_set_runtime_logging_mode_updates_overlay_runtime_contract() -> No
             self.modes.append(mode)
 
     page = FakePage()
-    controller = GuiController(page=page, app=SimpleNamespace(), config_path=Path("settings.json"))
+    controller = GuiController(
+        page=page,
+        app=_presentation(SimpleNamespace(), page=page),
+        config_path=Path("settings.json"),
+    )
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
     _attach_overlay_bridge(controller, FakeOverlayBridge(session_token="token"))
     manager = OverlayManagerSpy()
@@ -13174,7 +13214,7 @@ async def test_start_keeps_managed_openrouter_dashboard_toggle_available_without
     monkeypatch.setattr(GuiController, "_load_or_init_settings", lambda self, path: settings)
     monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(controller_module, "set_locale", lambda _locale: None)
+    monkeypatch.setattr(presentation_adapter_module, "set_ui_locale", lambda _locale: None)
     monkeypatch.setattr(
         controller_module,
         "create_secret_store",
@@ -13197,7 +13237,7 @@ async def test_start_keeps_managed_openrouter_dashboard_toggle_available_without
         async def run(self) -> None:
             return None
 
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeBridge)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
 
     controller = _make_controller(
         app=SimpleNamespace(view_dashboard=dash, view_logs=logs, view_settings=settings_view)
@@ -13240,7 +13280,7 @@ async def test_exhausted_managed_start_and_background_verify_do_not_auto_show_fo
     monkeypatch.setattr(GuiController, "_load_or_init_settings", lambda self, path: settings)
     monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(controller_module, "set_locale", lambda _locale: None)
+    monkeypatch.setattr(presentation_adapter_module, "set_ui_locale", lambda _locale: None)
     monkeypatch.setattr(
         controller_module,
         "create_secret_store",
@@ -13267,7 +13307,7 @@ async def test_exhausted_managed_start_and_background_verify_do_not_auto_show_fo
         async def run(self) -> None:
             return None
 
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeBridge)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
 
     controller = _make_controller(
         app=SimpleNamespace(
@@ -13529,7 +13569,6 @@ def test_managed_usage_view_state_clears_pass_status_when_identity_key_changes()
     controller._talk_together_pass_status_key = (None, "old-ref", "7KQ9M2")  # noqa: SLF001
 
     controller._set_managed_usage_view_state(  # noqa: SLF001
-        view_settings=settings_view,
         visible=True,
         remaining_percent=71,
         referral_id="7KQ9M2",
@@ -13624,7 +13663,6 @@ def test_status_refresh_managed_key_setter_type_error_is_not_masked() -> None:
 
     with pytest.raises(TypeError, match="pass_status setter internals failed"):
         controller._set_managed_usage_view_state(  # noqa: SLF001
-            view_settings=settings_view,
             visible=True,
             remaining_percent=71,
             referral_id="7KQ9M2",
@@ -14853,8 +14891,12 @@ async def test_apply_settings_replaces_stt_provider_when_source_language_changes
     async def fake_rebuild_pipeline(self, *, rebuild_stt: bool) -> None:
         pipeline_calls.append(rebuild_stt)
 
-    monkeypatch.setattr(controller_module, "get_locale", lambda: "en")
-    monkeypatch.setattr(controller_module, "set_locale", lambda locale: locale_calls.append(locale))
+    monkeypatch.setattr(
+        presentation_adapter_module,
+        "set_ui_locale",
+        lambda locale: locale_calls.append(locale),
+    )
+    monkeypatch.setattr(presentation_adapter_module, "get_ui_locale", lambda: "en")
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: saved.append("saved"))
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
@@ -14891,7 +14933,6 @@ async def test_apply_settings_source_language_change_reloads_settings_view(
         _ = self
         replace_calls.append("replace")
 
-    monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
@@ -14924,7 +14965,6 @@ async def test_apply_settings_reloads_settings_view_for_target_only_change(
     async def fake_refresh_peer_stt_runtime(self) -> None:
         _ = self
 
-    monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
@@ -14972,7 +15012,6 @@ async def test_apply_settings_target_only_change_clears_self_language_runtime_st
         _ = self
         refresh_peer_calls.append("peer")
 
-    monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController,
@@ -15026,7 +15065,6 @@ async def test_apply_settings_self_target_change_clears_peer_runtime_when_peer_t
         _ = self
         refresh_peer_calls.append("peer")
 
-    monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController,
@@ -15080,7 +15118,6 @@ async def test_apply_settings_self_source_change_clears_peer_runtime_when_peer_s
         _ = self
         refresh_peer_calls.append("peer")
 
-    monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController,
@@ -15133,7 +15170,6 @@ async def test_apply_settings_logs_and_continues_when_language_cleanup_fails(
     async def fake_refresh_peer_stt_runtime(self) -> None:
         raise AssertionError("peer runtime should not refresh for explicit peer target")
 
-    monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController,
@@ -15182,7 +15218,6 @@ async def test_order22_language_runtime_clear_failure_degrades_without_raw_log_t
     pending.languages.target_language = "ja"
 
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
         GuiController,
@@ -15299,9 +15334,10 @@ async def test_order24_locale_runtime_failure_degrades_without_raw_exception_tex
         saved_settings.append(copy.deepcopy(incoming))
 
     _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: "en")
     monkeypatch.setattr(
-        controller_module, "set_locale", lambda locale: applied_locales.append(locale)
+        presentation_adapter_module,
+        "set_ui_locale",
+        lambda locale: applied_locales.append(locale),
     )
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
 
@@ -15360,7 +15396,6 @@ async def test_order24_clipboard_start_failure_degrades_without_raw_exception_te
         saved_settings.append(copy.deepcopy(incoming))
 
     _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(controller_module.sys, "platform", "win32")
     monkeypatch.setattr(
         controller_module,
@@ -15432,7 +15467,6 @@ async def test_order24_clipboard_stop_failure_degrades_without_raw_exception_tex
         saved_settings.append(copy.deepcopy(incoming))
 
     _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
 
     await controller.apply_settings(pending)
 
@@ -15667,7 +15701,6 @@ async def test_apply_settings_reload_updates_overlay_calibration_baseline_withou
     async def fake_refresh_peer_stt_runtime(self) -> None:
         _ = self
 
-    monkeypatch.setattr(controller_module, "get_locale", lambda: settings.ui.locale)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
@@ -15748,8 +15781,12 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
         _ = self, smooth_local
         switch_calls.append("replace_stt")
 
-    monkeypatch.setattr(controller_module, "get_locale", lambda: "en")
-    monkeypatch.setattr(controller_module, "set_locale", lambda locale: locale_calls.append(locale))
+    monkeypatch.setattr(
+        presentation_adapter_module,
+        "set_ui_locale",
+        lambda locale: locale_calls.append(locale),
+    )
+    monkeypatch.setattr(presentation_adapter_module, "get_ui_locale", lambda: "en")
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
     monkeypatch.setattr(
@@ -17589,7 +17626,6 @@ async def test_order22_apply_settings_routes_stt_language_audio_patch_through_de
 
     monkeypatch.setattr(settings_mutation.SettingsMutationService, "mutate", capture_mutate)
     _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
         GuiController,
@@ -17662,7 +17698,6 @@ async def test_order22_apply_settings_runtime_failure_degrades_without_rollback_
         raise RuntimeError(raw_failure_text)
 
     _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
         GuiController,
@@ -17812,7 +17847,6 @@ async def test_order22_apply_settings_self_stt_provider_specific_change_restarts
 
     monkeypatch.setattr(settings_mutation.SettingsMutationService, "mutate", capture_mutate)
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
         GuiController,
@@ -17874,7 +17908,6 @@ async def test_order22_apply_settings_mixed_draft_applies_audio_runtime_and_pres
 
     monkeypatch.setattr(settings_mutation.SettingsMutationService, "mutate", capture_mutate)
     _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
         GuiController,
@@ -17964,7 +17997,6 @@ async def test_mixed_order22_order23_order24_fallback_save_failure_restores_comm
             raise RuntimeError(raw_failure_text)
 
     _patch_settings_save(monkeypatch, fail_uncommitted_full_draft_save)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
         GuiController,
@@ -18052,7 +18084,6 @@ async def test_order22_apply_settings_mixed_full_draft_save_failure_degrades_and
             raise RuntimeError(raw_failure_text)
 
     _patch_settings_save(monkeypatch, fail_third_save)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
         GuiController,
@@ -18455,7 +18486,6 @@ async def test_provider_order21_order24_fallback_save_failure_restores_committed
         self.hub.llm = object()
 
     _patch_settings_save(monkeypatch, fail_uncommitted_full_draft_save)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
 
@@ -18644,7 +18674,6 @@ async def test_order22_mixed_settings_direct_fallback_degrades_when_stt_unavaila
         self.hub.stt = None
 
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
         GuiController,
@@ -18704,7 +18733,6 @@ async def test_order22_qwen_historical_low_latency_change_does_not_rebuild_llm(
         rebuild_calls.append(self.hub.low_latency_mode)
 
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
         GuiController,
@@ -18751,7 +18779,6 @@ async def test_order22_qwen_historical_false_cannot_restore_non_fast_runtime(
         rebuild_markers.append(self.hub.low_latency_mode)
 
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(controller_module, "get_locale", lambda: controller.settings.ui.locale)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
         GuiController,
@@ -19551,7 +19578,12 @@ async def test_apply_providers_refreshes_only_peer_runtime_for_peer_provider_dra
 async def test_apply_providers_republishes_overlay_peer_contract_after_peer_refresh(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = SimpleNamespace()
+    contracts = []
+    app = SimpleNamespace(
+        view_dashboard=SimpleNamespace(
+            set_overlay_peer_contract=contracts.append,
+        )
+    )
     controller = _make_controller(app=app)
     controller.settings = AppSettings()
     controller.settings.ui.overlay_enabled = True
@@ -19559,15 +19591,6 @@ async def test_apply_providers_republishes_overlay_peer_contract_after_peer_refr
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.hub = DummyHub(peer_stt=None)
     controller.overlay_state = "connected"
-    contracts = []
-
-    def refresh_overlay_peer_contract() -> None:
-        contract = controller.build_overlay_peer_consumer_contract()
-        if contract is not None:
-            contracts.append(contract)
-
-    app.refresh_overlay_peer_contract = refresh_overlay_peer_contract
-
     updated = AppSettings()
     updated.ui.overlay_enabled = True
     updated.ui.peer_translation_enabled = True
@@ -20101,7 +20124,7 @@ async def test_rebuild_pipeline_restarts_runtime_and_schedules_verify(
     )
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
     monkeypatch.setattr(GuiController, "_verify_and_update_status", fake_verify_and_update_status)
-    monkeypatch.setattr(controller_module, "UIEventBridge", FakeBridge)
+    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
     await controller._rebuild_pipeline(rebuild_stt=True)
     await asyncio.sleep(0)
 
@@ -20154,7 +20177,7 @@ async def test_rebuild_pipeline_restores_stt_when_it_was_previously_enabled(
     monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
     monkeypatch.setattr(GuiController, "_verify_and_update_status", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        controller_module,
+        presentation_adapter_module,
         "UIEventBridge",
         lambda **kwargs: SimpleNamespace(run=lambda: asyncio.sleep(0)),
     )
@@ -20261,7 +20284,11 @@ def test_apply_overlay_calibration_uses_page_run_task_when_available(
     _patch_settings_save(monkeypatch, fail_direct_save)
 
     page = FakePage()
-    controller = GuiController(page=page, app=SimpleNamespace(), config_path=Path("settings.json"))
+    controller = GuiController(
+        page=page,
+        app=_presentation(SimpleNamespace(), page=page),
+        config_path=Path("settings.json"),
+    )
     controller.settings = AppSettings()
     controller.overlay_state = "connected"
     service = RecordingSettingsMutationService()
@@ -20335,9 +20362,10 @@ def test_schedule_overlay_calibration_emit_preserves_traceback_in_detailed_log()
             _ = coro_fn
             raise RuntimeError("boom")
 
+    page = FailingPage()
     controller = GuiController(
-        page=FailingPage(),
-        app=SimpleNamespace(),
+        page=page,
+        app=_presentation(SimpleNamespace(), page=page),
         config_path=Path("settings.json"),
     )
     controller._runtime_logging = RuntimeLoggingSpy()
@@ -20372,7 +20400,11 @@ async def test_apply_overlay_calibration_persists_settings_and_emits_overlay_eve
     _patch_settings_save(monkeypatch, fail_direct_save)
 
     page = FakePage()
-    controller = GuiController(page=page, app=SimpleNamespace(), config_path=Path("settings.json"))
+    controller = GuiController(
+        page=page,
+        app=_presentation(SimpleNamespace(), page=page),
+        config_path=Path("settings.json"),
+    )
     controller.settings = AppSettings()
     controller.overlay_state = "connected"
     service = RecordingSettingsMutationService()

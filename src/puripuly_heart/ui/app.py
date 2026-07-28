@@ -1089,18 +1089,13 @@ class TranslatorApp:
                 )
 
     def refresh_overlay_peer_contract(self) -> None:
-        contract = self.application.build_overlay_peer_consumer_contract()
-        self.overlay_peer_contract = contract
-        if contract is None:
-            return
-        view_settings = getattr(self, "view_settings", None)
-        set_settings_contract = getattr(view_settings, "set_overlay_peer_contract", None)
-        if callable(set_settings_contract):
-            set_settings_contract(contract)
-        view_dashboard = getattr(self, "view_dashboard", None)
-        set_dashboard_contract = getattr(view_dashboard, "set_overlay_peer_contract", None)
-        if callable(set_dashboard_contract):
-            set_dashboard_contract(contract)
+        presentation = getattr(self, "_presentation_adapter", None)
+        if presentation is None:
+            presentation = FletUiPresentationAdapter(self)
+            self._presentation_adapter = presentation
+        presentation.refresh_overlay_peer_contract(
+            self.application.overlay_peer_presentation_state()
+        )
 
     def _sync_settings_overlay_runtime_state(self) -> None:
         view_settings = getattr(self, "view_settings", None)

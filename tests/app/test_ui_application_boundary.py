@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationIntentRejectedError,
     ApplicationShutdownCoordinator,
@@ -159,9 +160,17 @@ class RecordingBackend:
         self.events.append(("calibration-cancel",))
         return True
 
-    def build_overlay_peer_consumer_contract(self) -> object:
+    def overlay_peer_presentation_state(self) -> OverlayPeerPresentationState:
         self.events.append(("overlay-peer-contract",))
-        return "peer-contract"
+        return OverlayPeerPresentationState(
+            overlay_intent_enabled=True,
+            overlay_state="connected",
+            overlay_failure_reason=None,
+            peer_intent_enabled=True,
+            peer_effective_enabled=True,
+            peer_warning_reason=None,
+            peer_activation_starting=False,
+        )
 
     def cycle_debug_capture_fault_profile(self) -> str:
         self.events.append(("capture-fault",))
@@ -413,7 +422,15 @@ async def test_overlay_projection_calibration_apply_cancel_and_reset_delegate() 
     assert boundary.set_overlay_calibration_field("opacity", 0.8) == 0.8
     assert boundary.apply_overlay_calibration() is True
     assert boundary.cancel_overlay_calibration() is True
-    assert boundary.build_overlay_peer_consumer_contract() == "peer-contract"
+    assert boundary.overlay_peer_presentation_state() == OverlayPeerPresentationState(
+        overlay_intent_enabled=True,
+        overlay_state="connected",
+        overlay_failure_reason=None,
+        peer_intent_enabled=True,
+        peer_effective_enabled=True,
+        peer_warning_reason=None,
+        peer_activation_starting=False,
+    )
 
     assert backend.events == [
         ("overlay-lock", True),

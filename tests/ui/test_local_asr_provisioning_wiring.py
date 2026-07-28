@@ -25,6 +25,7 @@ from puripuly_heart.core.local_stt_assets import (
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
 from puripuly_heart.ui.controller import GuiController
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
 async def _wait_until(predicate: Callable[[], bool]) -> None:
@@ -251,10 +252,12 @@ def _controller(
 ) -> GuiController:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=(
-            SimpleNamespace(view_dashboard=dashboard)
-            if dashboard is not None
-            else SimpleNamespace()
+        app=FletUiPresentationAdapter(
+            (
+                SimpleNamespace(view_dashboard=dashboard)
+                if dashboard is not None
+                else SimpleNamespace()
+            )
         ),
         config_path=Path("settings.json"),
         local_asr_provisioning=port,

@@ -39,7 +39,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/ui/views/settings.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/controller.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/ui/controller.py", LOOP_CREATE_TASK): 3,
-        ("src/puripuly_heart/ui/controller.py", BARE_RUN_TASK): 5,
+        ("src/puripuly_heart/ui/presentation_adapter.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/desktop_overlay.py", ASYNCIO_CREATE_TASK): 11,
         ("src/puripuly_heart/ui/desktop_overlay.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/core/osc/receiver.py", LOOP_CREATE_TASK): 1,
@@ -138,9 +138,9 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         LOOP_CREATE_TASK,
     ): "controller retains three loop-bound UI scheduling call sites for overlay updates and owner-scoped manual typing idle timeout after G09 lifecycle cutover",
     (
-        "src/puripuly_heart/ui/controller.py",
+        "src/puripuly_heart/ui/presentation_adapter.py",
         BARE_RUN_TASK,
-    ): "controller has exactly five injected UI task-runner call sites for overlay, calibration, and runtime callback scheduling",
+    ): "Flet presentation adapter owns one injected page task-runner call site for UI callback scheduling",
     (
         "src/puripuly_heart/ui/desktop_overlay.py",
         ASYNCIO_CREATE_TASK,

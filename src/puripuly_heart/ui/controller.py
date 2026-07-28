@@ -20,7 +20,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Protocol, cast
 
-import flet as ft
 import numpy as np
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
@@ -39,6 +38,13 @@ from puripuly_heart.app.ports.settings_repository import (
     SettingsCommitRequest,
     SettingsCommitResult,
     SettingsSnapshot,
+)
+from puripuly_heart.app.ports.ui_models import (
+    GpuDashboardNotice,
+    GpuDeviceOption,
+    GpuNoticeAction,
+    OptionItem,
+    OverlayPeerPresentationState,
 )
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
@@ -323,6 +329,7 @@ from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildS
 from puripuly_heart.core.runtime.receiver import VrcMicReceiverRuntime
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime_logging import (
+    RealtimeLogHandler,
     RuntimeLoggingSinks,
     SessionLoggingMode,
     SessionRuntimeLoggingService,
@@ -347,21 +354,6 @@ from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
 from puripuly_heart.core.vad.gating import VadGating, create_peer_vad_gating
 from puripuly_heart.core.vad.silero import SileroVadOnnx
-from puripuly_heart.ui.components.settings.settings_modal import OptionItem
-from puripuly_heart.ui.event_bridge import (
-    AppConversationEventDestination,
-    AppDashboardEventDestination,
-    AppHistoryEventDestination,
-    UIEventBridge,
-)
-from puripuly_heart.ui.gpu_device import GpuDeviceOption
-from puripuly_heart.ui.gpu_notice import GpuDashboardNotice, GpuNoticeAction
-from puripuly_heart.ui.i18n import get_locale, set_locale, t
-from puripuly_heart.ui.overlay_peer_contract import (
-    OverlayPeerConsumerContract,
-    build_overlay_peer_consumer_contract,
-)
-from puripuly_heart.ui.views.logs import FletLogHandler
 
 logger = logging.getLogger(__name__)
 
@@ -995,7 +987,7 @@ class _ControllerProviderVerifier(Protocol):
 
 @dataclass(slots=True)
 class GuiController:
-    page: ft.Page
+    page: object
     app: UiPresentationPort
     config_path: Path
     allow_stable_settings_import: bool = False
@@ -1150,7 +1142,7 @@ class GuiController:
         repr=False,
     )
     _vrc_receiver_lock: asyncio.Lock | None = None
-    _ui_event_bridge: UIEventBridge | None = None
+    _ui_event_bridge: object | None = None
     _clipboard_runtime: ClipboardRuntime | None = field(init=False, default=None)
     _clipboard_watcher_lock: asyncio.Lock | None = field(init=False, default=None)
     _strict_runtime_errors_for_clipboard_watcher: bool = field(
@@ -1350,13 +1342,13 @@ class GuiController:
             return None, None
         return self.settings.languages.source_language, self.settings.languages.target_language
 
-    def build_overlay_peer_consumer_contract(self) -> OverlayPeerConsumerContract | None:
+    def overlay_peer_presentation_state(self) -> OverlayPeerPresentationState | None:
         if self.settings is None:
             return None
         peer_effective = self._effective_peer_translation_enabled_for(self.settings)
         if peer_effective or not self.settings.ui.peer_translation_enabled:
             self._peer_process_warning_reason = None
-        return build_overlay_peer_consumer_contract(
+        return OverlayPeerPresentationState(
             overlay_intent_enabled=bool(self.settings.ui.overlay_enabled),
             overlay_state=self.overlay_state,
             overlay_failure_reason=self.failure_reason,
@@ -1369,10 +1361,8 @@ class GuiController:
         )
 
     def _refresh_overlay_peer_consumers(self) -> None:
-        refresh_contract = getattr(self.app, "refresh_overlay_peer_contract", None)
-        if callable(refresh_contract):
-            with contextlib.suppress(Exception):
-                refresh_contract()
+        with contextlib.suppress(Exception):
+            self.app.refresh_overlay_peer_contract(self.overlay_peer_presentation_state())
 
     async def _refresh_overlay_runtime_dependencies(
         self,
@@ -1425,7 +1415,7 @@ class GuiController:
         self.settings.ui.peer_translation_enabled = False
         self._sync_overlay_calibration_cache(self.settings)
         self._overlay_calibration_draft = None
-        set_locale(self.settings.ui.locale)
+        self.app.set_locale(self.settings.ui.locale)
         self._sync_ui_from_settings()
         self._notify_manual_local_asr_fallback(
             fallback_channels,
@@ -1439,54 +1429,44 @@ class GuiController:
         runtime_logging = self.runtime_logging
         runtime_logging.set_mode(SessionLoggingMode.BASIC)
 
-        # Attach realtime sink to LogsView for GUI log display
-        logs_view = getattr(self.app, "view_logs", None)
-        if logs_view is not None:
-            runtime_logging.attach_realtime_sink(logs_view)
+        self.app.attach_runtime_log_sink(runtime_logging)
 
         await self._init_pipeline()
         self._sync_local_stt_notice()
 
         assert self.hub is not None
 
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is not None:
-            # Set needs_key flags based on saved verification status & key existence
-            # STT: check current provider's verification status
-            stt_provider = self.settings.provider.stt.value
-            if self._stt_provider_requires_secret(self.settings.provider.stt):
-                # Map stt provider to api_key_verified field name (qwen_asr uses alibaba keys)
-                stt_key_map = {"qwen_asr": self._get_alibaba_verified_key()}
-                stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
-                stt_verified = getattr(self.settings.api_key_verified, stt_verified_key, False)
-                dash.stt_needs_key = (not self._hub_has_stt_provider("self")) or (not stt_verified)
-            else:
-                dash.stt_needs_key = False
+        stt_provider = self.settings.provider.stt.value
+        if self._stt_provider_requires_secret(self.settings.provider.stt):
+            stt_key_map = {"qwen_asr": self._get_alibaba_verified_key()}
+            stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
+            stt_verified = getattr(self.settings.api_key_verified, stt_verified_key, False)
+            stt_needs_key = (not self._hub_has_stt_provider("self")) or (not stt_verified)
+        else:
+            stt_needs_key = False
+        self.app.set_dashboard_stt_needs_key(stt_needs_key)
 
-            # LLM: check current provider's verification status
-            llm_provider = self.settings.provider.llm.value
-            if self._llm_provider_requires_secret(self.settings.provider.llm):
-                # Map llm provider to api_key_verified field name
-                llm_key_map = {
-                    "gemini": "google",
-                    "openrouter": "openrouter",
-                    "deepseek": "deepseek",
-                    "qwen": self._get_alibaba_verified_key(),
-                }
-                llm_verified_key = llm_key_map.get(llm_provider, llm_provider)
-                llm_verified = getattr(self.settings.api_key_verified, llm_verified_key, False)
-                dash.translation_needs_key = (
-                    False
-                    if self._managed_openrouter_can_attempt_translation()
-                    else (self.hub.llm is None) or (not llm_verified)
-                )
-            else:
-                dash.translation_needs_key = False
-
-            # Set initial enabled states (all start as off/gray)
-            dash.set_translation_enabled(False)
-            dash.set_stt_enabled(False)
-            self.hub.translation_enabled = False
+        llm_provider = self.settings.provider.llm.value
+        if self._llm_provider_requires_secret(self.settings.provider.llm):
+            llm_key_map = {
+                "gemini": "google",
+                "openrouter": "openrouter",
+                "deepseek": "deepseek",
+                "qwen": self._get_alibaba_verified_key(),
+            }
+            llm_verified_key = llm_key_map.get(llm_provider, llm_provider)
+            llm_verified = getattr(self.settings.api_key_verified, llm_verified_key, False)
+            translation_needs_key = (
+                False
+                if self._managed_openrouter_can_attempt_translation()
+                else (self.hub.llm is None) or (not llm_verified)
+            )
+        else:
+            translation_needs_key = False
+        self.app.set_dashboard_translation_needs_key(translation_needs_key)
+        self.app.set_dashboard_translation_enabled(False)
+        self.app.set_dashboard_stt_enabled(False)
+        self.hub.translation_enabled = False
         await self.hub.start(auto_flush_osc=True)
 
         bridge = self._create_ui_event_bridge(runtime_logging=runtime_logging)
@@ -1516,10 +1496,8 @@ class GuiController:
         if self._process_idle_preparation_scheduled:
             return
         self._process_idle_preparation_scheduled = True
-        run_task = getattr(self.page, "run_task", None)
-        if callable(run_task):
-            with contextlib.suppress(Exception):
-                run_task(self._prepare_process_discovery_idle)
+        with contextlib.suppress(Exception):
+            self.app.schedule_task(self._prepare_process_discovery_idle)
 
     async def _prepare_process_discovery_idle(self) -> None:
         with contextlib.suppress(Exception):
@@ -1548,7 +1526,6 @@ class GuiController:
         if progress_percent is not None:
             fields.append(f"progress_percent={progress_percent}")
         self.log_detailed(f"[GPU ASR] {' '.join(fields)}")
-        settings_view = getattr(self.app, "view_settings", None)
         devices = tuple(
             GpuDeviceOption(
                 device_id=device.device_id,
@@ -1557,30 +1534,26 @@ class GuiController:
             )
             for device in self._gpu_devices
         )
-        set_devices = getattr(settings_view, "set_gpu_devices", None)
-        if callable(set_devices):
-            set_devices(devices=devices)
         action_by_state: dict[str, GpuNoticeAction] = {
             "discovery_failed": "rediscover",
             "activation_failed": "restart",
         }
-        dashboard = getattr(self.app, "view_dashboard", None)
-        set_notice = getattr(dashboard, "set_gpu_notice", None)
-        if callable(set_notice):
-            if publish_notice:
-                set_notice(
-                    GpuDashboardNotice(
-                        status=state,
-                        progress_percent=progress_percent,
-                        action=action_by_state.get(state),
-                    )
-                )
-            else:
-                set_notice(None)
-        elif publish_notice and not callable(set_devices):
-            legacy_setter = getattr(settings_view, "set_gpu_runtime_state", None)
-            if callable(legacy_setter):
-                legacy_setter(state, devices=devices, progress_percent=progress_percent)
+        notice = (
+            GpuDashboardNotice(
+                status=state,
+                progress_percent=progress_percent,
+                action=action_by_state.get(state),
+            )
+            if publish_notice
+            else None
+        )
+        self.app.set_dashboard_gpu_state(
+            devices=devices,
+            state=state,
+            progress_percent=progress_percent,
+            notice=notice,
+            publish_notice=publish_notice,
+        )
 
     async def handle_gpu_notice_action(self, action: GpuNoticeAction) -> None:
         if action in {"install", "repair", "reinstall"}:
@@ -1844,35 +1817,14 @@ class GuiController:
         finally:
             self._abort_provider_recoveries(recovery)
 
-    def _create_ui_event_bridge(self, *, runtime_logging) -> UIEventBridge:  # noqa: ANN001
+    def _create_ui_event_bridge(self, *, runtime_logging) -> object:  # noqa: ANN001
         assert self.hub is not None
-        return UIEventBridge(
+        return self.app.create_ui_event_bridge(
             event_queue=self.hub.ui_events,
             runtime_logging=runtime_logging,
-            dashboard_destination=AppDashboardEventDestination(
-                getattr(self.app, "view_dashboard", None)
-            ),
-            history_destination=AppHistoryEventDestination(
-                getattr(self.app, "add_history_entry", None)
-            ),
-            conversation_destination=AppConversationEventDestination(
-                getattr(getattr(self.app, "view_logs", None), "append_conversation_record", None)
-            ),
-            get_language_codes=getattr(self.app, "get_event_language_codes", None),
-            is_translation_enabled=getattr(self.app, "is_event_translation_enabled", None),
-            get_stt_state=getattr(self.app, "get_event_stt_state", None),
-            clear_managed_auth_pending=getattr(self.app, "clear_managed_auth_pending_state", None),
-            show_snackbar=getattr(self.app, "show_snackbar", None),
-            on_github_star_translation_success=getattr(
-                self.app, "on_github_star_translation_success", None
-            ),
-            on_telemetry_translation_success=getattr(
-                self.app, "on_telemetry_translation_success", None
-            ),
-            on_overlay_state_changed=getattr(self.app, "on_overlay_state_changed", None),
         )
 
-    def _start_ui_event_bridge_task(self, bridge: UIEventBridge) -> None:
+    def _start_ui_event_bridge_task(self, bridge: object) -> None:
         assert self.hub is not None
         self._ui_event_bridge = bridge
         self._bridge_task = self.hub.output_runtime.start_ui_event_bridge(bridge)
@@ -1894,7 +1846,7 @@ class GuiController:
             coroutine.close()
             raise
 
-    async def _wait_for_ui_event_bridge_started(self, bridge: UIEventBridge) -> None:
+    async def _wait_for_ui_event_bridge_started(self, bridge: object) -> None:
         bridge_task = self._bridge_task
         if bridge_task is None:
             raise RuntimeError("UI Event Bridge task was not created")
@@ -2141,10 +2093,7 @@ class GuiController:
         )
 
     def _sync_managed_auth_dashboard_notice(self) -> None:
-        dash = getattr(self.app, "view_dashboard", None)
-        setter = getattr(dash, "set_managed_auth_pending", None) if dash is not None else None
-        if callable(setter):
-            setter(self._managed_trial_pending_auth)
+        self.app.set_dashboard_managed_auth_pending(self._managed_trial_pending_auth)
 
     def _set_managed_trial_pending_auth(self, pending: bool) -> None:
         self._managed_trial_pending_auth = bool(pending)
@@ -2461,7 +2410,6 @@ class GuiController:
                     getattr(issue, "referral_id", None)
                 )
                 self._set_managed_usage_view_state(
-                    view_settings=getattr(self.app, "view_settings", None),
                     visible=True,
                     remaining_percent=None,
                     referral_id=result_referral_id or self._current_owned_referral_id(),
@@ -2554,7 +2502,6 @@ class GuiController:
                 return False
             result_referral_id = normalize_owned_referral_id(getattr(result, "referral_id", None))
             self._set_managed_usage_view_state(
-                view_settings=getattr(self.app, "view_settings", None),
                 visible=True,
                 remaining_percent=None,
                 referral_id=result_referral_id or self._current_owned_referral_id(),
@@ -3122,7 +3069,6 @@ class GuiController:
     def _set_managed_usage_view_state(
         self,
         *,
-        view_settings: object | None,
         visible: bool,
         remaining_percent: int | None,
         referral_id: str | None,
@@ -3145,27 +3091,12 @@ class GuiController:
             self._clear_talk_together_pass_status_cache()
 
         effective_pass_status = self._cached_talk_together_pass_status_for(normalized_referral_id)
-        if view_settings is None:
-            return
-        managed_key_setter = getattr(view_settings, "set_managed_key_state", None)
-        if callable(managed_key_setter):
-            if _callable_accepts_keyword(managed_key_setter, "pass_status"):
-                managed_key_setter(
-                    visible=visible,
-                    remaining_percent=remaining_percent,
-                    referral_id=normalized_referral_id,
-                    pass_status=effective_pass_status,
-                )
-            else:
-                managed_key_setter(
-                    visible=visible,
-                    remaining_percent=remaining_percent,
-                    referral_id=normalized_referral_id,
-                )
-            return
-        usage_setter = getattr(view_settings, "set_managed_trial_usage_state", None)
-        if callable(usage_setter):
-            usage_setter(visible=visible, remaining_percent=remaining_percent)
+        self.app.set_settings_managed_key_state(
+            visible=visible,
+            remaining_percent=remaining_percent,
+            referral_id=normalized_referral_id,
+            pass_status=effective_pass_status,
+        )
 
     def _managed_key_card_visible_from_settings(self) -> bool:
         if self.settings is None:
@@ -3230,7 +3161,6 @@ class GuiController:
     def _schedule_owned_referral_id_status_refresh(
         self,
         *,
-        view_settings: object | None,
         remaining_percent: int | None,
         current_referral_id: str | None,
     ) -> None:
@@ -3276,7 +3206,6 @@ class GuiController:
                     return
                 if result.succeeded:
                     self._set_managed_usage_view_state(
-                        view_settings=view_settings,
                         visible=True,
                         remaining_percent=remaining_percent,
                         referral_id=refreshed_referral_id,
@@ -3284,7 +3213,6 @@ class GuiController:
                     )
                     return
                 self._set_managed_usage_view_state(
-                    view_settings=view_settings,
                     visible=True,
                     remaining_percent=remaining_percent,
                     referral_id=refreshed_referral_id,
@@ -3355,12 +3283,10 @@ class GuiController:
     ) -> None:
         if self._shutdown_ingress_frozen:
             return
-        view_settings = getattr(self.app, "view_settings", None)
         if self.settings is None:
             self._clear_managed_trial_usage_metadata_cache()
             self._set_managed_trial_pending_auth(False)
             self._set_managed_usage_view_state(
-                view_settings=view_settings,
                 visible=False,
                 remaining_percent=None,
                 referral_id=self._current_owned_referral_id(),
@@ -3371,7 +3297,6 @@ class GuiController:
             self._clear_managed_trial_usage_metadata_cache()
             self._set_managed_trial_pending_auth(False)
             self._set_managed_usage_view_state(
-                view_settings=view_settings,
                 visible=False,
                 remaining_percent=None,
                 referral_id=self._current_owned_referral_id(),
@@ -3382,7 +3307,6 @@ class GuiController:
             self._clear_managed_trial_usage_metadata_cache()
             self._set_managed_trial_pending_auth(False)
             self._set_managed_usage_view_state(
-                view_settings=view_settings,
                 visible=True,
                 remaining_percent=None,
                 referral_id=self._current_owned_referral_id(),
@@ -3415,7 +3339,6 @@ class GuiController:
         remaining_percent = self._managed_trial_remaining_percent(usage_metadata)
         current_referral_id = self._current_owned_referral_id()
         self._set_managed_usage_view_state(
-            view_settings=view_settings,
             visible=True,
             remaining_percent=remaining_percent,
             referral_id=current_referral_id,
@@ -3433,7 +3356,6 @@ class GuiController:
             )
 
         self._schedule_owned_referral_id_status_refresh(
-            view_settings=view_settings,
             remaining_percent=remaining_percent,
             current_referral_id=current_referral_id,
         )
@@ -3441,10 +3363,8 @@ class GuiController:
     def _show_founder_letter_dialog(self) -> None:
         if self.settings is None:
             return
-        show_founder_letter_dialog = getattr(self.app, "show_founder_letter_dialog", None)
-        if not callable(show_founder_letter_dialog):
+        if not self.app.show_founder_letter_dialog():
             return
-        show_founder_letter_dialog()
         mark_founder_letter_shown(
             build_managed_identity_state_port(
                 self.settings,
@@ -3465,9 +3385,7 @@ class GuiController:
             self._show_founder_letter_dialog()
         if self.hub is not None:
             self.hub.translation_enabled = False
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is not None:
-            dash.set_translation_enabled(False)
+        self.app.set_dashboard_translation_enabled(False)
 
     async def _should_route_managed_trans_to_founder_letter(self) -> bool:
         if self.settings is None:
@@ -3711,11 +3629,8 @@ class GuiController:
         self._set_overlay_session_fallback_notice_active(False)
 
     def _set_overlay_session_fallback_notice_active(self, active: bool) -> None:
-        dash = getattr(self.app, "view_dashboard", None)
-        set_notice = getattr(dash, "set_overlay_session_fallback_notice", None)
-        if callable(set_notice):
-            with contextlib.suppress(Exception):
-                set_notice(bool(active))
+        with contextlib.suppress(Exception):
+            self.app.set_dashboard_overlay_session_fallback_notice(bool(active))
 
     def _should_session_fallback_overlay_to_desktop(self, reason: str) -> bool:
         if reason not in {"steamvr_not_running", "steamvr_not_installed"}:
@@ -5215,7 +5130,7 @@ class GuiController:
             return
         enqueue_disclosure = getattr(hub, "enqueue_peer_translation_disclosure", None)
         if callable(enqueue_disclosure):
-            enqueue_disclosure(t("peer_translation.disclosure"))
+            enqueue_disclosure(self.app.localize("peer_translation.disclosure"))
 
     def on_overlay_start_failed(self, failure_reason: str | None) -> None:
         previous_state = self.overlay_state
@@ -5661,6 +5576,7 @@ class GuiController:
         bridge = self._ui_event_bridge
         if bridge is not None:
             bridge.report_overlay_state(self.overlay_state, failure_reason=self.failure_reason)
+        self._refresh_overlay_peer_consumers()
 
     def _log_overlay_state_transition(self, previous_state: str, next_state: str) -> None:
         runtime = self._overlay_runtime
@@ -5731,17 +5647,15 @@ class GuiController:
         async def _task() -> None:
             await self._apply_overlay_calibration_persistence(calibration.copy())
 
-        run_task = getattr(self.page, "run_task", None)
-        if callable(run_task):
-            try:
-                run_task(_task)
+        try:
+            if self.app.schedule_task(_task):
                 return
-            except Exception:
-                self.log_detailed(
-                    "[Overlay] Calibration persistence skipped reason=page_run_task_failed",
-                    level=logging.WARNING,
-                )
-                return
+        except Exception:
+            self.log_detailed(
+                "[Overlay] Calibration persistence skipped reason=page_run_task_failed",
+                level=logging.WARNING,
+            )
+            return
 
         self.log_detailed(
             "[Overlay] Calibration persistence skipped reason=page_run_task_unavailable",
@@ -5770,18 +5684,16 @@ class GuiController:
             return
         if self._current_overlay_presenter_for_direct_runtime_command() is None:
             return
-        run_task = getattr(self.page, "run_task", None)
-        if callable(run_task):
-            try:
-                run_task(self._emit_overlay_calibration_update)
+        try:
+            if self.app.schedule_task(self._emit_overlay_calibration_update):
                 return
-            except Exception as exc:
-                self.log_detailed(
-                    "[Overlay] Failed to schedule calibration update via page.run_task",
-                    level=logging.WARNING,
-                    exception=exc,
-                )
-                return
+        except Exception as exc:
+            self.log_detailed(
+                "[Overlay] Failed to schedule calibration update via page.run_task",
+                level=logging.WARNING,
+                exception=exc,
+            )
+            return
 
         self.log_detailed(
             "[Overlay] Skipping calibration update; page.run_task unavailable",
@@ -5824,9 +5736,7 @@ class GuiController:
             return False
         if enabled and self.hub.llm is None:
             self.hub.translation_enabled = False
-            dash = getattr(self.app, "view_dashboard", None)
-            if dash is not None:
-                dash.set_translation_enabled(False)
+            self.app.set_dashboard_translation_enabled(False)
             self._log_error("Translation is ON but LLM provider is not configured.")
             return False
 
@@ -5859,9 +5769,7 @@ class GuiController:
 
     async def set_stt_enabled(self, enabled: bool, *, force_immediate: bool = False) -> None:
         if enabled and not self._persist_current_manual_local_asr_fallback(channel="self"):
-            dash = getattr(self.app, "view_dashboard", None)
-            if dash is not None:
-                dash.set_stt_enabled(False)
+            self.app.set_dashboard_stt_enabled(False)
             return
         self.log_basic(f"[STT] Toggle request: enabled={enabled}")
         self.log_detailed(
@@ -5895,11 +5803,8 @@ class GuiController:
 
         snapshot = await self._ensure_stt_switch()
         self._stt_activation_starting = False
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is not None and (
-            snapshot is None or snapshot.state is not SelfCaptureSessionState.ADMISSION_PENDING
-        ):
-            dash.set_stt_enabled(
+        if snapshot is None or snapshot.state is not SelfCaptureSessionState.ADMISSION_PENDING:
+            self.app.set_dashboard_stt_enabled(
                 bool(
                     self._stt_desired
                     and not self._stt_activation_failed
@@ -5922,11 +5827,8 @@ class GuiController:
         if self._vrchat_osc_notice_active == active:
             return
         self._vrchat_osc_notice_active = active
-        dash = getattr(self.app, "view_dashboard", None)
-        set_notice = getattr(dash, "set_vrchat_osc_notice", None)
-        if callable(set_notice):
-            with contextlib.suppress(Exception):
-                set_notice(active)
+        with contextlib.suppress(Exception):
+            self.app.set_dashboard_vrchat_osc_notice(active)
 
     def _schedule_vrchat_osc_presence_probe(self, *, force: bool = False) -> None:
         _ = force
@@ -5992,29 +5894,10 @@ class GuiController:
         self._set_vrchat_osc_notice_active(False)
 
     def _show_short_message(self, message_key: str, **message_kwargs: object) -> None:
-        message = t(message_key, **message_kwargs)
-        show_snackbar = getattr(self.app, "show_snackbar", None)
-        if not callable(show_snackbar):
-            show_snackbar = getattr(self.app, "_show_snackbar", None)
-        if callable(show_snackbar):
-            with contextlib.suppress(Exception):
-                show_snackbar(message, ft.Colors.ORANGE_700)
-                return
-        show_dialog = getattr(self.page, "show_dialog", None)
-        if callable(show_dialog):
-            with contextlib.suppress(Exception):
-                show_dialog(
-                    ft.SnackBar(
-                        ft.Text(message, color=ft.Colors.WHITE),
-                        bgcolor=ft.Colors.ORANGE_700,
-                        duration=4000,
-                        behavior=ft.SnackBarBehavior.FLOATING,
-                        margin=ft.Margin.only(bottom=90),
-                        padding=20,
-                    )
-                )
-                return
-        self._log_error(message)
+        try:
+            self.app.show_message(message_key, **message_kwargs)
+        except Exception:
+            self._log_error(self.app.localize(message_key, **message_kwargs))
 
     async def _handle_managed_translation_enable(self, request_generation: int) -> bool:
         if self.settings is None or self.hub is None:
@@ -6080,9 +5963,7 @@ class GuiController:
             self.log_basic(f"[ManagedAuth] {diagnostics_text}", level=logging.ERROR)
         await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=False)
         self.hub.translation_enabled = False
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is not None:
-            dash.set_translation_enabled(False)
+        self.app.set_dashboard_translation_enabled(False)
         if (
             result.message_key == "qq_managed_auth.required"
             and self._managed_china_auth_relevant_for_translation_enable()
@@ -6193,8 +6074,7 @@ class GuiController:
             if self._save_settings() is False:
                 self.settings = previous
                 return False
-            if getattr(self.app, "view_settings", None) is not None:
-                self._sync_ui_from_settings()
+            self._sync_ui_from_settings()
             self._notify_manual_local_asr_fallback(
                 fallback_channels,
                 installation_fallback=installation_fallback,
@@ -6226,8 +6106,7 @@ class GuiController:
         if self._save_settings() is False:
             self.settings = previous
             return False
-        if getattr(self.app, "view_settings", None) is not None:
-            self._sync_ui_from_settings()
+        self._sync_ui_from_settings()
         self._notify_manual_local_asr_fallback(
             fallback_channels,
             installation_fallback=installation_fallback,
@@ -6264,10 +6143,7 @@ class GuiController:
         return (model_id,) if model_id is not None else ()
 
     def _sync_local_cpu_auto_availability(self, available: bool) -> None:
-        view_settings = getattr(self.app, "view_settings", None)
-        setter = getattr(view_settings, "set_local_cpu_auto_available", None)
-        if callable(setter):
-            setter(available)
+        self.app.set_settings_local_cpu_auto_available(available)
 
     def _local_stt_runtime_status_for_provider(self, provider: str) -> str:
         model_ids = self._required_local_stt_model_ids_for_provider(provider)
@@ -6319,13 +6195,8 @@ class GuiController:
             self._reset_local_stt_pending_peer_enable_after_install()
 
     def _sync_local_stt_notice(self) -> None:
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is None or self.settings is None:
+        if self.settings is None:
             return
-        set_stt_starting = getattr(dash, "set_stt_starting", None)
-        if callable(set_stt_starting):
-            with contextlib.suppress(Exception):
-                set_stt_starting(self._stt_activation_starting or self._self_asr_model_loading)
         self_provider = self.settings.provider.stt.value
         peer_provider = self.settings.provider.peer_stt.value
         self_local = self_provider in LOCAL_CPU_PROVIDERS
@@ -6367,16 +6238,15 @@ class GuiController:
             (self_local_asr or peer_local_asr) and status != "ready"
         )
         with contextlib.suppress(Exception):
-            set_model = getattr(dash, "set_local_stt_notice_model", None)
-            if callable(set_model):
-                set_model(notice_model_id if should_show else None)
-            dash.set_local_stt_notice(
-                status if should_show else None,
+            self.app.set_dashboard_local_stt_notice(
+                status=status if should_show else None,
+                model_id=notice_model_id if should_show else None,
                 percent=(
                     activity.progress_percent
                     if status == "downloading" and activity is not None
                     else None
                 ),
+                starting=self._stt_activation_starting or self._self_asr_model_loading,
             )
 
     def _request_local_asr_install(
@@ -6474,15 +6344,13 @@ class GuiController:
             if snapshot is not None and snapshot.generation != self._stt_activation_generation:
                 return
             self._stt_activation_starting = False
-            dash = getattr(self.app, "view_dashboard", None)
-            if dash is not None:
-                dash.set_stt_enabled(
-                    bool(
-                        self._stt_desired
-                        and not self._stt_activation_failed
-                        and self._mic_task is not None
-                    )
+            self.app.set_dashboard_stt_enabled(
+                bool(
+                    self._stt_desired
+                    and not self._stt_activation_failed
+                    and self._mic_task is not None
                 )
+            )
             self._sync_local_stt_notice()
 
         if should_resume_peer_local_stt:
@@ -6525,10 +6393,9 @@ class GuiController:
         affected_model_ids = model_ids or self._local_stt_models_needing_install(provider)
         if not affected_model_ids:
             affected_model_ids = self._required_local_stt_model_ids_for_provider(provider)
-        dash = getattr(self.app, "view_dashboard", None)
-        if channel == "self" and dash is not None:
-            dash.set_stt_enabled(False)
-            dash.set_stt_needs_key(False)
+        if channel == "self":
+            self.app.set_dashboard_stt_enabled(False)
+            self.app.set_dashboard_stt_needs_key(False)
         self._sync_local_stt_notice()
         self._request_local_asr_install(
             origin="manual",
@@ -6580,10 +6447,8 @@ class GuiController:
         )
         if not decision.supported:
             self._stt_desired = False
-            dash = getattr(self.app, "view_dashboard", None)
-            if dash is not None:
-                dash.set_stt_enabled(False)
-                dash.set_stt_needs_key(False)
+            self.app.set_dashboard_stt_enabled(False)
+            self.app.set_dashboard_stt_needs_key(False)
             self._show_short_stt_message("local_stt.language_unsupported")
             return False
         current_status = self._current_local_stt_runtime_status()
@@ -6595,9 +6460,7 @@ class GuiController:
                 if activation_generation is not None
                 else self._stt_activation_generation
             )
-            dash = getattr(self.app, "view_dashboard", None)
-            if dash is not None:
-                dash.set_stt_enabled(False)
+            self.app.set_dashboard_stt_enabled(False)
             self._show_short_stt_message("local_stt.download_in_progress")
             return False
         if current_status in ("missing", "invalid", "download_failed"):
@@ -6612,10 +6475,8 @@ class GuiController:
                 return False
         if self.hub is None or not self._hub_has_stt_provider("self"):
             self._stt_desired = False
-            dash = getattr(self.app, "view_dashboard", None)
-            if dash is not None:
-                dash.set_stt_enabled(False)
-                dash.set_stt_needs_key(False)
+            self.app.set_dashboard_stt_enabled(False)
+            self.app.set_dashboard_stt_needs_key(False)
             self._show_short_stt_message("error.local_stt_model_invalid")
             return False
         runtime = self._hub_local_asr_provider_runtime()
@@ -6814,11 +6675,9 @@ class GuiController:
     ) -> bool:
         available = snapshot.provider_status is SelfCaptureProviderStatus.READY
         self._sync_effective_hub_flags(self.settings)
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is not None:
-            dash.set_stt_needs_key(self._dashboard_stt_needs_key(stt_available=available))
-            if not available:
-                dash.set_stt_enabled(False)
+        self.app.set_dashboard_stt_needs_key(self._dashboard_stt_needs_key(stt_available=available))
+        if not available:
+            self.app.set_dashboard_stt_enabled(False)
         return available
 
     async def _apply_stt_runtime_replacement(self, *, smooth_local: bool) -> None:
@@ -7206,19 +7065,18 @@ class GuiController:
         *,
         preserve_custom_vocab_draft: bool,
     ) -> None:
-        view_settings = getattr(self.app, "view_settings", None)
-        if view_settings is None:
-            self._remember_settings_view_order22_baseline(settings)
-            self._remember_settings_view_order23_baseline(settings)
-            self._remember_settings_view_order24_baseline(settings)
-            return
         try:
-            view_settings.load_from_settings(
+            loaded = self.app.render_settings(
                 settings,
                 config_path=self.config_path,
                 preserve_custom_vocab_draft=preserve_custom_vocab_draft,
             )
         except Exception:
+            return
+        if not loaded:
+            self._remember_settings_view_order22_baseline(settings)
+            self._remember_settings_view_order23_baseline(settings)
+            self._remember_settings_view_order24_baseline(settings)
             return
         self._remember_settings_view_order22_baseline(settings)
         self._remember_settings_view_order23_baseline(settings)
@@ -7480,7 +7338,7 @@ class GuiController:
         ):
             await self.stop_microphone_test_for_audio_settings_change()
 
-        prev_locale = get_locale()
+        prev_locale = self.app.current_locale()
         prev_overlay_enabled = (
             self.settings.ui.overlay_enabled if self.settings is not None else False
         )
@@ -7738,15 +7596,13 @@ class GuiController:
             )
 
         if prev_locale != settings.ui.locale:
-            set_locale(settings.ui.locale)
-            apply_locale = getattr(self.app, "apply_locale", None)
-            if callable(apply_locale):
-                try:
-                    apply_locale()
-                except Exception:
-                    self._log_error("Failed to apply locale")
-                    if strict_runtime_errors:
-                        raise
+            self.app.set_locale(settings.ui.locale)
+            try:
+                self.app.apply_locale()
+            except Exception:
+                self._log_error("Failed to apply locale")
+                if strict_runtime_errors:
+                    raise
 
         self._refresh_overlay_peer_consumers()
         self._remember_settings_view_order22_baseline(self.settings)
@@ -9395,11 +9251,9 @@ class GuiController:
         )
         llm = outcome.provider
 
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is not None:
-            dash.set_translation_needs_key(
-                (llm is None) and self._llm_provider_requires_secret(self.settings.provider.llm)
-            )
+        self.app.set_dashboard_translation_needs_key(
+            (llm is None) and self._llm_provider_requires_secret(self.settings.provider.llm)
+        )
 
         await self._refresh_managed_trial_usage_state_best_effort()
 
@@ -9758,13 +9612,13 @@ class GuiController:
     def loopback_capture_summary(self, settings: AppSettings | None = None) -> str:
         resolved_settings = settings or self.settings
         if resolved_settings is None:
-            return t("settings.default_option")
+            return self.app.localize("settings.default_option")
         target = self._resolve_peer_capture_target(resolved_settings)
         if target.kind == "named_output_device":
-            return target.device_name or t("settings.default_option")
+            return target.device_name or self.app.localize("settings.default_option")
         if target.kind == "process":
             return self._process_capture_display_name(target)
-        return t("settings.default_option")
+        return self.app.localize("settings.default_option")
 
     def list_loopback_capture_options(self) -> list[OptionItem]:
         options = self.list_loopback_process_options()
@@ -9772,7 +9626,7 @@ class GuiController:
         return options
 
     def list_loopback_process_options(self) -> list[OptionItem]:
-        process_section = t("settings.desktop_audio.section.process")
+        process_section = self.app.localize("settings.desktop_audio.section.process")
         options: list[OptionItem] = []
         seen_process_values: set[str] = set()
         for candidate in ProcessCaptureResolver(
@@ -9807,11 +9661,11 @@ class GuiController:
         return options
 
     def list_loopback_device_options(self) -> list[OptionItem]:
-        device_section = t("settings.desktop_audio.section.device")
+        device_section = self.app.localize("settings.desktop_audio.section.device")
         options: list[OptionItem] = [
             OptionItem(
                 value="device:",
-                label=t("settings.default_option"),
+                label=self.app.localize("settings.default_option"),
                 description="",
                 disabled=False,
                 section=device_section,
@@ -9859,16 +9713,8 @@ class GuiController:
         await self._refresh_peer_stt_runtime()
         self._sync_effective_hub_flags(self.settings)
         self._refresh_overlay_peer_consumers()
-        view_settings = getattr(self.app, "view_settings", None)
-        if view_settings is not None:
-            with contextlib.suppress(Exception):
-                refresh_capture_target = getattr(
-                    view_settings,
-                    "refresh_loopback_capture_target",
-                    None,
-                )
-                if callable(refresh_capture_target):
-                    refresh_capture_target(self.settings)
+        with contextlib.suppress(Exception):
+            self.app.refresh_settings_loopback_capture_target(self.settings)
 
     def peer_warning_action_is_retry(self) -> bool:
         if self.settings is None or not self.settings.ui.peer_translation_enabled:
@@ -9922,15 +9768,15 @@ class GuiController:
         fallback_name: str,
     ) -> str:
         if target.kind == "vrchat":
-            base = t("settings.desktop_audio.process.vrchat")
+            base = self.app.localize("settings.desktop_audio.process.vrchat")
         elif target.kind == "discord":
             channel = target.discord_channel or "stable"
             if channel == "ptb":
-                base = t("settings.desktop_audio.process.discord_ptb")
+                base = self.app.localize("settings.desktop_audio.process.discord_ptb")
             elif channel == "canary":
-                base = t("settings.desktop_audio.process.discord_canary")
+                base = self.app.localize("settings.desktop_audio.process.discord_canary")
             else:
-                base = t("settings.desktop_audio.process.discord_stable")
+                base = self.app.localize("settings.desktop_audio.process.discord_stable")
         elif fallback_name:
             return fallback_name
         else:
@@ -9938,7 +9784,7 @@ class GuiController:
             basename = path.rsplit("\\", 1)[-1]
             if basename.lower().endswith(".exe"):
                 basename = basename[:-4]
-            base = basename or t("settings.default_option")
+            base = basename or self.app.localize("settings.default_option")
         if target.kind in {"vrchat", "discord"} and fallback_name:
             count_suffix = fallback_name.rsplit(" (", 1)
             if len(count_suffix) == 2 and count_suffix[1].endswith(")"):
@@ -10124,8 +9970,7 @@ class GuiController:
         if self._local_qwen_hallucination_modal_shown:
             return
 
-        show_dialog = getattr(self.app, "show_local_qwen_hallucination_dialog", None)
-        if not callable(show_dialog):
+        if not self.app.show_local_qwen_hallucination_dialog():
             self.log_detailed(
                 "[STT][SuppressedFinalNotification] "
                 f"local_qwen_guidance count={count} guidance_modal=unavailable"
@@ -10133,7 +9978,6 @@ class GuiController:
             return
 
         self._local_qwen_hallucination_modal_shown = True
-        show_dialog()
 
     def cycle_debug_capture_fault_profile(self) -> str:
         if not self._debug_audio_fault_allowed():
@@ -10335,20 +10179,17 @@ class GuiController:
         if presenter is not None:
             await self._replace_hub_overlay_sink(presenter)
 
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is not None:
-            dash.set_translation_needs_key(
-                (self.hub.llm is None)
-                and self._llm_provider_requires_secret(self.settings.provider.llm)
-            )
-            dash.set_stt_needs_key(
-                self._dashboard_stt_needs_key(stt_available=self._hub_has_stt_provider("self"))
-            )
-
-            self.hub.translation_enabled = (
-                bool(getattr(dash, "is_translation_on", True)) and self.hub.llm is not None
-            )
-            dash.set_translation_enabled(self.hub.translation_enabled)
+        self.app.set_dashboard_translation_needs_key(
+            (self.hub.llm is None)
+            and self._llm_provider_requires_secret(self.settings.provider.llm)
+        )
+        self.app.set_dashboard_stt_needs_key(
+            self._dashboard_stt_needs_key(stt_available=self._hub_has_stt_provider("self"))
+        )
+        self.hub.translation_enabled = (
+            self.app.dashboard_translation_enabled() and self.hub.llm is not None
+        )
+        self.app.set_dashboard_translation_enabled(self.hub.translation_enabled)
 
         await self.hub.start(auto_flush_osc=True)
 
@@ -11173,10 +11014,8 @@ class GuiController:
             self.settings.languages.source_language,
         )
         if not decision.supported:
-            dash = getattr(self.app, "view_dashboard", None)
-            if dash is not None:
-                dash.set_stt_enabled(False)
-                dash.set_stt_needs_key(False)
+            self.app.set_dashboard_stt_enabled(False)
+            self.app.set_dashboard_stt_needs_key(False)
             self._show_short_stt_message("local_stt.language_unsupported")
             return SelfCaptureAdmission(
                 SelfCaptureAdmissionStatus.REJECTED,
@@ -11186,9 +11025,7 @@ class GuiController:
         if current_status == "downloading":
             self._local_stt_pending_enable_after_install = True
             self._local_stt_pending_enable_generation = self._stt_activation_generation
-            dash = getattr(self.app, "view_dashboard", None)
-            if dash is not None:
-                dash.set_stt_enabled(False)
+            self.app.set_dashboard_stt_enabled(False)
             self._show_short_stt_message("local_stt.download_in_progress")
             return SelfCaptureAdmission(
                 SelfCaptureAdmissionStatus.PENDING,
@@ -11801,48 +11638,37 @@ class GuiController:
         if settings is None:
             return
 
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is not None:
-            if _callable_accepts_positional_arguments(dash.set_languages_from_codes, 5):
-                dash.set_languages_from_codes(
-                    settings.languages.source_language,
-                    settings.languages.target_language,
-                    settings.languages.peer_source_language,
-                    settings.languages.peer_target_language,
-                    settings.languages.peer_source_mode,
-                )
-            else:
-                dash.set_languages_from_codes(
-                    settings.languages.source_language,
-                    settings.languages.target_language,
-                    settings.languages.peer_source_language,
-                    settings.languages.peer_target_language,
-                )
-            dash.set_recent_languages(
-                settings.languages.recent_source_languages,
-                settings.languages.recent_target_languages,
-            )
-            dash.set_peer_auto_detect_available(
+        self.app.set_dashboard_languages(
+            source_language=settings.languages.source_language,
+            target_language=settings.languages.target_language,
+            peer_source_language=settings.languages.peer_source_language,
+            peer_target_language=settings.languages.peer_target_language,
+            peer_source_mode=settings.languages.peer_source_mode,
+            recent_source_languages=settings.languages.recent_source_languages,
+            recent_target_languages=settings.languages.recent_target_languages,
+            peer_auto_detect_available=(
                 settings.provider.peer_stt
                 in {STTProviderName.SONIOX, STTProviderName.LOCAL_QWEN_GPU}
-            )
+            ),
+        )
 
-        view_settings = getattr(self.app, "view_settings", None)
-        if view_settings is None:
+        try:
+            loaded = self.app.render_settings(
+                settings,
+                config_path=self.config_path,
+            )
+        except Exception:
+            return
+        if not loaded:
             self._remember_settings_view_order22_baseline(settings)
             self._remember_settings_view_order23_baseline(settings)
             self._remember_settings_view_order24_baseline(settings)
         else:
-            try:
-                view_settings.load_from_settings(settings, config_path=self.config_path)
-            except Exception:
-                pass
-            else:
-                self._remember_settings_view_order22_baseline(settings)
-                self._remember_settings_view_order23_baseline(settings)
-                self._remember_settings_view_order24_baseline(settings)
-                with contextlib.suppress(Exception):
-                    view_settings.set_overlay_calibration(self.overlay_calibration)
+            self._remember_settings_view_order22_baseline(settings)
+            self._remember_settings_view_order23_baseline(settings)
+            self._remember_settings_view_order24_baseline(settings)
+            with contextlib.suppress(Exception):
+                self.app.set_settings_overlay_calibration(self.overlay_calibration)
 
         self._refresh_overlay_peer_consumers()
 
@@ -11852,13 +11678,11 @@ class GuiController:
             self._runtime_logging = RuntimeLoggingService(
                 session_factory=lambda: SessionRuntimeLoggingService(
                     sinks=self.runtime_logging_sinks,
-                    ui_handler_factory=FletLogHandler,
+                    ui_handler_factory=RealtimeLogHandler,
                 ),
                 fallback_logger=logger,
             )
-        logs_view = getattr(self.app, "view_logs", None)
-        if logs_view is not None:
-            self._runtime_logging.attach_realtime_sink(logs_view)
+        self.app.attach_runtime_log_sink(self._runtime_logging)
         return self._runtime_logging
 
     @property
@@ -11889,17 +11713,15 @@ class GuiController:
         async def _task() -> None:
             await self._log_audio_environment_snapshot_async()
 
-        run_task = getattr(self.page, "run_task", None)
-        if callable(run_task):
-            try:
-                run_task(_task)
+        try:
+            if self.app.schedule_task(_task):
                 return
-            except Exception as exc:
-                self.log_detailed(
-                    "[AudioDiag][Snapshot] failed to schedule via page.run_task",
-                    level=logging.WARNING,
-                    exception=exc,
-                )
+        except Exception as exc:
+            self.log_detailed(
+                "[AudioDiag][Snapshot] failed to schedule via page.run_task",
+                level=logging.WARNING,
+                exception=exc,
+            )
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -11947,18 +11769,16 @@ class GuiController:
         if self._current_overlay_bridge_for_direct_runtime_command() is None:
             return
 
-        run_task = getattr(self.page, "run_task", None)
-        if callable(run_task):
-            try:
-                run_task(self._emit_overlay_runtime_logging_mode_update)
+        try:
+            if self.app.schedule_task(self._emit_overlay_runtime_logging_mode_update):
                 return
-            except Exception as exc:
-                self.log_detailed(
-                    "[Overlay] Failed to schedule logging mode update via page.run_task",
-                    level=logging.WARNING,
-                    exception=exc,
-                )
-                return
+        except Exception as exc:
+            self.log_detailed(
+                "[Overlay] Failed to schedule logging mode update via page.run_task",
+                level=logging.WARNING,
+                exception=exc,
+            )
+            return
 
         try:
             asyncio.get_running_loop().create_task(self._emit_overlay_runtime_logging_mode_update())
@@ -12091,10 +11911,6 @@ class GuiController:
         if self._shutdown_ingress_frozen or self.settings is None:
             return
 
-        dash = getattr(self.app, "view_dashboard", None)
-        if dash is None:
-            return
-
         secrets = None
         with contextlib.suppress(Exception):
             secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
@@ -12208,20 +12024,15 @@ class GuiController:
             return
 
         llm_requires_secret = self._llm_provider_requires_secret(self.settings.provider.llm)
-        # If LLM verification failed, only key-backed providers should show needs-key state.
         if not llm_valid:
-            dash.set_translation_needs_key(llm_requires_secret)
-            # If it was enabled, we potentially disable it or just let the warning show on next interaction
-            # User request: "Validation Fail -> Orange". Implicitly, if it's ON and fails, maybe we should turn it OFF?
-            # For now, setting needs_key=True ensures that if they try to toggle, it warns.
-            # If it is currently ON, we might want to flag it.
+            self.app.set_dashboard_translation_needs_key(llm_requires_secret)
             if self.hub:
-                self.hub.translation_enabled = False  # Disable internally
-            dash.set_translation_enabled(False)  # Visually turn off
+                self.hub.translation_enabled = False
+            self.app.set_dashboard_translation_enabled(False)
         else:
-            dash.set_translation_needs_key(False)
+            self.app.set_dashboard_translation_needs_key(False)
             if self.settings.provider.llm == LLMProviderName.LOCAL_LLM and self.hub is not None:
-                dash.set_translation_enabled(bool(self.hub.translation_enabled))
+                self.app.set_dashboard_translation_enabled(bool(self.hub.translation_enabled))
 
         # 2. Verify STT
         stt_requires_secret = self._stt_provider_requires_secret(self.settings.provider.stt)
@@ -12253,13 +12064,12 @@ class GuiController:
             return
 
         if not stt_valid:
-            dash.set_stt_needs_key(stt_requires_secret)
+            self.app.set_dashboard_stt_needs_key(stt_requires_secret)
             if self.hub:
-                # Close STT backend?
                 pass
-            dash.set_stt_enabled(False)
+            self.app.set_dashboard_stt_enabled(False)
         else:
-            dash.set_stt_needs_key(False)
+            self.app.set_dashboard_stt_needs_key(False)
 
         if not self._shutdown_ingress_frozen:
             await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=False)

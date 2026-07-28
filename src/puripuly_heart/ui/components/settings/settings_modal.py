@@ -6,11 +6,11 @@ with optional descriptions for each option.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Callable, Sequence
 
 import flet as ft
 
+from puripuly_heart.app.ports.ui_models import OptionItem
 from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.theme import (
@@ -22,17 +22,6 @@ from puripuly_heart.ui.theme import (
     COLOR_SURFACE,
     get_card_shadow,
 )
-
-
-@dataclass
-class OptionItem:
-    """Option item for settings modal."""
-
-    value: str
-    label: str
-    description: str = ""
-    disabled: bool = False
-    section: str = ""
 
 
 class SettingsModal:

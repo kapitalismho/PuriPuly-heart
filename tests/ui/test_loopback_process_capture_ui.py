@@ -46,10 +46,22 @@ from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.i18n import get_locale, set_locale, t
 from puripuly_heart.ui.overlay_peer_contract import (
     build_overlay_peer_consumer_contract,
+    build_overlay_peer_consumer_contract_from_state,
     is_process_capture_warning_reason,
 )
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.views.dashboard import DashboardView
 from puripuly_heart.ui.views.settings import SettingsView
+
+
+def _presentation(
+    app: object,
+    *,
+    page: object | None = None,
+) -> FletUiPresentationAdapter:
+    if page is not None:
+        setattr(app, "page", page)
+    return FletUiPresentationAdapter(app)
 
 
 class ReadyProvisioningPort:
@@ -303,7 +315,11 @@ def test_peer_contract_keeps_process_failure_warning_during_overlay_startup() ->
 async def test_process_identity_resolution_is_fresh_and_does_not_block_heartbeat(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    controller = GuiController(page=SimpleNamespace(), app=SimpleNamespace(), config_path=Path("x"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
+        config_path=Path("x"),
+    )
     target = ResolvedDesktopAudioCaptureTarget(
         kind="process",
         process_kind="vrchat",
@@ -350,9 +366,10 @@ async def test_idle_process_preparation_is_bounded_once_and_best_effort(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     queued: list[object] = []
+    page = SimpleNamespace(run_task=lambda callback: queued.append(callback))
     controller = GuiController(
-        page=SimpleNamespace(run_task=lambda callback: queued.append(callback)),
-        app=SimpleNamespace(),
+        page=page,
+        app=_presentation(SimpleNamespace(), page=page),
         config_path=Path("x"),
     )
     calls = 0
@@ -408,9 +425,11 @@ async def test_peer_starting_is_published_before_delayed_readiness_and_latest_in
     contracts = []
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(
-            refresh_overlay_peer_contract=lambda: contracts.append(
-                controller.build_overlay_peer_consumer_contract()
+        app=_presentation(
+            SimpleNamespace(
+                view_dashboard=SimpleNamespace(
+                    set_overlay_peer_contract=contracts.append,
+                )
             )
         ),
         config_path=Path("x"),
@@ -455,7 +474,11 @@ async def test_peer_starting_is_published_before_delayed_readiness_and_latest_in
 
 @pytest.mark.asyncio
 async def test_self_toggle_path_delegates_only_to_composed_capture_owner() -> None:
-    controller = GuiController(page=SimpleNamespace(), app=SimpleNamespace(), config_path=Path("x"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
+        config_path=Path("x"),
+    )
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     controller.hub = _runtime_hub_stub()
@@ -479,7 +502,9 @@ async def test_self_microphone_start_failure_becomes_effective_off_failure_notic
         set_local_stt_notice=lambda status, percent=None: dash.notices.append((status, percent)),
     )
     controller = GuiController(
-        page=SimpleNamespace(), app=SimpleNamespace(view_dashboard=dash), config_path=Path("x")
+        page=SimpleNamespace(),
+        app=_presentation(SimpleNamespace(view_dashboard=dash)),
+        config_path=Path("x"),
     )
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
@@ -499,7 +524,11 @@ async def test_peer_post_readiness_runtime_completion_cannot_publish_after_super
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     disclosures: list[str] = []
-    controller = GuiController(page=SimpleNamespace(), app=SimpleNamespace(), config_path=Path("x"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
+        config_path=Path("x"),
+    )
     controller.settings = AppSettings()
     controller.settings.provider.peer_stt = STTProviderName.SONIOX
     controller.settings.ui.peer_translation_eula_accepted = True
@@ -742,7 +771,7 @@ def test_dashboard_normal_peer_toggle_still_inverts_intent() -> None:
 def test_controller_encodes_and_decodes_loopback_capture_options() -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
     process = ProcessCaptureTargetIntent.generic_executable(r"C:\Apps\Game\Game.exe")
@@ -760,7 +789,7 @@ def test_controller_list_loopback_options_puts_process_before_device(
 ) -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
 
@@ -804,7 +833,7 @@ def test_controller_process_options_sorts_disabled_after_enabled(
 ) -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
 
@@ -842,7 +871,7 @@ def test_controller_process_options_sorts_disabled_after_enabled(
 def test_controller_process_diagnostic_sets_peer_warning_reason() -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(refresh_overlay_peer_contract=lambda: None),
+        app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
     controller.settings = AppSettings()
@@ -855,7 +884,9 @@ def test_controller_process_diagnostic_sets_peer_warning_reason() -> None:
         )
     )
     assert controller._peer_process_warning_reason == "process_unavailable_no_process"
-    contract = controller.build_overlay_peer_consumer_contract()
+    state = controller.overlay_peer_presentation_state()
+    assert state is not None
+    contract = build_overlay_peer_consumer_contract_from_state(state)
     assert contract is not None
     assert contract.peer.warning_reason == "process_unavailable_no_process"
 
@@ -866,7 +897,7 @@ async def test_controller_retry_clears_process_warning_only_on_success(
 ) -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(refresh_overlay_peer_contract=lambda: None),
+        app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
     controller.settings = AppSettings()
@@ -902,7 +933,7 @@ async def test_controller_retry_clears_process_warning_only_on_success(
 def test_loopback_summary_prefers_localized_process_name() -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
     settings = AppSettings()
@@ -940,7 +971,7 @@ def test_list_options_preserves_saved_process_when_stopped(
 ) -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
     controller.settings = AppSettings()
@@ -1093,7 +1124,7 @@ async def test_failed_process_warning_survives_unrelated_draft_apply_without_dev
     assert save_settings_with_result(path, initial).ok
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=path,
     )
     controller.settings = load_settings(path)
@@ -1113,7 +1144,7 @@ async def test_failed_process_warning_survives_unrelated_draft_apply_without_dev
         update=lambda: None,
     )
     view.on_loopback_capture_summary = lambda: controller.loopback_capture_summary()
-    controller.app = SimpleNamespace(view_settings=view)
+    controller.app = _presentation(SimpleNamespace(view_settings=view))
 
     async def refresh_peer_stt_runtime(_self) -> None:
         return None
@@ -1173,7 +1204,7 @@ async def test_controller_capture_target_apply_uses_narrow_settings_refresh(
 ) -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
     )
     controller.settings = AppSettings()
@@ -1188,7 +1219,7 @@ async def test_controller_capture_target_apply_uses_narrow_settings_refresh(
         refresh_loopback_capture_target=refreshed.append,
         load_from_settings=lambda *_args, **_kwargs: pytest.fail("full settings reload"),
     )
-    controller.app = SimpleNamespace(view_settings=view_settings)
+    controller.app = _presentation(SimpleNamespace(view_settings=view_settings))
 
     async def refresh_peer_stt_runtime(_self) -> None:
         return None

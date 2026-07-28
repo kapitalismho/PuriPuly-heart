@@ -206,6 +206,26 @@ class RealtimeLogSink(Protocol):
     def append_log(self, line: str) -> None: ...
 
 
+class RealtimeLogHandler(logging.Handler):
+    def __init__(self, sink: RealtimeLogSink):
+        super().__init__()
+        self._sink = sink
+        self.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
+        )
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            message = self.format(record)
+            append_threadsafe = getattr(self._sink, "append_log_threadsafe", None)
+            if callable(append_threadsafe):
+                append_threadsafe(message)
+            else:
+                self._sink.append_log(message)
+        except Exception:
+            return
+
+
 ObservabilityRunner = Callable[[Awaitable[None]], None]
 
 

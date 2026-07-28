@@ -38,6 +38,7 @@ from puripuly_heart.config.settings import (
 )
 from puripuly_heart.core import messages
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
+from puripuly_heart.core.runtime_logging import RealtimeLogHandler
 from puripuly_heart.ui import controller as controller_module
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.components import subtab_shell as subtab_shell_module
@@ -47,6 +48,7 @@ from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 from puripuly_heart.ui.i18n import language_name, provider_label, t
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.theme import COLOR_NEUTRAL_DARK
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import attach_dummy_page
@@ -1583,7 +1585,7 @@ async def test_order22_live_settings_view_audio_change_emits_copied_draft_and_ro
     view, _ = _make_settings_view(monkeypatch)
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(view_dashboard=None, view_settings=view),
+        app=FletUiPresentationAdapter(SimpleNamespace(view_dashboard=None, view_settings=view)),
         config_path=Path("settings.json"),
     )
     controller.settings = AppSettings()
@@ -1627,11 +1629,11 @@ async def test_order22_live_settings_view_audio_change_save_failure_restores_con
     view, _ = _make_settings_view(monkeypatch)
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(view_dashboard=None, view_settings=view),
+        app=FletUiPresentationAdapter(SimpleNamespace(view_dashboard=None, view_settings=view)),
         config_path=Path("settings.json"),
     )
     controller._runtime_logging = controller_module.SessionRuntimeLoggingService(
-        ui_handler_factory=controller_module.FletLogHandler
+        ui_handler_factory=RealtimeLogHandler
     )
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.DEEPGRAM
@@ -5269,7 +5271,7 @@ def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
 
         controller = GuiController(
             page=SimpleNamespace(),
-            app=SimpleNamespace(),
+            app=FletUiPresentationAdapter(SimpleNamespace()),
             config_path=Path("settings.json"),
         )
         controller.on_overlay_start_failed("window_configuration_failed")

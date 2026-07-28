@@ -26,6 +26,7 @@ from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
 from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
 from puripuly_heart.ui.controller import GuiController
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
 class DummyPage:
@@ -82,7 +83,7 @@ def _settings_for_connection(connection: TranslationConnection) -> AppSettings:
 def _controller_for(settings: AppSettings) -> GuiController:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=FletUiPresentationAdapter(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
     controller.settings = settings
@@ -112,7 +113,7 @@ def _eligible_app(
     app.page = page
     controller = GuiController(
         page=page,
-        app=app,
+        app=FletUiPresentationAdapter(app),
         config_path=Path("settings.json"),
     )
     controller.settings = settings or _settings_for_connection(TranslationConnection.MANAGED)
@@ -349,7 +350,7 @@ async def test_apply_settings_preserves_current_github_star_prompt_state(
     )
 
     controller.page = SimpleNamespace()
-    controller.app = SimpleNamespace(view_settings=None)
+    controller.app = FletUiPresentationAdapter(SimpleNamespace(view_settings=None))
     controller.hub = None
 
     await controller.apply_settings(replacement)
@@ -370,7 +371,7 @@ async def test_prompt_open_persistence_does_not_stale_overwrite_replaced_setting
     initial = _settings_for_connection(TranslationConnection.MANAGED)
     initial.languages.target_language = "en"
     controller = _controller_for(initial)
-    controller.app = SimpleNamespace(view_settings=None)
+    controller.app = FletUiPresentationAdapter(SimpleNamespace(view_settings=None))
     controller.hub = None
     replacement = _settings_for_connection(TranslationConnection.MANAGED)
     replacement.languages.target_language = "ja"
@@ -422,7 +423,7 @@ async def test_prompt_click_persistence_does_not_stale_overwrite_replaced_settin
     initial = _settings_for_connection(TranslationConnection.MANAGED)
     initial.languages.target_language = "en"
     controller = _controller_for(initial)
-    controller.app = SimpleNamespace(view_settings=None)
+    controller.app = FletUiPresentationAdapter(SimpleNamespace(view_settings=None))
     controller.hub = None
     replacement = _settings_for_connection(TranslationConnection.MANAGED)
     replacement.languages.target_language = "ja"

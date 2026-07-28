@@ -24,6 +24,7 @@ from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
 from puripuly_heart.ui import controller as controller_module
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.controller import GuiController
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
 class DummySecrets:
@@ -117,8 +118,10 @@ def test_manual_local_asr_mismatches_persist_qwen_for_self_and_peer(
     messages: list[str] = []
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(
-            _show_snackbar=lambda message, _color: messages.append(message),
+        app=FletUiPresentationAdapter(
+            SimpleNamespace(
+                show_snackbar=lambda message, _color: messages.append(message),
+            )
         ),
         config_path=Path("settings.json"),
     )
@@ -135,7 +138,7 @@ def test_manual_local_asr_mismatches_persist_qwen_for_self_and_peer(
     assert controller.settings.provider.stt == STTProviderName.LOCAL_QWEN
     assert controller.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN
     assert len(saved) == 1
-    assert messages == [controller_module.t("local_stt.language_fallback_qwen")]
+    assert messages == [i18n_module.t("local_stt.language_fallback_qwen")]
 
 
 def test_action_snackbar_helper_removed_from_app_source() -> None:
@@ -161,7 +164,11 @@ async def test_verify_qwen_llm_api_key_uses_async_verifier_in_low_latency(monkey
     settings.qwen.llm_model = QwenLLMModel.QWEN_35_FLASH
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
 
     seen: dict[str, str] = {}
@@ -197,7 +204,11 @@ async def test_verify_and_update_status_uses_qwen_specific_verifiers(monkeypatch
     settings.provider.stt = STTProviderName.QWEN_ASR
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub()
 
@@ -241,7 +252,11 @@ async def test_verify_api_key_returns_model_unavailable_when_fallback_model_work
     settings.qwen.llm_model = QwenLLMModel.QWEN_35_FLASH
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
 
     seen_models: list[str] = []
@@ -271,7 +286,11 @@ async def test_verify_and_update_status_splits_llm_model_access_from_stt_key_val
     settings.qwen.llm_model = QwenLLMModel.QWEN_35_FLASH
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub()
 
@@ -307,7 +326,11 @@ async def test_verify_and_update_status_uses_selected_qwen_model_for_both_llm_an
     settings.qwen.region = QwenRegion.SINGAPORE
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub()
 
@@ -340,7 +363,11 @@ async def test_verify_and_update_status_uses_openrouter_verifier(monkeypatch) ->
     settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub()
 
@@ -368,7 +395,7 @@ async def test_verify_and_update_status_uses_openrouter_verifier(monkeypatch) ->
 async def test_verify_api_key_uses_deepseek_verifier(monkeypatch) -> None:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(view_dashboard=DummyDashboard()),
+        app=FletUiPresentationAdapter(SimpleNamespace(view_dashboard=DummyDashboard())),
         config_path=Path("settings.json"),
     )
 
@@ -393,7 +420,11 @@ async def test_verify_and_update_status_uses_deepseek_verifier(monkeypatch) -> N
     settings.provider.llm = LLMProviderName.DEEPSEEK
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub()
 
@@ -423,7 +454,11 @@ async def test_verify_and_update_status_uses_deepseek_env_key(monkeypatch) -> No
     settings.provider.llm = LLMProviderName.DEEPSEEK
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub()
 
@@ -455,7 +490,11 @@ async def test_local_llm_status_update_skips_connection_probe(
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.LOCAL_LLM
     app = SimpleNamespace(view_dashboard=DummyDashboard())
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub()
 
@@ -481,7 +520,11 @@ async def test_verify_and_update_status_uses_selected_managed_openrouter_key(mon
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub()
 
@@ -514,7 +557,11 @@ async def test_verify_and_update_status_keeps_managed_openrouter_toggle_availabl
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub(llm=object())
 
@@ -543,7 +590,11 @@ async def test_verify_and_update_status_marks_openrouter_none_selected_source_as
     settings.openrouter.selected_source = OpenRouterCredentialSource.NONE
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub(llm=None)
 
@@ -573,7 +624,11 @@ async def test_verify_and_update_status_treats_local_qwen_stt_as_keyless(
     settings.provider.llm = LLMProviderName.GEMINI
     app = SimpleNamespace(view_dashboard=DummyDashboard())
 
-    controller = GuiController(page=SimpleNamespace(), app=app, config_path=Path("settings.json"))
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(app),
+        config_path=Path("settings.json"),
+    )
     controller.settings = settings
     controller.hub = DummyHub()
 

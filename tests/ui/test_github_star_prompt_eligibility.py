@@ -29,12 +29,13 @@ from puripuly_heart.ui.event_bridge import (
     AppHistoryEventDestination,
     UIEventBridge,
 )
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
 def _controller_for(settings: AppSettings) -> GuiController:
     controller = GuiController(
         page=SimpleNamespace(),
-        app=SimpleNamespace(),
+        app=FletUiPresentationAdapter(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
     controller.settings = settings

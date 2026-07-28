@@ -20,7 +20,6 @@ UI_APPLICATION_NON_INTENT_MEMBERS = {
     "application_shutdown_callbacks",
     "bind_application_lifecycle",
     "build_managed_openrouter_byok_target_settings",
-    "build_overlay_peer_consumer_contract",
     "cancel_managed_auth_task",
     "clear_managed_auth_task",
     "close_github_star_prompt_runtime",
@@ -44,6 +43,7 @@ UI_APPLICATION_NON_INTENT_MEMBERS = {
     "merge_settings_tab_apply_with_current_languages",
     "merge_settings_view_change_with_current",
     "overlay_calibration",
+    "overlay_peer_presentation_state",
     "should_show_github_star_prompt",
     "state",
     "stop",
@@ -218,8 +218,15 @@ def test_controller_presentation_access_is_explicit_and_adapter_is_closed() -> N
         ):
             accessed.add(node.args[1].value)
 
-    assert accessed - {"_show_snackbar"} <= _contract_members(UiPresentationPort)
+    assert accessed <= _contract_members(UiPresentationPort)
     assert _contract_members(UiPresentationPort) <= _contract_members(FletUiPresentationAdapter)
     assert "__getattr__" not in FletUiPresentationAdapter.__dict__
     assert FletUiPresentationAdapter.__annotations__["_app"] == "UiPresentationPort"
     assert not hasattr(FletUiPresentationAdapter, "app")
+
+
+def test_application_runtime_has_no_flet_or_ui_module_dependencies() -> None:
+    imports = _imports(CONTROLLER_PATH)
+
+    assert "flet" not in imports
+    assert not any(module.startswith("puripuly_heart.ui") for module in imports)

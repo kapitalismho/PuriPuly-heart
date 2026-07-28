@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
@@ -127,7 +128,7 @@ class UiApplicationPort(Protocol):
 
     def cancel_overlay_calibration(self) -> object: ...
 
-    def build_overlay_peer_consumer_contract(self) -> object | None: ...
+    def overlay_peer_presentation_state(self) -> OverlayPeerPresentationState | None: ...
 
     def dashboard_managed_auth_action(self) -> str: ...
 
