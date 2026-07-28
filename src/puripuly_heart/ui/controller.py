@@ -2478,13 +2478,6 @@ class GuiController:
             succeeded=False,
         )
 
-    async def _refresh_owned_referral_id_from_managed_status_best_effort(
-        self,
-        *,
-        service: object | None = None,
-    ) -> str | None:
-        return (await self._refresh_managed_status_best_effort(service=service)).referral_id
-
     def _schedule_owned_referral_id_status_refresh(
         self,
         *,
