@@ -42,6 +42,9 @@ def test_controller_microphone_test_state_is_backed_by_owner_properties() -> Non
     assert "_microphone_test_lifecycle_lock: asyncio.Lock | None" not in source
     assert "_microphone_test_meter_level: float = field(" not in source
     assert "_microphone_test_runtime: MicTestRuntime | None = field(" not in source
+    assert "def _prepare_microphone_test_capture(" not in source
+    assert "def _self_stt_active_or_desired_for_microphone_test(" not in source
+    assert "def _log_microphone_test_stt_auto_off(" not in source
     assert 'owner_name="MicrophoneTestSessionOwner"' in source
 
 
@@ -52,6 +55,9 @@ def test_microphone_test_session_owner_has_no_ui_or_controller_dependency() -> N
     assert "GuiController" not in source
     assert "MicTestRuntime" in source
     assert "MicrophoneTestSessionRequest" in source
+    assert "MicrophoneTestSelfCaptureState" in source
+    assert "await self.disable_self_capture()" in source
+    assert "self microphone source still open after STT auto-off" in source
     assert "drop meter updates from stale runtime generations" in source
 
 

@@ -8,16 +8,47 @@ from dataclasses import dataclass, field
 from puripuly_heart.core.runtime.mic_test import MicTestRuntime
 
 MicrophoneTestMeterCallback = Callable[[float], object]
-MicrophoneTestPrepareCapture = Callable[[], Awaitable[bool]]
 MicrophoneTestCaptureSession = Callable[
     [int, MicrophoneTestMeterCallback | None, float],
     Awaitable[None],
 ]
+MicrophoneTestDisableSelfCapture = Callable[[], Awaitable[None]]
 MicrophoneTestDiagnosticsSink = Callable[
     [str, Mapping[str, object], BaseException | None],
     None,
 ]
+MicrophoneTestLogSink = Callable[[str], None]
 MicrophoneTestRuntimeFactory = Callable[[], MicTestRuntime]
+MicrophoneTestSelfCaptureSnapshotProvider = Callable[
+    [],
+    "MicrophoneTestSelfCaptureState",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class MicrophoneTestSelfCaptureState:
+    stop_required: bool
+    source_open: bool
+    close_exception: BaseException | None = field(default=None, repr=False)
+
+
+def _inactive_self_capture_state() -> MicrophoneTestSelfCaptureState:
+    return MicrophoneTestSelfCaptureState(
+        stop_required=False,
+        source_open=False,
+    )
+
+
+async def _disable_inactive_self_capture() -> None:
+    return None
+
+
+def _log_value(value: object) -> str:
+    if value is None:
+        return "None"
+    if isinstance(value, str):
+        return repr(value)
+    return str(value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,8 +63,10 @@ class MicrophoneTestSessionRequest:
 
 @dataclass(slots=True)
 class MicrophoneTestSessionOwner:
-    prepare_capture: MicrophoneTestPrepareCapture
     capture_session: MicrophoneTestCaptureSession
+    self_capture_snapshot: MicrophoneTestSelfCaptureSnapshotProvider = _inactive_self_capture_state
+    disable_self_capture: MicrophoneTestDisableSelfCapture = _disable_inactive_self_capture
+    log_sink: MicrophoneTestLogSink | None = None
     diagnostics_sink: MicrophoneTestDiagnosticsSink | None = None
     runtime_factory: MicrophoneTestRuntimeFactory = MicTestRuntime
     _runtime: MicTestRuntime | None = field(init=False, default=None, repr=False)
@@ -114,7 +147,7 @@ class MicrophoneTestSessionOwner:
 
             if not await self._recover_before_start(runtime):
                 return False
-            if not await self.prepare_capture():
+            if not await self._prepare_self_capture():
                 return False
 
             try:
@@ -212,6 +245,63 @@ class MicrophoneTestSessionOwner:
             return False
         return runtime.source is None and runtime.pending_frame_task is None
 
+    async def _prepare_self_capture(self) -> bool:
+        initial = self.self_capture_snapshot()
+        requested = initial.stop_required
+        if not requested:
+            if initial.close_exception is not None:
+                self._log_self_capture_auto_off(
+                    requested=False,
+                    completed=False,
+                    exception=initial.close_exception,
+                )
+                return False
+            self._log_self_capture_auto_off(
+                requested=False,
+                completed=True,
+            )
+            return True
+
+        try:
+            await self.disable_self_capture()
+            current = self.self_capture_snapshot()
+            if current.close_exception is not None:
+                raise current.close_exception
+            if current.source_open:
+                raise RuntimeError("self microphone source still open after STT auto-off")
+        except Exception as exc:
+            self._log_self_capture_auto_off(
+                requested=True,
+                completed=False,
+                exception=exc,
+            )
+            return False
+
+        self._log_self_capture_auto_off(
+            requested=True,
+            completed=True,
+        )
+        return True
+
+    def _log_self_capture_auto_off(
+        self,
+        *,
+        requested: bool,
+        completed: bool,
+        exception: BaseException | None = None,
+    ) -> None:
+        if self.log_sink is None:
+            return
+        self.log_sink(
+            "[MicTest] stt_auto_off "
+            f"requested={requested} "
+            f"completed={completed} "
+            "exception_class="
+            f"{_log_value(type(exception).__name__ if exception else None)} "
+            "exception_message="
+            f"{_log_value(str(exception) if exception else None)}"
+        )
+
     def _lock(self) -> asyncio.Lock:
         if self._lifecycle_lock is None:
             self._lifecycle_lock = asyncio.Lock()
@@ -238,10 +328,13 @@ class MicrophoneTestSessionOwner:
 
 __all__ = [
     "MicrophoneTestCaptureSession",
+    "MicrophoneTestDisableSelfCapture",
     "MicrophoneTestDiagnosticsSink",
+    "MicrophoneTestLogSink",
     "MicrophoneTestMeterCallback",
-    "MicrophoneTestPrepareCapture",
     "MicrophoneTestRuntimeFactory",
+    "MicrophoneTestSelfCaptureSnapshotProvider",
+    "MicrophoneTestSelfCaptureState",
     "MicrophoneTestSessionOwner",
     "MicrophoneTestSessionRequest",
 ]

@@ -88,6 +88,7 @@ from puripuly_heart.app.services.managed_connection_auth import (
 from puripuly_heart.app.services.managed_status_refresh import ManagedStatusRefreshOwner
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.microphone_test import (
+    MicrophoneTestSelfCaptureState,
     MicrophoneTestSessionOwner,
     MicrophoneTestSessionRequest,
 )
@@ -485,16 +486,6 @@ DISCORD_AUTH_ERROR_KEY_BY_SUBCODE = {
 }
 _MICROPHONE_TEST_LEVEL_INTERVAL_S = 1.0
 LOCAL_QWEN_HALLUCINATION_GUIDANCE_TRIGGER_COUNT = 2
-
-
-def _mic_test_log_value(value: object) -> str:
-    if value is None:
-        return "None"
-    if isinstance(value, str):
-        return repr(value)
-    if isinstance(value, float):
-        return str(value)
-    return str(value)
 
 
 def _canonical_json_signature(value: object) -> str:
@@ -9935,7 +9926,6 @@ class GuiController:
         owner = self._microphone_test_owner
         if owner is None:
             owner = MicrophoneTestSessionOwner(
-                prepare_capture=self._prepare_microphone_test_capture,
                 capture_session=lambda generation, meter_callback, level_log_interval_s: (
                     self.run_microphone_test_capture(
                         generation=generation,
@@ -9943,6 +9933,9 @@ class GuiController:
                         level_log_interval_s=level_log_interval_s,
                     )
                 ),
+                self_capture_snapshot=self._microphone_test_self_capture_state,
+                disable_self_capture=lambda: self.set_stt_enabled(False),
+                log_sink=self.log_basic,
                 diagnostics_sink=self._on_microphone_test_session_diagnostic,
             )
             self._microphone_test_owner = owner
@@ -9990,66 +9983,15 @@ class GuiController:
             settings.audio.internal_channels,
         )
 
-    def _self_stt_active_or_desired_for_microphone_test(self) -> bool:
-        return bool(
-            self._stt_desired
-            or self._local_stt_pending_enable_after_install
-            or self._mic_task is not None
-            or self._audio_source is not None
+    def _microphone_test_self_capture_state(self) -> MicrophoneTestSelfCaptureState:
+        source_open = self._mic_task is not None or self._audio_source is not None
+        return MicrophoneTestSelfCaptureState(
+            stop_required=bool(
+                self._stt_desired or self._local_stt_pending_enable_after_install or source_open
+            ),
+            source_open=source_open,
+            close_exception=self._last_mic_loop_close_exception,
         )
-
-    def _log_microphone_test_stt_auto_off(
-        self,
-        *,
-        requested: bool,
-        completed: bool,
-        exception: BaseException | None = None,
-    ) -> None:
-        self.log_basic(
-            "[MicTest] stt_auto_off "
-            f"requested={requested} "
-            f"completed={completed} "
-            "exception_class="
-            f"{_mic_test_log_value(type(exception).__name__ if exception else None)} "
-            "exception_message="
-            f"{_mic_test_log_value(str(exception) if exception else None)}"
-        )
-
-    async def _prepare_microphone_test_capture(self) -> bool:
-        requested = self._self_stt_active_or_desired_for_microphone_test()
-        if not requested:
-            if self._last_mic_loop_close_exception is not None:
-                self._log_microphone_test_stt_auto_off(
-                    requested=False,
-                    completed=False,
-                    exception=self._last_mic_loop_close_exception,
-                )
-                return False
-            self._log_microphone_test_stt_auto_off(
-                requested=False,
-                completed=True,
-            )
-            return True
-
-        try:
-            await self.set_stt_enabled(False)
-            if self._last_mic_loop_close_exception is not None:
-                raise self._last_mic_loop_close_exception
-            if self._mic_task is not None or self._audio_source is not None:
-                raise RuntimeError("self microphone source still open after STT auto-off")
-        except Exception as exc:
-            self._log_microphone_test_stt_auto_off(
-                requested=True,
-                completed=False,
-                exception=exc,
-            )
-            return False
-
-        self._log_microphone_test_stt_auto_off(
-            requested=True,
-            completed=True,
-        )
-        return True
 
     async def start_microphone_test(
         self,
