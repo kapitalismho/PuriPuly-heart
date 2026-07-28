@@ -4504,6 +4504,12 @@ class GuiController:
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="ApplicationRuntimeLoggingOwner",
+                callback_name="close_background_tasks",
+                callback=self._close_runtime_logging_background_tasks,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
                 owner_name="GuiControllerBackgroundScope",
                 callback_name="close",
                 callback=self._ui_background_scope.close,
@@ -4587,6 +4593,9 @@ class GuiController:
         fallback_owner = self._overlay_session_fallback_owner
         if fallback_owner is not None:
             fallback_owner.stop_ingress()
+        logging_owner = self._runtime_logging_owner
+        if logging_owner is not None:
+            logging_owner.stop_ingress()
 
     def _stop_github_star_prompt_ingress(self) -> None:
         owner = self._github_star_prompt_owner
@@ -4607,6 +4616,11 @@ class GuiController:
         failures: list[Exception] = []
         await self._close_app_oauth_runtime_for_release(failures)
         _raise_lifecycle_cleanup_failures("App OAuth shutdown failed", failures)
+
+    async def _close_runtime_logging_background_tasks(self) -> None:
+        owner = self._runtime_logging_owner
+        if owner is not None:
+            await owner.close_background_tasks()
 
     async def _close_microphone_test_runtime(self) -> None:
         failures: list[Exception] = []
@@ -11129,6 +11143,10 @@ class GuiController:
                     fallback_logger=logger,
                 ),
                 fallback_logger=logger,
+                overlay_logging_mode_update=self._emit_overlay_runtime_logging_mode_update,
+                overlay_logging_mode_update_available=lambda: (
+                    self._current_overlay_bridge_for_direct_runtime_command() is not None
+                ),
             )
             self._runtime_logging_owner = owner
         return owner
@@ -11167,55 +11185,10 @@ class GuiController:
         )
 
     def _schedule_audio_environment_snapshot(self) -> None:
-        if self._shutdown_ingress_frozen:
-            return
-
-        async def _task() -> None:
-            await self._log_audio_environment_snapshot_async()
-
-        try:
-            if self.app.schedule_task(_task):
-                return
-        except Exception as exc:
-            self.log_detailed(
-                "[AudioDiag][Snapshot] failed to schedule via page.run_task",
-                level=logging.WARNING,
-                exception=exc,
-            )
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            self.log_detailed(
-                "[AudioDiag][Snapshot] skipped reason=no_running_loop",
-                level=logging.WARNING,
-            )
-            return
-
-        task_coro = _task()
-        try:
-            loop.create_task(task_coro)
-        except Exception as exc:
-            task_coro.close()
-            self.log_detailed(
-                "[AudioDiag][Snapshot] skipped reason=create_task_failed",
-                level=logging.WARNING,
-                exception=exc,
-            )
+        self._get_runtime_logging_owner().schedule_audio_environment_snapshot()
 
     async def _log_audio_environment_snapshot_async(self) -> None:
-        from puripuly_heart.core.audio.diagnostics import (
-            collect_pyaudiowpatch_snapshot_lines,
-            collect_sounddevice_snapshot_lines,
-        )
-
-        sounddevice_lines, loopback_lines = await asyncio.gather(
-            asyncio.to_thread(collect_sounddevice_snapshot_lines),
-            asyncio.to_thread(collect_pyaudiowpatch_snapshot_lines),
-        )
-        for line in sounddevice_lines:
-            self.log_detailed(line)
-        for line in loopback_lines:
-            self.log_detailed(line)
+        await self._get_runtime_logging_owner().log_audio_environment_snapshot()
 
     async def _emit_overlay_runtime_logging_mode_update(self) -> None:
         bridge = self._current_overlay_bridge_for_direct_runtime_command()
@@ -11224,29 +11197,7 @@ class GuiController:
         await bridge.broadcast_runtime_control(logging_mode=self.runtime_logging_mode)
 
     def _schedule_overlay_runtime_logging_mode_update(self) -> None:
-        if self._shutdown_ingress_frozen:
-            return
-        if self._current_overlay_bridge_for_direct_runtime_command() is None:
-            return
-
-        try:
-            if self.app.schedule_task(self._emit_overlay_runtime_logging_mode_update):
-                return
-        except Exception as exc:
-            self.log_detailed(
-                "[Overlay] Failed to schedule logging mode update via page.run_task",
-                level=logging.WARNING,
-                exception=exc,
-            )
-            return
-
-        try:
-            asyncio.get_running_loop().create_task(self._emit_overlay_runtime_logging_mode_update())
-        except RuntimeError:
-            self.log_detailed(
-                "[Overlay] Skipping logging mode update; no running loop and page.run_task unavailable",
-                level=logging.WARNING,
-            )
+        self._get_runtime_logging_owner().schedule_overlay_logging_mode_update()
 
     def log_basic(self, message: str, *, level: int = logging.INFO) -> None:
         self._get_runtime_logging_owner().emit_basic(message, level=level)

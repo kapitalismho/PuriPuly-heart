@@ -37,7 +37,6 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/ui/components/settings/api_key_field.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/dashboard.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/settings.py", RUN_TASK): 1,
-        ("src/puripuly_heart/ui/controller.py", LOOP_CREATE_TASK): 2,
         ("src/puripuly_heart/ui/presentation_adapter.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/desktop_overlay.py", ASYNCIO_CREATE_TASK): 11,
         ("src/puripuly_heart/ui/desktop_overlay.py", BARE_RUN_TASK): 1,
@@ -133,10 +132,6 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         "src/puripuly_heart/ui/views/settings.py",
         RUN_TASK,
     ): "SettingsView uses page.run_task at the UI boundary to load loopback process capture options asynchronously while keeping the modal responsive",
-    (
-        "src/puripuly_heart/ui/controller.py",
-        LOOP_CREATE_TASK,
-    ): "controller retains two loop-bound UI scheduling call sites for overlay updates after manual typing moved to its lifecycle owner",
     (
         "src/puripuly_heart/ui/presentation_adapter.py",
         BARE_RUN_TASK,

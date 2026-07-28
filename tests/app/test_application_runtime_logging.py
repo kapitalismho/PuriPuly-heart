@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from types import SimpleNamespace
+
+import pytest
 
 from puripuly_heart.app.services.application_runtime_logging import (
     ApplicationRuntimeLoggingOwner,
@@ -114,3 +117,58 @@ def test_owner_keeps_shutdown_diagnostics_and_close_on_the_logging_boundary() ->
     assert service.persisted[1][0] == logging.INFO
     assert "failure_count=1" in service.persisted[1][1]
     assert service.close_failures == (cleanup_error,)
+
+
+@pytest.mark.asyncio
+async def test_owner_owns_and_cancels_fallback_overlay_update_task() -> None:
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def update_overlay() -> None:
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    owner = ApplicationRuntimeLoggingOwner(
+        presentation=SimpleNamespace(
+            attach_runtime_log_sink=lambda _service: None,
+            schedule_task=lambda _callback: False,
+        ),
+        service_factory=RecordingRuntimeLogging,
+        fallback_logger=logging.getLogger("test.application-runtime-logging.tasks"),
+        overlay_logging_mode_update=update_overlay,
+        overlay_logging_mode_update_available=lambda: True,
+    )
+
+    owner.schedule_overlay_logging_mode_update()
+    await entered.wait()
+
+    assert owner.active_task_names
+
+    await owner.close_background_tasks()
+
+    assert cancelled.is_set()
+    assert owner.active_task_names == ()
+
+
+def test_owner_stops_new_background_ingress() -> None:
+    scheduled: list[object] = []
+    owner = ApplicationRuntimeLoggingOwner(
+        presentation=SimpleNamespace(
+            attach_runtime_log_sink=lambda _service: None,
+            schedule_task=lambda callback: scheduled.append(callback) or True,
+        ),
+        service_factory=RecordingRuntimeLogging,
+        fallback_logger=logging.getLogger("test.application-runtime-logging.ingress"),
+        overlay_logging_mode_update=lambda: asyncio.sleep(0),
+        overlay_logging_mode_update_available=lambda: True,
+    )
+
+    owner.stop_ingress()
+    owner.schedule_audio_environment_snapshot()
+    owner.schedule_overlay_logging_mode_update()
+
+    assert scheduled == []
