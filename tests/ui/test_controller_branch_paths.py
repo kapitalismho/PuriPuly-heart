@@ -9799,7 +9799,9 @@ async def test_overlay_start_failure_keeps_saved_preferences_but_effective_state
 
     assert controller.settings.ui.overlay_enabled is True
     assert controller.failure_reason == "renderer_init_failed"
-    assert controller.effective_peer_translation_enabled is False
+    presentation = controller.overlay_peer_presentation_state()
+    assert presentation is not None
+    assert presentation.peer_effective_enabled is False
 
 
 @pytest.mark.asyncio
@@ -9864,7 +9866,9 @@ async def test_overlay_runtime_disconnect_keeps_saved_preferences_without_auto_r
     assert controller.settings.ui.overlay_enabled is True
     assert controller.settings.ui.peer_translation_enabled is True
     assert controller.failure_reason == "runtime_disconnected"
-    assert controller.effective_peer_translation_enabled is False
+    presentation = controller.overlay_peer_presentation_state()
+    assert presentation is not None
+    assert presentation.peer_effective_enabled is False
     assert controller.hub.peer_translation_enabled is False
     assert controller.auto_restart_scheduled is False
 

@@ -1545,6 +1545,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "def peer_warning_action_is_retry(",
             "def _build_initial_desktop_runtime_controls(",
             "def discord_managed_auth_in_progress(",
+            "def effective_peer_translation_enabled(",
             "_self_local_asr_transition:",
             "_self_asr_model_loading:",
             "class _LocalASRTransitionSuperseded(",

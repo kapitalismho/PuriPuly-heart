@@ -985,12 +985,6 @@ class GuiController:
         self._get_settings_owner().canonical = settings
 
     @property
-    def effective_peer_translation_enabled(self) -> bool:
-        if self.settings is None:
-            return False
-        return self._effective_peer_translation_enabled_for(self.settings)
-
-    @property
     def managed_auth_pending(self) -> bool:
         return self._managed_trial_pending_auth
 
