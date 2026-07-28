@@ -1002,14 +1002,6 @@ class GuiController:
     def discord_managed_auth_in_progress(self) -> bool:
         return self._discord_managed_auth_in_progress
 
-    @property
-    def effective_context_mode(self) -> str:
-        if self.settings is None:
-            return "local"
-        if self._effective_integrated_context_enabled_for(self.settings):
-            return "integrated"
-        return "local"
-
     def _effective_peer_translation_enabled_for(self, settings: AppSettings) -> bool:
         return bool(
             self._peer_translation_activation_requested_for(settings)

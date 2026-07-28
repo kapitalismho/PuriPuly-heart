@@ -9751,23 +9751,23 @@ async def test_explicit_overlay_off_clears_saved_peer_translation_toggle(
     assert controller.settings.ui.peer_translation_enabled is False
 
 
-def test_effective_context_mode_falls_back_to_local_until_peer_translation_is_effective() -> None:
+def test_effective_integrated_context_falls_back_until_peer_translation_is_effective() -> None:
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.settings.ui.integrated_context_enabled = True
     controller.hub = DummyHub(peer_stt=object())
 
-    assert controller.effective_context_mode == "local"
+    assert controller._effective_integrated_context_enabled_for(controller.settings) is False
 
     controller.overlay_state = "connected"
     controller.settings.ui.peer_translation_enabled = True
     controller.settings.ui.peer_translation_eula_accepted = True
 
-    assert controller.effective_context_mode == "integrated"
+    assert controller._effective_integrated_context_enabled_for(controller.settings) is True
 
     controller.settings.ui.peer_translation_enabled = False
 
-    assert controller.effective_context_mode == "local"
+    assert controller._effective_integrated_context_enabled_for(controller.settings) is False
 
 
 @pytest.mark.asyncio

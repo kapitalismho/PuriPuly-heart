@@ -1541,6 +1541,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "def _build_stt_runtime_signature(",
             "def _peer_stt_runtime_custom_vocabulary_signature(",
             "def _update_canonical_settings_from_compatibility_mutation(",
+            "def effective_context_mode(",
             "_self_local_asr_transition:",
             "_self_asr_model_loading:",
             "class _LocalASRTransitionSuperseded(",
