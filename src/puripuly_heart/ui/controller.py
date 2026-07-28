@@ -4790,14 +4790,6 @@ class GuiController:
             ),
         )
 
-    async def _emit_overlay_shutdown(self) -> None:
-        presenter = self._current_overlay_presenter_for_direct_runtime_command()
-        if presenter is None:
-            return
-        with contextlib.suppress(Exception):
-            await presenter.broadcast_shutdown()
-            await asyncio.sleep(OVERLAY_SHUTDOWN_GRACE_S)
-
     async def _teardown_overlay_runtime(
         self,
         *,

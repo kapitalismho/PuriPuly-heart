@@ -1530,6 +1530,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "def _schedule_overlay_calibration_persistence(",
             "def _emit_overlay_calibration_update(",
             "def _schedule_overlay_calibration_emit(",
+            "def _emit_overlay_shutdown(",
             "def _sync_local_stt_download_runtime_aliases",
             "def _sync_clipboard_runtime_aliases",
             "def _sync_microphone_test_runtime_aliases",
