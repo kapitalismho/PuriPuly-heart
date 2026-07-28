@@ -26,6 +26,9 @@ VAD_ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_
 AUDIO_LOOP_ADAPTER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_audio_loop.py"
 )
+ADMISSION_ADAPTER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_admission.py"
+)
 
 
 def test_peer_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() -> None:
@@ -75,6 +78,7 @@ def test_production_controller_composes_one_peer_owner_through_ports() -> None:
         "diagnostic_sink",
     }.issubset(keywords)
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    assert "admission=create_peer_capture_admission_adapter(" in source
     assert "target_resolver=create_peer_capture_target_resolver_adapter()" in source
     assert "vad_factory=create_peer_capture_vad_adapter(" in source
     assert "run_audio_loop=create_peer_capture_audio_loop_adapter(" in source
@@ -222,3 +226,34 @@ def test_peer_capture_session_owner_remains_loop_task_and_cancellation_owner() -
     assert "loop_task = self._create_task(" in source
     assert "await self._cancel_loop(old_loop)" in source
     assert "await self._run_audio_loop(" in source
+
+
+def test_controller_composes_peer_admission_adapter_without_admission_algorithm() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    assert "admission=create_peer_capture_admission_adapter(" in source
+    assert "_PeerCaptureAdmissionAdapter" not in source
+    assert "_admit_peer_capture" not in source
+
+
+def test_peer_admission_adapter_has_no_ui_resource_or_lifecycle_ownership() -> None:
+    source = ADMISSION_ADAPTER_PATH.read_text(encoding="utf-8")
+
+    assert "puripuly_heart.ui" not in source
+    assert "GuiController" not in source
+    assert "AppSettings" not in source
+    assert "ClientHub" not in source
+    assert "PeerCaptureSessionOwner" not in source
+    assert "ProcessCaptureResolver" not in source
+    assert "AudioSource" not in source
+    assert "asyncio.create_task" not in source
+    assert "async def close(" not in source
+
+
+def test_peer_capture_session_owner_remains_admission_and_retry_lifecycle_owner() -> None:
+    source = OWNER_PATH.read_text(encoding="utf-8")
+
+    assert "admission: PeerCaptureAdmissionPort" in source
+    assert "admission = await self._admission.admit(config)" in source
+    assert "self._desired_active" in source
+    assert "async def retry_process_capture(" in source

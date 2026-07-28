@@ -13,6 +13,7 @@ from puripuly_heart.app.adapters.sync_secret_store import (
 from puripuly_heart.app.ports.secret_store import SecretStorePort
 from puripuly_heart.app.wiring_composition import (
     create_microphone_test_capture_adapter,
+    create_peer_capture_admission_adapter,
     create_peer_capture_audio_loop_adapter,
     create_peer_capture_source_adapter,
     create_peer_capture_target_resolver_adapter,
@@ -214,6 +215,7 @@ __all__ = (
     "create_llm_provider_from_resolved_config",
     "create_local_asr_provisioning_owner",
     "create_microphone_test_capture_adapter",
+    "create_peer_capture_admission_adapter",
     "create_peer_capture_audio_loop_adapter",
     "create_peer_capture_source_adapter",
     "create_peer_capture_target_resolver_adapter",

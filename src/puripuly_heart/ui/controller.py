@@ -182,6 +182,7 @@ from puripuly_heart.app.wiring import (
     create_llm_provider,
     create_local_asr_provisioning_owner,
     create_microphone_test_capture_adapter,
+    create_peer_capture_admission_adapter,
     create_peer_capture_audio_loop_adapter,
     create_peer_capture_source_adapter,
     create_peer_capture_target_resolver_adapter,
@@ -335,8 +336,6 @@ from puripuly_heart.core.overlay.process import (
     OverlayProcessRunner,
 )
 from puripuly_heart.core.peer_capture import (
-    PeerCaptureAdmission,
-    PeerCaptureAdmissionStatus,
     PeerCaptureDiagnostic,
     PeerCaptureFailureReason,
     PeerCaptureLanguageFacts,
@@ -648,14 +647,6 @@ class _SelfCaptureVadSink:
         if hub is None:
             raise RuntimeError("Self VAD sink requires the production hub")
         await hub.handle_vad_event(event)
-
-
-@dataclass(slots=True)
-class _PeerCaptureAdmissionAdapter:
-    callback: Callable[[PeerCaptureSessionConfig], Awaitable[PeerCaptureAdmission]]
-
-    async def admit(self, config: PeerCaptureSessionConfig) -> PeerCaptureAdmission:
-        return await self.callback(config)
 
 
 @dataclass(slots=True)
@@ -3955,23 +3946,6 @@ class GuiController:
             ),
             warmup=backend.provider != STTProviderName.LOCAL_QWEN.value,
         )
-
-    async def _admit_peer_capture(
-        self,
-        config: PeerCaptureSessionConfig,
-    ) -> PeerCaptureAdmission:
-        if self.settings is None or self.hub is None:
-            return PeerCaptureAdmission(
-                PeerCaptureAdmissionStatus.REJECTED,
-                reason="runtime_unavailable",
-            )
-        if config.local_provider and not await self._ensure_peer_local_stt_ready():
-            return PeerCaptureAdmission(
-                PeerCaptureAdmissionStatus.PENDING,
-                reason="provider_unavailable",
-                retain_intent=True,
-            )
-        return PeerCaptureAdmission(PeerCaptureAdmissionStatus.ADMITTED)
 
     def _on_peer_capture_state_changed(
         self,
@@ -9349,7 +9323,10 @@ class GuiController:
 
         self._peer_runtime = compose_peer_capture_session_owner(
             hub=hub,
-            admission=_PeerCaptureAdmissionAdapter(self._admit_peer_capture),
+            admission=create_peer_capture_admission_adapter(
+                runtime_available=lambda: self.settings is not None and self.hub is not None,
+                ensure_local_ready=self._ensure_peer_local_stt_ready,
+            ),
             target_resolver=create_peer_capture_target_resolver_adapter(),
             clock=self.clock,
             provider_request_factory=lambda config, warmup: self._peer_stt_provider_request(

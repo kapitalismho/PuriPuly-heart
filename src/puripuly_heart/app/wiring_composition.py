@@ -7,7 +7,10 @@ from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestMeterCallback,
 )
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
-from puripuly_heart.core.peer_capture import PeerCaptureTargetResolverPort
+from puripuly_heart.core.peer_capture import (
+    PeerCaptureAdmissionPort,
+    PeerCaptureTargetResolverPort,
+)
 from puripuly_heart.core.runtime.peer_channel import (
     PeerCaptureAudioLoop,
     PeerCaptureSourceFactory,
@@ -176,6 +179,21 @@ def create_peer_capture_audio_loop_adapter(
         runner=run_audio_vad_loop,
         log_detailed=log_detailed,
         is_detailed_enabled=is_detailed_enabled,
+    )
+
+
+def create_peer_capture_admission_adapter(
+    *,
+    runtime_available: Callable[[], bool],
+    ensure_local_ready: Callable[[], Awaitable[bool]],
+) -> PeerCaptureAdmissionPort:
+    from puripuly_heart.app.adapters.peer_capture_admission import (
+        PeerCaptureAdmissionAdapter,
+    )
+
+    return PeerCaptureAdmissionAdapter(
+        runtime_available=runtime_available,
+        ensure_local_ready=ensure_local_ready,
     )
 
 
