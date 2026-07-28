@@ -38,7 +38,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/ui/views/dashboard.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/settings.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/controller.py", ASYNCIO_CREATE_TASK): 1,
-        ("src/puripuly_heart/ui/controller.py", LOOP_CREATE_TASK): 3,
+        ("src/puripuly_heart/ui/controller.py", LOOP_CREATE_TASK): 2,
         ("src/puripuly_heart/ui/presentation_adapter.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/desktop_overlay.py", ASYNCIO_CREATE_TASK): 11,
         ("src/puripuly_heart/ui/desktop_overlay.py", BARE_RUN_TASK): 1,
@@ -66,6 +66,7 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
             "src/puripuly_heart/app/services/application_shutdown.py",
             ASYNCIO_CREATE_TASK,
         ): 3,
+        ("src/puripuly_heart/app/services/manual_typing.py", LOOP_CREATE_TASK): 1,
         ("src/puripuly_heart/providers/stt/local_gpu.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/ui/desktop_overlay_repro.py", ASYNCIO_CREATE_TASK): 3,
         ("src/puripuly_heart/ui/foundation/runtime.py", RUN_TASK): 1,
@@ -136,7 +137,7 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     (
         "src/puripuly_heart/ui/controller.py",
         LOOP_CREATE_TASK,
-    ): "controller retains three loop-bound UI scheduling call sites for overlay updates and owner-scoped manual typing idle timeout after G09 lifecycle cutover",
+    ): "controller retains two loop-bound UI scheduling call sites for overlay updates after manual typing moved to its lifecycle owner",
     (
         "src/puripuly_heart/ui/presentation_adapter.py",
         BARE_RUN_TASK,
@@ -201,6 +202,10 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         "src/puripuly_heart/app/services/application_shutdown.py",
         ASYNCIO_CREATE_TASK,
     ): "ApplicationShutdownCoordinator owns bounded callback and diagnostic tasks, cancels them on deadlines, and awaits terminal cleanup",
+    (
+        "src/puripuly_heart/app/services/manual_typing.py",
+        LOOP_CREATE_TASK,
+    ): "ManualTypingOwner owns its bounded idle timeout task and cancels it on input transitions and application shutdown",
     (
         "src/puripuly_heart/providers/stt/local_gpu.py",
         ASYNCIO_CREATE_TASK,

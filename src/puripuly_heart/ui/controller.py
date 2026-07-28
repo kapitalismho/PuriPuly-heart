@@ -74,6 +74,7 @@ from puripuly_heart.app.services.managed_connection_auth import (
     ManagedConnectionAuthRequest,
     ManagedConnectionAuthService,
 )
+from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.peer_capture_target import PeerCaptureTargetResolutionService
 from puripuly_heart.app.services.provider_runtime_apply import (
     _ControllerNoopRuntimeApply,
@@ -377,7 +378,6 @@ OVERLAY_STARTUP_TIMEOUT_MS = 3000
 OVERLAY_SHUTDOWN_GRACE_S = 0.05
 DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S = 0.05
 MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S = 3.0
-MANUAL_INPUT_TYPING_REASON = "manual_input"
 MANUAL_SUBMIT_TYPING_TIMEOUT_S = 10.0
 DESKTOP_INTERACTION_MODE_EDIT = "edit"
 DESKTOP_INTERACTION_MODE_PASS_THROUGH = "pass_through"
@@ -1060,8 +1060,11 @@ class GuiController:
 
     _bridge_task: asyncio.Task[None] | None = None
     _mic_task: asyncio.Task[None] | None = None
-    _manual_typing_idle_task: asyncio.Task[None] | None = field(init=False, default=None)
-    _manual_submit_generation: int = field(init=False, default=0)
+    _manual_typing_owner: ManualTypingOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _audio_source: AudioSource | None = None
     _last_mic_loop_close_exception: BaseException | None = field(
         init=False,
@@ -6832,106 +6835,52 @@ class GuiController:
             self._log_error(f"Clipboard submit failed: {exc}")
 
     async def submit_text(self, text: str) -> None:
-        self._clear_manual_input_typing()
-        if self.hub is None:
-            return
-        submit_reason = self._begin_manual_submit_typing()
-        try:
-            utterance_id = await self.hub.submit_text(text, source="You")
-            await self._wait_for_manual_submit_output(utterance_id)
-        except Exception as exc:
-            self._log_error(f"Submit failed: {exc}")
-        finally:
-            self._clear_manual_submit_typing(submit_reason)
+        hub = self.hub
+        submit = None if hub is None else lambda: hub.submit_text(text, source="You")
+        await self._get_manual_typing_owner().submit(submit)
 
     def set_manual_input_activity(self, has_text: bool) -> None:
-        if has_text:
-            self._set_typing_reason(MANUAL_INPUT_TYPING_REASON, True)
-            self._reschedule_manual_typing_idle_timeout()
-            return
-        self._clear_manual_input_typing()
+        self._get_manual_typing_owner().set_input_activity(has_text)
 
     async def release_manual_typing(self) -> None:
-        self._cancel_manual_typing_idle_task()
-        hub = self.hub
-        clear_typing = getattr(hub, "clear_self_chatbox_typing_reasons", None)
-        if callable(clear_typing):
-            clear_typing()
-        self.log_detailed("[ManualTyping] release status=cleared")
+        await self._get_manual_typing_owner().release()
 
     def _begin_manual_submit_typing(self) -> str:
-        self._manual_submit_generation += 1
-        reason = f"manual_submit:{self._manual_submit_generation}"
-        self._set_typing_reason(reason, True)
-        return reason
+        return self._get_manual_typing_owner().begin_submit()
 
-    def _clear_manual_submit_typing(self, reason: str) -> None:
-        self._set_typing_reason(reason, False)
+    @property
+    def _manual_typing_idle_task(self) -> asyncio.Task[None] | None:
+        owner = self._manual_typing_owner
+        return owner.idle_task if owner is not None else None
 
-    async def _wait_for_manual_submit_output(self, utterance_id: object) -> None:
-        hub = self.hub
-        if hub is None:
-            return
-        runtime = getattr(hub, "self_runtime", None)
-        tasks = getattr(runtime, "translation_tasks", None)
-        task = tasks.get(utterance_id) if isinstance(tasks, dict) else None
-        if task is None:
-            return
-        if isinstance(task, asyncio.Task):
-            awaitable: object = asyncio.gather(task, return_exceptions=True)
-        elif inspect.isawaitable(task):
-            awaitable = task
-        else:
-            return
-        try:
-            await asyncio.wait_for(
-                asyncio.shield(awaitable), timeout=MANUAL_SUBMIT_TYPING_TIMEOUT_S
+    def _get_manual_typing_owner(self) -> ManualTypingOwner:
+        owner = self._manual_typing_owner
+        if owner is None:
+
+            def output_provider():
+                hub = self.hub
+                set_reason = getattr(hub, "set_self_chatbox_typing_reason", None)
+                clear_reasons = getattr(hub, "clear_self_chatbox_typing_reasons", None)
+                if callable(set_reason) and callable(clear_reasons):
+                    return hub
+                return None
+
+            def completion_provider(utterance_id: object) -> object | None:
+                hub = self.hub
+                runtime = getattr(hub, "self_runtime", None)
+                tasks = getattr(runtime, "translation_tasks", None)
+                return tasks.get(utterance_id) if isinstance(tasks, dict) else None
+
+            owner = ManualTypingOwner(
+                output_provider=output_provider,
+                completion_provider=completion_provider,
+                log_detailed=lambda message: self.log_detailed(message),
+                log_error=lambda message: self._log_error(message),
+                idle_timeout_seconds=MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S,
+                submit_timeout_seconds=MANUAL_SUBMIT_TYPING_TIMEOUT_S,
             )
-        except asyncio.TimeoutError:
-            self.log_detailed("[ManualTyping] submit output wait timed out")
-        except Exception as exc:
-            self._log_error(f"Manual submit output wait failed: {exc}")
-
-    def _clear_manual_input_typing(self) -> None:
-        self._cancel_manual_typing_idle_task()
-        self._set_typing_reason(MANUAL_INPUT_TYPING_REASON, False)
-
-    def _set_typing_reason(self, reason: str, active: bool) -> None:
-        hub = self.hub
-        set_typing = getattr(hub, "set_self_chatbox_typing_reason", None)
-        if not callable(set_typing):
-            return
-        try:
-            set_typing(reason, active)
-        except Exception as exc:
-            self._log_error(f"Manual typing output update failed: {exc}")
-
-    def _reschedule_manual_typing_idle_timeout(self) -> None:
-        self._cancel_manual_typing_idle_task()
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            self._log_error("Manual typing idle timeout scheduling failed: no running loop")
-            return
-        self._manual_typing_idle_task = loop.create_task(self._manual_typing_idle_timeout())
-
-    def _cancel_manual_typing_idle_task(self) -> None:
-        task = self._manual_typing_idle_task
-        self._manual_typing_idle_task = None
-        if task is not None and not task.done():
-            task.cancel()
-
-    async def _manual_typing_idle_timeout(self) -> None:
-        try:
-            await asyncio.sleep(MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S)
-            self._set_typing_reason(MANUAL_INPUT_TYPING_REASON, False)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self._log_error(f"Manual typing idle timeout failed: {exc}")
-        finally:
-            if self._manual_typing_idle_task is asyncio.current_task():
-                self._manual_typing_idle_task = None
+            self._manual_typing_owner = owner
+        return owner
 
     async def on_dashboard_language_change(
         self,
