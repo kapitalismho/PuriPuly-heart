@@ -18,6 +18,9 @@ LEGACY_OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self
 VAD_SINK_ADAPTER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_vad_sink.py"
 )
+ADMISSION_ADAPTER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_admission.py"
+)
 
 
 def test_self_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() -> None:
@@ -84,6 +87,29 @@ def test_controller_composes_self_vad_sink_adapter_without_channel_wrapper() -> 
 
     assert "vad_sink=create_self_capture_vad_sink_adapter(" in source
     assert "_SelfCaptureVadSink" not in source
+
+
+def test_controller_composes_self_admission_adapter_without_admission_algorithm() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    assert "admission=create_self_capture_admission_adapter(" in source
+    assert "_SelfCaptureAdmissionAdapter" not in source
+    assert "_admit_self_capture" not in source
+    assert "SelfCaptureAdmissionStatus" not in source
+
+
+def test_self_admission_adapter_has_explicit_effects_without_cross_layer_ownership() -> None:
+    source = ADMISSION_ADAPTER_PATH.read_text(encoding="utf-8")
+
+    assert "puripuly_heart.ui" not in source
+    assert "GuiController" not in source
+    assert "ClientHub" not in source
+    assert "AppSettings" not in source
+    assert "chatbox" not in source.casefold()
+    assert "output" not in source.casefold()
+    assert "asyncio.create_task" not in source
+    assert "async def close(" not in source
+    assert "SelfCaptureAdmissionEffect" in source
 
 
 def test_self_vad_sink_adapter_routes_only_self_events_without_lifecycle_ownership() -> None:

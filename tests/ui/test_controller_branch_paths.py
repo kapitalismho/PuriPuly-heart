@@ -30,6 +30,10 @@ from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestCaptureRequest,
     MicrophoneTestRuntimePort,
 )
+from puripuly_heart.app.ports.self_capture_admission import (
+    SelfCaptureAdmissionEffect,
+    SelfCaptureAdmissionEffectType,
+)
 from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
 from puripuly_heart.app.services import (
     overlay_generation_start as overlay_generation_start_module,
@@ -129,8 +133,10 @@ from puripuly_heart.core.runtime_logging import (
     SessionRuntimeLoggingService,
 )
 from puripuly_heart.core.self_capture import (
+    SelfCaptureAdmissionStatus,
     SelfCaptureFailureReason,
     SelfCaptureProviderStatus,
+    SelfCaptureSessionConfig,
     SelfCaptureSessionSnapshot,
     SelfCaptureSessionState,
 )
@@ -834,6 +840,179 @@ def _make_controller(*, app: object) -> GuiController:
         config_path=Path("settings.json"),
         local_asr_provisioning=ReadyProvisioningPort(),
     )
+
+
+def test_self_capture_admission_state_projects_current_controller_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings()
+    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
+    controller.hub = SimpleNamespace()
+    controller._gpu_ui_state = "installing"
+    controller._stt_activation_generation = 17
+    monkeypatch.setattr(
+        GuiController,
+        "_current_local_stt_runtime_status",
+        lambda _self: "downloading",
+    )
+
+    state = controller._self_capture_admission_state(
+        controller._build_self_capture_session_config(controller.settings)
+    )
+
+    assert state.settings_available is True
+    assert state.runtime_available is True
+    assert state.gpu_status == "installing"
+    assert state.local_cpu_supported is True
+    assert state.local_runtime_status == "downloading"
+    assert state.activation_generation == 17
+
+
+@pytest.mark.parametrize("settings_available", [False, True])
+def test_self_capture_admission_state_skips_local_probes_outside_local_cpu(
+    monkeypatch: pytest.MonkeyPatch,
+    settings_available: bool,
+) -> None:
+    controller = _make_controller(app=SimpleNamespace())
+    controller.settings = AppSettings() if settings_available else None
+
+    def unexpected(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("local admission state must remain lazy")
+
+    monkeypatch.setattr(controller_module, "resolve_local_asr_selection", unexpected)
+    monkeypatch.setattr(
+        GuiController,
+        "_current_local_stt_runtime_status",
+        unexpected,
+    )
+
+    state = controller._self_capture_admission_state(
+        SelfCaptureSessionConfig(
+            provider_id="soniox",
+            provider_signature=("provider",),
+            runtime_signature=("runtime",),
+            capture_signature=("capture",),
+            target_sample_rate_hz=16000,
+        )
+    )
+
+    assert state.settings_available is settings_available
+    assert state.local_cpu_supported is True
+    assert state.local_runtime_status == "ready"
+
+
+@pytest.mark.asyncio
+async def test_self_capture_admission_rejects_unsupported_language_before_status_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dashboard = DummyDashboard()
+    controller = _make_controller(app=SimpleNamespace(view_dashboard=dashboard))
+    controller.settings = AppSettings()
+    controller.settings.provider.stt = STTProviderName.LOCAL_CPU_AUTO
+    controller.settings.languages.source_language = "he"
+    controller.hub = SimpleNamespace()
+    messages: list[str] = []
+
+    def unexpected_status(_self: GuiController) -> str:
+        raise RuntimeError("status probe must not run")
+
+    def show_message(_self: GuiController, message_key: str) -> None:
+        messages.append(message_key)
+
+    monkeypatch.setattr(
+        GuiController,
+        "_current_local_stt_runtime_status",
+        unexpected_status,
+    )
+    monkeypatch.setattr(GuiController, "_show_short_stt_message", show_message)
+    admission = controller._get_self_capture_owner()._admission
+
+    result = await admission.admit(
+        SelfCaptureSessionConfig(
+            provider_id=STTProviderName.LOCAL_CPU_AUTO.value,
+            provider_signature=("provider",),
+            runtime_signature=("runtime",),
+            capture_signature=("capture",),
+            target_sample_rate_hz=16000,
+            local_cpu=True,
+        )
+    )
+
+    assert result.status is SelfCaptureAdmissionStatus.REJECTED
+    assert result.reason == "language_unsupported"
+    assert dashboard.stt_enabled is False
+    assert dashboard.stt_needs_key is False
+    assert messages == ["local_stt.language_unsupported"]
+
+
+def test_self_capture_admission_effects_preserve_controller_compatibility(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dashboard = DummyDashboard()
+    controller = _make_controller(app=SimpleNamespace(view_dashboard=dashboard))
+    controller._gpu_pending_enable_channels = frozenset({"peer"})
+    messages: list[str] = []
+    repairs: list[tuple[str, str, int | None]] = []
+
+    def show_message(_self: GuiController, message_key: str) -> None:
+        messages.append(message_key)
+
+    def request_repair(
+        _self: GuiController,
+        status: str,
+        *,
+        channel: str,
+        model_ids: tuple[str, ...] | None = None,
+        activation_generation: int | None = None,
+    ) -> bool:
+        assert model_ids is None
+        repairs.append((status, channel, activation_generation))
+        return False
+
+    monkeypatch.setattr(GuiController, "_show_short_stt_message", show_message)
+    monkeypatch.setattr(
+        GuiController,
+        "_request_unavailable_local_asr_repair",
+        request_repair,
+    )
+
+    controller._apply_self_capture_admission_effect(
+        SelfCaptureAdmissionEffect(
+            SelfCaptureAdmissionEffectType.RETAIN_GPU_PENDING_INTENT,
+            status="installing",
+        )
+    )
+    controller._apply_self_capture_admission_effect(
+        SelfCaptureAdmissionEffect(
+            SelfCaptureAdmissionEffectType.REJECT_UNSUPPORTED_LANGUAGE,
+        )
+    )
+    controller._apply_self_capture_admission_effect(
+        SelfCaptureAdmissionEffect(
+            SelfCaptureAdmissionEffectType.RETAIN_DOWNLOAD_PENDING_INTENT,
+            status="downloading",
+            activation_generation=21,
+        )
+    )
+    controller._apply_self_capture_admission_effect(
+        SelfCaptureAdmissionEffect(
+            SelfCaptureAdmissionEffectType.REQUEST_LOCAL_REPAIR,
+            status="invalid",
+            activation_generation=23,
+        )
+    )
+
+    assert controller._gpu_pending_enable_channels == frozenset({"peer", "self"})
+    assert controller._local_stt_pending_enable_after_install is True
+    assert controller._local_stt_pending_enable_generation == 21
+    assert dashboard.stt_enabled is False
+    assert dashboard.stt_needs_key is False
+    assert messages == [
+        "local_stt.language_unsupported",
+        "local_stt.download_in_progress",
+    ]
+    assert repairs == [("invalid", "self", 23)]
 
 
 def _patch_settings_save(

@@ -7,6 +7,11 @@ from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestMeterCallback,
 )
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
+from puripuly_heart.app.ports.self_capture_admission import (
+    SelfCaptureAdmissionEffectSink,
+    SelfCaptureAdmissionStateProvider,
+    SelfCaptureGpuActivationValidator,
+)
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
     PeerCaptureTargetResolverPort,
@@ -21,6 +26,7 @@ from puripuly_heart.core.runtime.self_capture import (
     SelfCaptureSourceFactory,
     SelfCaptureVadFactory,
 )
+from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
 
 
 def create_microphone_test_capture_adapter(
@@ -69,6 +75,23 @@ def create_self_capture_source_adapter(
         source_factory=SoundDeviceAudioSource,
         log_detailed=log_detailed,
         wrap_source=wrap_source,
+    )
+
+
+def create_self_capture_admission_adapter(
+    *,
+    state_provider: SelfCaptureAdmissionStateProvider,
+    validate_gpu_activation: SelfCaptureGpuActivationValidator,
+    effect_sink: SelfCaptureAdmissionEffectSink,
+) -> SelfCaptureAdmissionPort:
+    from puripuly_heart.app.adapters.self_capture_admission import (
+        SelfCaptureAdmissionAdapter,
+    )
+
+    return SelfCaptureAdmissionAdapter(
+        state_provider=state_provider,
+        validate_gpu_activation=validate_gpu_activation,
+        effect_sink=effect_sink,
     )
 
 

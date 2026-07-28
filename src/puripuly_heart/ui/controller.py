@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 import time
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from pathlib import Path
@@ -27,6 +27,11 @@ from puripuly_heart.app.ports.microphone_test import (
 )
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
+from puripuly_heart.app.ports.self_capture_admission import (
+    SelfCaptureAdmissionEffect,
+    SelfCaptureAdmissionEffectType,
+    SelfCaptureAdmissionState,
+)
 from puripuly_heart.app.ports.settings_repository import CommittedSettingsRepositoryPort
 from puripuly_heart.app.ports.ui_models import (
     GpuDashboardNotice,
@@ -190,6 +195,7 @@ from puripuly_heart.app.wiring import (
     create_peer_capture_vad_sink_adapter,
     create_provider_verifier,
     create_secret_store,
+    create_self_capture_admission_adapter,
     create_self_capture_audio_loop_adapter,
     create_self_capture_source_adapter,
     create_self_capture_vad_adapter,
@@ -383,8 +389,6 @@ from puripuly_heart.core.runtime_logging import (
     SessionRuntimeLoggingService,
 )
 from puripuly_heart.core.self_capture import (
-    SelfCaptureAdmission,
-    SelfCaptureAdmissionStatus,
     SelfCaptureDiagnostic,
     SelfCaptureProviderStatus,
     SelfCaptureSessionConfig,
@@ -630,14 +634,6 @@ def _managed_openrouter_identity_signature(settings: AppSettings) -> tuple[objec
         identity.active_managed_expires_at,
         identity.referral_id,
     )
-
-
-@dataclass(slots=True)
-class _SelfCaptureAdmissionAdapter:
-    callback: Callable[[SelfCaptureSessionConfig], Awaitable[SelfCaptureAdmission]]
-
-    async def admit(self, config: SelfCaptureSessionConfig) -> SelfCaptureAdmission:
-        return await self.callback(config)
 
 
 @dataclass(slots=True)
@@ -9672,94 +9668,72 @@ class GuiController:
             warmup=provider != STTProviderName.LOCAL_QWEN.value,
         )
 
-    async def _admit_self_capture(
+    def _self_capture_admission_state(
         self,
         config: SelfCaptureSessionConfig,
-    ) -> SelfCaptureAdmission:
-        if self.settings is None:
-            return SelfCaptureAdmission(
-                SelfCaptureAdmissionStatus.REJECTED,
-                reason="runtime_unavailable",
+    ) -> SelfCaptureAdmissionState:
+        settings = self.settings
+        decision = (
+            resolve_local_asr_selection(
+                settings.provider.stt.value,
+                settings.languages.source_language,
             )
-        if config.local_gpu:
-            if await self._validate_gpu_activation():
-                return SelfCaptureAdmission(SelfCaptureAdmissionStatus.ADMITTED)
-            if self._gpu_ui_state in {
-                "not_installed",
-                "invalid",
-                "install_failed",
-                "installing",
-            }:
-                self._gpu_pending_enable_channels = frozenset(
-                    {*self._gpu_pending_enable_channels, "self"}
-                )
-                return SelfCaptureAdmission(
-                    SelfCaptureAdmissionStatus.PENDING,
-                    reason=self._gpu_ui_state,
-                    retain_intent=True,
-                )
-            return SelfCaptureAdmission(
-                SelfCaptureAdmissionStatus.REJECTED,
-                reason=self._gpu_ui_state or "gpu_unavailable",
-            )
-        if not config.local_cpu:
-            return SelfCaptureAdmission(
-                (
-                    SelfCaptureAdmissionStatus.ADMITTED
-                    if self.hub is not None
-                    else SelfCaptureAdmissionStatus.REJECTED
-                ),
-                reason=None if self.hub is not None else "runtime_unavailable",
-            )
-        decision = resolve_local_asr_selection(
-            self.settings.provider.stt.value,
-            self.settings.languages.source_language,
+            if settings is not None and config.local_cpu
+            else None
         )
-        if not decision.supported:
+        return SelfCaptureAdmissionState(
+            settings_available=settings is not None,
+            runtime_available=self.hub is not None,
+            gpu_status=self._gpu_ui_state,
+            local_cpu_supported=bool(decision is None or decision.supported),
+            local_runtime_status=(
+                self._current_local_stt_runtime_status()
+                if decision is not None and decision.supported
+                else "ready"
+            ),
+            activation_generation=self._stt_activation_generation,
+        )
+
+    def _apply_self_capture_admission_effect(
+        self,
+        effect: SelfCaptureAdmissionEffect,
+    ) -> None:
+        if effect.type is SelfCaptureAdmissionEffectType.RETAIN_GPU_PENDING_INTENT:
+            self._gpu_pending_enable_channels = frozenset(
+                {*self._gpu_pending_enable_channels, "self"}
+            )
+            return
+        if effect.type is SelfCaptureAdmissionEffectType.REJECT_UNSUPPORTED_LANGUAGE:
             self.app.set_dashboard_stt_enabled(False)
             self.app.set_dashboard_stt_needs_key(False)
             self._show_short_stt_message("local_stt.language_unsupported")
-            return SelfCaptureAdmission(
-                SelfCaptureAdmissionStatus.REJECTED,
-                reason="language_unsupported",
-            )
-        current_status = self._current_local_stt_runtime_status()
-        if current_status == "downloading":
+            return
+        if effect.type is SelfCaptureAdmissionEffectType.RETAIN_DOWNLOAD_PENDING_INTENT:
             self._local_stt_pending_enable_after_install = True
-            self._local_stt_pending_enable_generation = self._stt_activation_generation
+            self._local_stt_pending_enable_generation = effect.activation_generation
             self.app.set_dashboard_stt_enabled(False)
             self._show_short_stt_message("local_stt.download_in_progress")
-            return SelfCaptureAdmission(
-                SelfCaptureAdmissionStatus.PENDING,
-                reason=current_status,
-                retain_intent=True,
-            )
-        if current_status in {"missing", "invalid", "download_failed"}:
+            return
+        if effect.type is SelfCaptureAdmissionEffectType.REQUEST_LOCAL_REPAIR:
+            assert effect.status is not None
             self._request_unavailable_local_asr_repair(
-                current_status,
+                effect.status,
                 channel="self",
-                activation_generation=self._stt_activation_generation,
+                activation_generation=effect.activation_generation,
             )
-            return SelfCaptureAdmission(
-                SelfCaptureAdmissionStatus.PENDING,
-                reason=current_status,
-                retain_intent=True,
-            )
-        return SelfCaptureAdmission(
-            (
-                SelfCaptureAdmissionStatus.ADMITTED
-                if self.hub is not None
-                else SelfCaptureAdmissionStatus.REJECTED
-            ),
-            reason=None if self.hub is not None else "runtime_unavailable",
-        )
+            return
+        raise ValueError(f"Unsupported Self capture admission effect: {effect.type}")
 
     def _get_self_capture_owner(self) -> SelfCaptureSessionOwner:
         if self._self_capture_owner is not None:
             return self._self_capture_owner
         self._self_capture_owner = compose_self_capture_session_owner(
             hub=self.hub,
-            admission=_SelfCaptureAdmissionAdapter(self._admit_self_capture),
+            admission=create_self_capture_admission_adapter(
+                state_provider=self._self_capture_admission_state,
+                validate_gpu_activation=self._validate_gpu_activation,
+                effect_sink=self._apply_self_capture_admission_effect,
+            ),
             provider_request_factory=self._self_capture_provider_request,
             source_factory=create_self_capture_source_adapter(
                 log_detailed=self.log_detailed,
