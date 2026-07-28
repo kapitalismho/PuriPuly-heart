@@ -111,8 +111,10 @@ class ReadyProvisioningPort:
         _ = (explicit_intent, verify_checksums)
         return self.snapshot
 
-    def start_install(self, request):
-        raise AssertionError(f"unexpected provisioning install: {request}")
+    def start_install(self, request, *, result_handler=None):
+        raise AssertionError(
+            f"unexpected provisioning install: {request}, handler={result_handler}"
+        )
 
     async def report_model_validation_failure(self, model_id, *, failure_type):
         _ = (model_id, failure_type)

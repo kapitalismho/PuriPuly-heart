@@ -69,6 +69,10 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
             "src/puripuly_heart/core/runtime/github_star_prompt.py",
             ASYNCIO_CREATE_TASK,
         ): 2,
+        (
+            "src/puripuly_heart/core/runtime/local_asr_provisioning.py",
+            ASYNCIO_CREATE_TASK,
+        ): 1,
         ("src/puripuly_heart/core/runtime/local_stt_download.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/mic_test.py", ASYNCIO_CREATE_TASK): 2,
         ("src/puripuly_heart/core/runtime/receiver.py", ASYNCIO_CREATE_TASK): 1,
@@ -200,6 +204,10 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         "src/puripuly_heart/core/runtime/github_star_prompt.py",
         ASYNCIO_CREATE_TASK,
     ): "GithubStarPromptRuntime is the named lifecycle owner for prompt observation/launch tasks",
+    (
+        "src/puripuly_heart/core/runtime/local_asr_provisioning.py",
+        ASYNCIO_CREATE_TASK,
+    ): "LocalASRProvisioningOwner owns install-result delivery tasks and cancels and awaits them during close",
     (
         "src/puripuly_heart/core/runtime/local_stt_download.py",
         ASYNCIO_CREATE_TASK,
@@ -460,3 +468,18 @@ def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:
         "_ui_event_bridge_started_wait_task" in output_methods["wait_for_ui_event_bridge_started"]
     )
     assert "_cancel_ui_event_bridge_started_wait_task" in output_methods["close"]
+
+
+def test_order44_local_asr_owner_retires_controller_background_scope() -> None:
+    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    provisioning_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "local_asr_provisioning.py"
+    )
+    controller_source = controller_path.read_text(encoding="utf-8")
+    provisioning_source = provisioning_path.read_text(encoding="utf-8")
+
+    assert "_ui_background_scope" not in controller_source
+    assert "GuiControllerBackgroundScope" not in controller_source
+    assert "result_handler=" in controller_source
+    assert "_result_delivery_tasks" in provisioning_source
+    assert "LocalASRProvisioningOwner:install-result-" in provisioning_source

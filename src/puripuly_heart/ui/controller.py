@@ -1135,11 +1135,6 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _ui_background_scope: LifecycleScope = field(
-        init=False,
-        default_factory=lambda: LifecycleScope("gui-controller-background"),
-        repr=False,
-    )
     _vrchat_osc_presence_owner: VrchatOscPresenceProbeOwner | None = field(
         init=False,
         default=None,
@@ -4473,12 +4468,6 @@ class GuiController:
                 callback=self._close_provider_status_verification_owner,
             ),
             application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="GuiControllerBackgroundScope",
-                callback_name="close",
-                callback=self._ui_background_scope.close,
-            ),
-            application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
                 owner_name="ClientHub",
                 callback_name="stop_owned_runtimes",
@@ -5873,38 +5862,28 @@ class GuiController:
             return False
         requested_model_ids = model_ids or (LOCAL_STT_MODEL_ID,)
         try:
-            task = provisioning.start_install(
+            provisioning.start_install(
                 LocalASRInstallRequest(
                     backend="cpu",
                     model_ids=requested_model_ids,
                     locale=self.settings.ui.locale,
                     origin=origin,
-                )
+                ),
+                result_handler=lambda result: self._handle_local_stt_install_result(
+                    result,
+                    origin=origin,
+                ),
             )
         except RuntimeError:
             return False
-
-        def schedule_result_handler(
-            completed: asyncio.Task[LocalASRInstallResult],
-        ) -> None:
-            if self._ui_background_scope.is_closed:
-                return
-            start_lifecycle_task(
-                self._ui_background_scope,
-                self._handle_local_stt_install_result(completed, origin=origin),
-                name=f"local-asr-install-result-{id(completed)}",
-            )
-
-        task.add_done_callback(schedule_result_handler)
         return True
 
     async def _handle_local_stt_install_result(
         self,
-        task: asyncio.Task[LocalASRInstallResult],
+        result: LocalASRInstallResult,
         *,
         origin: str,
     ) -> None:
-        result = await task
         if result.cancelled:
             return
         if result.failed_model_ids:

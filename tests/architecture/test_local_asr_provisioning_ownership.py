@@ -40,6 +40,7 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
     assert ".inspect_cpu(" in source
     assert ".inspect_gpu(" in source
     assert ".start_install(" in source
+    assert "result_handler=" in source
     assert ".report_model_validation_failure(" in source
     assert ".close()" in source
     assert "puripuly_heart.core.local_stt_runtime_installer" not in imports
@@ -62,6 +63,7 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
     assert "_cancel_local_stt_download" not in source
     assert "_start_local_stt_download" not in source
     assert "_handle_local_stt_unavailable" not in source
+    assert "_ui_background_scope" not in source
 
 
 def test_provider_wiring_consumes_only_installed_path_contract() -> None:

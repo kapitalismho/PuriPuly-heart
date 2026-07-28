@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
@@ -114,6 +115,12 @@ class LocalASRInstallResult:
     snapshot: LocalASRProvisioningSnapshot
 
 
+LocalASRInstallResultHandler = Callable[
+    [LocalASRInstallResult],
+    Awaitable[None] | None,
+]
+
+
 @dataclass(frozen=True, slots=True)
 class LocalASRProvisioningDiagnostic:
     event: str
@@ -149,6 +156,8 @@ class LocalASRProvisioningPort(Protocol):
     def start_install(
         self,
         request: LocalASRInstallRequest,
+        *,
+        result_handler: LocalASRInstallResultHandler | None = None,
     ) -> asyncio.Task[LocalASRInstallResult]: ...
 
     async def report_model_validation_failure(
@@ -166,6 +175,7 @@ class LocalASRProvisioningPort(Protocol):
 __all__ = [
     "LocalASRInstallRequest",
     "LocalASRInstallResult",
+    "LocalASRInstallResultHandler",
     "LocalASRIntegrityStatus",
     "LocalASRModelProvisioningState",
     "LocalASROperationStatus",

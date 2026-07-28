@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -77,6 +78,7 @@ class RecordingProvisioningPort:
         self.validation_failures: list[tuple[str, str]] = []
         self.close_calls = 0
         self.tasks: list[asyncio.Task[LocalASRInstallResult]] = []
+        self.result_tasks: list[asyncio.Task[None]] = []
 
     @property
     def snapshot(self) -> LocalASRProvisioningSnapshot:
@@ -107,6 +109,8 @@ class RecordingProvisioningPort:
     def start_install(
         self,
         request: LocalASRInstallRequest,
+        *,
+        result_handler=None,
     ) -> asyncio.Task[LocalASRInstallResult]:
         if self._snapshot.activity_for(request.backend) is not None:
             raise RuntimeError("install already active")
@@ -133,6 +137,18 @@ class RecordingProvisioningPort:
         )
         task = asyncio.create_task(self._finish(request))
         self.tasks.append(task)
+        if result_handler is not None:
+
+            def schedule_result(completed: asyncio.Task[LocalASRInstallResult]) -> None:
+                async def deliver() -> None:
+                    result = await completed
+                    outcome = result_handler(result)
+                    if inspect.isawaitable(outcome):
+                        await outcome
+
+                self.result_tasks.append(asyncio.create_task(deliver()))
+
+            task.add_done_callback(schedule_result)
         return task
 
     async def _finish(self, request: LocalASRInstallRequest) -> LocalASRInstallResult:
@@ -220,6 +236,12 @@ class RecordingProvisioningPort:
         self.close_calls += 1
         await self.cancel_install("cpu")
         await self.cancel_install("gpu")
+        await asyncio.sleep(0)
+        for task in self.result_tasks:
+            if not task.done():
+                task.cancel()
+        if self.result_tasks:
+            await asyncio.gather(*self.result_tasks, return_exceptions=True)
         self._snapshot = replace(self._snapshot, closed=True)
 
 

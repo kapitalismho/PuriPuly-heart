@@ -11,6 +11,7 @@ from pathlib import Path
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
+    LocalASRInstallResultHandler,
     LocalASRModelProvisioningState,
     LocalASRProvisioningActivity,
     LocalASRProvisioningBackend,
@@ -67,14 +68,19 @@ class LocalASRProvisioningOwner:
     resource_fields = (
         "_cpu_install_runtime",
         "_gpu_install_runtime",
+        "_result_delivery_tasks",
         "installer cancel events",
         "Xet helper processes",
         "staging and backup directories",
         "model-root cross-process provisioning lease",
     )
     stop_ingress = "reject new inspect and install commands"
-    shutdown_policy = "cancel CPU and GPU install tasks, signal installers, and await close"
-    late_callback_rule = "ignore status callbacks whose owner generation is no longer current"
+    shutdown_policy = (
+        "cancel CPU and GPU install and result-delivery tasks, signal installers, and await close"
+    )
+    late_callback_rule = (
+        "ignore stale status generations and drop install-result delivery after close"
+    )
 
     def __init__(
         self,
@@ -106,6 +112,7 @@ class LocalASRProvisioningOwner:
         self._huggingface_downloader = huggingface_downloader
         self._cpu_install_runtime = download_runtime_factory()
         self._gpu_install_runtime = download_runtime_factory()
+        self._result_delivery_tasks: set[asyncio.Task[None]] = set()
         self._models = {
             model_id: LocalASRModelProvisioningState(
                 model_id=model_id,
@@ -224,11 +231,13 @@ class LocalASRProvisioningOwner:
     def start_install(
         self,
         request: LocalASRInstallRequest,
+        *,
+        result_handler: LocalASRInstallResultHandler | None = None,
     ) -> asyncio.Task[LocalASRInstallResult]:
         self._require_open("start install")
         self._validate_request(request)
         runtime = self._runtime_for(request.backend)
-        return runtime.start(
+        task = runtime.start(
             origin=request.origin,
             run_download=lambda cancel_event, generation: self._run_install(
                 request,
@@ -236,6 +245,14 @@ class LocalASRProvisioningOwner:
                 generation=generation,
             ),
         )
+        if result_handler is not None:
+            task.add_done_callback(
+                lambda completed: self._schedule_install_result_delivery(
+                    completed,
+                    result_handler=result_handler,
+                )
+            )
+        return task
 
     async def report_model_validation_failure(
         self,
@@ -279,6 +296,7 @@ class LocalASRProvisioningOwner:
             results = await asyncio.gather(
                 self._cpu_install_runtime.close(),
                 self._gpu_install_runtime.close(),
+                self._close_result_delivery_tasks(),
                 return_exceptions=True,
             )
             self._closing = False
@@ -290,10 +308,79 @@ class LocalASRProvisioningOwner:
                 raise ExceptionGroup("Local ASR provisioning close failed", failures)
 
     def _has_resources(self) -> bool:
-        return bool(self._activities) or any(
-            runtime.download_task is not None or runtime.cancel_event is not None
-            for runtime in (self._cpu_install_runtime, self._gpu_install_runtime)
+        return (
+            bool(self._activities)
+            or bool(self._result_delivery_tasks)
+            or any(
+                runtime.download_task is not None or runtime.cancel_event is not None
+                for runtime in (self._cpu_install_runtime, self._gpu_install_runtime)
+            )
         )
+
+    @property
+    def active_result_delivery_task_names(self) -> tuple[str, ...]:
+        return tuple(sorted(task.get_name() for task in self._result_delivery_tasks))
+
+    def _schedule_install_result_delivery(
+        self,
+        completed: asyncio.Task[LocalASRInstallResult],
+        *,
+        result_handler: LocalASRInstallResultHandler,
+    ) -> None:
+        if self._closing or self._closed:
+            return
+
+        async def deliver() -> None:
+            try:
+                result = await completed
+            except asyncio.CancelledError:
+                return
+            except Exception as exc:
+                await self._emit_diagnostic(
+                    LocalASRProvisioningDiagnostic(
+                        event="result_delivery",
+                        outcome="failed",
+                        failure_type=type(exc).__name__,
+                    )
+                )
+                return
+            try:
+                outcome = result_handler(result)
+                if inspect.isawaitable(outcome):
+                    await outcome
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                await self._emit_diagnostic(
+                    LocalASRProvisioningDiagnostic(
+                        event="result_delivery",
+                        backend=result.request.backend,
+                        origin=result.request.origin,
+                        outcome="failed",
+                        failure_type=type(exc).__name__,
+                    )
+                )
+
+        coroutine = deliver()
+        try:
+            task = asyncio.create_task(
+                coroutine,
+                name=f"LocalASRProvisioningOwner:install-result-{id(completed)}",
+            )
+        except RuntimeError:
+            coroutine.close()
+            return
+        self._result_delivery_tasks.add(task)
+        task.add_done_callback(self._result_delivery_tasks.discard)
+
+    async def _close_result_delivery_tasks(self) -> None:
+        tasks = tuple(self._result_delivery_tasks)
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._result_delivery_tasks.difference_update(tasks)
 
     async def _run_install(
         self,
