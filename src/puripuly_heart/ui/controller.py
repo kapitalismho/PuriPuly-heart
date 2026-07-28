@@ -6069,14 +6069,6 @@ class GuiController:
     async def release_manual_typing(self) -> None:
         await self._get_manual_typing_owner().release()
 
-    def _begin_manual_submit_typing(self) -> str:
-        return self._get_manual_typing_owner().begin_submit()
-
-    @property
-    def _manual_typing_idle_task(self) -> asyncio.Task[None] | None:
-        owner = self._manual_typing_owner
-        return owner.idle_task if owner is not None else None
-
     def _get_manual_typing_owner(self) -> ManualTypingOwner:
         owner = self._manual_typing_owner
         if owner is None:

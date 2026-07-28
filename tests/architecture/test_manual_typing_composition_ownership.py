@@ -20,8 +20,11 @@ def _method_source(class_name: str, method_name: str) -> str:
 
 
 def test_controller_manual_typing_owner_is_only_factory_composition() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
     method = _method_source("GuiController", "_get_manual_typing_owner")
 
+    assert "def _begin_manual_submit_typing(" not in source
+    assert "def _manual_typing_idle_task(" not in source
     assert "create_manual_typing_owner(" in method
     assert "ManualTypingOwner(" not in method
     assert 'getattr(hub, "set_self_chatbox_typing_reason", None)' in method
