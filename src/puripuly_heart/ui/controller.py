@@ -75,6 +75,7 @@ from puripuly_heart.app.services.managed_connection_auth import (
     ManagedConnectionAuthService,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.overlay_calibration import OverlayCalibrationOwner
 from puripuly_heart.app.services.peer_capture_target import PeerCaptureTargetResolutionService
 from puripuly_heart.app.services.provider_runtime_apply import (
     _ControllerNoopRuntimeApply,
@@ -1247,8 +1248,30 @@ class GuiController:
         init=False,
         default=DESKTOP_INTERACTION_MODE_EDIT,
     )
-    overlay_calibration: OverlayCalibration = field(default_factory=OverlayCalibration)
-    _overlay_calibration_draft: OverlayCalibration | None = None
+    _overlay_calibration_owner: OverlayCalibrationOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+
+    @property
+    def overlay_calibration(self) -> OverlayCalibration:
+        return self._get_overlay_calibration_owner().current
+
+    @overlay_calibration.setter
+    def overlay_calibration(self, calibration: OverlayCalibration) -> None:
+        self._get_overlay_calibration_owner().replace_current(calibration)
+
+    @property
+    def _overlay_calibration_draft(self) -> OverlayCalibration | None:
+        return self._get_overlay_calibration_owner().draft
+
+    @_overlay_calibration_draft.setter
+    def _overlay_calibration_draft(
+        self,
+        calibration: OverlayCalibration | None,
+    ) -> None:
+        self._get_overlay_calibration_owner().replace_draft(calibration)
 
     def _get_settings_owner(self) -> SettingsOwner:
         if self.settings_owner is None:
@@ -5557,41 +5580,25 @@ class GuiController:
         )
 
     def begin_overlay_calibration(self) -> OverlayCalibration:
-        if self._overlay_calibration_draft is None:
-            self._overlay_calibration_draft = self.overlay_calibration.copy()
-        return self._overlay_calibration_draft.copy()
+        return self._get_overlay_calibration_owner().begin()
 
     def set_overlay_calibration_field(
         self,
         field_name: str,
         value: object,
     ) -> OverlayCalibration:
-        if self._overlay_calibration_draft is None:
-            self._overlay_calibration_draft = self.overlay_calibration.copy()
-
-        if field_name not in OverlayCalibration.__dataclass_fields__:
-            raise ValueError(f"unknown overlay calibration field: {field_name}")
-
-        if field_name == "anchor":
-            setattr(self._overlay_calibration_draft, field_name, str(value))
-        else:
-            setattr(self._overlay_calibration_draft, field_name, float(value))
-
-        self._overlay_calibration_draft.validate()
-        return self._overlay_calibration_draft.copy()
+        return self._get_overlay_calibration_owner().set_field(field_name, value)
 
     def apply_overlay_calibration(self) -> OverlayCalibration:
-        if self._overlay_calibration_draft is None:
-            return self.overlay_calibration.copy()
-
-        self._overlay_calibration_draft.validate()
-        self.overlay_calibration = self._overlay_calibration_draft.copy()
-        self._overlay_calibration_draft = None
-        self._schedule_overlay_calibration_persistence(self.overlay_calibration.copy())
-        self._schedule_overlay_calibration_emit()
-        return self.overlay_calibration.copy()
+        return self._get_overlay_calibration_owner().apply()
 
     async def _apply_overlay_calibration_persistence(
+        self,
+        calibration: OverlayCalibration,
+    ) -> None:
+        await self._get_overlay_calibration_owner().persist_calibration(calibration)
+
+    async def _persist_overlay_calibration(
         self,
         calibration: OverlayCalibration,
     ) -> None:
@@ -5605,64 +5612,48 @@ class GuiController:
         self,
         calibration: OverlayCalibration,
     ) -> None:
-        if self.settings is None:
-            return
-
-        async def _task() -> None:
-            await self._apply_overlay_calibration_persistence(calibration.copy())
-
-        try:
-            if self.app.schedule_task(_task):
-                return
-        except Exception:
-            self.log_detailed(
-                "[Overlay] Calibration persistence skipped reason=page_run_task_failed",
-                level=logging.WARNING,
-            )
-            return
-
-        self.log_detailed(
-            "[Overlay] Calibration persistence skipped reason=page_run_task_unavailable",
-            level=logging.WARNING,
-        )
+        self._get_overlay_calibration_owner().schedule_persistence(calibration)
 
     def cancel_overlay_calibration(self) -> OverlayCalibration:
-        self._overlay_calibration_draft = None
-        return self.overlay_calibration.copy()
+        return self._get_overlay_calibration_owner().cancel()
 
     def _sync_overlay_calibration_cache(self, settings: AppSettings | None = None) -> None:
         resolved_settings = settings or self.settings
         if resolved_settings is None:
             return
-        self.overlay_calibration = resolved_settings.overlay.calibration.copy()
+        self._get_overlay_calibration_owner().replace_current(resolved_settings.overlay.calibration)
 
     async def _emit_overlay_calibration_update(self) -> None:
+        await self._get_overlay_calibration_owner().emit_current()
+
+    async def _emit_overlay_calibration_to_runtime(
+        self,
+        calibration: OverlayCalibration,
+    ) -> None:
         presenter = self._current_overlay_presenter_for_direct_runtime_command()
         if presenter is None:
             return
-        with contextlib.suppress(Exception):
-            await presenter.update_calibration(self.overlay_calibration.copy())
+        await presenter.update_calibration(calibration.copy())
 
     def _schedule_overlay_calibration_emit(self) -> None:
-        if self._shutdown_ingress_frozen:
-            return
-        if self._current_overlay_presenter_for_direct_runtime_command() is None:
-            return
-        try:
-            if self.app.schedule_task(self._emit_overlay_calibration_update):
-                return
-        except Exception as exc:
-            self.log_detailed(
-                "[Overlay] Failed to schedule calibration update via page.run_task",
-                level=logging.WARNING,
-                exception=exc,
-            )
-            return
+        self._get_overlay_calibration_owner().schedule_emit()
 
-        self.log_detailed(
-            "[Overlay] Skipping calibration update; page.run_task unavailable",
-            level=logging.WARNING,
-        )
+    def _get_overlay_calibration_owner(self) -> OverlayCalibrationOwner:
+        owner = self._overlay_calibration_owner
+        if owner is None:
+            owner = OverlayCalibrationOwner(
+                schedule_task=lambda task: self.app.schedule_task(task),
+                persist=self._persist_overlay_calibration,
+                emit=self._emit_overlay_calibration_to_runtime,
+                can_persist=lambda: self.settings is not None,
+                can_emit=lambda: (
+                    not self._shutdown_ingress_frozen
+                    and self._current_overlay_presenter_for_direct_runtime_command() is not None
+                ),
+                log_detailed=self.log_detailed,
+            )
+            self._overlay_calibration_owner = owner
+        return owner
 
     def begin_overlay_calibration_for_test(self) -> None:
         self.begin_overlay_calibration()
