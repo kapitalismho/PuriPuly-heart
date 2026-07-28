@@ -71,6 +71,13 @@ from puripuly_heart.app.services.gpu_provider_recovery import (
     GpuProviderRecoveryExecution,
     GpuProviderRecoveryOwner,
 )
+from puripuly_heart.app.services.local_asr_cpu_repair import (
+    LocalASRCpuRepairEffect,
+    LocalASRCpuRepairEffectType,
+    LocalASRCpuRepairOwner,
+    LocalASRCpuRepairRequest,
+    LocalASRCpuRepairRuntimeState,
+)
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningDiagnostic,
     LocalASRGpuProvisioningEffect,
@@ -215,6 +222,7 @@ from puripuly_heart.app.wiring import (
     resolve_self_stt_runtime_config,
 )
 from puripuly_heart.app.wiring_composition import (
+    create_local_asr_cpu_repair_owner,
     create_local_asr_gpu_provisioning_owner,
     create_manual_typing_owner,
     create_vrchat_osc_presence_probe_owner,
@@ -292,8 +300,6 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeTerminalFailureSink,
 )
 from puripuly_heart.core.local_asr_provisioning import (
-    LocalASRInstallRequest,
-    LocalASRInstallResult,
     LocalASRProvisioningDiagnostic,
     LocalASRProvisioningPort,
     LocalASRProvisioningSnapshot,
@@ -301,7 +307,6 @@ from puripuly_heart.core.local_asr_provisioning import (
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
 from puripuly_heart.core.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
-    LOCAL_STT_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
     LocalParakeetSherpaLoadError,
     LocalQwenSherpaLoadError,
@@ -808,9 +813,11 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _local_stt_pending_enable_after_install: bool = field(init=False, default=False)
-    _local_stt_pending_enable_generation: int | None = field(init=False, default=None)
-    _local_stt_pending_peer_enable_after_install: bool = field(init=False, default=False)
+    _local_asr_cpu_repair_owner: LocalASRCpuRepairOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _gpu_pending_enable_channels: frozenset[GpuASRChannel] = field(
         init=False,
         default=frozenset(),
@@ -5407,10 +5414,6 @@ class GuiController:
             return "ready"
         return self._local_stt_runtime_status_for_provider(self.settings.provider.stt.value)
 
-    def _local_stt_models_needing_install(self, provider: str) -> tuple[str, ...]:
-        model_ids = self._required_local_stt_model_ids_for_provider(provider)
-        return self._get_local_asr_provisioning_owner().snapshot.unavailable_model_ids(model_ids)
-
     def _peer_local_stt_requested(self, settings: AppSettings | None = None) -> bool:
         resolved_settings = settings or self.settings
         return bool(
@@ -5419,12 +5422,109 @@ class GuiController:
             and self._peer_translation_activation_requested_for(resolved_settings)
         )
 
+    def _local_asr_cpu_repair_state(self) -> LocalASRCpuRepairRuntimeState:
+        settings = self.settings
+        self_provider = settings.provider.stt.value if settings is not None else None
+        peer_provider = settings.provider.peer_stt.value if settings is not None else None
+        return LocalASRCpuRepairRuntimeState(
+            settings_available=settings is not None,
+            locale=settings.ui.locale if settings is not None else None,
+            self_provider=self_provider,
+            peer_provider=peer_provider,
+            self_provider_local=bool(self_provider in LOCAL_CPU_PROVIDERS),
+            peer_requested=self._peer_local_stt_requested(settings),
+            self_activation_generation=self._stt_activation_generation,
+            peer_activation_generation=self._peer_activation_generation,
+            self_desired=self._stt_desired,
+        )
+
+    def _apply_local_asr_cpu_repair_effect(
+        self,
+        effect: LocalASRCpuRepairEffect,
+    ) -> None:
+        if effect.type is LocalASRCpuRepairEffectType.DISABLE_SELF_INTENT:
+            self._stt_desired = False
+            return
+        if effect.type is LocalASRCpuRepairEffectType.DISABLE_SELF_DASHBOARD:
+            self.app.set_dashboard_stt_enabled(False)
+            self.app.set_dashboard_stt_needs_key(False)
+            return
+        if effect.type is LocalASRCpuRepairEffectType.SYNC_NOTICE:
+            self._sync_local_stt_notice()
+            return
+        if effect.type is LocalASRCpuRepairEffectType.SHOW_DOWNLOAD_FAILED:
+            self._show_short_stt_message("local_stt.download_failed")
+            return
+        raise ValueError(f"Unsupported Local ASR CPU repair effect: {effect.type}")
+
+    async def _resume_self_after_local_asr_cpu_repair(self) -> bool:
+        self._stt_desired = True
+        self._stt_activation_starting = True
+        self._sync_local_stt_notice()
+        snapshot = await self._ensure_stt_switch()
+        if snapshot is not None and snapshot.generation != self._stt_activation_generation:
+            return False
+        self._stt_activation_starting = False
+        self.app.set_dashboard_stt_enabled(
+            bool(
+                self._stt_desired and not self._stt_activation_failed and self._mic_task is not None
+            )
+        )
+        self._sync_local_stt_notice()
+        return True
+
+    async def _resume_peer_after_local_asr_cpu_repair(self) -> None:
+        await self._refresh_overlay_runtime_dependencies()
+
+    def _get_local_asr_cpu_repair_owner(self) -> LocalASRCpuRepairOwner:
+        owner = self._local_asr_cpu_repair_owner
+        if owner is None:
+            owner = create_local_asr_cpu_repair_owner(
+                provisioning_provider=lambda: self._get_local_asr_provisioning_owner(),
+                state_provider=lambda: self._local_asr_cpu_repair_state(),
+                model_ids_for_provider=lambda provider: (
+                    self._required_local_stt_model_ids_for_provider(provider)
+                ),
+                status_for_provider=lambda provider: (
+                    self._local_stt_runtime_status_for_provider(provider)
+                ),
+                effect_sink=lambda effect: self._apply_local_asr_cpu_repair_effect(effect),
+                rebuild_self_provider=lambda: self._rebuild_stt_provider(),
+                resume_self=lambda: self._resume_self_after_local_asr_cpu_repair(),
+                resume_peer=lambda: self._resume_peer_after_local_asr_cpu_repair(),
+            )
+            self._local_asr_cpu_repair_owner = owner
+        return owner
+
+    @property
+    def _local_stt_pending_enable_after_install(self) -> bool:
+        return self._get_local_asr_cpu_repair_owner().snapshot.self_pending
+
+    @_local_stt_pending_enable_after_install.setter
+    def _local_stt_pending_enable_after_install(self, pending: bool) -> None:
+        self._get_local_asr_cpu_repair_owner().set_self_pending(pending)
+
+    @property
+    def _local_stt_pending_enable_generation(self) -> int | None:
+        return self._get_local_asr_cpu_repair_owner().snapshot.self_activation_generation
+
+    @_local_stt_pending_enable_generation.setter
+    def _local_stt_pending_enable_generation(self, generation: int | None) -> None:
+        self._get_local_asr_cpu_repair_owner().set_self_activation_generation(generation)
+
+    @property
+    def _local_stt_pending_peer_enable_after_install(self) -> bool:
+        return self._get_local_asr_cpu_repair_owner().snapshot.peer_pending
+
+    @_local_stt_pending_peer_enable_after_install.setter
+    def _local_stt_pending_peer_enable_after_install(self, pending: bool) -> None:
+        self._get_local_asr_cpu_repair_owner().set_peer_pending(pending)
+
     def _reset_local_stt_pending_enable_after_install(self) -> None:
-        self._local_stt_pending_enable_after_install = False
-        self._local_stt_pending_enable_generation = None
+        self._get_local_asr_cpu_repair_owner().reset_self()
 
     def _reset_local_stt_pending_peer_enable_after_install(self) -> None:
-        self._local_stt_pending_peer_enable_after_install = False
+        self._get_local_asr_cpu_repair_owner().reset_peer()
 
     def _self_local_stt_activation_is_current(self, generation: int | None) -> bool:
         return generation is None or (
@@ -5438,12 +5538,7 @@ class GuiController:
         )
 
     def _clear_local_stt_pending_enable_if_provider_switched_away(self) -> None:
-        if self.settings is None:
-            return
-        if self.settings.provider.stt.value not in LOCAL_CPU_PROVIDERS:
-            self._reset_local_stt_pending_enable_after_install()
-        if not self._peer_local_stt_requested(self.settings):
-            self._reset_local_stt_pending_peer_enable_after_install()
+        self._get_local_asr_cpu_repair_owner().clear_if_provider_switched_away()
 
     def _sync_local_stt_notice(self) -> None:
         if self.settings is None:
@@ -5506,143 +5601,27 @@ class GuiController:
         origin: str,
         model_ids: tuple[str, ...] | None = None,
     ) -> bool:
-        if self.settings is None:
-            return False
-        provisioning = self._get_local_asr_provisioning_owner()
-        if provisioning.snapshot.activity_for("cpu") is not None:
-            return False
-        requested_model_ids = model_ids or (LOCAL_STT_MODEL_ID,)
-        try:
-            provisioning.start_install(
-                LocalASRInstallRequest(
-                    backend="cpu",
-                    model_ids=requested_model_ids,
-                    locale=self.settings.ui.locale,
-                    origin=origin,
-                ),
-                result_handler=lambda result: self._handle_local_stt_install_result(
-                    result,
-                    origin=origin,
-                ),
-            )
-        except RuntimeError:
-            return False
-        return True
-
-    async def _handle_local_stt_install_result(
-        self,
-        result: LocalASRInstallResult,
-        *,
-        origin: str,
-    ) -> None:
-        if result.cancelled:
-            return
-        if result.failed_model_ids:
-            if origin == "manual":
-                self._show_short_stt_message("local_stt.download_failed")
-            return
-
-        self._clear_local_stt_pending_enable_if_provider_switched_away()
-        should_resume_self_local_stt = (
-            origin == "manual"
-            and self.settings is not None
-            and self.settings.provider.stt.value in LOCAL_CPU_PROVIDERS
-            and self._local_stt_runtime_status_for_provider(self.settings.provider.stt.value)
-            == "ready"
-            and self._local_stt_pending_enable_after_install
-            and (
-                self._local_stt_pending_enable_generation is None
-                or self._local_stt_pending_enable_generation == self._stt_activation_generation
-            )
+        return self._get_local_asr_cpu_repair_owner().request_install(
+            origin=origin,
+            model_ids=model_ids,
         )
-        should_resume_peer_local_stt = (
-            origin == "manual"
-            and self.settings is not None
-            and self._peer_local_stt_requested(self.settings)
-            and self._local_stt_runtime_status_for_provider(self.settings.provider.peer_stt.value)
-            == "ready"
-            and self._local_stt_pending_peer_enable_after_install
-        )
-
-        if should_resume_self_local_stt:
-            resume_generation = (
-                self._local_stt_pending_enable_generation
-                if self._local_stt_pending_enable_generation is not None
-                else self._stt_activation_generation
-            )
-            await self._rebuild_stt_provider()
-            self._clear_local_stt_pending_enable_if_provider_switched_away()
-            if (
-                not self._local_stt_pending_enable_after_install
-                or self._local_stt_pending_enable_generation != resume_generation
-            ):
-                return
-            self._reset_local_stt_pending_enable_after_install()
-            self._stt_desired = True
-            self._stt_activation_starting = True
-            self._sync_local_stt_notice()
-            snapshot = await self._ensure_stt_switch()
-            if snapshot is not None and snapshot.generation != self._stt_activation_generation:
-                return
-            self._stt_activation_starting = False
-            self.app.set_dashboard_stt_enabled(
-                bool(
-                    self._stt_desired
-                    and not self._stt_activation_failed
-                    and self._mic_task is not None
-                )
-            )
-            self._sync_local_stt_notice()
-
-        if should_resume_peer_local_stt:
-            self._reset_local_stt_pending_peer_enable_after_install()
-            await self._refresh_overlay_runtime_dependencies()
 
     def _request_unavailable_local_asr_repair(
         self,
         status: str,
         *,
-        channel: str,
+        channel: Literal["self", "peer"],
         model_ids: tuple[str, ...] | None = None,
         activation_generation: int | None = None,
     ) -> bool:
-        if self.settings is None:
-            return False
-        if channel == "self" and not self._self_local_stt_activation_is_current(
-            activation_generation
-        ):
-            return False
-        if channel == "peer" and not self._peer_local_stt_activation_is_current(
-            activation_generation
-        ):
-            return False
-        provider = (
-            self.settings.provider.stt.value
-            if channel == "self"
-            else self.settings.provider.peer_stt.value
-        )
-        if channel == "self":
-            self._local_stt_pending_enable_after_install = True
-            self._local_stt_pending_enable_generation = (
-                activation_generation
-                if activation_generation is not None
-                else self._stt_activation_generation
+        return self._get_local_asr_cpu_repair_owner().request_repair(
+            LocalASRCpuRepairRequest(
+                status=status,
+                channel=channel,
+                model_ids=model_ids,
+                activation_generation=activation_generation,
             )
-            self._stt_desired = False
-        else:
-            self._local_stt_pending_peer_enable_after_install = True
-        affected_model_ids = model_ids or self._local_stt_models_needing_install(provider)
-        if not affected_model_ids:
-            affected_model_ids = self._required_local_stt_model_ids_for_provider(provider)
-        if channel == "self":
-            self.app.set_dashboard_stt_enabled(False)
-            self.app.set_dashboard_stt_needs_key(False)
-        self._sync_local_stt_notice()
-        self._request_local_asr_install(
-            origin="manual",
-            model_ids=affected_model_ids,
         )
-        return False
 
     @staticmethod
     def _snapshot_unavailable_status(
@@ -5695,11 +5674,13 @@ class GuiController:
         current_status = self._current_local_stt_runtime_status()
         if current_status == "downloading":
             self._stt_desired = False
-            self._local_stt_pending_enable_after_install = True
-            self._local_stt_pending_enable_generation = (
-                activation_generation
-                if activation_generation is not None
-                else self._stt_activation_generation
+            self._get_local_asr_cpu_repair_owner().retain_pending(
+                "self",
+                activation_generation=(
+                    activation_generation
+                    if activation_generation is not None
+                    else self._stt_activation_generation
+                ),
             )
             self.app.set_dashboard_stt_enabled(False)
             self._show_short_stt_message("local_stt.download_in_progress")
@@ -5848,7 +5829,7 @@ class GuiController:
             self.settings.provider.peer_stt.value
         )
         if current_status == "downloading":
-            self._local_stt_pending_peer_enable_after_install = True
+            self._get_local_asr_cpu_repair_owner().retain_pending("peer")
             self._sync_local_stt_notice()
             return False
         if current_status in ("missing", "invalid", "download_failed"):
@@ -5880,8 +5861,7 @@ class GuiController:
         return True
 
     async def _close_local_asr_provisioning(self) -> None:
-        self._reset_local_stt_pending_enable_after_install()
-        self._reset_local_stt_pending_peer_enable_after_install()
+        self._get_local_asr_cpu_repair_owner().reset_all()
         if self.local_asr_provisioning is not None:
             await self.local_asr_provisioning.close()
 
@@ -9723,8 +9703,10 @@ class GuiController:
             self._show_short_stt_message("local_stt.language_unsupported")
             return
         if effect.type is SelfCaptureAdmissionEffectType.RETAIN_DOWNLOAD_PENDING_INTENT:
-            self._local_stt_pending_enable_after_install = True
-            self._local_stt_pending_enable_generation = effect.activation_generation
+            self._get_local_asr_cpu_repair_owner().retain_pending(
+                "self",
+                activation_generation=effect.activation_generation,
+            )
             self.app.set_dashboard_stt_enabled(False)
             self._show_short_stt_message("local_stt.download_in_progress")
             return

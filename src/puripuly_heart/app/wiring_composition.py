@@ -14,6 +14,17 @@ from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureGpuActivationValidator,
 )
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
+from puripuly_heart.app.services.local_asr_cpu_repair import (
+    LocalASRCpuModelIdsForProvider,
+    LocalASRCpuPeerResume,
+    LocalASRCpuProvisioningProvider,
+    LocalASRCpuRepairEffectSink,
+    LocalASRCpuRepairOwner,
+    LocalASRCpuRepairRuntimeStateProvider,
+    LocalASRCpuSelfProviderRebuild,
+    LocalASRCpuSelfResume,
+    LocalASRCpuStatusForProvider,
+)
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
     LocalASRGpuActivationRetry,
     LocalASRGpuProvisioningDiagnosticSink,
@@ -103,6 +114,29 @@ def create_local_asr_gpu_provisioning_owner(
         effect_sink=effect_sink,
         retry_activation=retry_activation,
         diagnostic_sink=diagnostic_sink,
+    )
+
+
+def create_local_asr_cpu_repair_owner(
+    *,
+    provisioning_provider: LocalASRCpuProvisioningProvider,
+    state_provider: LocalASRCpuRepairRuntimeStateProvider,
+    model_ids_for_provider: LocalASRCpuModelIdsForProvider,
+    status_for_provider: LocalASRCpuStatusForProvider,
+    effect_sink: LocalASRCpuRepairEffectSink,
+    rebuild_self_provider: LocalASRCpuSelfProviderRebuild,
+    resume_self: LocalASRCpuSelfResume,
+    resume_peer: LocalASRCpuPeerResume,
+) -> LocalASRCpuRepairOwner:
+    return LocalASRCpuRepairOwner(
+        provisioning_provider=provisioning_provider,
+        state_provider=state_provider,
+        model_ids_for_provider=model_ids_for_provider,
+        status_for_provider=status_for_provider,
+        effect_sink=effect_sink,
+        rebuild_self_provider=rebuild_self_provider,
+        resume_self=resume_self,
+        resume_peer=resume_peer,
     )
 
 

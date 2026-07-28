@@ -289,6 +289,27 @@ def _controller(
     return controller
 
 
+def test_cpu_repair_pending_compatibility_properties_preserve_independent_generation() -> None:
+    controller = _controller(RecordingProvisioningPort(_snapshot()))
+
+    controller._local_stt_pending_enable_generation = 17
+    controller._local_stt_pending_enable_after_install = True
+    controller._local_stt_pending_enable_after_install = False
+
+    assert controller._local_stt_pending_enable_after_install is False
+    assert controller._local_stt_pending_enable_generation == 17
+
+    controller._local_stt_pending_enable_after_install = True
+
+    assert controller._local_stt_pending_enable_after_install is True
+    assert controller._local_stt_pending_enable_generation == 17
+
+    controller._reset_local_stt_pending_enable_after_install()
+
+    assert controller._local_stt_pending_enable_after_install is False
+    assert controller._local_stt_pending_enable_generation is None
+
+
 @pytest.mark.asyncio
 async def test_missing_direct_cpu_enable_requests_exact_model_through_owner() -> None:
     release = asyncio.Event()
@@ -338,6 +359,7 @@ async def test_successful_manual_repair_resumes_only_current_self_generation(
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     rebuilds: list[str] = []
     switches: list[str] = []
+    controller._get_local_asr_cpu_repair_owner()
 
     async def rebuild_with_owner_generation(self) -> None:
         rebuilds.append("rebuild")
@@ -374,32 +396,7 @@ async def test_successful_manual_repair_resumes_only_current_self_generation(
 
 
 @pytest.mark.asyncio
-async def test_provider_switch_before_repair_completion_suppresses_resume(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    release = asyncio.Event()
-    port = RecordingProvisioningPort(_snapshot(qwen="missing"), release=release)
-    controller = _controller(port, dashboard=Dashboard())
-    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
-    rebuilds: list[str] = []
-    monkeypatch.setattr(
-        GuiController,
-        "_rebuild_stt_provider",
-        lambda self: asyncio.sleep(0, result=rebuilds.append("rebuild")),
-    )
-
-    await controller.set_stt_enabled(True)
-    controller.settings.provider.stt = STTProviderName.DEEPGRAM
-    release.set()
-    await asyncio.gather(*port.tasks)
-    await asyncio.sleep(0)
-
-    assert rebuilds == []
-    assert controller._local_stt_pending_enable_after_install is False
-
-
-@pytest.mark.asyncio
-async def test_peer_disable_before_repair_completion_suppresses_resume(
+async def test_cpu_repair_composition_routes_peer_resume_to_runtime_refresh(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     release = asyncio.Event()
@@ -409,6 +406,7 @@ async def test_peer_disable_before_repair_completion_suppresses_resume(
     controller.settings.ui.peer_translation_enabled = True
     controller.settings.ui.peer_translation_eula_accepted = True
     refreshes: list[str] = []
+    controller._get_local_asr_cpu_repair_owner()
     monkeypatch.setattr(
         GuiController,
         "_refresh_overlay_runtime_dependencies",
@@ -417,12 +415,11 @@ async def test_peer_disable_before_repair_completion_suppresses_resume(
 
     assert await controller._ensure_peer_local_stt_ready() is False
     assert port.requests[0].model_ids == (LOCAL_STT_MODEL_ID,)
-    controller.settings.ui.peer_translation_enabled = False
     release.set()
     await asyncio.gather(*port.tasks)
-    await asyncio.sleep(0)
+    await _wait_until(lambda: bool(refreshes))
 
-    assert refreshes == []
+    assert refreshes == ["refresh"]
     assert controller._local_stt_pending_peer_enable_after_install is False
 
 

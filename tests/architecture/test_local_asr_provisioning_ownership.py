@@ -28,6 +28,12 @@ def test_production_constructs_one_local_asr_provisioning_owner_in_composition()
 
 def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> None:
     source = (SOURCE_ROOT / "ui" / "controller.py").read_text(encoding="utf-8")
+    cpu_repair = (SOURCE_ROOT / "app" / "services" / "local_asr_cpu_repair.py").read_text(
+        encoding="utf-8"
+    )
+    gpu_provisioning = (
+        SOURCE_ROOT / "app" / "services" / "local_asr_gpu_provisioning.py"
+    ).read_text(encoding="utf-8")
     tree = ast.parse(source)
     imports: set[str] = set()
     for node in ast.walk(tree):
@@ -37,10 +43,14 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
             imports.add(node.module)
 
     assert "create_local_asr_provisioning_owner(" in source
+    assert "create_local_asr_cpu_repair_owner(" in source
+    assert "create_local_asr_gpu_provisioning_owner(" in source
     assert ".inspect_cpu(" in source
     assert ".inspect_gpu(" in source
-    assert ".start_install(" in source
-    assert "result_handler=" in source
+    assert ".start_install(" not in source
+    assert ".start_install(" in cpu_repair
+    assert ".start_install(" in gpu_provisioning
+    assert "result_handler=" in cpu_repair
     assert ".report_model_validation_failure(" in source
     assert ".close()" in source
     assert "puripuly_heart.core.local_stt_runtime_installer" not in imports
