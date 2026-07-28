@@ -12945,7 +12945,7 @@ async def test_configure_vrc_mic_receiver_start_success_stores_receiver_and_rese
 
 
 @pytest.mark.asyncio
-async def test_stop_vrc_mic_receiver_stops_receiver_and_marks_gate_inactive() -> None:
+async def test_vrc_mic_sync_owner_stop_clears_receiver_and_marks_gate_inactive() -> None:
     controller = _make_controller(app=SimpleNamespace())
     gate = DummyGate()
     stop_calls: list[str] = []
@@ -12957,7 +12957,7 @@ async def test_stop_vrc_mic_receiver_stops_receiver_and_marks_gate_inactive() ->
     controller.receiver = FakeReceiver()
     controller.vrc_mic_audio_gate = gate
 
-    await controller._stop_vrc_mic_receiver()
+    await controller._get_vrc_mic_sync_owner().stop()
 
     assert stop_calls == ["stopped"]
     assert controller.receiver is None

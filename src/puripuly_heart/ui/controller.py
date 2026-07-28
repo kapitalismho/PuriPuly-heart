@@ -9752,9 +9752,6 @@ class GuiController:
     async def _configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
         await self._get_vrc_mic_sync_owner().configure(enabled=enabled)
 
-    async def _stop_vrc_mic_receiver(self) -> None:
-        await self._get_vrc_mic_sync_owner().stop()
-
     def _create_openrouter_pkce_client(self) -> OpenRouterPKCEClient:
         return OpenRouterPKCEClient(callback_origin="http://localhost:3000")
 
