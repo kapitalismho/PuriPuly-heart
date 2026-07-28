@@ -233,10 +233,7 @@ from puripuly_heart.app.wiring_composition import (
     create_vrchat_osc_presence_probe_owner,
 )
 from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
-from puripuly_heart.config.llm_profiles import (
-    get_openrouter_selection_alias_for_model_and_source,
-    profile_for_alias,
-)
+from puripuly_heart.config.llm_profiles import profile_for_alias
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.paths import user_config_dir
 from puripuly_heart.config.process_capture_resolution import (
@@ -265,7 +262,6 @@ from puripuly_heart.config.settings import (
     QwenRegion,
     STTProviderName,
     TranslationConnection,
-    TranslationModel,
     build_managed_openrouter_byok_target_settings,
     normalize_owned_referral_id,
     with_telemetry_consent,
@@ -488,10 +484,6 @@ _MANAGED_OPENROUTER_CONNECTIONS = frozenset(
         TranslationConnection.MANAGED_CHINA,
     }
 )
-_MANAGED_OPENROUTER_MODEL_BY_TRANSLATION_MODEL = {
-    TranslationModel.GEMMA4: OpenRouterLLMModel.GEMMA_4_26B_A4B_IT,
-    TranslationModel.DEEPSEEK_V4_FLASH: OpenRouterLLMModel.DEEPSEEK_V4_FLASH,
-}
 _GITHUB_STAR_PROMPT_USER_OWNED_CLOUD_CONNECTIONS = frozenset(
     {
         TranslationConnection.OPENROUTER,
@@ -1762,46 +1754,6 @@ class GuiController:
         return generation == self._translation_toggle_generation and (
             self._translation_toggle_intent_enabled == bool(enabled)
         )
-
-    def _managed_openrouter_fallback_branch_settings_for(
-        self,
-        settings: AppSettings,
-    ) -> AppSettings | None:
-        fallback = settings.translation.fallback
-        if not fallback.enabled or fallback.connection not in _MANAGED_OPENROUTER_CONNECTIONS:
-            return None
-        llm_model = _MANAGED_OPENROUTER_MODEL_BY_TRANSLATION_MODEL.get(fallback.model)
-        if llm_model is None:
-            return None
-        branch_settings = copy.deepcopy(settings)
-        branch_settings.provider.llm = LLMProviderName.OPENROUTER
-        branch_settings.translation.connection = fallback.connection
-        branch_settings.openrouter.llm_model = llm_model
-        branch_settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-        alias = get_openrouter_selection_alias_for_model_and_source(
-            llm_model.value,
-            OpenRouterCredentialSource.MANAGED.value,
-        )
-        branch_settings.openrouter.selection_alias = (
-            OpenRouterSelectionAlias(alias) if alias is not None else None
-        )
-        return branch_settings
-
-    def _managed_openrouter_branch_settings_for(
-        self,
-        settings: AppSettings,
-    ) -> tuple[AppSettings, ...]:
-        branches: list[AppSettings] = []
-        if (
-            settings.provider.llm == LLMProviderName.OPENROUTER
-            and settings.translation.connection in _MANAGED_OPENROUTER_CONNECTIONS
-            and settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-        ):
-            branches.append(settings)
-        fallback_branch = self._managed_openrouter_fallback_branch_settings_for(settings)
-        if fallback_branch is not None:
-            branches.append(fallback_branch)
-        return tuple(branches)
 
     def _managed_openrouter_release_settings(self) -> AppSettings | None:
         if self.settings is None:
