@@ -90,6 +90,12 @@ from puripuly_heart.app.services.microphone_test import (
 )
 from puripuly_heart.app.services.openrouter_pkce_flow import OpenRouterPkceFlowOwner
 from puripuly_heart.app.services.overlay_calibration import OverlayCalibrationOwner
+from puripuly_heart.app.services.overlay_session_transition import (
+    OverlaySessionShutdownExecution,
+    OverlaySessionStartExecution,
+    OverlaySessionTransitionDiagnostic,
+    OverlaySessionTransitionOwner,
+)
 from puripuly_heart.app.services.peer_capture_target import PeerCaptureTargetResolutionService
 from puripuly_heart.app.services.provider_credential_verification import (
     PROVIDER_CREDENTIAL_EMPTY,
@@ -856,7 +862,11 @@ class GuiController:
     )
     # Overlay runtime internals are owned by OverlayRuntimeHandle.
     _overlay_runtime: OverlayRuntimeHandle | None = None
-    _overlay_lock: asyncio.Lock | None = None
+    _overlay_session_transition_owner: OverlaySessionTransitionOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _active_overlay_target: str | None = field(init=False, default=None)
     _overlay_session_fallback_owner: OverlaySessionFallbackOwner | None = field(
         init=False,
@@ -4528,35 +4538,45 @@ class GuiController:
         self.on_overlay_start_failed("runtime_crashed")
 
     async def _begin_overlay_start(self) -> None:
-        if self._overlay_lock is None:
-            self._overlay_lock = asyncio.Lock()
+        await self._get_overlay_session_transition_owner().begin_start(
+            self._overlay_session_start_execution
+        )
 
-        async with self._overlay_lock:
-            if self.overlay_state in {"starting", "connected"}:
-                return
-
-            previous_runtime = self._overlay_runtime
-            teardown_succeeded = await self._teardown_overlay_runtime(
-                preserve_presenter_state=True,
+    def _get_overlay_session_transition_owner(self) -> OverlaySessionTransitionOwner:
+        owner = self._overlay_session_transition_owner
+        if owner is None:
+            owner = OverlaySessionTransitionOwner(
+                diagnostic_sink=self._on_overlay_session_transition_diagnostic,
             )
-            if not teardown_succeeded:
-                return
-            preserved_presenter = None
-            if previous_runtime is not None and previous_runtime.is_closed:
-                preserved_presenter = cast(
-                    OverlayPresenter | None,
-                    previous_runtime.detach_preserved_presenter(),
-                )
-            runtime = self._new_overlay_runtime_handle()
-            if preserved_presenter is not None:
-                runtime.adopt_presenter(preserved_presenter)
-            self._active_overlay_target = self._effective_overlay_target_for_start()
-            previous_state = self.overlay_state
-            self.overlay_state = "starting"
-            self.auto_restart_scheduled = False
-            self._log_overlay_state_transition(previous_state, self.overlay_state)
-            self._notify_overlay_state()
-            runtime.create_start_task(self._run_overlay_start(runtime))
+            self._overlay_session_transition_owner = owner
+        return owner
+
+    def _overlay_session_start_execution(self) -> OverlaySessionStartExecution:
+        return OverlaySessionStartExecution(
+            state=self.overlay_state,
+            previous_runtime=self._overlay_runtime,
+            teardown=lambda: self._teardown_overlay_runtime(
+                preserve_presenter_state=True,
+            ),
+            create_runtime=self._new_overlay_runtime_handle,
+            resolve_target=self._effective_overlay_target_for_start,
+            on_starting=self._mark_overlay_session_starting,
+            run_start=self._run_overlay_start,
+        )
+
+    def _mark_overlay_session_starting(
+        self,
+        runtime: OverlayRuntimeHandle,
+        target: str,
+    ) -> None:
+        if self._overlay_runtime is not runtime:
+            raise RuntimeError("overlay start transition runtime is not current")
+        self._active_overlay_target = target
+        previous_state = self.overlay_state
+        self.overlay_state = "starting"
+        self.auto_restart_scheduled = False
+        self._log_overlay_state_transition(previous_state, self.overlay_state)
+        self._notify_overlay_state()
 
     async def _apply_overlay_retry_ownership(
         self,
@@ -4847,9 +4867,6 @@ class GuiController:
         return owner
 
     async def _shutdown_overlay_runtime(self, *, preserve_failure_reason: bool) -> None:
-        if self._overlay_lock is None:
-            self._overlay_lock = asyncio.Lock()
-
         self.log_basic("[Overlay] Shutdown requested")
         runtime = self._overlay_runtime
         self.log_detailed(
@@ -4860,42 +4877,89 @@ class GuiController:
             f"has_manager={runtime is not None and runtime.process_manager is not None} "
             f"presenter_attached={runtime is not None and runtime.presenter is not None}"
         )
-        async with self._overlay_lock:
-            runtime = self._overlay_runtime
-            has_runtime = self._overlay_runtime_has_resources(runtime)
-            if not has_runtime and self.overlay_state == "off":
-                return
+        await self._get_overlay_session_transition_owner().shutdown(
+            lambda: self._overlay_session_shutdown_execution(
+                preserve_failure_reason=preserve_failure_reason,
+            )
+        )
 
-            previous_state = self.overlay_state
-            self.overlay_state = "stopping"
-            self.auto_restart_scheduled = False
-            self._log_overlay_state_transition(previous_state, self.overlay_state)
-            self._notify_overlay_state()
-
-            teardown_succeeded = await self._teardown_overlay_runtime(
+    def _overlay_session_shutdown_execution(
+        self,
+        *,
+        preserve_failure_reason: bool,
+    ) -> OverlaySessionShutdownExecution:
+        return OverlaySessionShutdownExecution(
+            state=self.overlay_state,
+            has_resources=self._overlay_runtime_has_resources(self._overlay_runtime),
+            teardown=lambda: self._teardown_overlay_runtime(
                 preserve_presenter_state=False,
                 emit_shutdown=True,
-            )
-            if not teardown_succeeded and self._overlay_runtime_has_resources(
+            ),
+            has_resources_after_teardown=lambda: self._overlay_runtime_has_resources(
                 self._overlay_runtime
-            ):
-                previous_state = self.overlay_state
-                self.overlay_state = "failed"
-                if not preserve_failure_reason or self.failure_reason is None:
-                    self.failure_reason = self._normalize_overlay_failure_reason(None)
-                self._log_overlay_state_transition(previous_state, self.overlay_state)
-                self._sync_effective_hub_flags()
-                await self._refresh_overlay_runtime_dependencies()
-                self._notify_overlay_state()
-                return
-            previous_state = self.overlay_state
-            self.overlay_state = "off"
-            if not preserve_failure_reason:
-                self.failure_reason = None
-            self._log_overlay_state_transition(previous_state, self.overlay_state)
-            self._sync_effective_hub_flags()
-            await self._refresh_overlay_runtime_dependencies()
-            self._notify_overlay_state()
+            ),
+            on_stopping=self._mark_overlay_session_stopping,
+            on_failed=lambda: self._complete_overlay_session_shutdown_failure(
+                preserve_failure_reason=preserve_failure_reason,
+            ),
+            on_stopped=lambda: self._complete_overlay_session_shutdown(
+                preserve_failure_reason=preserve_failure_reason,
+            ),
+        )
+
+    def _mark_overlay_session_stopping(self) -> None:
+        previous_state = self.overlay_state
+        self.overlay_state = "stopping"
+        self.auto_restart_scheduled = False
+        self._log_overlay_state_transition(previous_state, self.overlay_state)
+        self._notify_overlay_state()
+
+    async def _complete_overlay_session_shutdown_failure(
+        self,
+        *,
+        preserve_failure_reason: bool,
+    ) -> None:
+        previous_state = self.overlay_state
+        self.overlay_state = "failed"
+        if not preserve_failure_reason or self.failure_reason is None:
+            self.failure_reason = self._normalize_overlay_failure_reason(None)
+        self._log_overlay_state_transition(previous_state, self.overlay_state)
+        self._sync_effective_hub_flags()
+        await self._refresh_overlay_runtime_dependencies()
+        self._notify_overlay_state()
+
+    async def _complete_overlay_session_shutdown(
+        self,
+        *,
+        preserve_failure_reason: bool,
+    ) -> None:
+        previous_state = self.overlay_state
+        self.overlay_state = "off"
+        if not preserve_failure_reason:
+            self.failure_reason = None
+        self._log_overlay_state_transition(previous_state, self.overlay_state)
+        self._sync_effective_hub_flags()
+        await self._refresh_overlay_runtime_dependencies()
+        self._notify_overlay_state()
+
+    def _on_overlay_session_transition_diagnostic(
+        self,
+        diagnostic: OverlaySessionTransitionDiagnostic,
+    ) -> None:
+        fields = [
+            f"operation={diagnostic.operation}",
+            f"outcome={diagnostic.outcome}",
+        ]
+        if diagnostic.failure_type is not None:
+            fields.append(f"failure_type={diagnostic.failure_type}")
+        self.log_detailed(
+            f"[Overlay] session_transition {' '.join(fields)}",
+            level=(
+                logging.WARNING
+                if diagnostic.outcome in {"failed", "teardown_failed"}
+                else logging.INFO
+            ),
+        )
 
     async def _emit_overlay_shutdown(self) -> None:
         presenter = self._current_overlay_presenter_for_direct_runtime_command()

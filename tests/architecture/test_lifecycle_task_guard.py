@@ -496,4 +496,5 @@ def test_controller_does_not_retain_dead_shutdown_or_stt_switch_locks() -> None:
     assert "_provider_secret_change_owner" in source
     assert "_gpu_provider_recovery_lock" not in source
     assert "_gpu_provider_recovery_owner" in source
-    assert "_overlay_lock" in source
+    assert "_overlay_lock" not in source
+    assert "_overlay_session_transition_owner" in source
