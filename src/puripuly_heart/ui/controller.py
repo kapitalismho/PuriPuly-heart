@@ -380,7 +380,6 @@ from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRSessionOptions,
     LocalASRTransitionCoordinator,
     LocalASRTransitionRequest,
-    PreparedLocalASRTransition,
 )
 from puripuly_heart.core.runtime.local_qwen_lifecycle import LOCAL_QWEN_IDLE_RELEASE_SECONDS
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
@@ -564,10 +563,6 @@ def _raise_lifecycle_cleanup_failures(message: str, failures: list[Exception]) -
 
 
 class _StrictSettingsSaveFailed(Exception):
-    pass
-
-
-class _LocalASRTransitionSuperseded(Exception):
     pass
 
 
@@ -764,12 +759,6 @@ class GuiController:
     _stt_activation_generation: int = field(init=False, default=0)
     _stt_activation_starting: bool = field(init=False, default=False)
     _stt_activation_failed: bool = field(init=False, default=False)
-    _self_asr_model_loading: bool = field(init=False, default=False)
-    _self_local_asr_transition: LocalASRTransitionCoordinator = field(
-        init=False,
-        default_factory=lambda: LocalASRTransitionCoordinator(channel="self"),
-        repr=False,
-    )
     _peer_local_asr_transition: LocalASRTransitionCoordinator = field(
         init=False,
         default_factory=lambda: LocalASRTransitionCoordinator(channel="peer"),
@@ -3981,12 +3970,6 @@ class GuiController:
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="SelfLocalASRTransitionCoordinator",
-                callback_name="close",
-                callback=self._self_local_asr_transition.close,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
                 owner_name="PeerLocalASRTransitionCoordinator",
                 callback_name="close",
                 callback=self._peer_local_asr_transition.close,
@@ -5412,7 +5395,7 @@ class GuiController:
                 None,
             )
         )
-        if (self._stt_activation_starting or self._self_asr_model_loading) and self_local_asr:
+        if self._stt_activation_starting and self_local_asr:
             status = "self_loading"
         elif (self._peer_activation_starting or self._peer_asr_model_loading) and peer_local_asr:
             status = "peer_loading"
@@ -5430,7 +5413,7 @@ class GuiController:
                     if status == "downloading" and activity is not None
                     else None
                 ),
-                starting=self._stt_activation_starting or self._self_asr_model_loading,
+                starting=self._stt_activation_starting,
             )
 
     def _request_unavailable_local_asr_repair(
@@ -5736,87 +5719,6 @@ class GuiController:
             await replacement()
             return
         await replacement(smooth_local=smooth_local)
-
-    async def _transition_active_self_local_asr(self) -> bool:
-        if (
-            not self._stt_desired
-            or self.hub is None
-            or self.settings is None
-            or not self._hub_has_stt_provider("self")
-        ):
-            return False
-        transition_settings = self.settings
-        request = self._self_local_asr_transition_request(
-            self.settings,
-            trigger="settings",
-        )
-        if request is None:
-            return False
-        runtime = self._hub_local_asr_provider_runtime()
-        if runtime is None:
-            raise RuntimeError("local ASR provider runtime is unavailable")
-        current_model_id = runtime.snapshot.channel_for("self").model_id
-        if current_model_id is None:
-            return False
-        if current_model_id == request.model_id:
-            await self.hub.reconfigure_stt_channel("self", request.session_options)
-            self.log_detailed(
-                "[LocalASR][Transition] "
-                f"channel=self requested_provider={request.requested_provider} "
-                f"actual_provider={request.actual_provider} model_id={request.model_id} "
-                "outcome=reconfigured"
-            )
-            return True
-
-        coordinator = self._self_local_asr_transition
-        coordinator.diagnostic_sink = self._get_local_asr_diagnostics_owner().transition_diagnostic
-        target_settings = copy.deepcopy(self.settings)
-        self._self_asr_model_loading = True
-        self._sync_local_stt_notice()
-
-        async def prepare_owned(
-            prepared_request: LocalASRTransitionRequest,
-            generation: int,
-        ) -> PreparedLocalASRTransition:
-            return PreparedLocalASRTransition(
-                request=prepared_request,
-                provider=self._self_stt_provider_request(target_settings, warmup=True),
-                generation=generation,
-            )
-
-        async def commit_owned(prepared: PreparedLocalASRTransition) -> None:
-            if not isinstance(prepared.provider, ProviderRuntimeBuildRequest):
-                raise TypeError("owned Self STT transition requires a build request")
-            try:
-                result = await self.hub.handoff_stt_provider_request(
-                    prepared.provider,
-                    start=True,
-                )
-            except asyncio.CancelledError:
-                await self.hub.cancel_stt_provider_request_handoff()
-                raise
-            if result.status != "applied":
-                raise RuntimeError("owned Self STT handoff failed")
-
-        try:
-            outcome = await coordinator.request_transition(
-                request,
-                prepare=prepare_owned,
-                commit=commit_owned,
-            )
-        finally:
-            self._self_asr_model_loading = False
-            self._sync_local_stt_notice()
-        if outcome.status == "failed":
-            self._stt_activation_failed = True
-            self._sync_local_stt_notice()
-            raise RuntimeError("local ASR transition failed")
-        if outcome.status == "superseded":
-            self._superseded_local_asr_settings_ids.add(id(transition_settings))
-            raise _LocalASRTransitionSuperseded
-        if outcome.status == "closed":
-            raise RuntimeError("local ASR transition coordinator is closed")
-        return outcome.status == "applied"
 
     async def _run_stt_switch(self) -> SelfCaptureSessionSnapshot | None:
         if self.settings is None:

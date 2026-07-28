@@ -46,7 +46,7 @@ def test_controller_composes_local_asr_diagnostics_without_rendering_algorithms(
     assert "def _log_local_asr_load_result(" not in controller
     assert "create_local_asr_diagnostics_owner(" in controller
     assert ".provider_runtime_diagnostic" in controller
-    assert controller.count(".transition_diagnostic") == 2
+    assert controller.count(".transition_diagnostic") == 1
     assert "return LocalASRDiagnosticsOwner(" in composition
 
 
