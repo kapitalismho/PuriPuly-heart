@@ -125,6 +125,7 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureResolvedTarget,
     PeerCaptureTargetIntent,
 )
+from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.core.runtime.peer_channel import PeerRuntimeConfig
 from puripuly_heart.core.runtime_logging import (
@@ -13060,7 +13061,7 @@ async def test_controller_stop_uses_bounded_prompt_runtime_close_and_still_stops
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
-    runtime = controller_module.GithubStarPromptRuntime(cancel_timeout_s=0.01)
+    runtime = GithubStarPromptRuntime(cancel_timeout_s=0.01)
     started = asyncio.Event()
     release = asyncio.Event()
     events: list[str] = []
@@ -13077,7 +13078,7 @@ async def test_controller_stop_uses_bounded_prompt_runtime_close_and_still_stops
 
     task = runtime.start_translation_success_observation(suppress_cancellation())
     await started.wait()
-    controller._github_star_prompt_runtime = runtime
+    controller._get_github_star_prompt_owner().runtime = runtime
 
     class FakeHub:
         async def stop(self) -> None:
@@ -13145,12 +13146,13 @@ async def test_schedule_github_star_prompt_translation_success_uses_runtime_owne
     )
 
     assert controller.schedule_github_star_prompt_translation_success_observed() is True
-    runtime = controller._github_star_prompt_runtime
+    owner = controller._get_github_star_prompt_owner()
+    runtime = owner.runtime
     assert runtime is not None
     assert runtime.translation_success_task is not None
 
     await observed.wait()
-    await controller._drain_github_star_prompt_translation_success_observation()
+    await owner.drain_translation_success_observation()
 
     assert runtime.translation_success_task is None
 

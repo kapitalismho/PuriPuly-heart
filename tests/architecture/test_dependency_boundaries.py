@@ -1500,6 +1500,10 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
     disallowed_private_shims = {
         "src/puripuly_heart/ui/controller.py": (
             "_overlay_runtime_for_private_alias",
+            "def _get_github_star_prompt_runtime(",
+            "def _github_star_prompt_runtime(",
+            "@_github_star_prompt_runtime.setter",
+            "def _drain_github_star_prompt_translation_success_observation(",
             "def _sync_github_star_prompt_runtime_aliases",
             "def _sync_local_stt_download_runtime_aliases",
             "def _sync_clipboard_runtime_aliases",

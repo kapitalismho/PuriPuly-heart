@@ -448,7 +448,7 @@ async def test_apply_providers_drains_pending_observation_before_settings_replac
     monkeypatch.setattr(GuiController, "_replace_runtime_stt_provider", _async_noop)
     monkeypatch.setattr(GuiController, "_rebuild_stt_provider", _async_noop)
 
-    runtime = controller._get_github_star_prompt_runtime()
+    runtime = controller._get_github_star_prompt_owner().get_runtime()
     persist_task = runtime.start_translation_success_observation(
         controller.persist_github_star_prompt_translation_success_observed()
     )
@@ -498,7 +498,7 @@ async def test_stop_cancels_pending_github_star_observation_via_runtime_owner(
     monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_to_thread)
     _patch_stop_side_effects(monkeypatch)
 
-    runtime = controller._get_github_star_prompt_runtime()
+    runtime = controller._get_github_star_prompt_owner().get_runtime()
     persist_task = runtime.start_translation_success_observation(
         controller.persist_github_star_prompt_translation_success_observed()
     )

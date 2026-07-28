@@ -380,7 +380,6 @@ from puripuly_heart.core.runtime.desktop_overlay_bounds import (
     DesktopOverlayBoundsOwner,
     is_finite_non_bool_number,
 )
-from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRSessionOptions,
@@ -2337,21 +2336,6 @@ class GuiController:
     def record_github_star_prompt_translation_success_observed(self) -> bool:
         return self._get_github_star_prompt_owner().record_translation_success_observed()
 
-    def _get_github_star_prompt_runtime(self) -> GithubStarPromptRuntime:
-        return self._get_github_star_prompt_owner().get_runtime()
-
-    @property
-    def _github_star_prompt_runtime(self) -> GithubStarPromptRuntime | None:
-        owner = self._github_star_prompt_owner
-        return owner.runtime if owner is not None else None
-
-    @_github_star_prompt_runtime.setter
-    def _github_star_prompt_runtime(
-        self,
-        runtime: GithubStarPromptRuntime | None,
-    ) -> None:
-        self._get_github_star_prompt_owner().runtime = runtime
-
     def _get_github_star_prompt_owner(self) -> GithubStarPromptOwner:
         owner = self._github_star_prompt_owner
         if owner is None:
@@ -2418,11 +2402,6 @@ class GuiController:
 
     def schedule_github_star_prompt_translation_success_observed(self) -> bool:
         return self._get_github_star_prompt_owner().schedule_translation_success_observed()
-
-    async def _drain_github_star_prompt_translation_success_observation(self) -> None:
-        owner = self._github_star_prompt_owner
-        if owner is not None:
-            await owner.drain_translation_success_observation()
 
     def _get_telemetry_service(self) -> TranslationSuccessTelemetryService:
         return TranslationSuccessTelemetryService(
