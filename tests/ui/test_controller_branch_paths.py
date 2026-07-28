@@ -436,6 +436,36 @@ class DummyOutputRuntime:
         self.bridge_tasks.append(task)
         return task
 
+    async def wait_for_ui_event_bridge_started(self) -> None:
+        bridge = self.started_bridges[-1]
+        bridge_task = self.bridge_tasks[-1]
+        wait_started = getattr(bridge, "wait_started", None)
+        if not callable(wait_started):
+            await asyncio.sleep(0)
+            if bridge_task.done():
+                await bridge_task
+            return
+        started_task = asyncio.create_task(
+            wait_started(),
+            name="OutputRuntime:ui-event-bridge-started-wait",
+        )
+        try:
+            done, _ = await asyncio.wait(
+                {bridge_task, started_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if bridge_task in done:
+                await bridge_task
+                raise RuntimeError("UI Event Bridge stopped before reporting started")
+            await started_task
+            if bridge_task.done():
+                await bridge_task
+                raise RuntimeError("UI Event Bridge stopped during startup")
+        finally:
+            if not started_task.done():
+                started_task.cancel()
+            await asyncio.gather(started_task, return_exceptions=True)
+
     async def close(self) -> None:
         self.close_calls += 1
         for task in self.bridge_tasks:
@@ -12979,20 +13009,22 @@ async def test_bridge_start_wait_propagates_early_failure_and_collects_waiter() 
     blocker = asyncio.Event()
 
     class Bridge:
+        async def run(self) -> None:
+            raise failure
+
         async def wait_started(self) -> None:
             await blocker.wait()
 
-    async def fail() -> None:
-        raise failure
-
-    controller._bridge_task = asyncio.create_task(fail())
+    controller.hub = DummyHub()
+    bridge = Bridge()
+    controller._start_ui_event_bridge_task(bridge)
 
     with pytest.raises(RuntimeError) as exc_info:
-        await controller._wait_for_ui_event_bridge_started(Bridge())
+        await controller._wait_for_ui_event_bridge_started()
 
     assert exc_info.value is failure
     assert not any(
-        task.get_name() == "ui-event-bridge-started-wait" and not task.done()
+        task.get_name() == "OutputRuntime:ui-event-bridge-started-wait" and not task.done()
         for task in asyncio.all_tasks()
     )
 

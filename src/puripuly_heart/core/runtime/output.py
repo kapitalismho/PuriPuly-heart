@@ -74,6 +74,7 @@ class OutputRuntime:
     _chatbox_flush_task: asyncio.Task[None] | None = None
     _ui_event_bridge: UIEventBridgeAdapter | None = None
     _ui_event_bridge_task: asyncio.Task[Any] | None = None
+    _ui_event_bridge_started_wait_task: asyncio.Task[Any] | None = None
     _chatbox_typing_reasons_cleared: bool = False
     _chatbox_backlog_dropped: bool = False
     _completed_task_failures: dict[asyncio.Task[Any], Exception] = field(default_factory=dict)
@@ -93,6 +94,7 @@ class OutputRuntime:
         "overlay_event_adapter",
         "overlay delivery tasks",
         "UIEventBridge.run task",
+        "UIEventBridge startup wait task",
         "conversation adapter",
     )
 
@@ -116,6 +118,7 @@ class OutputRuntime:
         return (
             self._chatbox_flush_task is not None
             or self._ui_event_bridge_task is not None
+            or self._ui_event_bridge_started_wait_task is not None
             or self._ui_event_bridge is not None
             or bool(self._active_delivery_tasks)
             or not self._chatbox_typing_reasons_cleared
@@ -130,6 +133,10 @@ class OutputRuntime:
     @property
     def ui_event_bridge_task(self) -> asyncio.Task[Any] | None:
         return self._ui_event_bridge_task
+
+    @property
+    def ui_event_bridge_started_wait_task(self) -> asyncio.Task[Any] | None:
+        return self._ui_event_bridge_started_wait_task
 
     @property
     def routing_decisions(self) -> tuple[OutputRoutingDecision, ...]:
@@ -217,6 +224,44 @@ class OutputRuntime:
         )
         return self._ui_event_bridge_task
 
+    async def wait_for_ui_event_bridge_started(self) -> None:
+        bridge = self._ui_event_bridge
+        bridge_task = self._ui_event_bridge_task
+        if bridge is None or bridge_task is None:
+            raise RuntimeError("OutputRuntime does not own a UI event bridge task")
+        wait_started = getattr(bridge, "wait_started", None)
+        if not callable(wait_started):
+            await asyncio.sleep(0)
+            if bridge_task.done():
+                await bridge_task
+            return
+        existing = self._ui_event_bridge_started_wait_task
+        if existing is not None and not existing.done():
+            raise RuntimeError("OutputRuntime already owns a UI event bridge startup waiter")
+        started_task = self._create_task(
+            wait_started(),
+            task_name="ui-event-bridge-started-wait",
+        )
+        self._ui_event_bridge_started_wait_task = started_task
+        try:
+            done, _ = await asyncio.wait(
+                {bridge_task, started_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if bridge_task in done:
+                await bridge_task
+                raise RuntimeError("UI Event Bridge stopped before reporting started")
+            await started_task
+            if bridge_task.done():
+                await bridge_task
+                raise RuntimeError("UI Event Bridge stopped during startup")
+        finally:
+            if not started_task.done():
+                started_task.cancel()
+            await asyncio.gather(started_task, return_exceptions=True)
+            if self._ui_event_bridge_started_wait_task is started_task:
+                self._ui_event_bridge_started_wait_task = None
+
     async def close(self) -> None:
         if self._state == "closed" and not self.has_resources:
             return
@@ -227,6 +272,7 @@ class OutputRuntime:
         await self._cancel_active_delivery_tasks()
         self._clear_chatbox_typing_reasons(failures)
         self._drop_chatbox_backlog(failures)
+        await self._cancel_ui_event_bridge_started_wait_task(failures)
         await self._cancel_ui_event_bridge_task(failures)
         await self._close_ui_event_bridge_adapter(failures)
         self._drain_completed_task_failures(failures)
@@ -652,6 +698,16 @@ class OutputRuntime:
             return
         await self._cancel_owned_task(task, failures)
         self._ui_event_bridge_task = None
+
+    async def _cancel_ui_event_bridge_started_wait_task(
+        self,
+        failures: list[Exception],
+    ) -> None:
+        task = self._ui_event_bridge_started_wait_task
+        if task is None:
+            return
+        await self._cancel_owned_task(task, failures)
+        self._ui_event_bridge_started_wait_task = None
 
     async def _cancel_active_delivery_tasks(self) -> None:
         async with self._overlay_delivery_lock:

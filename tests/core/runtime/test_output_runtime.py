@@ -138,6 +138,9 @@ class CloseAwareBridge:
         self.started.set()
         await asyncio.Event().wait()
 
+    async def wait_started(self) -> None:
+        await self.started.wait()
+
     def close(self) -> None:
         self.close_calls += 1
 
@@ -158,6 +161,22 @@ class FailingRunBridge(CloseAwareBridge):
     async def run(self) -> None:
         self.started.set()
         raise RuntimeError("bridge run failed")
+
+
+class FailingBeforeStartedBridge:
+    def __init__(self, failure: RuntimeError) -> None:
+        self.failure = failure
+        self.blocker = asyncio.Event()
+        self.close_calls = 0
+
+    async def run(self) -> None:
+        raise self.failure
+
+    async def wait_started(self) -> None:
+        await self.blocker.wait()
+
+    def close(self) -> None:
+        self.close_calls += 1
 
 
 @dataclass(slots=True)
@@ -698,6 +717,51 @@ async def test_output_runtime_owns_ui_event_bridge_task_and_closes_adapter() -> 
     assert task.done()
     assert owner.ui_event_bridge_task is None
     assert bridge.close_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_owns_ui_event_bridge_started_waiter() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(chatbox=RecordingChatbox(), clock=FakeClock(_now=10.0))
+    bridge = CloseAwareBridge()
+
+    await owner.start()
+    owner.start_ui_event_bridge(bridge)
+    await owner.wait_for_ui_event_bridge_started()
+
+    assert owner.ui_event_bridge_started_wait_task is None
+    assert owner.ui_event_bridge_task is not None
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_bridge_wait_propagates_early_bridge_failure_and_cleans_waiter() -> (
+    None
+):
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(chatbox=RecordingChatbox(), clock=FakeClock(_now=10.0))
+    failure = RuntimeError("bridge startup failed")
+    bridge = FailingBeforeStartedBridge(failure)
+
+    await owner.start()
+    owner.start_ui_event_bridge(bridge)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await owner.wait_for_ui_event_bridge_started()
+
+    assert exc_info.value is failure
+    assert owner.ui_event_bridge_started_wait_task is None
+    assert not any(
+        task.get_name() == "OutputRuntime:ui-event-bridge-started-wait" and not task.done()
+        for task in asyncio.all_tasks()
+    )
+
+    with pytest.raises(RuntimeError) as close_exc_info:
+        await owner.close()
+
+    assert close_exc_info.value is failure
+    await owner.close()
 
 
 @pytest.mark.asyncio

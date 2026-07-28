@@ -435,3 +435,28 @@ def test_order42_provider_status_verification_uses_its_named_owner() -> None:
     assert "_schedule_provider_status_verification" in methods["_rebuild_pipeline"]
     assert "_ui_background_scope" not in methods["_rebuild_pipeline"]
     assert "ProviderStatusVerificationOwner" in methods["_get_provider_status_verification_owner"]
+
+
+def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:
+    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    output_path = REPO_ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "output.py"
+    controller_tree = ast.parse(controller_path.read_text(encoding="utf-8"))
+    output_tree = ast.parse(output_path.read_text(encoding="utf-8"))
+    controller_methods = {
+        node.name: ast.unparse(node)
+        for node in ast.walk(controller_tree)
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+    output_methods = {
+        node.name: ast.unparse(node)
+        for node in ast.walk(output_tree)
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+
+    controller_wait = controller_methods["_wait_for_ui_event_bridge_started"]
+    assert "_ui_background_scope" not in controller_wait
+    assert "wait_for_ui_event_bridge_started" in controller_wait
+    assert (
+        "_ui_event_bridge_started_wait_task" in output_methods["wait_for_ui_event_bridge_started"]
+    )
+    assert "_cancel_ui_event_bridge_started_wait_task" in output_methods["close"]

@@ -1448,7 +1448,7 @@ class GuiController:
 
         bridge = self._create_ui_event_bridge(runtime_logging=runtime_logging)
         self._start_ui_event_bridge_task(bridge)
-        await self._wait_for_ui_event_bridge_started(bridge)
+        await self._wait_for_ui_event_bridge_started()
         await self._sync_clipboard_watcher()
 
     async def refresh_openrouter_usage_after_launch(self) -> bool:
@@ -1806,38 +1806,10 @@ class GuiController:
         self._ui_event_bridge = bridge
         self._bridge_task = self.hub.output_runtime.start_ui_event_bridge(bridge)
 
-    async def _wait_for_ui_event_bridge_started(self, bridge: object) -> None:
-        bridge_task = self._bridge_task
-        if bridge_task is None:
-            raise RuntimeError("UI Event Bridge task was not created")
-        wait_started = getattr(bridge, "wait_started", None)
-        if not callable(wait_started):
-            await asyncio.sleep(0)
-            if bridge_task.done():
-                exception = bridge_task.exception()
-                if exception is not None:
-                    raise exception
-            return
-        started_task = start_lifecycle_task(
-            self._ui_background_scope,
-            wait_started(),
-            name="ui-event-bridge-started-wait",
-        )
-        try:
-            done, _ = await asyncio.wait(
-                {bridge_task, started_task},
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            if bridge_task in done:
-                await bridge_task
-                raise RuntimeError("UI Event Bridge stopped before reporting started")
-            if bridge_task.done():
-                await bridge_task
-                raise RuntimeError("UI Event Bridge stopped during startup")
-        finally:
-            if not started_task.done():
-                started_task.cancel()
-            await asyncio.gather(started_task, return_exceptions=True)
+    async def _wait_for_ui_event_bridge_started(self) -> None:
+        if self.hub is None:
+            raise RuntimeError("UI Event Bridge owner is unavailable")
+        await self.hub.output_runtime.wait_for_ui_event_bridge_started()
 
     def _get_alibaba_verified_key(self) -> str:
         """Get the api_key_verified field name based on Qwen region."""
