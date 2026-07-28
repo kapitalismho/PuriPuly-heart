@@ -1458,7 +1458,7 @@ def _attach_desktop_renderer_events(
 
 
 def _microphone_test_task(controller: GuiController) -> asyncio.Task[None] | None:
-    runtime = controller._microphone_test_runtime
+    runtime = controller._get_microphone_test_owner().runtime_if_created
     return runtime.session_task if runtime is not None else None
 
 
@@ -11640,9 +11640,9 @@ async def test_start_microphone_test_registers_named_mic_test_runtime_owner(
     assert await controller.start_microphone_test() is True
     await capture_started.wait()
 
-    owner = controller._microphone_test_runtime
-    assert owner is not None
-    snapshot = owner.lifecycle_owner_snapshot()
+    runtime = controller._get_microphone_test_owner().runtime_if_created
+    assert runtime is not None
+    snapshot = runtime.lifecycle_owner_snapshot()
     assert snapshot["owner"] == "MicTestRuntime"
     assert snapshot["resource_fields"] == (
         "_session_task",
@@ -11651,7 +11651,7 @@ async def test_start_microphone_test_registers_named_mic_test_runtime_owner(
         "_direct_capture_generation",
         "_generation",
     )
-    assert _microphone_test_task(controller) is owner.session_task
+    assert _microphone_test_task(controller) is runtime.session_task
 
     await controller.stop_microphone_test()
 
@@ -11675,8 +11675,9 @@ async def test_late_microphone_test_meter_update_after_stop_is_ignored(
 
     assert await controller.start_microphone_test(meter_callback=meter_values.append) is True
     await capture_started.wait()
-    assert controller._microphone_test_runtime is not None
-    old_generation = controller._microphone_test_runtime.generation
+    runtime = controller._get_microphone_test_owner().runtime_if_created
+    assert runtime is not None
+    old_generation = runtime.generation
 
     await controller.stop_microphone_test()
     controller._microphone_test_meter_level = 0.0
@@ -11998,7 +11999,7 @@ async def test_direct_microphone_capture_source_close_failure_is_observable_and_
     with pytest.raises(RuntimeError, match="mic source close failed"):
         await _capture_via_microphone_test_port(controller)
 
-    runtime = controller._microphone_test_runtime
+    runtime = controller._get_microphone_test_owner().runtime_if_created
     assert runtime is not None
     assert runtime.source is source
     assert source.close_calls == 1
@@ -12066,7 +12067,7 @@ async def test_start_microphone_test_recovers_retained_source_after_capture_clos
     assert await controller.start_microphone_test() is True
     await _wait_until(lambda: _microphone_test_task(controller) is None)
 
-    runtime = controller._microphone_test_runtime
+    runtime = controller._get_microphone_test_owner().runtime_if_created
     assert runtime is not None
     assert runtime.source is sources[0]
     assert sources[0].close_calls == 1

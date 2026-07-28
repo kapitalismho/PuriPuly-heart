@@ -389,7 +389,6 @@ from puripuly_heart.core.runtime.local_asr_transition import (
 )
 from puripuly_heart.core.runtime.local_qwen_lifecycle import LOCAL_QWEN_IDLE_RELEASE_SECONDS
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
-from puripuly_heart.core.runtime.mic_test import MicTestRuntime
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.core.runtime.overlay_session_fallback import (
     OverlaySessionFallbackOwner,
@@ -9289,15 +9288,6 @@ class GuiController:
         hook = self._discord_managed_auth_callback_received_hook
         if callable(hook):
             hook()
-
-    @property
-    def _microphone_test_runtime(self) -> MicTestRuntime | None:
-        owner = self._microphone_test_owner
-        return owner.runtime_if_created if owner is not None else None
-
-    @_microphone_test_runtime.setter
-    def _microphone_test_runtime(self, runtime: MicTestRuntime | None) -> None:
-        self._get_microphone_test_owner().runtime = runtime
 
     @property
     def _microphone_test_meter_level(self) -> float:

@@ -43,6 +43,8 @@ def test_controller_microphone_test_state_is_backed_by_owner_properties() -> Non
     assert "_microphone_test_meter_level: float = field(" not in source
     assert "_microphone_test_runtime: MicTestRuntime | None = field(" not in source
     assert "def _get_microphone_test_runtime(" not in source
+    assert "def _microphone_test_runtime(" not in source
+    assert "@_microphone_test_runtime.setter" not in source
     assert "def _prepare_microphone_test_capture(" not in source
     assert "def _self_stt_active_or_desired_for_microphone_test(" not in source
     assert "def _log_microphone_test_stt_auto_off(" not in source
