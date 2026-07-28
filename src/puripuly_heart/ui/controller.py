@@ -60,6 +60,9 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
     SettingsOwner,
     compose_settings_owner,
 )
+from puripuly_heart.app.services.clipboard_auto_translation import (
+    ClipboardAutoTranslationOwner,
+)
 from puripuly_heart.app.services.github_star_prompt import (
     GithubStarPromptOwner,
 )
@@ -1092,11 +1095,9 @@ class GuiController:
     )
     _vrc_receiver_lock: asyncio.Lock | None = None
     _ui_event_bridge: object | None = None
-    _clipboard_runtime: ClipboardRuntime | None = field(init=False, default=None)
-    _clipboard_watcher_lock: asyncio.Lock | None = field(init=False, default=None)
-    _strict_runtime_errors_for_clipboard_watcher: bool = field(
+    _clipboard_auto_translation_owner: ClipboardAutoTranslationOwner | None = field(
         init=False,
-        default=False,
+        default=None,
         repr=False,
     )
     _local_stt_pending_enable_after_install: bool = field(init=False, default=False)
@@ -4613,10 +4614,9 @@ class GuiController:
         _raise_lifecycle_cleanup_failures("Microphone test shutdown failed", failures)
 
     async def _close_clipboard_runtime_for_shutdown(self) -> None:
-        async with self._get_clipboard_watcher_lock():
-            runtime = self._clipboard_runtime
-            if runtime is not None:
-                await runtime.close()
+        owner = self._clipboard_auto_translation_owner
+        if owner is not None:
+            await owner.close(strict_runtime_errors=True)
 
     async def _stop_self_capture_ingress(self) -> None:
         await self.set_stt_enabled(False)
@@ -6423,79 +6423,70 @@ class GuiController:
         return snapshot
 
     def _get_clipboard_watcher_lock(self) -> asyncio.Lock:
-        if self._clipboard_watcher_lock is None:
-            self._clipboard_watcher_lock = asyncio.Lock()
-        return self._clipboard_watcher_lock
+        return self._get_clipboard_auto_translation_owner().lock
 
     def _get_clipboard_runtime(self) -> ClipboardRuntime:
-        if self._clipboard_runtime is None:
-            self._clipboard_runtime = ClipboardRuntime(
+        return self._get_clipboard_auto_translation_owner().get_runtime()
+
+    @property
+    def _clipboard_runtime(self) -> ClipboardRuntime | None:
+        owner = self._clipboard_auto_translation_owner
+        return owner.runtime if owner is not None else None
+
+    @_clipboard_runtime.setter
+    def _clipboard_runtime(self, runtime: ClipboardRuntime | None) -> None:
+        self._get_clipboard_auto_translation_owner().runtime = runtime
+
+    def _get_clipboard_auto_translation_owner(self) -> ClipboardAutoTranslationOwner:
+        owner = self._clipboard_auto_translation_owner
+        if owner is None:
+            owner = ClipboardAutoTranslationOwner(
                 watcher_factory=create_clipboard_watcher,
-                submit_handler=self._submit_clipboard_text,
+                submit_text=self._submit_clipboard_text_to_hub,
+                failure_sink=self._log_error,
+                platform_provider=lambda: sys.platform,
             )
-        return self._clipboard_runtime
+            self._clipboard_auto_translation_owner = owner
+        return owner
 
     async def _sync_clipboard_watcher(self) -> None:
-        strict_runtime_errors = self._strict_runtime_errors_for_clipboard_watcher
         enabled = bool(
             self.settings is not None and self.settings.ui.clipboard_auto_translate_enabled
         )
-        if not enabled or sys.platform != "win32":
-            await self._stop_clipboard_watcher()
-            return
-        async with self._get_clipboard_watcher_lock():
-            try:
-                await self._get_clipboard_runtime().sync(
-                    enabled=True,
-                    strict_runtime_errors=strict_runtime_errors,
-                )
-            except Exception:
-                self._log_error("Clipboard watcher failed to start")
-                if strict_runtime_errors:
-                    raise
+        await self._get_clipboard_auto_translation_owner().sync(enabled=enabled)
+
+    async def _sync_clipboard_watcher_with_policy(self, *, strict_runtime_errors: bool) -> None:
+        owner = self._get_clipboard_auto_translation_owner()
+        previous_strict_runtime_errors = owner.strict_runtime_errors
+        owner.strict_runtime_errors = strict_runtime_errors
+        try:
+            await self._sync_clipboard_watcher()
+        finally:
+            owner.strict_runtime_errors = previous_strict_runtime_errors
 
     async def _stop_clipboard_watcher(self) -> None:
-        async with self._get_clipboard_watcher_lock():
-            runtime = self._clipboard_runtime
-            if runtime is None:
-                return
-            try:
-                await runtime.stop(
-                    strict_runtime_errors=self._strict_runtime_errors_for_clipboard_watcher,
-                )
-            except Exception:
-                self._log_error("Clipboard watcher failed to stop")
-                if self._strict_runtime_errors_for_clipboard_watcher:
-                    raise
+        owner = self._clipboard_auto_translation_owner
+        if owner is not None:
+            await owner.stop()
 
     async def _close_clipboard_runtime(self) -> None:
-        async with self._get_clipboard_watcher_lock():
-            runtime = self._clipboard_runtime
-            if runtime is None:
-                return
-            try:
-                await runtime.close()
-            except Exception:
-                self._log_error("Clipboard runtime failed to close")
-                if self._strict_runtime_errors_for_clipboard_watcher:
-                    raise
+        owner = self._clipboard_auto_translation_owner
+        if owner is not None:
+            await owner.close()
 
     def _on_clipboard_text_from_thread(self, text: str) -> None:
-        self._get_clipboard_runtime().on_text_from_thread(text)
+        self._get_clipboard_auto_translation_owner().on_text_from_thread(text)
 
     def _schedule_clipboard_submit(self, text: str) -> None:
-        try:
-            self._get_clipboard_runtime().submit_from_loop(text)
-        except RuntimeError as exc:
-            self._log_error(f"Clipboard submit scheduling failed: {exc}")
+        self._get_clipboard_auto_translation_owner().submit_from_loop(text)
 
     async def _submit_clipboard_text(self, text: str) -> None:
+        await self._get_clipboard_auto_translation_owner().submit_now(text)
+
+    async def _submit_clipboard_text_to_hub(self, text: str) -> None:
         if self.hub is None:
             return
-        try:
-            await self.hub.submit_text(text, source="Clipboard")
-        except Exception as exc:
-            self._log_error(f"Clipboard submit failed: {exc}")
+        await self.hub.submit_text(text, source="Clipboard")
 
     async def submit_text(self, text: str) -> None:
         hub = self.hub
@@ -6951,14 +6942,9 @@ class GuiController:
                 if self._save_settings() is False:
                     return
         await self._broadcast_desktop_runtime_control_payloads(desktop_runtime_controls)
-        previous_strict_clipboard_runtime_errors = self._strict_runtime_errors_for_clipboard_watcher
-        self._strict_runtime_errors_for_clipboard_watcher = strict_runtime_errors
-        try:
-            await self._sync_clipboard_watcher()
-        finally:
-            self._strict_runtime_errors_for_clipboard_watcher = (
-                previous_strict_clipboard_runtime_errors
-            )
+        await self._sync_clipboard_watcher_with_policy(
+            strict_runtime_errors=strict_runtime_errors,
+        )
         provisioning = self._get_local_asr_provisioning_owner()
         await provisioning.inspect_cpu()
         await provisioning.inspect_gpu(

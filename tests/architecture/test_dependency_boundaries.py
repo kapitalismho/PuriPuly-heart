@@ -1510,6 +1510,9 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "_local_stt_download_origin",
             "_clipboard_watcher: ClipboardWatcherRuntime",
             "_clipboard_loop: asyncio.AbstractEventLoop",
+            "_clipboard_runtime: ClipboardRuntime",
+            "_clipboard_watcher_lock:",
+            "_strict_runtime_errors_for_clipboard_watcher",
             "_microphone_test_task",
         ),
         "src/puripuly_heart/ui/app.py": (
