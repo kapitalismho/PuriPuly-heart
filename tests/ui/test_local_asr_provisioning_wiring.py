@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -426,15 +427,34 @@ async def test_peer_disable_before_repair_completion_suppresses_resume(
 
 
 @pytest.mark.asyncio
-async def test_selected_gpu_install_uses_explicit_owner_intent() -> None:
-    port = RecordingProvisioningPort(_snapshot(gpu="missing"))
-    controller = _controller(port)
+async def test_gpu_provisioning_composition_re_resolves_port_after_inspection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inspected = RecordingProvisioningPort(_snapshot(gpu="missing"))
+    installed = RecordingProvisioningPort(_snapshot(gpu="missing"))
+    controller = _controller(inspected)
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
+    inspect_gpu = inspected.inspect_gpu
+
+    async def inspect_and_replace(
+        *,
+        explicit_intent: bool,
+        verify_checksums: bool = False,
+    ) -> LocalASRProvisioningSnapshot:
+        snapshot = await inspect_gpu(
+            explicit_intent=explicit_intent,
+            verify_checksums=verify_checksums,
+        )
+        controller.local_asr_provisioning = installed
+        return snapshot
+
+    monkeypatch.setattr(inspected, "inspect_gpu", inspect_and_replace)
 
     assert await controller.install_selected_gpu_model_if_needed() is True
 
-    assert port.gpu_inspections == [(True, False)]
-    assert port.requests == [
+    assert inspected.gpu_inspections == [(True, False)]
+    assert inspected.requests == []
+    assert installed.requests == [
         LocalASRInstallRequest(
             backend="gpu",
             model_ids=(LOCAL_QWEN_GPU_MODEL_ID,),
@@ -447,43 +467,146 @@ async def test_selected_gpu_install_uses_explicit_owner_intent() -> None:
 
 
 @pytest.mark.asyncio
-async def test_gpu_install_retries_only_channels_still_pending(
+async def test_gpu_provisioning_composition_preserves_sync_and_awaited_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    release = asyncio.Event()
-    port = RecordingProvisioningPort(_snapshot(gpu="missing"), release=release)
-    controller = _controller(port)
-    controller._gpu_pending_enable_channels = frozenset({"self"})
-    retries: list[str] = []
+    synchronous = RecordingProvisioningPort(_snapshot(gpu="missing"))
+    synchronous_controller = _controller(synchronous)
+    synchronous_logs: list[tuple[str, int, BaseException | None]] = []
+
+    def fail_start_install(*_args, **_kwargs):
+        raise RuntimeError("synchronous")
+
+    def record_synchronous_log(
+        _controller: GuiController,
+        message: str,
+        *,
+        level: int = logging.DEBUG,
+        exception: BaseException | None = None,
+    ) -> None:
+        synchronous_logs.append((message, level, exception))
+
+    monkeypatch.setattr(synchronous, "start_install", fail_start_install)
     monkeypatch.setattr(
         GuiController,
-        "retry_gpu_activation",
-        lambda self: asyncio.sleep(0, result=retries.append("retry")),
+        "log_detailed",
+        record_synchronous_log,
     )
 
-    install = asyncio.create_task(controller.install_or_repair_gpu_model())
-    await asyncio.sleep(0)
-    release.set()
-    await install
+    with pytest.raises(RuntimeError, match="synchronous"):
+        await synchronous_controller.install_or_repair_gpu_model()
 
-    assert retries == ["retry"]
+    assert synchronous_controller._gpu_ui_state == "installing"
+    assert synchronous_logs == [
+        (
+            "[GPU ASR] state=installing origin=manual progress_percent=0",
+            logging.DEBUG,
+            None,
+        )
+    ]
 
-    release = asyncio.Event()
-    port = RecordingProvisioningPort(_snapshot(gpu="missing"), release=release)
-    controller = _controller(port)
-    controller._gpu_pending_enable_channels = frozenset({"self"})
+    awaited = RecordingProvisioningPort(_snapshot(gpu="missing"))
+    awaited_controller = _controller(awaited)
+    awaited_logs: list[tuple[str, int, BaseException | None]] = []
+    failure = RuntimeError("awaited")
+
+    def start_failed_install(
+        request: LocalASRInstallRequest,
+        *,
+        result_handler=None,
+    ) -> asyncio.Task[LocalASRInstallResult]:
+        assert result_handler is None
+        awaited.requests.append(request)
+
+        async def fail() -> LocalASRInstallResult:
+            raise failure
+
+        return asyncio.create_task(fail())
+
+    def record_awaited_log(
+        _controller: GuiController,
+        message: str,
+        *,
+        level: int = logging.DEBUG,
+        exception: BaseException | None = None,
+    ) -> None:
+        awaited_logs.append((message, level, exception))
+
+    monkeypatch.setattr(awaited, "start_install", start_failed_install)
     monkeypatch.setattr(
         GuiController,
-        "retry_gpu_activation",
-        lambda self: asyncio.sleep(0, result=retries.append("late-retry")),
+        "log_detailed",
+        record_awaited_log,
     )
-    install = asyncio.create_task(controller.install_or_repair_gpu_model())
-    await asyncio.sleep(0)
-    controller._gpu_pending_enable_channels = frozenset()
-    release.set()
-    await install
 
-    assert retries == ["retry"]
+    await awaited_controller.install_or_repair_gpu_model(origin="repair")
+
+    failure_logs = [
+        item for item in awaited_logs if item[0] == "[GPU ASR] model_install failure=unexpected"
+    ]
+    assert len(failure_logs) == 1
+    message, level, exception = failure_logs[0]
+    assert message == "[GPU ASR] model_install failure=unexpected"
+    assert level == logging.WARNING
+    assert exception is failure
+    assert awaited_controller._gpu_ui_state == "install_failed"
+
+
+@pytest.mark.asyncio
+async def test_gpu_provisioning_composition_contains_retry_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    port = RecordingProvisioningPort(_snapshot(gpu="missing"))
+    controller = _controller(port)
+    controller._gpu_pending_enable_channels = frozenset({"self"})
+    failure = RuntimeError("retry")
+    diagnostics: list[BaseException | None] = []
+
+    async def fail_retry(_controller: GuiController) -> None:
+        raise failure
+
+    def record_diagnostic(
+        _controller: GuiController,
+        _message: str,
+        *,
+        level: int = logging.DEBUG,
+        exception: BaseException | None = None,
+    ) -> None:
+        _ = level
+        if _message == "[GPU ASR] model_install failure=unexpected":
+            diagnostics.append(exception)
+
+    monkeypatch.setattr(GuiController, "retry_gpu_activation", fail_retry)
+    monkeypatch.setattr(
+        GuiController,
+        "log_detailed",
+        record_diagnostic,
+    )
+
+    await controller.install_or_repair_gpu_model()
+
+    assert diagnostics == [failure]
+    assert diagnostics[0] is failure
+    assert controller._gpu_ui_state == "install_failed"
+
+
+@pytest.mark.asyncio
+async def test_gpu_provisioning_composition_propagates_retry_cancellation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    port = RecordingProvisioningPort(_snapshot(gpu="missing"))
+    controller = _controller(port)
+    controller._gpu_pending_enable_channels = frozenset({"peer"})
+
+    async def cancel_retry(_controller: GuiController) -> None:
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(GuiController, "retry_gpu_activation", cancel_retry)
+
+    with pytest.raises(asyncio.CancelledError):
+        await controller.install_or_repair_gpu_model()
+
+    assert controller._gpu_ui_state == "installed"
 
 
 def test_provisioning_snapshot_is_localized_only_at_ui_projection() -> None:

@@ -14,6 +14,14 @@ from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureGpuActivationValidator,
 )
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
+from puripuly_heart.app.services.local_asr_gpu_provisioning import (
+    LocalASRGpuActivationRetry,
+    LocalASRGpuProvisioningDiagnosticSink,
+    LocalASRGpuProvisioningEffectSink,
+    LocalASRGpuProvisioningOwner,
+    LocalASRGpuProvisioningStateProvider,
+    LocalASRProvisioningProvider,
+)
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
@@ -78,6 +86,23 @@ def create_manual_typing_owner(
         log_error=log_error,
         idle_timeout_seconds=idle_timeout_seconds,
         submit_timeout_seconds=submit_timeout_seconds,
+    )
+
+
+def create_local_asr_gpu_provisioning_owner(
+    *,
+    provisioning_provider: LocalASRProvisioningProvider,
+    state_provider: LocalASRGpuProvisioningStateProvider,
+    effect_sink: LocalASRGpuProvisioningEffectSink,
+    retry_activation: LocalASRGpuActivationRetry,
+    diagnostic_sink: LocalASRGpuProvisioningDiagnosticSink | None = None,
+) -> LocalASRGpuProvisioningOwner:
+    return LocalASRGpuProvisioningOwner(
+        provisioning_provider=provisioning_provider,
+        state_provider=state_provider,
+        effect_sink=effect_sink,
+        retry_activation=retry_activation,
+        diagnostic_sink=diagnostic_sink,
     )
 
 

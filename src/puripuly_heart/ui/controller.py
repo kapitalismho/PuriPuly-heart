@@ -71,6 +71,12 @@ from puripuly_heart.app.services.gpu_provider_recovery import (
     GpuProviderRecoveryExecution,
     GpuProviderRecoveryOwner,
 )
+from puripuly_heart.app.services.local_asr_gpu_provisioning import (
+    LocalASRGpuProvisioningDiagnostic,
+    LocalASRGpuProvisioningEffect,
+    LocalASRGpuProvisioningOwner,
+    LocalASRGpuProvisioningState,
+)
 from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_CPU_AUTO_PROVIDER,
     LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER,
@@ -209,6 +215,7 @@ from puripuly_heart.app.wiring import (
     resolve_self_stt_runtime_config,
 )
 from puripuly_heart.app.wiring_composition import (
+    create_local_asr_gpu_provisioning_owner,
     create_manual_typing_owner,
     create_vrchat_osc_presence_probe_owner,
 )
@@ -821,6 +828,11 @@ class GuiController:
         default=None,
         repr=False,
     )
+    _local_asr_gpu_provisioning_owner: LocalASRGpuProvisioningOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     # Overlay runtime internals are owned by OverlayRuntimeHandle.
     _overlay_runtime: OverlayRuntimeHandle | None = None
     _overlay_session_transition_owner: OverlaySessionTransitionOwner | None = field(
@@ -1393,78 +1405,61 @@ class GuiController:
         return False
 
     def _selected_gpu_provider_requires_model(self) -> bool:
-        return bool(
-            self.settings is not None
-            and (
-                self.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-                or self.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-            )
+        return self._local_asr_gpu_provisioning_state().selected_provider_requires_model
+
+    def _local_asr_gpu_provisioning_state(self) -> LocalASRGpuProvisioningState:
+        settings = self.settings
+        return LocalASRGpuProvisioningState(
+            selected_provider_requires_model=bool(
+                settings is not None
+                and (
+                    settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
+                    or settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
+                )
+            ),
+            locale=settings.ui.locale if settings is not None else None,
+            pending_channels=self._gpu_pending_enable_channels,
         )
+
+    def _apply_local_asr_gpu_provisioning_effect(
+        self,
+        effect: LocalASRGpuProvisioningEffect,
+    ) -> None:
+        self._set_gpu_ui_state(
+            effect.state,
+            progress_percent=effect.progress_percent,
+            publish_notice=effect.publish_notice,
+            origin=effect.origin,
+        )
+
+    def _on_local_asr_gpu_provisioning_diagnostic(
+        self,
+        diagnostic: LocalASRGpuProvisioningDiagnostic,
+    ) -> None:
+        self.log_detailed(
+            "[GPU ASR] model_install failure=unexpected",
+            level=logging.WARNING,
+            exception=diagnostic.exception,
+        )
+
+    def _get_local_asr_gpu_provisioning_owner(self) -> LocalASRGpuProvisioningOwner:
+        owner = self._local_asr_gpu_provisioning_owner
+        if owner is None:
+            owner = create_local_asr_gpu_provisioning_owner(
+                provisioning_provider=self._get_local_asr_provisioning_owner,
+                state_provider=self._local_asr_gpu_provisioning_state,
+                effect_sink=self._apply_local_asr_gpu_provisioning_effect,
+                retry_activation=self.retry_gpu_activation,
+                diagnostic_sink=self._on_local_asr_gpu_provisioning_diagnostic,
+            )
+            self._local_asr_gpu_provisioning_owner = owner
+        return owner
 
     async def install_selected_gpu_model_if_needed(self) -> bool:
-        if not self._selected_gpu_provider_requires_model():
-            return False
-        provisioning = self._get_local_asr_provisioning_owner()
-        if provisioning.snapshot.activity_for("gpu") is not None:
-            return False
-        snapshot = await provisioning.inspect_gpu(
-            explicit_intent=True,
-            verify_checksums=False,
-        )
-        if not self._selected_gpu_provider_requires_model():
-            return False
-        if snapshot.state_for(LOCAL_QWEN_GPU_MODEL_ID).status == "ready":
-            return False
-        await self.install_or_repair_gpu_model(origin="settings_exit")
-        return True
+        return await self._get_local_asr_gpu_provisioning_owner().install_selected_model_if_needed()
 
     async def install_or_repair_gpu_model(self, *, origin: str = "manual") -> None:
-        provisioning = self._get_local_asr_provisioning_owner()
-        if provisioning.snapshot.activity_for("gpu") is not None:
-            return
-        self._set_gpu_ui_state(
-            "installing",
-            progress_percent=0,
-            publish_notice=True,
-            origin=origin,
-        )
-        task = provisioning.start_install(
-            LocalASRInstallRequest(
-                backend="gpu",
-                model_ids=(LOCAL_QWEN_GPU_MODEL_ID,),
-                locale=self.settings.ui.locale if self.settings is not None else None,
-                origin=origin,
-                explicit_gpu_intent=True,
-            )
-        )
-        try:
-            result = await task
-            if result.cancelled:
-                return
-            if result.failed_model_ids:
-                self._set_gpu_ui_state(
-                    "install_failed",
-                    publish_notice=True,
-                    origin=origin,
-                )
-                return
-            pending = self._gpu_pending_enable_channels
-            self._set_gpu_ui_state("installed", origin=origin)
-            if pending:
-                await self.retry_gpu_activation()
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self.log_detailed(
-                "[GPU ASR] model_install failure=unexpected",
-                level=logging.WARNING,
-                exception=exc,
-            )
-            self._set_gpu_ui_state(
-                "install_failed",
-                publish_notice=True,
-                origin=origin,
-            )
+        await self._get_local_asr_gpu_provisioning_owner().install_or_repair(origin=origin)
 
     async def retry_gpu_activation(self) -> None:
         if self.settings is None:
