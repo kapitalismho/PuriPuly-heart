@@ -27,6 +27,9 @@ from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestRuntimePort,
 )
 from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
+from puripuly_heart.app.services import (
+    overlay_generation_start as overlay_generation_start_module,
+)
 from puripuly_heart.app.services import provider_runtime_apply as provider_runtime_apply_module
 from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.app.services.canonical_settings_persistence import (
@@ -1221,6 +1224,12 @@ def _patch_overlay_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeOverlayProcessManager.instances = []
     monkeypatch.setattr(controller_module, "OverlayBridge", FakeOverlayBridge)
     monkeypatch.setattr(controller_module, "OverlayProcessManager", FakeOverlayProcessManager)
+    monkeypatch.setattr(overlay_generation_start_module, "OverlayBridge", FakeOverlayBridge)
+    monkeypatch.setattr(
+        overlay_generation_start_module,
+        "OverlayProcessManager",
+        FakeOverlayProcessManager,
+    )
 
 
 def _overlay_runtime(controller: GuiController) -> OverlayRuntimeHandle:
@@ -6326,7 +6335,11 @@ async def test_overlay_shutdown_stops_bridge_while_bridge_start_is_in_flight(
                 raise
 
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(controller_module, "OverlayBridge", BlockingStartOverlayBridge)
+    monkeypatch.setattr(
+        overlay_generation_start_module,
+        "OverlayBridge",
+        BlockingStartOverlayBridge,
+    )
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
 
     controller = _make_controller(app=SimpleNamespace())
@@ -8801,9 +8814,13 @@ async def test_overlay_start_syncs_bridge_after_preserved_presenter_cleans_refre
             self.state = "connected"
             self.failure_reason = None
 
-    monkeypatch.setattr(controller_module, "OverlayBridge", CleaningDuringStartOverlayBridge)
     monkeypatch.setattr(
-        controller_module,
+        overlay_generation_start_module,
+        "OverlayBridge",
+        CleaningDuringStartOverlayBridge,
+    )
+    monkeypatch.setattr(
+        overlay_generation_start_module,
         "OverlayProcessManager",
         ImmediateConnectedOverlayProcessManager,
     )
@@ -8885,7 +8902,7 @@ async def test_desktop_overlay_start_cleans_preserved_self_refresh_marker_before
             self.failure_reason = None
 
     monkeypatch.setattr(
-        controller_module,
+        overlay_generation_start_module,
         "OverlayProcessManager",
         ImmediateConnectedOverlayProcessManager,
     )
@@ -9018,7 +9035,7 @@ async def test_begin_overlay_start_uses_empty_runtime_without_owned_presenter(
             self.failure_reason = None
 
     monkeypatch.setattr(
-        controller_module,
+        overlay_generation_start_module,
         "OverlayProcessManager",
         ImmediateConnectedOverlayProcessManager,
     )
@@ -9060,7 +9077,7 @@ async def test_overlay_start_uses_presenter_owned_by_runtime_handle(
             self.failure_reason = None
 
     monkeypatch.setattr(
-        controller_module,
+        overlay_generation_start_module,
         "OverlayProcessManager",
         ImmediateConnectedOverlayProcessManager,
     )
@@ -9130,7 +9147,7 @@ async def test_stale_overlay_start_after_hub_ingress_closes_runtime_without_lega
             controller._overlay_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
 
     monkeypatch.setattr(
-        controller_module,
+        overlay_generation_start_module,
         "OverlayProcessManager",
         StalingAfterIngressOverlayProcessManager,
     )
@@ -9186,7 +9203,11 @@ async def test_stale_overlay_start_exception_after_runtime_replacement_is_ignore
             controller.hub.overlay_sink = current_presenter
             raise RuntimeError("stale start failed")
 
-    monkeypatch.setattr(controller_module, "OverlayBridge", StalingFailingOverlayBridge)
+    monkeypatch.setattr(
+        overlay_generation_start_module,
+        "OverlayBridge",
+        StalingFailingOverlayBridge,
+    )
 
     stale_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
 

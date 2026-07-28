@@ -8,7 +8,6 @@ import inspect
 import json
 import logging
 import os
-import secrets
 import sys
 import time
 from collections.abc import Awaitable, Callable, Mapping
@@ -90,6 +89,12 @@ from puripuly_heart.app.services.microphone_test import (
 )
 from puripuly_heart.app.services.openrouter_pkce_flow import OpenRouterPkceFlowOwner
 from puripuly_heart.app.services.overlay_calibration import OverlayCalibrationOwner
+from puripuly_heart.app.services.overlay_generation_start import (
+    OverlayGenerationStartDiagnostic,
+    OverlayGenerationStartEffects,
+    OverlayGenerationStartOwner,
+    OverlayGenerationStartRequest,
+)
 from puripuly_heart.app.services.overlay_session_transition import (
     OverlaySessionShutdownExecution,
     OverlaySessionStartExecution,
@@ -325,7 +330,6 @@ from puripuly_heart.core.osc.receiver import (
 )
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
 from puripuly_heart.core.overlay.bridge import OverlayBridge
-from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.process import (
     DefaultOverlayProcessRunner,
@@ -863,6 +867,11 @@ class GuiController:
     # Overlay runtime internals are owned by OverlayRuntimeHandle.
     _overlay_runtime: OverlayRuntimeHandle | None = None
     _overlay_session_transition_owner: OverlaySessionTransitionOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _overlay_generation_start_owner: OverlayGenerationStartOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -4595,193 +4604,112 @@ class GuiController:
             runtime = self._overlay_runtime
             if runtime is None:
                 runtime = self._new_overlay_runtime_handle()
-        overlay_instance_id: str | None = None
-        try:
-            if self.settings is None or self.hub is None:
-                self._active_overlay_target = None
-                if self._overlay_runtime_is_current(runtime):
-                    self.on_overlay_start_failed("unknown")
-                return
+        if self.settings is None or self.hub is None:
+            self._active_overlay_target = None
+            if self._overlay_runtime_is_current(runtime):
+                self.on_overlay_start_failed("unknown")
+            return
+        await self._get_overlay_generation_start_owner().start(
+            runtime,
+            self._overlay_generation_start_request,
+            self._overlay_generation_start_effects(),
+        )
 
-            presenter = cast(OverlayPresenter | None, runtime.presenter)
-            overlay_instance_id = f"overlay-{secrets.token_hex(8)}"
-            runtime.set_overlay_instance_id(overlay_instance_id)
-            diagnostics = OverlayDiagnosticsRecorder(overlay_instance_id=overlay_instance_id)
-            runtime.attach_diagnostics(diagnostics)
-            resolved_overlay_config = resolve_overlay_config(self.settings)
-            overlay_target = self._active_overlay_target or self._normalized_overlay_target(
-                resolved_overlay_config.target
+    def _get_overlay_generation_start_owner(self) -> OverlayGenerationStartOwner:
+        owner = self._overlay_generation_start_owner
+        if owner is None:
+            owner = OverlayGenerationStartOwner(
+                diagnostic_sink=self._on_overlay_generation_start_diagnostic,
             )
-            self._active_overlay_target = overlay_target
-            peer_presentation_refresh_burst = overlay_target != OVERLAY_TARGET_DESKTOP
-            self_presentation_refresh_burst = overlay_target != OVERLAY_TARGET_DESKTOP
-            self.log_detailed(
-                "[Overlay][Start] "
-                f"target={overlay_target} "
-                f"overlay_instance_id={overlay_instance_id} "
-                f"logging_mode={self.runtime_logging_mode} "
-                f"peer_presentation_refresh_burst={peer_presentation_refresh_burst} "
-                f"self_presentation_refresh_burst={self_presentation_refresh_burst}"
-            )
+            self._overlay_generation_start_owner = owner
+        return owner
 
-            if presenter is None:
-                presenter = OverlayPresenter(
-                    calibration=self.overlay_calibration.copy(),
-                    clock=self.clock,
-                    diagnostics=diagnostics,
-                    runtime_log_detailed=self.log_detailed,
-                    show_translation=resolved_overlay_config.show_translation,
-                    show_peer_original=resolved_overlay_config.show_peer_original,
-                    task_factory=runtime.create_child_task,
-                    peer_presentation_refresh_burst=peer_presentation_refresh_burst,
-                    self_presentation_refresh_burst=self_presentation_refresh_burst,
-                )
-            else:
-                presenter.runtime_log_detailed = self.log_detailed
-            presenter = cast(OverlayPresenter, runtime.adopt_presenter(presenter))
-            presenter.runtime_log_detailed = self.log_detailed
-            if overlay_target != OVERLAY_TARGET_DESKTOP:
-                await presenter.update_native_retry_ownership(False)
-            await presenter.update_calibration(self.overlay_calibration.copy())
-            await presenter.update_display_preferences(
-                show_translation=resolved_overlay_config.show_translation,
-                show_peer_original=resolved_overlay_config.show_peer_original,
-            )
-            await presenter.update_peer_presentation_refresh_burst(peer_presentation_refresh_burst)
-            await presenter.update_self_presentation_refresh_burst(self_presentation_refresh_burst)
-            bridge = OverlayBridge(
-                session_token=secrets.token_urlsafe(16),
-                initial_snapshot=presenter.snapshot(),
-                overlay_instance_id=overlay_instance_id,
-                diagnostics=diagnostics,
-                runtime_logging_mode=self.runtime_logging_mode,
-                desktop_runtime_controls_enabled=overlay_target == OVERLAY_TARGET_DESKTOP,
-                task_factory=runtime.create_child_task,
-            )
-            if overlay_target == OVERLAY_TARGET_DESKTOP:
-                initial_desktop_controls = (
-                    self._build_initial_desktop_runtime_controls_from_resolved_config(
-                        resolved_overlay_config
-                    )
-                )
-                initial_interaction_control = initial_desktop_controls[-1]
-                self._set_desktop_overlay_interaction_mode(initial_interaction_control.get("mode"))
-                for payload in initial_desktop_controls:
-                    self._track_desktop_apply_window_bounds_control(payload)
-                bridge.set_initial_desktop_runtime_controls(initial_desktop_controls)
-            runtime.attach_bridge(bridge)
-            await bridge.start()
-            if not self._overlay_runtime_is_current(
+    def _overlay_generation_start_request(self) -> OverlayGenerationStartRequest:
+        assert self.settings is not None
+        config = resolve_overlay_config(self.settings)
+        target = self._active_overlay_target or self._normalized_overlay_target(config.target)
+        return OverlayGenerationStartRequest(
+            config=config,
+            target=target,
+            clock=self.clock,
+            startup_timeout_ms=OVERLAY_STARTUP_TIMEOUT_MS,
+        )
+
+    def _overlay_generation_start_effects(self) -> OverlayGenerationStartEffects:
+        return OverlayGenerationStartEffects(
+            log_runtime=self.log_detailed,
+            log_failure=lambda message, level, exception: self.log_detailed(
+                message,
+                level=level,
+                exception=exception,
+            ),
+            is_current=lambda runtime, instance_id: self._overlay_runtime_is_current(
                 runtime,
-                overlay_instance_id=overlay_instance_id,
-            ):
-                await self._close_stale_overlay_start_runtime(runtime)
-                return
-            current_presenter = cast(
-                OverlayPresenter | None,
-                runtime.current_presenter_for_ingress(),
-            )
-            if current_presenter is not presenter:
-                await self._close_stale_overlay_start_runtime(runtime)
-                return
-            presenter = current_presenter
-            presenter.attach_bridge(bridge)
-            latest_snapshot = presenter.snapshot()
-            if bridge.snapshot() != latest_snapshot:
-                await bridge.replace_snapshot(latest_snapshot)
-            runtime.attach_diagnostics(diagnostics)
-            await self._replace_hub_overlay_sink(presenter)
-            self.hub.overlay_diagnostics = diagnostics
-
-            renderer_events: asyncio.Queue[dict[str, object]] | None = None
-            if overlay_target == OVERLAY_TARGET_DESKTOP:
-                renderer_events = asyncio.Queue(maxsize=64)
-                runtime.attach_renderer_events(renderer_events)
-                runtime.create_renderer_event_task(
-                    self._consume_desktop_renderer_events(
-                        renderer_events,
-                        overlay_instance_id=overlay_instance_id,
-                    )
+                overlay_instance_id=instance_id,
+            ),
+            close_stale=self._close_stale_overlay_start_runtime,
+            replace_sink=self._replace_hub_overlay_sink,
+            set_diagnostics=lambda diagnostics: setattr(
+                self.hub,
+                "overlay_diagnostics",
+                diagnostics,
+            ),
+            set_target=lambda target: setattr(self, "_active_overlay_target", target),
+            calibration_snapshot=self.overlay_calibration.copy,
+            logging_mode=lambda: self.runtime_logging_mode,
+            locale=lambda: cast(AppSettings, self.settings).ui.locale,
+            log_dir=lambda: str(user_config_dir()),
+            build_desktop_controls=(
+                self._build_initial_desktop_runtime_controls_from_resolved_config
+            ),
+            set_interaction_mode=self._set_desktop_overlay_interaction_mode,
+            track_bounds_control=self._track_desktop_apply_window_bounds_control,
+            process_runner=lambda target, task_factory: self._overlay_process_runner_for_target(
+                target,
+                task_factory=task_factory,
+            ),
+            run_renderer_events=lambda queue, instance_id: (
+                self._consume_desktop_renderer_events(
+                    queue,
+                    overlay_instance_id=instance_id,
                 )
-            else:
-                runtime.attach_renderer_events(None)
-
-            manager = OverlayProcessManager(
-                process_runner=self._overlay_process_runner_for_target(
-                    overlay_target,
-                    task_factory=runtime.create_child_task,
-                ),
-                bridge_url=bridge.url,
-                bridge_messages=bridge.messages,
-                session_token=bridge.session_token,
-                locale=self.settings.ui.locale,
-                log_dir=str(user_config_dir()),
-                startup_timeout_ms=OVERLAY_STARTUP_TIMEOUT_MS,
-                renderer_events=renderer_events,
-                overlay_instance_id=overlay_instance_id,
-                logging_mode=self.runtime_logging_mode,
-                diagnostics=diagnostics,
-                task_factory=runtime.create_child_task,
-                retry_ownership_changed=(
-                    None
-                    if overlay_target == OVERLAY_TARGET_DESKTOP
-                    else lambda confirmed: self._apply_overlay_retry_ownership(
-                        runtime,
-                        presenter,
-                        manager,
-                        confirmed=confirmed,
-                    )
-                ),
-            )
-            runtime.attach_process_manager(manager)
-            await manager.start()
-
-            if not self._overlay_runtime_is_current(
-                runtime,
-                overlay_instance_id=overlay_instance_id,
-            ):
-                await self._close_stale_overlay_start_runtime(runtime)
-                return
-
-            if runtime.process_manager is not manager:
-                return
-
-            if manager.state != "connected":
-                await self._handle_overlay_start_failure(manager.failure_reason)
-                return
-
-            self._mark_overlay_connected()
-            await self._refresh_overlay_runtime_dependencies()
-            monitor_task = getattr(manager, "_monitor_task", None)
-            if monitor_task is not None:
-                runtime.create_monitor_task(
-                    self._watch_overlay_runtime(
-                        manager,
-                        monitor_task,
-                        runtime=runtime,
-                        overlay_instance_id=overlay_instance_id,
-                    )
+            ),
+            apply_retry_ownership=lambda runtime, presenter, manager, confirmed: (
+                self._apply_overlay_retry_ownership(
+                    runtime,
+                    presenter,
+                    manager,
+                    confirmed=confirmed,
                 )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            if not self._overlay_runtime_is_current(
-                runtime,
-                overlay_instance_id=overlay_instance_id,
-            ):
-                self.log_detailed(
-                    "[Overlay] Ignoring stale overlay runtime start failure",
-                    level=logging.WARNING,
-                    exception=exc,
+            ),
+            handle_failure=self._handle_overlay_start_failure,
+            mark_connected=self._mark_overlay_connected,
+            refresh_dependencies=self._refresh_overlay_runtime_dependencies,
+            watch_runtime=lambda manager, monitor, runtime, instance_id: (
+                self._watch_overlay_runtime(
+                    manager,
+                    monitor,
+                    runtime=runtime,
+                    overlay_instance_id=instance_id,
                 )
-                await self._close_stale_overlay_start_runtime(runtime)
-                return
-            self.log_detailed(
-                "[Overlay] Failed to start overlay runtime",
-                level=logging.ERROR,
-                exception=exc,
-            )
-            await self._handle_overlay_start_failure("unknown")
+            ),
+        )
+
+    def _on_overlay_generation_start_diagnostic(
+        self,
+        diagnostic: OverlayGenerationStartDiagnostic,
+    ) -> None:
+        fields = [
+            f"outcome={diagnostic.outcome}",
+            f"target={diagnostic.target or 'unknown'}",
+            f"overlay_instance_id={diagnostic.overlay_instance_id or 'unknown'}",
+        ]
+        if diagnostic.failure_type is not None:
+            fields.append(f"failure_type={diagnostic.failure_type}")
+        self.log_detailed(
+            f"[Overlay] generation_start {' '.join(fields)}",
+            level=logging.WARNING if diagnostic.outcome == "failed" else logging.INFO,
+        )
 
     async def _watch_overlay_runtime(
         self,
