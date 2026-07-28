@@ -28,7 +28,6 @@ def _owner(
         can_start=can_start,
         start_overlay=start_overlay or default_start,
         publish_notice=notices.append,
-        task_factory=lambda coroutine, name: asyncio.create_task(coroutine, name=name),
         diagnostics_sink=lambda event, metadata, exception: diagnostics.append(
             (event, dict(metadata), exception)
         ),
@@ -82,6 +81,7 @@ async def test_owner_schedules_one_generation_checked_fallback_start() -> None:
     task = owner.task
 
     assert task is not None
+    assert task.get_name() == "OverlaySessionFallbackOwner:overlay-session-desktop-fallback-1"
     await task
 
     assert starts == ["desktop"]

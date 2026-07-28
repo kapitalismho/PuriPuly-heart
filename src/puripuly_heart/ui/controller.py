@@ -5135,11 +5135,6 @@ class GuiController:
                 ),
                 start_overlay=self._begin_overlay_start,
                 publish_notice=self.app.set_dashboard_overlay_session_fallback_notice,
-                task_factory=lambda coroutine, name: start_lifecycle_task(
-                    self._ui_background_scope,
-                    coroutine,
-                    name=name,
-                ),
                 diagnostics_sink=lambda _event, _metadata, exception: self.log_detailed(
                     "[Overlay] Failed to schedule session desktop fallback",
                     level=logging.WARNING,

@@ -15,12 +15,22 @@ OverlaySessionFallbackDiagnosticsSink = Callable[
 ]
 
 
+def _create_overlay_session_fallback_task(
+    coroutine: Coroutine[Any, Any, None],
+    name: str,
+) -> asyncio.Task[None]:
+    return asyncio.create_task(
+        coroutine,
+        name=f"OverlaySessionFallbackOwner:{name}",
+    )
+
+
 @dataclass(slots=True)
 class OverlaySessionFallbackOwner:
     can_start: Callable[[], bool]
     start_overlay: Callable[[], Awaitable[None]]
     publish_notice: Callable[[bool], None]
-    task_factory: OverlaySessionFallbackTaskFactory
+    task_factory: OverlaySessionFallbackTaskFactory = _create_overlay_session_fallback_task
     diagnostics_sink: OverlaySessionFallbackDiagnosticsSink | None = None
     _active: bool = field(init=False, default=False, repr=False)
     _notice_active: bool = field(init=False, default=False, repr=False)

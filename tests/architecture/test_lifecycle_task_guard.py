@@ -58,6 +58,10 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
             ASYNCIO_CREATE_TASK,
         ): 1,
         (
+            "src/puripuly_heart/core/runtime/overlay_session_fallback.py",
+            ASYNCIO_CREATE_TASK,
+        ): 1,
+        (
             "src/puripuly_heart/core/runtime/github_star_prompt.py",
             ASYNCIO_CREATE_TASK,
         ): 2,
@@ -164,6 +168,10 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         "src/puripuly_heart/core/runtime/overlay.py",
         ASYNCIO_CREATE_TASK,
     ): "OverlayRuntimeHandle is the named lifecycle owner for overlay tasks",
+    (
+        "src/puripuly_heart/core/runtime/overlay_session_fallback.py",
+        ASYNCIO_CREATE_TASK,
+    ): "OverlaySessionFallbackOwner owns its named deferred fallback task and cancels and awaits it during close",
     (
         "src/puripuly_heart/core/runtime/output.py",
         ASYNCIO_CREATE_TASK,
