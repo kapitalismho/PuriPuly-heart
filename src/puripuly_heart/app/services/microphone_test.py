@@ -5,12 +5,16 @@ import inspect
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 
+from puripuly_heart.app.ports.microphone_test import (
+    MicrophoneTestCapturePort,
+    MicrophoneTestCaptureRequest,
+)
 from puripuly_heart.core.runtime.mic_test import MicTestRuntime
 
 MicrophoneTestMeterCallback = Callable[[float], object]
-MicrophoneTestCaptureSession = Callable[
+MicrophoneTestCaptureRequestFactory = Callable[
     [int, MicrophoneTestMeterCallback | None, float],
-    Awaitable[None],
+    MicrophoneTestCaptureRequest,
 ]
 MicrophoneTestDisableSelfCapture = Callable[[], Awaitable[None]]
 MicrophoneTestDiagnosticsSink = Callable[
@@ -63,7 +67,8 @@ class MicrophoneTestSessionRequest:
 
 @dataclass(slots=True)
 class MicrophoneTestSessionOwner:
-    capture_session: MicrophoneTestCaptureSession
+    capture_port: MicrophoneTestCapturePort
+    capture_request_factory: MicrophoneTestCaptureRequestFactory
     self_capture_snapshot: MicrophoneTestSelfCaptureSnapshotProvider = _inactive_self_capture_state
     disable_self_capture: MicrophoneTestDisableSelfCapture = _disable_inactive_self_capture
     log_sink: MicrophoneTestLogSink | None = None
@@ -213,10 +218,14 @@ class MicrophoneTestSessionOwner:
         request: MicrophoneTestSessionRequest,
     ) -> None:
         try:
-            await self.capture_session(
+            capture_request = self.capture_request_factory(
                 generation,
                 request.meter_callback,
                 request.level_log_interval_s,
+            )
+            await self.capture_port.capture(
+                capture_request,
+                runtime=self.runtime,
             )
         except asyncio.CancelledError:
             raise
@@ -327,7 +336,7 @@ class MicrophoneTestSessionOwner:
 
 
 __all__ = [
-    "MicrophoneTestCaptureSession",
+    "MicrophoneTestCaptureRequestFactory",
     "MicrophoneTestDisableSelfCapture",
     "MicrophoneTestDiagnosticsSink",
     "MicrophoneTestLogSink",

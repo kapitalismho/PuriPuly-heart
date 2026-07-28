@@ -9926,13 +9926,8 @@ class GuiController:
         owner = self._microphone_test_owner
         if owner is None:
             owner = MicrophoneTestSessionOwner(
-                capture_session=lambda generation, meter_callback, level_log_interval_s: (
-                    self.run_microphone_test_capture(
-                        generation=generation,
-                        meter_callback=meter_callback,
-                        level_log_interval_s=level_log_interval_s,
-                    )
-                ),
+                capture_port=self._build_microphone_test_capture_adapter(),
+                capture_request_factory=self._microphone_test_capture_request,
                 self_capture_snapshot=self._microphone_test_self_capture_state,
                 disable_self_capture=lambda: self.set_stt_enabled(False),
                 log_sink=self.log_basic,
@@ -10060,6 +10055,22 @@ class GuiController:
             source_factory=SoundDeviceAudioSource,
         )
 
+    def _microphone_test_capture_request(
+        self,
+        generation: int | None,
+        meter_callback: Callable[[float], object] | None,
+        level_log_interval_s: float,
+    ) -> MicrophoneTestCaptureRequest:
+        assert self.settings is not None
+        return MicrophoneTestCaptureRequest(
+            saved_host_api=self.settings.audio.input_host_api,
+            requested_device=self.settings.audio.input_device,
+            internal_channels=self.settings.audio.internal_channels,
+            generation=generation,
+            meter_callback=meter_callback,
+            level_log_interval_s=level_log_interval_s,
+        )
+
     async def run_microphone_test_capture(
         self,
         *,
@@ -10067,12 +10078,8 @@ class GuiController:
         meter_callback: Callable[[float], object] | None = None,
         level_log_interval_s: float = _MICROPHONE_TEST_LEVEL_INTERVAL_S,
     ) -> None:
-        assert self.settings is not None
         await self._build_microphone_test_capture_adapter().capture(
-            MicrophoneTestCaptureRequest(
-                saved_host_api=self.settings.audio.input_host_api,
-                requested_device=self.settings.audio.input_device,
-                internal_channels=self.settings.audio.internal_channels,
+            self._microphone_test_capture_request(
                 generation=generation,
                 meter_callback=meter_callback,
                 level_log_interval_s=level_log_interval_s,

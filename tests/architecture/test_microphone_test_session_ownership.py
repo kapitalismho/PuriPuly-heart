@@ -54,11 +54,25 @@ def test_microphone_test_session_owner_has_no_ui_or_controller_dependency() -> N
     assert "puripuly_heart.ui" not in source
     assert "GuiController" not in source
     assert "MicTestRuntime" in source
+    assert "MicrophoneTestCapturePort" in source
+    assert "await self.capture_port.capture(" in source
     assert "MicrophoneTestSessionRequest" in source
     assert "MicrophoneTestSelfCaptureState" in source
     assert "await self.disable_self_capture()" in source
     assert "self microphone source still open after STT auto-off" in source
     assert "drop meter updates from stale runtime generations" in source
+
+
+def test_production_microphone_test_session_does_not_reenter_controller_capture() -> None:
+    factory = _method_source(
+        CONTROLLER_PATH,
+        "GuiController",
+        "_get_microphone_test_owner",
+    )
+
+    assert "capture_port=self._build_microphone_test_capture_adapter()" in factory
+    assert "capture_request_factory=self._microphone_test_capture_request" in factory
+    assert "run_microphone_test_capture(" not in factory
 
 
 def test_controller_microphone_test_capture_is_an_adapter_delegate() -> None:
@@ -68,7 +82,7 @@ def test_controller_microphone_test_capture_is_an_adapter_delegate() -> None:
         "run_microphone_test_capture",
     )
 
-    assert "MicrophoneTestCaptureRequest(" in method
+    assert "_microphone_test_capture_request(" in method
     assert "_build_microphone_test_capture_adapter().capture(" in method
     assert "SoundDeviceAudioSource(" not in method
     assert "runtime.create_frame_task(" not in method

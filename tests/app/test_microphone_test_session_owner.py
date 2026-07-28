@@ -1,15 +1,70 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import pytest
 
+from puripuly_heart.app.ports.microphone_test import (
+    MicrophoneTestCaptureRequest,
+    MicrophoneTestRuntimePort,
+)
 from puripuly_heart.app.services.microphone_test import (
     MicrophoneTestSelfCaptureState,
     MicrophoneTestSessionOwner,
     MicrophoneTestSessionRequest,
 )
 from puripuly_heart.core.runtime.mic_test import MicTestRuntime
+
+CaptureCallback = Callable[
+    [int, Callable[[float], object] | None, float],
+    Awaitable[None],
+]
+
+
+class CallbackCapturePort:
+    def __init__(self, callback: CaptureCallback) -> None:
+        self.callback = callback
+
+    async def capture(
+        self,
+        request: MicrophoneTestCaptureRequest,
+        *,
+        runtime: MicrophoneTestRuntimePort,
+    ) -> None:
+        assert request.generation is not None
+        await self.callback(
+            request.generation,
+            request.meter_callback,
+            request.level_log_interval_s,
+        )
+
+
+def _capture_request(
+    generation: int,
+    meter_callback: Callable[[float], object] | None,
+    level_log_interval_s: float,
+) -> MicrophoneTestCaptureRequest:
+    return MicrophoneTestCaptureRequest(
+        saved_host_api="Windows WASAPI",
+        requested_device="Microphone",
+        internal_channels=1,
+        generation=generation,
+        meter_callback=meter_callback,
+        level_log_interval_s=level_log_interval_s,
+    )
+
+
+def _owner(
+    capture_callback: CaptureCallback,
+    **kwargs: Any,
+) -> MicrophoneTestSessionOwner:
+    return MicrophoneTestSessionOwner(
+        capture_port=CallbackCapturePort(capture_callback),
+        capture_request_factory=_capture_request,
+        **kwargs,
+    )
 
 
 @pytest.mark.asyncio
@@ -51,8 +106,8 @@ async def test_owner_starts_stops_and_owns_meter_and_audio_signature() -> None:
             capture_cancelled.set()
             raise
 
-    owner = MicrophoneTestSessionOwner(
-        capture_session=capture,
+    owner = _owner(
+        capture,
         self_capture_snapshot=self_capture_snapshot,
         disable_self_capture=disable_self_capture,
         log_sink=logs.append,
@@ -91,9 +146,7 @@ async def test_owner_rejects_parallel_and_active_direct_capture_sessions() -> No
         capture_started.set()
         await asyncio.Event().wait()
 
-    owner = MicrophoneTestSessionOwner(
-        capture_session=capture,
-    )
+    owner = _owner(capture)
     request = MicrophoneTestSessionRequest(audio_signature=("signature",))
 
     assert await owner.start(request) is True
@@ -117,8 +170,8 @@ async def test_owner_rejects_retained_self_capture_failure_without_starting_runt
         nonlocal capture_calls
         capture_calls += 1
 
-    owner = MicrophoneTestSessionOwner(
-        capture_session=capture,
+    owner = _owner(
+        capture,
         self_capture_snapshot=lambda: MicrophoneTestSelfCaptureState(
             stop_required=False,
             source_open=False,
@@ -143,8 +196,8 @@ async def test_owner_contains_self_capture_disable_failure() -> None:
     async def fail_disable() -> None:
         raise RuntimeError("disable detail")
 
-    owner = MicrophoneTestSessionOwner(
-        capture_session=lambda _generation, _meter_callback, _interval: asyncio.sleep(0),
+    owner = _owner(
+        lambda _generation, _meter_callback, _interval: asyncio.sleep(0),
         self_capture_snapshot=lambda: MicrophoneTestSelfCaptureState(
             stop_required=True,
             source_open=True,
@@ -177,8 +230,8 @@ async def test_owner_rejects_source_that_remains_open_after_disable() -> None:
     )
     logs: list[str] = []
 
-    owner = MicrophoneTestSessionOwner(
-        capture_session=lambda _generation, _meter_callback, _interval: asyncio.sleep(0),
+    owner = _owner(
+        lambda _generation, _meter_callback, _interval: asyncio.sleep(0),
         self_capture_snapshot=lambda: next(snapshots),
         disable_self_capture=lambda: asyncio.sleep(0),
         log_sink=logs.append,
@@ -196,8 +249,8 @@ async def test_owner_rejects_source_that_remains_open_after_disable() -> None:
 @pytest.mark.asyncio
 async def test_owner_drops_stale_meter_updates_and_contains_callback_failure() -> None:
     diagnostics: list[tuple[str, dict[str, object], BaseException | None]] = []
-    owner = MicrophoneTestSessionOwner(
-        capture_session=lambda _generation, _meter_callback, _interval: asyncio.sleep(0),
+    owner = _owner(
+        lambda _generation, _meter_callback, _interval: asyncio.sleep(0),
         diagnostics_sink=lambda event, metadata, exception: diagnostics.append(
             (event, dict(metadata), exception)
         ),
@@ -228,8 +281,8 @@ async def test_owner_contains_session_failure_and_closes_runtime() -> None:
     ) -> None:
         raise RuntimeError("capture detail")
 
-    owner = MicrophoneTestSessionOwner(
-        capture_session=fail_capture,
+    owner = _owner(
+        fail_capture,
         diagnostics_sink=lambda event, metadata, exception: diagnostics.append(
             (event, dict(metadata), exception)
         ),
@@ -267,8 +320,8 @@ async def test_owner_retries_completed_stale_runtime_resources_before_start() ->
     source = RecordingSource()
     assert runtime.attach_source(source, generation=generation) is True
     runtime.end_direct_capture(generation)
-    owner = MicrophoneTestSessionOwner(
-        capture_session=lambda _generation, _meter_callback, _interval: asyncio.sleep(0),
+    owner = _owner(
+        lambda _generation, _meter_callback, _interval: asyncio.sleep(0),
         runtime_factory=lambda: runtime,
     )
 

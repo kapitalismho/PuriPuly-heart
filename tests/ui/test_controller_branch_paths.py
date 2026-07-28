@@ -9,7 +9,7 @@ import threading
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Literal
+from typing import Awaitable, Callable, Literal
 from uuid import uuid4
 
 import flet as ft
@@ -22,6 +22,10 @@ from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as canonical_persistence_adapter_module,
 )
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.microphone_test import (
+    MicrophoneTestCaptureRequest,
+    MicrophoneTestRuntimePort,
+)
 from puripuly_heart.app.services import provider_runtime_apply as provider_runtime_apply_module
 from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.config.audio_host_api import (
@@ -10520,6 +10524,46 @@ def _mic_test_basic_messages(controller: GuiController) -> list[str]:
     return [message for _level, message in runtime_logging.basic_messages]
 
 
+class _CallbackMicrophoneTestCapturePort:
+    def __init__(
+        self,
+        controller: GuiController,
+        callback: Callable[..., Awaitable[None]],
+    ) -> None:
+        self.controller = controller
+        self.callback = callback
+
+    async def capture(
+        self,
+        request: MicrophoneTestCaptureRequest,
+        *,
+        runtime: MicrophoneTestRuntimePort,
+    ) -> None:
+        _ = runtime
+        await self.callback(
+            self.controller,
+            generation=request.generation,
+            meter_callback=request.meter_callback,
+            level_log_interval_s=request.level_log_interval_s,
+        )
+
+
+def _patch_microphone_test_capture(
+    monkeypatch: pytest.MonkeyPatch,
+    controller: GuiController,
+    callback: Callable[..., Awaitable[None]],
+) -> None:
+    capture_port = _CallbackMicrophoneTestCapturePort(controller, callback)
+    owner = controller._microphone_test_owner
+    if owner is not None:
+        owner.capture_port = capture_port
+    monkeypatch.setattr(
+        GuiController,
+        "_build_microphone_test_capture_adapter",
+        lambda _controller: capture_port,
+    )
+
+
 def _assert_mic_test_event_and_field_names_have_no_verdict_labels(messages: list[str]) -> None:
     banned = {"success", "failure", "failed", "usable", "near_silence", "good", "bad"}
     for message in messages:
@@ -11030,7 +11074,7 @@ async def test_start_microphone_test_disables_self_stt_before_capture(
         capture_started.set()
         await asyncio.sleep(3600)
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     started = await controller.start_microphone_test()
     await capture_started.wait()
@@ -11072,7 +11116,7 @@ async def test_start_microphone_test_when_stt_already_off_logs_neutral_auto_off(
         capture_calls.append("captured")
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", unexpected_disable)
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     started = await controller.start_microphone_test()
     await _wait_until(lambda: _microphone_test_task(controller) is None)
@@ -11104,7 +11148,7 @@ async def test_start_microphone_test_clears_pending_self_stt_desire_before_captu
     async def fake_capture(self, **_kwargs) -> None:
         capture_pending_state.append(self._local_stt_pending_enable_after_install)
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     started = await controller.start_microphone_test()
     await _wait_until(lambda: _microphone_test_task(controller) is None)
@@ -11140,7 +11184,7 @@ async def test_start_microphone_test_stop_exception_logs_and_skips_capture(
         capture_calls.append("captured")
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", failing_disable)
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", unexpected_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, unexpected_capture)
 
     started = await controller.start_microphone_test()
 
@@ -11186,7 +11230,7 @@ async def test_start_microphone_test_source_close_exception_retains_source_until
     task = asyncio.create_task(asyncio.sleep(3600))
     controller._mic_task = task
     controller._self_capture_owner = MicTestSelfCaptureOwner(source=source, task=task)
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     first_started = await controller.start_microphone_test()
 
@@ -11243,7 +11287,7 @@ async def test_start_microphone_test_retry_after_source_close_exception_still_sk
     task = asyncio.create_task(asyncio.sleep(3600))
     controller._mic_task = task
     controller._self_capture_owner = MicTestSelfCaptureOwner(source=source, task=task)
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", unexpected_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, unexpected_capture)
 
     try:
         first_started = await controller.start_microphone_test()
@@ -11286,7 +11330,7 @@ async def test_start_microphone_test_rejects_duplicate_start_without_duplicate_r
         capture_started.set()
         await asyncio.sleep(3600)
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     first_started = await controller.start_microphone_test()
     await capture_started.wait()
@@ -11313,7 +11357,7 @@ async def test_start_microphone_test_registers_named_mic_test_runtime_owner(
         capture_started.set()
         await asyncio.sleep(3600)
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     assert await controller.start_microphone_test() is True
     await capture_started.wait()
@@ -11349,7 +11393,7 @@ async def test_late_microphone_test_meter_update_after_stop_is_ignored(
         capture_started.set()
         await asyncio.sleep(3600)
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     assert await controller.start_microphone_test(meter_callback=meter_values.append) is True
     await capture_started.wait()
@@ -11586,7 +11630,7 @@ async def test_direct_microphone_capture_releases_direct_generation_when_initial
     async def fake_capture(self, **_kwargs) -> None:
         _ = self
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
     assert await controller.start_microphone_test() is True
     await _wait_until(lambda: _microphone_test_task(controller) is None)
 
@@ -11615,7 +11659,7 @@ async def test_direct_microphone_capture_releases_direct_generation_when_route_o
     async def fake_capture(self, **_kwargs) -> None:
         _ = self
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
     assert await controller.start_microphone_test() is True
     await _wait_until(lambda: _microphone_test_task(controller) is None)
 
@@ -11784,7 +11828,7 @@ async def test_audio_settings_change_stops_active_microphone_test_and_next_start
         finally:
             capture_cancelled.append(device_name)
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     assert await controller.start_microphone_test() is True
     await capture_started[0].wait()
@@ -11828,7 +11872,7 @@ async def test_audio_settings_change_stops_active_microphone_test_after_in_place
         finally:
             capture_cancelled.append(device_name)
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     assert await controller.start_microphone_test() is True
     await capture_started.wait()
@@ -11861,7 +11905,7 @@ async def test_stop_microphone_test_is_idempotent_and_cleans_active_session(
         finally:
             capture_cancelled.append("cancelled")
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     assert await controller.start_microphone_test() is True
     await capture_started.wait()
@@ -11891,7 +11935,7 @@ async def test_controller_stop_cancels_active_microphone_test(
         finally:
             capture_cancelled.append("cancelled")
 
-    monkeypatch.setattr(GuiController, "run_microphone_test_capture", fake_capture)
+    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
     assert await controller.start_microphone_test() is True
     await capture_started.wait()
