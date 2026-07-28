@@ -12,13 +12,15 @@ import time
 import traceback
 import wave
 from pathlib import Path
-from types import SimpleNamespace
 from uuid import uuid4
 
 import numpy as np
 
-from puripuly_heart.app.wiring_local_asr_provider_runtime import (
-    LocalASRProviderRuntimeFactory,
+from puripuly_heart.app.ports.local_asr_production_evidence import (
+    LocalASRProductionEvidenceFactoryPort,
+)
+from puripuly_heart.composition.local_asr_production_evidence import (
+    compose_local_asr_production_evidence,
 )
 from puripuly_heart.config.paths import default_settings_path
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
@@ -26,7 +28,6 @@ from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
-from puripuly_heart.ui.controller import GuiController
 
 
 def _read_audio(path: Path) -> np.ndarray:
@@ -164,6 +165,9 @@ async def _execute(
     audio_path: Path,
     candidate: str,
     expected_gpu_name: str,
+    composition_factory: LocalASRProductionEvidenceFactoryPort = (
+        compose_local_asr_production_evidence
+    ),
 ) -> dict[str, object]:
     if os.name != "nt" or not getattr(sys, "frozen", False):
         raise RuntimeError("production composition evidence requires the packaged Windows app")
@@ -171,12 +175,10 @@ async def _execute(
     if not model_path.is_file() or not audio_path.is_file():
         raise FileNotFoundError({"model": str(model_path), "audio": str(audio_path)})
     samples = _read_audio(audio_path)
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=SimpleNamespace(debug_ui_preview=False),
+    application = composition_factory(
         config_path=default_settings_path(),
     )
-    settings = controller._load_or_init_settings(controller.config_path)
+    settings = application.load_compatibility_settings()
     provider_type = type(settings.provider.stt)
     settings.provider.stt = provider_type("local_qwen_gpu")
     settings.provider.peer_stt = provider_type("local_qwen_gpu")
@@ -187,7 +189,6 @@ async def _execute(
     settings.ui.peer_translation_enabled = False
     settings.osc.chatbox_send = False
     os.environ["PURIPULY_HEART_SECRETS_PASSPHRASE"] = uuid4().hex
-    controller.settings = settings
     self_events: list[object] = []
     peer_events: list[object] = []
     retired_events: list[object] = []
@@ -196,7 +197,7 @@ async def _execute(
         "candidate": candidate,
         "packaged": True,
         "executable": sys.executable,
-        "config_path": str(controller.config_path),
+        "config_path": str(application.config_path),
         "model": str(model_path),
         "model_sha256": _sha256(model_path),
         "audio": str(audio_path),
@@ -206,23 +207,15 @@ async def _execute(
     }
     owner: LocalASRProviderRuntimeOwner | None = None
     try:
-        await controller._init_pipeline()
-        hub = controller.hub
-        if hub is None or not isinstance(
-            hub.local_asr_provider_runtime,
-            LocalASRProviderRuntimeOwner,
-        ):
-            raise RuntimeError("production controller did not compose the canonical owner")
-        owner = hub.local_asr_provider_runtime
+        await application.initialize(settings)
+        hub = application.hub
+        owner = application.owner
         await hub.replace_llm_provider(None)
         hub.translation_enabled = False
         if hub.llm is not None:
             raise RuntimeError("production evidence did not disable the external LLM provider")
         report["composition"] = {
-            "controller": type(controller).__name__,
-            "hub": type(hub).__name__,
-            "factory": LocalASRProviderRuntimeFactory.__name__,
-            "owner": type(owner).__name__,
+            **application.composition_facts(),
             "external_llm_disabled": True,
             "secrets_backend": settings.secrets.backend.value,
         }
@@ -238,14 +231,13 @@ async def _execute(
         settings.stt.gpu_device_id = physical.device_id
         report["selected_device"] = dataclasses.asdict(physical)
 
-        self_request = controller._self_stt_provider_request(settings, warmup=True)
+        self_request = application.build_self_provider_request(settings, warmup=True)
         self_result = await hub.replace_stt_provider_request(self_request, start=True)
         if self_result.status != "applied":
             raise RuntimeError("production Self GPU activation failed")
         self_pid = owner.snapshot.gpu.worker_pid
 
-        peer_config = controller._build_peer_runtime_config(settings)
-        peer_request = controller._peer_stt_provider_request(peer_config, warmup=True)
+        peer_request = application.build_peer_provider_request(settings, warmup=True)
         peer_result = await hub.replace_peer_stt_provider_request(
             peer_request,
             start=True,
@@ -296,7 +288,7 @@ async def _execute(
         )
         await hub.handle_vad_event(SpeechEnd(utterance_id=utterance_id))
         handoff = await hub.handoff_stt_provider_request(
-            controller._self_stt_provider_request(settings, warmup=False),
+            application.build_self_provider_request(settings, warmup=False),
             start=True,
         )
         if handoff.status != "applied":
@@ -330,7 +322,7 @@ async def _execute(
         os.kill(failed_pid, signal.SIGTERM)
         await _wait_until(lambda: owner.snapshot.gpu.retry_required, timeout=30.0)
         failed_snapshot = _snapshot_fact(owner)
-        await controller.retry_gpu_activation()
+        await application.retry_gpu_activation()
         controller_recovery = _snapshot_fact(owner)
         controller_recovered_pid = owner.snapshot.gpu.worker_pid
         if controller_recovered_pid is None or controller_recovered_pid == failed_pid:
@@ -400,7 +392,7 @@ async def _execute(
         )
     finally:
         try:
-            await controller.stop()
+            await application.close()
         except Exception as exc:
             report["shutdown_failure"] = {
                 "failure_type": type(exc).__name__,

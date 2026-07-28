@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from puripuly_heart.composition.local_asr_production_evidence import (
+    compose_local_asr_production_evidence,
+)
 from puripuly_heart.release_evidence import local_asr_production_composition as evidence
 
 
@@ -61,3 +65,9 @@ def test_runner_rejects_non_packaged_execution_with_report(
     assert report["candidate"] == "candidate-sha"
     assert report["failure_type"] == "RuntimeError"
     assert "packaged Windows app" in report["failure"]
+
+
+def test_execute_defaults_to_the_package_evidence_composition_factory() -> None:
+    parameter = inspect.signature(evidence._execute).parameters["composition_factory"]
+
+    assert parameter.default is compose_local_asr_production_evidence
