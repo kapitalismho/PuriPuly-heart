@@ -998,10 +998,6 @@ class GuiController:
     def desktop_overlay_captions_locked(self) -> bool:
         return self.desktop_overlay_interaction_mode == DESKTOP_INTERACTION_MODE_PASS_THROUGH
 
-    @property
-    def discord_managed_auth_in_progress(self) -> bool:
-        return self._discord_managed_auth_in_progress
-
     def _effective_peer_translation_enabled_for(self, settings: AppSettings) -> bool:
         return bool(
             self._peer_translation_activation_requested_for(settings)
