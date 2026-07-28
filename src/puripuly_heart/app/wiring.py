@@ -14,6 +14,7 @@ from puripuly_heart.app.ports.secret_store import SecretStorePort
 from puripuly_heart.app.wiring_composition import (
     create_microphone_test_capture_adapter,
     create_provider_verifier,
+    create_self_capture_source_adapter,
 )
 from puripuly_heart.app.wiring_llm_factory import (
     MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
@@ -211,6 +212,7 @@ __all__ = (
     "create_peer_stt_backend_from_resolved_config",
     "create_provider_verifier",
     "create_secret_store",
+    "create_self_capture_source_adapter",
     "create_sync_secret_store_adapter",
     "copy_stable_secrets_to_vnext_namespace",
     "create_stt_backend",

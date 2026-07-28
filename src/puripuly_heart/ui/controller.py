@@ -184,12 +184,12 @@ from puripuly_heart.app.wiring import (
     create_microphone_test_capture_adapter,
     create_provider_verifier,
     create_secret_store,
+    create_self_capture_source_adapter,
     create_sync_secret_store_adapter,
     resolve_overlay_config,
     resolve_peer_stt_runtime_config_from_vnext,
     resolve_self_stt_runtime_config,
 )
-from puripuly_heart.config.audio_host_api import normalize_input_host_api
 from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
 from puripuly_heart.config.llm_profiles import (
     get_openrouter_selection_alias_for_model_and_source,
@@ -244,11 +244,9 @@ from puripuly_heart.core.audio.process_identity import (
 from puripuly_heart.core.audio.process_source import ProcessAudioCaptureSource
 from puripuly_heart.core.audio.source import (
     AudioSource,
-    SelfMicCaptureChannelDecision,
     SoundDeviceAudioSource,
     determine_self_mic_capture_channels,
     observe_microphone_test_route,
-    resolve_sounddevice_input_device,
 )
 from puripuly_heart.core.clipboard.watcher import create_clipboard_watcher
 from puripuly_heart.core.clock import SystemClock
@@ -9946,7 +9944,13 @@ class GuiController:
             hub=self.hub,
             admission=_SelfCaptureAdmissionAdapter(self._admit_self_capture),
             provider_request_factory=self._self_capture_provider_request,
-            source_factory=self._create_self_capture_source,
+            source_factory=create_self_capture_source_adapter(
+                log_detailed=self.log_detailed,
+                wrap_source=lambda source: self._wrap_diagnostic_audio_source(
+                    cast(AudioSource, source),
+                    channel_label="self",
+                ),
+            ),
             vad_factory=self._create_self_capture_vad,
             run_audio_loop=self._run_self_capture_audio_loop,
             vad_sink=_SelfCaptureVadSink(lambda: self.hub),
@@ -10015,191 +10019,6 @@ class GuiController:
             diagnostics_enabled=self._detailed_audio_diag_enabled,
             diagnostic_label="self",
         )
-
-    def _create_self_capture_source(self, config: SelfCaptureSessionConfig) -> AudioSource:
-        def resolve_device(host_api: str, device: str) -> int | None:
-            try:
-                return resolve_sounddevice_input_device(host_api=host_api, device=device)
-            except Exception as exc:
-                self.log_detailed(
-                    "[STT] Device resolution detail: "
-                    f"host_api={host_api!r} device={device!r} error={exc}",
-                    level=logging.WARNING,
-                )
-                return None
-
-        def source_int(source: SoundDeviceAudioSource, attr: str, fallback: int) -> int:
-            try:
-                return int(getattr(source, attr, fallback))
-            except Exception:
-                return fallback
-
-        def open_source_once(
-            dev_idx: int | None,
-            *,
-            attempt: str,
-            requested_channels: int,
-            decision: SelfMicCaptureChannelDecision,
-            host_api_for_log: str,
-            device_for_log: str,
-            wasapi_auto_convert: bool = False,
-            wasapi_exclusive: bool = False,
-        ) -> SoundDeviceAudioSource:
-            source = SoundDeviceAudioSource(
-                sample_rate_hz=None,
-                channels=requested_channels,
-                device=dev_idx,
-                wasapi_auto_convert=wasapi_auto_convert,
-                wasapi_exclusive=wasapi_exclusive,
-            )
-            metadata = decision.metadata
-            opened_channels = source_int(source, "opened_channels", requested_channels)
-            frame_channels = source_int(source, "frame_channels", opened_channels)
-            actual_sample_rate_hz = source_int(source, "actual_sample_rate_hz", 0)
-            self.log_detailed(
-                "[STT] Microphone capture format: "
-                f"attempt={attempt!r} "
-                f"internal_channels={decision.internal_channels} "
-                f"preferred_capture_channels={decision.preferred_capture_channels} "
-                f"requested_channels={requested_channels} "
-                f"opened_channels={opened_channels} "
-                f"frame_channels={frame_channels} "
-                "frame_channels_source='opened_fallback' "
-                f"saved_host_api={config.input_host_api!r} "
-                f"actual_host_api={host_api_for_log!r} "
-                f"device={device_for_log!r} "
-                f"device_idx={dev_idx} "
-                f"wasapi_auto_convert={wasapi_auto_convert} "
-                f"wasapi_exclusive={wasapi_exclusive} "
-                f"actual_sample_rate_hz={actual_sample_rate_hz or None} "
-                f"metadata_device_idx={metadata.device_idx} "
-                f"metadata_device_name={metadata.name!r} "
-                f"device_max_input_channels={metadata.max_input_channels} "
-                f"device_default_samplerate={metadata.default_samplerate} "
-                f"metadata_status={metadata.metadata_status!r} "
-                f"metadata_error={metadata.metadata_error!r}"
-            )
-            return source
-
-        def open_source_with_mono_retry(
-            dev_idx: int | None,
-            *,
-            attempt: str,
-            host_api_for_log: str,
-            device_for_log: str,
-            wasapi_auto_convert: bool = False,
-            wasapi_exclusive: bool = False,
-        ) -> SoundDeviceAudioSource:
-            decision = determine_self_mic_capture_channels(
-                device_idx=dev_idx,
-                internal_channels=config.internal_channels,
-            )
-            try:
-                return open_source_once(
-                    dev_idx,
-                    attempt=attempt,
-                    requested_channels=decision.preferred_capture_channels,
-                    decision=decision,
-                    host_api_for_log=host_api_for_log,
-                    device_for_log=device_for_log,
-                    wasapi_auto_convert=wasapi_auto_convert,
-                    wasapi_exclusive=wasapi_exclusive,
-                )
-            except Exception as exc:
-                if decision.preferred_capture_channels <= config.internal_channels:
-                    raise
-                self.log_detailed(
-                    "[STT] Microphone open detail: "
-                    f"attempt={attempt!r} "
-                    f"host_api={host_api_for_log!r} "
-                    f"device={device_for_log!r} "
-                    f"device_idx={dev_idx} "
-                    f"preferred_capture_channels={decision.preferred_capture_channels} "
-                    f"requested_channels={decision.preferred_capture_channels} "
-                    f"wasapi_auto_convert={wasapi_auto_convert} "
-                    f"wasapi_exclusive={wasapi_exclusive} "
-                    f"metadata_status={decision.metadata.metadata_status!r} "
-                    "will_retry_mono=True "
-                    f"error={exc}",
-                    level=logging.WARNING,
-                )
-                return open_source_once(
-                    dev_idx,
-                    attempt=f"{attempt}_mono_retry",
-                    requested_channels=config.internal_channels,
-                    decision=decision,
-                    host_api_for_log=host_api_for_log,
-                    device_for_log=device_for_log,
-                    wasapi_auto_convert=wasapi_auto_convert,
-                    wasapi_exclusive=wasapi_exclusive,
-                )
-
-        host_api_profile = normalize_input_host_api(config.input_host_api)
-        host_api = host_api_profile.actual_host_api
-        first_open_used_wasapi_flags = (
-            host_api_profile.wasapi_auto_convert or host_api_profile.wasapi_exclusive
-        )
-        device_idx = resolve_device(host_api, config.input_device)
-        source: SoundDeviceAudioSource | None = None
-        try:
-            source = open_source_with_mono_retry(
-                device_idx,
-                attempt="primary",
-                host_api_for_log=host_api,
-                device_for_log=config.input_device,
-                wasapi_auto_convert=host_api_profile.wasapi_auto_convert,
-                wasapi_exclusive=host_api_profile.wasapi_exclusive,
-            )
-            self.log_detailed(
-                "[STT] Microphone opened: "
-                f"saved_host_api={config.input_host_api!r} "
-                f"actual_host_api={host_api!r} "
-                f"device={config.input_device!r} "
-                f"device_idx={device_idx} "
-                f"wasapi_auto_convert={host_api_profile.wasapi_auto_convert} "
-                f"wasapi_exclusive={host_api_profile.wasapi_exclusive}"
-            )
-        except Exception as exc:
-            self.log_detailed(
-                "[STT] Microphone open detail: "
-                f"host_api={host_api!r} device={config.input_device!r} error={exc}",
-                level=logging.ERROR,
-            )
-        if source is None and config.input_device:
-            fallback_idx = resolve_device("", config.input_device)
-            if fallback_idx != device_idx or first_open_used_wasapi_flags:
-                try:
-                    source = open_source_with_mono_retry(
-                        fallback_idx,
-                        attempt="name_fallback",
-                        host_api_for_log="",
-                        device_for_log=config.input_device,
-                    )
-                    self.log_detailed(
-                        f"[STT] Microphone opened with fallback: device_idx={fallback_idx}"
-                    )
-                except Exception as exc:
-                    self.log_detailed(
-                        f"[STT] Fallback microphone detail: error={exc}",
-                        level=logging.ERROR,
-                    )
-        if source is None:
-            try:
-                source = open_source_with_mono_retry(
-                    None,
-                    attempt="system_default",
-                    host_api_for_log="",
-                    device_for_log="",
-                )
-                self.log_detailed("[STT] Microphone opened with system default")
-            except Exception as exc:
-                self.log_detailed(
-                    f"[STT] System default microphone detail: error={exc}",
-                    level=logging.ERROR,
-                )
-        if source is None:
-            raise RuntimeError("All microphone attempts failed")
-        return self._wrap_diagnostic_audio_source(source, channel_label="self")
 
     async def _run_self_capture_audio_loop(self, **kwargs: object) -> None:
         from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop

@@ -21,6 +21,7 @@ pytest.importorskip("flet")
 from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as canonical_persistence_adapter_module,
 )
+from puripuly_heart.app.adapters.self_capture_source import SelfCaptureSourceAdapter
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestCaptureRequest,
@@ -39,6 +40,7 @@ from puripuly_heart.config.audio_host_api import (
     WINDOWS_MME_HOST_API,
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,
     WINDOWS_WASAPI_HOST_API,
+    normalize_input_host_api,
 )
 from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
@@ -69,6 +71,7 @@ from puripuly_heart.config.settings import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core import messages
+from puripuly_heart.core.audio import source as audio_source_module
 from puripuly_heart.core.audio.format import AudioFrameF32
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.audio.source import (
@@ -10449,10 +10452,20 @@ def _self_mic_decision(
     )
 
 
-def _create_self_capture_source_for_test(controller: GuiController) -> object:
+def _create_self_capture_source_via_adapter_for_test(controller: GuiController) -> object:
     assert controller.settings is not None
-    source = controller._create_self_capture_source(
-        controller._build_self_capture_session_config(controller.settings)
+    source = SelfCaptureSourceAdapter(
+        normalize_host_api=normalize_input_host_api,
+        resolve_device=audio_source_module.resolve_sounddevice_input_device,
+        channel_decision=controller_module.determine_self_mic_capture_channels,
+        source_factory=controller_module.SoundDeviceAudioSource,
+        log_detailed=controller.log_detailed,
+        wrap_source=lambda raw_source: controller._wrap_diagnostic_audio_source(
+            raw_source,
+            channel_label="self",
+        ),
+    )(
+        controller._build_self_capture_session_config(controller.settings),
     )
     controller._audio_source = source
     return source
@@ -12008,8 +12021,7 @@ async def test_controller_stop_cancels_active_microphone_test(
     assert _microphone_test_task(controller) is None
 
 
-@pytest.mark.asyncio
-async def test_self_capture_source_normalizes_wasapi_compatibility_mode(
+def test_self_capture_source_adapter_normalizes_wasapi_compatibility_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12033,14 +12045,7 @@ async def test_self_capture_source_normalizes_wasapi_compatibility_mode(
         source_calls.append(dict(kwargs))
         return FakeSource()
 
-    async def fake_run_self_capture_loop(self) -> None:
-        _ = self
-        return None
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", fake_resolve)
+    monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
         controller_module,
         "determine_self_mic_capture_channels",
@@ -12050,10 +12055,8 @@ async def test_self_capture_source_normalizes_wasapi_compatibility_mode(
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    _create_self_capture_source_for_test(controller)
-    await asyncio.sleep(0)
+    _create_self_capture_source_via_adapter_for_test(controller)
 
     assert resolve_calls == [{"host_api": WINDOWS_WASAPI_HOST_API, "device": "Compat Mic"}]
     assert source_calls[0]["device"] == 7
@@ -12062,8 +12065,7 @@ async def test_self_capture_source_normalizes_wasapi_compatibility_mode(
     assert source_calls[0]["channels"] == 1
 
 
-@pytest.mark.asyncio
-async def test_self_capture_source_wires_self_vad_diagnostics(
+def test_self_capture_vad_wires_self_diagnostics(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12074,43 +12076,17 @@ async def test_self_capture_source_wires_self_vad_diagnostics(
     controller._runtime_logging = RuntimeLoggingSpy()
     vad_calls: list[dict[str, object]] = []
 
-    class FakeSource:
-        actual_sample_rate_hz = 48000
-        requested_channels = 1
-        opened_channels = 1
-        frame_channels = 1
-
-        async def close(self) -> None:
-            return None
-
     def fake_vad_gating(*_args, **kwargs):
         vad_calls.append(dict(kwargs))
         return SimpleNamespace()
 
-    async def fake_run_self_capture_loop(self) -> None:
-        _ = self
-        return None
-
     monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
     monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
     monkeypatch.setattr(controller_module, "VadGating", fake_vad_gating)
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", lambda **kwargs: 7)
-    monkeypatch.setattr(
-        controller_module,
-        "determine_self_mic_capture_channels",
-        lambda *, device_idx, internal_channels: _self_mic_decision(
-            device_idx=device_idx,
-            preferred_channels=1,
-        ),
-    )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", lambda *a, **k: FakeSource())
-    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
     controller._vad = controller._create_self_capture_vad(
         controller._build_self_capture_session_config(controller.settings)
     )
-    _create_self_capture_source_for_test(controller)
-    await asyncio.sleep(0)
 
     assert vad_calls[0].get("max_segment_ms") is None
     assert vad_calls[0]["diagnostic_label"] == "self"
@@ -12130,8 +12106,7 @@ async def test_self_capture_source_wires_self_vad_diagnostics(
     assert diagnostics_enabled() is False
 
 
-@pytest.mark.asyncio
-async def test_self_capture_source_requests_two_channel_capture_from_metadata(
+def test_self_capture_source_adapter_requests_two_channel_capture_from_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12155,14 +12130,11 @@ async def test_self_capture_source_requests_two_channel_capture_from_metadata(
         source_calls.append(dict(kwargs))
         return FakeSource()
 
-    async def fake_run_self_capture_loop(self) -> None:
-        _ = self
-        return None
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", lambda **kwargs: 7)
+    monkeypatch.setattr(
+        audio_source_module,
+        "resolve_sounddevice_input_device",
+        lambda **kwargs: 7,
+    )
     monkeypatch.setattr(
         controller_module,
         "determine_self_mic_capture_channels",
@@ -12173,10 +12145,8 @@ async def test_self_capture_source_requests_two_channel_capture_from_metadata(
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    _create_self_capture_source_for_test(controller)
-    await asyncio.sleep(0)
+    _create_self_capture_source_via_adapter_for_test(controller)
 
     detailed_logs = [message for _level, message in controller._runtime_logging.detailed_messages]
     basic_logs = [message for _level, message in controller._runtime_logging.basic_messages]
@@ -12194,8 +12164,7 @@ async def test_self_capture_source_requests_two_channel_capture_from_metadata(
     assert any("metadata_device_name='마이크'" in item for item in detailed_logs)
 
 
-@pytest.mark.asyncio
-async def test_self_capture_source_retries_same_device_with_mono_after_two_channel_failure(
+def test_self_capture_source_adapter_retries_same_device_with_mono_after_two_channel_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12226,14 +12195,7 @@ async def test_self_capture_source_retries_same_device_with_mono_after_two_chann
             raise RuntimeError("2ch rejected")
         return FakeSource()
 
-    async def fake_run_self_capture_loop(self) -> None:
-        _ = self
-        return None
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", fake_resolve)
+    monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
         controller_module,
         "determine_self_mic_capture_channels",
@@ -12243,10 +12205,8 @@ async def test_self_capture_source_retries_same_device_with_mono_after_two_chann
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    _create_self_capture_source_for_test(controller)
-    await asyncio.sleep(0)
+    _create_self_capture_source_via_adapter_for_test(controller)
 
     detailed_logs = [message for _level, message in controller._runtime_logging.detailed_messages]
     basic_logs = [message for _level, message in controller._runtime_logging.basic_messages]
@@ -12262,8 +12222,7 @@ async def test_self_capture_source_retries_same_device_with_mono_after_two_chann
     assert any("opened_channels=1" in item for item in detailed_logs)
 
 
-@pytest.mark.asyncio
-async def test_self_capture_source_recomputes_capture_channels_for_name_fallback(
+def test_self_capture_source_adapter_recomputes_channels_for_name_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12301,32 +12260,22 @@ async def test_self_capture_source_recomputes_capture_channels_for_name_fallback
             raise RuntimeError("primary failed")
         return FakeSource()
 
-    async def fake_run_self_capture_loop(self) -> None:
-        _ = self
-        return None
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", fake_resolve)
+    monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
         controller_module,
         "determine_self_mic_capture_channels",
         fake_decision,
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    _create_self_capture_source_for_test(controller)
-    await asyncio.sleep(0)
+    _create_self_capture_source_via_adapter_for_test(controller)
 
     assert [(call["device"], call["channels"]) for call in source_calls] == [(7, 1), (8, 2)]
     assert source_calls[1].get("wasapi_auto_convert") is False
     assert source_calls[1].get("wasapi_exclusive") is False
 
 
-@pytest.mark.asyncio
-async def test_self_capture_source_uses_default_metadata_for_system_default_fallback(
+def test_self_capture_source_adapter_uses_default_metadata_for_system_default_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12364,32 +12313,26 @@ async def test_self_capture_source_uses_default_metadata_for_system_default_fall
             )
         return _self_mic_decision(device_idx=device_idx, preferred_channels=1)
 
-    async def fake_run_self_capture_loop(self) -> None:
-        _ = self
-        return None
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", lambda **kwargs: 7)
+    monkeypatch.setattr(
+        audio_source_module,
+        "resolve_sounddevice_input_device",
+        lambda **kwargs: 7,
+    )
     monkeypatch.setattr(
         controller_module,
         "determine_self_mic_capture_channels",
         fake_decision,
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    _create_self_capture_source_for_test(controller)
-    await asyncio.sleep(0)
+    _create_self_capture_source_via_adapter_for_test(controller)
 
     assert [(call["device"], call["channels"]) for call in source_calls] == [(7, 1), (None, 2)]
     assert source_calls[1].get("wasapi_auto_convert") is False
     assert source_calls[1].get("wasapi_exclusive") is False
 
 
-@pytest.mark.asyncio
-async def test_self_capture_source_suppresses_capture_format_diagnostics_in_basic_mode(
+def test_self_capture_source_adapter_suppresses_format_diagnostics_in_basic_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12413,14 +12356,11 @@ async def test_self_capture_source_suppresses_capture_format_diagnostics_in_basi
         source_calls.append(dict(kwargs))
         return FakeSource()
 
-    async def fake_run_self_capture_loop(self) -> None:
-        _ = self
-        return None
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", lambda **kwargs: 7)
+    monkeypatch.setattr(
+        audio_source_module,
+        "resolve_sounddevice_input_device",
+        lambda **kwargs: 7,
+    )
     monkeypatch.setattr(
         controller_module,
         "determine_self_mic_capture_channels",
@@ -12431,10 +12371,8 @@ async def test_self_capture_source_suppresses_capture_format_diagnostics_in_basi
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    _create_self_capture_source_for_test(controller)
-    await asyncio.sleep(0)
+    _create_self_capture_source_via_adapter_for_test(controller)
 
     all_messages = [
         message
@@ -12542,8 +12480,7 @@ def test_controller_runtime_logging_uses_injected_main_sinks(
     assert captured["sinks"] is sinks
 
 
-@pytest.mark.asyncio
-async def test_self_capture_source_does_not_apply_wasapi_flags_to_name_fallback(
+def test_self_capture_source_adapter_omits_wasapi_flags_from_name_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12573,14 +12510,7 @@ async def test_self_capture_source_does_not_apply_wasapi_flags_to_name_fallback(
             raise RuntimeError("first open failed")
         return FakeSource()
 
-    async def fake_run_self_capture_loop(self) -> None:
-        _ = self
-        return None
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", fake_resolve)
+    monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
         controller_module,
         "determine_self_mic_capture_channels",
@@ -12590,10 +12520,8 @@ async def test_self_capture_source_does_not_apply_wasapi_flags_to_name_fallback(
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    _create_self_capture_source_for_test(controller)
-    await asyncio.sleep(0)
+    _create_self_capture_source_via_adapter_for_test(controller)
 
     assert resolve_calls == [
         {"host_api": WINDOWS_WASAPI_HOST_API, "device": "Compat Mic"},
@@ -12606,8 +12534,7 @@ async def test_self_capture_source_does_not_apply_wasapi_flags_to_name_fallback(
     assert [call["channels"] for call in source_calls] == [1, 1]
 
 
-@pytest.mark.asyncio
-async def test_self_capture_source_retries_same_device_name_fallback_without_wasapi_flags(
+def test_self_capture_source_adapter_retries_same_device_without_wasapi_flags(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12633,14 +12560,7 @@ async def test_self_capture_source_retries_same_device_name_fallback_without_was
             raise RuntimeError("first open failed")
         return FakeSource()
 
-    async def fake_run_self_capture_loop(self) -> None:
-        _ = self
-        return None
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", fake_resolve)
+    monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
         controller_module,
         "determine_self_mic_capture_channels",
@@ -12650,10 +12570,8 @@ async def test_self_capture_source_retries_same_device_name_fallback_without_was
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    _create_self_capture_source_for_test(controller)
-    await asyncio.sleep(0)
+    _create_self_capture_source_via_adapter_for_test(controller)
 
     assert resolve_calls == [
         {"host_api": WINDOWS_WASAPI_HOST_API, "device": "Compat Mic"},
@@ -12669,8 +12587,7 @@ async def test_self_capture_source_retries_same_device_name_fallback_without_was
     assert [call["channels"] for call in source_calls] == [1, 1]
 
 
-@pytest.mark.asyncio
-async def test_self_capture_source_does_not_apply_wasapi_flags_to_system_default_fallback(
+def test_self_capture_source_adapter_omits_wasapi_flags_from_system_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _make_controller(app=SimpleNamespace())
@@ -12698,14 +12615,7 @@ async def test_self_capture_source_does_not_apply_wasapi_flags_to_system_default
             raise RuntimeError("first open failed")
         return FakeSource()
 
-    async def fake_run_self_capture_loop(self) -> None:
-        _ = self
-        return None
-
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "resolve_sounddevice_input_device", fake_resolve)
+    monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
         controller_module,
         "determine_self_mic_capture_channels",
@@ -12715,10 +12625,8 @@ async def test_self_capture_source_does_not_apply_wasapi_flags_to_system_default
         ),
     )
     monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
-    monkeypatch.setattr(GuiController, "_run_self_capture_audio_loop", fake_run_self_capture_loop)
 
-    _create_self_capture_source_for_test(controller)
-    await asyncio.sleep(0)
+    _create_self_capture_source_via_adapter_for_test(controller)
 
     assert resolve_calls == [{"host_api": WINDOWS_WASAPI_HOST_API, "device": ""}]
     assert source_calls[0].get("wasapi_auto_convert") is True
