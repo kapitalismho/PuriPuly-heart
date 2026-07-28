@@ -9201,15 +9201,6 @@ class GuiController:
             on_discord_callback_received=self._on_discord_managed_auth_callback_received,
         )
 
-    @property
-    def _openrouter_pkce_client(self) -> object | None:
-        owner = self._openrouter_pkce_flow_owner
-        return owner.active_client if owner is not None else None
-
-    @_openrouter_pkce_client.setter
-    def _openrouter_pkce_client(self, client: object | None) -> None:
-        self._get_openrouter_pkce_flow_owner().active_client = client
-
     def _get_openrouter_pkce_flow_owner(self) -> OpenRouterPkceFlowOwner:
         owner = self._openrouter_pkce_flow_owner
         if owner is None:
@@ -9223,12 +9214,6 @@ class GuiController:
         owner = self._openrouter_pkce_flow_owner
         if owner is not None:
             await owner.close()
-
-    async def _close_oauth_runtime_for_release(self, failures: list[Exception]) -> None:
-        try:
-            await self._close_oauth_runtime()
-        except Exception as exc:
-            failures.append(exc)
 
     async def _close_app_oauth_runtime_for_release(self, failures: list[Exception]) -> None:
         close_oauth_runtime = getattr(self.app, "close_oauth_runtime", None)

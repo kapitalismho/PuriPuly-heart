@@ -16728,7 +16728,7 @@ def test_reopen_openrouter_pkce_authorization_url_delegates_to_active_client() -
     controller = _make_controller(
         app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=DummySettingsView())
     )
-    controller._openrouter_pkce_client = SimpleNamespace(
+    controller._get_openrouter_pkce_flow_owner().active_client = SimpleNamespace(
         reopen_authorization_url=lambda: reopen_calls.append("reopen") or True
     )
 
