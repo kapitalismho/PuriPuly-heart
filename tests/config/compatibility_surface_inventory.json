@@ -1023,6 +1023,14 @@
       "rationale": "MicrophoneTestCaptureAdapter implements the internal microphone-test capture port and is reached through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
     {
+      "surface": "puripuly_heart.app.adapters synchronous SecretStore adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.sync_secret_store"
+      ],
+      "rationale": "SyncSecretStoreAdapter implements the internal asynchronous SecretStore port for the canonical synchronous store and is reached through application composition rather than an external public compatibility facade."
+    },
+    {
       "surface": "puripuly_heart.app provider runtime wiring modules",
       "classification": "internal_provider_runtime_wiring",
       "modules": [

@@ -6,6 +6,11 @@ from pathlib import Path
 from puripuly_heart.app import wiring_llm_factory as _llm_factory
 from puripuly_heart.app.adapters.peer_capture_provider import PeerCaptureProviderAdapter
 from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
+from puripuly_heart.app.adapters.sync_secret_store import (
+    SyncSecretStore,
+    SyncSecretStoreAdapter,
+)
+from puripuly_heart.app.ports.secret_store import SecretStorePort
 from puripuly_heart.app.wiring_composition import (
     create_microphone_test_capture_adapter,
     create_provider_verifier,
@@ -186,6 +191,10 @@ def create_local_asr_provisioning_owner(
     )
 
 
+def create_sync_secret_store_adapter(store: SyncSecretStore) -> SecretStorePort:
+    return SyncSecretStoreAdapter(store)
+
+
 __all__ = (
     "SECRETS_PASSPHRASE_ENV",
     "MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR",
@@ -202,6 +211,7 @@ __all__ = (
     "create_peer_stt_backend_from_resolved_config",
     "create_provider_verifier",
     "create_secret_store",
+    "create_sync_secret_store_adapter",
     "copy_stable_secrets_to_vnext_namespace",
     "create_stt_backend",
     "create_stt_backend_from_resolved_config",

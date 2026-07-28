@@ -29,11 +29,6 @@ from puripuly_heart.app.ports.microphone_test import (
 )
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
-from puripuly_heart.app.ports.secret_store import (
-    SecretReadResult,
-    SecretSnapshot,
-    SecretWriteResult,
-)
 from puripuly_heart.app.ports.settings_repository import (
     SettingsCommitRequest,
     SettingsCommitResult,
@@ -177,6 +172,7 @@ from puripuly_heart.app.wiring import (
     create_microphone_test_capture_adapter,
     create_provider_verifier,
     create_secret_store,
+    create_sync_secret_store_adapter,
     resolve_overlay_config,
     resolve_peer_stt_runtime_config_from_vnext,
     resolve_self_stt_runtime_config,
@@ -705,71 +701,6 @@ def _apply_managed_identity_delta(settings: AppSettings, values: Mapping[str, ob
 def _restore_managed_identity(settings: AppSettings, snapshot: object) -> None:
     for field_name, value in asdict(snapshot).items():
         setattr(settings.managed_identity, field_name, copy.deepcopy(value))
-
-
-@dataclass(slots=True)
-class _ControllerSecretStorePortAdapter:
-    """Adapts a sync ``SecretStore`` to the async ``SecretStorePort`` protocol.
-
-    Lets the controller route secret atomicity through ``SecretSettingsTransaction``
-    without a separate async store construction path. The underlying sync store is
-    the same instance produced by ``create_secret_store`` so existing wiring and
-    test doubles continue to observe ``set``/``delete`` calls.
-    """
-
-    store: object
-
-    async def get_secret(self, key: str) -> SecretReadResult:
-        value = await asyncio.to_thread(self.store.get, key)
-        return SecretReadResult(
-            key=key,
-            value=value,
-            revision=None,
-            message=None,
-            diagnostics=None,
-        )
-
-    async def set_secret(self, key: str, value: str) -> SecretWriteResult:
-        await asyncio.to_thread(self.store.set, key, value)
-        return SecretWriteResult(
-            succeeded=True,
-            key=key,
-            revision=None,
-            message=None,
-            diagnostics=None,
-        )
-
-    async def clear_secret(self, key: str) -> SecretWriteResult:
-        await asyncio.to_thread(self.store.delete, key)
-        return SecretWriteResult(
-            succeeded=True,
-            key=key,
-            revision=None,
-            message=None,
-            diagnostics=None,
-        )
-
-    async def snapshot_secret(self, key: str) -> SecretSnapshot:
-        value = await asyncio.to_thread(self.store.get, key)
-        return SecretSnapshot(
-            key=key,
-            value=value,
-            revision=None,
-            existed=value is not None,
-        )
-
-    async def restore_secret(self, snapshot: SecretSnapshot) -> SecretWriteResult:
-        if snapshot.existed and snapshot.value is not None:
-            await asyncio.to_thread(self.store.set, snapshot.key, snapshot.value)
-        else:
-            await asyncio.to_thread(self.store.delete, snapshot.key)
-        return SecretWriteResult(
-            succeeded=True,
-            key=snapshot.key,
-            revision=None,
-            message=None,
-            diagnostics=None,
-        )
 
 
 def _copy_runtime_only_ui_state(source: AppSettings, target: AppSettings) -> None:
@@ -2093,7 +2024,7 @@ class GuiController:
         settings: AppSettings,
     ) -> ManagedAuthClaimGuard:
         secret_store = create_secret_store(settings.secrets, config_path=self.config_path)
-        secret_store_port = _ControllerSecretStorePortAdapter(secret_store)
+        secret_store_port = create_sync_secret_store_adapter(secret_store)
         managed_state = build_managed_identity_state_port(
             settings,
             self._managed_identity_persistence_callback(settings),
@@ -2116,7 +2047,7 @@ class GuiController:
         if broker_client is None:
             return "qq_auth.error.retry", {}
         secret_store = create_secret_store(self.settings.secrets, config_path=self.config_path)
-        secret_store_port = _ControllerSecretStorePortAdapter(secret_store)
+        secret_store_port = create_sync_secret_store_adapter(secret_store)
         managed_state = build_managed_identity_state_port(
             self.settings,
             self._managed_identity_persistence_callback(self.settings),
@@ -2190,7 +2121,7 @@ class GuiController:
                 )
             updated = copy.deepcopy(self.settings)
             secret_store = create_secret_store(updated.secrets, config_path=self.config_path)
-            secret_store_port = _ControllerSecretStorePortAdapter(secret_store)
+            secret_store_port = create_sync_secret_store_adapter(secret_store)
             managed_state = build_managed_identity_state_port(
                 updated,
                 self._managed_identity_persistence_callback(updated),
@@ -8351,7 +8282,7 @@ class GuiController:
             surface="provider_secret_change",
         )
         transaction = SecretSettingsTransaction(
-            secret_store=_ControllerSecretStorePortAdapter(secret_store),
+            secret_store=create_sync_secret_store_adapter(secret_store),
             settings_repository=repository,
         )
         settings_values = _settings_snapshot_values(updated)
@@ -10638,7 +10569,7 @@ class GuiController:
 
         plan = self._build_provider_runtime_apply_plan(updated, force_rebuild_llm=True)
         secret_store = create_secret_store(self.settings.secrets, config_path=self.config_path)
-        secret_store_port = _ControllerSecretStorePortAdapter(secret_store)
+        secret_store_port = create_sync_secret_store_adapter(secret_store)
         settings_repository = _ControllerSettingsPatchRepository(
             controller=self,
             base_settings=self.settings,
