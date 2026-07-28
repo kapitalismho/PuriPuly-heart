@@ -209,6 +209,7 @@ from puripuly_heart.app.wiring import (
     resolve_self_stt_runtime_config,
 )
 from puripuly_heart.app.wiring_composition import (
+    create_manual_typing_owner,
     create_vrchat_osc_presence_probe_owner,
 )
 from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
@@ -6142,7 +6143,7 @@ class GuiController:
                 tasks = getattr(runtime, "translation_tasks", None)
                 return tasks.get(utterance_id) if isinstance(tasks, dict) else None
 
-            owner = ManualTypingOwner(
+            owner = create_manual_typing_owner(
                 output_provider=output_provider,
                 completion_provider=completion_provider,
                 log_detailed=lambda message: self.log_detailed(message),

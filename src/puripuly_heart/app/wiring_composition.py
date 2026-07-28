@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
+from puripuly_heart.app.ports.manual_typing import SelfChatboxTypingPort
 from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestCapturePort,
     MicrophoneTestMeterCallback,
@@ -13,6 +14,7 @@ from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureGpuActivationValidator,
 )
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
+from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
     PeerCaptureTargetResolverPort,
@@ -57,6 +59,25 @@ def create_microphone_test_capture_adapter(
         route_observer=route_observer,
         channel_decision=channel_decision,
         source_factory=source_factory,
+    )
+
+
+def create_manual_typing_owner(
+    *,
+    output_provider: Callable[[], SelfChatboxTypingPort | None],
+    completion_provider: Callable[[object], object | None],
+    log_detailed: Callable[[str], object],
+    log_error: Callable[[str], object],
+    idle_timeout_seconds: float,
+    submit_timeout_seconds: float,
+) -> ManualTypingOwner:
+    return ManualTypingOwner(
+        output_provider=output_provider,
+        completion_provider=completion_provider,
+        log_detailed=log_detailed,
+        log_error=log_error,
+        idle_timeout_seconds=idle_timeout_seconds,
+        submit_timeout_seconds=submit_timeout_seconds,
     )
 
 
