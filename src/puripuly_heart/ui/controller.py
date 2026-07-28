@@ -7793,12 +7793,6 @@ class GuiController:
     def clear_provider_verification(self, provider: str) -> None:
         self.persist_api_key_verification(provider, "", False)
 
-    def _update_canonical_settings_from_compatibility_mutation(
-        self,
-        settings: AppSettings,
-    ) -> AppSettingsVNext:
-        return self._update_canonical_settings_from_legacy_delta(self.settings, settings)
-
     def _remember_canonical_legacy_projection(self, settings: AppSettings) -> None:
         self._canonical_legacy_projection_snapshot = copy.deepcopy(settings)
 

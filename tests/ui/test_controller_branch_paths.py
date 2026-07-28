@@ -4415,7 +4415,7 @@ def test_direct_peer_settings_mutation_refreshes_canonical_runtime_intent() -> N
     pending.desktop_audio.output_device = "Headphones (Loopback)"
     pending.desktop_audio.vad_speech_threshold = 0.72
 
-    controller._update_canonical_settings_from_compatibility_mutation(pending)
+    controller._update_canonical_settings_from_legacy_delta(controller.settings, pending)
     config = controller._build_peer_runtime_config(pending)
 
     assert controller.vnext_settings.intent.languages.peer_source_mode == "auto"
@@ -4454,7 +4454,7 @@ def test_unrelated_legacy_apply_preserves_canonical_peer_auto_intent_after_save_
     pending = copy.deepcopy(legacy)
     pending.ui.locale = "ja"
     controller._begin_canonical_mutation()
-    controller._update_canonical_settings_from_compatibility_mutation(pending)
+    controller._update_canonical_settings_from_legacy_delta(controller.settings, pending)
     controller.settings = pending
     controller.persist_settings()
 
@@ -4494,7 +4494,7 @@ def test_failed_canonical_persistence_rolls_back_peer_auto_intent(
     pending = copy.deepcopy(legacy)
     pending.ui.locale = "ja"
     controller._begin_canonical_mutation()
-    controller._update_canonical_settings_from_compatibility_mutation(pending)
+    controller._update_canonical_settings_from_legacy_delta(controller.settings, pending)
     controller.settings = pending
     monkeypatch.setattr(
         canonical_persistence_adapter_module,
