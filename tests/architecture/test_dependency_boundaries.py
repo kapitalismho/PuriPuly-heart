@@ -1536,6 +1536,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "_MANAGED_OPENROUTER_MODEL_BY_TRANSLATION_MODEL =",
             "def _log_audio_environment_snapshot_async(",
             "def _refresh_owned_referral_id_from_managed_status_best_effort(",
+            "def _request_local_asr_install(",
             "def _sync_local_stt_download_runtime_aliases",
             "def _sync_clipboard_runtime_aliases",
             "def _sync_microphone_test_runtime_aliases",

@@ -5433,17 +5433,6 @@ class GuiController:
                 starting=self._stt_activation_starting or self._self_asr_model_loading,
             )
 
-    def _request_local_asr_install(
-        self,
-        *,
-        origin: str,
-        model_ids: tuple[str, ...] | None = None,
-    ) -> bool:
-        return self._get_local_asr_cpu_repair_owner().request_install(
-            origin=origin,
-            model_ids=model_ids,
-        )
-
     def _request_unavailable_local_asr_repair(
         self,
         status: str,

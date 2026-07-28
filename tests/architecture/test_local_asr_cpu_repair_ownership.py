@@ -46,7 +46,6 @@ def test_cpu_repair_owner_is_constructed_only_by_application_composition() -> No
 
 def test_controller_cpu_repair_commands_are_compatibility_delegates() -> None:
     request = _method_source(CONTROLLER_PATH, "_request_unavailable_local_asr_repair")
-    install = _method_source(CONTROLLER_PATH, "_request_local_asr_install")
     clear = _method_source(
         CONTROLLER_PATH,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -56,8 +55,6 @@ def test_controller_cpu_repair_commands_are_compatibility_delegates() -> None:
     assert ".request_repair(" in request
     assert "LocalASRCpuRepairRequest(" in request
     assert "LocalASRInstallRequest" not in request
-    assert ".request_install(" in install
-    assert "LocalASRInstallRequest" not in install
     assert ".clear_if_provider_switched_away()" in clear
     assert "create_local_asr_cpu_repair_owner(" in getter
     assert "LocalASRCpuRepairOwner(" not in getter
