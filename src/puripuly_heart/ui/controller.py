@@ -208,6 +208,9 @@ from puripuly_heart.app.wiring import (
     resolve_peer_stt_runtime_config_from_vnext,
     resolve_self_stt_runtime_config,
 )
+from puripuly_heart.app.wiring_composition import (
+    create_vrchat_osc_presence_probe_owner,
+)
 from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
 from puripuly_heart.config.llm_profiles import (
     get_openrouter_selection_alias_for_model_and_source,
@@ -5131,7 +5134,7 @@ class GuiController:
     def _get_vrchat_osc_presence_owner(self) -> VrchatOscPresenceProbeOwner:
         owner = self._vrchat_osc_presence_owner
         if owner is None:
-            owner = VrchatOscPresenceProbeOwner(
+            owner = create_vrchat_osc_presence_probe_owner(
                 presence_provider=lambda: self.vrchat_osc_presence,
                 port_provider=self._vrchat_osc_probe_port,
                 publish_notice=self.app.set_dashboard_vrchat_osc_notice,

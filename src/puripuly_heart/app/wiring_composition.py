@@ -12,6 +12,7 @@ from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureAdmissionStateProvider,
     SelfCaptureGpuActivationValidator,
 )
+from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
     PeerCaptureTargetResolverPort,
@@ -25,6 +26,10 @@ from puripuly_heart.core.runtime.self_capture import (
     SelfCaptureAudioLoop,
     SelfCaptureSourceFactory,
     SelfCaptureVadFactory,
+)
+from puripuly_heart.core.runtime.vrchat_osc_presence import (
+    VrchatOscPresenceProbeOwner,
+    VrchatOscProbeDiagnosticsSink,
 )
 from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
 
@@ -52,6 +57,21 @@ def create_microphone_test_capture_adapter(
         route_observer=route_observer,
         channel_decision=channel_decision,
         source_factory=source_factory,
+    )
+
+
+def create_vrchat_osc_presence_probe_owner(
+    *,
+    presence_provider: Callable[[], VrchatOscPresencePort | None],
+    port_provider: Callable[[], int],
+    publish_notice: Callable[[bool], None],
+    diagnostics_sink: VrchatOscProbeDiagnosticsSink | None = None,
+) -> VrchatOscPresenceProbeOwner:
+    return VrchatOscPresenceProbeOwner(
+        presence_provider=presence_provider,
+        port_provider=port_provider,
+        publish_notice=publish_notice,
+        diagnostics_sink=diagnostics_sink,
     )
 
 
