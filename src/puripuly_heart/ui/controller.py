@@ -1699,9 +1699,6 @@ class GuiController:
             settings.stt.gpu_device_id,
         )
 
-    def _build_stt_runtime_signature(self, settings: AppSettings) -> tuple[object, ...]:
-        return self._build_self_stt_runtime_signature(settings)
-
     def _build_peer_stt_runtime_signature(self, settings: AppSettings) -> tuple[object, ...]:
         return self._build_peer_runtime_config(settings).runtime_signature
 

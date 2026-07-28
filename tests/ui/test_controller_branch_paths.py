@@ -4069,9 +4069,9 @@ def test_verified_key_and_runtime_signature_depend_on_region_and_settings() -> N
     settings.qwen.region = QwenRegion.SINGAPORE
     key_singapore = controller._get_alibaba_verified_key()
 
-    baseline = controller._build_stt_runtime_signature(settings)
+    baseline = controller._build_self_stt_runtime_signature(settings)
     settings.audio.input_device = "Microphone 2"
-    changed = controller._build_stt_runtime_signature(settings)
+    changed = controller._build_self_stt_runtime_signature(settings)
 
     assert key_beijing == "alibaba_beijing"
     assert key_singapore == "alibaba_singapore"
@@ -4234,10 +4234,10 @@ def test_stt_runtime_signature_includes_custom_vocabulary_state() -> None:
     settings.stt.custom_terms = {"ko": [" Puripuly ", "VRChat", "Puripuly"], "en": ["Avatar"]}
     settings.stt.custom_vocabulary_enabled = False
 
-    disabled_signature = controller._build_stt_runtime_signature(settings)
+    disabled_signature = controller._build_self_stt_runtime_signature(settings)
 
     settings.stt.custom_vocabulary_enabled = True
-    enabled_signature = controller._build_stt_runtime_signature(settings)
+    enabled_signature = controller._build_self_stt_runtime_signature(settings)
 
     assert disabled_signature != enabled_signature
     assert enabled_signature[-2] is True
@@ -4250,9 +4250,9 @@ def test_stt_runtime_signature_includes_source_language() -> None:
     settings.provider.stt = STTProviderName.DEEPGRAM
     settings.languages.source_language = "ko"
 
-    ko_signature = controller._build_stt_runtime_signature(settings)
+    ko_signature = controller._build_self_stt_runtime_signature(settings)
     settings.languages.source_language = "en"
-    en_signature = controller._build_stt_runtime_signature(settings)
+    en_signature = controller._build_self_stt_runtime_signature(settings)
 
     assert ko_signature != en_signature
     assert ko_signature[0] == "ko"
@@ -4266,9 +4266,9 @@ def test_stt_runtime_signature_differs_between_plain_wasapi_and_compatibility_mo
     compat = copy.deepcopy(plain)
     compat.audio.input_host_api = WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 
-    assert controller._build_stt_runtime_signature(
+    assert controller._build_self_stt_runtime_signature(
         plain
-    ) != controller._build_stt_runtime_signature(compat)
+    ) != controller._build_self_stt_runtime_signature(compat)
 
 
 def test_stt_runtime_signature_ignores_custom_vocabulary_for_qwen_asr() -> None:
@@ -4278,10 +4278,10 @@ def test_stt_runtime_signature_ignores_custom_vocabulary_for_qwen_asr() -> None:
     settings.languages.source_language = "ko"
     settings.stt.custom_terms = {"ko": ["Puripuly", "VRChat"]}
 
-    disabled_signature = controller._build_stt_runtime_signature(settings)
+    disabled_signature = controller._build_self_stt_runtime_signature(settings)
 
     settings.stt.custom_vocabulary_enabled = True
-    enabled_signature = controller._build_stt_runtime_signature(settings)
+    enabled_signature = controller._build_self_stt_runtime_signature(settings)
 
     assert disabled_signature == enabled_signature
     assert enabled_signature[-2] is False
@@ -4296,10 +4296,10 @@ def test_stt_runtime_signature_uses_capped_custom_vocabulary_for_local_qwen() ->
     settings.stt.custom_terms = {"ko": [f"term-{i:02d}" for i in range(20)]}
     settings.stt.custom_vocabulary_enabled = False
 
-    disabled_signature = controller._build_stt_runtime_signature(settings)
+    disabled_signature = controller._build_self_stt_runtime_signature(settings)
 
     settings.stt.custom_vocabulary_enabled = True
-    enabled_signature = controller._build_stt_runtime_signature(settings)
+    enabled_signature = controller._build_self_stt_runtime_signature(settings)
 
     assert disabled_signature != enabled_signature
     assert enabled_signature[-2] is True
@@ -10500,7 +10500,7 @@ async def test_apply_settings_updates_vrc_gate_and_reconfigures_receiver(
     controller.hub.low_latency_mode = settings.stt.low_latency_mode
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-    controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
 
     gate = DummyGate()
     configure_calls: list[bool] = []
@@ -16176,7 +16176,7 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
-    controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
     controller._stt_desired = False
     controller._mic_task = None
     controller._self_capture_owner = FakeOwner()
@@ -16220,7 +16220,7 @@ async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabular
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
-    controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
     controller._stt_desired = True
 
     settings.stt.custom_vocabulary_enabled = True
@@ -16296,7 +16296,7 @@ async def test_apply_settings_does_not_restart_stt_for_qwen_custom_vocabulary_ch
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
-    controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
     controller._stt_desired = True
     controller._mic_task = object()
 
@@ -16345,7 +16345,7 @@ async def test_apply_settings_restarts_stt_for_local_qwen_custom_vocabulary_chan
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
-    controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
     controller._stt_desired = True
     controller._mic_task = object()
 
@@ -16397,7 +16397,7 @@ async def test_apply_settings_skips_vrc_sync_when_setting_is_unchanged(
         hangover_s=1.1,
         peer_stt=None,
     )
-    controller._last_stt_runtime_signature = controller._build_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
     controller._last_vrc_mic_sync_enabled = settings.osc.vrc_mic_intercept
 
     settings.stt.custom_vocabulary_enabled = True
