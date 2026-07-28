@@ -17568,6 +17568,59 @@ async def test_order22_save_failure_does_not_leak_rejected_canonical_state(
 
 
 @pytest.mark.asyncio
+async def test_order22_live_settings_view_alias_save_failure_restores_legacy_and_canonical_baseline(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    baseline = AppSettings()
+    baseline.provider.stt = STTProviderName.DEEPGRAM
+    baseline.provider.peer_stt = STTProviderName.DEEPGRAM
+    baseline.audio.input_device = "Built-in Mic"
+    controller, path = _controller_with_persisted_settings(tmp_path, baseline)
+    settings_view = DummySettingsView()
+    controller.app = _presentation(
+        SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=settings_view)
+    )
+    controller._runtime_logging = RuntimeLoggingSpy()
+    controller._sync_ui_from_settings()
+
+    assert settings_view.calls[-1][0] is controller.settings
+
+    controller.settings.audio.input_device = "Headset Mic"
+    pending = copy.deepcopy(controller.settings)
+    adapter_type = canonical_persistence_adapter_module.SettingsVNextCanonicalPersistenceAdapter
+    original_persist = adapter_type.persist
+    persist_calls = 0
+    raw_failure_text = "live alias save failed secret-token-must-not-leak"
+
+    def fail_once(self, incoming_path, canonical) -> None:
+        nonlocal persist_calls
+        persist_calls += 1
+        if persist_calls == 1:
+            raise OSError(raw_failure_text)
+        original_persist(self, incoming_path, canonical)
+
+    monkeypatch.setattr(adapter_type, "persist", fail_once)
+
+    await controller.apply_settings(pending)
+
+    result = controller.last_settings_mutation_result
+    assert result is not None
+    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
+    assert controller.settings.audio.input_device == "Built-in Mic"
+    assert controller.vnext_settings is not None
+    assert controller.vnext_settings.intent.audio.input_device == "Built-in Mic"
+    assert raw_failure_text not in repr(result)
+    assert raw_failure_text not in repr(controller._runtime_logging.basic_messages)
+
+    controller.settings.ui.locale = "ja"
+    assert controller._save_settings() is True
+    persisted = adapter_type().load_active(path)
+    assert persisted.canonical_settings.intent.audio.input_device == "Built-in Mic"
+    assert persisted.canonical_settings.intent.ui.locale == "ja"
+
+
+@pytest.mark.asyncio
 async def test_order22_apply_settings_self_stt_provider_specific_change_restarts_runtime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

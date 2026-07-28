@@ -10,7 +10,6 @@ import pytest
 
 pytest.importorskip("flet")
 
-from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.settings import (
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
@@ -36,22 +35,14 @@ from puripuly_heart.config.settings import (
     TranslationSettings,
     to_dict,
 )
-from puripuly_heart.core import messages
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
-from puripuly_heart.core.runtime_logging import (
-    RealtimeLogHandler,
-    SessionRuntimeLoggingService,
-)
-from puripuly_heart.ui import controller as controller_module
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.components import subtab_shell as subtab_shell_module
 from puripuly_heart.ui.components.bottom_nav import BottomNavBar
-from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 from puripuly_heart.ui.i18n import language_name, provider_label, t
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
-from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.theme import COLOR_NEUTRAL_DARK
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import attach_dummy_page
@@ -1581,100 +1572,30 @@ def test_load_from_settings_loads_local_llm_api_key(
     assert view._local_llm_api_key.value == "server-secret"
 
 
-@pytest.mark.asyncio
-async def test_order22_live_settings_view_audio_change_emits_copied_draft_and_routes_controller(
+def test_order22_live_settings_view_audio_change_emits_copied_draft(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=FletUiPresentationAdapter(SimpleNamespace(view_dashboard=None, view_settings=view)),
-        config_path=Path("settings.json"),
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.stt = STTProviderName.DEEPGRAM
-    controller.settings.provider.peer_stt = STTProviderName.DEEPGRAM
-    controller.settings.audio.input_device = "Built-in Mic"
-    controller._sync_ui_from_settings()
+    settings = AppSettings()
+    settings.provider.stt = STTProviderName.DEEPGRAM
+    settings.provider.peer_stt = STTProviderName.DEEPGRAM
+    settings.audio.input_device = "Built-in Mic"
+    view.load_from_settings(settings, config_path=Path("settings.json"))
 
     emitted: list[AppSettings] = []
-    requests: list[settings_mutation.SettingsMutationRequest] = []
-    original_mutate = settings_mutation.SettingsMutationService.mutate
-
-    async def capture_mutate(self, request):
-        requests.append(request)
-        return await original_mutate(self, request)
-
     view.on_settings_changed = emitted.append
     view._audio_settings.microphone = "Headset Mic"
-    monkeypatch.setattr(settings_mutation.SettingsMutationService, "mutate", capture_mutate)
-    monkeypatch.setattr(controller_module.SettingsOwner, "persist", lambda _self: None)
 
     view._on_audio_change()
 
-    assert controller.settings.audio.input_device == "Headset Mic"
+    assert settings.audio.input_device == "Headset Mic"
+    assert view._settings is not None
+    assert view._settings is settings
+    assert view._settings.audio.input_device == "Headset Mic"
     assert len(emitted) == 1
-    assert emitted[0] is not controller.settings
+    assert emitted[0] is not settings
     assert emitted[0] is not view._settings
     assert emitted[0].audio.input_device == "Headset Mic"
-
-    await controller.apply_settings(emitted[0])
-
-    assert len(requests) == 1
-    assert requests[0].reason == settings_mutation.SETTINGS_MUTATION_SURFACE_STT_LANGUAGE_AUDIO
-    assert requests[0].values == {"audio.input_device": "Headset Mic"}
-
-
-@pytest.mark.asyncio
-async def test_order22_live_settings_view_audio_change_save_failure_restores_controller_baseline(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=FletUiPresentationAdapter(SimpleNamespace(view_dashboard=None, view_settings=view)),
-        config_path=Path("settings.json"),
-    )
-    controller._runtime_logging = SessionRuntimeLoggingService(
-        ui_handler_factory=RealtimeLogHandler
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.stt = STTProviderName.DEEPGRAM
-    controller.settings.provider.peer_stt = STTProviderName.DEEPGRAM
-    controller.settings.audio.input_device = "Built-in Mic"
-    controller._sync_ui_from_settings()
-    emitted: list[AppSettings] = []
-    raw_failure_text = "save failed secret-token-must-not-leak"
-
-    def fail_save_settings(_self) -> None:
-        raise RuntimeError(raw_failure_text)
-
-    view.on_settings_changed = emitted.append
-    view._audio_settings.microphone = "Headset Mic"
-    monkeypatch.setattr(controller_module.SettingsOwner, "persist", fail_save_settings)
-
-    view._on_audio_change()
-    assert controller.settings.audio.input_device == "Headset Mic"
-
-    await controller.apply_settings(emitted[-1])
-
-    result = controller.last_settings_mutation_result
-    assert result is not None
-    assert result.status == settings_mutation.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
-    assert result.diagnostics == settings_mutation.ErrorDiagnostics(
-        component="settings_repository",
-        operation="save",
-        code="settings_save_failed",
-        category=messages.DIAGNOSTIC_CATEGORY_TRANSACTION,
-        visibility=settings_mutation.DIAGNOSTIC_VISIBILITY_BASIC,
-        content_policy=settings_mutation.CONTENT_POLICY_METADATA_ONLY,
-        status_code=None,
-        retry_after_ms=None,
-        fields={"surface": "stt_language_audio"},
-    )
-    assert controller.settings.audio.input_device == "Built-in Mic"
-    assert raw_failure_text not in repr(result)
-    assert raw_failure_text not in repr(controller._runtime_logging)
 
 
 def test_load_from_settings_without_local_llm_api_key_shows_empty_field(
@@ -5258,8 +5179,6 @@ def test_desktop_gui_runtime_position_reset_defers_to_callback_without_stale_emi
 def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from puripuly_heart.ui.controller import GuiController
-
     previous_locale = i18n_module.get_locale()
     try:
         i18n_module.set_locale("en")
@@ -5272,17 +5191,9 @@ def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
         view.on_desktop_overlay_recovery_action = recovery_actions.append
         view.on_view_logs = lambda: details_opened.append(True)
 
-        controller = GuiController(
-            page=SimpleNamespace(),
-            app=FletUiPresentationAdapter(SimpleNamespace()),
-            config_path=Path("settings.json"),
-        )
-        controller.on_overlay_start_failed("window_configuration_failed")
-        assert controller.failure_reason == "window_configuration_failed"
-
         view.set_overlay_runtime_state(
             "failed",
-            failure_reason=controller.failure_reason,
+            failure_reason="window_configuration_failed",
             overlay_target="desktop",
             desktop_captions_locked=False,
         )
