@@ -36,6 +36,7 @@ class OverlaySessionFallbackOwner:
     _notice_active: bool = field(init=False, default=False, repr=False)
     _generation: int = field(init=False, default=0, repr=False)
     _task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _accepting_ingress: bool = field(init=False, default=True, repr=False)
 
     @property
     def owner_name(self) -> str:
@@ -49,11 +50,20 @@ class OverlaySessionFallbackOwner:
     def task(self) -> asyncio.Task[None] | None:
         return self._task
 
+    @property
+    def accepting_ingress(self) -> bool:
+        return self._accepting_ingress
+
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
             "owner": self.owner_name,
-            "resource_fields": ("_active", "_generation", "_task"),
-            "stop_ingress": "invalidate and cancel deferred fallback start",
+            "resource_fields": (
+                "_active",
+                "_generation",
+                "_task",
+                "_accepting_ingress",
+            ),
+            "stop_ingress": "reject new work, invalidate and cancel deferred fallback start",
             "shutdown_policy": "cancel and await deferred fallback start",
             "late_callback_rule": "generation and active-state checks reject stale starts",
         }
@@ -70,6 +80,7 @@ class OverlaySessionFallbackOwner:
     ) -> bool:
         return bool(
             reason in {"steamvr_not_running", "steamvr_not_installed"}
+            and self._accepting_ingress
             and not self._active
             and active_target != desktop_target
             and configured_enabled
@@ -77,6 +88,8 @@ class OverlaySessionFallbackOwner:
         )
 
     def activate(self) -> None:
+        if not self._accepting_ingress:
+            return
         self._active = True
 
     def publish(self, active: bool) -> None:
@@ -90,6 +103,8 @@ class OverlaySessionFallbackOwner:
             return
 
     def schedule(self) -> None:
+        if not self._accepting_ingress:
+            return
         self._generation += 1
         generation = self._generation
         task = self._task
@@ -115,10 +130,14 @@ class OverlaySessionFallbackOwner:
 
     def clear(self) -> None:
         self._active = False
-        self.stop_ingress()
+        self._invalidate_pending()
         self.publish(False)
 
     def stop_ingress(self) -> None:
+        self._accepting_ingress = False
+        self._invalidate_pending()
+
+    def _invalidate_pending(self) -> None:
         self._generation += 1
         task = self._task
         if task is not None and not task.done():

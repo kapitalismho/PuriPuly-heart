@@ -149,3 +149,31 @@ async def test_owner_close_cancels_task_and_clears_session_state() -> None:
     assert owner.task is None
     assert owner.active is False
     assert notices == [True, False]
+
+    owner.activate()
+    owner.schedule()
+
+    assert owner.accepting_ingress is False
+    assert owner.active is False
+    assert owner.task is None
+
+
+@pytest.mark.asyncio
+async def test_owner_clear_invalidates_pending_start_without_freezing_ingress() -> None:
+    starts: list[str] = []
+
+    async def start() -> None:
+        starts.append("desktop")
+
+    owner, _, _ = _owner(start_overlay=start)
+    owner.activate()
+    owner.schedule()
+    owner.clear()
+    owner.activate()
+    owner.schedule()
+    task = owner.task
+
+    assert owner.accepting_ingress is True
+    assert task is not None
+    await task
+    assert starts == ["desktop"]

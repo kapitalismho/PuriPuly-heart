@@ -46,6 +46,7 @@ class VrcMicSyncOwner:
         default=None,
         repr=False,
     )
+    _accepting_ingress: bool = field(init=False, default=True, repr=False)
 
     @property
     def runtime(self) -> VrcMicReceiverRuntime | None:
@@ -53,6 +54,8 @@ class VrcMicSyncOwner:
 
     @runtime.setter
     def runtime(self, runtime: VrcMicReceiverRuntime | None) -> None:
+        if runtime is not None and not self._accepting_ingress:
+            return
         self._runtime = runtime
 
     @property
@@ -61,6 +64,8 @@ class VrcMicSyncOwner:
 
     @receiver.setter
     def receiver(self, receiver: object | None) -> None:
+        if receiver is not None and not self._accepting_ingress:
+            return
         self._receiver = receiver
 
     @property
@@ -77,7 +82,30 @@ class VrcMicSyncOwner:
             self._lock = asyncio.Lock()
         return self._lock
 
+    @property
+    def accepting_ingress(self) -> bool:
+        return self._accepting_ingress
+
+    def lifecycle_owner_snapshot(self) -> dict[str, object]:
+        return {
+            "owner": "VrcMicSyncOwner",
+            "resource_fields": (
+                "_runtime",
+                "_receiver",
+                "_lock",
+                "_accepting_ingress",
+            ),
+            "stop_ingress": "reject runtime creation and configuration",
+            "shutdown_policy": "stop ingress, close the runtime and keep the audio gate disabled",
+            "late_callback_rule": "closed owners cannot recreate the receiver runtime",
+        }
+
+    def stop_ingress(self) -> None:
+        self._accepting_ingress = False
+
     def get_runtime(self) -> VrcMicReceiverRuntime | None:
+        if not self._accepting_ingress:
+            return None
         state = self.state_provider()
         if state is None:
             return None
@@ -98,6 +126,8 @@ class VrcMicSyncOwner:
 
     async def configure(self, *, enabled: bool) -> None:
         async with self.lock:
+            if not self._accepting_ingress:
+                return
             self._last_enabled = enabled
             gate = self.gate_provider()
             if gate is not None:
@@ -155,6 +185,7 @@ class VrcMicSyncOwner:
 
     async def close(self) -> None:
         async with self.lock:
+            self.stop_ingress()
             await self._close_locked()
 
     async def _close_locked(self) -> None:

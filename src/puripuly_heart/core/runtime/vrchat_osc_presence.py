@@ -38,6 +38,7 @@ class VrchatOscPresenceProbeOwner:
     _notice_active: bool = field(init=False, default=False, repr=False)
     _task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _generation: int = field(init=False, default=0, repr=False)
+    _accepting_ingress: bool = field(init=False, default=True, repr=False)
 
     @property
     def owner_name(self) -> str:
@@ -55,11 +56,20 @@ class VrchatOscPresenceProbeOwner:
     def generation(self) -> int:
         return self._generation
 
+    @property
+    def accepting_ingress(self) -> bool:
+        return self._accepting_ingress
+
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
             "owner": self.owner_name,
-            "resource_fields": ("_task", "_generation", "_notice_active"),
-            "stop_ingress": "invalidate active probe generation",
+            "resource_fields": (
+                "_task",
+                "_generation",
+                "_notice_active",
+                "_accepting_ingress",
+            ),
+            "stop_ingress": "reject new probes and invalidate the active generation",
             "shutdown_policy": "cancel and await presence probe task",
             "late_callback_rule": "generation check drops stale probe results",
         }
@@ -76,6 +86,8 @@ class VrchatOscPresenceProbeOwner:
 
     def schedule(self, *, force: bool = False) -> None:
         _ = force
+        if not self._accepting_ingress:
+            return
         if self.presence_provider() is None:
             self.publish(False)
             return
@@ -121,6 +133,7 @@ class VrchatOscPresenceProbeOwner:
                 raise
 
     def stop_ingress(self) -> None:
+        self._accepting_ingress = False
         self._generation += 1
 
     async def cancel(self) -> None:

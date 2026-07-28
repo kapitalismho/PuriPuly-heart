@@ -2618,6 +2618,23 @@ async def test_managed_trial_delegate_refresh_is_cancelled_by_managed_status_own
     assert owner.active_task_names == ()
 
 
+def test_application_ingress_freeze_is_terminal_for_late_work_owners() -> None:
+    app = SimpleNamespace(
+        set_dashboard_overlay_session_fallback_notice=lambda _active: None,
+        set_dashboard_vrchat_osc_notice=lambda _active: None,
+    )
+    controller = _make_controller(app=app)
+    overlay_owner = controller._get_overlay_session_fallback_owner()
+    osc_owner = controller._get_vrchat_osc_presence_owner()
+    mic_owner = controller._get_vrc_mic_sync_owner()
+
+    controller._freeze_application_ingress()
+
+    assert overlay_owner.accepting_ingress is False
+    assert osc_owner.accepting_ingress is False
+    assert mic_owner.accepting_ingress is False
+
+
 @pytest.mark.asyncio
 async def test_blocked_provider_verifier_cannot_publish_after_shutdown_freeze(
     monkeypatch: pytest.MonkeyPatch,

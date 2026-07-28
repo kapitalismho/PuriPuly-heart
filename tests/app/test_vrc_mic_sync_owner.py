@@ -150,3 +150,31 @@ async def test_owner_close_preserves_failing_legacy_receiver_for_retry() -> None
     assert owner.last_enabled is False
     assert gate.enabled == [False]
     assert gate.active == [False]
+
+
+@pytest.mark.asyncio
+async def test_owner_rejects_runtime_resurrection_after_close() -> None:
+    gate = RecordingGate()
+    factory_calls = 0
+
+    def receiver_factory(**kwargs: object) -> RecordingReceiver:
+        nonlocal factory_calls
+        factory_calls += 1
+        return RecordingReceiver(**kwargs)
+
+    owner, _, _ = _owner(
+        state=VrcMicState(),
+        gate=gate,
+        receiver_factory=receiver_factory,
+    )
+    await owner.configure(enabled=True)
+
+    await owner.close()
+    await owner.configure(enabled=True)
+
+    assert owner.accepting_ingress is False
+    assert owner.runtime is None
+    assert owner.receiver is None
+    assert factory_calls == 1
+    assert gate.enabled == [True, False]
+    assert gate.active == [True, False]

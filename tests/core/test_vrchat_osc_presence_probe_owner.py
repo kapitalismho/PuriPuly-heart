@@ -125,3 +125,23 @@ async def test_owner_without_presence_port_clears_existing_notice() -> None:
 
     assert owner.task is None
     assert notices == [True, False]
+
+
+@pytest.mark.asyncio
+async def test_owner_rejects_new_probes_after_ingress_stop_and_cancel() -> None:
+    presence = PresencePort([True])
+    owner, notices, _ = _owner(presence)
+
+    owner.stop_ingress()
+    owner.schedule()
+
+    assert owner.accepting_ingress is False
+    assert owner.task is None
+    assert presence.ports == []
+    assert notices == []
+
+    await owner.cancel()
+    owner.schedule()
+
+    assert owner.task is None
+    assert presence.ports == []

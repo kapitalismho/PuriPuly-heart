@@ -4211,6 +4211,9 @@ class GuiController:
         fallback_owner = self._overlay_session_fallback_owner
         if fallback_owner is not None:
             fallback_owner.stop_ingress()
+        vrc_mic_sync_owner = self._vrc_mic_sync_owner
+        if vrc_mic_sync_owner is not None:
+            vrc_mic_sync_owner.stop_ingress()
         logging_owner = self._runtime_logging_owner
         if logging_owner is not None:
             logging_owner.stop_ingress()
