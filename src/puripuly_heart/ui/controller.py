@@ -124,6 +124,9 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
     _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
+from puripuly_heart.app.services.provider_secret_change_serialization import (
+    ProviderSecretChangeSerializationOwner,
+)
 from puripuly_heart.app.services.provider_status_verification import (
     ConfiguredProviderStatusVerificationRequest,
     ConfiguredProviderStatusVerificationResult,
@@ -906,10 +909,12 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _provider_secret_change_lock: asyncio.Lock | None = field(
-        init=False,
-        default=None,
-        repr=False,
+    _provider_secret_change_serialization_owner: ProviderSecretChangeSerializationOwner | None = (
+        field(
+            init=False,
+            default=None,
+            repr=False,
+        )
     )
     _canonical_mutation_rollback_authoritative: bool = field(
         init=False,
@@ -8311,10 +8316,18 @@ class GuiController:
         secret_key: str,
         value: str,
     ) -> bool:
-        if self._provider_secret_change_lock is None:
-            self._provider_secret_change_lock = asyncio.Lock()
-        async with self._provider_secret_change_lock:
-            return await self._persist_provider_secret_change_serialized(secret_key, value)
+        return await self._get_provider_secret_change_serialization_owner().run(
+            lambda: self._persist_provider_secret_change_serialized(secret_key, value)
+        )
+
+    def _get_provider_secret_change_serialization_owner(
+        self,
+    ) -> ProviderSecretChangeSerializationOwner:
+        owner = self._provider_secret_change_serialization_owner
+        if owner is None:
+            owner = ProviderSecretChangeSerializationOwner()
+            self._provider_secret_change_serialization_owner = owner
+        return owner
 
     async def _persist_provider_secret_change_serialized(
         self,
