@@ -4306,7 +4306,7 @@ def test_stt_runtime_signature_uses_capped_custom_vocabulary_for_local_qwen() ->
     assert enabled_signature[-1] == tuple(f"term-{i:02d}" for i in range(12))
 
 
-def test_peer_stt_runtime_custom_vocabulary_signature_is_disabled() -> None:
+def test_peer_runtime_config_disables_self_custom_vocabulary() -> None:
     controller = _make_controller(app=SimpleNamespace())
     settings = AppSettings()
     settings.languages.peer_source_language = "zh-CN"
@@ -4316,7 +4316,10 @@ def test_peer_stt_runtime_custom_vocabulary_signature_is_disabled() -> None:
         "zh-CN": ["airi", "shinano"],
     }
 
-    assert controller._peer_stt_runtime_custom_vocabulary_signature(settings) == (False, ())
+    backend = controller._build_peer_runtime_config(settings).provider_context
+
+    assert backend.custom_vocabulary_enabled is False
+    assert backend.custom_terms == {}
 
 
 def test_self_stt_runtime_signature_ignores_overlay_and_peer_desktop_settings() -> None:

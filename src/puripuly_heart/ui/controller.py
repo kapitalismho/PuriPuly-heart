@@ -1579,12 +1579,6 @@ class GuiController:
             ),
         )
 
-    def _peer_stt_runtime_custom_vocabulary_signature(
-        self, settings: AppSettings
-    ) -> tuple[bool, tuple[str, ...]]:
-        _ = settings
-        return (False, ())
-
     def _build_self_stt_runtime_signature(self, settings: AppSettings) -> tuple[object, ...]:
         custom_vocab_enabled, custom_terms = self._stt_runtime_custom_vocabulary_signature(settings)
         return (
