@@ -2588,19 +2588,18 @@ async def test_blocked_provider_verifier_cannot_publish_after_shutdown_freeze(
         lambda self: BlockedVerifier(),
     )
 
-    task = controller._start_ui_background_task(
-        controller._verify_and_update_status(),
-        name="provider-status-verification",
-    )
+    controller._schedule_provider_status_verification()
+    owner = controller._provider_status_verification_owner
+    assert owner is not None
     await entered.wait()
     controller._freeze_application_ingress()
     release.set()
-    await task
+    await _wait_until(lambda: not owner.active_task_names)
 
     assert dash.translation_needs_key is None
     assert dash.translation_enabled is None
     assert controller.hub.translation_enabled is True
-    await controller._ui_background_scope.close()
+    await owner.close()
 
 
 @pytest.mark.asyncio

@@ -419,3 +419,19 @@ def test_order41_managed_refresh_scheduling_uses_its_named_owner() -> None:
 
     assert "schedule_status_refresh" in methods["_schedule_owned_referral_id_status_refresh"]
     assert "schedule_trial_usage_refresh" in methods["_schedule_managed_trial_usage_refresh"]
+
+
+def test_order42_provider_status_verification_uses_its_named_owner() -> None:
+    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    source = controller_path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    methods = {
+        node.name: ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+
+    assert "def _start_ui_background_task" not in source
+    assert "_schedule_provider_status_verification" in methods["_rebuild_pipeline"]
+    assert "_ui_background_scope" not in methods["_rebuild_pipeline"]
+    assert "ProviderStatusVerificationOwner" in methods["_get_provider_status_verification_owner"]

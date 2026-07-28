@@ -12,7 +12,7 @@ import os
 import secrets
 import sys
 import time
-from collections.abc import Awaitable, Callable, Coroutine, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from enum import Enum
@@ -107,6 +107,9 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _translation_provider_save_failed_transaction_result,
     _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
     _ui_prompt_clipboard_state_save_failed_transaction_result,
+)
+from puripuly_heart.app.services.provider_status_verification import (
+    ProviderStatusVerificationOwner,
 )
 from puripuly_heart.app.services.qq_managed_auth import QqManagedAuthRequest, QqManagedAuthService
 from puripuly_heart.app.services.secret_settings_transaction import (
@@ -1137,7 +1140,6 @@ class GuiController:
         default_factory=lambda: LifecycleScope("gui-controller-background"),
         repr=False,
     )
-    _ui_background_task_sequence: int = field(init=False, default=0, repr=False)
     _vrchat_osc_presence_owner: VrchatOscPresenceProbeOwner | None = field(
         init=False,
         default=None,
@@ -1149,6 +1151,11 @@ class GuiController:
         repr=False,
     )
     _managed_status_refresh_owner: ManagedStatusRefreshOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _provider_status_verification_owner: ProviderStatusVerificationOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -1798,23 +1805,6 @@ class GuiController:
         assert self.hub is not None
         self._ui_event_bridge = bridge
         self._bridge_task = self.hub.output_runtime.start_ui_event_bridge(bridge)
-
-    def _start_ui_background_task(
-        self,
-        coroutine: Coroutine[Any, Any, None],
-        *,
-        name: str,
-    ) -> asyncio.Task[None]:
-        self._ui_background_task_sequence += 1
-        try:
-            return start_lifecycle_task(
-                self._ui_background_scope,
-                coroutine,
-                name=f"{name}-{self._ui_background_task_sequence}",
-            )
-        except RuntimeError:
-            coroutine.close()
-            raise
 
     async def _wait_for_ui_event_bridge_started(self, bridge: object) -> None:
         bridge_task = self._bridge_task
@@ -4506,6 +4496,12 @@ class GuiController:
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="ProviderStatusVerificationOwner",
+                callback_name="close",
+                callback=self._close_provider_status_verification_owner,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
                 owner_name="GuiControllerBackgroundScope",
                 callback_name="close",
                 callback=self._ui_background_scope.close,
@@ -4595,6 +4591,9 @@ class GuiController:
         managed_status_owner = self._managed_status_refresh_owner
         if managed_status_owner is not None:
             managed_status_owner.stop_ingress()
+        provider_status_owner = self._provider_status_verification_owner
+        if provider_status_owner is not None:
+            provider_status_owner.stop_ingress()
 
     def _stop_github_star_prompt_ingress(self) -> None:
         owner = self._github_star_prompt_owner
@@ -4623,6 +4622,11 @@ class GuiController:
 
     async def _close_managed_status_refresh_owner(self) -> None:
         owner = self._managed_status_refresh_owner
+        if owner is not None:
+            await owner.close()
+
+    async def _close_provider_status_verification_owner(self) -> None:
+        owner = self._provider_status_verification_owner
         if owner is not None:
             await owner.close()
 
@@ -8689,6 +8693,25 @@ class GuiController:
             self.provider_verifier = create_provider_verifier()
         return self.provider_verifier
 
+    def _get_provider_status_verification_owner(self) -> ProviderStatusVerificationOwner:
+        owner = self._provider_status_verification_owner
+        if owner is None:
+            owner = ProviderStatusVerificationOwner(
+                diagnostics_sink=lambda event, metadata, exception: self.log_detailed(
+                    "[ProviderVerification] Background status verification failed "
+                    f"event={event} error_type={metadata.get('error_type')}",
+                    level=logging.WARNING,
+                    exception=exception,
+                )
+            )
+            self._provider_status_verification_owner = owner
+        return owner
+
+    def _schedule_provider_status_verification(self) -> None:
+        if self._shutdown_ingress_frozen:
+            return
+        self._get_provider_status_verification_owner().schedule(self._verify_and_update_status)
+
     async def _rebuild_llm_provider(self) -> None:
         """Rebuild only the LLM provider without tearing down the entire pipeline."""
         if self.hub is None or self.settings is None:
@@ -9665,10 +9688,7 @@ class GuiController:
         if restore_stt_enabled:
             await self.set_stt_enabled(True)
 
-        self._start_ui_background_task(
-            self._verify_and_update_status(),
-            name="provider-status-verification",
-        )
+        self._schedule_provider_status_verification()
 
     async def _init_pipeline(self) -> None:
         assert self.settings is not None
