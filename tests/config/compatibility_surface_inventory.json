@@ -1055,6 +1055,14 @@
       "rationale": "PeerCaptureVadAdapter implements the internal Peer capture VAD-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
     {
+      "surface": "puripuly_heart.app.adapters Peer capture audio loop adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture_audio_loop"
+      ],
+      "rationale": "PeerCaptureAudioLoopAdapter implements the internal Peer capture audio-loop contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
       "surface": "puripuly_heart.app.adapters synchronous SecretStore adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [

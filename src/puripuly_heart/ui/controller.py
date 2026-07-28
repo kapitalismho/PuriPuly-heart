@@ -182,6 +182,7 @@ from puripuly_heart.app.wiring import (
     create_llm_provider,
     create_local_asr_provisioning_owner,
     create_microphone_test_capture_adapter,
+    create_peer_capture_audio_loop_adapter,
     create_peer_capture_source_adapter,
     create_peer_capture_target_resolver_adapter,
     create_peer_capture_vad_adapter,
@@ -9135,16 +9136,6 @@ class GuiController:
             extra_fields_provider=extra_fields,
         )
 
-    async def _run_peer_audio_vad_loop(self, **kwargs: object) -> None:
-        from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
-
-        await run_audio_vad_loop(
-            **kwargs,
-            channel_label="peer",
-            is_detailed_enabled=self._detailed_audio_diag_enabled,
-            log_detailed=lambda message: self.log_detailed(message),
-        )
-
     async def _refresh_peer_stt_runtime(self, *, stop_mode: str = "retain") -> None:
         if self.settings is None or self.hub is None or self._peer_runtime is None:
             return
@@ -9378,7 +9369,10 @@ class GuiController:
                 log_detailed=self.log_detailed,
                 diagnostics_enabled=self._detailed_audio_diag_enabled,
             ),
-            run_audio_loop=self._run_peer_audio_vad_loop,
+            run_audio_loop=create_peer_capture_audio_loop_adapter(
+                log_detailed=self.log_detailed,
+                is_detailed_enabled=self._detailed_audio_diag_enabled,
+            ),
             vad_sink=_PeerCaptureVadSink(lambda: self.hub),
             state_changed=self._on_peer_capture_state_changed,
             diagnostic_sink=self._on_peer_runtime_diagnostic,

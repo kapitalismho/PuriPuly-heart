@@ -23,6 +23,9 @@ TARGET_RESOLVER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_target_resolver.py"
 )
 VAD_ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_vad.py"
+AUDIO_LOOP_ADAPTER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_audio_loop.py"
+)
 
 
 def test_peer_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() -> None:
@@ -74,6 +77,7 @@ def test_production_controller_composes_one_peer_owner_through_ports() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
     assert "target_resolver=create_peer_capture_target_resolver_adapter()" in source
     assert "vad_factory=create_peer_capture_vad_adapter(" in source
+    assert "run_audio_loop=create_peer_capture_audio_loop_adapter(" in source
     assert "PeerChannelRuntime" not in source
     assert "PeerRuntimeConfig" not in source
 
@@ -94,9 +98,7 @@ def test_controller_does_not_construct_peer_owner_resources_outside_adapters() -
             "_run_peer_audio_vad_loop",
         }
     }
-    assert resource_methods == {
-        "_run_peer_audio_vad_loop",
-    }
+    assert resource_methods == set()
 
 
 def test_controller_composes_peer_capture_source_adapter_without_source_algorithm() -> None:
@@ -192,3 +194,31 @@ def test_peer_capture_session_owner_remains_vad_and_loop_lifecycle_owner() -> No
     assert "vad_factory: PeerCaptureVadFactory" in source
     assert "vad = self._vad_factory(config)" in source
     assert "self._run_audio_loop" in source
+
+
+def test_controller_composes_peer_audio_loop_adapter_without_loop_method() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    assert "run_audio_loop=create_peer_capture_audio_loop_adapter(" in source
+    assert "_run_peer_audio_vad_loop" not in source
+
+
+def test_peer_audio_loop_adapter_has_no_ui_task_or_session_lifecycle_ownership() -> None:
+    source = AUDIO_LOOP_ADAPTER_PATH.read_text(encoding="utf-8")
+
+    assert "puripuly_heart.ui" not in source
+    assert "GuiController" not in source
+    assert "AppSettings" not in source
+    assert "asyncio.create_task" not in source
+    assert "async def close(" not in source
+    assert 'channel_label="peer"' in source
+
+
+def test_peer_capture_session_owner_remains_loop_task_and_cancellation_owner() -> None:
+    source = OWNER_PATH.read_text(encoding="utf-8")
+
+    assert "run_audio_loop: PeerCaptureAudioLoop" in source
+    assert '"_loop_task"' in source
+    assert "loop_task = self._create_task(" in source
+    assert "await self._cancel_loop(old_loop)" in source
+    assert "await self._run_audio_loop(" in source
