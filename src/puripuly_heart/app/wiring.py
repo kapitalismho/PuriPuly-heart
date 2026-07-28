@@ -23,6 +23,7 @@ from puripuly_heart.app.wiring_composition import (
     create_self_capture_audio_loop_adapter,
     create_self_capture_source_adapter,
     create_self_capture_vad_adapter,
+    create_self_capture_vad_sink_adapter,
 )
 from puripuly_heart.app.wiring_llm_factory import (
     MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
@@ -229,6 +230,7 @@ __all__ = (
     "create_self_capture_audio_loop_adapter",
     "create_self_capture_source_adapter",
     "create_self_capture_vad_adapter",
+    "create_self_capture_vad_sink_adapter",
     "create_sync_secret_store_adapter",
     "copy_stable_secrets_to_vnext_namespace",
     "create_stt_backend",

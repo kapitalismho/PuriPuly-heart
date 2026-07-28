@@ -208,6 +208,17 @@ def create_peer_capture_vad_sink_adapter(
     return PeerCaptureVadSinkAdapter(runtime_provider=runtime_provider)
 
 
+def create_self_capture_vad_sink_adapter(
+    *,
+    runtime_provider: Callable[[], object | None],
+) -> object:
+    from puripuly_heart.app.adapters.self_capture_vad_sink import (
+        SelfCaptureVadSinkAdapter,
+    )
+
+    return SelfCaptureVadSinkAdapter(runtime_provider=runtime_provider)
+
+
 def create_provider_verifier() -> ProviderVerifierPort:
     from puripuly_heart.app.adapters.provider_verifier import ProviderVerifierAdapter
 

@@ -193,6 +193,7 @@ from puripuly_heart.app.wiring import (
     create_self_capture_audio_loop_adapter,
     create_self_capture_source_adapter,
     create_self_capture_vad_adapter,
+    create_self_capture_vad_sink_adapter,
     create_sync_secret_store_adapter,
     resolve_overlay_config,
     resolve_peer_stt_runtime_config_from_vnext,
@@ -637,17 +638,6 @@ class _SelfCaptureAdmissionAdapter:
 
     async def admit(self, config: SelfCaptureSessionConfig) -> SelfCaptureAdmission:
         return await self.callback(config)
-
-
-@dataclass(slots=True)
-class _SelfCaptureVadSink:
-    hub_provider: Callable[[], ClientHub | None]
-
-    async def handle_vad_event(self, event: object) -> None:
-        hub = self.hub_provider()
-        if hub is None:
-            raise RuntimeError("Self VAD sink requires the production hub")
-        await hub.handle_vad_event(event)
 
 
 @dataclass(slots=True)
@@ -9780,7 +9770,7 @@ class GuiController:
                 log_detailed=self.log_detailed,
                 is_detailed_enabled=self._detailed_audio_diag_enabled,
             ),
-            vad_sink=_SelfCaptureVadSink(lambda: self.hub),
+            vad_sink=create_self_capture_vad_sink_adapter(runtime_provider=lambda: self.hub),
             state_changed=self._on_self_capture_state_changed,
             diagnostic_sink=self._on_self_capture_diagnostic,
             audio_gate_reset=(

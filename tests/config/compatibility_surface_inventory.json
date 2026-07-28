@@ -1047,6 +1047,14 @@
       "rationale": "SelfCaptureAudioLoopAdapter implements the internal Self capture audio-loop contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
     {
+      "surface": "puripuly_heart.app.adapters Self capture VAD sink adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.self_capture_vad_sink"
+      ],
+      "rationale": "SelfCaptureVadSinkAdapter implements the internal Self capture VAD-event sink boundary through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
       "surface": "puripuly_heart.app.adapters Peer capture source adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [

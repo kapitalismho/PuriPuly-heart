@@ -15,6 +15,9 @@ ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
 LEGACY_OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_audio.py"
+VAD_SINK_ADAPTER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_vad_sink.py"
+)
 
 
 def test_self_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() -> None:
@@ -74,3 +77,33 @@ def test_controller_has_no_legacy_self_capture_lifecycle() -> None:
             "_drain_self_stt_for_toggle_off",
         }
     )
+
+
+def test_controller_composes_self_vad_sink_adapter_without_channel_wrapper() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    assert "vad_sink=create_self_capture_vad_sink_adapter(" in source
+    assert "_SelfCaptureVadSink" not in source
+
+
+def test_self_vad_sink_adapter_routes_only_self_events_without_lifecycle_ownership() -> None:
+    source = VAD_SINK_ADAPTER_PATH.read_text(encoding="utf-8")
+
+    assert "puripuly_heart.ui" not in source
+    assert "GuiController" not in source
+    assert "ClientHub" not in source
+    assert "handle_peer_vad_event" not in source
+    assert "chatbox" not in source.casefold()
+    assert "output" not in source.casefold()
+    assert "await runtime.handle_vad_event(event)" in source
+    assert "asyncio.create_task" not in source
+    assert "async def close(" not in source
+
+
+def test_self_capture_session_owner_remains_generation_guard_and_sink_caller() -> None:
+    source = OWNER_PATH.read_text(encoding="utf-8")
+
+    assert "class _GenerationGuardedVadSink" in source
+    assert "if not self.owner.is_current_generation" in source
+    assert "await cast(_VadSink, self.sink).handle_vad_event(event)" in source
+    assert "vad_sink: object" in source
