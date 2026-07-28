@@ -236,7 +236,7 @@ def test_record_github_star_prompt_opened_persists_timestamp_count_and_not_click
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
-    assert controller.record_github_star_prompt_opened(opened_at=opened_at) is True
+    assert controller._get_github_star_prompt_owner().record_opened(opened_at=opened_at) is True
 
     assert controller.settings.ui.github_star_prompt_last_shown_at == "2026-05-24T12:34:56Z"
     assert controller.settings.ui.github_star_prompt_show_count == 3
@@ -257,7 +257,7 @@ def test_record_github_star_prompt_clicked_persists_permanent_suppression(
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
     )
 
-    assert controller.record_github_star_prompt_clicked() is True
+    assert controller._get_github_star_prompt_owner().record_clicked() is True
 
     assert controller.settings.ui.github_star_prompt_clicked is True
     assert saved_payloads[-1]["ui"]["github_star_prompt_clicked"] is True

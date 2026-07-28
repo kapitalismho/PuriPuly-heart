@@ -2239,24 +2239,8 @@ class GuiController:
             return bool(self.settings.ui.github_star_prompt_translation_success_observed)
         return False
 
-    def _github_star_prompt_initial_launch_gate_satisfied(self, settings: AppSettings) -> bool:
-        return self._get_github_star_prompt_owner().initial_launch_gate_satisfied(settings)
-
     def should_show_github_star_prompt(self, *, now: datetime | None = None) -> bool:
         return self._get_github_star_prompt_owner().should_show(now=now)
-
-    def _get_github_star_prompt_persistence_lock(self) -> asyncio.Lock:
-        return self._get_github_star_prompt_owner().persistence_lock
-
-    def _github_star_prompt_state_snapshot(self, settings: AppSettings) -> tuple[object, ...]:
-        return self._get_github_star_prompt_owner().state_snapshot(settings)
-
-    def _restore_github_star_prompt_state_snapshot(
-        self,
-        settings: AppSettings,
-        snapshot: tuple[object, ...],
-    ) -> None:
-        self._get_github_star_prompt_owner().restore_state_snapshot(settings, snapshot)
 
     def _log_github_star_prompt_save_failure(
         self,
@@ -2289,17 +2273,6 @@ class GuiController:
         self.last_settings_mutation_result = result
         return _settings_mutation_committed(result)
 
-    async def _persist_github_star_prompt_mutation(
-        self,
-        *,
-        failure_context: str,
-        mutate,
-    ) -> bool:
-        return await self._get_github_star_prompt_owner().persist_mutation(
-            failure_context=failure_context,
-            mutate=mutate,
-        )
-
     async def persist_github_star_prompt_opened(
         self,
         *,
@@ -2314,23 +2287,11 @@ class GuiController:
     async def persist_github_star_prompt_eligible_launch(self) -> bool:
         return await self._get_github_star_prompt_owner().persist_eligible_launch()
 
-    def _run_github_star_prompt_persistence_sync(self, coro) -> bool:  # noqa: ANN001
-        return self._get_github_star_prompt_owner().run_sync(coro)
-
-    def record_github_star_prompt_opened(self, *, opened_at: datetime | None = None) -> bool:
-        return self._get_github_star_prompt_owner().record_opened(opened_at=opened_at)
-
     async def persist_github_star_prompt_clicked(self) -> bool:
         return await self._get_github_star_prompt_owner().persist_clicked()
 
-    def record_github_star_prompt_clicked(self) -> bool:
-        return self._get_github_star_prompt_owner().record_clicked()
-
     async def persist_github_star_prompt_translation_success_observed(self) -> bool:
         return await self._get_github_star_prompt_owner().persist_translation_success_observed()
-
-    def record_github_star_prompt_translation_success_observed(self) -> bool:
-        return self._get_github_star_prompt_owner().record_translation_success_observed()
 
     def _get_github_star_prompt_owner(self) -> GithubStarPromptOwner:
         owner = self._github_star_prompt_owner

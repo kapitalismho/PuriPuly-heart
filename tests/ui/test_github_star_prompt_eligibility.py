@@ -190,7 +190,7 @@ def test_user_owned_cloud_translation_success_observation_persists_through_setti
 
     _patch_settings_save(monkeypatch, fake_save_settings)
 
-    assert controller.record_github_star_prompt_translation_success_observed() is True
+    assert controller._get_github_star_prompt_owner().record_translation_success_observed() is True
 
     assert settings.ui.github_star_prompt_translation_success_observed is True
     assert saved_payloads
@@ -210,7 +210,7 @@ def test_translation_success_observation_restores_state_when_persistence_fails(
 
     _patch_settings_save(monkeypatch, fail_save_settings)
 
-    assert controller.record_github_star_prompt_translation_success_observed() is False
+    assert controller._get_github_star_prompt_owner().record_translation_success_observed() is False
     assert settings.ui.github_star_prompt_translation_success_observed is False
 
     def capture_save_settings(_path: Path, updated: AppSettings) -> None:
@@ -218,7 +218,7 @@ def test_translation_success_observation_restores_state_when_persistence_fails(
 
     _patch_settings_save(monkeypatch, capture_save_settings)
 
-    assert controller.record_github_star_prompt_translation_success_observed() is True
+    assert controller._get_github_star_prompt_owner().record_translation_success_observed() is True
     assert settings.ui.github_star_prompt_translation_success_observed is True
     assert saved_payloads
 
@@ -286,7 +286,7 @@ def test_translation_success_observation_ignores_non_user_owned_cloud_connection
         lambda _path, _updated: save_calls.append("save"),
     )
 
-    assert controller.record_github_star_prompt_translation_success_observed() is False
+    assert controller._get_github_star_prompt_owner().record_translation_success_observed() is False
 
     assert settings.ui.github_star_prompt_translation_success_observed is False
     assert save_calls == []
