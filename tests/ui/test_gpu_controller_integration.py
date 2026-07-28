@@ -368,7 +368,7 @@ async def test_gpu_discovery_keeps_startup_progress_off_dashboard() -> None:
     task = asyncio.create_task(controller.ensure_gpu_device_discovery(origin="startup"))
     await asyncio.sleep(0)
     await asyncio.sleep(0)
-    controller._on_local_asr_provider_runtime_diagnostic(
+    controller._get_local_asr_diagnostics_owner().provider_runtime_diagnostic(
         ProviderRuntimeDiagnostic(event="discovery_pending")
     )
     assert controller._gpu_ui_state == "discovery_pending"
@@ -385,7 +385,7 @@ async def test_gpu_worker_failure_keeps_recovery_membership_out_of_controller_st
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
     controller._stt_desired = True
 
-    controller._on_local_asr_provider_runtime_diagnostic(
+    controller._get_local_asr_diagnostics_owner().provider_runtime_diagnostic(
         ProviderRuntimeDiagnostic(
             event="worker_failed",
             outcome="failed",

@@ -25,6 +25,13 @@ from puripuly_heart.app.services.local_asr_cpu_repair import (
     LocalASRCpuSelfResume,
     LocalASRCpuStatusForProvider,
 )
+from puripuly_heart.app.services.local_asr_diagnostics import (
+    LocalASRBasicLogSink,
+    LocalASRDetailedLogSink,
+    LocalASRDiagnosticsGpuEffectSink,
+    LocalASRDiagnosticsOwner,
+    LocalASRGpuDiscoveryOriginProvider,
+)
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
     LocalASRGpuActivationRetry,
     LocalASRGpuProvisioningDiagnosticSink,
@@ -114,6 +121,23 @@ def create_local_asr_gpu_provisioning_owner(
         effect_sink=effect_sink,
         retry_activation=retry_activation,
         diagnostic_sink=diagnostic_sink,
+    )
+
+
+def create_local_asr_diagnostics_owner(
+    *,
+    basic_log_sink: LocalASRBasicLogSink,
+    detailed_log_sink: LocalASRDetailedLogSink,
+    gpu_effect_sink: LocalASRDiagnosticsGpuEffectSink,
+    gpu_discovery_origin_provider: LocalASRGpuDiscoveryOriginProvider,
+    gpu_provider_id: str,
+) -> LocalASRDiagnosticsOwner:
+    return LocalASRDiagnosticsOwner(
+        basic_log_sink=basic_log_sink,
+        detailed_log_sink=detailed_log_sink,
+        gpu_effect_sink=gpu_effect_sink,
+        gpu_discovery_origin_provider=gpu_discovery_origin_provider,
+        gpu_provider_id=gpu_provider_id,
     )
 
 

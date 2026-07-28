@@ -78,6 +78,10 @@ from puripuly_heart.app.services.local_asr_cpu_repair import (
     LocalASRCpuRepairRequest,
     LocalASRCpuRepairRuntimeState,
 )
+from puripuly_heart.app.services.local_asr_diagnostics import (
+    LocalASRDiagnosticsGpuEffect,
+    LocalASRDiagnosticsOwner,
+)
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningDiagnostic,
     LocalASRGpuProvisioningEffect,
@@ -223,6 +227,7 @@ from puripuly_heart.app.wiring import (
 )
 from puripuly_heart.app.wiring_composition import (
     create_local_asr_cpu_repair_owner,
+    create_local_asr_diagnostics_owner,
     create_local_asr_gpu_provisioning_owner,
     create_manual_typing_owner,
     create_vrchat_osc_presence_probe_owner,
@@ -296,7 +301,6 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeSnapshot,
     ProviderRuntimeBuildRequest,
     ProviderRuntimeChannel,
-    ProviderRuntimeDiagnostic,
     ProviderRuntimeTerminalFailureSink,
 )
 from puripuly_heart.core.local_asr_provisioning import (
@@ -836,6 +840,11 @@ class GuiController:
         repr=False,
     )
     _local_asr_gpu_provisioning_owner: LocalASRGpuProvisioningOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _local_asr_diagnostics_owner: LocalASRDiagnosticsOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -1460,6 +1469,32 @@ class GuiController:
                 diagnostic_sink=self._on_local_asr_gpu_provisioning_diagnostic,
             )
             self._local_asr_gpu_provisioning_owner = owner
+        return owner
+
+    def _apply_local_asr_diagnostics_gpu_effect(
+        self,
+        effect: LocalASRDiagnosticsGpuEffect,
+    ) -> None:
+        self._set_gpu_ui_state(
+            effect.state,
+            publish_notice=effect.publish_notice,
+            origin=effect.origin,
+        )
+
+    def _get_local_asr_diagnostics_owner(self) -> LocalASRDiagnosticsOwner:
+        owner = self._local_asr_diagnostics_owner
+        if owner is None:
+            owner = create_local_asr_diagnostics_owner(
+                basic_log_sink=lambda message, level: self.log_basic(
+                    message,
+                    level=level,
+                ),
+                detailed_log_sink=self.log_detailed,
+                gpu_effect_sink=self._apply_local_asr_diagnostics_gpu_effect,
+                gpu_discovery_origin_provider=lambda: self._gpu_discovery_origin,
+                gpu_provider_id=STTProviderName.LOCAL_QWEN_GPU.value,
+            )
+            self._local_asr_diagnostics_owner = owner
         return owner
 
     async def install_selected_gpu_model_if_needed(self) -> bool:
@@ -5715,7 +5750,7 @@ class GuiController:
                 return False
             loaded_model_id = channel_snapshot.model_id or decision.model_id
             if not was_loaded:
-                self._log_local_asr_load_result(
+                self._get_local_asr_diagnostics_owner().log_load_result(
                     channel="self",
                     model_id=str(loaded_model_id or "unknown"),
                     backend="CPU",
@@ -5751,7 +5786,7 @@ class GuiController:
                 activation_generation=activation_generation,
             )
         except LocalSTTModelMissingError as exc:
-            self._log_local_asr_load_result(
+            self._get_local_asr_diagnostics_owner().log_load_result(
                 channel="self",
                 model_id=str(decision.model_id or "unknown"),
                 backend="CPU",
@@ -5770,7 +5805,7 @@ class GuiController:
             LocalQwenSherpaLoadError,
             LocalParakeetSherpaLoadError,
         ) as exc:
-            self._log_local_asr_load_result(
+            self._get_local_asr_diagnostics_owner().log_load_result(
                 channel="self",
                 model_id=str(decision.model_id or "unknown"),
                 backend="CPU",
@@ -5942,7 +5977,7 @@ class GuiController:
             return True
 
         coordinator = self._self_local_asr_transition
-        coordinator.diagnostic_sink = self._local_asr_transition_diagnostic
+        coordinator.diagnostic_sink = self._get_local_asr_diagnostics_owner().transition_diagnostic
         target_settings = copy.deepcopy(self.settings)
         self._self_asr_model_loading = True
         self._sync_local_stt_notice()
@@ -8457,7 +8492,7 @@ class GuiController:
             provisioning=self.local_asr_provisioning,
             clock=self.clock,
             state_changed=self._on_local_asr_provider_runtime_state_changed,
-            diagnostic_sink=self._on_local_asr_provider_runtime_diagnostic,
+            diagnostic_sink=self._get_local_asr_diagnostics_owner().provider_runtime_diagnostic,
         )
 
     def _on_local_asr_provider_runtime_state_changed(
@@ -8475,107 +8510,6 @@ class GuiController:
             if snapshot.gpu.phase == "unsupported"
             else "discovery_failed" if snapshot.gpu.phase == "failed" else None
         )
-
-    def _on_local_asr_provider_runtime_diagnostic(
-        self,
-        diagnostic: ProviderRuntimeDiagnostic,
-    ) -> None:
-        fields = [f"event={diagnostic.event}"]
-        for name in (
-            "channel",
-            "provider_id",
-            "model_id",
-            "device_id",
-            "phase",
-            "outcome",
-            "failure_code",
-            "failure_type",
-        ):
-            value = getattr(diagnostic, name)
-            if value is not None:
-                fields.append(f"{name}={value}")
-        self.log_detailed(f"[LocalASR][ProviderRuntime] {' '.join(fields)}")
-        if diagnostic.event == "activation_ready":
-            self._log_local_asr_load_result(
-                channel=diagnostic.channel or "unknown",
-                model_id=diagnostic.model_id or "unknown",
-                backend="Vulkan",
-                device=diagnostic.device_id or "unknown",
-                outcome="ready",
-                load_seconds=diagnostic.model_load_seconds or 0.0,
-                warmup_seconds=diagnostic.warmup_seconds or 0.0,
-            )
-        elif diagnostic.event == "activation_failed":
-            self._log_local_asr_load_result(
-                channel=diagnostic.channel or "unknown",
-                model_id=diagnostic.model_id or "unknown",
-                backend="Vulkan",
-                outcome="failed",
-                load_seconds=diagnostic.model_load_seconds or 0.0,
-                failure_code=diagnostic.failure_code or "activation_failed",
-            )
-        elif diagnostic.event == "worker_failed":
-            exit_code = (
-                f" exit_code={diagnostic.worker_exit_code}"
-                if diagnostic.worker_exit_code is not None
-                else ""
-            )
-            self.log_basic(
-                "[LocalASR][Worker] backend=Vulkan outcome=failed "
-                f"failure_code={diagnostic.failure_code or 'worker_failed'}{exit_code}",
-                level=logging.ERROR,
-            )
-        elif diagnostic.event == "worker_recovery_started":
-            self.log_basic(
-                "[LocalASR][Worker] backend=Vulkan outcome=restarting "
-                f"failure_code={diagnostic.failure_code or 'decode_failure'} "
-                "utterance_retry=false",
-                level=logging.WARNING,
-            )
-        elif diagnostic.event == "worker_recovery_ready":
-            self.log_basic(
-                "[LocalASR][Worker] backend=Vulkan outcome=recovered utterance_retry=false"
-            )
-        elif diagnostic.event == "decode_attempt" and all(
-            value is not None
-            for value in (
-                diagnostic.audio_seconds,
-                diagnostic.decode_seconds,
-                diagnostic.rtf,
-                diagnostic.queue_wait_seconds,
-            )
-        ):
-            self.log_basic(
-                "[LocalASR][Attempt] "
-                f"channel={diagnostic.channel or 'unknown'} "
-                f"model={diagnostic.model_id or 'unknown'} "
-                "backend=Vulkan "
-                f"audio_seconds={diagnostic.audio_seconds:.3f} "
-                f"decode_seconds={diagnostic.decode_seconds:.3f} "
-                f"rtf={diagnostic.rtf:.6f} "
-                f"result={diagnostic.outcome or 'unknown'} "
-                f"queue_wait_seconds={diagnostic.queue_wait_seconds:.3f}"
-            )
-        if diagnostic.event == "worker_lifecycle" and diagnostic.phase in {
-            "validating",
-            "loading",
-            "warming",
-            "ready",
-        }:
-            self._set_gpu_ui_state(diagnostic.phase, origin="worker_lifecycle")
-        elif diagnostic.event == "activation_ready":
-            self._set_gpu_ui_state("ready", origin="activation")
-        elif diagnostic.event == "discovery_pending":
-            self._set_gpu_ui_state(
-                "discovery_pending",
-                origin=self._gpu_discovery_origin,
-            )
-        elif diagnostic.event in {"activation_failed", "worker_failed"}:
-            self._set_gpu_ui_state(
-                "activation_failed",
-                publish_notice=True,
-                origin="worker",
-            )
 
     async def _rebuild_stt_provider(self) -> None:
         """Rebuild only the STT provider so later enable uses current settings."""
@@ -8641,58 +8575,6 @@ class GuiController:
                 source_language=settings.languages.source_language,
             ),
             trigger=trigger,
-        )
-
-    def _local_asr_transition_diagnostic(self, fields: dict[str, object]) -> None:
-        ordered = " ".join(f"{key}={value}" for key, value in fields.items())
-        self.log_detailed(f"[LocalASR][Transition] {ordered}")
-        actual_provider = str(fields.get("actual_provider") or "")
-        if actual_provider == STTProviderName.LOCAL_QWEN_GPU.value:
-            return
-        outcome = str(fields.get("outcome") or "")
-        if outcome not in {"applied", "failed"}:
-            return
-        self._log_local_asr_load_result(
-            channel=str(fields.get("channel") or "unknown"),
-            model_id=str(fields.get("model_id") or "unknown"),
-            backend="CPU",
-            outcome="ready" if outcome == "applied" else "failed",
-            load_seconds=max(0.0, float(fields.get("load_ms") or 0) / 1000.0),
-            failure_type=(
-                str(fields["failure_type"]) if fields.get("failure_type") is not None else None
-            ),
-        )
-
-    def _log_local_asr_load_result(
-        self,
-        *,
-        channel: str,
-        model_id: str,
-        backend: str,
-        outcome: str,
-        load_seconds: float,
-        failure_type: str | None = None,
-        device: str | None = None,
-        warmup_seconds: float | None = None,
-        failure_code: str | None = None,
-    ) -> None:
-        fields = [
-            f"channel={channel}",
-            f"model={model_id}",
-            f"backend={backend}",
-        ]
-        if device is not None:
-            fields.append(f"device={device}")
-        fields.extend((f"outcome={outcome}", f"load_seconds={max(0.0, load_seconds):.3f}"))
-        if warmup_seconds is not None:
-            fields.append(f"warmup_seconds={max(0.0, warmup_seconds):.3f}")
-        if failure_type is not None:
-            fields.append(f"failure_type={failure_type}")
-        if failure_code is not None:
-            fields.append(f"failure_code={failure_code}")
-        self.log_basic(
-            f"[LocalASR][Load] {' '.join(fields)}",
-            level=logging.ERROR if outcome == "failed" else logging.INFO,
         )
 
     def _on_peer_runtime_diagnostic(self, diagnostic: PeerCaptureDiagnostic) -> None:
@@ -9329,7 +9211,9 @@ class GuiController:
             vad_sink=create_peer_capture_vad_sink_adapter(runtime_provider=lambda: self.hub),
             state_changed=self._on_peer_capture_state_changed,
             diagnostic_sink=self._on_peer_runtime_diagnostic,
-            local_asr_diagnostic_sink=self._local_asr_transition_diagnostic,
+            local_asr_diagnostic_sink=(
+                self._get_local_asr_diagnostics_owner().transition_diagnostic
+            ),
         )
         self._last_peer_translation_enabled = self.settings.ui.peer_translation_enabled
         await self._configure_vrc_mic_receiver(enabled=self.settings.osc.vrc_mic_intercept)

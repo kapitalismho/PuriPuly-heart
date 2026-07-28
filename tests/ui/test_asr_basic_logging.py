@@ -1,51 +1,44 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from types import SimpleNamespace
 
-import pytest
-
+from puripuly_heart.app.services.local_asr_diagnostics import (
+    LocalASRDiagnosticsGpuEffect,
+    LocalASRDiagnosticsOwner,
+)
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
-from puripuly_heart.ui.controller import GuiController
 
 
-def _controller_with_logs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> tuple[GuiController, list[tuple[str, int]], list[str]]:
+def _owner_with_logs() -> tuple[
+    LocalASRDiagnosticsOwner,
+    list[tuple[str, int]],
+    list[str],
+    list[LocalASRDiagnosticsGpuEffect],
+]:
     basic: list[tuple[str, int]] = []
     detailed: list[str] = []
-    monkeypatch.setattr(
-        GuiController,
-        "log_basic",
-        lambda _self, message, *, level=logging.INFO: basic.append((message, level)),
+    effects: list[LocalASRDiagnosticsGpuEffect] = []
+    owner = LocalASRDiagnosticsOwner(
+        basic_log_sink=lambda message, level: basic.append((message, level)),
+        detailed_log_sink=lambda message: detailed.append(message),
+        gpu_effect_sink=effects.append,
+        gpu_discovery_origin_provider=lambda: "settings",
+        gpu_provider_id="local_qwen_gpu",
     )
-    monkeypatch.setattr(
-        GuiController,
-        "log_detailed",
-        lambda _self, message, **_kwargs: detailed.append(message) or True,
-    )
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=SimpleNamespace(),
-        config_path=Path("settings.json"),
-    )
-    return controller, basic, detailed
+    return owner, basic, detailed, effects
 
 
-def test_local_asr_load_result_is_basic_and_bounded(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller, basic, _detailed = _controller_with_logs(monkeypatch)
+def test_local_asr_load_result_is_basic_and_bounded() -> None:
+    owner, basic, _detailed, _effects = _owner_with_logs()
 
-    controller._log_local_asr_load_result(
+    owner.log_load_result(
         channel="self",
         model_id="parakeet-v3",
         backend="CPU",
         outcome="ready",
         load_seconds=2.4184,
     )
-    controller._log_local_asr_load_result(
+    owner.log_load_result(
         channel="peer",
         model_id="qwen",
         backend="CPU",
@@ -68,12 +61,10 @@ def test_local_asr_load_result_is_basic_and_bounded(
     ]
 
 
-def test_cpu_transition_promotes_only_terminal_load_results_to_basic(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller, basic, detailed = _controller_with_logs(monkeypatch)
+def test_cpu_transition_promotes_only_terminal_load_results_to_basic() -> None:
+    owner, basic, detailed, _effects = _owner_with_logs()
 
-    controller._local_asr_transition_diagnostic(
+    owner.transition_diagnostic(
         {
             "channel": "peer",
             "actual_provider": "local_parakeet_v3",
@@ -82,7 +73,7 @@ def test_cpu_transition_promotes_only_terminal_load_results_to_basic(
             "outcome": "applied",
         }
     )
-    controller._local_asr_transition_diagnostic(
+    owner.transition_diagnostic(
         {
             "channel": "self",
             "actual_provider": "local_qwen",
@@ -92,7 +83,7 @@ def test_cpu_transition_promotes_only_terminal_load_results_to_basic(
             "failure_type": "LocalQwenSherpaLoadError",
         }
     )
-    controller._local_asr_transition_diagnostic(
+    owner.transition_diagnostic(
         {
             "channel": "self",
             "actual_provider": "local_qwen",
@@ -117,13 +108,10 @@ def test_cpu_transition_promotes_only_terminal_load_results_to_basic(
     ]
 
 
-def test_gpu_ready_and_worker_failure_are_basic_terminal_logs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller, basic, detailed = _controller_with_logs(monkeypatch)
-    monkeypatch.setattr(GuiController, "_set_gpu_ui_state", lambda *_args, **_kwargs: None)
+def test_gpu_ready_and_worker_failure_are_basic_terminal_logs() -> None:
+    owner, basic, detailed, effects = _owner_with_logs()
 
-    controller._on_local_asr_provider_runtime_diagnostic(
+    owner.provider_runtime_diagnostic(
         ProviderRuntimeDiagnostic(
             event="activation_ready",
             channel="self",
@@ -134,7 +122,7 @@ def test_gpu_ready_and_worker_failure_are_basic_terminal_logs(
             warmup_seconds=0.382,
         )
     )
-    controller._on_local_asr_provider_runtime_diagnostic(
+    owner.provider_runtime_diagnostic(
         ProviderRuntimeDiagnostic(
             event="worker_failed",
             outcome="failed",
@@ -156,14 +144,20 @@ def test_gpu_ready_and_worker_failure_are_basic_terminal_logs(
             logging.ERROR,
         ),
     ]
+    assert effects == [
+        LocalASRDiagnosticsGpuEffect(state="ready", origin="activation"),
+        LocalASRDiagnosticsGpuEffect(
+            state="activation_failed",
+            origin="worker",
+            publish_notice=True,
+        ),
+    ]
 
 
-def test_gpu_decode_attempt_logs_rtf_in_basic_mode(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller, basic, detailed = _controller_with_logs(monkeypatch)
+def test_gpu_decode_attempt_logs_rtf_in_basic_mode() -> None:
+    owner, basic, detailed, _effects = _owner_with_logs()
 
-    controller._on_local_asr_provider_runtime_diagnostic(
+    owner.provider_runtime_diagnostic(
         ProviderRuntimeDiagnostic(
             event="decode_attempt",
             channel="self",
@@ -187,20 +181,16 @@ def test_gpu_decode_attempt_logs_rtf_in_basic_mode(
     ]
 
 
-def test_gpu_worker_recovery_logs_restart_without_utterance_retry(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller, basic, detailed = _controller_with_logs(monkeypatch)
+def test_gpu_worker_recovery_logs_restart_without_utterance_retry() -> None:
+    owner, basic, detailed, _effects = _owner_with_logs()
 
-    controller._on_local_asr_provider_runtime_diagnostic(
+    owner.provider_runtime_diagnostic(
         ProviderRuntimeDiagnostic(
             event="worker_recovery_started",
             failure_code="decode_failure",
         )
     )
-    controller._on_local_asr_provider_runtime_diagnostic(
-        ProviderRuntimeDiagnostic(event="worker_recovery_ready")
-    )
+    owner.provider_runtime_diagnostic(ProviderRuntimeDiagnostic(event="worker_recovery_ready"))
 
     assert len(detailed) == 2
     assert basic == [
