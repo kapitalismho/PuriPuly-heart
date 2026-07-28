@@ -11,6 +11,9 @@ from types import SimpleNamespace
 import flet as ft
 import pytest
 
+from puripuly_heart.app.adapters.peer_capture_target_resolver import (
+    PeerCaptureTargetResolverAdapter,
+)
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.config.settings_vnext.facade import load_settings, save_settings_with_result
@@ -317,14 +320,7 @@ def test_peer_contract_keeps_process_failure_warning_during_overlay_startup() ->
 
 
 @pytest.mark.asyncio
-async def test_process_identity_resolution_is_fresh_and_does_not_block_heartbeat(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=_presentation(SimpleNamespace()),
-        config_path=Path("x"),
-    )
+async def test_process_identity_resolution_is_fresh_and_does_not_block_heartbeat() -> None:
     target = CorePeerCaptureTargetIntent(
         kind="process",
         process_kind="vrchat",
@@ -342,8 +338,10 @@ async def test_process_identity_resolution_is_fresh_and_does_not_block_heartbeat
             release.wait(timeout=1)
             return SimpleNamespace(identity=object(), unavailable_reason=None)
 
-    monkeypatch.setattr(controller_module, "ProcessCaptureResolver", Resolver)
-    activation = asyncio.create_task(controller._resolve_peer_capture_target_for_owner(target))
+    resolver = PeerCaptureTargetResolverAdapter(
+        resolver_factory=lambda: Resolver(snapshots=object())
+    )
+    activation = asyncio.create_task(resolver.resolve(target))
     await asyncio.sleep(0)
     heartbeat = False
     await asyncio.sleep(0)
@@ -399,8 +397,10 @@ async def test_idle_process_preparation_is_bounded_once_and_best_effort(
         process_kind="vrchat",
         executable_identity=r"c:\vrchat\vrchat.exe",
     )
-    monkeypatch.setattr(controller_module, "ProcessCaptureResolver", FreshResolver)
-    resolution = await controller._resolve_peer_capture_target_for_owner(target)
+    resolver = PeerCaptureTargetResolverAdapter(
+        resolver_factory=lambda: FreshResolver(snapshots=object())
+    )
+    resolution = await resolver.resolve(target)
     assert resolution.target is not None
     assert calls == 1
     assert fresh_resolutions == 1
@@ -1177,8 +1177,10 @@ async def test_failed_process_warning_survives_unrelated_draft_apply_without_dev
         def resolve_for_start(self, _target):
             return SimpleNamespace(identity=None, unavailable_reason="no_process")
 
-    monkeypatch.setattr(controller_module, "ProcessCaptureResolver", UnavailableResolver)
-    resolution = await controller._resolve_peer_capture_target_for_owner(config.capture_target)
+    resolver = PeerCaptureTargetResolverAdapter(
+        resolver_factory=lambda: UnavailableResolver(snapshots=object())
+    )
+    resolution = await resolver.resolve(config.capture_target)
     assert resolution.status is PeerCaptureTargetStatus.UNAVAILABLE
     assert resolution.target is None
     assert resolution.reason == "no_process"

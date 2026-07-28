@@ -1039,6 +1039,14 @@
       "rationale": "PeerCaptureSourceAdapter implements the internal Peer capture source-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
     {
+      "surface": "puripuly_heart.app.adapters Peer capture target resolver adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture_target_resolver"
+      ],
+      "rationale": "PeerCaptureTargetResolverAdapter implements the internal Peer capture target-resolver port through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
       "surface": "puripuly_heart.app.adapters synchronous SecretStore adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [

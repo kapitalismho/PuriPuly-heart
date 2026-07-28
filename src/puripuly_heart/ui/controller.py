@@ -183,6 +183,7 @@ from puripuly_heart.app.wiring import (
     create_local_asr_provisioning_owner,
     create_microphone_test_capture_adapter,
     create_peer_capture_source_adapter,
+    create_peer_capture_target_resolver_adapter,
     create_provider_verifier,
     create_secret_store,
     create_self_capture_source_adapter,
@@ -335,12 +336,9 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureDiagnostic,
     PeerCaptureFailureReason,
     PeerCaptureLanguageFacts,
-    PeerCaptureResolvedTarget,
     PeerCaptureSessionConfig,
     PeerCaptureSessionSnapshot,
     PeerCaptureTargetIntent,
-    PeerCaptureTargetResolution,
-    PeerCaptureTargetStatus,
 )
 from puripuly_heart.core.runtime.clipboard import ClipboardRuntime
 from puripuly_heart.core.runtime.desktop_overlay_bounds import (
@@ -657,20 +655,6 @@ class _PeerCaptureAdmissionAdapter:
 
     async def admit(self, config: PeerCaptureSessionConfig) -> PeerCaptureAdmission:
         return await self.callback(config)
-
-
-@dataclass(slots=True)
-class _PeerCaptureTargetResolverAdapter:
-    callback: Callable[
-        [PeerCaptureTargetIntent],
-        Awaitable[PeerCaptureTargetResolution],
-    ]
-
-    async def resolve(
-        self,
-        target: PeerCaptureTargetIntent,
-    ) -> PeerCaptureTargetResolution:
-        return await self.callback(target)
 
 
 @dataclass(slots=True)
@@ -9011,46 +8995,6 @@ class GuiController:
                     manager.terminate()
         return names
 
-    async def _resolve_peer_capture_target_for_owner(
-        self,
-        target: PeerCaptureTargetIntent,
-    ) -> PeerCaptureTargetResolution:
-        if target.kind != "process":
-            return PeerCaptureTargetResolution(
-                PeerCaptureTargetStatus.RESOLVED,
-                target=PeerCaptureResolvedTarget(intent=target),
-            )
-        process_target = self._process_target_from_capture_target(target)
-        resolution = await asyncio.to_thread(
-            lambda: ProcessCaptureResolver(
-                snapshots=PsutilCurrentUserProcessSnapshots()
-            ).resolve_for_start(process_target)
-        )
-        if resolution.identity is None:
-            return PeerCaptureTargetResolution(
-                PeerCaptureTargetStatus.UNAVAILABLE,
-                reason=resolution.unavailable_reason,
-            )
-        return PeerCaptureTargetResolution(
-            PeerCaptureTargetStatus.RESOLVED,
-            target=PeerCaptureResolvedTarget(
-                intent=target,
-                capture_descriptor=resolution,
-            ),
-        )
-
-    @staticmethod
-    def _process_target_from_capture_target(
-        target: PeerCaptureTargetIntent,
-    ) -> ProcessCaptureTargetIntent:
-        if target.kind != "process" or target.process_kind is None:
-            raise ValueError("process peer source requires a process capture target")
-        if target.process_kind == "discord":
-            return ProcessCaptureTargetIntent.discord(target.discord_channel or "")
-        if target.process_kind == "vrchat":
-            return ProcessCaptureTargetIntent.vrchat(target.executable_identity or "")
-        return ProcessCaptureTargetIntent.generic_executable(target.executable_identity or "")
-
     @staticmethod
     def _peer_capture_sample_rate(config: object) -> int:
         sample_rate = getattr(config, "target_sample_rate_hz", None)
@@ -9439,9 +9383,7 @@ class GuiController:
         self._peer_runtime = compose_peer_capture_session_owner(
             hub=hub,
             admission=_PeerCaptureAdmissionAdapter(self._admit_peer_capture),
-            target_resolver=_PeerCaptureTargetResolverAdapter(
-                self._resolve_peer_capture_target_for_owner
-            ),
+            target_resolver=create_peer_capture_target_resolver_adapter(),
             clock=self.clock,
             provider_request_factory=lambda config, warmup: self._peer_stt_provider_request(
                 config,

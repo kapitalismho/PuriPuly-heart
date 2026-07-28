@@ -19,6 +19,9 @@ CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
 SOURCE_ADAPTER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_source.py"
 )
+TARGET_RESOLVER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_target_resolver.py"
+)
 
 
 def test_peer_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() -> None:
@@ -68,6 +71,7 @@ def test_production_controller_composes_one_peer_owner_through_ports() -> None:
         "diagnostic_sink",
     }.issubset(keywords)
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    assert "target_resolver=create_peer_capture_target_resolver_adapter()" in source
     assert "PeerChannelRuntime" not in source
     assert "PeerRuntimeConfig" not in source
 
@@ -85,13 +89,11 @@ def test_controller_does_not_construct_peer_owner_resources_outside_adapters() -
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         and node.name
         in {
-            "_resolve_peer_capture_target_for_owner",
             "_create_peer_vad_from_runtime_config",
             "_run_peer_audio_vad_loop",
         }
     }
     assert resource_methods == {
-        "_resolve_peer_capture_target_for_owner",
         "_create_peer_vad_from_runtime_config",
         "_run_peer_audio_vad_loop",
     }
@@ -128,3 +130,34 @@ def test_peer_capture_session_owner_remains_source_lifecycle_owner() -> None:
     assert "self._retired_sources" in source
     assert "await self._close_if_possible(source)" in source
     assert "source_factory: PeerCaptureSourceFactory" in source
+
+
+def test_controller_composes_peer_target_resolver_without_resolution_algorithm() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    assert "target_resolver=create_peer_capture_target_resolver_adapter()" in source
+    assert "_PeerCaptureTargetResolverAdapter" not in source
+    assert "_resolve_peer_capture_target_for_owner" not in source
+    assert "_process_target_from_capture_target" not in source
+
+
+def test_peer_target_resolver_has_no_ui_source_or_session_lifecycle_ownership() -> None:
+    source = TARGET_RESOLVER_PATH.read_text(encoding="utf-8")
+
+    assert "puripuly_heart.ui" not in source
+    assert "GuiController" not in source
+    assert "AppSettings" not in source
+    assert "DesktopLoopbackAudioSource" not in source
+    assert "ProcessAudioCaptureSource" not in source
+    assert "PeerCaptureSessionOwner" not in source
+    assert "async def close(" not in source
+    assert "asyncio.to_thread" in source
+    assert "PeerCaptureTargetResolverPort" not in source
+
+
+def test_peer_capture_session_owner_remains_target_resolution_lifecycle_caller() -> None:
+    source = OWNER_PATH.read_text(encoding="utf-8")
+
+    assert "target_resolver: PeerCaptureTargetResolverPort" in source
+    assert "await self._target_resolver.resolve(config.capture_target)" in source
+    assert "self._is_superseded(generation)" in source

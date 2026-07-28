@@ -7,6 +7,7 @@ from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestMeterCallback,
 )
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
+from puripuly_heart.core.peer_capture import PeerCaptureTargetResolverPort
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSourceFactory
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSourceFactory
 
@@ -81,6 +82,19 @@ def create_peer_capture_source_adapter(
         wrap_source=wrap_source,
         is_detailed_enabled=is_detailed_enabled,
     )
+
+
+def create_peer_capture_target_resolver_adapter() -> PeerCaptureTargetResolverPort:
+    from puripuly_heart.app.adapters.peer_capture_target_resolver import (
+        PeerCaptureTargetResolverAdapter,
+    )
+    from puripuly_heart.config.process_capture_resolution import ProcessCaptureResolver
+    from puripuly_heart.core.audio.process_identity import PsutilCurrentUserProcessSnapshots
+
+    def create_process_resolver() -> ProcessCaptureResolver:
+        return ProcessCaptureResolver(snapshots=PsutilCurrentUserProcessSnapshots())
+
+    return PeerCaptureTargetResolverAdapter(resolver_factory=create_process_resolver)
 
 
 def create_provider_verifier() -> ProviderVerifierPort:
