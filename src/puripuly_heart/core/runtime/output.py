@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections import deque
-from collections.abc import Coroutine
+from collections.abc import Awaitable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
@@ -52,8 +52,19 @@ class ChatboxQueue(Protocol):
     def process_due(self) -> None: ...
 
 
-class UIEventBridgeAdapter(Protocol):
+class UIEventBridgePort(Protocol):
     async def run(self) -> None: ...
+    async def wait_started(self) -> None: ...
+    def report_overlay_state(
+        self,
+        state: str,
+        *,
+        failure_reason: str | None = None,
+    ) -> None: ...
+    def close(self) -> Awaitable[None] | None: ...
+
+
+UIEventBridgeAdapter = UIEventBridgePort
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,7 +83,7 @@ class OutputRuntime:
     diagnostics_capacity: int = 4096
     _state: OutputRuntimeState = "open"
     _chatbox_flush_task: asyncio.Task[None] | None = None
-    _ui_event_bridge: UIEventBridgeAdapter | None = None
+    _ui_event_bridge: UIEventBridgePort | None = None
     _ui_event_bridge_task: asyncio.Task[Any] | None = None
     _ui_event_bridge_started_wait_task: asyncio.Task[Any] | None = None
     _chatbox_typing_reasons_cleared: bool = False
@@ -210,7 +221,7 @@ class OutputRuntime:
                 task_name="chatbox-flush",
             )
 
-    def start_ui_event_bridge(self, bridge: UIEventBridgeAdapter) -> asyncio.Task[Any]:
+    def start_ui_event_bridge(self, bridge: UIEventBridgePort) -> asyncio.Task[Any]:
         if self._state != "open":
             raise RuntimeError("OutputRuntime is not accepting UI event bridge work")
         if self._ui_event_bridge_task is not None:
@@ -229,17 +240,11 @@ class OutputRuntime:
         bridge_task = self._ui_event_bridge_task
         if bridge is None or bridge_task is None:
             raise RuntimeError("OutputRuntime does not own a UI event bridge task")
-        wait_started = getattr(bridge, "wait_started", None)
-        if not callable(wait_started):
-            await asyncio.sleep(0)
-            if bridge_task.done():
-                await bridge_task
-            return
         existing = self._ui_event_bridge_started_wait_task
         if existing is not None and not existing.done():
             raise RuntimeError("OutputRuntime already owns a UI event bridge startup waiter")
         started_task = self._create_task(
-            wait_started(),
+            bridge.wait_started(),
             task_name="ui-event-bridge-started-wait",
         )
         self._ui_event_bridge_started_wait_task = started_task
@@ -730,12 +735,8 @@ class OutputRuntime:
         bridge = self._ui_event_bridge
         if bridge is None:
             return
-        close = getattr(bridge, "close", None)
-        if not callable(close):
-            self._ui_event_bridge = None
-            return
         try:
-            result = close()
+            result = bridge.close()
             if inspect.isawaitable(result):
                 await result
         except Exception as exc:
@@ -936,4 +937,5 @@ __all__ = [
     "OutputRuntime",
     "OutputRuntimeState",
     "UIEventBridgeAdapter",
+    "UIEventBridgePort",
 ]

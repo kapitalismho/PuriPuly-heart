@@ -5,7 +5,7 @@ import inspect
 from pathlib import Path
 
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
-from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
+from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.app.services.ui_application import (
     UI_APPLICATION_USER_INTENT_METHODS,
     UiApplicationBoundary,
@@ -111,6 +111,19 @@ def test_ui_application_contract_covers_every_translator_app_boundary_access() -
 def test_ui_boundary_implementations_match_every_declared_contract_signature() -> None:
     _assert_contract_signatures(UiApplicationPort, UiApplicationBoundary)
     _assert_contract_signatures(UiPresentationPort, FletUiPresentationAdapter)
+
+
+def test_ui_event_bridge_boundary_declares_every_consumed_operation() -> None:
+    assert _contract_members(UIEventBridgePort) == {
+        "close",
+        "report_overlay_state",
+        "run",
+        "wait_started",
+    }
+
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    assert "_ui_event_bridge: UIEventBridgePort | None" in source
+    assert "def _start_ui_event_bridge_task(self, bridge: UIEventBridgePort)" in source
 
 
 def test_every_ui_application_member_is_classified_as_guarded_intent_or_safe_operation() -> None:

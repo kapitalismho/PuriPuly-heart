@@ -50,7 +50,9 @@ class ManualTypingOwner:
         self.clear_input()
 
     async def release(self) -> None:
-        self._cancel_idle_task()
+        task = self._cancel_idle_task()
+        if task is not None:
+            await asyncio.gather(task, return_exceptions=True)
         output = self.output_provider()
         if output is not None:
             output.clear_self_chatbox_typing_reasons()
@@ -107,11 +109,12 @@ class ManualTypingOwner:
             return
         self._idle_task = loop.create_task(self._idle_timeout())
 
-    def _cancel_idle_task(self) -> None:
+    def _cancel_idle_task(self) -> asyncio.Task[None] | None:
         task = self._idle_task
         self._idle_task = None
         if task is not None and not task.done():
             task.cancel()
+        return task
 
     async def _idle_timeout(self) -> None:
         try:

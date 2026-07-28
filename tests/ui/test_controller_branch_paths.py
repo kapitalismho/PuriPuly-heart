@@ -12994,9 +12994,27 @@ async def test_start_initializes_dashboard_and_bridge(
                 "on_overlay_state_changed",
             }.issubset(kwargs)
             bridge_events.append(("init", kwargs["event_queue"], kwargs.get("runtime_logging")))
+            self.started = asyncio.Event()
+            self.closed = asyncio.Event()
 
         async def run(self) -> None:
             bridge_events.append("run")
+            self.started.set()
+            await self.closed.wait()
+
+        async def wait_started(self) -> None:
+            await self.started.wait()
+
+        def report_overlay_state(
+            self,
+            _state: str,
+            *,
+            failure_reason: str | None = None,
+        ) -> None:
+            _ = failure_reason
+
+        def close(self) -> None:
+            self.closed.set()
 
     async def fake_init_pipeline(self) -> None:
         self.hub = hub

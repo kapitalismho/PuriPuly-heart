@@ -8,7 +8,7 @@ from typing import Any
 import flet as ft
 
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
-from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
+from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.ui.event_bridge import (
     AppConversationEventDestination,
     AppDashboardEventDestination,
@@ -92,7 +92,7 @@ class FletUiPresentationAdapter:
         *,
         event_queue: object,
         runtime_logging: object,
-    ) -> object:
+    ) -> UIEventBridgePort:
         logs_view = getattr(self._app, "view_logs", None)
         return UIEventBridge(
             event_queue=event_queue,

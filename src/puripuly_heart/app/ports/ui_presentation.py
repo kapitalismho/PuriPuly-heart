@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.core.runtime.output import UIEventBridgePort
 
 
 class UiPresentationPort(Protocol):
@@ -34,7 +35,7 @@ class UiPresentationPort(Protocol):
         *,
         event_queue: object,
         runtime_logging: object,
-    ) -> object: ...
+    ) -> UIEventBridgePort: ...
 
     def set_dashboard_translation_enabled(self, enabled: bool) -> None: ...
 
@@ -147,4 +148,4 @@ class UiPresentationPort(Protocol):
     async def close_oauth_runtime(self) -> None: ...
 
 
-__all__ = ["UiPresentationPort"]
+__all__ = ["UIEventBridgePort", "UiPresentationPort"]

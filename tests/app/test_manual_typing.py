@@ -58,9 +58,13 @@ async def test_owner_clears_input_typing_on_empty_idle_and_release() -> None:
     assert output.reasons == set()
 
     owner.set_input_activity(True)
+    idle_task = owner.idle_task
+    assert idle_task is not None
     await owner.release()
 
     assert owner.idle_task is None
+    assert idle_task.done()
+    assert idle_task.cancelled()
     assert output.reasons == set()
     assert ("clear", None) in output.calls
     assert detailed[-1] == "[ManualTyping] release status=cleared"

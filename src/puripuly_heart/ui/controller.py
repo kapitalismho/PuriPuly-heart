@@ -35,7 +35,7 @@ from puripuly_heart.app.ports.ui_models import (
     OptionItem,
     OverlayPeerPresentationState,
 )
-from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
+from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
 from puripuly_heart.app.services.application_runtime_logging import (
     ApplicationRuntimeLoggingOwner,
@@ -786,7 +786,7 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _ui_event_bridge: object | None = None
+    _ui_event_bridge: UIEventBridgePort | None = None
     _clipboard_auto_translation_owner: ClipboardAutoTranslationOwner | None = field(
         init=False,
         default=None,
@@ -1468,14 +1468,18 @@ class GuiController:
             )
         )
 
-    def _create_ui_event_bridge(self, *, runtime_logging) -> object:  # noqa: ANN001
+    def _create_ui_event_bridge(
+        self,
+        *,
+        runtime_logging,
+    ) -> UIEventBridgePort:  # noqa: ANN001
         assert self.hub is not None
         return self.app.create_ui_event_bridge(
             event_queue=self.hub.ui_events,
             runtime_logging=runtime_logging,
         )
 
-    def _start_ui_event_bridge_task(self, bridge: object) -> None:
+    def _start_ui_event_bridge_task(self, bridge: UIEventBridgePort) -> None:
         assert self.hub is not None
         self._ui_event_bridge = bridge
         self._bridge_task = self.hub.output_runtime.start_ui_event_bridge(bridge)
