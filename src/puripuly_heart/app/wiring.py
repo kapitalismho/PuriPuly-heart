@@ -6,7 +6,10 @@ from pathlib import Path
 from puripuly_heart.app import wiring_llm_factory as _llm_factory
 from puripuly_heart.app.adapters.peer_capture_provider import PeerCaptureProviderAdapter
 from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
-from puripuly_heart.app.wiring_composition import create_provider_verifier
+from puripuly_heart.app.wiring_composition import (
+    create_microphone_test_capture_adapter,
+    create_provider_verifier,
+)
 from puripuly_heart.app.wiring_llm_factory import (
     MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
     _LazyFactoryLLMProvider,
@@ -194,6 +197,7 @@ __all__ = (
     "create_llm_provider",
     "create_llm_provider_from_resolved_config",
     "create_local_asr_provisioning_owner",
+    "create_microphone_test_capture_adapter",
     "create_peer_stt_backend",
     "create_peer_stt_backend_from_resolved_config",
     "create_provider_verifier",

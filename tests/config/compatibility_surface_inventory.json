@@ -1015,6 +1015,14 @@
       "rationale": "ProviderVerifierAdapter is an app adapter implementation of the provider-verifier port; the adapter class is importable for wiring/tests but is not an external public compatibility facade."
     },
     {
+      "surface": "puripuly_heart.app.adapters microphone test capture adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.microphone_test_capture"
+      ],
+      "rationale": "MicrophoneTestCaptureAdapter implements the internal microphone-test capture port and is reached through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
       "surface": "puripuly_heart.app provider runtime wiring modules",
       "classification": "internal_provider_runtime_wiring",
       "modules": [

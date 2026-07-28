@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "services" / "microphone_test.py"
+ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "microphone_test_capture.py"
 
 
 def _method_source(path: Path, class_name: str, method_name: str) -> str:
@@ -52,3 +53,27 @@ def test_microphone_test_session_owner_has_no_ui_or_controller_dependency() -> N
     assert "MicTestRuntime" in source
     assert "MicrophoneTestSessionRequest" in source
     assert "drop meter updates from stale runtime generations" in source
+
+
+def test_controller_microphone_test_capture_is_an_adapter_delegate() -> None:
+    method = _method_source(
+        CONTROLLER_PATH,
+        "GuiController",
+        "run_microphone_test_capture",
+    )
+
+    assert "MicrophoneTestCaptureRequest(" in method
+    assert "_build_microphone_test_capture_adapter().capture(" in method
+    assert "SoundDeviceAudioSource(" not in method
+    assert "runtime.create_frame_task(" not in method
+    assert "asyncio.wait(" not in method
+
+
+def test_microphone_test_capture_adapter_has_no_ui_or_controller_dependency() -> None:
+    source = ADAPTER_PATH.read_text(encoding="utf-8")
+
+    assert "puripuly_heart.ui" not in source
+    assert "GuiController" not in source
+    assert "MicrophoneTestCaptureRequest" in source
+    assert "MicrophoneTestRuntimePort" in source
+    assert "source_factory" in source
