@@ -10391,7 +10391,7 @@ async def test_stop_aggregates_oauth_runtime_close_failure_and_continues_later_s
 
     hub.stop = failing_stop  # type: ignore[method-assign]
     controller.hub = hub
-    controller._oauth_runtime = FailingOAuthRuntime()  # type: ignore[assignment]
+    controller._get_openrouter_pkce_flow_owner().runtime = FailingOAuthRuntime()  # type: ignore[assignment]
     controller._runtime_logging = FakeRuntimeLogging()
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)

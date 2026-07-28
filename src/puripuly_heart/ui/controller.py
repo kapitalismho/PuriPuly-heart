@@ -390,7 +390,6 @@ from puripuly_heart.core.runtime.local_asr_transition import (
 from puripuly_heart.core.runtime.local_qwen_lifecycle import LOCAL_QWEN_IDLE_RELEASE_SECONDS
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.core.runtime.mic_test import MicTestRuntime
-from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.core.runtime.overlay_session_fallback import (
     OverlaySessionFallbackOwner,
@@ -9246,18 +9245,6 @@ class GuiController:
             app_version=__version__,
             on_discord_callback_received=self._on_discord_managed_auth_callback_received,
         )
-
-    def _get_oauth_runtime(self) -> OAuthRuntime:
-        return self._get_openrouter_pkce_flow_owner().get_runtime()
-
-    @property
-    def _oauth_runtime(self) -> OAuthRuntime | None:
-        owner = self._openrouter_pkce_flow_owner
-        return owner.runtime if owner is not None else None
-
-    @_oauth_runtime.setter
-    def _oauth_runtime(self, runtime: OAuthRuntime | None) -> None:
-        self._get_openrouter_pkce_flow_owner().runtime = runtime
 
     @property
     def _openrouter_pkce_client(self) -> object | None:
