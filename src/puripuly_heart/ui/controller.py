@@ -6053,25 +6053,6 @@ class GuiController:
         finally:
             owner.strict_runtime_errors = previous_strict_runtime_errors
 
-    async def _stop_clipboard_watcher(self) -> None:
-        owner = self._clipboard_auto_translation_owner
-        if owner is not None:
-            await owner.stop()
-
-    async def _close_clipboard_runtime(self) -> None:
-        owner = self._clipboard_auto_translation_owner
-        if owner is not None:
-            await owner.close()
-
-    def _on_clipboard_text_from_thread(self, text: str) -> None:
-        self._get_clipboard_auto_translation_owner().on_text_from_thread(text)
-
-    def _schedule_clipboard_submit(self, text: str) -> None:
-        self._get_clipboard_auto_translation_owner().submit_from_loop(text)
-
-    async def _submit_clipboard_text(self, text: str) -> None:
-        await self._get_clipboard_auto_translation_owner().submit_now(text)
-
     async def _submit_clipboard_text_to_hub(self, text: str) -> None:
         if self.hub is None:
             return

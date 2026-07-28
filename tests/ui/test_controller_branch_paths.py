@@ -13041,7 +13041,6 @@ async def test_controller_stop_closes_vrc_mic_receiver_before_hub_shutdown(
     controller.receiver = object()
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(GuiController, "_close_clipboard_runtime", fake_noop)
     monkeypatch.setattr(GuiController, "_close_app_oauth_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_close_oauth_runtime", fake_noop)
     monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", fake_noop)
@@ -13101,7 +13100,6 @@ async def test_controller_stop_uses_bounded_prompt_runtime_close_and_still_stops
 
     controller.hub = FakeHub()
     monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(GuiController, "_close_clipboard_runtime", fake_noop)
     monkeypatch.setattr(GuiController, "_close_app_oauth_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_close_oauth_runtime", fake_noop)
     monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", fake_noop)
