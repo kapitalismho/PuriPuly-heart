@@ -88,6 +88,18 @@ class RecordingBackend:
         self.settings = settings
         self.events.append(("settings", settings))
 
+    def refresh_settings_projection(
+        self,
+        *,
+        preserve_custom_vocab_draft: bool = False,
+    ) -> bool:
+        self.events.append(("settings-projection", preserve_custom_vocab_draft))
+        return True
+
+    def refresh_settings_after_openrouter_pkce_success(self) -> bool:
+        self.events.append(("settings-pkce-projection",))
+        return True
+
     async def apply_providers(self, *args, **kwargs) -> None:
         self.events.append(("providers", args, kwargs))
 
@@ -226,6 +238,19 @@ def test_compatibility_settings_is_detached_and_missing_ui_state_stays_unknown()
     assert backend.settings.ui.peer_translation_eula_accepted is False
     backend.settings = None
     assert boundary.state().peer_translation_eula_accepted is None
+
+
+def test_settings_projection_operations_delegate_without_exposing_the_view() -> None:
+    backend = RecordingBackend()
+    boundary = UiApplicationBoundary(backend)
+
+    assert boundary.refresh_settings_projection(preserve_custom_vocab_draft=True) is True
+    assert boundary.refresh_settings_after_openrouter_pkce_success() is True
+
+    assert backend.events == [
+        ("settings-projection", True),
+        ("settings-pkce-projection",),
+    ]
 
 
 @pytest.mark.asyncio

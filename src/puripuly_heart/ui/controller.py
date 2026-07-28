@@ -23,7 +23,6 @@ from typing import Any, Literal, Protocol, cast
 import numpy as np
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
-from puripuly_heart.app.ports._settings_values import freeze_settings_values
 from puripuly_heart.app.ports.canonical_settings_persistence import (
     ProviderVerificationBinding,
 )
@@ -109,15 +108,15 @@ from puripuly_heart.app.services.settings_mutation import (
 )
 from puripuly_heart.app.services.settings_mutation_legacy import (
     _apply_settings_path_patch,
-    _SettingsPathSnapshot,
     build_overlay_osc_output_settings_path_patch,
     build_stt_language_audio_settings_path_patch,
     build_translation_provider_settings_path_patch,
     build_ui_prompt_clipboard_state_settings_path_patch,
     settings_path_mutation_validator_for_command,
-    settings_path_snapshot_for_overlay_osc_output,
-    settings_path_snapshot_for_stt_language_audio,
-    settings_path_snapshot_for_ui_prompt_clipboard_state,
+)
+from puripuly_heart.app.services.settings_projection import (
+    SettingsProjectionOwner,
+    SettingsViewSettingsChange,
 )
 from puripuly_heart.app.wiring import (
     DiscordManagedBrokerClientAdapter,
@@ -845,17 +844,6 @@ def _copy_runtime_only_ui_state(source: AppSettings, target: AppSettings) -> Non
     target.ui.peer_translation_enabled = bool(source.ui.peer_translation_enabled)
 
 
-@dataclass(frozen=True, slots=True)
-class SettingsViewSettingsChange:
-    values_by_path: Mapping[str, object]
-    pending_settings: AppSettings
-    can_rebase: bool
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "values_by_path", freeze_settings_values(self.values_by_path))
-        object.__setattr__(self, "pending_settings", copy.deepcopy(self.pending_settings))
-
-
 def _settings_mutation_committed(result: TransactionResult) -> bool:
     return result.status in {
         TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -1126,17 +1114,7 @@ class GuiController:
     _process_idle_preparation_scheduled: bool = field(init=False, default=False)
     _peer_process_warning_reason: str | None = field(init=False, default=None)
     _last_vrc_mic_sync_enabled: bool | None = None
-    _settings_view_order22_baseline: _SettingsPathSnapshot | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _settings_view_order23_baseline: _SettingsPathSnapshot | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _settings_view_order24_baseline: _SettingsPathSnapshot | None = field(
+    _settings_projection_owner: SettingsProjectionOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -3594,10 +3572,7 @@ class GuiController:
             strict_runtime_errors=False,
         )
         self.settings = copy.deepcopy(base_settings)
-        self._reload_settings_view_from_settings(
-            self.settings,
-            preserve_custom_vocab_draft=True,
-        )
+        self.refresh_settings_projection(preserve_custom_vocab_draft=True)
 
     def _is_qwen_llm(self, settings: object) -> bool:
         # Boundary accessor used by the app-service runtime-apply adapters to
@@ -6995,155 +6970,53 @@ class GuiController:
         try:
             await self.apply_settings(updated)
             if self.settings is not None:
-                self._reload_settings_view_from_settings(
-                    self.settings,
-                    preserve_custom_vocab_draft=True,
-                )
+                self.refresh_settings_projection(preserve_custom_vocab_draft=True)
         finally:
             self._complete_canonical_mutation()
 
-    def _remember_settings_view_order22_baseline(self, settings: AppSettings | None) -> None:
-        self._settings_view_order22_baseline = (
-            settings_path_snapshot_for_stt_language_audio(settings)
-            if settings is not None
-            else None
-        )
-
-    def _remember_settings_view_order23_baseline(self, settings: AppSettings | None) -> None:
-        self._settings_view_order23_baseline = (
-            settings_path_snapshot_for_overlay_osc_output(settings)
-            if settings is not None
-            else None
-        )
-
-    def _remember_settings_view_order24_baseline(self, settings: AppSettings | None) -> None:
-        self._settings_view_order24_baseline = (
-            settings_path_snapshot_for_ui_prompt_clipboard_state(settings)
-            if settings is not None
-            else None
-        )
+    def _settings_projection(self) -> SettingsProjectionOwner:
+        owner = self._settings_projection_owner
+        if owner is None:
+            owner = SettingsProjectionOwner(
+                presentation=self.app,
+                config_path=self.config_path,
+                current_settings=lambda: self.settings,
+            )
+            self._settings_projection_owner = owner
+        return owner
 
     def capture_settings_view_change(
         self,
         pending_settings: AppSettings,
     ) -> SettingsViewSettingsChange:
-        baselines = (
-            self._settings_view_order22_baseline,
-            self._settings_view_order23_baseline,
-            self._settings_view_order24_baseline,
-        )
-        if any(baseline is None for baseline in baselines):
-            return SettingsViewSettingsChange(
-                values_by_path={},
-                pending_settings=pending_settings,
-                can_rebase=False,
-            )
-
-        values_by_path: dict[str, object] = {}
-        for baseline in baselines:
-            if baseline is not None:
-                values_by_path.update(baseline.patch_to(pending_settings))
-        return SettingsViewSettingsChange(
-            values_by_path=values_by_path,
-            pending_settings=pending_settings,
-            can_rebase=True,
-        )
+        return self._settings_projection().capture(pending_settings)
 
     def merge_settings_view_change_with_current(
         self,
         change: SettingsViewSettingsChange,
     ) -> AppSettings:
-        if not change.can_rebase or self.settings is None:
-            return copy.deepcopy(change.pending_settings)
-        merged_settings = copy.deepcopy(self.settings)
-        _apply_settings_path_patch(merged_settings, change.values_by_path)
-        return merged_settings
+        return cast(AppSettings, self._settings_projection().merge_with_current(change))
 
-    def _reload_settings_view_from_settings(
+    def refresh_settings_projection(
         self,
-        settings: AppSettings,
         *,
-        preserve_custom_vocab_draft: bool,
-    ) -> None:
-        try:
-            loaded = self.app.render_settings(
+        preserve_custom_vocab_draft: bool = False,
+    ) -> bool:
+        settings = self.settings
+        if settings is None:
+            return False
+        return bool(
+            self._settings_projection().render(
                 settings,
-                config_path=self.config_path,
                 preserve_custom_vocab_draft=preserve_custom_vocab_draft,
             )
-        except Exception:
-            return
-        if not loaded:
-            self._remember_settings_view_order22_baseline(settings)
-            self._remember_settings_view_order23_baseline(settings)
-            self._remember_settings_view_order24_baseline(settings)
-            return
-        self._remember_settings_view_order22_baseline(settings)
-        self._remember_settings_view_order23_baseline(settings)
-        self._remember_settings_view_order24_baseline(settings)
-
-    def _order22_patch_base_and_values(
-        self,
-        next_settings: AppSettings,
-    ) -> tuple[AppSettings, dict[str, object]] | None:
-        base_settings = self.settings
-        if base_settings is None:
-            return None
-        patch_values = build_stt_language_audio_settings_path_patch(
-            base_settings,
-            next_settings,
         )
-        if patch_values or next_settings is base_settings:
-            return base_settings, patch_values
 
-        baseline = self._settings_view_order22_baseline
-        if baseline is not None:
-            baseline_patch_values = baseline.patch_to(next_settings)
-            if baseline_patch_values:
-                return baseline.materialize_base_from(base_settings), baseline_patch_values
-        return base_settings, patch_values
-
-    def _order23_patch_base_and_values(
-        self,
-        next_settings: AppSettings,
-    ) -> tuple[AppSettings, dict[str, object]] | None:
-        base_settings = self.settings
-        if base_settings is None:
-            return None
-        patch_values = build_overlay_osc_output_settings_path_patch(
-            base_settings,
-            next_settings,
-        )
-        if patch_values or next_settings is base_settings:
-            return base_settings, patch_values
-
-        baseline = self._settings_view_order23_baseline
-        if baseline is not None:
-            baseline_patch_values = baseline.patch_to(next_settings)
-            if baseline_patch_values:
-                return baseline.materialize_base_from(base_settings), baseline_patch_values
-        return base_settings, patch_values
-
-    def _order24_patch_base_and_values(
-        self,
-        next_settings: AppSettings,
-    ) -> tuple[AppSettings, dict[str, object]] | None:
-        base_settings = self.settings
-        if base_settings is None:
-            return None
-        patch_values = build_ui_prompt_clipboard_state_settings_path_patch(
-            base_settings,
-            next_settings,
-        )
-        if patch_values or next_settings is base_settings:
-            return base_settings, patch_values
-
-        baseline = self._settings_view_order24_baseline
-        if baseline is not None:
-            baseline_patch_values = baseline.patch_to(next_settings)
-            if baseline_patch_values:
-                return baseline.materialize_base_from(base_settings), baseline_patch_values
-        return base_settings, patch_values
+    def refresh_settings_after_openrouter_pkce_success(self) -> bool:
+        settings = self.settings
+        if settings is None:
+            return False
+        return bool(self._settings_projection().refresh_after_openrouter_pkce_success(settings))
 
     def _sync_memory_runtime_fields_from_settings(self, settings: AppSettings) -> None:
         restored_settings = copy.deepcopy(settings)
@@ -7590,7 +7463,7 @@ class GuiController:
             or peer_target_language_changed
             or peer_source_mode_changed
         ):
-            self._reload_settings_view_from_settings(
+            self._settings_projection().render(
                 settings,
                 preserve_custom_vocab_draft=True,
             )
@@ -7605,9 +7478,7 @@ class GuiController:
                     raise
 
         self._refresh_overlay_peer_consumers()
-        self._remember_settings_view_order22_baseline(self.settings)
-        self._remember_settings_view_order23_baseline(self.settings)
-        self._remember_settings_view_order24_baseline(self.settings)
+        self._settings_projection().remember_all(self.settings)
         if persist:
             self._complete_canonical_mutation()
 
@@ -7615,9 +7486,10 @@ class GuiController:
         self,
         next_settings: AppSettings,
     ) -> bool:
-        order22_base_and_patch = self._order22_patch_base_and_values(next_settings)
-        order23_base_and_patch = self._order23_patch_base_and_values(next_settings)
-        order24_base_and_patch = self._order24_patch_base_and_values(next_settings)
+        projection = self._settings_projection()
+        order22_base_and_patch = projection.order22_patch_base_and_values(next_settings)
+        order23_base_and_patch = projection.order23_patch_base_and_values(next_settings)
+        order24_base_and_patch = projection.order24_patch_base_and_values(next_settings)
         if (
             order22_base_and_patch is None
             or order23_base_and_patch is None
@@ -7738,10 +7610,7 @@ class GuiController:
                 )
 
         if self.settings is not None:
-            self._reload_settings_view_from_settings(
-                self.settings,
-                preserve_custom_vocab_draft=True,
-            )
+            self.refresh_settings_projection(preserve_custom_vocab_draft=True)
 
         if (
             self.last_settings_mutation_result is not None
@@ -7766,7 +7635,7 @@ class GuiController:
         *,
         reload_settings_view: bool = True,
     ) -> bool:
-        base_and_patch = self._order22_patch_base_and_values(next_settings)
+        base_and_patch = self._settings_projection().order22_patch_base_and_values(next_settings)
         if base_and_patch is None:
             return False
         base_settings, patch_values = base_and_patch
@@ -7809,11 +7678,11 @@ class GuiController:
         self.last_settings_mutation_result = result
         if not _settings_mutation_committed(result):
             self.settings = copy.deepcopy(base_settings)
-            self._remember_settings_view_order22_baseline(self.settings)
+            self._settings_projection().remember_order22(self.settings)
             return True
         if id(committed_settings) in self._superseded_local_asr_settings_ids:
             self._superseded_local_asr_settings_ids.discard(id(committed_settings))
-            self._remember_settings_view_order22_baseline(self.settings)
+            self._settings_projection().remember_order22(self.settings)
             return True
         if (
             not has_out_of_scope_draft
@@ -7827,7 +7696,7 @@ class GuiController:
                 )
             except Exception:
                 self._log_error("Failed to compensate local ASR settings apply")
-            self._remember_settings_view_order22_baseline(self.settings)
+            self._settings_projection().remember_order22(self.settings)
             return True
 
         if has_out_of_scope_draft:
@@ -7865,14 +7734,14 @@ class GuiController:
             self.settings = committed_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
                 self._sync_signature_caches(committed_settings)
-        self._remember_settings_view_order22_baseline(self.settings)
+        self._settings_projection().remember_order22(self.settings)
         return True
 
     async def _apply_overlay_osc_output_settings_via_mutation_service(
         self,
         next_settings: AppSettings,
     ) -> bool:
-        base_and_patch = self._order23_patch_base_and_values(next_settings)
+        base_and_patch = self._settings_projection().order23_patch_base_and_values(next_settings)
         if base_and_patch is None:
             return False
         base_settings, patch_values = base_and_patch
@@ -7923,7 +7792,7 @@ class GuiController:
         self.last_settings_mutation_result = result
         if not _settings_mutation_committed(result):
             self.settings = copy.deepcopy(base_settings)
-            self._remember_settings_view_order23_baseline(self.settings)
+            self._settings_projection().remember_order23(self.settings)
             return True
 
         if has_out_of_scope_draft:
@@ -7950,7 +7819,7 @@ class GuiController:
         else:
             if self.settings is None or self.settings is base_settings:
                 self.settings = committed_settings
-        self._remember_settings_view_order23_baseline(self.settings)
+        self._settings_projection().remember_order23(self.settings)
         return True
 
     async def _mutate_order24_settings_patch(
@@ -7984,7 +7853,7 @@ class GuiController:
         self,
         next_settings: AppSettings,
     ) -> bool:
-        base_and_patch = self._order24_patch_base_and_values(next_settings)
+        base_and_patch = self._settings_projection().order24_patch_base_and_values(next_settings)
         if base_and_patch is None:
             return False
         base_settings, patch_values = base_and_patch
@@ -8014,7 +7883,7 @@ class GuiController:
         self.last_settings_mutation_result = result
         if not _settings_mutation_committed(result):
             self.settings = copy.deepcopy(base_settings)
-            self._remember_settings_view_order24_baseline(self.settings)
+            self._settings_projection().remember_order24(self.settings)
             return True
 
         if has_out_of_scope_draft:
@@ -8042,7 +7911,7 @@ class GuiController:
             self.settings = runtime_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
                 self._sync_signature_caches(runtime_settings)
-        self._remember_settings_view_order24_baseline(self.settings)
+        self._settings_projection().remember_order24(self.settings)
         return True
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
@@ -8224,7 +8093,9 @@ class GuiController:
             base_settings,
             next_settings,
         )
-        order24_base_and_patch = self._order24_patch_base_and_values(next_settings)
+        order24_base_and_patch = self._settings_projection().order24_patch_base_and_values(
+            next_settings
+        )
         if order24_base_and_patch is None:
             return False
         _order24_base_settings, order24_patch_values = order24_base_and_patch
@@ -8453,7 +8324,7 @@ class GuiController:
                     )
         elif result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
             self._sync_signature_caches(committed_settings)
-        self._remember_settings_view_order22_baseline(self.settings)
+        self._settings_projection().remember_order22(self.settings)
         return True
 
     async def _apply_stt_language_audio_provider_settings_via_mutation_service(
@@ -8517,11 +8388,11 @@ class GuiController:
         self.last_settings_mutation_result = result
         if not _settings_mutation_committed(result):
             self.settings = copy.deepcopy(base_settings)
-            self._remember_settings_view_order22_baseline(self.settings)
+            self._settings_projection().remember_order22(self.settings)
             return True
         if id(committed_settings) in self._superseded_local_asr_settings_ids:
             self._superseded_local_asr_settings_ids.discard(id(committed_settings))
-            self._remember_settings_view_order22_baseline(self.settings)
+            self._settings_projection().remember_order22(self.settings)
             return True
         if (
             not has_out_of_scope_draft
@@ -8535,7 +8406,7 @@ class GuiController:
                 )
             except Exception:
                 self._log_error("Failed to compensate local ASR provider settings apply")
-            self._remember_settings_view_order22_baseline(self.settings)
+            self._settings_projection().remember_order22(self.settings)
             return True
 
         if has_out_of_scope_draft:
@@ -8590,7 +8461,7 @@ class GuiController:
             self.settings = committed_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
                 self._sync_signature_caches(committed_settings)
-        self._remember_settings_view_order22_baseline(self.settings)
+        self._settings_projection().remember_order22(self.settings)
         return True
 
     async def _apply_providers_direct(
@@ -8637,7 +8508,7 @@ class GuiController:
             if self._save_settings() is False:
                 return False
         await self._apply_provider_runtime_plan(next_settings, plan)
-        self._remember_settings_view_order22_baseline(self.settings)
+        self._settings_projection().remember_order22(self.settings)
         self._complete_canonical_mutation()
         return True
 
@@ -11652,21 +11523,10 @@ class GuiController:
             ),
         )
 
-        try:
-            loaded = self.app.render_settings(
-                settings,
-                config_path=self.config_path,
-            )
-        except Exception:
+        loaded = self._settings_projection().render(settings)
+        if loaded is None:
             return
-        if not loaded:
-            self._remember_settings_view_order22_baseline(settings)
-            self._remember_settings_view_order23_baseline(settings)
-            self._remember_settings_view_order24_baseline(settings)
-        else:
-            self._remember_settings_view_order22_baseline(settings)
-            self._remember_settings_view_order23_baseline(settings)
-            self._remember_settings_view_order24_baseline(settings)
+        if loaded:
             with contextlib.suppress(Exception):
                 self.app.set_settings_overlay_calibration(self.overlay_calibration)
 

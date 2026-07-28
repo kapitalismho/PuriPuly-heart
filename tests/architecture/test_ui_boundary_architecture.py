@@ -44,6 +44,8 @@ UI_APPLICATION_NON_INTENT_MEMBERS = {
     "merge_settings_view_change_with_current",
     "overlay_calibration",
     "overlay_peer_presentation_state",
+    "refresh_settings_after_openrouter_pkce_success",
+    "refresh_settings_projection",
     "should_show_github_star_prompt",
     "state",
     "stop",

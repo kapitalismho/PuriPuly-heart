@@ -36,6 +36,9 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
     settings = SimpleNamespace(
         set_gpu_devices=lambda **kwargs: events.append(("gpu-devices", kwargs)),
         load_from_settings=lambda *args, **kwargs: events.append(("load-settings", args, kwargs)),
+        refresh_after_openrouter_pkce_success=lambda *args, **kwargs: events.append(
+            ("pkce-refresh", args, kwargs)
+        ),
         set_overlay_calibration=lambda value: events.append(("calibration", value)),
         refresh_loopback_capture_target=lambda value: events.append(("capture-target", value)),
         set_local_cpu_auto_available=lambda value: events.append(("cpu-auto", value)),
@@ -144,6 +147,9 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     settings = SimpleNamespace(
         set_gpu_devices=lambda **kwargs: events.append(("gpu-devices", kwargs)),
         load_from_settings=lambda *args, **kwargs: events.append(("load-settings", args, kwargs)),
+        refresh_after_openrouter_pkce_success=lambda *args, **kwargs: events.append(
+            ("pkce-refresh", args, kwargs)
+        ),
         set_overlay_calibration=lambda value: events.append(("calibration", value)),
         refresh_loopback_capture_target=lambda value: events.append(("capture-target", value)),
         set_local_cpu_auto_available=lambda value: events.append(("cpu-auto", value)),
@@ -204,6 +210,10 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         peer_auto_detect_available=True,
     )
     assert adapter.render_settings(settings_value, config_path=tmp_path / "settings.json")
+    assert adapter.refresh_settings_after_openrouter_pkce_success(
+        settings_value,
+        config_path=tmp_path / "settings.json",
+    )
     adapter.set_settings_overlay_calibration(calibration)
     adapter.refresh_settings_loopback_capture_target(settings_value)
     adapter.set_settings_local_cpu_auto_available(True)
@@ -224,6 +234,11 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         "load-settings",
         (settings_value,),
         {"config_path": tmp_path / "settings.json", "preserve_custom_vocab_draft": False},
+    ) in events
+    assert (
+        "pkce-refresh",
+        (settings_value,),
+        {"config_path": tmp_path / "settings.json"},
     ) in events
     assert (
         "managed-key",

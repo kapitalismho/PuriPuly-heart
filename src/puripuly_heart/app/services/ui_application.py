@@ -241,6 +241,28 @@ class UiApplicationBoundary:
         merge = getattr(self._backend, "merge_settings_view_change_with_current", None)
         return merge(captured) if callable(merge) else captured
 
+    def refresh_settings_projection(
+        self,
+        *,
+        preserve_custom_vocab_draft: bool = False,
+    ) -> bool:
+        refresh = getattr(self._backend, "refresh_settings_projection", None)
+        if not callable(refresh):
+            return False
+        return bool(
+            refresh(
+                preserve_custom_vocab_draft=preserve_custom_vocab_draft,
+            )
+        )
+
+    def refresh_settings_after_openrouter_pkce_success(self) -> bool:
+        refresh = getattr(
+            self._backend,
+            "refresh_settings_after_openrouter_pkce_success",
+            None,
+        )
+        return bool(refresh()) if callable(refresh) else False
+
     def merge_settings_tab_apply_with_current_languages(self, settings: Any) -> Any:
         return self._backend.merge_settings_tab_apply_with_current_languages(settings)
 

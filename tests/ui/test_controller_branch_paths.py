@@ -1224,11 +1224,12 @@ def _microphone_test_task(controller: GuiController) -> asyncio.Task[None] | Non
 
 def test_settings_view_order22_baseline_uses_path_snapshot_not_legacy_settings() -> None:
     controller = _make_controller(app=SimpleNamespace())
+    projection = controller._settings_projection()
     baseline = AppSettings()
     baseline.languages.source_language = "ko"
-    controller._remember_settings_view_order22_baseline(baseline)
+    projection.remember_order22(baseline)
 
-    assert not isinstance(controller._settings_view_order22_baseline, AppSettings)
+    assert not isinstance(projection.order22_baseline, AppSettings)
 
     current = AppSettings()
     current.languages.source_language = "ja"
@@ -1236,7 +1237,7 @@ def test_settings_view_order22_baseline_uses_path_snapshot_not_legacy_settings()
     controller.settings = current
     pending = copy.deepcopy(current)
 
-    base_settings, patch_values = controller._order22_patch_base_and_values(pending)
+    base_settings, patch_values = projection.order22_patch_base_and_values(pending)
 
     assert patch_values == {"languages.source_language": "ja"}
     assert base_settings is not current
@@ -1246,11 +1247,10 @@ def test_settings_view_order22_baseline_uses_path_snapshot_not_legacy_settings()
 
 def test_settings_view_change_rebases_audio_patch_without_restoring_stale_peer_language() -> None:
     controller = _make_controller(app=SimpleNamespace())
+    projection = controller._settings_projection()
     settings_view_snapshot = AppSettings()
     settings_view_snapshot.provider.peer_stt = STTProviderName.LOCAL_CPU_AUTO
-    controller._remember_settings_view_order22_baseline(settings_view_snapshot)
-    controller._remember_settings_view_order23_baseline(settings_view_snapshot)
-    controller._remember_settings_view_order24_baseline(settings_view_snapshot)
+    projection.remember_all(settings_view_snapshot)
 
     pending = copy.deepcopy(settings_view_snapshot)
     pending.desktop_audio.output_device = "Speakers (Loopback)"
@@ -1259,7 +1259,7 @@ def test_settings_view_change_rebases_audio_patch_without_restoring_stale_peer_l
     current = copy.deepcopy(settings_view_snapshot)
     current.languages.peer_source_language = "ja"
     controller.settings = current
-    controller._remember_settings_view_order22_baseline(current)
+    projection.remember_order22(current)
 
     merged = controller.merge_settings_view_change_with_current(change)
 
@@ -1282,17 +1282,16 @@ def test_failed_settings_view_reload_preserves_displayed_mutation_baseline(
             raise RuntimeError("settings view reload failed")
 
     controller = _make_controller(app=SimpleNamespace(view_settings=FailingSettingsView()))
+    projection = controller._settings_projection()
     displayed = AppSettings()
     displayed.languages.source_language = "en"
-    controller._remember_settings_view_order22_baseline(displayed)
-    controller._remember_settings_view_order23_baseline(displayed)
-    controller._remember_settings_view_order24_baseline(displayed)
+    projection.remember_all(displayed)
 
     committed = copy.deepcopy(displayed)
     committed.languages.source_language = "ja"
     controller.settings = committed
     if reload_method == "reload":
-        controller._reload_settings_view_from_settings(
+        projection.render(
             committed,
             preserve_custom_vocab_draft=True,
         )
@@ -18884,7 +18883,7 @@ async def test_order23_apply_settings_restore_baseline_on_live_settings_view_sav
     controller.settings = AppSettings()
     controller.settings.overlay.show_translation = True
     controller.settings.osc.chatbox_include_source = False
-    controller._remember_settings_view_order23_baseline(controller.settings)
+    controller._settings_projection().remember_order23(controller.settings)
     raw_failure_text = "order23 save failed secret-token-must-not-leak"
 
     # SettingsView mutates the loaded AppSettings object in place before emitting a copy.

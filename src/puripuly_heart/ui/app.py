@@ -1471,22 +1471,7 @@ class TranslatorApp:
                     launch_source=launch_source,
                 )
                 if ok:
-                    refresh_after_openrouter_pkce_success = getattr(
-                        self.view_settings,
-                        "refresh_after_openrouter_pkce_success",
-                        None,
-                    )
-                    if callable(refresh_after_openrouter_pkce_success):
-                        refresh_after_openrouter_pkce_success(
-                            self.application.compatibility_settings(),
-                            config_path=self.application.state().config_path,
-                        )
-                    else:
-                        self.view_settings.load_from_settings(
-                            self.application.compatibility_settings(),
-                            config_path=self.application.state().config_path,
-                            preserve_custom_vocab_draft=True,
-                        )
+                    self.application.refresh_settings_after_openrouter_pkce_success()
                     self._show_snackbar(t("openrouter.pkce.connected"), COLOR_SUCCESS)
             finally:
                 self._openrouter_pkce_request_active = False

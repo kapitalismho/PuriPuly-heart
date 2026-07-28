@@ -3393,14 +3393,10 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         settings=updated_settings,
         config_path=Path("settings.json"),
-    )
-    app.view_settings = SimpleNamespace(
-        refresh_after_openrouter_pkce_success=lambda settings, *, config_path: refresh_calls.append(
-            (settings, config_path)
-        ),
-        load_from_settings=lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("full load_from_settings refresh should not run on PKCE success")
-        ),
+        refresh_settings_after_openrouter_pkce_success=lambda: refresh_calls.append(
+            (updated_settings, Path("settings.json"))
+        )
+        or True,
     )
     app._show_snackbar = lambda message, bgcolor: snackbar_calls.append((message, bgcolor))
     queued: list[object] = []
@@ -3439,14 +3435,10 @@ async def test_on_request_openrouter_pkce_does_not_refresh_settings_view_on_fail
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         settings=AppSettings(),
         config_path=Path("settings.json"),
-    )
-    app.view_settings = SimpleNamespace(
-        refresh_after_openrouter_pkce_success=lambda settings, *, config_path: refresh_calls.append(
-            (settings, config_path)
-        ),
-        load_from_settings=lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("full load_from_settings refresh should not run on PKCE failure")
-        ),
+        refresh_settings_after_openrouter_pkce_success=lambda: refresh_calls.append(
+            (AppSettings(), Path("settings.json"))
+        )
+        or True,
     )
     queued: list[object] = []
     monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)

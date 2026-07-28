@@ -33,14 +33,12 @@ from puripuly_heart.ui.views import settings as settings_view_module
 
 SOURCE_ROOT = pathlib.Path(puripuly_heart.__file__).resolve().parent
 
-GUI_CONTROLLER_ONLY_PUSHES = (
+SETTINGS_ADAPTER_PUSHES = (
     "set_managed_trial_usage_state",
     "set_local_cpu_auto_available",
     "refresh_loopback_capture_target",
-)
-
-DUAL_DRIVER_PUSHES = (
     "load_from_settings",
+    "refresh_after_openrouter_pkce_success",
     "set_managed_key_state",
     "set_gpu_devices",
     "set_overlay_calibration",
@@ -462,21 +460,25 @@ def _attribute_calls(source: str, owner_names: tuple[str, ...]) -> set[str]:
     return names
 
 
-def test_both_drivers_reach_the_settings_view_without_an_orphaned_push() -> None:
+def test_settings_projection_is_the_only_full_settings_view_pusher() -> None:
     adapter_source = (SOURCE_ROOT / "ui" / "presentation_adapter.py").read_text(encoding="utf-8")
     app_source = (SOURCE_ROOT / "ui" / "app.py").read_text(encoding="utf-8")
+    projection_source = (SOURCE_ROOT / "app" / "services" / "settings_projection.py").read_text(
+        encoding="utf-8"
+    )
     driver_names = ("view_settings", "settings_view")
 
     adapter_attrs = _attribute_calls(adapter_source, driver_names)
     app_attrs = _attribute_calls(app_source, driver_names)
+    projection_attrs = _attribute_calls(projection_source, ("presentation",))
 
-    for name in GUI_CONTROLLER_ONLY_PUSHES:
+    for name in SETTINGS_ADAPTER_PUSHES:
         assert name in adapter_attrs, f"{name} lost its presentation adapter push site"
         assert callable(getattr(settings_view_module.SettingsView, name, None)), name
 
-    for name in DUAL_DRIVER_PUSHES:
-        assert name in adapter_attrs, f"{name} lost its presentation adapter push site"
-
-    assert "load_from_settings" in app_attrs
+    assert "render_settings" in projection_attrs
+    assert "refresh_settings_after_openrouter_pkce_success" in projection_attrs
+    assert "load_from_settings" not in app_attrs
+    assert "refresh_after_openrouter_pkce_success" not in app_attrs
     assert "consume_provider_apply_settings" in app_attrs
     assert "has_provider_changes" in app_attrs

@@ -92,6 +92,13 @@ class UiPresentationPort(Protocol):
         preserve_custom_vocab_draft: bool = False,
     ) -> bool: ...
 
+    def refresh_settings_after_openrouter_pkce_success(
+        self,
+        settings: object,
+        *,
+        config_path: Path,
+    ) -> bool: ...
+
     def set_settings_overlay_calibration(self, calibration: object) -> None: ...
 
     def refresh_settings_loopback_capture_target(self, settings: object) -> None: ...

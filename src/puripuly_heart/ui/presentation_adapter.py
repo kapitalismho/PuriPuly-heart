@@ -293,6 +293,19 @@ class FletUiPresentationAdapter:
         )
         return True
 
+    def refresh_settings_after_openrouter_pkce_success(
+        self,
+        settings: object,
+        *,
+        config_path: Path,
+    ) -> bool:
+        settings_view = getattr(self._app, "view_settings", None)
+        refresh = getattr(settings_view, "refresh_after_openrouter_pkce_success", None)
+        if not callable(refresh):
+            return False
+        refresh(settings, config_path=config_path)
+        return True
+
     def set_settings_overlay_calibration(self, calibration: object) -> None:
         settings_view = getattr(self._app, "view_settings", None)
         setter = getattr(settings_view, "set_overlay_calibration", None)
