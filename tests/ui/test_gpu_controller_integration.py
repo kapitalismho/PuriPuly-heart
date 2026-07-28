@@ -437,6 +437,7 @@ async def test_valid_device_change_quiesces_both_before_either_restore(
     controller.settings.stt.gpu_device_id = "vk:1"
     controller._stt_desired = True
     controller._peer_runtime = RecordingSelfRecoveryOwner()
+    controller._self_capture_owner = RecordingSelfRecoveryOwner()
     events: list[str] = []
 
     class Owner:
@@ -464,12 +465,32 @@ async def test_valid_device_change_quiesces_both_before_either_restore(
     async def suspend(_self: GuiController, _channels) -> None:
         events.extend(("self_closed", "peer_closed"))
 
-    async def resume(_self: GuiController, **_kwargs) -> None:
+    async def refresh_peer(_self: GuiController) -> None:
         assert events[-1] == "owner_rebuilt"
-        events.append("consumers_resumed")
+        events.append("peer_resumed")
 
     monkeypatch.setattr(GuiController, "_suspend_gpu_provider_consumers", suspend)
-    monkeypatch.setattr(GuiController, "_resume_gpu_provider_consumers", resume)
+    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", refresh_peer)
+    monkeypatch.setattr(
+        GuiController,
+        "_on_self_capture_state_changed",
+        lambda _self, _snapshot: events.append("self_resumed"),
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_ensure_stt_switch",
+        lambda _self: asyncio.sleep(0),
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_sync_effective_hub_flags",
+        lambda _self, _settings: None,
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_refresh_overlay_peer_consumers",
+        lambda _self: None,
+    )
 
     await controller._apply_gpu_runtime_owner_recovery(controller.settings, _gpu_restart_plan())
 
@@ -478,7 +499,8 @@ async def test_valid_device_change_quiesces_both_before_either_restore(
         "self_closed",
         "peer_closed",
         "owner_rebuilt",
-        "consumers_resumed",
+        "peer_resumed",
+        "self_resumed",
     ]
 
 
@@ -492,7 +514,6 @@ async def test_unavailable_device_change_retains_selection_and_stops_both(
     controller._stt_desired = True
     controller._peer_runtime = RecordingSelfRecoveryOwner()
     suspend = AsyncMock()
-    resume = AsyncMock()
 
     class Owner:
         def __init__(self) -> None:
@@ -521,16 +542,11 @@ async def test_unavailable_device_change_retains_selection_and_stops_both(
         "_suspend_gpu_provider_consumers",
         lambda _self, channels: suspend(channels),
     )
-    monkeypatch.setattr(
-        GuiController,
-        "_resume_gpu_provider_consumers",
-        lambda _self, **kwargs: resume(**kwargs),
-    )
 
     await controller._apply_gpu_runtime_owner_recovery(controller.settings, _gpu_restart_plan())
 
     suspend.assert_awaited_once_with(("self", "peer"))
-    resume.assert_not_awaited()
+    assert controller._peer_runtime.adopted_handlers == []
     assert self_owner.aborted_handlers == self_owner.prepared_handlers
     assert controller.settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
     assert controller.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
@@ -617,7 +633,7 @@ async def test_cancelled_device_recovery_aborts_pending_self_callback(
     assert self_owner.aborted_handlers == self_owner.prepared_handlers
 
 
-async def test_recovery_request_build_failure_aborts_pending_self_callback(
+async def test_recovery_plan_build_failure_does_not_prepare_callbacks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller, _view = _controller()
@@ -634,12 +650,12 @@ async def test_recovery_request_build_failure_aborts_pending_self_callback(
     monkeypatch.setattr(GuiController, "_peer_stt_provider_request", fail_peer_request)
 
     with pytest.raises(RuntimeError, match="peer recovery request failed"):
-        controller._build_gpu_recovery_request(
+        controller._gpu_provider_recovery_channel_plans(
             controller.settings,
             frozenset({"self", "peer"}),
-            reason="settings_restart",
         )
 
+    assert self_owner.prepared_handlers == []
     assert self_owner.aborted_handlers == self_owner.prepared_handlers
 
 
@@ -657,34 +673,20 @@ async def test_overlapping_manual_and_settings_recovery_adopt_exact_callbacks(
         lambda _self, _snapshot: None,
     )
 
-    manual_recovery, manual_peer_config = controller._build_gpu_recovery_request(
+    manual_plan = controller._gpu_provider_recovery_channel_plans(
         controller.settings,
         frozenset({"self"}),
-        reason="manual_retry",
-    )
-    settings_recovery, settings_peer_config = controller._build_gpu_recovery_request(
+    )[0]
+    settings_plan = controller._gpu_provider_recovery_channel_plans(
         controller.settings,
         frozenset({"self"}),
-        reason="settings_restart",
-    )
-    manual_handler = manual_recovery.channels[0].on_terminal_failure
-    settings_handler = settings_recovery.channels[0].on_terminal_failure
+    )[0]
+    manual_handler = manual_plan.prepare()
+    settings_handler = settings_plan.prepare()
 
-    await controller._resume_gpu_provider_consumers(
-        settings=controller.settings,
-        channels=frozenset({"self"}),
-        peer_config=manual_peer_config,
-        recovery=manual_recovery,
-    )
-    await controller._resume_gpu_provider_consumers(
-        settings=controller.settings,
-        channels=frozenset({"self"}),
-        peer_config=settings_peer_config,
-        recovery=settings_recovery,
-    )
+    await manual_plan.adopt(manual_handler)
+    await settings_plan.adopt(settings_handler)
 
-    assert manual_handler is not None
-    assert settings_handler is not None
     assert manual_handler is not settings_handler
     assert self_owner.adopted_handlers == [manual_handler, settings_handler]
     assert self_owner.pending_handlers == set()
@@ -824,11 +826,35 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
     controller.settings.ui.peer_translation_enabled = "peer" in channels
     controller._stt_desired = "self" in channels
     controller._gpu_devices = (device,)
-    resumed = AsyncMock()
+    self_owner = RecordingSelfRecoveryOwner()
+    peer_owner = RecordingSelfRecoveryOwner()
+    controller._self_capture_owner = self_owner
+    if "peer" in channels:
+        controller._peer_runtime = peer_owner
     monkeypatch.setattr(
         GuiController,
-        "_resume_gpu_provider_consumers",
-        lambda _self, **kwargs: resumed(**kwargs),
+        "_on_self_capture_state_changed",
+        lambda _self, _snapshot: None,
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_ensure_stt_switch",
+        lambda _self: asyncio.sleep(0),
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_refresh_peer_stt_runtime",
+        lambda _self: asyncio.sleep(0),
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_sync_effective_hub_flags",
+        lambda _self, _settings: None,
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_refresh_overlay_peer_consumers",
+        lambda _self: None,
     )
 
     class Owner:
@@ -855,8 +881,6 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
 
     owner = Owner()
     controller.hub = SimpleNamespace(local_asr_provider_runtime=owner)
-    if "peer" in channels:
-        controller._peer_runtime = RecordingSelfRecoveryOwner()
 
     await controller.retry_gpu_activation()
 
@@ -876,7 +900,8 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
     assert owner.snapshot.gpu.active_channels == channels
     assert controller.settings.stt.gpu_device_id == device.device_id
     assert controller._gpu_ui_state == "ready"
-    resumed.assert_awaited_once()
+    assert len(self_owner.adopted_handlers) == (1 if "self" in channels else 0)
+    assert len(peer_owner.adopted_handlers) == (1 if "peer" in channels else 0)
 
 
 async def test_controller_gpu_discovery_and_readiness_delegate_to_owned_runtime() -> None:

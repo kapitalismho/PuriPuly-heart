@@ -61,6 +61,12 @@ from puripuly_heart.app.services.github_star_prompt import (
 from puripuly_heart.app.services.github_star_prompt import (
     github_star_prompt_utc_timestamp as _github_star_prompt_utc_timestamp,
 )
+from puripuly_heart.app.services.gpu_provider_recovery import (
+    GpuProviderRecoveryChannelPlan,
+    GpuProviderRecoveryDiagnostic,
+    GpuProviderRecoveryExecution,
+    GpuProviderRecoveryOwner,
+)
 from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_CPU_AUTO_PROVIDER,
     LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER,
@@ -249,9 +255,9 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     LocalASRProviderRuntimeSnapshot,
     ProviderRuntimeBuildRequest,
+    ProviderRuntimeChannel,
     ProviderRuntimeDiagnostic,
-    ProviderRuntimeGpuRecoveryRequest,
-    ProviderRuntimeRecoveryChannel,
+    ProviderRuntimeTerminalFailureSink,
 )
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRInstallRequest,
@@ -843,7 +849,7 @@ class GuiController:
     _gpu_discovery_failure_state: str | None = field(init=False, default=None, repr=False)
     _gpu_discovery_generation: int = field(init=False, default=0, repr=False)
     _gpu_discovery_origin: str = field(init=False, default="settings", repr=False)
-    _gpu_provider_recovery_lock: asyncio.Lock | None = field(
+    _gpu_provider_recovery_owner: GpuProviderRecoveryOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -1485,59 +1491,15 @@ class GuiController:
             )
 
     async def retry_gpu_activation(self) -> None:
-        async with self._get_gpu_provider_recovery_lock():
-            await self._execute_gpu_provider_recovery_retry()
-
-    async def _execute_gpu_provider_recovery_retry(self) -> None:
         if self.settings is None:
             return
-        owned_runtime = self._hub_local_asr_provider_runtime()
-        if owned_runtime is None:
-            raise RuntimeError("local ASR provider runtime is unavailable")
-        desired_channels = frozenset(
-            {
-                *self._desired_gpu_channels(self.settings),
-                *self._gpu_pending_enable_channels,
-            }
+        await self._get_gpu_provider_recovery_owner().recover(
+            lambda: self._gpu_provider_recovery_execution(
+                self.settings,
+                reason="manual_retry",
+                plan=None,
+            )
         )
-        recovery, peer_config = self._build_gpu_recovery_request(
-            self.settings,
-            desired_channels,
-            reason="manual_retry",
-        )
-        if not recovery.channels:
-            return
-        try:
-            snapshot = await owned_runtime.recover_gpu(
-                recovery,
-                quiesce=self._suspend_gpu_provider_consumers,
-            )
-            recovered_channels = frozenset(item.request.channel for item in recovery.channels)
-            if snapshot.gpu.retry_required or not recovered_channels.issubset(
-                snapshot.gpu.active_channels
-            ):
-                self._on_local_asr_provider_runtime_state_changed(snapshot)
-                return
-            await self._resume_gpu_provider_consumers(
-                settings=self.settings,
-                channels=recovered_channels,
-                peer_config=peer_config,
-                recovery=recovery,
-            )
-            self._gpu_pending_enable_channels = frozenset(
-                channel
-                for channel in self._gpu_pending_enable_channels
-                if channel not in recovered_channels
-            )
-            self._set_gpu_ui_state("ready", origin="manual_retry")
-        except Exception:
-            self._set_gpu_ui_state(
-                "activation_failed",
-                publish_notice=True,
-                origin="manual_retry",
-            )
-        finally:
-            self._abort_provider_recoveries(recovery)
 
     def _create_ui_event_bridge(self, *, runtime_logging) -> object:  # noqa: ANN001
         assert self.hub is not None
@@ -7844,63 +7806,92 @@ class GuiController:
         next_settings: AppSettings,
         plan: _ProviderRuntimeApplyPlan,
     ) -> None:
-        async with self._get_gpu_provider_recovery_lock():
-            await self._apply_gpu_runtime_owner_recovery_locked(next_settings, plan)
-
-    async def _apply_gpu_runtime_owner_recovery_locked(
-        self,
-        next_settings: AppSettings,
-        plan: _ProviderRuntimeApplyPlan,
-    ) -> None:
-        owned_runtime = self._hub_local_asr_provider_runtime()
-        if owned_runtime is None:
-            raise RuntimeError("local ASR provider runtime is unavailable")
-        desired_channels = self._desired_gpu_channels(next_settings)
-        recovery, peer_config = self._build_gpu_recovery_request(
-            next_settings,
-            desired_channels,
-            reason="settings_restart",
+        await self._get_gpu_provider_recovery_owner().recover(
+            lambda: self._gpu_provider_recovery_execution(
+                next_settings,
+                reason="settings_restart",
+                plan=plan,
+            )
         )
-        try:
-            snapshot = await owned_runtime.recover_gpu(
-                recovery,
-                quiesce=self._suspend_gpu_provider_consumers,
+
+    def _get_gpu_provider_recovery_owner(self) -> GpuProviderRecoveryOwner:
+        owner = self._gpu_provider_recovery_owner
+        if owner is None:
+            owner = GpuProviderRecoveryOwner(
+                diagnostic_sink=self._on_gpu_provider_recovery_diagnostic,
             )
-            recovered_channels = frozenset(item.request.channel for item in recovery.channels)
-            if recovered_channels and (
-                snapshot.gpu.retry_required
-                or not recovered_channels.issubset(snapshot.gpu.active_channels)
-            ):
-                self._on_local_asr_provider_runtime_state_changed(snapshot)
-                return
-            await self._resume_gpu_provider_consumers(
-                settings=next_settings,
-                channels=recovered_channels,
-                peer_config=peer_config,
-                recovery=recovery,
+            self._gpu_provider_recovery_owner = owner
+        return owner
+
+    def _gpu_provider_recovery_execution(
+        self,
+        settings: AppSettings,
+        *,
+        reason: Literal["manual_retry", "settings_restart"],
+        plan: _ProviderRuntimeApplyPlan | None,
+    ) -> GpuProviderRecoveryExecution:
+        runtime = self._hub_local_asr_provider_runtime()
+        if runtime is None:
+            raise RuntimeError("local ASR provider runtime is unavailable")
+        desired_channels = self._desired_gpu_channels(settings)
+        if reason == "manual_retry":
+            desired_channels = frozenset(
+                {
+                    *desired_channels,
+                    *self._gpu_pending_enable_channels,
+                }
             )
-            if plan.should_refresh_self_stt and "self" not in recovered_channels:
-                if self._stt_desired:
-                    await self._replace_runtime_stt_provider()
-                else:
-                    await self._rebuild_stt_provider()
-            if plan.should_refresh_peer and "peer" not in recovered_channels:
-                await self._refresh_peer_stt_runtime()
-                self._sync_effective_hub_flags(next_settings)
-                self._refresh_overlay_peer_consumers()
-        except Exception:
-            self._set_gpu_ui_state(
+        return GpuProviderRecoveryExecution(
+            runtime=runtime,
+            device_id=settings.stt.gpu_device_id,
+            reason=reason,
+            channels=self._gpu_provider_recovery_channel_plans(
+                settings,
+                desired_channels,
+            ),
+            quiesce=self._suspend_gpu_provider_consumers,
+            on_incomplete=self._on_local_asr_provider_runtime_state_changed,
+            on_applied=lambda recovered_channels: self._complete_gpu_provider_recovery(
+                settings=settings,
+                reason=reason,
+                plan=plan,
+                recovered_channels=recovered_channels,
+            ),
+            on_failure=lambda: self._set_gpu_ui_state(
                 "activation_failed",
                 publish_notice=True,
-                origin="settings_apply",
-            )
-        finally:
-            self._abort_provider_recoveries(recovery)
+                origin="manual_retry" if reason == "manual_retry" else "settings_apply",
+            ),
+            skip_if_no_channels=reason == "manual_retry",
+        )
 
-    def _get_gpu_provider_recovery_lock(self) -> asyncio.Lock:
-        if self._gpu_provider_recovery_lock is None:
-            self._gpu_provider_recovery_lock = asyncio.Lock()
-        return self._gpu_provider_recovery_lock
+    async def _complete_gpu_provider_recovery(
+        self,
+        *,
+        settings: AppSettings,
+        reason: Literal["manual_retry", "settings_restart"],
+        plan: _ProviderRuntimeApplyPlan | None,
+        recovered_channels: frozenset[ProviderRuntimeChannel],
+    ) -> None:
+        if reason == "manual_retry":
+            self._gpu_pending_enable_channels = frozenset(
+                channel
+                for channel in self._gpu_pending_enable_channels
+                if channel not in recovered_channels
+            )
+            self._set_gpu_ui_state("ready", origin="manual_retry")
+            return
+        if plan is None:
+            raise RuntimeError("settings GPU recovery requires a runtime apply plan")
+        if plan.should_refresh_self_stt and "self" not in recovered_channels:
+            if self._stt_desired:
+                await self._replace_runtime_stt_provider()
+            else:
+                await self._rebuild_stt_provider()
+        if plan.should_refresh_peer and "peer" not in recovered_channels:
+            await self._refresh_peer_stt_runtime()
+            self._sync_effective_hub_flags(settings)
+            self._refresh_overlay_peer_consumers()
 
     def _desired_gpu_channels(self, settings: AppSettings) -> frozenset[GpuASRChannel]:
         owned_runtime = self._hub_local_asr_provider_runtime()
@@ -7918,75 +7909,63 @@ class GuiController:
             desired.add("peer")
         return frozenset(desired)
 
-    def _build_gpu_recovery_request(
+    def _gpu_provider_recovery_channel_plans(
         self,
         settings: AppSettings,
         channels: frozenset[GpuASRChannel],
-        *,
-        reason: Literal["manual_retry", "settings_restart"],
-    ) -> tuple[ProviderRuntimeGpuRecoveryRequest, PeerCaptureSessionConfig | None]:
-        targets: list[ProviderRuntimeRecoveryChannel] = []
-        peer_config = None
-        self_recovery_owner = None
-        self_recovery_handler = None
-        peer_recovery_owner = None
-        peer_recovery_handler = None
-        try:
-            if "self" in channels and settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU:
-                self_config = self._build_self_capture_session_config(settings)
-                self_recovery_owner = self._get_self_capture_owner()
-                self_recovery_handler = self_recovery_owner.prepare_provider_recovery(self_config)
-                targets.append(
-                    ProviderRuntimeRecoveryChannel(
-                        request=self._self_stt_provider_request(settings, warmup=True),
-                        start=self._stt_desired,
-                        on_terminal_failure=self_recovery_handler,
-                    )
-                )
-            if "peer" in channels and settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU:
-                peer_config = self._build_peer_runtime_config(settings)
-                peer_recovery_owner = self._peer_runtime
-                if peer_recovery_owner is None:
-                    raise RuntimeError("Peer recovery requires a capture owner")
-                peer_recovery_handler = peer_recovery_owner.prepare_provider_recovery(peer_config)
-                targets.append(
-                    ProviderRuntimeRecoveryChannel(
-                        request=self._peer_stt_provider_request(peer_config, warmup=True),
-                        start=False,
-                        on_terminal_failure=peer_recovery_handler,
-                    )
-                )
-        except BaseException:
-            if self_recovery_owner is not None and self_recovery_handler is not None:
-                self_recovery_owner.abort_provider_recovery(self_recovery_handler)
-            if peer_recovery_owner is not None and peer_recovery_handler is not None:
-                peer_recovery_owner.abort_provider_recovery(peer_recovery_handler)
-            raise
-        return (
-            ProviderRuntimeGpuRecoveryRequest(
-                device_id=settings.stt.gpu_device_id,
-                channels=tuple(targets),
-                reason=reason,
-            ),
-            peer_config,
-        )
+    ) -> tuple[GpuProviderRecoveryChannelPlan, ...]:
+        plans: list[GpuProviderRecoveryChannelPlan] = []
+        if "self" in channels and settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU:
+            self_config = self._build_self_capture_session_config(settings)
+            self_owner = self._get_self_capture_owner()
 
-    def _abort_provider_recoveries(
-        self,
-        recovery: ProviderRuntimeGpuRecoveryRequest,
-    ) -> None:
-        for channel, owner in (
-            ("self", self._self_capture_owner),
-            ("peer", self._peer_runtime),
-        ):
-            if owner is None:
-                continue
-            target = next(
-                (item for item in recovery.channels if item.request.channel == channel),
-                None,
+            async def adopt_self(
+                failure_handler: ProviderRuntimeTerminalFailureSink,
+            ) -> None:
+                snapshot = await self_owner.adopt_recovered_provider(
+                    self_config,
+                    on_terminal_failure=failure_handler,
+                )
+                self._on_self_capture_state_changed(snapshot)
+                if self._stt_desired:
+                    await self._ensure_stt_switch()
+
+            plans.append(
+                GpuProviderRecoveryChannelPlan(
+                    request=self._self_stt_provider_request(settings, warmup=True),
+                    start=self._stt_desired,
+                    prepare=lambda: self_owner.prepare_provider_recovery(self_config),
+                    abort=self_owner.abort_provider_recovery,
+                    adopt=adopt_self,
+                )
             )
-            if target is not None and target.on_terminal_failure is not None:
-                owner.abort_provider_recovery(target.on_terminal_failure)
+        if "peer" in channels and settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU:
+            peer_config = self._build_peer_runtime_config(settings)
+            peer_owner = self._peer_runtime
+            if peer_owner is None:
+                raise RuntimeError("Peer recovery requires a capture owner")
+
+            async def adopt_peer(
+                failure_handler: ProviderRuntimeTerminalFailureSink,
+            ) -> None:
+                await peer_owner.adopt_recovered_provider(
+                    peer_config,
+                    on_terminal_failure=failure_handler,
+                )
+                await self._refresh_peer_stt_runtime()
+                self._sync_effective_hub_flags(settings)
+                self._refresh_overlay_peer_consumers()
+
+            plans.append(
+                GpuProviderRecoveryChannelPlan(
+                    request=self._peer_stt_provider_request(peer_config, warmup=True),
+                    start=False,
+                    prepare=lambda: peer_owner.prepare_provider_recovery(peer_config),
+                    abort=peer_owner.abort_provider_recovery,
+                    adopt=adopt_peer,
+                )
+            )
+        return tuple(plans)
 
     async def _suspend_gpu_provider_consumers(
         self,
@@ -7998,41 +7977,25 @@ class GuiController:
         if "peer" in channels and self._peer_runtime is not None:
             await self._peer_runtime.suspend_provider_consumer()
 
-    async def _resume_gpu_provider_consumers(
+    def _on_gpu_provider_recovery_diagnostic(
         self,
-        *,
-        settings: AppSettings,
-        channels: frozenset[GpuASRChannel],
-        peer_config: PeerCaptureSessionConfig | None,
-        recovery: ProviderRuntimeGpuRecoveryRequest,
+        diagnostic: GpuProviderRecoveryDiagnostic,
     ) -> None:
-        if "peer" in channels and self._peer_runtime is not None:
-            if peer_config is None:
-                peer_config = self._build_peer_runtime_config(settings)
-            peer_target = next(item for item in recovery.channels if item.request.channel == "peer")
-            if peer_target.on_terminal_failure is None:
-                raise RuntimeError("Peer recovery requires an owner failure callback")
-            await self._peer_runtime.adopt_recovered_provider(
-                peer_config,
-                on_terminal_failure=peer_target.on_terminal_failure,
-            )
-            await self._refresh_peer_stt_runtime()
-            self._sync_effective_hub_flags(settings)
-            self._refresh_overlay_peer_consumers()
-        if "self" in channels:
-            if self._self_capture_owner is not None:
-                self_target = next(
-                    item for item in recovery.channels if item.request.channel == "self"
-                )
-                if self_target.on_terminal_failure is None:
-                    raise RuntimeError("Self recovery requires an owner failure callback")
-                snapshot = await self._self_capture_owner.adopt_recovered_provider(
-                    self._build_self_capture_session_config(settings),
-                    on_terminal_failure=self_target.on_terminal_failure,
-                )
-                self._on_self_capture_state_changed(snapshot)
-            if self._stt_desired:
-                await self._ensure_stt_switch()
+        fields = [
+            f"outcome={diagnostic.outcome}",
+            f"reason={diagnostic.reason}",
+            f"channels={','.join(diagnostic.channels) or 'none'}",
+        ]
+        if diagnostic.failure_type is not None:
+            fields.append(f"failure_type={diagnostic.failure_type}")
+        self.log_detailed(
+            f"[GPU ASR] provider_recovery {' '.join(fields)}",
+            level=(
+                logging.WARNING
+                if diagnostic.outcome in {"failed", "prepare_failed"}
+                else logging.INFO
+            ),
+        )
 
     def _load_or_init_settings(self, path: Path) -> AppSettings:
         if path != self.config_path:
