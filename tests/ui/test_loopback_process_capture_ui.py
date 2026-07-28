@@ -1168,7 +1168,6 @@ async def test_failed_process_warning_survives_unrelated_draft_apply_without_dev
     assert persisted.desktop_audio.runtime_capture_target.kind == "process"
     assert config.capture_target.kind == "process"
     assert controller._peer_process_warning_reason == warning_reason
-    assert controller.peer_warning_action_is_retry() is True
 
     class UnavailableResolver:
         def __init__(self, *, snapshots):

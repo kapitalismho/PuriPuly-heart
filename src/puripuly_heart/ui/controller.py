@@ -8358,14 +8358,6 @@ class GuiController:
         with contextlib.suppress(Exception):
             self.app.refresh_settings_loopback_capture_target(self.settings)
 
-    def peer_warning_action_is_retry(self) -> bool:
-        if self.settings is None or not self.settings.ui.peer_translation_enabled:
-            return False
-        reason = self._peer_process_warning_reason
-        return reason is not None and (
-            reason.startswith("process_") or reason.startswith("process_unavailable_")
-        )
-
     @staticmethod
     def _encode_process_capture_option(target: ProcessCaptureTargetIntent) -> str:
         if target.kind == "discord":
