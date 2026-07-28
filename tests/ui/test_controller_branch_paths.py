@@ -22,6 +22,7 @@ from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as canonical_persistence_adapter_module,
 )
 from puripuly_heart.app.adapters.peer_capture_source import PeerCaptureSourceAdapter
+from puripuly_heart.app.adapters.peer_capture_vad import PeerCaptureVadAdapter
 from puripuly_heart.app.adapters.self_capture_source import SelfCaptureSourceAdapter
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.microphone_test import (
@@ -6107,10 +6108,7 @@ def test_dashboard_stt_needs_key_remains_self_oriented_when_peer_provider_differ
     assert controller._dashboard_stt_needs_key(stt_available=True) is False
 
 
-@pytest.mark.asyncio
-async def test_create_peer_vad_from_runtime_config_uses_shared_peer_vad_policy_helper(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_peer_capture_vad_adapter_uses_shared_peer_vad_policy_helper() -> None:
     controller = _make_controller(app=SimpleNamespace())
     settings = AppSettings()
     settings.desktop_audio.vad_speech_threshold = 0.72
@@ -6146,10 +6144,15 @@ async def test_create_peer_vad_from_runtime_config_uses_shared_peer_vad_policy_h
         )
         return "peer-vad"
 
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *args, **kwargs: engine)
-    monkeypatch.setattr(controller_module, "create_peer_vad_gating", fake_create_peer_vad_gating)
+    adapter = PeerCaptureVadAdapter(
+        model_path_resolver=lambda: Path("vad.onnx"),
+        engine_factory=lambda *args, **kwargs: engine,
+        gating_factory=fake_create_peer_vad_gating,
+        log_detailed=controller.log_detailed,
+        diagnostics_enabled=controller._detailed_audio_diag_enabled,
+    )
 
-    vad = controller._create_peer_vad_from_runtime_config(config, Path("vad.onnx"))
+    vad = adapter(config)
 
     assert vad == "peer-vad"
     assert helper_calls == [

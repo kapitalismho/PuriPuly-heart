@@ -184,6 +184,7 @@ from puripuly_heart.app.wiring import (
     create_microphone_test_capture_adapter,
     create_peer_capture_source_adapter,
     create_peer_capture_target_resolver_adapter,
+    create_peer_capture_vad_adapter,
     create_provider_verifier,
     create_secret_store,
     create_self_capture_source_adapter,
@@ -395,7 +396,7 @@ from puripuly_heart.core.telemetry import (
 )
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
-from puripuly_heart.core.vad.gating import VadGating, create_peer_vad_gating
+from puripuly_heart.core.vad.gating import VadGating
 from puripuly_heart.core.vad.silero import SileroVadOnnx
 
 logger = logging.getLogger(__name__)
@@ -8995,13 +8996,6 @@ class GuiController:
                     manager.terminate()
         return names
 
-    @staticmethod
-    def _peer_capture_sample_rate(config: object) -> int:
-        sample_rate = getattr(config, "target_sample_rate_hz", None)
-        if sample_rate is not None:
-            return int(sample_rate)
-        return int(getattr(getattr(config, "backend"), "sample_rate_hz"))
-
     @property
     def debug_capture_fault_profile(self) -> str:
         return self._debug_capture_fault_profile
@@ -9139,23 +9133,6 @@ class GuiController:
                 else AudioFaultProfile.NONE.value
             ),
             extra_fields_provider=extra_fields,
-        )
-
-    def _create_peer_vad_from_runtime_config(
-        self,
-        config: PeerCaptureSessionConfig,
-        model_path: Path | None = None,
-    ) -> VadGating:
-        model_path = model_path or ensure_silero_vad_onnx()
-        return create_peer_vad_gating(
-            engine=SileroVadOnnx(model_path=model_path),
-            sample_rate_hz=self._peer_capture_sample_rate(config),
-            ring_buffer_ms=config.vad_pre_roll_ms,
-            speech_threshold=config.vad_speech_threshold,
-            hangover_ms=config.vad_hangover_ms,
-            diagnostic_event_callback=lambda message: self.log_detailed(message),
-            diagnostics_enabled=self._detailed_audio_diag_enabled,
-            diagnostic_label="peer",
         )
 
     async def _run_peer_audio_vad_loop(self, **kwargs: object) -> None:
@@ -9397,7 +9374,10 @@ class GuiController:
                 ),
                 is_detailed_enabled=self._detailed_audio_diag_enabled,
             ),
-            vad_factory=self._create_peer_vad_from_runtime_config,
+            vad_factory=create_peer_capture_vad_adapter(
+                log_detailed=self.log_detailed,
+                diagnostics_enabled=self._detailed_audio_diag_enabled,
+            ),
             run_audio_loop=self._run_peer_audio_vad_loop,
             vad_sink=_PeerCaptureVadSink(lambda: self.hub),
             state_changed=self._on_peer_capture_state_changed,

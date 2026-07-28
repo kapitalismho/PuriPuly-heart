@@ -1047,6 +1047,14 @@
       "rationale": "PeerCaptureTargetResolverAdapter implements the internal Peer capture target-resolver port through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
     {
+      "surface": "puripuly_heart.app.adapters Peer capture VAD adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture_vad"
+      ],
+      "rationale": "PeerCaptureVadAdapter implements the internal Peer capture VAD-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
       "surface": "puripuly_heart.app.adapters synchronous SecretStore adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [

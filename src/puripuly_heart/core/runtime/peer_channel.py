@@ -148,6 +148,7 @@ PeerCaptureSourceFactory = Callable[
     [PeerCaptureSessionConfig, PeerCaptureResolvedTarget],
     Awaitable[object] | object,
 ]
+PeerCaptureVadFactory = Callable[[PeerCaptureSessionConfig], object]
 
 
 class PeerCaptureSessionOwner:
@@ -176,7 +177,7 @@ class PeerCaptureSessionOwner:
             object,
         ],
         source_factory: PeerCaptureSourceFactory,
-        vad_factory: Callable[[PeerCaptureSessionConfig], object],
+        vad_factory: PeerCaptureVadFactory,
         run_audio_loop: Callable[..., Awaitable[None]],
         vad_sink: object,
         state_changed: Callable[[PeerCaptureSessionSnapshot], object] | None = None,

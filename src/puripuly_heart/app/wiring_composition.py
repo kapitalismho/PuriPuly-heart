@@ -8,7 +8,10 @@ from puripuly_heart.app.ports.microphone_test import (
 )
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.core.peer_capture import PeerCaptureTargetResolverPort
-from puripuly_heart.core.runtime.peer_channel import PeerCaptureSourceFactory
+from puripuly_heart.core.runtime.peer_channel import (
+    PeerCaptureSourceFactory,
+    PeerCaptureVadFactory,
+)
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSourceFactory
 
 
@@ -95,6 +98,25 @@ def create_peer_capture_target_resolver_adapter() -> PeerCaptureTargetResolverPo
         return ProcessCaptureResolver(snapshots=PsutilCurrentUserProcessSnapshots())
 
     return PeerCaptureTargetResolverAdapter(resolver_factory=create_process_resolver)
+
+
+def create_peer_capture_vad_adapter(
+    *,
+    log_detailed: Callable[[str], object],
+    diagnostics_enabled: Callable[[], bool],
+) -> PeerCaptureVadFactory:
+    from puripuly_heart.app.adapters.peer_capture_vad import PeerCaptureVadAdapter
+    from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
+    from puripuly_heart.core.vad.gating import create_peer_vad_gating
+    from puripuly_heart.core.vad.silero import SileroVadOnnx
+
+    return PeerCaptureVadAdapter(
+        model_path_resolver=ensure_silero_vad_onnx,
+        engine_factory=SileroVadOnnx,
+        gating_factory=create_peer_vad_gating,
+        log_detailed=log_detailed,
+        diagnostics_enabled=diagnostics_enabled,
+    )
 
 
 def create_provider_verifier() -> ProviderVerifierPort:
