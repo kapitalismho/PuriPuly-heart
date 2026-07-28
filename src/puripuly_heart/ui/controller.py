@@ -399,7 +399,6 @@ from puripuly_heart.core.runtime.peer_channel import (
     PeerLocalASRTransitionSuperseded,
 )
 from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildService
-from puripuly_heart.core.runtime.receiver import VrcMicReceiverRuntime
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.vrchat_osc_presence import (
     VrchatOscPresenceProbeOwner,
@@ -9661,15 +9660,6 @@ class GuiController:
         self._get_vrc_mic_sync_owner().receiver = receiver
 
     @property
-    def _vrc_mic_receiver_runtime(self) -> VrcMicReceiverRuntime | None:
-        owner = self._vrc_mic_sync_owner
-        return owner.runtime if owner is not None else None
-
-    @_vrc_mic_receiver_runtime.setter
-    def _vrc_mic_receiver_runtime(self, runtime: VrcMicReceiverRuntime | None) -> None:
-        self._get_vrc_mic_sync_owner().runtime = runtime
-
-    @property
     def _last_vrc_mic_sync_enabled(self) -> bool | None:
         owner = self._vrc_mic_sync_owner
         return owner.last_enabled if owner is not None else None
@@ -9692,15 +9682,6 @@ class GuiController:
             )
             self._vrc_mic_sync_owner = owner
         return owner
-
-    def _get_vrc_mic_receiver_runtime(self) -> VrcMicReceiverRuntime | None:
-        return self._get_vrc_mic_sync_owner().get_runtime()
-
-    def _sync_vrc_mic_receiver_runtime_aliases(
-        self,
-        runtime: VrcMicReceiverRuntime | None = None,
-    ) -> None:
-        self._get_vrc_mic_sync_owner().sync_runtime_receiver(runtime)
 
     def _vrc_mic_receiver_runtime_diagnostics_sink(
         self,

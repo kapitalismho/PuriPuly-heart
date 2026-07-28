@@ -10012,7 +10012,7 @@ async def test_stop_terminally_closes_vrc_receiver_runtime_before_hub_teardown(
             events.append(("sender_close", None))
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    controller._vrc_mic_receiver_runtime = FakeReceiverRuntime()
+    controller._get_vrc_mic_sync_owner().runtime = FakeReceiverRuntime()
     controller.receiver = object()
     controller.hub = FakeHub()
     controller.sender = FakeSender()
@@ -10060,7 +10060,8 @@ async def test_stop_aggregates_vrc_receiver_close_failure_and_still_stops_hub(
         _ = (self, preserve_failure_reason)
         events.append("overlay_shutdown")
 
-    controller._vrc_mic_receiver_runtime = FailingReceiverRuntime()
+    owner = controller._get_vrc_mic_sync_owner()
+    owner.runtime = FailingReceiverRuntime()
     controller.receiver = receiver
     controller.hub = FakeHub()
     controller.sender = FakeSender()
@@ -10074,7 +10075,7 @@ async def test_stop_aggregates_vrc_receiver_close_failure_and_still_stops_hub(
     assert events[:4] == ["stt_off", "receiver_close", "overlay_shutdown", "hub_stop"]
     assert events[-1] == "sender_close"
     assert "receiver_stop" not in events
-    assert controller._vrc_mic_receiver_runtime is not None
+    assert owner.runtime is not None
     assert controller.receiver is receiver
 
 
@@ -12989,13 +12990,14 @@ async def test_configure_vrc_mic_receiver_disabled_stops_runtime_owner_and_marks
     controller.receiver = receiver
     controller.vrc_mic_audio_gate = gate
     runtime = FakeReceiverRuntime()
-    controller._vrc_mic_receiver_runtime = runtime
+    owner = controller._get_vrc_mic_sync_owner()
+    owner.runtime = runtime
 
     await controller._configure_vrc_mic_receiver(enabled=False)
 
     assert stop_calls == ["runtime-stopped"]
     assert runtime.close_calls == 0
-    assert controller._vrc_mic_receiver_runtime is runtime
+    assert owner.runtime is runtime
     assert controller.receiver is None
     assert gate.enabled_calls == [False]
     assert gate.receiver_active_calls == [False]
@@ -13034,7 +13036,7 @@ async def test_controller_stop_closes_vrc_mic_receiver_before_hub_shutdown(
     async def fake_noop(self, *args, **kwargs) -> None:  # noqa: ANN001, ANN002, ANN003
         _ = (self, args, kwargs)
 
-    controller._vrc_mic_receiver_runtime = FakeReceiverRuntime()
+    controller._get_vrc_mic_sync_owner().runtime = FakeReceiverRuntime()
     controller.receiver = object()
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
