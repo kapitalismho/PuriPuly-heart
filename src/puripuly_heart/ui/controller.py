@@ -311,6 +311,10 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureTargetStatus,
 )
 from puripuly_heart.core.runtime.clipboard import ClipboardRuntime
+from puripuly_heart.core.runtime.desktop_overlay_bounds import (
+    DesktopOverlayBoundsOwner,
+    is_finite_non_bool_number,
+)
 from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 from puripuly_heart.core.runtime.local_asr_transition import (
@@ -1173,19 +1177,9 @@ class GuiController:
         repr=False,
     )
     _vrchat_osc_probe_generation: int = field(init=False, default=0)
-    _desktop_bounds_persist_task: asyncio.Task[None] | None = field(
+    _desktop_overlay_bounds_owner: DesktopOverlayBoundsOwner | None = field(
         init=False,
         default=None,
-        repr=False,
-    )
-    _pending_desktop_bounds: dict[str, int | float] | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _desktop_suppressed_bounds_signatures: set[tuple[float, float, float, float]] = field(
-        init=False,
-        default_factory=set,
         repr=False,
     )
     _managed_trial_pending_auth: bool = field(init=False, default=False)
@@ -3940,78 +3934,28 @@ class GuiController:
 
     @staticmethod
     def _is_finite_non_bool_number(value: object) -> bool:
-        return (
-            isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-        )
-
-    @staticmethod
-    def _desktop_bounds_signature(
-        bounds: dict[str, int | float],
-    ) -> tuple[float, float, float, float]:
-        return (
-            float(bounds["x"]),
-            float(bounds["y"]),
-            float(bounds["width"]),
-            float(bounds["height"]),
-        )
+        return is_finite_non_bool_number(value)
 
     def _desktop_bounds_from_payload(
         self,
         payload: dict[object, object],
     ) -> dict[str, int | float] | None:
-        x = payload.get("x")
-        y = payload.get("y")
-        width = payload.get("width")
-        height = payload.get("height")
-        if not (
-            self._is_finite_non_bool_number(x)
-            and self._is_finite_non_bool_number(y)
-            and self._is_finite_non_bool_number(width)
-            and self._is_finite_non_bool_number(height)
-        ):
-            return None
-        if width < DESKTOP_FLET_MIN_WIDTH or height < DESKTOP_FLET_MIN_HEIGHT:  # type: ignore[operator]
-            return None
-        return {
-            "x": x,  # type: ignore[dict-item]
-            "y": y,  # type: ignore[dict-item]
-            "width": width,  # type: ignore[dict-item]
-            "height": height,  # type: ignore[dict-item]
-        }
+        return self._get_desktop_overlay_bounds_owner().bounds_from_payload(payload)
 
     def _is_valid_desktop_window_bounds_event_payload(
         self,
         payload: dict[object, object],
     ) -> bool:
-        source = payload.get("source")
-        persist = payload.get("persist")
-        if source not in {"user", "reset", "programmatic", "launch_repair"}:
-            return False
-        expected_persist = source in {"user", "reset"}
-        return bool(
-            payload.get("event") == "window_bounds_changed"
-            and isinstance(persist, bool)
-            and persist is expected_persist
-            and self._desktop_bounds_from_payload(payload) is not None
-        )
+        return self._get_desktop_overlay_bounds_owner().is_valid_event_payload(payload)
 
     def _track_desktop_apply_window_bounds_control(self, payload: dict[str, object]) -> None:
-        if payload.get("command") != "apply_window_bounds":
-            return
-        bounds = self._desktop_bounds_from_payload(payload)
-        if bounds is None:
-            return
-        self._desktop_suppressed_bounds_signatures.add(self._desktop_bounds_signature(bounds))
+        self._get_desktop_overlay_bounds_owner().track_apply_control(payload)
 
     def _consume_suppressed_desktop_bounds(self, bounds: dict[str, int | float]) -> bool:
-        signature = self._desktop_bounds_signature(bounds)
-        if signature not in self._desktop_suppressed_bounds_signatures:
-            return False
-        self._desktop_suppressed_bounds_signatures.discard(signature)
-        return True
+        return self._get_desktop_overlay_bounds_owner().consume_suppressed(bounds)
 
     def _discard_suppressed_desktop_bounds(self, bounds: dict[str, int | float]) -> None:
-        self._desktop_suppressed_bounds_signatures.discard(self._desktop_bounds_signature(bounds))
+        self._get_desktop_overlay_bounds_owner().discard_suppressed(bounds)
 
     @staticmethod
     def _is_desktop_user_window_bounds_event(event: object) -> bool:
@@ -4256,28 +4200,10 @@ class GuiController:
         self,
         bounds: dict[str, int | float],
     ) -> None:
-        self._pending_desktop_bounds = dict(bounds)
-        task = self._desktop_bounds_persist_task
-        if task is not None and not task.done():
-            task.cancel()
-        self._desktop_bounds_persist_task = asyncio.create_task(
-            self._persist_desktop_bounds_after_debounce()
-        )
+        self._get_desktop_overlay_bounds_owner().schedule_persistence(bounds)
 
     async def _persist_desktop_bounds_after_debounce(self) -> None:
-        current_task = asyncio.current_task()
-        try:
-            await asyncio.sleep(DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S)
-            bounds = self._pending_desktop_bounds
-            self._pending_desktop_bounds = None
-            if bounds is None:
-                return
-            await self._persist_desktop_bounds(bounds)
-        except asyncio.CancelledError:
-            raise
-        finally:
-            if self._desktop_bounds_persist_task is current_task:
-                self._desktop_bounds_persist_task = None
+        await self._get_desktop_overlay_bounds_owner().persist_after_debounce()
 
     async def _persist_desktop_bounds(self, bounds: dict[str, int | float]) -> None:
         if self.settings is None or self._active_overlay_target != OVERLAY_TARGET_DESKTOP:
@@ -4376,24 +4302,43 @@ class GuiController:
             return None
 
     async def _cancel_desktop_bounds_persistence(self) -> None:
-        current_task = asyncio.current_task()
-        task = self._desktop_bounds_persist_task
-        self._desktop_bounds_persist_task = None
-        self._pending_desktop_bounds = None
-        if task is not None and task is not current_task and not task.done():
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
+        await self._get_desktop_overlay_bounds_owner().cancel()
 
     def _discard_pending_desktop_bounds_persistence(self) -> None:
-        try:
-            current_task = asyncio.current_task()
-        except RuntimeError:
-            current_task = None
-        task = self._desktop_bounds_persist_task
-        self._desktop_bounds_persist_task = None
-        self._pending_desktop_bounds = None
-        if task is not None and task is not current_task and not task.done():
-            task.cancel()
+        self._get_desktop_overlay_bounds_owner().discard()
+
+    @property
+    def _desktop_bounds_persist_task(self) -> asyncio.Task[None] | None:
+        owner = self._desktop_overlay_bounds_owner
+        return owner.persist_task if owner is not None else None
+
+    @property
+    def _pending_desktop_bounds(self) -> dict[str, int | float] | None:
+        owner = self._desktop_overlay_bounds_owner
+        return owner.pending_bounds if owner is not None else None
+
+    @_pending_desktop_bounds.setter
+    def _pending_desktop_bounds(
+        self,
+        bounds: dict[str, int | float] | None,
+    ) -> None:
+        self._get_desktop_overlay_bounds_owner().replace_pending_bounds(bounds)
+
+    def _get_desktop_overlay_bounds_owner(self) -> DesktopOverlayBoundsOwner:
+        owner = self._desktop_overlay_bounds_owner
+        if owner is None:
+            owner = DesktopOverlayBoundsOwner(
+                persist_bounds=self._persist_desktop_bounds,
+                debounce_seconds=lambda: DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S,
+                minimum_width=DESKTOP_FLET_MIN_WIDTH,
+                minimum_height=DESKTOP_FLET_MIN_HEIGHT,
+                diagnostics_sink=lambda event, metadata: self.log_detailed(
+                    f"[DesktopOverlay][Bounds] event={event} metadata={dict(metadata)}",
+                    level=logging.WARNING,
+                ),
+            )
+            self._desktop_overlay_bounds_owner = owner
+        return owner
 
     def _desktop_runtime_is_running_for_settings_update(
         self,
@@ -5540,7 +5485,7 @@ class GuiController:
         if close_succeeded and not self._overlay_runtime_has_resources(runtime):
             self._overlay_runtime = None
         self._active_overlay_target = None
-        self._desktop_suppressed_bounds_signatures.clear()
+        self._get_desktop_overlay_bounds_owner().clear_suppressed()
         if not preserve_presenter_state:
             self._set_desktop_overlay_interaction_mode(DESKTOP_INTERACTION_MODE_EDIT)
         return close_succeeded

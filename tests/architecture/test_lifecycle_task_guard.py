@@ -37,7 +37,6 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/ui/components/settings/api_key_field.py", RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/dashboard.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/views/settings.py", RUN_TASK): 1,
-        ("src/puripuly_heart/ui/controller.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/ui/controller.py", LOOP_CREATE_TASK): 2,
         ("src/puripuly_heart/ui/presentation_adapter.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/desktop_overlay.py", ASYNCIO_CREATE_TASK): 11,
@@ -55,6 +54,10 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
         ("src/puripuly_heart/core/runtime/output.py", ASYNCIO_CREATE_TASK): 2,
         ("src/puripuly_heart/core/runtime/oauth.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/clipboard.py", ASYNCIO_CREATE_TASK): 1,
+        (
+            "src/puripuly_heart/core/runtime/desktop_overlay_bounds.py",
+            ASYNCIO_CREATE_TASK,
+        ): 1,
         (
             "src/puripuly_heart/core/runtime/github_star_prompt.py",
             ASYNCIO_CREATE_TASK,
@@ -132,10 +135,6 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     ): "SettingsView uses page.run_task at the UI boundary to load loopback process capture options asynchronously while keeping the modal responsive",
     (
         "src/puripuly_heart/ui/controller.py",
-        ASYNCIO_CREATE_TASK,
-    ): "controller retains one bounded UI task handle for desktop-bounds persistence after G09 moved other task families behind lifecycle scopes",
-    (
-        "src/puripuly_heart/ui/controller.py",
         LOOP_CREATE_TASK,
     ): "controller retains two loop-bound UI scheduling call sites for overlay updates after manual typing moved to its lifecycle owner",
     (
@@ -182,6 +181,10 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         "src/puripuly_heart/core/runtime/clipboard.py",
         ASYNCIO_CREATE_TASK,
     ): "ClipboardRuntime is the named lifecycle owner for clipboard watcher tasks",
+    (
+        "src/puripuly_heart/core/runtime/desktop_overlay_bounds.py",
+        ASYNCIO_CREATE_TASK,
+    ): "DesktopOverlayBoundsOwner owns the debounced bounds persistence task and cancels or gathers it before resets, setting changes, and shutdown",
     (
         "src/puripuly_heart/core/runtime/github_star_prompt.py",
         ASYNCIO_CREATE_TASK,
@@ -318,11 +321,11 @@ def test_order34_named_owner_allowlist_does_not_claim_stt_controller_legacy_task
     assert stt_controller_tasks not in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
 
 
-def test_order37_named_owner_allowlist_preserves_remaining_legacy_ui_task_debt() -> None:
+def test_order37_named_owner_allowlist_retires_controller_bounds_task_debt() -> None:
     assert (
         "src/puripuly_heart/ui/controller.py",
         ASYNCIO_CREATE_TASK,
-    ) in LEGACY_TASK_CREATION_ALLOWLIST
+    ) not in LEGACY_TASK_CREATION_ALLOWLIST
     assert (
         "src/puripuly_heart/ui/foundation/runtime.py",
         RUN_TASK,
@@ -356,7 +359,7 @@ def test_order38_named_owner_allowlist_preserves_installer_legacy_task_debt() ->
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
 
 
-def test_order39_named_owner_allowlist_adds_receiver_and_prompt_owners() -> None:
+def test_order39_named_owner_allowlist_adds_receiver_prompt_and_bounds_owners() -> None:
     assert (
         "src/puripuly_heart/core/runtime/receiver.py",
         ASYNCIO_CREATE_TASK,
@@ -368,7 +371,11 @@ def test_order39_named_owner_allowlist_adds_receiver_and_prompt_owners() -> None
     assert (
         "src/puripuly_heart/ui/controller.py",
         ASYNCIO_CREATE_TASK,
-    ) in LEGACY_TASK_CREATION_ALLOWLIST
+    ) not in LEGACY_TASK_CREATION_ALLOWLIST
+    assert (
+        "src/puripuly_heart/core/runtime/desktop_overlay_bounds.py",
+        ASYNCIO_CREATE_TASK,
+    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
     assert (
         "src/puripuly_heart/ui/foundation/runtime.py",
         RUN_TASK,
