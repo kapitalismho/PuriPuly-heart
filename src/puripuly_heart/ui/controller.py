@@ -86,6 +86,10 @@ from puripuly_heart.app.services.managed_connection_auth import (
 )
 from puripuly_heart.app.services.managed_status_refresh import ManagedStatusRefreshOwner
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.microphone_test import (
+    MicrophoneTestSessionOwner,
+    MicrophoneTestSessionRequest,
+)
 from puripuly_heart.app.services.openrouter_pkce_flow import OpenRouterPkceFlowOwner
 from puripuly_heart.app.services.overlay_calibration import OverlayCalibrationOwner
 from puripuly_heart.app.services.peer_capture_target import PeerCaptureTargetResolutionService
@@ -1034,9 +1038,7 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _microphone_test_meter_level: float = field(init=False, default=0.0)
-    _microphone_test_runtime: MicTestRuntime | None = field(init=False, default=None)
-    _microphone_test_lifecycle_lock: asyncio.Lock | None = field(
+    _microphone_test_owner: MicrophoneTestSessionOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -1068,7 +1070,6 @@ class GuiController:
     _last_self_stt_provider_signature: tuple[object, ...] | None = None
     _last_peer_stt_provider_signature: tuple[object, ...] | None = None
     _last_llm_provider_signature: tuple[object, ...] | None = None
-    _last_microphone_test_audio_settings_signature: tuple[object, ...] | None = None
     _last_peer_translation_enabled: bool | None = None
     _last_peer_translation_activation_requested: bool | None = None
     _peer_activation_generation: int = field(init=False, default=0)
@@ -4430,7 +4431,7 @@ class GuiController:
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="MicTestRuntime",
+                owner_name="MicrophoneTestSessionOwner",
                 callback_name="close",
                 callback=self._close_microphone_test_runtime,
             ),
@@ -9944,24 +9945,91 @@ class GuiController:
             hook()
 
     @property
+    def _microphone_test_runtime(self) -> MicTestRuntime | None:
+        owner = self._microphone_test_owner
+        return owner.runtime_if_created if owner is not None else None
+
+    @_microphone_test_runtime.setter
+    def _microphone_test_runtime(self, runtime: MicTestRuntime | None) -> None:
+        self._get_microphone_test_owner().runtime = runtime
+
+    @property
+    def _microphone_test_meter_level(self) -> float:
+        owner = self._microphone_test_owner
+        return owner.meter_level if owner is not None else 0.0
+
+    @_microphone_test_meter_level.setter
+    def _microphone_test_meter_level(self, value: float) -> None:
+        self._get_microphone_test_owner().meter_level = value
+
+    @property
+    def _last_microphone_test_audio_settings_signature(
+        self,
+    ) -> tuple[object, ...] | None:
+        owner = self._microphone_test_owner
+        return owner.audio_signature if owner is not None else None
+
+    @_last_microphone_test_audio_settings_signature.setter
+    def _last_microphone_test_audio_settings_signature(
+        self,
+        signature: tuple[object, ...] | None,
+    ) -> None:
+        self._get_microphone_test_owner().audio_signature = signature
+
+    @property
     def microphone_test_meter_level(self) -> float:
         return self._microphone_test_meter_level
 
     @property
     def microphone_test_active(self) -> bool:
-        runtime = self._microphone_test_runtime
-        task = runtime.session_task if runtime is not None else None
-        return task is not None and not task.done()
+        owner = self._microphone_test_owner
+        return owner.active if owner is not None else False
 
-    def _get_microphone_test_lifecycle_lock(self) -> asyncio.Lock:
-        if self._microphone_test_lifecycle_lock is None:
-            self._microphone_test_lifecycle_lock = asyncio.Lock()
-        return self._microphone_test_lifecycle_lock
+    def _get_microphone_test_owner(self) -> MicrophoneTestSessionOwner:
+        owner = self._microphone_test_owner
+        if owner is None:
+            owner = MicrophoneTestSessionOwner(
+                prepare_capture=self._prepare_microphone_test_capture,
+                capture_session=lambda generation, meter_callback, level_log_interval_s: (
+                    self.run_microphone_test_capture(
+                        generation=generation,
+                        meter_callback=meter_callback,
+                        level_log_interval_s=level_log_interval_s,
+                    )
+                ),
+                diagnostics_sink=self._on_microphone_test_session_diagnostic,
+            )
+            self._microphone_test_owner = owner
+        return owner
+
+    def _on_microphone_test_session_diagnostic(
+        self,
+        event: str,
+        metadata: Mapping[str, object],
+        exception: BaseException | None,
+    ) -> None:
+        if event == "session_failed":
+            self._log_error(f"Microphone test error: {exception}")
+            return
+        if event == "cleanup_retry_failed":
+            self._log_error(f"Microphone test cleanup retry failed: {exception}")
+            return
+        if event == "meter_callback_failed":
+            exc_info = (
+                (type(exception), exception, exception.__traceback__)
+                if exception is not None
+                else None
+            )
+            logger.debug("Microphone-test meter callback raised", exc_info=exc_info)
+            return
+        self.log_detailed(
+            f"[MicTest] owner event={event} error_type={metadata.get('error_type')}",
+            level=logging.WARNING,
+            exception=exception,
+        )
 
     def _get_microphone_test_runtime(self) -> MicTestRuntime:
-        if self._microphone_test_runtime is None:
-            self._microphone_test_runtime = MicTestRuntime()
-        return self._microphone_test_runtime
+        return self._get_microphone_test_owner().runtime
 
     @staticmethod
     def _microphone_test_audio_settings_signature(
@@ -10045,96 +10113,35 @@ class GuiController:
     ) -> bool:
         if self.settings is None:
             return False
-        if self._last_microphone_test_audio_settings_signature is None:
-            self._last_microphone_test_audio_settings_signature = (
-                self._microphone_test_audio_settings_signature(self.settings)
-            )
-        async with self._get_microphone_test_lifecycle_lock():
-            runtime = self._get_microphone_test_runtime()
-            task = runtime.session_task
-            if task is not None:
-                if not task.done():
-                    return False
-                await asyncio.gather(task, return_exceptions=True)
-
-            if not await self._recover_microphone_test_runtime_before_start(runtime):
-                return False
-
-            if not await self._prepare_microphone_test_capture():
-                return False
-
-            try:
-                runtime.start(
-                    lambda generation: self._run_microphone_test_session(
-                        generation=generation,
-                        meter_callback=meter_callback,
-                        level_log_interval_s=level_log_interval_s,
-                    )
-                )
-            except RuntimeError:
-                return False
-            return True
-
-    async def _run_microphone_test_session(
-        self,
-        *,
-        generation: int | None = None,
-        meter_callback: Callable[[float], object] | None,
-        level_log_interval_s: float,
-    ) -> None:
-        try:
-            await self.run_microphone_test_capture(
-                generation=generation,
+        signature = self._microphone_test_audio_settings_signature(self.settings)
+        assert signature is not None
+        return await self._get_microphone_test_owner().start(
+            MicrophoneTestSessionRequest(
+                audio_signature=signature,
                 meter_callback=meter_callback,
                 level_log_interval_s=level_log_interval_s,
             )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self._log_error(f"Microphone test error: {exc}")
+        )
 
     async def stop_microphone_test(self) -> None:
-        async with self._get_microphone_test_lifecycle_lock():
-            runtime = self._microphone_test_runtime
-            if runtime is not None:
-                await runtime.stop()
-                self._microphone_test_meter_level = 0.0
-                return
-            self._microphone_test_meter_level = 0.0
+        owner = self._microphone_test_owner
+        if owner is not None:
+            await owner.stop()
 
     async def stop_microphone_test_for_audio_settings_change(self) -> None:
         await self.stop_microphone_test()
-
-    async def _recover_microphone_test_runtime_before_start(
-        self,
-        runtime: MicTestRuntime,
-    ) -> bool:
-        if runtime.has_active_direct_capture:
-            return False
-        if runtime.source is None and runtime.pending_frame_task is None:
-            return True
-        if runtime.pending_frame_task is not None and not runtime.pending_frame_task.done():
-            return False
-        try:
-            await runtime.stop()
-        except Exception as exc:
-            self._log_error(f"Microphone test cleanup retry failed: {exc}")
-            return False
-        return runtime.source is None and runtime.pending_frame_task is None
 
     async def _close_microphone_test_runtime_for_release(
         self,
         cleanup_failures: list[Exception],
     ) -> None:
-        runtime = self._microphone_test_runtime
-        if runtime is None:
+        owner = self._microphone_test_owner
+        if owner is None:
             return
         try:
-            await runtime.close()
+            await owner.close()
         except Exception as exc:
             cleanup_failures.append(exc)
-        finally:
-            self._microphone_test_meter_level = 0.0
 
     async def _set_microphone_test_meter_level(
         self,
@@ -10143,22 +10150,11 @@ class GuiController:
         *,
         generation: int | None = None,
     ) -> None:
-        if generation is not None:
-            runtime = self._microphone_test_runtime
-            if runtime is None or not runtime.is_current_generation(generation):
-                return
-        level = max(0.0, min(1.0, float(value)))
-        if level <= 1e-6:
-            level = 0.0
-        self._microphone_test_meter_level = level
-        if meter_callback is None:
-            return
-        try:
-            result = meter_callback(level)
-            if inspect.isawaitable(result):
-                await result
-        except Exception:
-            logger.debug("Microphone-test meter callback raised", exc_info=True)
+        await self._get_microphone_test_owner().set_meter_level(
+            value,
+            meter_callback,
+            generation=generation,
+        )
 
     @staticmethod
     def _microphone_test_meter_level_from_frame(frame) -> float:  # noqa: ANN001
