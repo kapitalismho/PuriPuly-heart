@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from puripuly_heart.app.services.canonical_settings_persistence import compose_settings_owner
 from puripuly_heart.config import settings as settings_module
 from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.settings import (
@@ -17,7 +18,6 @@ from puripuly_heart.config.settings import (
     to_dict,
 )
 from puripuly_heart.main import _load_settings_or_default
-from puripuly_heart.ui.controller import GuiController
 from tests.config.settings_vnext_test_helpers import legacy_projected_settings_file
 
 
@@ -176,15 +176,14 @@ def test_first_run_settings_without_explicit_locale_detects_system_locale(
     assert settings.ui.locale == "zh-CN"
 
 
-def test_controller_first_run_uses_detected_system_locale(
+def test_settings_owner_first_run_uses_detected_system_locale(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings_module, "detect_system_locale", lambda: "ko_KR", raising=False)
     path = tmp_path / "settings.json"
-    controller = GuiController(page=object(), app=object(), config_path=path)
 
-    loaded = controller._load_or_init_settings(path)
+    loaded = compose_settings_owner(path).start().settings
 
     assert loaded.ui.locale == "ko"
     assert legacy_projected_settings_file(path)["ui"]["locale"] == "ko"
@@ -253,20 +252,14 @@ def test_main_existing_invalid_stable_settings_are_not_replaced_with_defaults(
     assert stable_path.read_text(encoding="utf-8") == "not-json"
 
 
-def test_controller_existing_invalid_stable_settings_are_not_replaced_with_defaults(
+def test_settings_owner_existing_invalid_settings_are_not_replaced_with_defaults(
     tmp_path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     stable_path = tmp_path / "puripuly-heart" / "settings.json"
     stable_path.parent.mkdir()
     stable_path.write_text("not-json", encoding="utf-8")
-    controller = GuiController(
-        page=object(),
-        app=object(),
-        config_path=stable_path,
-    )
 
     with pytest.raises(RuntimeError):
-        controller._load_or_init_settings(stable_path)
+        compose_settings_owner(stable_path).start()
 
     assert stable_path.read_text(encoding="utf-8") == "not-json"
