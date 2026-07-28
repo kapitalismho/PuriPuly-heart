@@ -10071,22 +10071,6 @@ class GuiController:
             level_log_interval_s=level_log_interval_s,
         )
 
-    async def run_microphone_test_capture(
-        self,
-        *,
-        generation: int | None = None,
-        meter_callback: Callable[[float], object] | None = None,
-        level_log_interval_s: float = _MICROPHONE_TEST_LEVEL_INTERVAL_S,
-    ) -> None:
-        await self._build_microphone_test_capture_adapter().capture(
-            self._microphone_test_capture_request(
-                generation=generation,
-                meter_callback=meter_callback,
-                level_log_interval_s=level_log_interval_s,
-            ),
-            runtime=self._get_microphone_test_runtime(),
-        )
-
     def _build_self_capture_session_config(
         self,
         settings: AppSettings,
