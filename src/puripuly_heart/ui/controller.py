@@ -9406,9 +9406,6 @@ class GuiController:
             exception=exception,
         )
 
-    def _get_microphone_test_runtime(self) -> MicTestRuntime:
-        return self._get_microphone_test_owner().runtime
-
     @staticmethod
     def _microphone_test_audio_settings_signature(
         settings: AppSettings | None,

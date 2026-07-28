@@ -10820,7 +10820,7 @@ async def _capture_via_microphone_test_port(
     )
     await capture_port.capture(
         request,
-        runtime=controller._get_microphone_test_runtime(),
+        runtime=controller._get_microphone_test_owner().runtime,
     )
 
 
@@ -11695,7 +11695,7 @@ async def test_controller_stop_closes_mic_test_runtime_and_continues_after_close
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller._runtime_logging = RuntimeLoggingSpy()
-    runtime = controller._get_microphone_test_runtime()
+    runtime = controller._get_microphone_test_owner().runtime
     generation = runtime.begin_direct_capture()
     events: list[str] = []
 
@@ -11750,7 +11750,7 @@ async def test_direct_microphone_capture_rejects_overlap_without_invalidating_ac
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller._runtime_logging = RuntimeLoggingSpy()
-    runtime = controller._get_microphone_test_runtime()
+    runtime = controller._get_microphone_test_owner().runtime
     session_started = asyncio.Event()
 
     async def active_session(generation: int) -> None:
@@ -11785,7 +11785,7 @@ async def test_start_microphone_test_does_not_preempt_active_direct_capture(
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller._runtime_logging = RuntimeLoggingSpy()
-    runtime = controller._get_microphone_test_runtime()
+    runtime = controller._get_microphone_test_owner().runtime
     sources: list[BlockingMicrophoneTestSource] = []
 
     class BlockingMicrophoneTestSource:
@@ -11883,7 +11883,7 @@ async def test_direct_microphone_capture_releases_direct_generation_when_initial
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller._runtime_logging = RuntimeLoggingSpy()
-    runtime = controller._get_microphone_test_runtime()
+    runtime = controller._get_microphone_test_owner().runtime
     route_observed = False
 
     async def cancelled_meter_callback(_level: float) -> None:
@@ -11922,7 +11922,7 @@ async def test_direct_microphone_capture_releases_direct_generation_when_route_o
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller._runtime_logging = RuntimeLoggingSpy()
-    runtime = controller._get_microphone_test_runtime()
+    runtime = controller._get_microphone_test_owner().runtime
 
     def observe_route(**_kwargs):
         raise RuntimeError("route observation failed")
