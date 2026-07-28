@@ -10187,12 +10187,3 @@ class GuiController:
             return legacy_key, self.settings.qwen.get_llm_base_url()
 
         return "", self.settings.qwen.get_llm_base_url()
-
-    async def _verify_and_update_status(self) -> None:
-        if self._shutdown_ingress_frozen:
-            return
-        request = self._build_provider_status_verification_request()
-        if request is None:
-            return
-        result = await self._get_provider_status_verification_owner().verify(request)
-        await self._apply_provider_status_verification_result(result)

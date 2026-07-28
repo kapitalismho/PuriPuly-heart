@@ -156,6 +156,9 @@ from puripuly_heart.ui.i18n import set_locale, t
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.fakes import FakeSender
+from tests.helpers.provider_status import (
+    run_configured_provider_status_verification as _run_configured_provider_status_verification,
+)
 
 PEER_DISCLOSURE_KEY = "peer_translation.disclosure"
 
@@ -1997,7 +2000,7 @@ async def test_start_local_llm_without_runtime_does_not_show_api_key_warning(
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_trusts_local_llm_runtime_without_probe(
+async def test_scheduled_provider_status_trusts_local_llm_runtime_without_probe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
@@ -2031,7 +2034,7 @@ async def test_verify_and_update_status_trusts_local_llm_runtime_without_probe(
         staticmethod(fake_verify_connection),
     )
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert probe_calls == 0
     assert dash.translation_needs_key is False
@@ -2040,7 +2043,7 @@ async def test_verify_and_update_status_trusts_local_llm_runtime_without_probe(
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_handles_mixed_provider_failures(
+async def test_scheduled_provider_status_handles_mixed_provider_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
@@ -2079,7 +2082,7 @@ async def test_verify_and_update_status_handles_mixed_provider_failures(
         verify_qwen_llm_api_key=fake_verify_qwen,
     )
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert models_seen == ["qwen3.5-flash", "qwen3.5-plus"]
     assert dash.translation_needs_key is True
@@ -2089,7 +2092,7 @@ async def test_verify_and_update_status_handles_mixed_provider_failures(
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_marks_needs_key_when_secret_store_fails(
+async def test_scheduled_provider_status_marks_needs_key_when_secret_store_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
@@ -2112,7 +2115,7 @@ async def test_verify_and_update_status_marks_needs_key_when_secret_store_fails(
     monkeypatch.setattr(GeminiLLMProvider, "verify_api_key", staticmethod(always_false))
     monkeypatch.setattr(DeepgramRealtimeSTTBackend, "verify_api_key", staticmethod(always_false))
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert dash.translation_needs_key is True
     assert dash.translation_enabled is False
@@ -13586,10 +13589,18 @@ async def test_exhausted_managed_start_and_background_verify_do_not_auto_show_fo
             usage_usd=0.0693,
         )
 
+    async def fake_verify_api_key(_api_key: str) -> bool:
+        return True
+
     monkeypatch.setattr(
         OpenRouterLLMProvider,
         "fetch_key_metadata",
         staticmethod(fake_fetch_key_metadata),
+    )
+    monkeypatch.setattr(
+        OpenRouterLLMProvider,
+        "verify_api_key",
+        staticmethod(fake_verify_api_key),
     )
 
     class FakeBridge:
@@ -13612,7 +13623,7 @@ async def test_exhausted_managed_start_and_background_verify_do_not_auto_show_fo
 
     await controller.start()
     await asyncio.sleep(0)
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert shown == []
 

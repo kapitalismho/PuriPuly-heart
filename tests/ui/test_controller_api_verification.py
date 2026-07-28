@@ -25,6 +25,9 @@ from puripuly_heart.ui import controller as controller_module
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.provider_status import (
+    run_configured_provider_status_verification as _run_configured_provider_status_verification,
+)
 
 
 class DummySecrets:
@@ -101,6 +104,44 @@ class DummyHub:
             await old_llm.close()
 
 
+@pytest.mark.asyncio
+async def test_scheduled_provider_status_helper_surfaces_result_handler_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(
+            SimpleNamespace(view_dashboard=DummyDashboard()),
+        ),
+        config_path=Path("settings.json"),
+    )
+    controller.settings = AppSettings()
+    controller.settings.provider.llm = LLMProviderName.LOCAL_LLM
+    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
+    controller.hub = DummyHub()
+    error = AssertionError("result delivery failed")
+
+    async def fail_result_handler(self, _result) -> None:
+        _ = self
+        raise error
+
+    monkeypatch.setattr(
+        controller_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets({}),
+    )
+    monkeypatch.setattr(
+        GuiController,
+        "_apply_provider_status_verification_result",
+        fail_result_handler,
+    )
+
+    with pytest.raises(AssertionError, match="result delivery failed") as caught:
+        await _run_configured_provider_status_verification(controller)
+
+    assert caught.value is error
+
+
 def test_local_stt_download_prompt_helpers_removed() -> None:
     assert not hasattr(GuiController, "_show_local_stt_download_prompt")
     assert not hasattr(GuiController, "_on_local_stt_download_action")
@@ -158,7 +199,7 @@ def test_obsolete_local_stt_prompt_keys_are_removed(locale: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_uses_qwen_specific_verifiers(monkeypatch) -> None:
+async def test_scheduled_provider_status_uses_qwen_specific_verifiers(monkeypatch) -> None:
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.QWEN
     settings.provider.stt = STTProviderName.QWEN_ASR
@@ -191,23 +232,36 @@ async def test_verify_and_update_status_uses_qwen_specific_verifiers(monkeypatch
         llm_seen.append((api_key, base_url))
         return True
 
-    async def fail_qwen_asr_verify(*_args, **_kwargs) -> bool:
-        raise AssertionError("qwen ASR verifier should not be called when Alibaba result is shared")
+    qwen_asr_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    legacy_llm_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
 
-    async def fail_legacy_verify(*_args, **_kwargs) -> bool:
-        raise AssertionError("legacy llm verifier path must not be called")
+    async def record_qwen_asr_verify(*args, **kwargs) -> bool:
+        qwen_asr_calls.append((args, kwargs))
+        return False
+
+    async def record_legacy_verify(*args, **kwargs) -> bool:
+        legacy_llm_calls.append((args, kwargs))
+        return False
 
     controller.provider_verifier = SimpleNamespace(
         verify_qwen_llm_api_key=fake_verify_qwen_llm,
     )
     monkeypatch.setattr(
-        QwenASRRealtimeSTTBackend, "verify_api_key", staticmethod(fail_qwen_asr_verify)
+        QwenASRRealtimeSTTBackend,
+        "verify_api_key",
+        staticmethod(record_qwen_asr_verify),
     )
-    monkeypatch.setattr(QwenLLMProvider, "verify_api_key", staticmethod(fail_legacy_verify))
+    monkeypatch.setattr(
+        QwenLLMProvider,
+        "verify_api_key",
+        staticmethod(record_legacy_verify),
+    )
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert llm_seen == [("secret", "https://dashscope.aliyuncs.com/api/v1")]
+    assert qwen_asr_calls == []
+    assert legacy_llm_calls == []
     assert app.view_dashboard.translation_needs_key is False
     assert app.view_dashboard.stt_needs_key is False
 
@@ -245,7 +299,7 @@ async def test_verify_api_key_returns_model_unavailable_when_fallback_model_work
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_splits_llm_model_access_from_stt_key_validity(
+async def test_scheduled_provider_status_splits_llm_model_access_from_stt_key_validity(
     monkeypatch,
 ) -> None:
     settings = AppSettings()
@@ -278,7 +332,7 @@ async def test_verify_and_update_status_splits_llm_model_access_from_stt_key_val
 
     monkeypatch.setattr(AsyncQwenLLMProvider, "verify_api_key", staticmethod(fake_async_verify))
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert app.view_dashboard.translation_needs_key is True
     assert app.view_dashboard.stt_needs_key is False
@@ -286,7 +340,7 @@ async def test_verify_and_update_status_splits_llm_model_access_from_stt_key_val
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_uses_selected_qwen_model_for_both_llm_and_stt_when_valid(
+async def test_scheduled_provider_status_uses_selected_qwen_model_for_both_llm_and_stt_when_valid(
     monkeypatch,
 ) -> None:
     settings = AppSettings()
@@ -328,14 +382,14 @@ async def test_verify_and_update_status_uses_selected_qwen_model_for_both_llm_an
         verify_qwen_llm_api_key=fake_verify_qwen_llm,
     )
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert app.view_dashboard.translation_needs_key is False
     assert app.view_dashboard.stt_needs_key is False
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_uses_openrouter_verifier(monkeypatch) -> None:
+async def test_scheduled_provider_status_uses_openrouter_verifier(monkeypatch) -> None:
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
@@ -363,7 +417,7 @@ async def test_verify_and_update_status_uses_openrouter_verifier(monkeypatch) ->
 
     monkeypatch.setattr(OpenRouterLLMProvider, "verify_api_key", staticmethod(fake_verify))
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert seen == ["secret"]
     assert app.view_dashboard.translation_needs_key is False
@@ -393,7 +447,7 @@ async def test_verify_api_key_uses_deepseek_verifier(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_uses_deepseek_verifier(monkeypatch) -> None:
+async def test_scheduled_provider_status_uses_deepseek_verifier(monkeypatch) -> None:
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.DEEPSEEK
     app = SimpleNamespace(view_dashboard=DummyDashboard())
@@ -420,14 +474,14 @@ async def test_verify_and_update_status_uses_deepseek_verifier(monkeypatch) -> N
 
     monkeypatch.setattr(DeepSeekLLMProvider, "verify_api_key", staticmethod(fake_verify))
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert seen == ["secret"]
     assert app.view_dashboard.translation_needs_key is False
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_uses_deepseek_env_key(monkeypatch) -> None:
+async def test_scheduled_provider_status_uses_deepseek_env_key(monkeypatch) -> None:
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.DEEPSEEK
     app = SimpleNamespace(view_dashboard=DummyDashboard())
@@ -455,14 +509,14 @@ async def test_verify_and_update_status_uses_deepseek_env_key(monkeypatch) -> No
 
     monkeypatch.setattr(DeepSeekLLMProvider, "verify_api_key", staticmethod(fake_verify))
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert seen == ["env-secret"]
     assert app.view_dashboard.translation_needs_key is False
 
 
 @pytest.mark.asyncio
-async def test_local_llm_status_update_skips_connection_probe(
+async def test_scheduled_local_llm_status_skips_connection_probe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
@@ -485,14 +539,16 @@ async def test_local_llm_status_update_skips_connection_probe(
 
     monkeypatch.setenv("LOCAL_LLM_API_KEY", "env-secret")
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert app.view_dashboard.translation_needs_key is False
     assert app.view_dashboard.translation_enabled is True
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_uses_selected_managed_openrouter_key(monkeypatch) -> None:
+async def test_scheduled_provider_status_uses_selected_managed_openrouter_key(
+    monkeypatch,
+) -> None:
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
@@ -518,16 +574,24 @@ async def test_verify_and_update_status_uses_selected_managed_openrouter_key(mon
         seen.append(api_key)
         return True
 
-    monkeypatch.setattr(OpenRouterLLMProvider, "verify_api_key", staticmethod(fake_verify))
+    async def no_usage_metadata(_api_key: str):
+        return None
 
-    await controller._verify_and_update_status()
+    monkeypatch.setattr(OpenRouterLLMProvider, "verify_api_key", staticmethod(fake_verify))
+    monkeypatch.setattr(
+        OpenRouterLLMProvider,
+        "fetch_key_metadata",
+        staticmethod(no_usage_metadata),
+    )
+
+    await _run_configured_provider_status_verification(controller)
 
     assert seen == ["managed-secret"]
     assert app.view_dashboard.translation_needs_key is False
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_keeps_managed_openrouter_toggle_available_without_local_key(
+async def test_scheduled_provider_status_keeps_managed_toggle_available_without_local_key(
     monkeypatch,
 ) -> None:
     settings = AppSettings()
@@ -549,18 +613,26 @@ async def test_verify_and_update_status_keeps_managed_openrouter_toggle_availabl
         lambda *_args, **_kwargs: DummySecrets({}),
     )
 
-    async def fail_verify(_api_key: str) -> bool:
-        raise AssertionError("verify_api_key should not be called without a local managed key")
+    verify_calls: list[str] = []
 
-    monkeypatch.setattr(OpenRouterLLMProvider, "verify_api_key", staticmethod(fail_verify))
+    async def record_verify(api_key: str) -> bool:
+        verify_calls.append(api_key)
+        return False
 
-    await controller._verify_and_update_status()
+    monkeypatch.setattr(
+        OpenRouterLLMProvider,
+        "verify_api_key",
+        staticmethod(record_verify),
+    )
 
+    await _run_configured_provider_status_verification(controller)
+
+    assert verify_calls == []
     assert app.view_dashboard.translation_needs_key is False
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_marks_openrouter_none_selected_source_as_needs_key(
+async def test_scheduled_provider_status_marks_openrouter_none_source_as_needs_key(
     monkeypatch,
 ) -> None:
     settings = AppSettings()
@@ -582,19 +654,27 @@ async def test_verify_and_update_status_marks_openrouter_none_selected_source_as
         lambda *_args, **_kwargs: DummySecrets({"openrouter_api_key": "secret"}),
     )
 
-    async def fail_verify(_api_key: str) -> bool:
-        raise AssertionError("verify_api_key should not be called")
+    verify_calls: list[str] = []
 
-    monkeypatch.setattr(OpenRouterLLMProvider, "verify_api_key", staticmethod(fail_verify))
+    async def record_verify(api_key: str) -> bool:
+        verify_calls.append(api_key)
+        return False
 
-    await controller._verify_and_update_status()
+    monkeypatch.setattr(
+        OpenRouterLLMProvider,
+        "verify_api_key",
+        staticmethod(record_verify),
+    )
 
+    await _run_configured_provider_status_verification(controller)
+
+    assert verify_calls == []
     assert app.view_dashboard.translation_needs_key is True
     assert app.view_dashboard.translation_enabled is False
 
 
 @pytest.mark.asyncio
-async def test_verify_and_update_status_treats_local_qwen_stt_as_keyless(
+async def test_scheduled_provider_status_treats_local_qwen_stt_as_keyless(
     monkeypatch,
 ) -> None:
     settings = AppSettings()
@@ -615,6 +695,6 @@ async def test_verify_and_update_status_treats_local_qwen_stt_as_keyless(
 
     monkeypatch.setattr(controller_module, "create_secret_store", fail_secret_store)
 
-    await controller._verify_and_update_status()
+    await _run_configured_provider_status_verification(controller)
 
     assert app.view_dashboard.stt_needs_key is False
