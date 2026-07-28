@@ -26,8 +26,10 @@ def _method_source(path: Path, class_name: str, method_name: str) -> str:
 
 
 def test_controller_interactive_verification_is_an_owner_delegate() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
     method = _method_source(CONTROLLER_PATH, "GuiController", "verify_api_key")
 
+    assert "def _verify_qwen_llm_api_key(" not in source
     assert "ProviderCredentialVerificationRequest(" in method
     assert "_get_provider_credential_verification_owner().verify(" in method
     assert "verifier.verify_api_key(" not in method

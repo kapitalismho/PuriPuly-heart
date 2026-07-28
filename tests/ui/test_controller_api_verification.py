@@ -158,46 +158,6 @@ def test_obsolete_local_stt_prompt_keys_are_removed(locale: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_verify_qwen_llm_api_key_uses_async_verifier_in_low_latency(monkeypatch) -> None:
-    settings = AppSettings()
-    settings.stt.low_latency_mode = True
-    settings.qwen.llm_model = QwenLLMModel.QWEN_35_FLASH
-    app = SimpleNamespace(view_dashboard=DummyDashboard())
-
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=FletUiPresentationAdapter(app),
-        config_path=Path("settings.json"),
-    )
-    controller.settings = settings
-
-    seen: dict[str, str] = {}
-
-    async def fake_async_verify(api_key: str, *, base_url: str, model: str) -> bool:
-        seen["api_key"] = api_key
-        seen["base_url"] = base_url
-        seen["model"] = model
-        return True
-
-    async def fail_sync_verify(*_args, **_kwargs) -> bool:
-        raise AssertionError("sync verifier must not be called in low latency mode")
-
-    monkeypatch.setattr(AsyncQwenLLMProvider, "verify_api_key", staticmethod(fake_async_verify))
-    monkeypatch.setattr(QwenLLMProvider, "verify_api_key", staticmethod(fail_sync_verify))
-
-    ok = await controller._verify_qwen_llm_api_key(
-        "secret", base_url="https://dashscope.aliyuncs.com/api/v1"
-    )
-
-    assert ok is True
-    assert seen == {
-        "api_key": "secret",
-        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "model": "qwen3.5-flash",
-    }
-
-
-@pytest.mark.asyncio
 async def test_verify_and_update_status_uses_qwen_specific_verifiers(monkeypatch) -> None:
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.QWEN

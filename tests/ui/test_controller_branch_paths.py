@@ -146,7 +146,6 @@ from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.llm.qwen import QwenLLMProvider
-from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 from puripuly_heart.ui import controller as controller_module
@@ -20500,71 +20499,6 @@ async def test_rebuild_pipeline_restores_stt_when_it_was_previously_enabled(
     await controller._rebuild_pipeline(rebuild_stt=True)
 
     assert calls == [False, True]
-
-
-@pytest.mark.asyncio
-async def test_verify_qwen_llm_api_key_returns_false_without_settings() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-
-    result = await controller._verify_qwen_llm_api_key(
-        "secret",
-        base_url="https://dashscope.aliyuncs.com/api/v1",
-    )
-
-    assert result is False
-
-
-@pytest.mark.asyncio
-async def test_verify_qwen_llm_api_key_uses_async_provider_in_low_latency_mode(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.stt.low_latency_mode = True
-    calls: list[tuple[str, str, str]] = []
-
-    async def fake_verify(api_key: str, *, base_url: str, model: str) -> bool:
-        calls.append((api_key, base_url, model))
-        return True
-
-    monkeypatch.setattr(AsyncQwenLLMProvider, "verify_api_key", staticmethod(fake_verify))
-
-    result = await controller._verify_qwen_llm_api_key(
-        "secret",
-        base_url="https://dashscope.aliyuncs.com/api/v1",
-    )
-
-    assert result is True
-    assert calls == [
-        ("secret", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen3.5-plus")
-    ]
-
-
-@pytest.mark.asyncio
-async def test_verify_qwen_llm_api_key_uses_async_provider_for_historical_false(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.stt.low_latency_mode = False
-    calls: list[tuple[str, str, str]] = []
-
-    async def fake_verify(api_key: str, *, base_url: str, model: str) -> bool:
-        calls.append((api_key, base_url, model))
-        return True
-
-    monkeypatch.setattr(AsyncQwenLLMProvider, "verify_api_key", staticmethod(fake_verify))
-
-    result = await controller._verify_qwen_llm_api_key(
-        "secret",
-        base_url="https://dashscope.aliyuncs.com/api/v1",
-        model="qwen3.5-flash",
-    )
-
-    assert result is True
-    assert calls == [
-        ("secret", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen3.5-flash")
-    ]
 
 
 def test_overlay_calibration_controls_follow_apply_cancel_contract() -> None:

@@ -10188,23 +10188,6 @@ class GuiController:
 
         return "", self.settings.qwen.get_llm_base_url()
 
-    async def _verify_qwen_llm_api_key(
-        self,
-        api_key: str,
-        *,
-        base_url: str,
-        model: str | None = None,
-    ) -> bool:
-        if self.settings is None:
-            return False
-        runtime_model = model or self.settings.qwen.llm_model.value
-        return await self._get_provider_verifier().verify_qwen_llm_api_key(
-            api_key,
-            base_url=base_url,
-            model=runtime_model,
-            low_latency=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
-        )
-
     async def _verify_and_update_status(self) -> None:
         if self._shutdown_ingress_frozen:
             return
