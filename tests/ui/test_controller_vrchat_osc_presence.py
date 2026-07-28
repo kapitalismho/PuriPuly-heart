@@ -12,7 +12,7 @@ from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
 @pytest.mark.asyncio
-async def test_controller_owns_injected_osc_presence_probe_until_cancel() -> None:
+async def test_controller_composes_injected_osc_presence_owner_until_cancel() -> None:
     notices: list[bool] = []
     probed_ports: list[int] = []
 
@@ -38,6 +38,7 @@ async def test_controller_owns_injected_osc_presence_probe_until_cancel() -> Non
 
     assert probed_ports == [9000]
     assert notices == [True]
+    assert controller._vrchat_osc_presence_owner is not None
 
     await controller._cancel_vrchat_osc_presence_probe()
 

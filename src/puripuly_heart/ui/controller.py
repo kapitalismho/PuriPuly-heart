@@ -335,6 +335,9 @@ from puripuly_heart.core.runtime.peer_channel import (
 from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildService
 from puripuly_heart.core.runtime.receiver import VrcMicReceiverRuntime
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
+from puripuly_heart.core.runtime.vrchat_osc_presence import (
+    VrchatOscPresenceProbeOwner,
+)
 from puripuly_heart.core.runtime_logging import (
     RealtimeLogHandler,
     RuntimeLoggingSinks,
@@ -1170,13 +1173,11 @@ class GuiController:
     )
     _ui_background_task_sequence: int = field(init=False, default=0, repr=False)
     _overlay_session_fallback_generation: int = field(init=False, default=0)
-    _vrchat_osc_notice_active: bool = field(init=False, default=False)
-    _vrchat_osc_probe_task: asyncio.Task[None] | None = field(
+    _vrchat_osc_presence_owner: VrchatOscPresenceProbeOwner | None = field(
         init=False,
         default=None,
         repr=False,
     )
-    _vrchat_osc_probe_generation: int = field(init=False, default=0)
     _desktop_overlay_bounds_owner: DesktopOverlayBoundsOwner | None = field(
         init=False,
         default=None,
@@ -4687,7 +4688,7 @@ class GuiController:
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="VrchatOscPresenceProbe",
+                owner_name="VrchatOscPresenceProbeOwner",
                 callback_name="cancel",
                 callback=self._cancel_vrchat_osc_presence_probe,
             ),
@@ -4836,7 +4837,9 @@ class GuiController:
         self._stt_activation_generation += 1
         self._peer_activation_generation += 1
         self._gpu_discovery_generation += 1
-        self._vrchat_osc_probe_generation += 1
+        owner = self._vrchat_osc_presence_owner
+        if owner is not None:
+            owner.stop_ingress()
 
     def _stop_github_star_prompt_ingress(self) -> None:
         runtime = self._github_star_prompt_runtime
@@ -5723,75 +5726,42 @@ class GuiController:
         return port if isinstance(port, int) and 0 < port <= 65535 else 9000
 
     def _set_vrchat_osc_notice_active(self, active: bool) -> None:
-        active = bool(active)
-        if self._vrchat_osc_notice_active == active:
-            return
-        self._vrchat_osc_notice_active = active
-        with contextlib.suppress(Exception):
-            self.app.set_dashboard_vrchat_osc_notice(active)
+        self._get_vrchat_osc_presence_owner().publish(active)
 
     def _schedule_vrchat_osc_presence_probe(self, *, force: bool = False) -> None:
-        _ = force
-        if self.vrchat_osc_presence is None:
-            self._set_vrchat_osc_notice_active(False)
-            return
-        self._vrchat_osc_probe_generation += 1
-        generation = self._vrchat_osc_probe_generation
-        existing = self._vrchat_osc_probe_task
-        if existing is not None and not existing.done():
-            existing.cancel()
-
-        async def _task() -> None:
-            await self._run_vrchat_osc_presence_probe_loop(generation)
-
-        try:
-            self._vrchat_osc_probe_task = start_lifecycle_task(
-                self._ui_background_scope,
-                _task(),
-                name=f"vrchat-osc-presence-{generation}",
-            )
-        except RuntimeError:
-            self._vrchat_osc_probe_task = None
+        self._get_vrchat_osc_presence_owner().schedule(force=force)
 
     async def _run_vrchat_osc_presence_probe_loop(self, generation: int) -> None:
-        while generation == self._vrchat_osc_probe_generation:
-            try:
-                presence_port = self.vrchat_osc_presence
-                should_prompt = (
-                    None
-                    if presence_port is None
-                    else await presence_port.should_prompt_enable_osc(
-                        port=self._vrchat_osc_probe_port()
-                    )
-                )
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                self.log_detailed(
-                    "[OSC] VRChat OSC presence probe failed",
-                    level=logging.WARNING,
-                    exception=exc,
-                )
-                should_prompt = None
-            if generation != self._vrchat_osc_probe_generation:
-                return
-            self._set_vrchat_osc_notice_active(bool(should_prompt))
-            try:
-                await asyncio.sleep(30.0)
-            except asyncio.CancelledError:
-                raise
+        await self._get_vrchat_osc_presence_owner().run(generation)
 
     async def _cancel_vrchat_osc_presence_probe(self) -> None:
-        self._vrchat_osc_probe_generation += 1
-        task = self._vrchat_osc_probe_task
-        self._vrchat_osc_probe_task = None
-        if task is None:
-            self._set_vrchat_osc_notice_active(False)
-            return
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await task
-        self._set_vrchat_osc_notice_active(False)
+        await self._get_vrchat_osc_presence_owner().cancel()
+
+    @property
+    def _vrchat_osc_probe_task(self) -> asyncio.Task[None] | None:
+        owner = self._vrchat_osc_presence_owner
+        return owner.task if owner is not None else None
+
+    def _get_vrchat_osc_presence_owner(self) -> VrchatOscPresenceProbeOwner:
+        owner = self._vrchat_osc_presence_owner
+        if owner is None:
+            owner = VrchatOscPresenceProbeOwner(
+                presence_provider=lambda: self.vrchat_osc_presence,
+                port_provider=self._vrchat_osc_probe_port,
+                publish_notice=self.app.set_dashboard_vrchat_osc_notice,
+                task_factory=lambda coroutine, name: start_lifecycle_task(
+                    self._ui_background_scope,
+                    coroutine,
+                    name=name,
+                ),
+                diagnostics_sink=lambda _event, _metadata, exception: self.log_detailed(
+                    "[OSC] VRChat OSC presence probe failed",
+                    level=logging.WARNING,
+                    exception=exception,
+                ),
+            )
+            self._vrchat_osc_presence_owner = owner
+        return owner
 
     def _show_short_message(self, message_key: str, **message_kwargs: object) -> None:
         try:
