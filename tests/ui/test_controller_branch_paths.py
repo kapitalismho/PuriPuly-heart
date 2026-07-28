@@ -10859,7 +10859,7 @@ async def test_microphone_test_capture_port_logs_route_open_level_end_and_update
     controller.settings = AppSettings()
     controller.settings.audio.input_host_api = WINDOWS_MME_HOST_API
     controller.settings.audio.input_device = "마이크"
-    controller._microphone_test_meter_level = 0.42
+    controller._get_microphone_test_owner().meter_level = 0.42
     controller._runtime_logging = RuntimeLoggingSpy()
     source_calls: list[dict[str, object]] = []
     close_calls: list[str] = []
@@ -10935,7 +10935,7 @@ async def test_microphone_test_capture_port_logs_route_open_level_end_and_update
         }
     ]
     assert close_calls == ["closed"]
-    assert controller.microphone_test_meter_level == 0.0
+    assert controller._get_microphone_test_owner().meter_level == 0.0
     assert meter_values[0] == 0.0
     assert any(value > 0.0 for value in meter_values)
     assert meter_values[-1] == 0.0
@@ -11008,7 +11008,7 @@ async def test_microphone_test_capture_port_resolution_miss_does_not_open_and_lo
     )
 
     messages = _mic_test_basic_messages(controller)
-    assert controller.microphone_test_meter_level == 0.0
+    assert controller._get_microphone_test_owner().meter_level == 0.0
     assert meter_values == [0.0, 0.0]
     assert any(
         message.startswith("[MicTest] route ")
@@ -11078,7 +11078,7 @@ async def test_microphone_test_capture_port_stream_open_exception_logs_raw_messa
     )
 
     messages = _mic_test_basic_messages(controller)
-    assert controller.microphone_test_meter_level == 0.0
+    assert controller._get_microphone_test_owner().meter_level == 0.0
     assert meter_values == [0.0, 0.0]
     assert any(
         message.startswith("[MicTest] open ")
@@ -11156,7 +11156,7 @@ async def test_microphone_test_capture_port_silent_frames_and_throttles_periodic
     assert "peak_db=-120.0" in level_messages[0]
     assert "zero_ratio=1.000" in level_messages[0]
     assert "frames=3" in level_messages[0]
-    assert controller.microphone_test_meter_level == 0.0
+    assert controller._get_microphone_test_owner().meter_level == 0.0
     assert meter_values == [0.0, 0.0, 0.0, 0.0, 0.0]
     _assert_mic_test_event_and_field_names_have_no_verdict_labels(messages)
 
@@ -11235,7 +11235,7 @@ async def test_microphone_test_capture_port_cancellation_closes_source_and_logs_
         and "exception_class='CancelledError'" in message
         for message in messages
     )
-    assert controller.microphone_test_meter_level == 0.0
+    assert controller._get_microphone_test_owner().meter_level == 0.0
     _assert_mic_test_event_and_field_names_have_no_verdict_labels(messages)
 
 
@@ -11319,7 +11319,7 @@ async def test_microphone_test_capture_port_cancellation_after_nonzero_frame_cle
     assert meter_values[0] == 0.0
     assert any(value > 0.0 for value in meter_values)
     assert meter_values[-1] == 0.0
-    assert controller.microphone_test_meter_level == 0.0
+    assert controller._get_microphone_test_owner().meter_level == 0.0
     assert final_clear_after_end == [True]
     assert any(
         message.startswith("[MicTest] end ")
@@ -11693,14 +11693,14 @@ async def test_late_microphone_test_meter_update_after_stop_is_ignored(
     old_generation = runtime.generation
 
     await controller.stop_microphone_test()
-    controller._microphone_test_meter_level = 0.0
+    controller._get_microphone_test_owner().meter_level = 0.0
     await controller._set_microphone_test_meter_level(
         0.9,
         meter_values.append,
         generation=old_generation,
     )
 
-    assert controller.microphone_test_meter_level == 0.0
+    assert controller._get_microphone_test_owner().meter_level == 0.0
     assert meter_values == []
 
 
@@ -12016,7 +12016,7 @@ async def test_direct_microphone_capture_source_close_failure_is_observable_and_
     assert runtime is not None
     assert runtime.source is source
     assert source.close_calls == 1
-    assert controller.microphone_test_meter_level == 0.0
+    assert controller._get_microphone_test_owner().meter_level == 0.0
 
     await runtime.stop()
     assert runtime.source is None

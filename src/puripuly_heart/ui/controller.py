@@ -8873,15 +8873,6 @@ class GuiController:
             hook()
 
     @property
-    def _microphone_test_meter_level(self) -> float:
-        owner = self._microphone_test_owner
-        return owner.meter_level if owner is not None else 0.0
-
-    @_microphone_test_meter_level.setter
-    def _microphone_test_meter_level(self, value: float) -> None:
-        self._get_microphone_test_owner().meter_level = value
-
-    @property
     def _last_microphone_test_audio_settings_signature(
         self,
     ) -> tuple[object, ...] | None:
@@ -8894,10 +8885,6 @@ class GuiController:
         signature: tuple[object, ...] | None,
     ) -> None:
         self._get_microphone_test_owner().audio_signature = signature
-
-    @property
-    def microphone_test_meter_level(self) -> float:
-        return self._microphone_test_meter_level
 
     @property
     def microphone_test_active(self) -> bool:
