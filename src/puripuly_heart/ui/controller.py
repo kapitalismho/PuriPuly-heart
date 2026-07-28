@@ -113,8 +113,10 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
     _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
-from puripuly_heart.app.services.provider_secret_change_serialization import (
-    ProviderSecretChangeSerializationOwner,
+from puripuly_heart.app.services.provider_secret_change import (
+    ProviderSecretChangeExecution,
+    ProviderSecretChangeOwner,
+    ProviderSecretChangeRequest,
 )
 from puripuly_heart.app.services.provider_status_verification import (
     ConfiguredProviderStatusVerificationRequest,
@@ -123,7 +125,6 @@ from puripuly_heart.app.services.provider_status_verification import (
 )
 from puripuly_heart.app.services.qq_managed_auth import QqManagedAuthRequest, QqManagedAuthService
 from puripuly_heart.app.services.secret_settings_transaction import (
-    SecretClearRequest,
     SecretSetRequest,
     SecretSettingsTransaction,
 )
@@ -242,8 +243,6 @@ from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-    LifecycleScope,
-    start_lifecycle_task,
 )
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.local_asr_provider_runtime import (
@@ -706,12 +705,10 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _provider_secret_change_serialization_owner: ProviderSecretChangeSerializationOwner | None = (
-        field(
-            init=False,
-            default=None,
-            repr=False,
-        )
+    _provider_secret_change_owner: ProviderSecretChangeOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
     )
     _canonical_mutation_rollback_authoritative: bool = field(
         init=False,
@@ -8131,24 +8128,24 @@ class GuiController:
         secret_key: str,
         value: str,
     ) -> bool:
-        return await self._get_provider_secret_change_serialization_owner().run(
-            lambda: self._persist_provider_secret_change_serialized(secret_key, value)
+        return await self._get_provider_secret_change_owner().change(
+            lambda: self._provider_secret_change_execution(secret_key, value)
         )
 
-    def _get_provider_secret_change_serialization_owner(
+    def _get_provider_secret_change_owner(
         self,
-    ) -> ProviderSecretChangeSerializationOwner:
-        owner = self._provider_secret_change_serialization_owner
+    ) -> ProviderSecretChangeOwner:
+        owner = self._provider_secret_change_owner
         if owner is None:
-            owner = ProviderSecretChangeSerializationOwner()
-            self._provider_secret_change_serialization_owner = owner
+            owner = ProviderSecretChangeOwner()
+            self._provider_secret_change_owner = owner
         return owner
 
-    async def _persist_provider_secret_change_serialized(
+    def _provider_secret_change_execution(
         self,
         secret_key: str,
         value: str,
-    ) -> bool:
+    ) -> ProviderSecretChangeExecution:
         assert self.settings is not None
         provider = _PROVIDER_BY_VERIFICATION_SECRET_KEY.get(secret_key)
         if provider is None:
@@ -8168,54 +8165,32 @@ class GuiController:
             secret_store=create_sync_secret_store_adapter(secret_store),
             settings_repository=repository,
         )
-        settings_values = self._get_settings_owner().legacy_snapshot_values(updated)
-        scope = LifecycleScope(f"provider-secret-change:{provider}")
-        if value:
-            operation = start_lifecycle_task(
-                scope,
-                transaction.set_provider_secret(
-                    SecretSetRequest(
-                        secret_key=secret_key,
-                        secret_value=value,
-                        settings_values=settings_values,
-                        expected_settings_revision=None,
-                        reason="provider_secret_change",
-                        correlation_id=None,
-                    )
-                ),
-                name="transaction",
-            )
-        else:
-            operation = start_lifecycle_task(
-                scope,
-                transaction.clear_provider_secret(
-                    SecretClearRequest(
-                        secret_key=secret_key,
-                        settings_values=settings_values,
-                        expected_settings_revision=None,
-                        reason="provider_secret_change",
-                        correlation_id=None,
-                    )
-                ),
-                name="transaction",
-            )
-        cancelled = False
-        try:
-            result = await asyncio.shield(operation)
-        except asyncio.CancelledError:
-            cancelled = True
-            result = await operation
-        finally:
-            await scope.close()
+        return ProviderSecretChangeExecution(
+            transaction=transaction,
+            request=ProviderSecretChangeRequest(
+                provider=provider,
+                secret_key=secret_key,
+                secret_value=value,
+                settings_values=self._get_settings_owner().legacy_snapshot_values(updated),
+            ),
+            result_handler=lambda result, succeeded: self._apply_provider_secret_change_result(
+                repository,
+                result,
+                succeeded,
+            ),
+        )
+
+    def _apply_provider_secret_change_result(
+        self,
+        repository: CommittedSettingsRepositoryPort[AppSettings],
+        result: TransactionResult,
+        succeeded: bool,
+    ) -> None:
         self.last_settings_mutation_result = result
-        succeeded = result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
         if succeeded:
             self.settings = repository.committed_settings
             self._remember_canonical_legacy_projection(self.settings)
             self._complete_canonical_mutation()
-        if cancelled:
-            raise asyncio.CancelledError
-        return succeeded
 
     def persist_api_key_verification(
         self,
