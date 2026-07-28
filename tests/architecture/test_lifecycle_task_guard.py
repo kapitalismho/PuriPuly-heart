@@ -483,3 +483,14 @@ def test_order44_local_asr_owner_retires_controller_background_scope() -> None:
     assert "result_handler=" in controller_source
     assert "_result_delivery_tasks" in provisioning_source
     assert "LocalASRProvisioningOwner:install-result-" in provisioning_source
+
+
+def test_controller_does_not_retain_dead_shutdown_or_stt_switch_locks() -> None:
+    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    source = controller_path.read_text(encoding="utf-8")
+
+    assert "_stop_lock" not in source
+    assert "_stt_switch_lock" not in source
+    assert "_provider_secret_change_lock" in source
+    assert "_gpu_provider_recovery_lock" in source
+    assert "_overlay_lock" in source

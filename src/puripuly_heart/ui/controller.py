@@ -984,7 +984,6 @@ class GuiController:
     _debug_stt_fault_profile: str = field(init=False, default="none")
     _vad: VadGating | None = None
     _stt_desired: bool = False
-    _stt_switch_lock: asyncio.Lock | None = None
     _stt_restart_requested: bool = False
     _stt_force_immediate: bool = False
     _stt_activation_generation: int = field(init=False, default=0)
@@ -1128,7 +1127,6 @@ class GuiController:
     _shutdown_ingress_frozen: bool = field(init=False, default=False, repr=False)
     _local_qwen_hallucination_detection_count: int = field(init=False, default=0)
     _local_qwen_hallucination_modal_shown: bool = field(init=False, default=False)
-    _stop_lock: asyncio.Lock | None = field(init=False, default=None, repr=False)
     _stop_complete: bool = field(init=False, default=False, repr=False)
     _stop_exception: BaseException | None = field(init=False, default=None, repr=False)
 
