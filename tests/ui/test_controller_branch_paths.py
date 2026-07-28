@@ -2520,7 +2520,7 @@ def test_on_managed_trial_delegate_ready_clears_dashboard_pending_notice() -> No
 
 
 @pytest.mark.asyncio
-async def test_managed_trial_delegate_refresh_is_cancelled_by_ui_background_owner(
+async def test_managed_trial_delegate_refresh_is_cancelled_by_managed_status_owner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     dash = DummyDashboard()
@@ -2546,15 +2546,17 @@ async def test_managed_trial_delegate_refresh_is_cancelled_by_ui_background_owne
     controller._on_managed_trial_delegate_ready()
     await entered.wait()
 
-    assert controller._ui_background_scope.active_task_names
+    owner = controller._managed_status_refresh_owner
+    assert owner is not None
+    assert owner.active_task_names
     controller._freeze_application_ingress()
-    await controller._ui_background_scope.close()
+    await owner.close()
 
     assert cancelled.is_set()
-    assert controller._ui_background_scope.active_task_names == ()
+    assert owner.active_task_names == ()
 
     controller._on_managed_trial_delegate_ready()
-    assert controller._ui_background_scope.active_task_names == ()
+    assert owner.active_task_names == ()
 
 
 @pytest.mark.asyncio
@@ -13629,7 +13631,9 @@ async def test_status_refresh_drops_stale_pass_status_when_identity_scope_change
     controller.settings.managed_identity.active_managed_credential_ref = "new-ref"
     status_service.release.set()
     await asyncio.wait_for(status_service.finished.wait(), timeout=1.0)
-    await _wait_until(lambda: not controller._ui_background_scope.active_task_names)
+    owner = controller._managed_status_refresh_owner
+    assert owner is not None
+    await _wait_until(lambda: not owner.active_task_names)
 
     assert status_service.calls == 1
     assert settings_view.managed_key_state_calls
@@ -14079,9 +14083,11 @@ async def test_status_refresh_background_view_update_error_is_logged_not_left_on
 
     await controller._refresh_managed_trial_usage_state()
     await _wait_until(lambda: bool(log_messages))
-    await _wait_until(lambda: not controller._ui_background_scope.active_task_names)
+    owner = controller._managed_status_refresh_owner
+    assert owner is not None
+    await _wait_until(lambda: not owner.active_task_names)
 
-    assert controller._ui_background_scope.active_task_names == ()
+    assert owner.active_task_names == ()
     assert any(
         "Referral ID status refresh failed" in message
         and "managed key repaint failed" in message

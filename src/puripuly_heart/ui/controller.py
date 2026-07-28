@@ -83,6 +83,7 @@ from puripuly_heart.app.services.managed_connection_auth import (
     ManagedConnectionAuthRequest,
     ManagedConnectionAuthService,
 )
+from puripuly_heart.app.services.managed_status_refresh import ManagedStatusRefreshOwner
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.openrouter_pkce_flow import OpenRouterPkceFlowOwner
 from puripuly_heart.app.services.overlay_calibration import OverlayCalibrationOwner
@@ -1143,6 +1144,11 @@ class GuiController:
         repr=False,
     )
     _desktop_overlay_bounds_owner: DesktopOverlayBoundsOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _managed_status_refresh_owner: ManagedStatusRefreshOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -2973,24 +2979,30 @@ class GuiController:
                     level=logging.WARNING,
                 )
 
-        with contextlib.suppress(RuntimeError):
-            self._start_ui_background_task(
-                _run_status_refresh(),
-                name="managed-status-refresh",
-            )
+        self._get_managed_status_refresh_owner().schedule_status_refresh(_run_status_refresh)
 
     def _schedule_managed_trial_usage_refresh(self) -> None:
         if self._shutdown_ingress_frozen:
             return
 
-        async def _run_refresh() -> None:
-            await self._refresh_managed_trial_usage_state_best_effort()
+        self._get_managed_status_refresh_owner().schedule_trial_usage_refresh(
+            self._refresh_managed_trial_usage_state_best_effort
+        )
 
-        with contextlib.suppress(RuntimeError):
-            self._start_ui_background_task(
-                _run_refresh(),
-                name="managed-trial-usage-refresh",
+    def _get_managed_status_refresh_owner(self) -> ManagedStatusRefreshOwner:
+        owner = self._managed_status_refresh_owner
+        if owner is None:
+            owner = ManagedStatusRefreshOwner(
+                diagnostics_sink=lambda event, metadata, exception: self.log_detailed(
+                    "[ManagedAuth] Background refresh failed "
+                    f"event={event} kind={metadata.get('kind')} "
+                    f"error_type={metadata.get('error_type')}",
+                    level=logging.WARNING,
+                    exception=exception,
+                )
             )
+            self._managed_status_refresh_owner = owner
+        return owner
 
     def _on_managed_trial_delegate_ready(self) -> None:
         if self._shutdown_ingress_frozen:
@@ -4488,6 +4500,12 @@ class GuiController:
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="ManagedStatusRefreshOwner",
+                callback_name="close",
+                callback=self._close_managed_status_refresh_owner,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
                 owner_name="GuiControllerBackgroundScope",
                 callback_name="close",
                 callback=self._ui_background_scope.close,
@@ -4574,6 +4592,9 @@ class GuiController:
         logging_owner = self._runtime_logging_owner
         if logging_owner is not None:
             logging_owner.stop_ingress()
+        managed_status_owner = self._managed_status_refresh_owner
+        if managed_status_owner is not None:
+            managed_status_owner.stop_ingress()
 
     def _stop_github_star_prompt_ingress(self) -> None:
         owner = self._github_star_prompt_owner
@@ -4599,6 +4620,11 @@ class GuiController:
         owner = self._runtime_logging_owner
         if owner is not None:
             await owner.close_background_tasks()
+
+    async def _close_managed_status_refresh_owner(self) -> None:
+        owner = self._managed_status_refresh_owner
+        if owner is not None:
+            await owner.close()
 
     async def _close_microphone_test_runtime(self) -> None:
         failures: list[Exception] = []

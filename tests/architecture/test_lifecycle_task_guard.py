@@ -398,3 +398,24 @@ def test_order40_named_owner_allowlist_adds_vrchat_osc_presence_owner() -> None:
         "src/puripuly_heart/core/runtime/vrchat_osc_presence.py",
         ASYNCIO_CREATE_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
+
+
+def test_order41_managed_refresh_scheduling_uses_its_named_owner() -> None:
+    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    tree = ast.parse(controller_path.read_text(encoding="utf-8"))
+    methods = {
+        node.name: ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+
+    for method_name in (
+        "_schedule_owned_referral_id_status_refresh",
+        "_schedule_managed_trial_usage_refresh",
+    ):
+        method_source = methods[method_name]
+        assert "_start_ui_background_task" not in method_source
+        assert "_ui_background_scope" not in method_source
+
+    assert "schedule_status_refresh" in methods["_schedule_owned_referral_id_status_refresh"]
+    assert "schedule_trial_usage_refresh" in methods["_schedule_managed_trial_usage_refresh"]
