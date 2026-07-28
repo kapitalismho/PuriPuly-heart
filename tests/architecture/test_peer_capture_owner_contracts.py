@@ -29,6 +29,9 @@ AUDIO_LOOP_ADAPTER_PATH = (
 ADMISSION_ADAPTER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_admission.py"
 )
+VAD_SINK_ADAPTER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_vad_sink.py"
+)
 
 
 def test_peer_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() -> None:
@@ -82,6 +85,7 @@ def test_production_controller_composes_one_peer_owner_through_ports() -> None:
     assert "target_resolver=create_peer_capture_target_resolver_adapter()" in source
     assert "vad_factory=create_peer_capture_vad_adapter(" in source
     assert "run_audio_loop=create_peer_capture_audio_loop_adapter(" in source
+    assert "vad_sink=create_peer_capture_vad_sink_adapter(" in source
     assert "PeerChannelRuntime" not in source
     assert "PeerRuntimeConfig" not in source
 
@@ -257,3 +261,33 @@ def test_peer_capture_session_owner_remains_admission_and_retry_lifecycle_owner(
     assert "admission = await self._admission.admit(config)" in source
     assert "self._desired_active" in source
     assert "async def retry_process_capture(" in source
+
+
+def test_controller_composes_peer_vad_sink_adapter_without_channel_wrapper() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    assert "vad_sink=create_peer_capture_vad_sink_adapter(" in source
+    assert "_PeerCaptureVadSink" not in source
+
+
+def test_peer_vad_sink_adapter_routes_only_peer_events_without_lifecycle_ownership() -> None:
+    source = VAD_SINK_ADAPTER_PATH.read_text(encoding="utf-8")
+
+    assert "puripuly_heart.ui" not in source
+    assert "GuiController" not in source
+    assert "ClientHub" not in source
+    assert "chatbox" not in source.casefold()
+    assert "output" not in source.casefold()
+    assert "handle_peer_vad_event" in source
+    assert "handle_vad_event(event)" not in source
+    assert "asyncio.create_task" not in source
+    assert "async def close(" not in source
+
+
+def test_peer_capture_session_owner_remains_generation_guard_and_sink_caller() -> None:
+    source = OWNER_PATH.read_text(encoding="utf-8")
+
+    assert "class _GenerationGuardedVadSink" in source
+    assert "if not self.runtime.is_current_generation" in source
+    assert "await cast(_VadSink, self.sink).handle_vad_event(event)" in source
+    assert "vad_sink: object" in source

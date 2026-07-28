@@ -187,6 +187,7 @@ from puripuly_heart.app.wiring import (
     create_peer_capture_source_adapter,
     create_peer_capture_target_resolver_adapter,
     create_peer_capture_vad_adapter,
+    create_peer_capture_vad_sink_adapter,
     create_provider_verifier,
     create_secret_store,
     create_self_capture_audio_loop_adapter,
@@ -647,17 +648,6 @@ class _SelfCaptureVadSink:
         if hub is None:
             raise RuntimeError("Self VAD sink requires the production hub")
         await hub.handle_vad_event(event)
-
-
-@dataclass(slots=True)
-class _PeerCaptureVadSink:
-    hub_provider: Callable[[], ClientHub | None]
-
-    async def handle_vad_event(self, event: object) -> None:
-        hub = self.hub_provider()
-        if hub is None:
-            raise RuntimeError("Peer VAD sink requires the production hub")
-        await hub.handle_peer_vad_event(event)
 
 
 @dataclass(slots=True)
@@ -9349,7 +9339,7 @@ class GuiController:
                 log_detailed=self.log_detailed,
                 is_detailed_enabled=self._detailed_audio_diag_enabled,
             ),
-            vad_sink=_PeerCaptureVadSink(lambda: self.hub),
+            vad_sink=create_peer_capture_vad_sink_adapter(runtime_provider=lambda: self.hub),
             state_changed=self._on_peer_capture_state_changed,
             diagnostic_sink=self._on_peer_runtime_diagnostic,
             local_asr_diagnostic_sink=self._local_asr_transition_diagnostic,
