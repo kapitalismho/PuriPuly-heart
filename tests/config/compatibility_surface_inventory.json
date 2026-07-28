@@ -1031,6 +1031,14 @@
       "rationale": "SelfCaptureSourceAdapter implements the internal Self capture source-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
     {
+      "surface": "puripuly_heart.app.adapters Self capture VAD adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.self_capture_vad"
+      ],
+      "rationale": "SelfCaptureVadAdapter implements the internal Self capture VAD-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
       "surface": "puripuly_heart.app.adapters Peer capture source adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [

@@ -13,7 +13,10 @@ from puripuly_heart.core.runtime.peer_channel import (
     PeerCaptureSourceFactory,
     PeerCaptureVadFactory,
 )
-from puripuly_heart.core.runtime.self_capture import SelfCaptureSourceFactory
+from puripuly_heart.core.runtime.self_capture import (
+    SelfCaptureSourceFactory,
+    SelfCaptureVadFactory,
+)
 
 
 def create_microphone_test_capture_adapter(
@@ -62,6 +65,25 @@ def create_self_capture_source_adapter(
         source_factory=SoundDeviceAudioSource,
         log_detailed=log_detailed,
         wrap_source=wrap_source,
+    )
+
+
+def create_self_capture_vad_adapter(
+    *,
+    log_detailed: Callable[[str], object],
+    diagnostics_enabled: Callable[[], bool],
+) -> SelfCaptureVadFactory:
+    from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
+    from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
+    from puripuly_heart.core.vad.gating import VadGating
+    from puripuly_heart.core.vad.silero import SileroVadOnnx
+
+    return SelfCaptureVadAdapter(
+        model_path_resolver=ensure_silero_vad_onnx,
+        engine_factory=SileroVadOnnx,
+        gating_factory=VadGating,
+        log_detailed=log_detailed,
+        diagnostics_enabled=diagnostics_enabled,
     )
 
 

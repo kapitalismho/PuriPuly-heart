@@ -24,6 +24,7 @@ from puripuly_heart.app.adapters import (
 from puripuly_heart.app.adapters.peer_capture_source import PeerCaptureSourceAdapter
 from puripuly_heart.app.adapters.peer_capture_vad import PeerCaptureVadAdapter
 from puripuly_heart.app.adapters.self_capture_source import SelfCaptureSourceAdapter
+from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestCaptureRequest,
@@ -12070,9 +12071,7 @@ def test_self_capture_source_adapter_normalizes_wasapi_compatibility_mode(
     assert source_calls[0]["channels"] == 1
 
 
-def test_self_capture_vad_wires_self_diagnostics(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_self_capture_vad_adapter_wires_self_diagnostics() -> None:
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.settings.audio.input_host_api = WINDOWS_WASAPI_COMPATIBILITY_HOST_API
@@ -12085,13 +12084,14 @@ def test_self_capture_vad_wires_self_diagnostics(
         vad_calls.append(dict(kwargs))
         return SimpleNamespace()
 
-    monkeypatch.setattr(controller_module, "ensure_silero_vad_onnx", lambda: Path("vad.onnx"))
-    monkeypatch.setattr(controller_module, "SileroVadOnnx", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "VadGating", fake_vad_gating)
-
-    controller._vad = controller._create_self_capture_vad(
-        controller._build_self_capture_session_config(controller.settings)
+    adapter = SelfCaptureVadAdapter(
+        model_path_resolver=lambda: Path("vad.onnx"),
+        engine_factory=lambda *args, **kwargs: object(),
+        gating_factory=fake_vad_gating,
+        log_detailed=controller.log_detailed,
+        diagnostics_enabled=controller._detailed_audio_diag_enabled,
     )
+    controller._vad = adapter(controller._build_self_capture_session_config(controller.settings))
 
     assert vad_calls[0].get("max_segment_ms") is None
     assert vad_calls[0]["diagnostic_label"] == "self"

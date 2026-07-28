@@ -19,6 +19,7 @@ from puripuly_heart.app.wiring_composition import (
     create_peer_capture_vad_adapter,
     create_provider_verifier,
     create_self_capture_source_adapter,
+    create_self_capture_vad_adapter,
 )
 from puripuly_heart.app.wiring_llm_factory import (
     MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
@@ -221,6 +222,7 @@ __all__ = (
     "create_provider_verifier",
     "create_secret_store",
     "create_self_capture_source_adapter",
+    "create_self_capture_vad_adapter",
     "create_sync_secret_store_adapter",
     "copy_stable_secrets_to_vnext_namespace",
     "create_stt_backend",

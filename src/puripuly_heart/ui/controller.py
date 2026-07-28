@@ -189,6 +189,7 @@ from puripuly_heart.app.wiring import (
     create_provider_verifier,
     create_secret_store,
     create_self_capture_source_adapter,
+    create_self_capture_vad_adapter,
     create_sync_secret_store_adapter,
     resolve_overlay_config,
     resolve_peer_stt_runtime_config_from_vnext,
@@ -396,9 +397,6 @@ from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryService,
 )
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
-from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
-from puripuly_heart.core.vad.gating import VadGating
-from puripuly_heart.core.vad.silero import SileroVadOnnx
 
 logger = logging.getLogger(__name__)
 
@@ -775,7 +773,7 @@ class GuiController:
     )
     _debug_capture_fault_profile: str = field(init=False, default="none")
     _debug_stt_fault_profile: str = field(init=False, default="none")
-    _vad: VadGating | None = None
+    _vad: object | None = None
     _stt_desired: bool = False
     _stt_restart_requested: bool = False
     _stt_force_immediate: bool = False
@@ -9805,7 +9803,10 @@ class GuiController:
                     channel_label="self",
                 ),
             ),
-            vad_factory=self._create_self_capture_vad,
+            vad_factory=create_self_capture_vad_adapter(
+                log_detailed=self.log_detailed,
+                diagnostics_enabled=self._detailed_audio_diag_enabled,
+            ),
             run_audio_loop=self._run_self_capture_audio_loop,
             vad_sink=_SelfCaptureVadSink(lambda: self.hub),
             state_changed=self._on_self_capture_state_changed,
@@ -9837,7 +9838,7 @@ class GuiController:
                 AudioSource | None,
                 owner.source if owner.source is not None else owner.cleanup_source,
             )
-            self._vad = cast(VadGating | None, owner.vad)
+            self._vad = owner.vad
             self._last_mic_loop_close_exception = owner.last_cleanup_exception
         self._stt_desired = snapshot.desired_active
         self._stt_activation_generation = snapshot.generation
@@ -9860,19 +9861,6 @@ class GuiController:
         if diagnostic.detail is not None:
             fields.append(f"detail={diagnostic.detail}")
         self.log_detailed(f"[SelfCapture] {' '.join(fields)}")
-
-    def _create_self_capture_vad(self, config: SelfCaptureSessionConfig) -> VadGating:
-        model_path = ensure_silero_vad_onnx()
-        return VadGating(
-            engine=SileroVadOnnx(model_path=model_path),
-            sample_rate_hz=config.target_sample_rate_hz,
-            ring_buffer_ms=config.ring_buffer_ms,
-            speech_threshold=config.vad_speech_threshold,
-            hangover_ms=config.vad_hangover_ms,
-            diagnostic_event_callback=lambda message: self.log_detailed(message),
-            diagnostics_enabled=self._detailed_audio_diag_enabled,
-            diagnostic_label="self",
-        )
 
     async def _run_self_capture_audio_loop(self, **kwargs: object) -> None:
         from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop

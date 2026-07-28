@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
 ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_source.py"
+VAD_ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_vad.py"
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
 
 
@@ -58,3 +59,37 @@ def test_self_capture_session_owner_remains_source_lifecycle_owner() -> None:
     assert '"_retired_sources"' in source
     assert "await self._close_source" in source
     assert "source_factory: SelfCaptureSourceFactory" in source
+
+
+def test_controller_composes_self_vad_adapter_without_vad_algorithm() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    composition = _controller_method_source("_get_self_capture_owner")
+
+    assert "vad_factory=create_self_capture_vad_adapter(" in composition
+    assert "_create_self_capture_vad" not in source
+    assert "ensure_silero_vad_onnx" not in source
+    assert "SileroVadOnnx" not in source
+    assert "VadGating" not in source
+
+
+def test_self_vad_adapter_has_no_ui_peer_vad_or_session_lifecycle_ownership() -> None:
+    source = VAD_ADAPTER_PATH.read_text(encoding="utf-8")
+
+    assert "puripuly_heart.ui" not in source
+    assert "GuiController" not in source
+    assert "AppSettings" not in source
+    assert "PeerCaptureSessionConfig" not in source
+    assert "run_audio_vad_loop" not in source
+    assert "asyncio" not in source
+    assert "async def close(" not in source
+    assert "SelfCaptureSessionConfig" in source
+
+
+def test_self_capture_session_owner_remains_vad_and_loop_lifecycle_owner() -> None:
+    source = OWNER_PATH.read_text(encoding="utf-8")
+
+    assert '"_vad"' in source
+    assert "vad_factory: SelfCaptureVadFactory" in source
+    assert "vad = self._vad_factory(config)" in source
+    assert "run_audio_loop: SelfCaptureAudioLoop" in source
+    assert '"_loop_task"' in source
