@@ -1957,7 +1957,7 @@ async def test_clipboard_watcher_not_started_on_non_windows(
     await controller._sync_clipboard_watcher()
 
     assert called is False
-    assert controller._clipboard_runtime is None
+    assert controller._get_clipboard_auto_translation_owner().runtime is None
 
 
 @pytest.mark.asyncio
@@ -15734,8 +15734,9 @@ async def test_order24_clipboard_start_failure_degrades_without_raw_exception_te
     assert [settings.ui.clipboard_auto_translate_enabled for settings in saved_settings] == [True]
     assert controller.settings is not None
     assert controller.settings.ui.clipboard_auto_translate_enabled is True
-    assert controller._clipboard_runtime is not None
-    assert controller._clipboard_runtime.watcher is None
+    runtime = controller._get_clipboard_auto_translation_owner().runtime
+    assert runtime is not None
+    assert runtime.watcher is None
     logged_text = "\n".join(
         message
         for _level, message in (
@@ -15799,8 +15800,9 @@ async def test_order24_clipboard_stop_failure_degrades_without_raw_exception_tex
     assert [settings.ui.clipboard_auto_translate_enabled for settings in saved_settings] == [False]
     assert controller.settings is not None
     assert controller.settings.ui.clipboard_auto_translate_enabled is False
-    assert controller._clipboard_runtime is not None
-    assert controller._clipboard_runtime.watcher is None
+    runtime = controller._get_clipboard_auto_translation_owner().runtime
+    assert runtime is not None
+    assert runtime.watcher is None
     logged_text = "\n".join(
         message
         for _level, message in (

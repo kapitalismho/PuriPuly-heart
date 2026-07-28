@@ -375,7 +375,6 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureSessionSnapshot,
     PeerCaptureTargetIntent,
 )
-from puripuly_heart.core.runtime.clipboard import ClipboardRuntime
 from puripuly_heart.core.runtime.desktop_overlay_bounds import (
     DesktopOverlayBoundsOwner,
     is_finite_non_bool_number,
@@ -6026,21 +6025,6 @@ class GuiController:
         )
         self._on_self_capture_state_changed(snapshot)
         return snapshot
-
-    def _get_clipboard_watcher_lock(self) -> asyncio.Lock:
-        return self._get_clipboard_auto_translation_owner().lock
-
-    def _get_clipboard_runtime(self) -> ClipboardRuntime:
-        return self._get_clipboard_auto_translation_owner().get_runtime()
-
-    @property
-    def _clipboard_runtime(self) -> ClipboardRuntime | None:
-        owner = self._clipboard_auto_translation_owner
-        return owner.runtime if owner is not None else None
-
-    @_clipboard_runtime.setter
-    def _clipboard_runtime(self, runtime: ClipboardRuntime | None) -> None:
-        self._get_clipboard_auto_translation_owner().runtime = runtime
 
     def _get_clipboard_auto_translation_owner(self) -> ClipboardAutoTranslationOwner:
         owner = self._clipboard_auto_translation_owner
