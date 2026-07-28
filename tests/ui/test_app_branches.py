@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 from pathlib import Path
-from types import MethodType, SimpleNamespace
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -27,12 +27,12 @@ from puripuly_heart.config.settings import (
     TranslationConnection,
     TranslationModel,
     TranslationSettings,
+    build_managed_openrouter_byok_target_settings,
     with_telemetry_consent,
 )
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
-from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 MISSING = object()
@@ -1909,9 +1909,11 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
     settings.openrouter.llm_model = OpenRouterLLMModel.QWEN_35_FLASH_02_23
-    app.controller = SimpleNamespace(settings=settings)
-    app.controller.build_managed_openrouter_byok_target_settings = MethodType(
-        GuiController.build_managed_openrouter_byok_target_settings, app.controller
+    app.controller = SimpleNamespace(
+        settings=settings,
+        build_managed_openrouter_byok_target_settings=(
+            lambda: build_managed_openrouter_byok_target_settings(settings)
+        ),
     )
     pkce_calls: list[tuple[AppSettings, str]] = []
     app._on_request_openrouter_pkce = (
@@ -1951,9 +1953,11 @@ def test_discord_managed_auth_byok_clears_managed_china_translation_state() -> N
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
     settings.openrouter.llm_model = OpenRouterLLMModel.DEEPSEEK_V4_FLASH
     settings.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
-    app.controller = SimpleNamespace(settings=settings)
-    app.controller.build_managed_openrouter_byok_target_settings = MethodType(
-        GuiController.build_managed_openrouter_byok_target_settings, app.controller
+    app.controller = SimpleNamespace(
+        settings=settings,
+        build_managed_openrouter_byok_target_settings=(
+            lambda: build_managed_openrouter_byok_target_settings(settings)
+        ),
     )
 
     target_settings = app._build_managed_openrouter_byok_target_settings()

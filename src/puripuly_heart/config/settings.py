@@ -1497,6 +1497,45 @@ def _desktop_flet_settings_to_dict(settings: DesktopFletOverlaySettings) -> dict
     }
 
 
+def build_managed_openrouter_byok_target_settings(
+    current_settings: AppSettings | None,
+) -> AppSettings | None:
+    if current_settings is None:
+        return None
+    if current_settings.provider.llm != LLMProviderName.OPENROUTER:
+        return None
+    if current_settings.openrouter.selected_source != OpenRouterCredentialSource.MANAGED:
+        return None
+
+    openrouter_model = None
+    selection_alias = current_settings.openrouter.selection_alias
+    if selection_alias is not None:
+        profile = get_openrouter_llm_profile(selection_alias.value)
+        if profile is not None:
+            openrouter_model = profile.openrouter_model
+    if openrouter_model is None:
+        openrouter_model = current_settings.openrouter.llm_model.value
+
+    alias_value = get_openrouter_selection_alias_for_model_and_source(
+        openrouter_model,
+        OpenRouterCredentialSource.BYOK.value,
+    )
+    if alias_value is None:
+        return None
+
+    target_settings = copy.deepcopy(current_settings)
+    target_settings.provider.llm = LLMProviderName.OPENROUTER
+    target_settings.openrouter.selection_alias = OpenRouterSelectionAlias(alias_value)
+    target_settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
+    target_settings.openrouter.llm_model = OpenRouterLLMModel(openrouter_model)
+    target_settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
+    target_settings.translation.connection = TranslationConnection.OPENROUTER
+    target_settings.translation.connection_history[target_settings.translation.model.value] = (
+        TranslationConnection.OPENROUTER
+    )
+    return target_settings
+
+
 def to_dict(settings: AppSettings) -> dict[str, Any]:
     settings = copy.deepcopy(settings)
     if _translation_settings_is_exact_default(settings.translation):
