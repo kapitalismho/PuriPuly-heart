@@ -6,6 +6,9 @@ from typing import Any, cast
 
 import pytest
 
+from puripuly_heart.app.services.application_runtime_shutdown import (
+    compose_application_runtime_shutdown_callbacks,
+)
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
 )
@@ -62,7 +65,7 @@ async def test_application_shutdown_retries_retained_pipeline_cleanup() -> None:
     )
     callback = next(
         callback
-        for callback in controller.application_shutdown_callbacks()
+        for callback in compose_application_runtime_shutdown_callbacks(controller)
         if callback.owner_name == "RuntimePipelineLauncher"
     )
 

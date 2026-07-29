@@ -140,7 +140,6 @@ from puripuly_heart.core.overlay.sink import (
     SelfTranscriptFinal,
     TranslationFinal,
 )
-from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.core.runtime.peer_channel import PeerRuntimeConfig
 from puripuly_heart.core.runtime_logging import (
@@ -1525,6 +1524,7 @@ def test_manual_local_asr_mismatches_persist_qwen_for_self_and_peer(
         ),
         config_path=Path("settings.json"),
     )
+    install_test_runtime_composition(controller)
     controller.settings = settings
 
     monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
@@ -1662,34 +1662,6 @@ async def test_verify_api_key_preserves_model_and_error_contracts(
     assert any("[ERROR]" in line and "bad key" in line for line in logs.logs)
 
 
-def test_log_error_falls_back_to_standard_logger_without_direct_logs_view_append(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    logs = DummyLogsView()
-    controller = _make_controller(app=SimpleNamespace(view_logs=logs))
-
-    class BrokenRuntimeLogging:
-        def attach_realtime_sink(self, _sink) -> None:
-            return None
-
-        def emit_basic(self, _message: str, *, level: int = logging.INFO) -> None:
-            _ = level
-            raise RuntimeError("emit failed")
-
-    controller._runtime_logging = BrokenRuntimeLogging()
-    seen: list[tuple[int, str]] = []
-    monkeypatch.setattr(
-        controller_module.logger,
-        "log",
-        lambda level, message: seen.append((level, message)),
-    )
-
-    controller._log_error("fallback message")
-
-    assert seen == [(logging.ERROR, "fallback message")]
-    assert logs.logs == []
-
-
 def test_sync_ui_from_settings_updates_dashboard_and_settings_view() -> None:
     settings = AppSettings()
     settings.languages.source_language = "ko"
@@ -1752,7 +1724,7 @@ def test_application_ingress_freeze_is_terminal_for_late_work_owners() -> None:
     osc_owner = controller._get_vrchat_osc_presence_owner()
     mic_owner = controller._get_vrc_mic_sync_owner()
 
-    controller._freeze_application_ingress()
+    controller.freeze_application_ingress()
 
     assert overlay_owner.accepting_ingress is False
     assert osc_owner.accepting_ingress is False
@@ -2631,6 +2603,7 @@ async def test_closing_desktop_overlay_runtime_rejects_direct_bridge_commands() 
         app=_presentation(SimpleNamespace(), page=page),
         config_path=Path("settings.json"),
     )
+    install_test_runtime_composition(controller)
     controller.settings = AppSettings()
     controller.settings.ui.overlay_enabled = True
     controller.settings.overlay.target = OVERLAY_TARGET_DESKTOP
@@ -2727,6 +2700,7 @@ async def test_closing_overlay_runtime_rejects_direct_presenter_commands() -> No
         app=_presentation(SimpleNamespace(), page=page),
         config_path=Path("settings.json"),
     )
+    install_test_runtime_composition(controller)
     controller.settings = AppSettings()
     _overlay_owner(controller).state = "connected"
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -4717,6 +4691,7 @@ async def test_overlay_start_restores_compatibility_refresh_for_existing_present
         app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
+    install_test_runtime_composition(controller)
     controller.settings = AppSettings()
     controller.hub = DummyHub()
     _attach_overlay_presenter(
@@ -4867,6 +4842,7 @@ async def test_desktop_overlay_start_disables_existing_peer_presentation_refresh
         app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
+    install_test_runtime_composition(controller)
     controller.settings = AppSettings()
     controller.settings.overlay.target = OVERLAY_TARGET_DESKTOP
     controller.hub = DummyHub()
@@ -5885,482 +5861,6 @@ async def test_overlay_successful_recovery_clears_previous_failure_reason(
     assert _overlay_owner(controller).snapshot.failure_reason is None
 
 
-@pytest.mark.asyncio
-async def test_stop_terminally_closes_vrc_receiver_runtime_before_hub_teardown(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    events: list[tuple[str, object]] = []
-    controller = _make_controller(app=SimpleNamespace())
-
-    async def fake_set_stt_enabled(self, enabled: bool) -> None:
-        _ = self
-        events.append(("stt", enabled))
-
-    class FakeReceiverRuntime:
-        async def stop(self, *, strict_runtime_errors: bool = False) -> None:
-            events.append(("receiver_stop", strict_runtime_errors))
-
-        async def close(self) -> None:
-            events.append(("receiver_close", None))
-            controller.receiver = None
-
-    class FakeHub:
-        async def stop(self) -> None:
-            events.append(("hub_stop", None))
-
-    class FakeSender:
-        def close(self) -> None:
-            events.append(("sender_close", None))
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    controller._get_vrc_mic_sync_owner().runtime = FakeReceiverRuntime()
-    controller.receiver = object()
-    controller.hub = FakeHub()
-    controller.sender = FakeSender()
-    controller._bridge_task = asyncio.create_task(asyncio.sleep(3600))
-
-    await controller.stop()
-
-    assert events[:3] == [("stt", False), ("receiver_close", None), ("hub_stop", None)]
-    assert ("receiver_stop", False) not in events
-    assert controller.hub is None
-    assert controller.sender is None
-    assert controller._bridge_task is None
-
-
-@pytest.mark.asyncio
-async def test_stop_aggregates_vrc_receiver_close_failure_and_still_stops_hub(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    events: list[str] = []
-    controller = _make_controller(app=SimpleNamespace())
-    receiver = object()
-
-    class FailingReceiverRuntime:
-        async def stop(self, *, strict_runtime_errors: bool = False) -> None:
-            _ = strict_runtime_errors
-            events.append("receiver_stop")
-
-        async def close(self) -> None:
-            events.append("receiver_close")
-            raise RuntimeError("receiver close failed")
-
-    class FakeHub:
-        async def stop(self) -> None:
-            events.append("hub_stop")
-
-    class FakeSender:
-        def close(self) -> None:
-            events.append("sender_close")
-
-    async def fake_set_stt_enabled(self, enabled: bool) -> None:
-        _ = (self, enabled)
-        events.append("stt_off")
-
-    async def fake_shutdown_overlay(self, *, preserve_failure_reason: bool) -> None:
-        _ = (self, preserve_failure_reason)
-        events.append("overlay_shutdown")
-
-    owner = controller._get_vrc_mic_sync_owner()
-    owner.runtime = FailingReceiverRuntime()
-    controller.receiver = receiver
-    controller.hub = FakeHub()
-    controller.sender = FakeSender()
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay)
-
-    with pytest.raises(RuntimeError, match="receiver close failed"):
-        await controller.stop()
-
-    assert events[:4] == ["stt_off", "receiver_close", "overlay_shutdown", "hub_stop"]
-    assert events[-1] == "sender_close"
-    assert "receiver_stop" not in events
-    assert owner.runtime is not None
-    assert controller.receiver is receiver
-
-
-@pytest.mark.asyncio
-async def test_stop_closes_peer_runtime_without_replacing_self_stt(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-    _peer_owner(controller).bind_runtime(DummyPeerRuntime())
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(
-        OverlayApplicationOwner,
-        "shutdown",
-        lambda self, preserve_failure_reason: asyncio.sleep(0),
-    )
-
-    await controller.stop()
-
-    assert _peer_owner(controller).runtime is None
-    assert controller.hub is None
-
-
-@pytest.mark.asyncio
-async def test_stop_preserves_peer_runtime_when_close_fails_and_stops_hub(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-
-    class FailingPeerRuntime(DummyPeerRuntime):
-        async def close(self) -> None:
-            raise RuntimeError("peer runtime close failed")
-
-    peer_runtime = FailingPeerRuntime()
-    controller.hub = hub
-    _peer_owner(controller).bind_runtime(peer_runtime)
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(
-        OverlayApplicationOwner,
-        "shutdown",
-        lambda self, preserve_failure_reason: asyncio.sleep(0),
-    )
-
-    with pytest.raises(RuntimeError, match="peer runtime close failed"):
-        await controller.stop()
-
-    assert _peer_owner(controller).runtime is peer_runtime
-    assert hub.stop_calls == 1
-    assert controller.hub is None
-
-
-@pytest.mark.asyncio
-async def test_stop_preserves_hub_when_hub_stop_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-
-    async def failing_stop() -> None:
-        hub.stop_calls += 1
-        raise RuntimeError("hub stop failed")
-
-    hub.stop = failing_stop  # type: ignore[method-assign]
-    controller.hub = hub
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(
-        OverlayApplicationOwner,
-        "shutdown",
-        lambda self, preserve_failure_reason: asyncio.sleep(0),
-    )
-
-    with pytest.raises(RuntimeError, match="hub stop failed"):
-        await controller.stop()
-
-    assert controller.hub is hub
-    assert hub.stop_calls == 1
-
-
-@pytest.mark.asyncio
-async def test_stop_closes_runtime_logging_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    events: list[str] = []
-
-    class FakeRuntimeLogging:
-        def close_after_producers_stop(self, *, cleanup_failures=()) -> None:
-            events.append(
-                "runtime_logging_summary:"
-                + ",".join(type(failure).__name__ for failure in cleanup_failures)
-            )
-            events.append("runtime_logging_close")
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(
-        OverlayApplicationOwner,
-        "shutdown",
-        lambda self, preserve_failure_reason: asyncio.sleep(0),
-    )
-
-    controller._runtime_logging = FakeRuntimeLogging()
-
-    await controller.stop()
-
-    assert events == ["runtime_logging_summary:", "runtime_logging_close"]
-    assert controller._runtime_logging is not None
-
-
-@pytest.mark.asyncio
-async def test_stop_emits_shutdown_summary_after_hub_failure_before_logging_close(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    events: list[str] = []
-    hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-
-    async def failing_stop() -> None:
-        hub.stop_calls += 1
-        events.append("hub_stop")
-        raise RuntimeError("hub stop failed with raw detail")
-
-    class FakeRuntimeLogging:
-        def close_after_producers_stop(self, *, cleanup_failures=()) -> None:
-            events.append(
-                "runtime_logging_summary:"
-                + ",".join(type(failure).__name__ for failure in cleanup_failures)
-            )
-            events.append("runtime_logging_close")
-
-    hub.stop = failing_stop  # type: ignore[method-assign]
-    controller.hub = hub
-    controller._runtime_logging = FakeRuntimeLogging()
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(
-        OverlayApplicationOwner,
-        "shutdown",
-        lambda self, preserve_failure_reason: asyncio.sleep(0),
-    )
-
-    with pytest.raises(RuntimeError, match="hub stop failed"):
-        await controller.stop()
-
-    assert events == [
-        "hub_stop",
-        "runtime_logging_summary:RuntimeError",
-        "runtime_logging_close",
-    ]
-    assert controller._runtime_logging is not None
-
-
-@pytest.mark.asyncio
-async def test_log_basic_after_stop_uses_closed_logging_owner_without_recreation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    runtime_logging = RuntimeLoggingSpy()
-    controller._runtime_logging = runtime_logging
-    new_service_creations: list[str] = []
-
-    def create_new_runtime_logging(*_args, **_kwargs):
-        new_service_creations.append("created")
-        return RuntimeLoggingSpy()
-
-    monkeypatch.setattr(
-        controller_module,
-        "SessionRuntimeLoggingService",
-        create_new_runtime_logging,
-    )
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(
-        OverlayApplicationOwner,
-        "shutdown",
-        lambda self, preserve_failure_reason: asyncio.sleep(0),
-    )
-
-    await controller.stop()
-    stopped_runtime_logging = controller._runtime_logging
-    controller.log_basic("late after stop")
-
-    assert controller._runtime_logging is stopped_runtime_logging
-    assert runtime_logging.basic_messages[-1] == (logging.INFO, "late after stop")
-    assert new_service_creations == []
-
-
-@pytest.mark.asyncio
-async def test_runtime_logging_close_failure_is_aggregated_not_suppressed(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-    events: list[str] = []
-
-    async def failing_stop() -> None:
-        hub.stop_calls += 1
-        events.append("hub_stop")
-        raise RuntimeError("hub stop failed")
-
-    class FakeRuntimeLogging:
-        def close_after_producers_stop(self, *, cleanup_failures=()) -> None:
-            events.append(
-                "runtime_logging_summary:"
-                + ",".join(type(failure).__name__ for failure in cleanup_failures)
-            )
-            events.append("runtime_logging_close")
-            raise OSError("runtime logging close failed")
-
-    hub.stop = failing_stop  # type: ignore[method-assign]
-    controller.hub = hub
-    controller._runtime_logging = FakeRuntimeLogging()
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(
-        OverlayApplicationOwner,
-        "shutdown",
-        lambda self, preserve_failure_reason: asyncio.sleep(0),
-    )
-
-    with pytest.raises(ExceptionGroup) as exc_info:
-        await controller.stop()
-
-    assert [type(failure).__name__ for failure in exc_info.value.exceptions] == [
-        "RuntimeError",
-        "OSError",
-    ]
-    assert events == [
-        "hub_stop",
-        "runtime_logging_summary:RuntimeError",
-        "runtime_logging_close",
-    ]
-
-
-@pytest.mark.asyncio
-async def test_stop_aggregates_oauth_runtime_close_failure_and_continues_later_shutdown(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    events: list[str] = []
-    oauth_failure = RuntimeError("oauth cleanup sentinel")
-    hub_failure = RuntimeError("hub cleanup sentinel")
-    logging_failure = OSError("runtime logging cleanup sentinel")
-
-    class FailingOAuthRuntime:
-        async def close(self) -> None:
-            events.append("oauth_close")
-            raise oauth_failure
-
-    class FakeRuntimeLogging:
-        def close_after_producers_stop(self, *, cleanup_failures=()) -> None:
-            events.append(
-                "runtime_logging_summary:"
-                + ",".join(type(failure).__name__ for failure in cleanup_failures)
-            )
-            events.append("runtime_logging_close")
-            raise logging_failure
-
-    hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-
-    async def failing_stop() -> None:
-        hub.stop_calls += 1
-        events.append("hub_stop")
-        raise hub_failure
-
-    async def fake_set_stt_enabled(self, value: bool) -> None:
-        _ = (self, value)
-        events.append("stt_off")
-
-    async def fake_shutdown_overlay(self, *, preserve_failure_reason: bool) -> None:
-        _ = (self, preserve_failure_reason)
-        events.append("overlay_shutdown")
-
-    hub.stop = failing_stop  # type: ignore[method-assign]
-    controller.hub = hub
-    controller._get_openrouter_pkce_flow_owner().runtime = FailingOAuthRuntime()  # type: ignore[assignment]
-    controller._runtime_logging = FakeRuntimeLogging()
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay)
-
-    with pytest.raises(ExceptionGroup) as exc_info:
-        await controller.stop()
-
-    assert list(exc_info.value.exceptions) == [
-        oauth_failure,
-        hub_failure,
-        logging_failure,
-    ]
-    assert events == [
-        "oauth_close",
-        "stt_off",
-        "overlay_shutdown",
-        "hub_stop",
-        "runtime_logging_summary:RuntimeError,RuntimeError",
-        "runtime_logging_close",
-    ]
-    assert controller.hub is hub
-    assert controller._runtime_logging is not None
-
-
-@pytest.mark.asyncio
-async def test_stop_closes_app_owned_oauth_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
-    events: list[str] = []
-
-    class FakeApp:
-        async def close_oauth_runtime(self) -> None:
-            events.append("app_oauth_close")
-
-    controller = _make_controller(app=FakeApp())
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    monkeypatch.setattr(
-        OverlayApplicationOwner,
-        "shutdown",
-        lambda self, preserve_failure_reason: asyncio.sleep(0),
-    )
-
-    await controller.stop()
-
-    assert events == ["app_oauth_close"]
-
-
-def test_log_error_fallback_does_not_append_duplicate_ui_line(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    logs = DummyLogsView()
-    controller = _make_controller(app=SimpleNamespace(view_logs=logs))
-    controller._runtime_logging = RuntimeLoggingSpy(basic_error=RuntimeError("boom"))
-
-    with caplog.at_level(logging.ERROR, logger=controller_module.logger.name):
-        controller._log_error("shared failure")
-
-    assert logs.logs == []
-    assert any("shared failure" in message for message in caplog.messages)
-
-
 def test_overlay_state_transition_routes_snapshot_details_to_detailed_log() -> None:
     controller = _make_controller(app=SimpleNamespace())
     controller._runtime_logging = RuntimeLoggingSpy()
@@ -6909,61 +6409,6 @@ async def test_start_microphone_test_clears_pending_self_stt_desire_before_captu
 
 
 @pytest.mark.asyncio
-async def test_controller_stop_closes_mic_test_runtime_and_continues_after_close_failure(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller._runtime_logging = RuntimeLoggingSpy()
-    runtime = controller._get_microphone_test_runtime().owner().runtime
-    generation = runtime.begin_direct_capture()
-    events: list[str] = []
-
-    class FailingSource:
-        def __init__(self) -> None:
-            self.close_calls = 0
-
-        async def close(self) -> None:
-            self.close_calls += 1
-            raise RuntimeError("mic source close failed")
-
-    source = FailingSource()
-    assert runtime.attach_source(source, generation=generation) is True
-
-    async def fake_set_stt_enabled(self, enabled: bool) -> None:
-        _ = self, enabled
-        events.append("stt-off")
-
-    async def fake_close_vrc_mic_receiver_runtime_for_release(
-        self,
-        failures: list[Exception],
-    ) -> None:
-        _ = self, failures
-        events.append("vrc-off")
-
-    async def fake_shutdown_overlay_runtime(self, *, preserve_failure_reason: bool) -> None:
-        _ = self, preserve_failure_reason
-        events.append("overlay-shutdown")
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(
-        GuiController,
-        "_close_vrc_mic_receiver_runtime_for_release",
-        fake_close_vrc_mic_receiver_runtime_for_release,
-    )
-    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay_runtime)
-
-    with pytest.raises(RuntimeError, match="mic source close failed"):
-        await controller.stop()
-
-    assert events == ["stt-off", "vrc-off", "overlay-shutdown"]
-    assert runtime.is_closed is True
-    assert runtime.source is source
-    assert source.close_calls == 1
-    assert await controller.start_microphone_test() is False
-
-
-@pytest.mark.asyncio
 async def test_direct_microphone_capture_rejects_overlap_without_invalidating_active_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -7151,6 +6596,7 @@ async def test_audio_settings_change_stops_active_microphone_test_and_next_start
         app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
     )
+    install_test_runtime_composition(controller)
     controller.settings = AppSettings()
     controller.settings.audio.input_device = "Old Mic"
     controller._runtime_logging = RuntimeLoggingSpy()
@@ -7197,6 +6643,7 @@ async def test_audio_settings_change_stops_active_microphone_test_after_in_place
         app=_presentation(SimpleNamespace()),
         config_path=tmp_path / "settings.json",
     )
+    install_test_runtime_composition(controller)
     controller.settings = AppSettings()
     controller.settings.audio.input_device = "Old Mic"
     controller._runtime_logging = RuntimeLoggingSpy()
@@ -7224,34 +6671,6 @@ async def test_audio_settings_change_stops_active_microphone_test_after_in_place
         assert capture_cancelled == ["Old Mic"]
     finally:
         await controller.stop_microphone_test()
-
-
-@pytest.mark.asyncio
-async def test_controller_stop_cancels_active_microphone_test(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller._runtime_logging = RuntimeLoggingSpy()
-    capture_started = asyncio.Event()
-    capture_cancelled: list[str] = []
-
-    async def fake_capture(self, **_kwargs) -> None:
-        _ = self
-        capture_started.set()
-        try:
-            await asyncio.sleep(3600)
-        finally:
-            capture_cancelled.append("cancelled")
-
-    _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
-
-    assert await controller.start_microphone_test() is True
-    await capture_started.wait()
-    await controller.stop()
-
-    assert capture_cancelled == ["cancelled"]
-    assert _microphone_test_task(controller) is None
 
 
 def test_self_capture_source_adapter_normalizes_wasapi_compatibility_mode(
@@ -7649,69 +7068,6 @@ def test_runtime_logging_writes_non_ascii_detailed_messages_to_utf8_file(tmp_pat
         stream_handler.close()
 
 
-def test_controller_runtime_logging_uses_injected_main_sinks(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    captured: dict[str, object] = {}
-    log_file = tmp_path / "runtime.log"
-    sinks = RuntimeLoggingSinks(
-        stream_handler=logging.NullHandler(),
-        file_handler=logging.NullHandler(),
-        log_file=log_file,
-    )
-    session_log_file = log_file
-
-    class FakeSessionRuntimeLoggingService:
-        mode = SessionLoggingMode.BASIC
-        log_file = session_log_file
-
-        def set_mode(self, mode) -> None:
-            self.mode = SessionLoggingMode(mode)
-
-        def attach_realtime_sink(self, sink) -> None:
-            _ = sink
-
-        def detach_realtime_sink(self) -> None:
-            return None
-
-        def emit_basic(self, message, *, level=logging.INFO) -> None:
-            _ = message, level
-
-        def emit_detailed(self, message, *, level=logging.INFO) -> bool:
-            _ = message, level
-            return False
-
-        def emit_detailed_lazy(self, build_message, *, level=logging.INFO) -> bool:
-            _ = build_message, level
-            return False
-
-        def emit_persisted(self, message, *, level=logging.INFO) -> None:
-            _ = message, level
-
-        def close(self) -> None:
-            return None
-
-    def create_session(**kwargs):
-        captured.update(kwargs)
-        return FakeSessionRuntimeLoggingService()
-
-    monkeypatch.setattr(
-        controller_module,
-        "SessionRuntimeLoggingService",
-        create_session,
-    )
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=_presentation(SimpleNamespace()),
-        config_path=tmp_path / "settings.json",
-        runtime_logging_sinks=sinks,
-    )
-
-    assert controller.runtime_logging.log_file == log_file
-    assert captured["sinks"] is sinks
-
-
 def test_self_capture_source_adapter_omits_wasapi_flags_from_name_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -7869,128 +7225,6 @@ def test_self_capture_source_adapter_omits_wasapi_flags_from_system_default(
 
 
 @pytest.mark.asyncio
-async def test_controller_stop_closes_vrc_mic_receiver_before_hub_shutdown(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.hub = DummyHub()
-    order: list[str] = []
-
-    class FakeReceiverRuntime:
-        async def stop(self, *, strict_runtime_errors: bool = False) -> None:
-            _ = strict_runtime_errors
-            order.append("receiver_stop")
-
-        async def close(self) -> None:
-            order.append("receiver_close")
-            controller.receiver = None
-
-    async def fake_set_stt_enabled(self, enabled: bool) -> None:
-        _ = (self, enabled)
-        order.append("stt")
-
-    async def fake_shutdown_overlay(self, *, preserve_failure_reason: bool) -> None:
-        _ = (self, preserve_failure_reason)
-        order.append("overlay")
-
-    async def fake_stop_hub_for_release(self, failures: list[Exception]) -> None:
-        _ = failures
-        order.append("hub")
-        self.hub = None
-
-    async def fake_noop(self, *args, **kwargs) -> None:  # noqa: ANN001, ANN002, ANN003
-        _ = (self, args, kwargs)
-
-    controller._get_vrc_mic_sync_owner().runtime = FakeReceiverRuntime()
-    controller.receiver = object()
-
-    monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(GuiController, "_close_app_oauth_runtime_for_release", fake_noop)
-    monkeypatch.setattr(GuiController, "_close_oauth_runtime", fake_noop)
-    monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", fake_noop)
-    monkeypatch.setattr(GuiController, "_close_microphone_test_runtime_for_release", fake_noop)
-    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay)
-    monkeypatch.setattr(GuiController, "_close_peer_runtime_for_release", fake_noop)
-    monkeypatch.setattr(GuiController, "_stop_hub_for_release", fake_stop_hub_for_release)
-    monkeypatch.setattr(GuiController, "_close_managed_openrouter_release_service", fake_noop)
-    monkeypatch.setattr(
-        GuiController, "_close_app_github_star_prompt_runtime_for_release", fake_noop
-    )
-
-    await controller.stop()
-
-    assert order == ["stt", "receiver_close", "overlay", "hub"]
-
-
-@pytest.mark.asyncio
-async def test_controller_stop_uses_bounded_prompt_runtime_close_and_still_stops_hub(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    runtime = GithubStarPromptRuntime(cancel_timeout_s=0.01)
-    started = asyncio.Event()
-    release = asyncio.Event()
-    events: list[str] = []
-    hub_stopped = asyncio.Event()
-
-    async def suppress_cancellation() -> bool:
-        started.set()
-        while not release.is_set():
-            try:
-                await release.wait()
-            except asyncio.CancelledError:
-                events.append("prompt_cancelled")
-        return True
-
-    task = runtime.start_translation_success_observation(suppress_cancellation())
-    await started.wait()
-    controller._get_github_star_prompt_owner().runtime = runtime
-
-    class FakeHub:
-        async def stop(self) -> None:
-            events.append("hub_stop")
-            hub_stopped.set()
-
-    async def fake_set_stt_enabled(self, enabled: bool) -> None:
-        _ = self
-        events.append(f"stt:{enabled}")
-
-    async def fake_shutdown_overlay(self, *, preserve_failure_reason: bool) -> None:
-        _ = (self, preserve_failure_reason)
-        events.append("overlay_shutdown")
-
-    async def fake_noop(self, *args, **kwargs) -> None:  # noqa: ANN001, ANN002, ANN003
-        _ = (self, args, kwargs)
-
-    controller.hub = FakeHub()
-    monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(GuiController, "_close_app_oauth_runtime_for_release", fake_noop)
-    monkeypatch.setattr(GuiController, "_close_oauth_runtime", fake_noop)
-    monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", fake_noop)
-    monkeypatch.setattr(GuiController, "_close_microphone_test_runtime_for_release", fake_noop)
-    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay)
-    monkeypatch.setattr(GuiController, "_close_peer_runtime_for_release", fake_noop)
-    monkeypatch.setattr(GuiController, "_close_managed_openrouter_release_service", fake_noop)
-
-    stop_task = asyncio.create_task(controller.stop())
-    try:
-        await asyncio.wait_for(hub_stopped.wait(), timeout=0.2)
-
-        with pytest.raises(TimeoutError, match="translation_success"):
-            await asyncio.wait_for(stop_task, timeout=0.2)
-
-        assert events[:3] == ["prompt_cancelled", "stt:False", "overlay_shutdown"]
-        assert events[-1] == "hub_stop"
-        assert runtime.translation_success_task is task
-    finally:
-        release.set()
-        await asyncio.wait_for(task, timeout=0.2)
-        if not stop_task.done():
-            with contextlib.suppress(Exception):
-                await asyncio.wait_for(stop_task, timeout=0.2)
-
-
-@pytest.mark.asyncio
 async def test_schedule_github_star_prompt_translation_success_uses_runtime_owner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -8133,30 +7367,6 @@ async def test_start_initializes_dashboard_and_bridge(
 
 
 @pytest.mark.asyncio
-async def test_controller_start_failure_runs_best_effort_cleanup_and_reraises(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    failure = RuntimeError("pipeline failed")
-    cleanup_calls: list[str] = []
-
-    async def fail_start(self: GuiController) -> None:
-        raise failure
-
-    async def stop(self: GuiController) -> None:
-        cleanup_calls.append("stop")
-
-    monkeypatch.setattr(GuiController, "_start_impl", fail_start)
-    monkeypatch.setattr(GuiController, "stop", stop)
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await controller.start()
-
-    assert exc_info.value is failure
-    assert cleanup_calls == ["stop"]
-
-
-@pytest.mark.asyncio
 async def test_start_does_not_auto_restore_transient_overlay_or_peer_toggles(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -8211,129 +7421,6 @@ async def test_start_does_not_auto_restore_transient_overlay_or_peer_toggles(
     assert overlay_calls == []
     assert hub.peer_translation_enabled is False
     assert gpu_discovery_requests == []
-
-
-@pytest.mark.asyncio
-async def test_set_runtime_logging_mode_emits_audio_snapshot_once_on_basic_to_detailed(
-    monkeypatch,
-) -> None:
-    class FakePage:
-        def __init__(self) -> None:
-            self.tasks: list[object] = []
-
-        def run_task(self, coro_fn) -> None:
-            self.tasks.append(coro_fn)
-
-    sounddevice_lines = ["[AudioDiag][Snapshot][SoundDevice] one"]
-    loopback_lines = ["[AudioDiag][Snapshot][Loopback] one"]
-    monkeypatch.setattr(
-        "puripuly_heart.core.audio.diagnostics.collect_sounddevice_snapshot_lines",
-        lambda: sounddevice_lines,
-    )
-    monkeypatch.setattr(
-        "puripuly_heart.core.audio.diagnostics.collect_pyaudiowpatch_snapshot_lines",
-        lambda: loopback_lines,
-    )
-
-    runtime = RuntimeLoggingSpy(detailed_enabled=False)
-    page = FakePage()
-    controller = GuiController(
-        page=page,
-        app=_presentation(SimpleNamespace(), page=page),
-        config_path=Path("settings.json"),
-    )
-    controller._runtime_logging = runtime
-
-    controller.set_runtime_logging_mode("detailed")
-    controller.set_runtime_logging_mode("detailed")
-    assert len(page.tasks) == 1
-    await page.tasks[0]()
-
-    messages = [message for _level, message in runtime.detailed_messages]
-    assert messages.count("[AudioDiag][Snapshot][SoundDevice] one") == 1
-    assert messages.count("[AudioDiag][Snapshot][Loopback] one") == 1
-
-
-@pytest.mark.asyncio
-async def test_set_runtime_logging_mode_audio_snapshot_run_task_failure_falls_back_to_loop(
-    monkeypatch,
-) -> None:
-    class FailingPage:
-        def run_task(self, coro_fn) -> None:
-            _ = coro_fn
-            raise RuntimeError("run_task rejected")
-
-    sounddevice_lines = ["[AudioDiag][Snapshot][SoundDevice] fallback"]
-    loopback_lines = ["[AudioDiag][Snapshot][Loopback] fallback"]
-    monkeypatch.setattr(
-        "puripuly_heart.core.audio.diagnostics.collect_sounddevice_snapshot_lines",
-        lambda: sounddevice_lines,
-    )
-    monkeypatch.setattr(
-        "puripuly_heart.core.audio.diagnostics.collect_pyaudiowpatch_snapshot_lines",
-        lambda: loopback_lines,
-    )
-
-    runtime = RuntimeLoggingSpy(detailed_enabled=False)
-    page = FailingPage()
-    controller = GuiController(
-        page=page,
-        app=_presentation(SimpleNamespace(), page=page),
-        config_path=Path("settings.json"),
-    )
-    controller._runtime_logging = runtime
-
-    controller.set_runtime_logging_mode("detailed")
-    await _wait_until(
-        lambda: any(
-            message == "[AudioDiag][Snapshot][Loopback] fallback"
-            for _level, message in runtime.detailed_messages
-        ),
-        attempts=50,
-        delay_s=0.01,
-    )
-
-    messages = [message for _level, message in runtime.detailed_messages]
-    assert "[AudioDiag][Snapshot][SoundDevice] fallback" in messages
-    assert "[AudioDiag][Snapshot][Loopback] fallback" in messages
-
-
-@pytest.mark.asyncio
-async def test_set_runtime_logging_mode_updates_overlay_runtime_contract() -> None:
-    class FakePage:
-        def __init__(self) -> None:
-            self.tasks: list[object] = []
-
-        def run_task(self, coro_fn) -> None:
-            self.tasks.append(coro_fn)
-
-    class OverlayManagerSpy:
-        def __init__(self) -> None:
-            self.modes: list[str] = []
-
-        def set_logging_mode(self, mode: str) -> None:
-            self.modes.append(mode)
-
-    page = FakePage()
-    controller = GuiController(
-        page=page,
-        app=_presentation(SimpleNamespace(), page=page),
-        config_path=Path("settings.json"),
-    )
-    controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
-    _attach_overlay_bridge(controller, FakeOverlayBridge(session_token="token"))
-    manager = OverlayManagerSpy()
-    _attach_overlay_manager(controller, manager)
-
-    controller.set_runtime_logging_mode("detailed")
-
-    assert controller.runtime_logging_mode == "detailed"
-    assert manager.modes == ["detailed"]
-    assert len(page.tasks) == 1
-
-    await page.tasks[0]()
-
-    assert _overlay_runtime(controller).bridge.runtime_control_messages == ["detailed"]
 
 
 class CapturingManagedKeySettingsView(DummySettingsView):
@@ -9548,7 +8635,7 @@ async def test_apply_settings_skips_vrc_sync_when_setting_is_unchanged(
         fake_configure_vrc_mic_receiver,
     )
 
-    with caplog.at_level(logging.INFO, logger=controller_module.logger.name):
+    with caplog.at_level(logging.INFO, logger="puripuly_heart.runtime"):
         await controller.apply_settings(settings)
 
     assert receiver_calls == []
@@ -12212,6 +11299,7 @@ def test_schedule_overlay_calibration_emit_preserves_traceback_in_detailed_log()
         app=_presentation(SimpleNamespace(), page=page),
         config_path=Path("settings.json"),
     )
+    install_test_runtime_composition(controller)
     controller._runtime_logging = RuntimeLoggingSpy()
     _overlay_owner(controller).state = "connected"
     _attach_overlay_presenter(controller, object())

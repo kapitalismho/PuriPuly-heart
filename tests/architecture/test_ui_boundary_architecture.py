@@ -17,8 +17,7 @@ APP_PATH = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "app.py"
 CONTROLLER_PATH = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
 
 UI_APPLICATION_NON_INTENT_MEMBERS = {
-    "application_shutdown_callbacks",
-    "bind_application_lifecycle",
+    "application_lifecycle",
     "build_managed_openrouter_byok_target_settings",
     "cancel_managed_auth_task",
     "clear_managed_auth_task",
@@ -46,6 +45,7 @@ UI_APPLICATION_NON_INTENT_MEMBERS = {
     "overlay_peer_presentation_state",
     "refresh_settings_after_openrouter_pkce_success",
     "refresh_settings_projection",
+    "register_application_shutdown_callbacks",
     "should_show_github_star_prompt",
     "state",
     "stop",
@@ -106,6 +106,26 @@ def test_ui_application_contract_covers_every_translator_app_boundary_access() -
     assert contract <= implementation
     assert "__getattr__" not in UiApplicationBoundary.__dict__
     assert not hasattr(UiApplicationBoundary, "backend")
+    boundary_parameters = inspect.signature(UiApplicationBoundary).parameters
+    assert {
+        name: parameter.default
+        for name, parameter in boundary_parameters.items()
+        if name in {"runtime", "state", "runtime_shutdown", "runtime_logging"}
+    } == {
+        "runtime": inspect.Parameter.empty,
+        "state": inspect.Parameter.empty,
+        "runtime_shutdown": inspect.Parameter.empty,
+        "runtime_logging": inspect.Parameter.empty,
+    }
+    state_owner_source = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "ui_application_state.py"
+    ).read_text(encoding="utf-8")
+    startup_port_source = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "ports" / "application_startup.py"
+    ).read_text(encoding="utf-8")
+    assert "getattr(" not in state_owner_source
+    assert "Any" not in startup_port_source
+    assert "_get_" not in startup_port_source
 
 
 def test_ui_boundary_implementations_match_every_declared_contract_signature() -> None:
@@ -169,6 +189,7 @@ def test_production_gui_constructor_wires_one_explicit_boundary_in_each_directio
     assert 'application = getattr(app, "application", None)' in main_gui_source
     assert "await application.start()" in main_gui_source
     assert 'UiApplicationBoundary(getattr(app, "controller", None))' not in main_gui_source
+    assert 'hasattr(self, "controller")' not in source
 
 
 def test_translator_app_has_no_operational_controller_or_hub_reach_through() -> None:
@@ -209,7 +230,7 @@ def test_translator_app_imports_only_the_approved_backend_boundary_surface() -> 
 
     assert not any(module.startswith(forbidden_prefixes) for module in imports)
     assert "puripuly_heart.app.ports.ui_application" in imports
-    assert "puripuly_heart.app.services.ui_application" in imports
+    assert "puripuly_heart.app.services.ui_application" not in imports
 
 
 def test_controller_presentation_access_is_explicit_and_adapter_is_closed() -> None:

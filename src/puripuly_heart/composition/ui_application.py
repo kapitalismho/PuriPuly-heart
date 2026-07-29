@@ -19,10 +19,14 @@ from puripuly_heart.app.services.provider_verification_binding import (
     ProviderVerificationBindingOwner,
 )
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
+from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
 from puripuly_heart.app.wiring import (
     create_secret_store,
     create_self_capture_admission_adapter,
     create_sync_secret_store_adapter,
+)
+from puripuly_heart.app.wiring_application_runtime_logging import (
+    compose_application_runtime_logging,
 )
 from puripuly_heart.app.wiring_capture_runtime import CaptureOwnerFactory
 from puripuly_heart.app.wiring_managed_account import (
@@ -34,6 +38,12 @@ from puripuly_heart.app.wiring_managed_account import (
 from puripuly_heart.app.wiring_provider_runtime import compose_provider_runtime
 from puripuly_heart.app.wiring_runtime_composition import RuntimeCompositionComponents
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineLauncher
+from puripuly_heart.composition.controller_application_startup import (
+    compose_controller_application_startup,
+)
+from puripuly_heart.composition.controller_ui_application_state import (
+    ControllerUiApplicationStateAdapter,
+)
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
@@ -272,7 +282,18 @@ def compose_gui_controller(
         settings_owner=settings_owner,
         provider_settings_owner=provider_settings_owner,
     )
+    backend.install_runtime_logging_owner(
+        compose_application_runtime_logging(
+            presentation=presentation,
+            sinks=runtime_logging_sinks,
+            overlay_logging_mode_update=backend._emit_overlay_runtime_logging_mode_update,
+            overlay_logging_mode_update_available=lambda: (
+                backend._get_overlay_application_owner().current_bridge() is not None
+            ),
+        )
+    )
     backend.install_runtime_composition(compose_gui_runtime_components(backend))
+    backend.install_startup_owner(compose_controller_application_startup(backend))
     provider_settings_owner.save_failure_sink = backend._log_error
     return backend
 
@@ -292,4 +313,19 @@ def compose_ui_application(
         runtime_logging_sinks=runtime_logging_sinks,
         vrchat_osc_presence=vrchat_osc_presence,
     )
-    return UiApplicationBoundary(backend)
+    return compose_gui_application_boundary(backend)
+
+
+def compose_gui_application_boundary(
+    backend: GuiController,
+) -> UiApplicationBoundary:
+    runtime_logging = backend.runtime_logging_owner
+    return UiApplicationBoundary(
+        backend,
+        state=UiApplicationStateOwner(
+            ControllerUiApplicationStateAdapter(backend),
+            runtime_logging=runtime_logging,
+        ),
+        runtime_shutdown=backend,
+        runtime_logging=runtime_logging,
+    )

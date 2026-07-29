@@ -9,7 +9,6 @@ import pytest
 
 pytest.importorskip("flet")
 
-from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.app.services.provider_runtime_apply import LlmProviderRebuildOwner
 from puripuly_heart.app.services.self_capture_application import (
@@ -81,18 +80,6 @@ async def _wait_until(predicate, *, attempts: int = 20) -> None:
 
 async def _async_noop(*_args: object, **_kwargs: object) -> None:
     return None
-
-
-def _patch_stop_side_effects(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", _async_noop)
-    monkeypatch.setattr(GuiController, "set_stt_enabled", _async_noop)
-    monkeypatch.setattr(GuiController, "_configure_vrc_mic_receiver", _async_noop)
-    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", _async_noop)
-    monkeypatch.setattr(
-        GuiController,
-        "_close_managed_openrouter_release_service",
-        _async_noop,
-    )
 
 
 def test_official_byok_fixture_uses_supported_model_provider_combo() -> None:

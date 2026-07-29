@@ -34,6 +34,7 @@ from puripuly_heart.ui.event_projection import EventProjectionContext, EventProj
 from puripuly_heart.ui.i18n import get_locale, set_locale, t
 from puripuly_heart.ui.views import logs as logs_view_module
 from puripuly_heart.ui.views.logs import FletLogHandler, LogsView
+from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 assert logs_view_module.LogsView is LogsView
 
@@ -332,6 +333,7 @@ def test_event_bridge_reads_language_codes_from_controller_contract_without_sett
         get_event_language_codes=lambda: ("ja", "de"),
         hub=SimpleNamespace(translation_enabled=False),
     )
+    app._ui_application = compose_test_ui_application_boundary(app.controller)
     bridge = make_bridge(app, event_queue=asyncio.Queue())
 
     assert bridge._get_language_codes() == ("ja", "de")

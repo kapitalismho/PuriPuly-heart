@@ -10,7 +10,6 @@ import pytest
 pytest.importorskip("flet")
 import flet as ft
 
-from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.config.settings import (
     AppSettings,
     STTProviderName,
@@ -28,6 +27,7 @@ from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.fakes import install_test_runtime_composition
+from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
 class DummyPage:
@@ -125,6 +125,7 @@ def _eligible_app(
         usage_usd=50.0,
     )
     app.controller = controller
+    app._ui_application = compose_test_ui_application_boundary(controller)
     return app, page, controller
 
 
@@ -555,7 +556,7 @@ async def test_main_gui_runs_github_star_prompt_after_update_check(
             _ = (incoming_page, config_path, debug_ui_preview)
             self.page = incoming_page
             self.controller = FakeController()
-            self.application = UiApplicationBoundary(self.controller)
+            self.application = compose_test_ui_application_boundary(self.controller)
 
         def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
@@ -604,7 +605,7 @@ async def test_after_launch_update_failure_still_runs_github_star_prompt(
     events: list[str] = []
     logged: list[str] = []
     app = TranslatorApp.__new__(TranslatorApp)
-    app._ui_application = UiApplicationBoundary(None)
+    app._ui_application = compose_test_ui_application_boundary(None)
     app.page = DummyPage()
     app._log_detailed = lambda message, **_kwargs: logged.append(message)
 
@@ -654,6 +655,7 @@ async def test_after_launch_usage_and_update_run_in_parallel_before_github_star(
             events.append("runtime-preparation")
 
     app.controller = Controller()
+    app._ui_application = compose_test_ui_application_boundary(app.controller)
 
     async def check_update(_page, **_kwargs) -> None:
         events.append("update-started")
@@ -707,6 +709,7 @@ async def test_after_launch_high_priority_feedback_suppresses_github_star(
             return None
 
     app.controller = Controller()
+    app._ui_application = compose_test_ui_application_boundary(app.controller)
 
     async def check_update(_page, **kwargs) -> None:
         if priority == "update":
@@ -743,7 +746,7 @@ async def test_after_launch_close_cancels_owner_before_prompt_runtime_close() ->
 
     app._after_launch_task_handle = asyncio.create_task(after_launch())
     app.controller = SimpleNamespace()
-    app._ui_application = UiApplicationBoundary(app.controller)
+    app._ui_application = compose_test_ui_application_boundary(app.controller)
     app._ui_application._github_star_prompt_runtime = Runtime()
     await asyncio.sleep(0)
 
@@ -807,6 +810,7 @@ def test_stt_compatibility_snackbar_marks_launch_high_priority_feedback(
         settings=settings,
         on_dashboard_language_change=fake_on_dashboard_language_change,
     )
+    app._ui_application = compose_test_ui_application_boundary(app.controller)
 
     app._on_language_change(
         app_module.LanguageSelectionChange(
@@ -868,6 +872,7 @@ def test_debug_preview_github_star_snackbar_opens_without_mutating_prompt_state(
     controller = _eligible_managed_controller()
     initial_prompt_state = to_dict(controller.settings)["ui"]
     app.controller = controller
+    app._ui_application = compose_test_ui_application_boundary(controller)
     opened_urls: list[str] = []
     previous_locale = i18n_module.get_locale()
 

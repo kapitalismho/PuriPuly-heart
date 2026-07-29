@@ -480,9 +480,26 @@ def test_controller_does_not_retain_dead_shutdown_stt_or_provider_ownership() ->
     provider_runtime_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_runtime_apply.py"
     )
+    startup_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "application_startup.py"
+    )
+    startup_adapter_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "controller_application_startup.py"
+    )
+    shutdown_path = (
+        REPO_ROOT
+        / "src"
+        / "puripuly_heart"
+        / "app"
+        / "services"
+        / "application_runtime_shutdown.py"
+    )
     source = controller_path.read_text(encoding="utf-8")
     provider_settings_source = provider_settings_path.read_text(encoding="utf-8")
     provider_runtime_source = provider_runtime_path.read_text(encoding="utf-8")
+    startup_source = startup_path.read_text(encoding="utf-8")
+    startup_adapter_source = startup_adapter_path.read_text(encoding="utf-8")
+    shutdown_source = shutdown_path.read_text(encoding="utf-8")
 
     assert "_stop_lock" not in source
     assert "_stt_switch_lock" not in source
@@ -507,3 +524,13 @@ def test_controller_does_not_retain_dead_shutdown_stt_or_provider_ownership() ->
     assert "_gpu_provider_recovery_owner" in source
     assert "_overlay_lock" not in source
     assert "_overlay_application_owner" in source
+    assert "def application_shutdown_callbacks" not in source
+    assert "ApplicationShutdownCoordinator" not in source
+    assert "application_shutdown_callback(" not in source
+    assert "class ApplicationStartupOwner" in startup_source
+    assert "_get_" not in startup_source
+    assert "Any" not in startup_source
+    assert "await provisioning.inspect_cpu()" in startup_adapter_source
+    assert "await runtime.runtime_composition.pipeline_launcher.launch(" in startup_adapter_source
+    assert "compose_application_runtime_shutdown_callbacks" in shutdown_source
+    assert "SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS" in shutdown_source

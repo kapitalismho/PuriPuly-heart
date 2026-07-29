@@ -10,14 +10,20 @@ import pytest
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationIntentRejectedError,
-    ApplicationShutdownCoordinator,
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.ui_application import (
     UI_APPLICATION_USER_INTENT_METHODS,
-    UiApplicationBoundary,
+)
+from puripuly_heart.app.services.ui_application import (
+    UiApplicationBoundary as ProductionUiApplicationBoundary,
 )
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FREEZE_INGRESS
+from tests.helpers.ui_application import compose_test_ui_application_boundary
+
+
+def UiApplicationBoundary(backend: object) -> ProductionUiApplicationBoundary:
+    return compose_test_ui_application_boundary(backend)
 
 
 class RecordingBackend:
@@ -43,16 +49,6 @@ class RecordingBackend:
 
     async def start(self) -> None:
         self.events.append(("start",))
-
-    async def stop(self) -> None:
-        self.events.append(("stop",))
-
-    def application_shutdown_callbacks(self) -> tuple[object, ...]:
-        self.events.append(("shutdown-callbacks",))
-        return ("callback",)
-
-    def bind_application_lifecycle(self, lifecycle: object) -> None:
-        self.events.append(("bind-lifecycle", lifecycle))
 
     def emit_application_shutdown_diagnostic(self, diagnostic: object) -> None:
         self.events.append(("shutdown-diagnostic", diagnostic))
@@ -270,8 +266,36 @@ async def test_primary_intents_delegate_once_and_preserve_results() -> None:
         ("start",),
         ("submit", "hello"),
         ("translation", True),
-        ("stop",),
     ]
+    assert boundary.application_lifecycle().is_terminal
+
+
+@pytest.mark.asyncio
+async def test_start_failure_runs_owned_shutdown_and_preserves_original_error() -> None:
+    class FailingBackend(RecordingBackend):
+        async def start(self) -> None:
+            self.events.append(("start",))
+            raise RuntimeError("pipeline failed")
+
+    backend = FailingBackend()
+    boundary = UiApplicationBoundary(backend)
+    cleanup: list[str] = []
+    boundary.register_application_shutdown_callbacks(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="TestRuntime",
+                callback_name="cleanup",
+                callback=lambda: cleanup.append("cleanup"),
+            ),
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="pipeline failed"):
+        await boundary.start()
+
+    assert cleanup == ["cleanup"]
+    assert boundary.application_lifecycle().is_terminal
 
 
 @pytest.mark.asyncio
@@ -308,22 +332,30 @@ async def test_provider_apply_preserves_no_argument_and_forced_rebuild_contracts
 async def test_lifecycle_callbacks_diagnostics_and_logging_stay_behind_boundary() -> None:
     backend = RecordingBackend()
     boundary = UiApplicationBoundary(backend)
-    lifecycle = object()
     diagnostic = object()
+    closed: list[str] = []
 
-    assert boundary.application_shutdown_callbacks() == ("callback",)
-    boundary.bind_application_lifecycle(lifecycle)
+    boundary.register_application_shutdown_callbacks(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="TestRuntime",
+                callback_name="close",
+                callback=lambda: closed.append("closed"),
+            ),
+        )
+    )
     assert boundary.emit_application_shutdown_diagnostic(diagnostic) is None
     boundary.log_basic("basic", level=10)
     boundary.log_detailed("detailed", level=20)
+    await boundary.stop()
 
     assert backend.events == [
-        ("shutdown-callbacks",),
-        ("bind-lifecycle", lifecycle),
         ("shutdown-diagnostic", diagnostic),
         ("log-basic", "basic", 10),
         ("log-detailed", "detailed", 20),
     ]
+    assert closed == ["closed"]
 
 
 @pytest.mark.asyncio
@@ -337,7 +369,7 @@ async def test_every_user_intent_is_rejected_after_freeze_without_backend_invoca
         freeze_started.set()
         await release_freeze.wait()
 
-    lifecycle = ApplicationShutdownCoordinator(
+    boundary.register_application_shutdown_callbacks(
         (
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
@@ -347,7 +379,7 @@ async def test_every_user_intent_is_rejected_after_freeze_without_backend_invoca
             ),
         )
     )
-    boundary.bind_application_lifecycle(lifecycle)
+    lifecycle = boundary.application_lifecycle()
     shutdown_task = asyncio.create_task(lifecycle.shutdown())
     await freeze_started.wait()
     backend.events.clear()
@@ -432,9 +464,9 @@ async def test_provider_verification_secret_and_managed_auth_transitions_delegat
     assert (
         await boundary.start_discord_managed_auth_from_dialog(stage="waiting") == "discord-result"
     )
-    assert boundary.supports_discord_managed_auth_reopen() is True
-    assert boundary.reopen_discord_managed_auth_browser() is True
-    assert boundary.cancel_discord_managed_auth() is True
+    assert boundary.supports_discord_managed_auth_reopen() is False
+    assert boundary.reopen_discord_managed_auth_browser() is None
+    assert boundary.cancel_discord_managed_auth() is None
 
     assert backend.events == [
         ("verify", "openrouter", "key"),
@@ -442,8 +474,6 @@ async def test_provider_verification_secret_and_managed_auth_transitions_delegat
         ("secret", "llm", "secret"),
         ("qq-auth", {"stage": "retry"}),
         ("discord-auth", {"stage": "waiting"}),
-        ("discord-reopen",),
-        ("discord-cancel",),
     ]
 
 
@@ -531,7 +561,7 @@ async def test_telemetry_and_verification_mutations_stay_behind_named_intents() 
 
 
 @pytest.mark.asyncio
-async def test_boundary_owns_managed_auth_task_cancellation_and_terminal_close() -> None:
+async def test_boundary_stop_owns_managed_auth_task_cancellation_and_terminal_close() -> None:
     boundary = UiApplicationBoundary(RecordingBackend())
     started = asyncio.Event()
     cancelled = asyncio.Event()
@@ -552,16 +582,17 @@ async def test_boundary_owns_managed_auth_task_cancellation_and_terminal_close()
     await started.wait()
 
     assert boundary.managed_auth_task_names() == ("discord-managed-auth-dialog",)
-    await boundary.close_managed_auth_tasks()
+    await boundary.stop()
     await asyncio.gather(handle, return_exceptions=True)
 
     assert handle.cancelled() is True
     assert cancelled.is_set() is True
     assert boundary.managed_auth_tasks_open() is False
+    assert boundary.application_lifecycle().is_terminal
 
 
 @pytest.mark.asyncio
-async def test_boundary_owns_github_prompt_generation_and_cancellation() -> None:
+async def test_boundary_stop_owns_github_prompt_generation_and_cancellation() -> None:
     boundary = UiApplicationBoundary(RecordingBackend())
     started = asyncio.Event()
     cancelled = asyncio.Event()
@@ -577,8 +608,8 @@ async def test_boundary_owns_github_prompt_generation_and_cancellation() -> None
 
     task = boundary.start_github_star_prompt(prompt)
     await started.wait()
-    boundary.stop_github_star_prompt_ingress()
-    await boundary.close_github_star_prompt_runtime()
+    await boundary.stop()
 
     assert await task is False
     assert cancelled.is_set() is True
+    assert boundary.application_lifecycle().is_terminal

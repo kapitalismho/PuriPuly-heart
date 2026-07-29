@@ -5,6 +5,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from puripuly_heart.app.wiring_application_runtime_logging import (
+    compose_application_runtime_logging,
+)
+from puripuly_heart.composition.controller_application_startup import (
+    compose_controller_application_startup,
+)
 from puripuly_heart.core.self_capture import (
     SelfCaptureProviderStatus,
     SelfCaptureSessionSnapshot,
@@ -29,6 +35,19 @@ class DeferredRuntimeComposition:
 
 
 def install_test_runtime_composition(controller):
+    if controller._runtime_logging_owner is None:
+        controller.install_runtime_logging_owner(
+            compose_application_runtime_logging(
+                presentation=controller.app,
+                sinks=controller.runtime_logging_sinks,
+                overlay_logging_mode_update=controller._emit_overlay_runtime_logging_mode_update,
+                overlay_logging_mode_update_available=lambda: (
+                    controller._get_overlay_application_owner().current_bridge() is not None
+                ),
+            )
+        )
+    if controller._startup_owner is None:
+        controller.install_startup_owner(compose_controller_application_startup(controller))
     controller._runtime_composition = DeferredRuntimeComposition(controller)
     return controller
 

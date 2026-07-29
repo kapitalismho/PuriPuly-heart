@@ -26,12 +26,10 @@ from puripuly_heart.app.services.application_runtime_logging import (
     ApplicationRuntimeLoggingOwner,
 )
 from puripuly_heart.app.services.application_shutdown import (
-    ApplicationShutdownCallback,
     ApplicationShutdownContext,
-    ApplicationShutdownCoordinator,
     ApplicationShutdownDiagnostic,
-    application_shutdown_callback,
 )
+from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
 from puripuly_heart.app.services.canonical_settings_persistence import (
     SettingsOwner,
     compose_settings_owner,
@@ -179,14 +177,6 @@ from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.audio.process_identity import PsutilCurrentUserProcessSnapshots
 from puripuly_heart.core.clipboard.watcher import create_clipboard_watcher
 from puripuly_heart.core.clock import SystemClock
-from puripuly_heart.core.lifecycle import (
-    SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
-    SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
-    SHUTDOWN_PHASE_FINAL_DIAGNOSTICS,
-    SHUTDOWN_PHASE_FREEZE_INGRESS,
-    SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-    SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-)
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     LocalASRProviderRuntimeSnapshot,
@@ -212,17 +202,11 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureSessionSnapshot,
 )
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
-from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.vrchat_osc_presence import (
     VrchatOscPresenceProbeOwner,
 )
-from puripuly_heart.core.runtime_logging import (
-    RealtimeLogHandler,
-    RuntimeLoggingSinks,
-    SessionLoggingMode,
-    SessionRuntimeLoggingService,
-)
+from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks, SessionLoggingMode
 from puripuly_heart.core.self_capture import (
     SelfCaptureSessionSnapshot,
     SelfCaptureSessionState,
@@ -233,8 +217,6 @@ from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryService,
 )
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
-
-logger = logging.getLogger(__name__)
 
 # Hardcoded STT session reset deadline (not configurable via settings)
 STT_RESET_DEADLINE_S = 300.0
@@ -318,6 +300,11 @@ class GuiController:
 
     clock: SystemClock = SystemClock()
     _runtime_composition: RuntimeCompositionComponents | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _startup_owner: ApplicationStartupOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -434,17 +421,9 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _application_lifecycle: ApplicationShutdownCoordinator | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
     _shutdown_ingress_frozen: bool = field(init=False, default=False, repr=False)
     _local_qwen_hallucination_detection_count: int = field(init=False, default=0)
     _local_qwen_hallucination_modal_shown: bool = field(init=False, default=False)
-    _stop_complete: bool = field(init=False, default=False, repr=False)
-    _stop_exception: BaseException | None = field(init=False, default=None, repr=False)
-
     _overlay_calibration_application_owner: OverlayCalibrationApplicationOwner | None = field(
         init=False,
         default=None,
@@ -466,6 +445,25 @@ class GuiController:
         if current is not None and current is not components:
             raise RuntimeError("GuiController runtime composition is already installed")
         self._runtime_composition = components
+
+    def install_runtime_logging_owner(
+        self,
+        owner: ApplicationRuntimeLoggingOwner,
+    ) -> None:
+        current = self._runtime_logging_owner
+        if current is not None and current is not owner:
+            raise RuntimeError("GuiController runtime logging owner is already installed")
+        self._runtime_logging_owner = owner
+
+    def install_startup_owner(self, owner: ApplicationStartupOwner) -> None:
+        current = self._startup_owner
+        if current is not None and current is not owner:
+            raise RuntimeError("GuiController startup owner is already installed")
+        self._startup_owner = owner
+
+    @property
+    def runtime_logging_owner(self) -> ApplicationRuntimeLoggingOwner:
+        return self._require_runtime_logging_owner()
 
     @property
     def overlay_calibration(self) -> OverlayCalibration:
@@ -758,115 +756,10 @@ class GuiController:
         self._refresh_overlay_peer_consumers()
 
     async def start(self) -> None:
-        try:
-            await self._start_impl()
-        except BaseException:
-            with contextlib.suppress(BaseException):
-                await self.stop()
-            raise
-
-    async def _start_impl(self) -> None:
-        self.settings = self._load_or_init_settings(self.config_path)
-        self._get_settings_owner().authoritative = True
-        self._get_settings_owner().remember_projection(self.settings)
-        provisioning = self._get_local_asr_provisioning_owner()
-        await provisioning.inspect_cpu()
-        await provisioning.inspect_gpu(
-            explicit_intent=self._gpu_runtime_interaction_state().selected_provider_requires_model,
-        )
-        loaded_settings = self.settings
-        fallback_plan = self.manual_local_asr_fallback_owner.plan(
-            self.manual_local_asr_fallback_owner.state(
-                loaded_settings,
-                cpu_auto_available=provisioning.snapshot.cpu_auto_available,
-            )
-        )
-        fallback_channels = fallback_plan.fallback_channels
-        installation_fallback = fallback_plan.installation_fallback
-        if fallback_plan.changed:
-            normalized_settings = self.manual_local_asr_fallback_owner.apply(
-                loaded_settings,
-                fallback_plan,
-            )
-            self.settings = normalized_settings
-            if not self._get_settings_owner().save_current(
-                failure_sink=lambda exc: self._log_error(f"Failed to save settings: {exc}")
-            ):
-                self.settings = loaded_settings
-                fallback_channels = ()
-            else:
-                loaded_settings.provider.stt = normalized_settings.provider.stt
-                loaded_settings.provider.peer_stt = normalized_settings.provider.peer_stt
-                self.settings = loaded_settings
-        self.settings.ui.overlay_enabled = False
-        self.settings.ui.peer_translation_enabled = False
-        self._get_overlay_calibration_application_owner().sync_from_settings(self.settings)
-        self._get_overlay_calibration_application_owner().replace_draft(None)
-        self.app.set_locale(self.settings.ui.locale)
-        self._sync_ui_from_settings()
-        self._get_settings_application_owner().notify_fallback(
-            fallback_channels,
-            installation_fallback,
-        )
-        with contextlib.suppress(Exception):
-            apply_locale = getattr(self.app, "apply_locale", None)
-            if callable(apply_locale):
-                apply_locale()
-
-        runtime_logging = self.runtime_logging
-        runtime_logging.set_mode(SessionLoggingMode.BASIC)
-
-        self.app.attach_runtime_log_sink(runtime_logging)
-
-        self._get_local_asr_provisioning_owner()
-        self._sync_signature_caches(self.settings)
-        await self.runtime_composition.pipeline_launcher.launch(
-            self.settings,
-            vrc_mic_state=self.vrc_mic_state,
-            vrc_mic_audio_gate=self.vrc_mic_audio_gate,
-            receiver_active=self.receiver is not None,
-        )
-        self._get_local_asr_application_runtime().adapters.notice.sync()
-
-        assert self.hub is not None
-
-        stt_provider = self.settings.provider.stt.value
-        if self._stt_provider_requires_secret(self.settings.provider.stt):
-            stt_key_map = {"qwen_asr": self._get_alibaba_verified_key()}
-            stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
-            stt_verified = getattr(self.settings.api_key_verified, stt_verified_key, False)
-            stt_needs_key = (not self._hub_has_stt_provider("self")) or (not stt_verified)
-        else:
-            stt_needs_key = False
-        self.app.set_dashboard_stt_needs_key(stt_needs_key)
-
-        llm_provider = self.settings.provider.llm.value
-        if self._llm_provider_requires_secret(self.settings.provider.llm):
-            llm_key_map = {
-                "gemini": "google",
-                "openrouter": "openrouter",
-                "deepseek": "deepseek",
-                "qwen": self._get_alibaba_verified_key(),
-            }
-            llm_verified_key = llm_key_map.get(llm_provider, llm_provider)
-            llm_verified = getattr(self.settings.api_key_verified, llm_verified_key, False)
-            translation_needs_key = (
-                False
-                if self._managed_openrouter_can_attempt_translation()
-                else (self.hub.llm is None) or (not llm_verified)
-            )
-        else:
-            translation_needs_key = False
-        self.app.set_dashboard_translation_needs_key(translation_needs_key)
-        self.app.set_dashboard_translation_enabled(False)
-        self.app.set_dashboard_stt_enabled(False)
-        self.hub.translation_enabled = False
-        await self.hub.start(auto_flush_osc=True)
-
-        bridge = self._create_ui_event_bridge(runtime_logging=runtime_logging)
-        self._start_ui_event_bridge_task(bridge)
-        await self._wait_for_ui_event_bridge_started()
-        await self._sync_clipboard_watcher()
+        owner = self._startup_owner
+        if owner is None:
+            raise RuntimeError("GuiController startup owner is not installed")
+        await owner.start()
 
     async def refresh_openrouter_usage_after_launch(self) -> bool:
         owner = self._get_managed_usage_owner()
@@ -1219,22 +1112,6 @@ class GuiController:
         except Exception as exc:
             failures.append(exc)
 
-    async def _close_app_github_star_prompt_runtime_for_release(
-        self,
-        failures: list[Exception],
-    ) -> None:
-        close_prompt_runtime = getattr(self.app, "close_after_launch_tasks", None)
-        if not callable(close_prompt_runtime):
-            close_prompt_runtime = getattr(self.app, "close_github_star_prompt_runtime", None)
-        if not callable(close_prompt_runtime):
-            return
-        try:
-            result = close_prompt_runtime()
-            if inspect.isawaitable(result):
-                await result
-        except Exception as exc:
-            failures.append(exc)
-
     def schedule_github_star_prompt_translation_success_observed(self) -> bool:
         return self._get_github_star_prompt_owner().schedule_translation_success_observed()
 
@@ -1476,198 +1353,7 @@ class GuiController:
         if self._self_capture_owner is owner:
             self._self_capture_owner = None
 
-    def bind_application_lifecycle(
-        self,
-        lifecycle: ApplicationShutdownCoordinator,
-    ) -> None:
-        if self._application_lifecycle is not None and self._application_lifecycle is not lifecycle:
-            raise RuntimeError("GuiController application lifecycle is already bound")
-        self._application_lifecycle = lifecycle
-
-    def application_shutdown_callbacks(self) -> tuple[ApplicationShutdownCallback, ...]:
-        return (
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
-                owner_name="GuiControllerCompatibilityFacade",
-                callback_name="freeze_ingress",
-                callback=self._freeze_application_ingress,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
-                owner_name="GithubStarPromptRuntime",
-                callback_name="stop_ingress",
-                callback=self._stop_github_star_prompt_ingress,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="GuiControllerCompatibilityFacade",
-                callback_name="release_manual_typing",
-                callback=self.release_manual_typing,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="ClipboardRuntime",
-                callback_name="close",
-                callback=self._close_clipboard_runtime_for_shutdown,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="VrchatOscPresenceProbeOwner",
-                callback_name="cancel",
-                callback=self._cancel_vrchat_osc_presence_probe,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="SelfCaptureSessionOwner",
-                callback_name="stop_ingress",
-                callback=self._stop_self_capture_ingress,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="VrcMicReceiverRuntime",
-                callback_name="close",
-                callback=self._close_vrc_mic_receiver_runtime,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="OverlayApplicationOwner",
-                callback_name="close",
-                callback=self._close_overlay_runtime,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="PeerApplicationOwner",
-                callback_name="close",
-                callback=self._close_peer_runtime,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="GithubStarPromptRuntime",
-                callback_name="close",
-                callback=self._close_github_star_prompt_runtime,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="OAuthRuntime",
-                callback_name="close",
-                callback=self._close_oauth_runtime,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="LocalASRProvisioningRuntime",
-                callback_name="close",
-                callback=self._close_local_asr_provisioning,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="MicrophoneTestSessionOwner",
-                callback_name="close",
-                callback=self._close_microphone_test_runtime,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="SelfCaptureSessionOwner",
-                callback_name="close",
-                callback=self._close_self_capture_owner,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="ApplicationRuntimeLoggingOwner",
-                callback_name="close_background_tasks",
-                callback=self._close_runtime_logging_background_tasks,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="ManagedAuthOwner",
-                callback_name="close",
-                callback=self._close_managed_auth_owner,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="TranslationEnableOwner",
-                callback_name="close",
-                callback=self._close_translation_enable_owner,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="ManagedUsageOwner",
-                callback_name="close",
-                callback=self._close_managed_usage_owner,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
-                owner_name="RuntimePipelineLauncher",
-                callback_name="close_failed_resources",
-                callback=self._close_runtime_pipeline_launcher,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
-                owner_name="ClientHub",
-                callback_name="stop_owned_runtimes",
-                callback=self._stop_hub,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
-                owner_name="VrchatOscUdpSender",
-                callback_name="close",
-                callback=self._close_sender,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
-                owner_name="ManagedOpenRouterReleaseService",
-                callback_name="close",
-                callback=self._close_managed_openrouter_release_service,
-            ),
-            ApplicationShutdownCallback(
-                phase=SHUTDOWN_PHASE_FINAL_DIAGNOSTICS,
-                owner_name="GuiControllerCompatibilityFacade",
-                callback_name="emit_final_shutdown_diagnostics",
-                callback=self._emit_final_application_shutdown_diagnostics,
-            ),
-            ApplicationShutdownCallback(
-                phase=SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
-                owner_name="RuntimeLoggingService",
-                callback_name="close_after_producers_stop",
-                callback=self._close_runtime_logging,
-            ),
-        )
-
-    async def stop(self) -> None:
-        lifecycle = self._application_lifecycle
-        if lifecycle is None:
-            lifecycle = ApplicationShutdownCoordinator(
-                self._standalone_application_shutdown_callbacks(),
-                diagnostics_sink=self.emit_application_shutdown_diagnostic,
-            )
-            self.bind_application_lifecycle(lifecycle)
-        try:
-            await lifecycle.shutdown()
-        except BaseException as exc:
-            self._stop_exception = exc
-            raise
-        finally:
-            self._stop_complete = lifecycle.is_terminal
-
-    def _standalone_application_shutdown_callbacks(
-        self,
-    ) -> tuple[ApplicationShutdownCallback, ...]:
-        app_callbacks = (
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="TranslatorAppCompatibilityFacade",
-                callback_name="close_after_launch_tasks",
-                callback=self._close_app_github_star_prompt_runtime,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="TranslatorAppCompatibilityFacade",
-                callback_name="close_oauth_runtime",
-                callback=self._close_app_oauth_runtime,
-            ),
-        )
-        return app_callbacks + self.application_shutdown_callbacks()
-
-    def _freeze_application_ingress(self) -> None:
+    def freeze_application_ingress(self) -> None:
         self._shutdown_ingress_frozen = True
         self_owner = self._self_capture_owner
         if self_owner is not None:
@@ -1694,85 +1380,75 @@ class GuiController:
             managed.auth.stop_ingress()
             managed.translation.stop_ingress()
 
-    def _stop_github_star_prompt_ingress(self) -> None:
+    def stop_github_star_prompt_ingress(self) -> None:
         owner = self._github_star_prompt_owner
         if owner is not None:
             owner.stop_ingress()
 
-    async def _close_github_star_prompt_runtime(self) -> None:
+    async def close_github_star_prompt_owner(self) -> None:
         failures: list[Exception] = []
         await self._close_github_star_prompt_runtime_for_release(failures)
         _raise_lifecycle_cleanup_failures("GitHub prompt shutdown failed", failures)
 
-    async def _close_app_github_star_prompt_runtime(self) -> None:
-        failures: list[Exception] = []
-        await self._close_app_github_star_prompt_runtime_for_release(failures)
-        _raise_lifecycle_cleanup_failures("App prompt shutdown failed", failures)
-
-    async def _close_app_oauth_runtime(self) -> None:
-        failures: list[Exception] = []
-        await self._close_app_oauth_runtime_for_release(failures)
-        _raise_lifecycle_cleanup_failures("App OAuth shutdown failed", failures)
-
-    async def _close_runtime_logging_background_tasks(self) -> None:
+    async def close_runtime_logging_background_tasks(self) -> None:
         owner = self._runtime_logging_owner
         if owner is not None:
             await owner.close_background_tasks()
 
-    async def _close_managed_usage_owner(self) -> None:
+    async def close_managed_usage_owner(self) -> None:
         composition = self._runtime_composition
         managed = composition.managed_account if composition is not None else None
         if managed is not None:
             await managed.usage.close()
 
-    async def _close_managed_auth_owner(self) -> None:
+    async def close_managed_auth_owner(self) -> None:
         composition = self._runtime_composition
         managed = composition.managed_account if composition is not None else None
         if managed is not None:
             await managed.auth.close()
 
-    async def _close_translation_enable_owner(self) -> None:
+    async def close_translation_enable_owner(self) -> None:
         composition = self._runtime_composition
         managed = composition.managed_account if composition is not None else None
         if managed is not None:
             await managed.translation.close()
 
-    async def _close_microphone_test_runtime(self) -> None:
+    async def close_microphone_test_runtime(self) -> None:
         failures: list[Exception] = []
         await self._close_microphone_test_runtime_for_release(failures)
         _raise_lifecycle_cleanup_failures("Microphone test shutdown failed", failures)
 
-    async def _close_clipboard_runtime_for_shutdown(self) -> None:
+    async def close_clipboard_runtime(self) -> None:
         owner = self._clipboard_auto_translation_owner
         if owner is not None:
             await owner.close(strict_runtime_errors=True)
 
-    async def _stop_self_capture_ingress(self) -> None:
+    async def stop_self_capture_ingress(self) -> None:
         await self.set_stt_enabled(False)
 
-    async def _close_self_capture_owner(self) -> None:
+    async def close_self_capture_owner(self) -> None:
         failures: list[Exception] = []
         await self._close_self_capture_owner_for_release(failures)
         _raise_lifecycle_cleanup_failures("Self capture shutdown failed", failures)
 
-    async def _close_vrc_mic_receiver_runtime(self) -> None:
+    async def close_vrc_mic_receiver_runtime(self) -> None:
         failures: list[Exception] = []
         await self._close_vrc_mic_receiver_runtime_for_release(failures)
         _raise_lifecycle_cleanup_failures("VRChat microphone receiver shutdown failed", failures)
 
-    async def _close_overlay_runtime(self) -> None:
+    async def close_overlay_runtime(self) -> None:
         owner = self._get_overlay_application_owner()
         owner.stop_ingress()
         await owner.shutdown(preserve_failure_reason=True)
         owner.clear_fallback()
         await owner.fallback_owner.close()
 
-    async def _close_peer_runtime(self) -> None:
+    async def close_peer_runtime(self) -> None:
         failures: list[Exception] = []
         await self._close_peer_runtime_for_release(failures)
         _raise_lifecycle_cleanup_failures("Peer capture shutdown failed", failures)
 
-    async def _stop_hub(self) -> None:
+    async def stop_hub_owned_runtimes(self) -> None:
         failures: list[Exception] = []
         await self._stop_hub_for_release(failures)
         if self.hub is None:
@@ -1780,13 +1456,13 @@ class GuiController:
             self._ui_event_bridge = None
         _raise_lifecycle_cleanup_failures("Hub owner shutdown failed", failures)
 
-    async def _close_runtime_pipeline_launcher(self) -> None:
+    async def close_runtime_pipeline_launcher(self) -> None:
         composition = self._runtime_composition
         if composition is None:
             return
         await composition.pipeline_launcher.close()
 
-    def _close_sender(self) -> None:
+    def close_vrchat_sender(self) -> None:
         sender = self.sender
         if sender is None:
             self.osc = None
@@ -1795,13 +1471,13 @@ class GuiController:
         self.sender = None
         self.osc = None
 
-    async def _close_managed_openrouter_release_service(self) -> None:
+    async def close_managed_openrouter_release_service(self) -> None:
         composition = self._runtime_composition
         managed = composition.managed_account if composition is not None else None
         if managed is not None:
             await managed.release.close()
 
-    def _emit_final_application_shutdown_diagnostics(
+    def emit_final_application_shutdown_diagnostics(
         self,
         context: ApplicationShutdownContext,
     ) -> None:
@@ -1809,7 +1485,7 @@ class GuiController:
         if owner is not None:
             owner.emit_terminal_summary(context)
 
-    def _close_runtime_logging(self, context: ApplicationShutdownContext) -> None:
+    def close_runtime_logging(self, context: ApplicationShutdownContext) -> None:
         owner = self._runtime_logging_owner
         if owner is not None:
             owner.close_after_producers_stop(context)
@@ -1820,7 +1496,7 @@ class GuiController:
     ) -> None:
         owner = self._runtime_logging_owner
         if owner is None:
-            owner = self._get_runtime_logging_owner()
+            owner = self._require_runtime_logging_owner()
         owner.emit_shutdown_diagnostic(diagnostic)
 
     async def set_overlay_enabled(self, enabled: bool) -> None:
@@ -1938,7 +1614,7 @@ class GuiController:
     def _schedule_vrchat_osc_presence_probe(self, *, force: bool = False) -> None:
         self._get_vrchat_osc_presence_owner().schedule(force=force)
 
-    async def _cancel_vrchat_osc_presence_probe(self) -> None:
+    async def cancel_vrchat_osc_presence_probe(self) -> None:
         await self._get_vrchat_osc_presence_owner().cancel()
 
     def _get_vrchat_osc_presence_owner(self) -> VrchatOscPresenceProbeOwner:
@@ -2047,7 +1723,7 @@ class GuiController:
     async def _resume_peer_after_local_asr_cpu_repair(self) -> None:
         await self._refresh_overlay_runtime_dependencies()
 
-    async def _close_local_asr_provisioning(self) -> None:
+    async def close_local_asr_provisioning(self) -> None:
         runtime = self._local_asr_application_runtime
         if runtime is not None:
             await runtime.close()
@@ -2644,22 +2320,11 @@ class GuiController:
     def _get_openrouter_pkce_application_owner(self) -> OpenRouterPkceApplicationOwner:
         return self.runtime_composition.managed_account.pkce
 
-    async def _close_oauth_runtime(self) -> None:
+    async def close_openrouter_oauth_runtime(self) -> None:
         composition = self._runtime_composition
         managed = composition.managed_account if composition is not None else None
         if managed is not None:
             await managed.pkce_flow.close()
-
-    async def _close_app_oauth_runtime_for_release(self, failures: list[Exception]) -> None:
-        close_oauth_runtime = getattr(self.app, "close_oauth_runtime", None)
-        if not callable(close_oauth_runtime):
-            return
-        try:
-            result = close_oauth_runtime()
-            if inspect.isawaitable(result):
-                await result
-        except Exception as exc:
-            failures.append(exc)
 
     @property
     def _last_microphone_test_audio_settings_signature(
@@ -2838,25 +2503,10 @@ class GuiController:
 
         self._refresh_overlay_peer_consumers()
 
-    def _get_runtime_logging_owner(self) -> ApplicationRuntimeLoggingOwner:
+    def _require_runtime_logging_owner(self) -> ApplicationRuntimeLoggingOwner:
         owner = self._runtime_logging_owner
         if owner is None:
-            owner = ApplicationRuntimeLoggingOwner(
-                presentation=self.app,
-                service_factory=lambda: RuntimeLoggingService(
-                    session_factory=lambda: SessionRuntimeLoggingService(
-                        sinks=self.runtime_logging_sinks,
-                        ui_handler_factory=RealtimeLogHandler,
-                    ),
-                    fallback_logger=logger,
-                ),
-                fallback_logger=logger,
-                overlay_logging_mode_update=self._emit_overlay_runtime_logging_mode_update,
-                overlay_logging_mode_update_available=lambda: (
-                    self._get_overlay_application_owner().current_bridge() is not None
-                ),
-            )
-            self._runtime_logging_owner = owner
+            raise RuntimeError("GuiController runtime logging owner is not installed")
         return owner
 
     @property
@@ -2866,15 +2516,15 @@ class GuiController:
 
     @_runtime_logging.setter
     def _runtime_logging(self, service: Any | None) -> None:
-        self._get_runtime_logging_owner().install_service(service)
+        self._require_runtime_logging_owner().install_service(service)
 
     @property
     def runtime_logging(self) -> Any:
-        return self._get_runtime_logging_owner().service
+        return self._require_runtime_logging_owner().service
 
     @property
     def runtime_logging_mode(self) -> str:
-        return self._get_runtime_logging_owner().mode
+        return self._require_runtime_logging_owner().mode
 
     def set_runtime_logging_mode(self, mode: SessionLoggingMode | str) -> None:
         def mode_changed(normalized_mode: str) -> None:
@@ -2886,14 +2536,14 @@ class GuiController:
                     set_logging_mode(normalized_mode)
             self._schedule_overlay_runtime_logging_mode_update()
 
-        self._get_runtime_logging_owner().set_mode(
+        self._require_runtime_logging_owner().set_mode(
             mode,
             detailed_enabled=self._schedule_audio_environment_snapshot,
             mode_changed=mode_changed,
         )
 
     def _schedule_audio_environment_snapshot(self) -> None:
-        self._get_runtime_logging_owner().schedule_audio_environment_snapshot()
+        self._require_runtime_logging_owner().schedule_audio_environment_snapshot()
 
     async def _emit_overlay_runtime_logging_mode_update(self) -> None:
         bridge = self._get_overlay_application_owner().current_bridge()
@@ -2902,10 +2552,10 @@ class GuiController:
         await bridge.broadcast_runtime_control(logging_mode=self.runtime_logging_mode)
 
     def _schedule_overlay_runtime_logging_mode_update(self) -> None:
-        self._get_runtime_logging_owner().schedule_overlay_logging_mode_update()
+        self._require_runtime_logging_owner().schedule_overlay_logging_mode_update()
 
     def log_basic(self, message: str, *, level: int = logging.INFO) -> None:
-        self._get_runtime_logging_owner().emit_basic(message, level=level)
+        self._require_runtime_logging_owner().emit_basic(message, level=level)
 
     def log_detailed(
         self,
@@ -2914,7 +2564,7 @@ class GuiController:
         level: int = logging.INFO,
         exception: BaseException | None = None,
     ) -> bool:
-        return self._get_runtime_logging_owner().emit_detailed(
+        return self._require_runtime_logging_owner().emit_detailed(
             message,
             level=level,
             exception=exception,
@@ -2927,7 +2577,7 @@ class GuiController:
         level: int = logging.INFO,
         exception: BaseException | None = None,
     ) -> bool:
-        return self._get_runtime_logging_owner().emit_detailed_lazy(
+        return self._require_runtime_logging_owner().emit_detailed_lazy(
             build_message,
             level=level,
             exception=exception,

@@ -74,6 +74,11 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
     )
     monkeypatch.setattr(
         composition_module,
+        "compose_gui_application_boundary",
+        lambda backend: SimpleNamespace(stop=backend.stop),
+    )
+    monkeypatch.setattr(
+        composition_module,
         "LocalASRProviderRuntimeOwner",
         FakeOwner,
     )
@@ -139,6 +144,9 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
 
 @pytest.mark.asyncio
 async def test_initialize_preserves_canonical_owner_failure_contract(monkeypatch) -> None:
+    async def close() -> None:
+        return None
+
     class FakeController:
         def __init__(self, config_path: Path) -> None:
             self.config_path = config_path
@@ -164,6 +172,11 @@ async def test_initialize_preserves_canonical_owner_failure_contract(monkeypatch
         composition_module,
         "compose_gui_controller",
         lambda **kwargs: FakeController(kwargs["config_path"]),
+    )
+    monkeypatch.setattr(
+        composition_module,
+        "compose_gui_application_boundary",
+        lambda _backend: SimpleNamespace(stop=close),
     )
     application = composition_module.compose_local_asr_production_evidence(
         config_path=Path("settings.json"),

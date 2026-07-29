@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from puripuly_heart.app.ports.local_asr_production_evidence import (
     LocalASRProductionEvidencePort,
 )
+from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
@@ -16,7 +17,10 @@ from puripuly_heart.app.wiring_stt_factory import (
     build_peer_stt_provider_request,
     build_self_stt_provider_request,
 )
-from puripuly_heart.composition.ui_application import compose_gui_controller
+from puripuly_heart.composition.ui_application import (
+    compose_gui_application_boundary,
+    compose_gui_controller,
+)
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
@@ -29,6 +33,7 @@ from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 @dataclass(slots=True)
 class _ControllerBackedLocalASRProductionEvidence:
     backend: GuiController
+    application: UiApplicationPort
 
     @property
     def config_path(self) -> Path:
@@ -101,7 +106,7 @@ class _ControllerBackedLocalASRProductionEvidence:
         await self.backend.retry_gpu_activation()
 
     async def close(self) -> None:
-        await self.backend.stop()
+        await self.application.stop()
 
 
 def compose_local_asr_production_evidence(
@@ -115,4 +120,7 @@ def compose_local_asr_production_evidence(
         presentation=presentation,
         config_path=config_path,
     )
-    return _ControllerBackedLocalASRProductionEvidence(backend)
+    return _ControllerBackedLocalASRProductionEvidence(
+        backend,
+        compose_gui_application_boundary(backend),
+    )

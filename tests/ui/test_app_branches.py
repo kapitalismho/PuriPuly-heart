@@ -13,6 +13,9 @@ import flet as ft
 
 import puripuly_heart.ui.app as app_module
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.services.application_shutdown import (
+    application_shutdown_callback,
+)
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.composition.ui_application import compose_ui_application
 from puripuly_heart.config.settings import (
@@ -30,12 +33,47 @@ from puripuly_heart.config.settings import (
     build_managed_openrouter_byok_target_settings,
     with_telemetry_consent,
 )
+from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 MISSING = object()
+
+
+def _application_boundary_with_stop(controller: object) -> UiApplicationBoundary:
+    boundary = compose_test_ui_application_boundary(controller)
+    boundary.register_application_shutdown_callbacks(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+                owner_name="ApplicationTestRuntime",
+                callback_name="stop",
+                callback=controller.stop,
+            ),
+        )
+    )
+    return boundary
+
+
+@pytest.fixture(autouse=True)
+def _compose_explicit_application_test_double(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application_getter = TranslatorApp.application.fget
+
+    def resolve_application(self: TranslatorApp):
+        if getattr(self, "_ui_application", None) is None and hasattr(self, "controller"):
+            self._ui_application = compose_test_ui_application_boundary(self.controller)
+        return application_getter(self)
+
+    monkeypatch.setattr(
+        TranslatorApp,
+        "application",
+        property(resolve_application),
+    )
 
 
 class DummyPage:
@@ -445,7 +483,7 @@ def _construction_application_factory(
         config_path=config_path,
     )
     presentation._app.controller = controller
-    return UiApplicationBoundary(controller)
+    return compose_test_ui_application_boundary(controller)
 
 
 def _patch_app_construction(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -515,7 +553,7 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_logs.on_mode_change == app._on_runtime_logging_mode_change
     assert app.view_logs.runtime_logging_mode == "detailed"
     assert isinstance(app.application, UiApplicationBoundary)
-    assert app.application.wraps(app.controller)
+    assert app.application is app._ui_application
     assert isinstance(app.controller.app, FletUiPresentationAdapter)
     assert app.controller.app is app._presentation_adapter
 
@@ -622,7 +660,7 @@ async def test_main_gui_constructs_the_real_application_and_presentation_boundar
         )
         presentation._app.controller = controller
         constructed["controller"] = controller
-        return UiApplicationBoundary(controller)
+        return compose_test_ui_application_boundary(controller)
 
     monkeypatch.setattr(TranslatorApp, "schedule_after_launch_tasks", lambda self: None)
 
@@ -639,7 +677,7 @@ async def test_main_gui_constructs_the_real_application_and_presentation_boundar
     translator_app = controller.app._app
     assert isinstance(translator_app, TranslatorApp)
     assert isinstance(translator_app.application, UiApplicationBoundary)
-    assert translator_app.application.wraps(controller)
+    assert translator_app.application is translator_app._ui_application
     assert controller.start_calls == 1
 
 
@@ -1159,7 +1197,7 @@ def test_debug_preview_discord_callback_page_opens_local_preview_without_oauth(
 
 def test_mark_discord_managed_auth_callback_received_updates_open_dialog() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    app._ui_application = UiApplicationBoundary(None)
+    app._ui_application = compose_test_ui_application_boundary(None)
     calls: list[str] = []
     app._discord_managed_auth_generation = 7
     app._discord_managed_auth_cancelled = False
@@ -1212,7 +1250,7 @@ def test_translator_app_keeps_debug_ui_preview_out_of_controller(
         )
         controller = RecordingController(None, presentation, config_path)
         presentation._app.controller = controller
-        return UiApplicationBoundary(controller)
+        return compose_test_ui_application_boundary(controller)
 
     app = TranslatorApp(
         DummyPage(),
@@ -1354,7 +1392,7 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
         )
         controller = DummyController(None, presentation, config_path)
         presentation._app.controller = controller
-        return UiApplicationBoundary(controller)
+        return compose_test_ui_application_boundary(controller)
 
     app = TranslatorApp(
         DummyPage(),
@@ -1473,7 +1511,7 @@ async def test_main_gui_routes_update_check_through_app_log_helper(
             seen["app"] = self
             self.page = incoming_page
             self.controller = FakeController()
-            self.application = UiApplicationBoundary(self.controller)
+            self.application = compose_test_ui_application_boundary(self.controller)
 
         def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
@@ -1523,7 +1561,7 @@ async def test_main_gui_forwards_debug_ui_preview_flag(
             seen["init"] = (incoming_page, config_path, debug_ui_preview)
             self.page = incoming_page
             self.controller = FakeController()
-            self.application = UiApplicationBoundary(self.controller)
+            self.application = compose_test_ui_application_boundary(self.controller)
 
         def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
@@ -3750,7 +3788,7 @@ def test_on_nav_change_closes_open_dialog_before_switching_tabs() -> None:
 
 def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    app._ui_application = UiApplicationBoundary(None)
+    app._ui_application = compose_test_ui_application_boundary(None)
     app.page = DummyPage()
     app.title_bar = SimpleNamespace(set_title=lambda value: setattr(app, "_title", value))
     view_calls: list[str] = []
@@ -3770,7 +3808,7 @@ def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_refresh_overlay_peer_contract_ignores_missing_controller() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    app._ui_application = UiApplicationBoundary(None)
+    app._ui_application = compose_test_ui_application_boundary(None)
     app.view_dashboard = SimpleNamespace(
         set_overlay_peer_contract=lambda contract: (_ for _ in ()).throw(
             AssertionError(f"unexpected dashboard contract: {contract}")
@@ -4376,6 +4414,7 @@ async def test_shutdown_is_idempotent_and_cancels_tracked_page_tasks() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
     app.controller = Controller()
+    app._ui_application = _application_boundary_with_stop(app.controller)
     app._shutdown_lock = None
     app._shutdown_complete = False
     app._shutting_down = False
@@ -4426,6 +4465,7 @@ async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
         )
         self.page = incoming_page
         self.controller = Controller()
+        self._ui_application = _application_boundary_with_stop(self.controller)
         self._tracked_page_tasks = set()
         self._shutdown_lock = None
         self._shutdown_complete = False

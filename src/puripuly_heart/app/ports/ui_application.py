@@ -29,6 +29,7 @@ class UiApplicationState:
     overlay_target: str | None
     desktop_overlay_captions_locked: bool
     managed_auth_referral_bonus_applied: bool
+    translation_runtime_ready: bool | None = None
 
 
 class UiApplicationFactoryPort(Protocol):
@@ -55,9 +56,12 @@ class UiApplicationPort(Protocol):
 
     async def stop(self) -> None: ...
 
-    def application_shutdown_callbacks(self) -> Sequence[ApplicationShutdownCallback]: ...
+    def application_lifecycle(self) -> ApplicationShutdownCoordinator: ...
 
-    def bind_application_lifecycle(self, lifecycle: ApplicationShutdownCoordinator) -> None: ...
+    def register_application_shutdown_callbacks(
+        self,
+        callbacks: Sequence[ApplicationShutdownCallback],
+    ) -> None: ...
 
     def emit_application_shutdown_diagnostic(
         self,

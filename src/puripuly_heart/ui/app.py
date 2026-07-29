@@ -18,13 +18,11 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
     application_shutdown_callback,
 )
-from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.core.discord_oauth_loopback import (
     render_discord_oauth_callback_completion_page,
 )
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
-    SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
@@ -284,12 +282,6 @@ class TranslatorApp:
     @property
     def application(self) -> UiApplicationPort:
         boundary = getattr(self, "_ui_application", None)
-        if hasattr(self, "controller"):
-            backend = self.controller
-            wraps = getattr(boundary, "wraps", None)
-            if boundary is None or not callable(wraps) or not wraps(backend):
-                boundary = UiApplicationBoundary(backend)
-                self._ui_application = boundary
         if boundary is None:
             raise RuntimeError("TranslatorApp application boundary is not composed")
         return boundary
@@ -328,24 +320,10 @@ class TranslatorApp:
 
     def _compose_application_lifecycle(self) -> ApplicationShutdownCoordinator:
         foundation_runtime = self._ensure_foundation_runtime()
-        callbacks = list(self._application_shutdown_callbacks())
-        controller_callbacks = self.application.application_shutdown_callbacks()
-        if controller_callbacks:
-            callbacks.extend(controller_callbacks)
-        else:
-            callbacks.append(
-                application_shutdown_callback(
-                    phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
-                    owner_name="GuiControllerCompatibilityFacade",
-                    callback_name="stop",
-                    callback=self.application.stop,
-                )
-            )
-        lifecycle = ApplicationShutdownCoordinator(
-            callbacks,
-            diagnostics_sink=self.application.emit_application_shutdown_diagnostic,
+        self.application.register_application_shutdown_callbacks(
+            self._application_shutdown_callbacks()
         )
-        self.application.bind_application_lifecycle(lifecycle)
+        lifecycle = self.application.application_lifecycle()
         foundation_runtime.bind_application_lifecycle(lifecycle)
         return lifecycle
 
@@ -365,33 +343,24 @@ class TranslatorApp:
                 callback_name="freeze_ui_ingress",
                 callback=self._freeze_ui_ingress,
             ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
-                owner_name="GithubStarPromptRuntime",
-                callback_name="stop_app_ingress",
-                callback=self._stop_after_launch_ingress,
-            ),
             *foundation_runtime.application_shutdown_callbacks(),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="GithubStarPromptRuntime",
-                callback_name="close_app_runtime",
-                callback=self.close_after_launch_tasks,
+                owner_name="TranslatorApp",
+                callback_name="close_after_launch_tasks",
+                callback=self._close_after_launch_ui_tasks,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="OAuthRuntime",
-                callback_name="close_app_runtime",
-                callback=self.close_oauth_runtime,
+                owner_name="TranslatorApp",
+                callback_name="close_managed_auth_tasks",
+                callback=self._close_managed_auth_ui_tasks,
             ),
         )
 
     def _freeze_ui_ingress(self) -> None:
         self._shutting_down = True
         self._settings_mutation_queue = []
-
-    def _stop_after_launch_ingress(self) -> None:
-        self.application.stop_github_star_prompt_ingress()
 
     async def _on_page_lifecycle_end(self, _event=None) -> None:
         await self.shutdown()
@@ -649,7 +618,7 @@ class TranslatorApp:
                 level=logging.WARNING,
             )
 
-    async def close_after_launch_tasks(self) -> None:
+    async def _close_after_launch_ui_tasks(self) -> None:
         handle = getattr(self, "_after_launch_task_handle", None)
         if handle is not None:
             if not handle.done():
@@ -668,6 +637,10 @@ class TranslatorApp:
             finally:
                 if self._after_launch_task_handle is handle:
                     self._after_launch_task_handle = None
+        self._github_star_prompt_launch_pending = False
+
+    async def close_after_launch_tasks(self) -> None:
+        await self._close_after_launch_ui_tasks()
         await self.close_github_star_prompt_runtime()
 
     async def _open_github_star_prompt_snackbar(self, *, should_open=None) -> bool:  # noqa: ANN001
@@ -1694,7 +1667,7 @@ class TranslatorApp:
             generation=generation,
         )
 
-    async def close_oauth_runtime(self) -> None:
+    async def _close_managed_auth_ui_tasks(self) -> None:
         self._discord_managed_auth_cancelled = True
         self._qq_managed_auth_cancelled = True
         self._discord_managed_auth_generation = (
@@ -1713,6 +1686,9 @@ class TranslatorApp:
             task_handle,
             task_name="discord-managed-auth-dialog",
         )
+
+    async def close_oauth_runtime(self) -> None:
+        await self._close_managed_auth_ui_tasks()
         await self.application.close_managed_auth_tasks()
 
     def mark_discord_managed_auth_callback_received(self, generation: int | None = None) -> None:

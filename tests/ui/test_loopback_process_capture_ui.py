@@ -65,6 +65,7 @@ from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.views.dashboard import DashboardView
 from puripuly_heart.ui.views.settings import SettingsView
 from tests.helpers.fakes import install_test_runtime_composition
+from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
 def _presentation(
@@ -469,6 +470,7 @@ async def test_peer_starting_is_published_before_delayed_readiness_and_latest_in
         ),
         config_path=Path("x"),
     )
+    install_test_runtime_composition(controller)
     controller.settings = AppSettings()
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
     controller.settings.ui.peer_translation_eula_accepted = True
@@ -793,6 +795,7 @@ def test_controller_process_diagnostic_sets_peer_warning_reason() -> None:
         app=_presentation(SimpleNamespace()),
         config_path=Path("settings.json"),
     )
+    install_test_runtime_composition(controller)
     controller.settings = AppSettings()
     controller.settings.ui.peer_translation_enabled = True
     controller._get_peer_application_runtime().owner.on_runtime_diagnostic(
@@ -987,6 +990,7 @@ async def test_failed_process_warning_survives_unrelated_draft_apply_without_dev
         app=_presentation(SimpleNamespace()),
         config_path=path,
     )
+    install_test_runtime_composition(controller)
     controller.settings = load_settings(path)
     controller.settings.ui.peer_translation_enabled = True
     controller.settings.ui.peer_translation_eula_accepted = True
@@ -1557,6 +1561,7 @@ async def test_app_queues_process_capture_retry_and_apply_actions() -> None:
         retry_peer_process_capture=lambda: _record_async_call(calls, "retry"),
         apply_loopback_capture_option=lambda value: _record_async_call(calls, "apply", value),
     )
+    app._ui_application = compose_test_ui_application_boundary(app.controller)
     app._queue_settings_mutation_task = queued.append  # type: ignore[method-assign]
 
     app._on_retry_peer_process_capture()

@@ -26,8 +26,11 @@ def test_production_constructs_one_local_asr_provisioning_owner_in_composition()
     assert constructions == ["src/puripuly_heart/app/wiring.py"]
 
 
-def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> None:
+def test_application_owners_delegate_provisioning_without_asset_or_task_ownership() -> None:
     source = (SOURCE_ROOT / "ui" / "controller.py").read_text(encoding="utf-8")
+    startup = (SOURCE_ROOT / "composition" / "controller_application_startup.py").read_text(
+        encoding="utf-8"
+    )
     cpu_repair = (SOURCE_ROOT / "app" / "services" / "local_asr_cpu_repair.py").read_text(
         encoding="utf-8"
     )
@@ -60,8 +63,10 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
     assert "create_gpu_runtime_interaction_owner(" in source
     assert "create_local_asr_readiness_owner(" not in source
     assert "create_local_asr_readiness_owner(" in application_wiring
-    assert ".inspect_cpu(" in source
-    assert ".inspect_gpu(" in source
+    assert ".inspect_cpu(" not in source
+    assert ".inspect_cpu(" in startup
+    assert ".inspect_gpu(" not in source
+    assert ".inspect_gpu(" in startup
     assert ".inspect_gpu(" in gpu_provisioning
     assert ".inspect_gpu_readiness(" in gpu_interaction
     assert ".start_install(" not in source

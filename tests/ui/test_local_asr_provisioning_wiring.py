@@ -381,8 +381,8 @@ async def test_controller_shutdown_awaits_idempotent_provisioning_owner_close() 
     port = RecordingProvisioningPort(_snapshot())
     controller = _controller(port)
 
-    await controller._close_local_asr_provisioning()
-    await controller._close_local_asr_provisioning()
+    await controller.close_local_asr_provisioning()
+    await controller.close_local_asr_provisioning()
 
     assert port.close_calls == 1
     assert port.snapshot.closed is True
