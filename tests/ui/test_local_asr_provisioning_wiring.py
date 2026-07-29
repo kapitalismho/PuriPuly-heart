@@ -27,6 +27,7 @@ from puripuly_heart.core.local_stt_assets import (
 )
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.fakes import install_test_runtime_composition
 
 
 async def _wait_until(predicate: Callable[[], bool]) -> None:
@@ -285,7 +286,7 @@ def _controller(
         local_asr_provisioning=port,
     )
     controller.settings = AppSettings()
-    return controller
+    return install_test_runtime_composition(controller)
 
 
 @pytest.mark.asyncio

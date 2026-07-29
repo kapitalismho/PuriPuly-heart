@@ -64,6 +64,7 @@ from puripuly_heart.ui.overlay_peer_contract import (
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.views.dashboard import DashboardView
 from puripuly_heart.ui.views.settings import SettingsView
+from tests.helpers.fakes import install_test_runtime_composition
 
 
 def _presentation(
@@ -513,6 +514,7 @@ async def test_self_toggle_path_delegates_only_to_composed_capture_owner() -> No
         app=_presentation(SimpleNamespace()),
         config_path=Path("x"),
     )
+    install_test_runtime_composition(controller)
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     controller.hub = _runtime_hub_stub()
@@ -540,6 +542,7 @@ async def test_self_microphone_start_failure_becomes_effective_off_failure_notic
         app=_presentation(SimpleNamespace(view_dashboard=dash)),
         config_path=Path("x"),
     )
+    install_test_runtime_composition(controller)
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     controller.hub = _runtime_hub_stub()

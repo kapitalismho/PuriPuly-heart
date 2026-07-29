@@ -149,9 +149,7 @@ from puripuly_heart.core.runtime_logging import (
     SessionRuntimeLoggingService,
 )
 from puripuly_heart.core.self_capture import (
-    SelfCaptureAdmissionStatus,
     SelfCaptureProviderStatus,
-    SelfCaptureSessionConfig,
     SelfCaptureSessionSnapshot,
     SelfCaptureSessionState,
 )
@@ -171,6 +169,7 @@ from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.fakes import (
     FakeSender,
     SelfCaptureStateStub,
+    install_test_runtime_composition,
     self_capture_snapshot,
 )
 
@@ -786,52 +785,26 @@ def _presentation(
 
 
 def _make_controller(*, app: object) -> GuiController:
-    return GuiController(
+    controller = GuiController(
         page=SimpleNamespace(),
         app=_presentation(app),
         config_path=Path("settings.json"),
         local_asr_provisioning=ReadyProvisioningPort(),
     )
+    return install_test_runtime_composition(controller)
+
+
+def _replace_pipeline_launcher(controller: GuiController, launcher: object) -> None:
+    _ = controller.runtime_composition.pipeline_launcher
+    composition = controller.runtime_composition
+    controller._runtime_composition = replace(
+        composition,
+        pipeline_launcher=launcher,
+    )
 
 
 def _settings_result(controller: GuiController) -> messages.TransactionResult | None:
     return controller._get_settings_application_owner().results.current
-
-
-@pytest.mark.asyncio
-async def test_self_capture_admission_rejects_unsupported_language_before_status_probe(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dashboard = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dashboard))
-    controller.settings = AppSettings()
-    controller.settings.provider.stt = STTProviderName.LOCAL_CPU_AUTO
-    controller.settings.languages.source_language = "he"
-    controller.hub = SimpleNamespace()
-    messages: list[str] = []
-
-    def show_message(_self: GuiController, message_key: str) -> None:
-        messages.append(message_key)
-
-    monkeypatch.setattr(GuiController, "_show_short_stt_message", show_message)
-    admission = controller._get_self_capture_owner()._admission
-
-    result = await admission.admit(
-        SelfCaptureSessionConfig(
-            provider_id=STTProviderName.LOCAL_CPU_AUTO.value,
-            provider_signature=("provider",),
-            runtime_signature=("runtime",),
-            capture_signature=("capture",),
-            target_sample_rate_hz=16000,
-            local_cpu=True,
-        )
-    )
-
-    assert result.status is SelfCaptureAdmissionStatus.REJECTED
-    assert result.reason == "language_unsupported"
-    assert dashboard.stt_enabled is False
-    assert dashboard.stt_needs_key is False
-    assert messages == ["local_stt.language_unsupported"]
 
 
 def test_self_capture_admission_effects_preserve_controller_compatibility(
@@ -1601,7 +1574,10 @@ async def test_start_local_llm_without_runtime_does_not_show_api_key_warning(
     async def fake_launch(*_args, **_kwargs) -> None:
         controller.hub = hub
 
-    controller._runtime_pipeline_launcher = SimpleNamespace(launch=fake_launch)
+    _replace_pipeline_launcher(
+        controller,
+        SimpleNamespace(launch=fake_launch),
+    )
     await controller.start()
     await asyncio.sleep(0)
 
@@ -8128,7 +8104,10 @@ async def test_start_initializes_dashboard_and_bridge(
     async def fake_launch(*_args, **_kwargs) -> None:
         controller.hub = hub
 
-    controller._runtime_pipeline_launcher = SimpleNamespace(launch=fake_launch)
+    _replace_pipeline_launcher(
+        controller,
+        SimpleNamespace(launch=fake_launch),
+    )
 
     assert callable(getattr(controller, "set_runtime_logging_mode", None))
     controller.set_runtime_logging_mode("detailed")
@@ -8221,7 +8200,10 @@ async def test_start_does_not_auto_restore_transient_overlay_or_peer_toggles(
     async def fake_launch(*_args, **_kwargs) -> None:
         controller.hub = hub
 
-    controller._runtime_pipeline_launcher = SimpleNamespace(launch=fake_launch)
+    _replace_pipeline_launcher(
+        controller,
+        SimpleNamespace(launch=fake_launch),
+    )
 
     await controller.start()
     await asyncio.sleep(0)
@@ -9417,165 +9399,6 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
     assert controller.hub.low_latency_mode is True
     assert "Failed to apply locale" in errors
     assert raw_failure_text not in "\n".join(errors)
-
-
-@pytest.mark.asyncio
-async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_stt_disabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.DEEPGRAM
-
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = settings
-
-    prepared_configs: list[object] = []
-
-    class FakeOwner:
-        snapshot = self_capture_snapshot(False)
-        loop_task = None
-        source = None
-        cleanup_source = None
-        vad = None
-        last_cleanup_exception = None
-
-        async def prepare_provider(self, config):
-            prepared_configs.append(config)
-            return SelfCaptureSessionSnapshot(
-                state=SelfCaptureSessionState.STOPPED,
-                provider_status=SelfCaptureProviderStatus.READY,
-                desired_active=False,
-                effective_active=False,
-                generation=1,
-                provider_id=config.provider_id,
-                runtime_signature=config.runtime_signature,
-                failure_reason=None,
-                admission_reason=None,
-                has_source=False,
-                has_vad=False,
-                has_loop_task=False,
-                cleanup_debt=0,
-                closed=False,
-            )
-
-    controller.hub = DummyHub(stt=object())
-    controller.hub.source_language = settings.languages.source_language
-    controller.hub.target_language = settings.languages.target_language
-    controller.hub.system_prompt = settings.system_prompt
-    controller.hub.low_latency_mode = settings.stt.low_latency_mode
-    controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
-    controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-    controller.hub.hangover_s = 1.1
-    controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._self_capture_owner = FakeOwner()
-
-    settings.stt.custom_vocabulary_enabled = True
-    settings.stt.custom_terms = {"ko": ["Puripuly"]}
-
-    async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
-        _ = (self, enabled)
-
-    monkeypatch.setattr(
-        SettingsOwner,
-        "save_current",
-        lambda self, **_kwargs: True,
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        fake_configure_vrc_mic_receiver,
-    )
-    await controller.apply_settings(settings)
-
-    request = controller._get_capture_owner_factory().self_provider_request(
-        prepared_configs[-1],
-        False,
-    )
-    assert request.config.source_language == "ko"
-    assert request.config.custom_vocabulary_enabled is True
-    assert request.config.custom_terms == {"ko": ("Puripuly",)}
-    assert controller.hub.replace_stt_request_calls == []
-    assert dash.stt_needs_key is False
-
-
-@pytest.mark.asyncio
-async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabulary_changes(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.DEEPGRAM
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = settings
-    controller.hub = DummyHub(stt=object())
-    controller.hub.source_language = settings.languages.source_language
-    controller.hub.target_language = settings.languages.target_language
-    controller.hub.system_prompt = settings.system_prompt
-    controller.hub.low_latency_mode = settings.stt.low_latency_mode
-    controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
-    controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-    controller.hub.hangover_s = 1.1
-    controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._self_capture_owner = SelfCaptureStateStub(True)
-
-    settings.stt.custom_vocabulary_enabled = True
-    settings.stt.custom_terms = {"ko": ["Puripuly", "VRChat"]}
-
-    apply_calls: list[dict[str, object]] = []
-
-    class FakeOwner:
-        snapshot = self_capture_snapshot(True)
-        loop_task = object()
-        source = object()
-        cleanup_source = None
-        vad = object()
-        last_cleanup_exception = None
-
-        async def apply_intent(self, config, **kwargs):
-            apply_calls.append(kwargs)
-            return SelfCaptureSessionSnapshot(
-                state=SelfCaptureSessionState.RUNNING,
-                provider_status=SelfCaptureProviderStatus.READY,
-                desired_active=True,
-                effective_active=True,
-                generation=1,
-                provider_id=config.provider_id,
-                runtime_signature=config.runtime_signature,
-                failure_reason=None,
-                admission_reason=None,
-                has_source=True,
-                has_vad=True,
-                has_loop_task=True,
-                cleanup_debt=0,
-                closed=False,
-            )
-
-    async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
-        _ = (self, enabled)
-
-    controller._self_capture_owner = FakeOwner()
-    monkeypatch.setattr(
-        SettingsOwner,
-        "save_current",
-        lambda self, **_kwargs: True,
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        fake_configure_vrc_mic_receiver,
-    )
-
-    await controller.apply_settings(settings)
-
-    assert apply_calls == [
-        {
-            "enabled": True,
-            "restart": False,
-            "explicit_toggle_off": False,
-        }
-    ]
-    assert controller._stt_restart_requested is False
 
 
 @pytest.mark.asyncio

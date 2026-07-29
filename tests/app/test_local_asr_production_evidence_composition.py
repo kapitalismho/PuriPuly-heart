@@ -19,21 +19,33 @@ class FakeHub:
 @pytest.mark.asyncio
 async def test_composition_is_page_free_and_delegates_the_complete_evidence_contract(
     monkeypatch,
+    tmp_path: Path,
 ) -> None:
+    actual_path = tmp_path / "actual-settings.json"
+    actual_application = composition_module.compose_local_asr_production_evidence(
+        config_path=actual_path,
+    )
+    assert actual_application.config_path == actual_path
+
     captured: dict[str, object] = {}
     events: list[object] = []
     settings = AppSettings()
     owner = FakeOwner()
 
     class FakeController:
-        def __init__(self, **kwargs) -> None:
-            captured.update(kwargs)
-            self.config_path = kwargs["config_path"]
+        def __init__(self, config_path: Path) -> None:
+            self.config_path = config_path
             self.settings = None
             self.hub = FakeHub(owner)
             self.vrc_mic_state = None
             self.vrc_mic_audio_gate = None
             self.receiver = None
+            self.runtime_composition = SimpleNamespace(
+                pipeline_launcher=SimpleNamespace(launch=self._launch),
+            )
+
+        async def _launch(self, settings: object, **_kwargs) -> None:
+            events.append(("initialize", settings))
 
         def _load_or_init_settings(self, path: Path) -> object:
             events.append(("load", path))
@@ -45,19 +57,21 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
         def _sync_signature_caches(self, settings: object) -> None:
             _ = settings
 
-        def _get_runtime_pipeline_launcher(self) -> object:
-            async def launch(settings: object, **_kwargs) -> None:
-                events.append(("initialize", settings))
-
-            return SimpleNamespace(launch=launch)
-
         async def retry_gpu_activation(self) -> None:
             events.append("retry")
 
         async def stop(self) -> None:
             events.append("close")
 
-    monkeypatch.setattr(composition_module, "GuiController", FakeController)
+    def compose_controller(**kwargs) -> FakeController:
+        captured.update(kwargs)
+        return FakeController(kwargs["config_path"])
+
+    monkeypatch.setattr(
+        composition_module,
+        "compose_gui_controller",
+        compose_controller,
+    )
     monkeypatch.setattr(
         composition_module,
         "LocalASRProviderRuntimeOwner",
@@ -110,9 +124,8 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
     await application.retry_gpu_activation()
     await application.close()
 
-    assert captured["page"] is None
     assert captured["config_path"] == Path("settings.json")
-    assert captured["app"].debug_ui_preview is False
+    assert captured["presentation"].debug_ui_preview is False
     assert events == [
         ("load", Path("settings.json")),
         ("initialize", settings),
@@ -127,13 +140,19 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
 @pytest.mark.asyncio
 async def test_initialize_preserves_canonical_owner_failure_contract(monkeypatch) -> None:
     class FakeController:
-        def __init__(self, **kwargs) -> None:
-            self.config_path = kwargs["config_path"]
+        def __init__(self, config_path: Path) -> None:
+            self.config_path = config_path
             self.settings = None
             self.hub = FakeHub(object())
             self.vrc_mic_state = None
             self.vrc_mic_audio_gate = None
             self.receiver = None
+            self.runtime_composition = SimpleNamespace(
+                pipeline_launcher=SimpleNamespace(launch=self._launch),
+            )
+
+        async def _launch(self, _settings: object, **_kwargs) -> None:
+            return None
 
         def _get_local_asr_provisioning_owner(self) -> object:
             return object()
@@ -141,13 +160,11 @@ async def test_initialize_preserves_canonical_owner_failure_contract(monkeypatch
         def _sync_signature_caches(self, settings: object) -> None:
             _ = settings
 
-        def _get_runtime_pipeline_launcher(self) -> object:
-            async def launch(_settings: object, **_kwargs) -> None:
-                return None
-
-            return SimpleNamespace(launch=launch)
-
-    monkeypatch.setattr(composition_module, "GuiController", FakeController)
+    monkeypatch.setattr(
+        composition_module,
+        "compose_gui_controller",
+        lambda **kwargs: FakeController(kwargs["config_path"]),
+    )
     application = composition_module.compose_local_asr_production_evidence(
         config_path=Path("settings.json"),
     )

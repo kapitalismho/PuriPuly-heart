@@ -14,6 +14,25 @@ from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.domain.models import OSCMessage
 
 
+class DeferredRuntimeComposition:
+    def __init__(self, controller: object) -> None:
+        self._controller = controller
+
+    def __getattr__(self, name: str):
+        from puripuly_heart.composition.ui_application import (
+            compose_gui_runtime_components,
+        )
+
+        components = compose_gui_runtime_components(self._controller)
+        self._controller._runtime_composition = components
+        return getattr(components, name)
+
+
+def install_test_runtime_composition(controller):
+    controller._runtime_composition = DeferredRuntimeComposition(controller)
+    return controller
+
+
 @dataclass(slots=True)
 class FakeSender:
     sent: list[str]

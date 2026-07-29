@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from puripuly_heart.app.ports.local_asr_production_evidence import (
     LocalASRProductionEvidencePort,
 )
+from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
 )
@@ -15,12 +16,14 @@ from puripuly_heart.app.wiring_stt_factory import (
     build_peer_stt_provider_request,
     build_self_stt_provider_request,
 )
+from puripuly_heart.composition.ui_application import compose_gui_controller
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
 from puripuly_heart.ui.controller import GuiController
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
 @dataclass(slots=True)
@@ -38,7 +41,7 @@ class _ControllerBackedLocalASRProductionEvidence:
         self.backend.settings = settings
         self.backend._get_local_asr_provisioning_owner()
         self.backend._sync_signature_caches(settings)
-        await self.backend._get_runtime_pipeline_launcher().launch(
+        await self.backend.runtime_composition.pipeline_launcher.launch(
             settings,
             vrc_mic_state=self.backend.vrc_mic_state,
             vrc_mic_audio_gate=self.backend.vrc_mic_audio_gate,
@@ -105,9 +108,11 @@ def compose_local_asr_production_evidence(
     *,
     config_path: Path,
 ) -> LocalASRProductionEvidencePort:
-    backend = GuiController(
-        page=None,
-        app=SimpleNamespace(debug_ui_preview=False),
+    presentation: UiPresentationPort = FletUiPresentationAdapter(
+        SimpleNamespace(debug_ui_preview=False),
+    )
+    backend = compose_gui_controller(
+        presentation=presentation,
         config_path=config_path,
     )
     return _ControllerBackedLocalASRProductionEvidence(backend)

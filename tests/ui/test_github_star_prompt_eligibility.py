@@ -37,6 +37,7 @@ from puripuly_heart.ui.event_bridge import (
     UIEventBridge,
 )
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.fakes import install_test_runtime_composition
 
 
 def _controller_for(settings: AppSettings) -> GuiController:
@@ -46,7 +47,7 @@ def _controller_for(settings: AppSettings) -> GuiController:
         config_path=Path("settings.json"),
     )
     controller.settings = settings
-    return controller
+    return install_test_runtime_composition(controller)
 
 
 def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:

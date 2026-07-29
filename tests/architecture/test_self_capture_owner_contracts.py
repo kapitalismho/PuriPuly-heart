@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
 CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
+RUNTIME_COMPOSITION_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "ui_application.py"
 LEGACY_OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_audio.py"
 VAD_SINK_ADAPTER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_vad_sink.py"
@@ -110,11 +111,13 @@ def test_controller_composes_self_vad_sink_adapter_without_channel_wrapper() -> 
 
 def test_controller_composes_self_admission_adapter_without_admission_algorithm() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    composition_source = RUNTIME_COMPOSITION_PATH.read_text(encoding="utf-8")
     local_asr_adapter = (
         ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "local_asr_application.py"
     ).read_text(encoding="utf-8")
 
-    assert "admission=create_self_capture_admission_adapter(" in source
+    assert "admission=create_self_capture_admission_adapter(" not in source
+    assert "admission=create_self_capture_admission_adapter(" in composition_source
     assert "_SelfCaptureAdmissionAdapter" not in source
     assert "_admit_self_capture" not in source
     assert "SelfCaptureAdmissionStatus" not in source

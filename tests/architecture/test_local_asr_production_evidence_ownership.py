@@ -1,4 +1,8 @@
+import ast
 from pathlib import Path
+
+from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DRIVER_PATH = (
@@ -14,6 +18,7 @@ PORT_PATH = (
 COMPOSITION_PATH = (
     REPO_ROOT / "src" / "puripuly_heart" / "composition" / "local_asr_production_evidence.py"
 )
+UI_COMPOSITION_PATH = REPO_ROOT / "src" / "puripuly_heart" / "composition" / "ui_application.py"
 
 
 def test_local_asr_evidence_driver_has_no_controller_dependency() -> None:
@@ -34,8 +39,25 @@ def test_local_asr_evidence_driver_has_no_controller_dependency() -> None:
 def test_evidence_contract_is_ui_neutral_and_composition_is_page_free() -> None:
     port_source = PORT_PATH.read_text(encoding="utf-8")
     composition_source = COMPOSITION_PATH.read_text(encoding="utf-8")
+    ui_composition_source = UI_COMPOSITION_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in port_source
-    assert "page=None" in composition_source
-    assert "flet" not in composition_source.casefold()
+    assert "compose_gui_controller(" in composition_source
+    assert "page=None" in ui_composition_source
+    imported_modules = {
+        node.module
+        for node in ast.walk(ast.parse(composition_source))
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    imported_modules.update(
+        alias.name
+        for node in ast.walk(ast.parse(composition_source))
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    )
+    assert "flet" not in imported_modules
     assert "_ControllerBackedLocalASRProductionEvidence" in composition_source
+    required_presentation_members = {
+        name for name in UiPresentationPort.__dict__ if not name.startswith("_")
+    }
+    assert required_presentation_members <= set(dir(FletUiPresentationAdapter))

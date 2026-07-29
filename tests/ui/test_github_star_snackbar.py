@@ -27,6 +27,7 @@ from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
 from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.fakes import install_test_runtime_composition
 
 
 class DummyPage:
@@ -87,7 +88,7 @@ def _controller_for(settings: AppSettings) -> GuiController:
         config_path=Path("settings.json"),
     )
     controller.settings = settings
-    return controller
+    return install_test_runtime_composition(controller)
 
 
 def _eligible_managed_controller() -> GuiController:
@@ -117,6 +118,7 @@ def _eligible_app(
         config_path=Path("settings.json"),
     )
     controller.settings = settings or _settings_for_connection(TranslationConnection.MANAGED)
+    install_test_runtime_composition(controller)
     controller._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=50.0,

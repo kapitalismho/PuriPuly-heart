@@ -37,6 +37,7 @@ from puripuly_heart.core.local_stt_assets import (
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.fakes import install_test_runtime_composition
 
 pytestmark = pytest.mark.asyncio
 
@@ -184,7 +185,7 @@ def _controller(
         local_asr_provisioning=ReadyProvisioningPort(),
     )
     controller.settings = AppSettings()
-    return controller, view
+    return install_test_runtime_composition(controller), view
 
 
 @pytest.mark.parametrize(

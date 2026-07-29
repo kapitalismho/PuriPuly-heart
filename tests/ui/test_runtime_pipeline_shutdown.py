@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
 )
+from puripuly_heart.app.wiring_runtime_composition import RuntimeCompositionComponents
 from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineLauncher,
     RuntimePipelineResources,
@@ -49,7 +51,15 @@ async def test_application_shutdown_retries_retained_pipeline_cleanup() -> None:
         app=SimpleNamespace(),
         config_path=Path("settings.json"),
     )
-    controller._runtime_pipeline_launcher = launcher
+    controller.install_runtime_composition(
+        RuntimeCompositionComponents(
+            self_capture_owner=lambda: cast(Any, object()),
+            provider_runtime=cast(Any, object()),
+            managed_account=cast(Any, object()),
+            provider_application=cast(Any, object()),
+            pipeline_launcher=launcher,
+        )
+    )
     callback = next(
         callback
         for callback in controller.application_shutdown_callbacks()
@@ -61,4 +71,4 @@ async def test_application_shutdown_retries_retained_pipeline_cleanup() -> None:
     assert snapshot.state == "completed"
     assert retained.close_calls == 2
     assert launcher.failed_resources is None
-    assert controller._runtime_pipeline_launcher is None
+    assert controller.runtime_composition.pipeline_launcher is launcher
