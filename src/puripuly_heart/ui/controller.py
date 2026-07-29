@@ -9,28 +9,23 @@ import json
 import logging
 import sys
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, cast
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
-from puripuly_heart.app.ports.canonical_settings_persistence import (
-    ProviderVerificationBinding,
-)
 from puripuly_heart.app.ports.gpu_worker import GpuWorkerDevice
 from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestCapturePort,
     MicrophoneTestCaptureRequest,
 )
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
-from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
 from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureAdmissionEffect,
     SelfCaptureAdmissionEffectType,
     SelfCaptureAdmissionState,
 )
-from puripuly_heart.app.ports.settings_repository import CommittedSettingsRepositoryPort
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
     OptionItem,
@@ -104,8 +99,6 @@ from puripuly_heart.app.services.managed_usage import (
 )
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
-    ManualLocalASRFallbackPlan,
-    ManualLocalASRFallbackState,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.microphone_test import (
@@ -113,7 +106,10 @@ from puripuly_heart.app.services.microphone_test import (
     MicrophoneTestSessionOwner,
     MicrophoneTestSessionRequest,
 )
-from puripuly_heart.app.services.openrouter_pkce_flow import OpenRouterPkceFlowOwner
+from puripuly_heart.app.services.openrouter_pkce_flow import (
+    OpenRouterPkceApplicationOwner,
+    OpenRouterPkceFlowOwner,
+)
 from puripuly_heart.app.services.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
@@ -129,23 +125,9 @@ from puripuly_heart.app.services.provider_credential_verification import (
 from puripuly_heart.app.services.provider_runtime_apply import (
     LlmProviderRebuildContext,
     LlmProviderRebuildOwner,
-    NoopRuntimeApply,
-    OverlayOscOutputRuntimeApplyAdapter,
-    ProviderRuntimeApplyAdapter,
     ProviderRuntimeApplyPlan,
     ProviderRuntimeOwner,
     ProviderRuntimeState,
-    SettingsRuntimeState,
-    SttLanguageAudioRuntimeApplyAdapter,
-    UiPromptClipboardStateRuntimeApplyAdapter,
-    _overlay_osc_output_runtime_degraded_transaction_result,
-    _overlay_osc_output_save_failed_transaction_result,
-    _runtime_apply_result_as_degraded_transaction,
-    _stt_language_audio_runtime_degraded_transaction_result,
-    _stt_language_audio_runtime_unavailable_result,
-    _stt_language_audio_save_failed_transaction_result,
-    _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
-    _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
 from puripuly_heart.app.services.provider_settings import (
     ProviderApplicationOwner,
@@ -155,24 +137,14 @@ from puripuly_heart.app.services.provider_settings import (
 from puripuly_heart.app.services.provider_verification_binding import (
     ProviderVerificationBindingOwner,
 )
-from puripuly_heart.app.services.secret_settings_transaction import (
-    SecretSetRequest,
-    SecretSettingsTransaction,
-)
-from puripuly_heart.app.services.settings_mutation import (
-    OverlayOscOutputSettingsMutation,
-    SettingsMutationService,
-    SttLanguageAudioSettingsMutation,
-    UiPromptClipboardStateSettingsMutation,
-)
-from puripuly_heart.app.services.settings_mutation_legacy import (
-    _apply_settings_path_patch,
-    build_overlay_osc_output_settings_path_patch,
-    settings_path_mutation_validator_for_command,
-)
+from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
+from puripuly_heart.app.services.settings_mutation import SettingsMutationService
 from puripuly_heart.app.services.settings_projection import (
     SettingsProjectionOwner,
     SettingsViewSettingsChange,
+)
+from puripuly_heart.app.services.settings_runtime_effects import (
+    SettingsRuntimeEffectsAdapter,
 )
 from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
@@ -187,7 +159,6 @@ from puripuly_heart.app.wiring import (
     build_peer_stt_provider_signature_from_vnext,
     build_peer_stt_runtime_signature,
     build_self_capture_session_config,
-    build_self_capture_vad_signature,
     build_self_stt_provider_request,
     build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
@@ -227,7 +198,6 @@ from puripuly_heart.app.wiring_managed_auth_factory import (
     ManagedAuthRuntimeAdapter,
     ManagedTranslationRuntimeAdapter,
 )
-from puripuly_heart.config.llm_profiles import profile_for_alias
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.paths import user_config_dir
 from puripuly_heart.config.process_capture_resolution import (
@@ -248,9 +218,7 @@ from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
     OpenRouterCredentialSource,
-    OpenRouterLLMModel,
     OpenRouterProviderRouting,
-    OpenRouterSelectionAlias,
     QwenLLMModel,
     STTProviderName,
     TranslationConnection,
@@ -303,15 +271,11 @@ from puripuly_heart.core.managed_openrouter_release import (
     UnavailableManagedOpenRouterReleaseClient,
 )
 from puripuly_heart.core.messages import (
-    RUNTIME_APPLY_STATUS_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
     TransactionResult,
 )
-from puripuly_heart.core.openrouter_credentials import (
-    OPENROUTER_BYOK_API_KEY_SECRET,
-    resolve_openrouter_credentials,
-)
+from puripuly_heart.core.openrouter_credentials import resolve_openrouter_credentials
 from puripuly_heart.core.openrouter_handoff import should_auto_show_founder_letter
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEClient
 from puripuly_heart.core.orchestrator.hub import ClientHub
@@ -435,35 +399,6 @@ def _raise_lifecycle_cleanup_failures(message: str, failures: list[Exception]) -
     raise ExceptionGroup(message, failures)
 
 
-class _StrictSettingsSaveFailed(Exception):
-    pass
-
-
-def _managed_identity_delta(baseline: object, current: object) -> dict[str, object]:
-    baseline_values = asdict(baseline)
-    current_values = asdict(current)
-    return {
-        field_name: copy.deepcopy(value)
-        for field_name, value in current_values.items()
-        if baseline_values.get(field_name) != value
-    }
-
-
-def _apply_managed_identity_delta(settings: AppSettings, values: Mapping[str, object]) -> None:
-    for field_name, value in values.items():
-        setattr(settings.managed_identity, field_name, copy.deepcopy(value))
-
-
-def _restore_managed_identity(settings: AppSettings, snapshot: object) -> None:
-    for field_name, value in asdict(snapshot).items():
-        setattr(settings.managed_identity, field_name, copy.deepcopy(value))
-
-
-def _copy_runtime_only_ui_state(source: AppSettings, target: AppSettings) -> None:
-    target.ui.overlay_enabled = bool(source.ui.overlay_enabled)
-    target.ui.peer_translation_enabled = bool(source.ui.peer_translation_enabled)
-
-
 def _settings_mutation_committed(result: TransactionResult) -> bool:
     return result.status in {
         TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -517,13 +452,14 @@ class GuiController:
         repr=False,
     )
 
-    last_settings_mutation_result: TransactionResult | None = field(
-        init=False,
-        default=None,
-    )
     clock: SystemClock = SystemClock()
     _managed_openrouter_release_service: ManagedOpenRouterReleaseService | None = None
     _openrouter_pkce_flow_owner: OpenRouterPkceFlowOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _openrouter_pkce_application_owner: OpenRouterPkceApplicationOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -539,6 +475,11 @@ class GuiController:
         repr=False,
     )
     _provider_application_owner: ProviderApplicationOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _settings_application_owner: SettingsApplicationOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -740,22 +681,6 @@ class GuiController:
     @settings.setter
     def settings(self, settings: AppSettings | None) -> None:
         self._get_settings_owner().current = settings
-
-    def _legacy_settings_patch_repository(
-        self,
-        *,
-        committed_settings: AppSettings,
-        base_settings: AppSettings | None = None,
-        surface: str = "translation_provider",
-        provider_verification_binding: ProviderVerificationBinding | None = None,
-    ) -> CommittedSettingsRepositoryPort[AppSettings]:
-        return self._get_settings_owner().create_legacy_patch_repository(
-            committed_settings=committed_settings,
-            base_settings=base_settings,
-            surface=surface,
-            provider_verification_binding=provider_verification_binding,
-            save_failure_sink=self._log_error,
-        )
 
     @property
     def vnext_settings(self) -> AppSettingsVNext | None:
@@ -1040,8 +965,8 @@ class GuiController:
                     "overlay_enabled",
                     enabled,
                 ),
-                persist_manual_fallback=lambda: self._persist_current_manual_local_asr_fallback(
-                    channel="peer"
+                persist_manual_fallback=lambda: (
+                    self._get_settings_application_owner().persist_manual_fallback(channel="peer")
                 ),
                 ensure_local_ready=lambda generation: self._ensure_peer_local_stt_ready(
                     activation_generation=generation
@@ -1139,17 +1064,22 @@ class GuiController:
         )
         loaded_settings = self.settings
         fallback_plan = self.manual_local_asr_fallback_owner.plan(
-            self._manual_local_asr_fallback_state(loaded_settings)
+            self.manual_local_asr_fallback_owner.state(
+                loaded_settings,
+                cpu_auto_available=provisioning.snapshot.cpu_auto_available,
+            )
         )
         fallback_channels = fallback_plan.fallback_channels
         installation_fallback = fallback_plan.installation_fallback
         if fallback_plan.changed:
-            normalized_settings = self._settings_with_manual_local_asr_fallback_plan(
+            normalized_settings = self.manual_local_asr_fallback_owner.apply(
                 loaded_settings,
                 fallback_plan,
             )
             self.settings = normalized_settings
-            if not self._save_settings():
+            if not self._get_settings_owner().save_current(
+                failure_sink=lambda exc: self._log_error(f"Failed to save settings: {exc}")
+            ):
                 self.settings = loaded_settings
                 fallback_channels = ()
             else:
@@ -1162,9 +1092,9 @@ class GuiController:
         self._overlay_calibration_draft = None
         self.app.set_locale(self.settings.ui.locale)
         self._sync_ui_from_settings()
-        self._notify_manual_local_asr_fallback(
+        self._get_settings_application_owner().notify_fallback(
             fallback_channels,
-            installation_fallback=installation_fallback,
+            installation_fallback,
         )
         with contextlib.suppress(Exception):
             apply_locale = getattr(self.app, "apply_locale", None)
@@ -1463,12 +1393,15 @@ class GuiController:
                 settings_provider=lambda: self.settings,
                 settings_sink=lambda settings: setattr(self, "settings", settings),
                 release_service_provider=lambda: self._managed_openrouter_release_service,
-                persistence_callback_factory=self._managed_identity_persistence_callback,
+                persistence_callback_factory=(
+                    self._get_settings_owner().managed_identity_persistence_callback
+                ),
                 settings_repository_factory=lambda base, committed, surface: (
-                    self._legacy_settings_patch_repository(
+                    self._get_settings_owner().create_legacy_patch_repository(
                         base_settings=base,
                         committed_settings=committed,
                         surface=surface,
+                        save_failure_sink=self._log_error,
                     )
                 ),
                 settings_owner_complete=self._get_settings_owner().complete,
@@ -1497,11 +1430,7 @@ class GuiController:
                     key,
                     **dict(values),
                 ),
-                result_sink=lambda result: setattr(
-                    self,
-                    "last_settings_mutation_result",
-                    result,
-                ),
+                result_sink=self._get_settings_application_owner().results.set,
                 log_sink=lambda message: self.log_basic(
                     message,
                     level=logging.ERROR,
@@ -1552,7 +1481,9 @@ class GuiController:
                 ),
                 ingress_provider=lambda: self._shutdown_ingress_frozen,
                 founder_dialog=self.app.show_founder_letter_dialog,
-                persist_settings=self._save_settings,
+                persist_settings=lambda: self._get_settings_owner().save_current(
+                    failure_sink=lambda exc: self._log_error(f"Failed to save settings: {exc}")
+                ),
             )
             self._managed_translation_runtime_adapter = adapter
         return adapter
@@ -1584,11 +1515,7 @@ class GuiController:
                     if callable(getattr(self.app, "show_qq_managed_auth_dialog", None))
                     else None
                 ),
-                result_sink=lambda result: setattr(
-                    self,
-                    "last_settings_mutation_result",
-                    result,
-                ),
+                result_sink=self._get_settings_application_owner().results.set,
                 log_basic=self.log_basic,
                 log_detailed=self.log_detailed,
                 log_error=self._log_error,
@@ -1687,11 +1614,7 @@ class GuiController:
             owner = compose_github_star_prompt_owner(
                 settings=self._get_settings_owner(),
                 managed_remaining_percent=lambda: self._get_managed_usage_owner().remaining_percent,
-                transaction_result_sink=lambda result: setattr(
-                    self,
-                    "last_settings_mutation_result",
-                    result,
-                ),
+                transaction_result_sink=self._get_settings_application_owner().results.set,
                 save_failure_sink=self._log_github_star_prompt_save_failure,
                 runtime_diagnostics_sink=self._github_star_prompt_runtime_diagnostics_sink,
                 mutation_service_provider=lambda: self.settings_mutation_service,
@@ -1764,9 +1687,7 @@ class GuiController:
 
         async def _persist(updated: AppSettings) -> bool:
             await self.apply_settings(updated)
-            return self.last_settings_mutation_result is not None and _settings_mutation_committed(
-                self.last_settings_mutation_result
-            )
+            return self._get_settings_application_owner().results.committed()
 
         return await self._get_telemetry_service().record_translation_success_day(
             self.settings,
@@ -2066,26 +1987,6 @@ class GuiController:
             )
         )
         return self_changed or peer_changed
-
-    async def _compensate_failed_local_asr_settings_apply(
-        self,
-        *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
-    ) -> None:
-        self._get_settings_owner().apply_legacy_delta(
-            committed_settings,
-            base_settings,
-        )
-        await asyncio.to_thread(self._get_settings_owner().persist)
-        self._get_settings_owner().remember_projection(base_settings)
-        await self._apply_settings_direct(
-            copy.deepcopy(base_settings),
-            persist=False,
-            strict_runtime_errors=False,
-        )
-        self.settings = copy.deepcopy(base_settings)
-        self.refresh_settings_projection(preserve_custom_vocab_draft=True)
 
     def _is_qwen_llm(self, settings: object) -> bool:
         # Boundary accessor used by the app-service runtime-apply adapters to
@@ -2557,10 +2458,13 @@ class GuiController:
         desktop_settings.position.x = bounds["x"]
         desktop_settings.position.y = bounds["y"]
         desktop_settings.position.validate()
-        routed = await self._apply_overlay_osc_output_settings_via_mutation_service(next_settings)
-        if not routed or self.last_settings_mutation_result is None:
+        routed = await self._get_settings_application_owner().apply_overlay_osc_output(
+            next_settings
+        )
+        result = self._get_settings_application_owner().results.current
+        if not routed or result is None:
             return
-        if not _settings_mutation_committed(self.last_settings_mutation_result):
+        if not _settings_mutation_committed(result):
             return
         self.log_detailed(
             "[DesktopOverlay][Bounds] persisted "
@@ -2592,11 +2496,11 @@ class GuiController:
         desktop_settings.position.x = None
         desktop_settings.position.y = None
         desktop_settings.validate()
-        routed = await self._apply_overlay_osc_output_settings_via_mutation_service(next_settings)
-        if routed and (
-            self.last_settings_mutation_result is None
-            or not _settings_mutation_committed(self.last_settings_mutation_result)
-        ):
+        routed = await self._get_settings_application_owner().apply_overlay_osc_output(
+            next_settings
+        )
+        result = self._get_settings_application_owner().results.current
+        if routed and (result is None or not _settings_mutation_committed(result)):
             return
         if self.settings is not None:
             self.settings.overlay.desktop_flet.locked = False
@@ -3259,7 +3163,7 @@ class GuiController:
             return
         next_settings = copy.deepcopy(self.settings)
         next_settings.overlay.calibration = calibration.copy()
-        await self._apply_overlay_osc_output_settings_via_mutation_service(next_settings)
+        await self._get_settings_application_owner().apply_overlay_osc_output(next_settings)
 
     def cancel_overlay_calibration(self) -> OverlayCalibration:
         return self._get_overlay_calibration_owner().cancel()
@@ -3312,7 +3216,9 @@ class GuiController:
         return await self._get_translation_enable_owner().set_enabled(enabled)
 
     async def set_stt_enabled(self, enabled: bool, *, force_immediate: bool = False) -> None:
-        if enabled and not self._persist_current_manual_local_asr_fallback(channel="self"):
+        if enabled and not self._get_settings_application_owner().persist_manual_fallback(
+            channel="self"
+        ):
             self.app.set_dashboard_stt_enabled(False)
             return
         self.log_basic(f"[STT] Toggle request: enabled={enabled}")
@@ -3391,81 +3297,6 @@ class GuiController:
             self.app.show_message(message_key, **message_kwargs)
         except Exception:
             self._log_error(self.app.localize(message_key, **message_kwargs))
-
-    def _manual_local_asr_fallback_state(
-        self,
-        settings: AppSettings,
-    ) -> ManualLocalASRFallbackState:
-        cpu_auto_requested = (
-            settings.provider.stt == STTProviderName.LOCAL_CPU_AUTO
-            or settings.provider.peer_stt == STTProviderName.LOCAL_CPU_AUTO
-        )
-        cpu_auto_available = True
-        if cpu_auto_requested:
-            cpu_auto_available = (
-                self._get_local_asr_provisioning_owner().snapshot.cpu_auto_available
-            )
-        return ManualLocalASRFallbackState(
-            self_provider=settings.provider.stt.value,
-            peer_provider=settings.provider.peer_stt.value,
-            self_source_language=settings.languages.source_language,
-            peer_source_language=settings.languages.effective_peer_source,
-            cpu_auto_available=cpu_auto_available,
-        )
-
-    @staticmethod
-    def _settings_with_manual_local_asr_fallback_plan(
-        settings: AppSettings,
-        plan: ManualLocalASRFallbackPlan,
-    ) -> AppSettings:
-        normalized = copy.deepcopy(settings)
-        normalized.provider.stt = STTProviderName(plan.self_provider)
-        normalized.provider.peer_stt = STTProviderName(plan.peer_provider)
-        return normalized
-
-    def _notify_manual_local_asr_fallback(
-        self,
-        channels: tuple[str, ...],
-        *,
-        installation_fallback: bool = False,
-    ) -> None:
-        if not channels:
-            return
-        self._show_short_message(
-            "local_stt.installation_fallback_qwen"
-            if installation_fallback
-            else "local_stt.language_fallback_qwen"
-        )
-
-    def _persist_current_manual_local_asr_fallback(self, *, channel: str | None = None) -> bool:
-        if self.settings is None:
-            return False
-        previous = self.settings
-        plan = self.manual_local_asr_fallback_owner.plan(
-            self._manual_local_asr_fallback_state(previous),
-            channel=channel,
-        )
-        if not plan.changed:
-            return True
-        normalized = self._settings_with_manual_local_asr_fallback_plan(
-            previous,
-            plan,
-        )
-        self.settings = normalized
-        if self._save_settings() is False:
-            self.settings = previous
-            return False
-        self._sync_ui_from_settings()
-        self._notify_manual_local_asr_fallback(
-            plan.fallback_channels,
-            installation_fallback=plan.installation_fallback,
-        )
-        self._log_manual_local_asr_fallbacks(
-            previous,
-            normalized,
-            plan.fallback_channels,
-        )
-        return True
 
     def _log_manual_local_asr_fallbacks(
         self,
@@ -3656,7 +3487,7 @@ class GuiController:
                 rebuild_self_provider=self._rebuild_stt_provider,
                 probe_self_provider=probe_self_provider,
                 persist_manual_fallback=lambda channel: (
-                    self._persist_current_manual_local_asr_fallback(channel=channel)
+                    self._get_settings_application_owner().persist_manual_fallback(channel=channel)
                 ),
                 validate_gpu_activation=self._validate_gpu_activation,
                 gpu_state_provider=lambda: (
@@ -3931,28 +3762,7 @@ class GuiController:
         self,
         change: LanguageSelectionChange,
     ) -> None:
-        if self.settings is None:
-            return
-
-        updated = copy.deepcopy(self.settings)
-        updated.languages.source_language = change.source_code
-        updated.languages.target_language = change.target_code
-        updated.languages.peer_source_mode = change.peer_source_mode
-        updated.languages.peer_source_language = change.peer_source_code
-        updated.languages.peer_target_language = change.peer_target_code
-        updated.languages.recent_source_languages = list(change.recent_source_codes)
-        updated.languages.recent_target_languages = list(change.recent_target_codes)
-        self._get_settings_owner().begin(
-            legacy_snapshot=self._get_settings_owner().projection_snapshot or self.settings
-        )
-        self._capture_runtime_signatures_before_canonical_mutation()
-        self._get_settings_owner().apply_legacy_delta(self.settings, updated)
-        try:
-            await self.apply_settings(updated)
-            if self.settings is not None:
-                self.refresh_settings_projection(preserve_custom_vocab_draft=True)
-        finally:
-            self._get_settings_owner().complete()
+        await self._get_settings_application_owner().apply_language_selection(change)
 
     def _settings_projection(self) -> SettingsProjectionOwner:
         owner = self._settings_projection_owner
@@ -3963,6 +3773,37 @@ class GuiController:
                 current_settings=lambda: self.settings,
             )
             self._settings_projection_owner = owner
+        return owner
+
+    def _get_settings_application_owner(self) -> SettingsApplicationOwner:
+        owner = self._settings_application_owner
+        if owner is None:
+            owner = SettingsApplicationOwner(
+                settings=self._get_settings_owner(),
+                projection=self._settings_projection(),
+                runtime_effects=SettingsRuntimeEffectsAdapter(self),
+                manual_fallback=self.manual_local_asr_fallback_owner,
+                cpu_auto_available=lambda: (
+                    self._get_local_asr_provisioning_owner().snapshot.cpu_auto_available
+                ),
+                inspect_cpu=self._get_local_asr_provisioning_owner().inspect_cpu,
+                fallback_sink=lambda channels, installation_fallback: (
+                    self._show_short_message(
+                        "local_stt.installation_fallback_qwen"
+                        if installation_fallback
+                        else "local_stt.language_fallback_qwen"
+                    )
+                    if channels
+                    else None
+                ),
+                sync_ui=self._sync_ui_from_settings,
+                fallback_log_sink=self._log_manual_local_asr_fallbacks,
+                mutation_service_provider=lambda: self.settings_mutation_service,
+                consume_superseded_settings=self._consume_superseded_local_asr_settings,
+                active_local_asr_change=self._active_local_asr_change,
+                failure_sink=self._log_error,
+            )
+            self._settings_application_owner = owner
         return owner
 
     def capture_settings_view_change(
@@ -3998,922 +3839,14 @@ class GuiController:
             return False
         return bool(self._settings_projection().refresh_after_openrouter_pkce_success(settings))
 
-    def _sync_memory_runtime_fields_from_settings(self, settings: AppSettings) -> None:
-        restored_settings = copy.deepcopy(settings)
-        self.settings = restored_settings
-        self._sync_overlay_calibration_cache(restored_settings)
-        if self.hub is not None:
-            self.hub.source_language = restored_settings.languages.source_language
-            self.hub.target_language = restored_settings.languages.target_language
-            self.hub.peer_source_language = restored_settings.languages.peer_source_language
-            self.hub.peer_target_language = restored_settings.languages.peer_target_language
-            self.hub.system_prompt = restored_settings.system_prompt
-            self.hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            self.hub.low_latency_merge_gap_ms = restored_settings.stt.low_latency_merge_gap_ms
-            self.hub.low_latency_spec_retry_max = restored_settings.stt.low_latency_spec_retry_max
-            self.hub.hangover_s = (
-                restored_settings.stt.low_latency_vad_hangover_ms / 1000.0
-                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-                else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
-            )
-            self.hub.peer_hangover_s = restored_settings.desktop_audio.vad_hangover_ms / 1000.0
-            self.hub.chatbox_include_source = restored_settings.osc.chatbox_include_source
-            self._sync_effective_hub_flags(restored_settings)
-        self._sync_signature_caches(restored_settings)
-
-    async def _resync_committed_order22_settings_after_strict_save_failure(
-        self,
-        *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
-    ) -> None:
-        self._sync_memory_runtime_fields_from_settings(base_settings)
-        try:
-            await self._apply_settings_direct(
-                copy.deepcopy(committed_settings),
-                persist=False,
-                strict_runtime_errors=True,
-            )
-        except Exception:
-            self._log_error("Failed to resync committed order22 settings runtime")
-            self._sync_memory_runtime_fields_from_settings(committed_settings)
-
-    async def _resync_committed_order22_provider_runtime_after_strict_save_failure(
-        self,
-        *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
-        plan: ProviderRuntimeApplyPlan,
-    ) -> None:
-        self._sync_memory_runtime_fields_from_settings(base_settings)
-        try:
-            await self._get_provider_runtime_owner().apply(
-                copy.deepcopy(committed_settings),
-                plan,
-            )
-        except Exception:
-            self._log_error("Failed to resync committed order22 provider runtime")
-            self._sync_memory_runtime_fields_from_settings(committed_settings)
-
-    async def _resync_committed_order23_settings_after_strict_save_failure(
-        self,
-        *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
-    ) -> None:
-        self._sync_memory_runtime_fields_from_settings(base_settings)
-        try:
-            await self._apply_settings_direct(
-                copy.deepcopy(committed_settings),
-                persist=False,
-                strict_runtime_errors=True,
-            )
-        except Exception:
-            self._log_error("Failed to resync committed order23 settings runtime")
-            self._sync_memory_runtime_fields_from_settings(committed_settings)
-
-    async def _resync_committed_order24_settings_after_strict_save_failure(
-        self,
-        *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
-    ) -> None:
-        self._sync_memory_runtime_fields_from_settings(base_settings)
-        try:
-            await self._apply_settings_direct(
-                copy.deepcopy(committed_settings),
-                persist=False,
-                strict_runtime_errors=True,
-            )
-        except Exception:
-            self._log_error("Failed to resync committed order24 settings runtime")
-            self._sync_memory_runtime_fields_from_settings(committed_settings)
-
     async def apply_settings(self, settings: AppSettings) -> None:
-        owner = self._get_settings_owner()
-        if self.settings is not None:
-            owner.normalize_compatibility(self.settings)
-        owner.normalize_compatibility(settings)
-        fallback_channels: tuple[str, ...] = ()
-        installation_fallback = False
-        normalization_channels = self.manual_local_asr_fallback_owner.normalization_channels(
-            current=(
-                self._manual_local_asr_fallback_state(self.settings)
-                if self.settings is not None
-                else None
-            ),
-            pending=self._manual_local_asr_fallback_state(settings),
-        )
-        if normalization_channels:
-            await self._get_local_asr_provisioning_owner().inspect_cpu()
-            fallback_plan = self.manual_local_asr_fallback_owner.plan(
-                self._manual_local_asr_fallback_state(settings)
-            )
-            fallback_channels = tuple(
-                channel
-                for channel in fallback_plan.fallback_channels
-                if channel in normalization_channels
-            )
-            if fallback_channels:
-                settings = self._settings_with_manual_local_asr_fallback_plan(
-                    settings,
-                    ManualLocalASRFallbackPlan(
-                        self_provider=(
-                            fallback_plan.self_provider
-                            if "self" in fallback_channels
-                            else settings.provider.stt.value
-                        ),
-                        peer_provider=(
-                            fallback_plan.peer_provider
-                            if "peer" in fallback_channels
-                            else settings.provider.peer_stt.value
-                        ),
-                        fallback_channels=fallback_channels,
-                        installation_fallback=bool(
-                            fallback_plan.installation_fallback and fallback_channels
-                        ),
-                    ),
-                )
-            installation_fallback = bool(fallback_plan.installation_fallback and fallback_channels)
-        if settings is not self.settings:
-            routed = await self._apply_order22_order23_order24_settings_via_mutation_services(
-                settings
-            )
-            if routed:
-                self._notify_manual_local_asr_fallback(
-                    fallback_channels,
-                    installation_fallback=installation_fallback,
-                )
-                return
-            routed = await self._apply_stt_language_audio_settings_via_mutation_service(settings)
-            if routed:
-                self._notify_manual_local_asr_fallback(
-                    fallback_channels,
-                    installation_fallback=installation_fallback,
-                )
-                return
-            routed = await self._apply_overlay_osc_output_settings_via_mutation_service(settings)
-            if routed:
-                self._notify_manual_local_asr_fallback(
-                    fallback_channels,
-                    installation_fallback=installation_fallback,
-                )
-                return
-            routed = await self._apply_ui_prompt_clipboard_state_settings_via_mutation_service(
-                settings
-            )
-            if routed:
-                self._notify_manual_local_asr_fallback(
-                    fallback_channels,
-                    installation_fallback=installation_fallback,
-                )
-                return
-        await self._apply_settings_direct(settings)
-        self._notify_manual_local_asr_fallback(
-            fallback_channels,
-            installation_fallback=installation_fallback,
-        )
+        await self._get_settings_application_owner().apply(settings)
 
     async def apply_telemetry_consent(self, consent: str) -> AppSettings | None:
         if self.settings is None:
             return None
         await self.apply_settings(with_telemetry_consent(self.settings, consent))
         return self.settings
-
-    async def _apply_settings_direct(
-        self,
-        settings: AppSettings,
-        *,
-        persist: bool = True,
-        strict_runtime_errors: bool = False,
-        strict_persistence_errors: bool = False,
-        reload_settings_view: bool = True,
-    ) -> None:
-        await self._preserve_github_star_prompt_observation_before_settings_replace(settings)
-        if persist:
-            self._get_settings_owner().begin(
-                legacy_snapshot=self._get_settings_owner().projection_snapshot or self.settings
-            )
-            self._capture_runtime_signatures_before_canonical_mutation()
-            self._get_settings_owner().apply_legacy_delta(
-                self._get_settings_owner().projection_snapshot or self.settings,
-                settings,
-            )
-
-        def _effective_peer_language(language: str, peer_language: str) -> str:
-            return peer_language or language
-
-        prev_microphone_test_audio_signature = (
-            self._last_microphone_test_audio_settings_signature
-            or self._microphone_test_audio_settings_signature(self.settings)
-        )
-        next_microphone_test_audio_signature = self._microphone_test_audio_settings_signature(
-            settings
-        )
-        if (
-            prev_microphone_test_audio_signature is not None
-            and prev_microphone_test_audio_signature != next_microphone_test_audio_signature
-        ):
-            await self.stop_microphone_test_for_audio_settings_change()
-
-        prev_locale = self.app.current_locale()
-        prev_overlay_enabled = (
-            self.settings.ui.overlay_enabled if self.settings is not None else False
-        )
-        previous_settings_for_desktop = (
-            copy.deepcopy(self.settings) if self.settings is not None else None
-        )
-        prev_settings_overlay_target = self._overlay_target_for_settings(self.settings)
-        next_overlay_target = self._overlay_target_for_settings(settings)
-        if self._get_overlay_application_owner().fallback_owner.active:
-            # Session fallback keeps settings on SteamVR while runtime is desktop.
-            # Compare settings targets so unrelated applies do not look like a switch.
-            prev_overlay_target = prev_settings_overlay_target
-        else:
-            prev_overlay_target = self._previous_overlay_target_for_apply()
-        if next_overlay_target == OVERLAY_TARGET_DESKTOP:
-            self._clear_overlay_session_desktop_fallback()
-        if (
-            prev_overlay_target != next_overlay_target
-            and prev_overlay_enabled
-            and settings.ui.overlay_enabled
-            and self._overlay_runtime_is_active()
-        ):
-            self.log_basic(
-                "[Overlay] Target changed while running; stopping current overlay before switch"
-            )
-            settings = copy.deepcopy(settings)
-            settings.ui.overlay_enabled = False
-            self._clear_overlay_session_desktop_fallback()
-        desktop_runtime_controls = self._prepare_desktop_runtime_settings_update(
-            previous_settings_for_desktop,
-            settings,
-        )
-        prev_peer_translation_enabled = (
-            self._last_peer_translation_enabled
-            if self._last_peer_translation_enabled is not None
-            else (self.settings.ui.peer_translation_enabled if self.settings is not None else False)
-        )
-        prev_peer_activation_requested = (
-            self._last_peer_translation_activation_requested
-            if self._last_peer_translation_activation_requested is not None
-            else (
-                self._peer_translation_activation_requested_for(self.settings)
-                if self.settings is not None
-                else False
-            )
-        )
-        prev_self_signature = (
-            self._last_self_stt_runtime_signature or self._last_stt_runtime_signature
-        )
-        prev_peer_signature = self._last_peer_stt_runtime_signature
-        # hub.source_language를 기준으로 비교 (settings 객체는 이미 수정되어 전달될 수 있음)
-        prev_source_lang = self.hub.source_language if self.hub else None
-        prev_target_lang = self.hub.target_language if self.hub else None
-        prev_peer_source_lang = (
-            getattr(self.hub, "peer_source_language", None) if self.hub else None
-        )
-        prev_peer_target_lang = (
-            getattr(self.hub, "peer_target_language", None) if self.hub else None
-        )
-        prev_peer_source_mode = (
-            previous_settings_for_desktop.languages.peer_source_mode
-            if previous_settings_for_desktop is not None
-            else None
-        )
-        prev_effective_peer_source = (
-            _effective_peer_language(prev_source_lang, prev_peer_source_lang)
-            if prev_source_lang is not None and prev_peer_source_lang is not None
-            else None
-        )
-        prev_effective_peer_target = (
-            _effective_peer_language(prev_target_lang, prev_peer_target_lang)
-            if prev_target_lang is not None and prev_peer_target_lang is not None
-            else None
-        )
-        source_language_changed = (
-            prev_source_lang is not None and prev_source_lang != settings.languages.source_language
-        )
-        target_language_changed = (
-            prev_target_lang is not None and prev_target_lang != settings.languages.target_language
-        )
-        effective_peer_source_changed = (
-            prev_effective_peer_source is not None
-            and prev_effective_peer_source
-            != _effective_peer_language(
-                settings.languages.source_language,
-                settings.languages.peer_source_language,
-            )
-        )
-        effective_peer_target_changed = (
-            prev_effective_peer_target is not None
-            and prev_effective_peer_target
-            != _effective_peer_language(
-                settings.languages.target_language,
-                settings.languages.peer_target_language,
-            )
-        )
-        peer_source_language_changed = (
-            prev_peer_source_lang is not None
-            and prev_peer_source_lang != settings.languages.peer_source_language
-        )
-        peer_target_language_changed = (
-            prev_peer_target_lang is not None
-            and prev_peer_target_lang != settings.languages.peer_target_language
-        )
-        peer_source_mode_changed = (
-            prev_peer_source_mode is not None
-            and prev_peer_source_mode != settings.languages.peer_source_mode
-        )
-        if source_language_changed or target_language_changed:
-            presenter = self._current_overlay_presenter_for_direct_runtime_command()
-            bridge = self._current_overlay_bridge_for_direct_runtime_command()
-            self.log_basic(
-                "[Settings] Applying languages: "
-                f"source={prev_source_lang}->{settings.languages.source_language} "
-                f"target={prev_target_lang}->{settings.languages.target_language}"
-            )
-            self.log_detailed(
-                "[Settings] Language apply detail: "
-                f"overlay_state={self.overlay_state} "
-                f"presenter_attached={presenter is not None} "
-                f"bridge_attached={bridge is not None} "
-                "overlay_sink_matches_presenter="
-                f"{self.hub is not None and presenter is not None and getattr(self.hub, 'overlay_sink', None) is presenter}"
-            )
-        self.settings = settings
-        self._last_microphone_test_audio_settings_signature = next_microphone_test_audio_signature
-        self._sync_overlay_calibration_cache(settings)
-        self._sync_desktop_overlay_interaction_mode_from_settings(settings)
-        if persist:
-            if strict_persistence_errors:
-                try:
-                    self._get_settings_owner().persist()
-                except Exception:
-                    self._get_settings_owner().rollback()
-                    raise _StrictSettingsSaveFailed from None
-                else:
-                    self._get_settings_owner().remember_projection(self.settings)
-            else:
-                if self._save_settings() is False:
-                    return
-        await self._broadcast_desktop_runtime_control_payloads(desktop_runtime_controls)
-        await self._sync_clipboard_watcher_with_policy(
-            strict_runtime_errors=strict_runtime_errors,
-        )
-        provisioning = self._get_local_asr_provisioning_owner()
-        await provisioning.inspect_cpu()
-        await provisioning.inspect_gpu(
-            explicit_intent=self._gpu_runtime_interaction_state().selected_provider_requires_model,
-        )
-        self._clear_local_stt_pending_enable_if_provider_switched_away()
-
-        if self.hub is not None:
-            self.hub.source_language = settings.languages.source_language
-            self.hub.target_language = settings.languages.target_language
-            self.hub.peer_source_language = settings.languages.peer_source_language
-            self.hub.peer_target_language = settings.languages.peer_target_language
-            self.hub.system_prompt = settings.system_prompt
-            self.hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            self.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
-            self.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-            self.hub.hangover_s = (
-                settings.stt.low_latency_vad_hangover_ms / 1000.0
-                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-                else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
-            )
-            self.hub.peer_hangover_s = settings.desktop_audio.vad_hangover_ms / 1000.0
-            self.hub.chatbox_include_source = settings.osc.chatbox_include_source
-            self._sync_effective_hub_flags(settings)
-
-            async def _clear_language_runtime_state(channel: str) -> None:
-                try:
-                    await self.hub.clear_language_runtime_state(channel=channel)
-                except Exception as exc:
-                    if strict_runtime_errors:
-                        self._log_error(f"Failed to clear language runtime state for {channel}")
-                    else:
-                        self._log_error(
-                            f"Failed to clear language runtime state for {channel}: {exc}"
-                        )
-                    if strict_runtime_errors:
-                        raise
-
-            if source_language_changed or target_language_changed:
-                await _clear_language_runtime_state("self")
-            if effective_peer_source_changed or effective_peer_target_changed:
-                await _clear_language_runtime_state("peer")
-
-        presenter = self._current_overlay_presenter_for_direct_runtime_command()
-        if presenter is not None:
-            await presenter.update_display_preferences(
-                show_translation=settings.overlay.show_translation,
-                show_peer_original=settings.overlay.show_peer_original,
-            )
-
-        if prev_overlay_enabled != settings.ui.overlay_enabled:
-            await self.set_overlay_enabled(settings.ui.overlay_enabled)
-
-        if self._last_vrc_mic_sync_enabled != settings.osc.vrc_mic_intercept:
-            if self.vrc_mic_audio_gate is not None:
-                self.vrc_mic_audio_gate.set_enabled(settings.osc.vrc_mic_intercept)
-            self.log_detailed(f"[Settings] VRC mic sync enabled: {settings.osc.vrc_mic_intercept}")
-            await self._configure_vrc_mic_receiver(enabled=settings.osc.vrc_mic_intercept)
-
-        current_self_signature = build_self_stt_runtime_signature(settings)
-        current_peer_signature = build_peer_stt_runtime_signature(
-            settings,
-            canonical_settings=self._canonical_vnext_settings_for(settings),
-        )
-        next_peer_activation_requested = self._peer_translation_activation_requested_for(settings)
-        should_restart_stt = (
-            prev_self_signature is not None and current_self_signature != prev_self_signature
-        )
-        should_refresh_peer = (
-            prev_peer_signature is None
-            or current_peer_signature != prev_peer_signature
-            or prev_peer_translation_enabled != settings.ui.peer_translation_enabled
-            or prev_peer_activation_requested != next_peer_activation_requested
-        )
-
-        self._sync_signature_caches(settings)
-
-        if source_language_changed or target_language_changed:
-            self.log_detailed(
-                "[Settings] Language runtime impact: "
-                f"should_restart_stt={should_restart_stt} "
-                f"should_refresh_peer={should_refresh_peer} "
-                f"prev_overlay_enabled={prev_overlay_enabled} "
-                f"next_overlay_enabled={settings.ui.overlay_enabled}"
-            )
-
-        if should_refresh_peer and self.hub is not None:
-            await self._refresh_peer_stt_runtime()
-            self._sync_effective_hub_flags(settings)
-
-        if should_restart_stt:
-            smooth_local = bool(
-                previous_settings_for_desktop is not None
-                and build_self_capture_vad_signature(previous_settings_for_desktop)
-                == build_self_capture_vad_signature(settings)
-            )
-            await self._apply_stt_runtime_replacement(smooth_local=smooth_local)
-
-        if reload_settings_view and (
-            source_language_changed
-            or target_language_changed
-            or peer_source_language_changed
-            or peer_target_language_changed
-            or peer_source_mode_changed
-        ):
-            self._settings_projection().render(
-                settings,
-                preserve_custom_vocab_draft=True,
-            )
-
-        if prev_locale != settings.ui.locale:
-            self.app.set_locale(settings.ui.locale)
-            try:
-                self.app.apply_locale()
-            except Exception:
-                self._log_error("Failed to apply locale")
-                if strict_runtime_errors:
-                    raise
-
-        self._refresh_overlay_peer_consumers()
-        self._settings_projection().remember_all(self.settings)
-        if persist:
-            self._get_settings_owner().complete()
-
-    async def _apply_order22_order23_order24_settings_via_mutation_services(
-        self,
-        next_settings: AppSettings,
-    ) -> bool:
-        projection = self._settings_projection()
-        order22_base_and_patch = projection.order22_patch_base_and_values(next_settings)
-        order23_base_and_patch = projection.order23_patch_base_and_values(next_settings)
-        order24_base_and_patch = projection.order24_patch_base_and_values(next_settings)
-        if (
-            order22_base_and_patch is None
-            or order23_base_and_patch is None
-            or order24_base_and_patch is None
-        ):
-            return False
-        _order22_base_settings, order22_patch_values = order22_base_and_patch
-        _order23_base_settings, order23_patch_values = order23_base_and_patch
-        _order24_base_settings, order24_patch_values = order24_base_and_patch
-        patch_count = sum(
-            1
-            for patch_values in (
-                order22_patch_values,
-                order23_patch_values,
-                order24_patch_values,
-            )
-            if patch_values
-        )
-        if patch_count < 2:
-            return False
-
-        committed_results: list[TransactionResult] = []
-
-        async def _route_patch_only(
-            patch_values: dict[str, object],
-            route,
-            *,
-            route_stt: bool = False,
-            reload_settings_view: bool = True,
-            runtime_only_source: AppSettings | None = None,
-        ) -> bool:
-            if self.settings is None:
-                return False
-            patch_only_settings = copy.deepcopy(self.settings)
-            _apply_settings_path_patch(patch_only_settings, patch_values)
-            if runtime_only_source is not None:
-                _copy_runtime_only_ui_state(runtime_only_source, patch_only_settings)
-            if route_stt:
-                routed = await route(
-                    patch_only_settings,
-                    reload_settings_view=reload_settings_view,
-                )
-            else:
-                routed = await route(patch_only_settings)
-            if not routed:
-                return False
-            result = self.last_settings_mutation_result
-            if result is None or not _settings_mutation_committed(result):
-                return True
-            committed_results.append(result)
-            return True
-
-        if order22_patch_values:
-            routed_order22 = await _route_patch_only(
-                order22_patch_values,
-                self._apply_stt_language_audio_settings_via_mutation_service,
-                route_stt=True,
-                reload_settings_view=False,
-            )
-            if not routed_order22:
-                return False
-            if self.last_settings_mutation_result is None or not _settings_mutation_committed(
-                self.last_settings_mutation_result,
-            ):
-                return True
-
-        if order23_patch_values:
-            routed_order23 = await _route_patch_only(
-                order23_patch_values,
-                self._apply_overlay_osc_output_settings_via_mutation_service,
-            )
-            if not routed_order23:
-                return False
-            if self.last_settings_mutation_result is None or not _settings_mutation_committed(
-                self.last_settings_mutation_result,
-            ):
-                return True
-
-        if order24_patch_values:
-            routed_order24 = await _route_patch_only(
-                order24_patch_values,
-                self._apply_ui_prompt_clipboard_state_settings_via_mutation_service,
-                runtime_only_source=next_settings,
-            )
-            if not routed_order24:
-                return False
-            if self.last_settings_mutation_result is None or not _settings_mutation_committed(
-                self.last_settings_mutation_result,
-            ):
-                return True
-
-        committed_settings_before_full_draft = (
-            copy.deepcopy(self.settings) if self.settings is not None else None
-        )
-        if self.settings is not None and self._get_settings_owner().legacy_snapshot_values(
-            self.settings
-        ) != self._get_settings_owner().legacy_snapshot_values(next_settings):
-            try:
-                await self._apply_settings_direct(
-                    next_settings,
-                    strict_runtime_errors=True,
-                    strict_persistence_errors=True,
-                )
-            except _StrictSettingsSaveFailed:
-                if committed_settings_before_full_draft is not None:
-                    await self._resync_committed_order24_settings_after_strict_save_failure(
-                        base_settings=committed_settings_before_full_draft,
-                        committed_settings=committed_settings_before_full_draft,
-                    )
-                self.last_settings_mutation_result = (
-                    _ui_prompt_clipboard_state_save_failed_transaction_result(
-                        operation="apply_order22_order23_order24_full_draft_save"
-                    )
-                )
-            except Exception:
-                self.last_settings_mutation_result = (
-                    _ui_prompt_clipboard_state_runtime_degraded_transaction_result()
-                )
-
-        if self.settings is not None:
-            self.refresh_settings_projection(preserve_custom_vocab_draft=True)
-
-        if (
-            self.last_settings_mutation_result is not None
-            and self.last_settings_mutation_result.status
-            == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-        ):
-            degraded_result = next(
-                (
-                    result
-                    for result in committed_results
-                    if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-                ),
-                None,
-            )
-            if degraded_result is not None:
-                self.last_settings_mutation_result = degraded_result
-        return True
-
-    async def _apply_stt_language_audio_settings_via_mutation_service(
-        self,
-        next_settings: AppSettings,
-        *,
-        reload_settings_view: bool = True,
-    ) -> bool:
-        base_and_patch = self._settings_projection().order22_patch_base_and_values(next_settings)
-        if base_and_patch is None:
-            return False
-        base_settings, patch_values = base_and_patch
-        if not patch_values:
-            return False
-
-        committed_settings = copy.deepcopy(base_settings)
-        _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self._get_settings_owner().legacy_snapshot_values(
-            committed_settings
-        ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
-        repository = self._legacy_settings_patch_repository(
-            base_settings=base_settings,
-            committed_settings=committed_settings,
-            surface="stt_language_audio",
-        )
-        runtime_apply = (
-            NoopRuntimeApply()
-            if has_out_of_scope_draft
-            else SttLanguageAudioRuntimeApplyAdapter(
-                apply_settings=self._apply_settings_runtime_effect,
-                state_provider=self._settings_runtime_state,
-                settings=committed_settings,
-                reload_settings_view=reload_settings_view,
-            )
-        )
-        command = SttLanguageAudioSettingsMutation(values=patch_values)
-        service = self.settings_mutation_service or SettingsMutationService(
-            settings_repository=repository,
-            runtime_apply=runtime_apply,
-            validator=settings_path_mutation_validator_for_command(command),
-        )
-        request = command.to_mutation_request(
-            expected_revision=None,
-            correlation_id=None,
-        )
-
-        result = await service.mutate(request)
-        self._get_settings_owner().complete()
-        self.last_settings_mutation_result = result
-        if not _settings_mutation_committed(result):
-            self.settings = copy.deepcopy(base_settings)
-            self._settings_projection().remember_order22(self.settings)
-            return True
-        if id(committed_settings) in self._superseded_local_asr_settings_ids:
-            self._superseded_local_asr_settings_ids.discard(id(committed_settings))
-            self._settings_projection().remember_order22(self.settings)
-            return True
-        if (
-            not has_out_of_scope_draft
-            and result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-            and self._active_local_asr_change(base_settings, committed_settings)
-        ):
-            try:
-                await self._compensate_failed_local_asr_settings_apply(
-                    base_settings=base_settings,
-                    committed_settings=committed_settings,
-                )
-            except Exception:
-                self._log_error("Failed to compensate local ASR settings apply")
-            self._settings_projection().remember_order22(self.settings)
-            return True
-
-        if has_out_of_scope_draft:
-            try:
-                await self._apply_settings_direct(
-                    next_settings,
-                    strict_runtime_errors=True,
-                    strict_persistence_errors=True,
-                    reload_settings_view=reload_settings_view,
-                )
-            except _StrictSettingsSaveFailed:
-                await self._resync_committed_order22_settings_after_strict_save_failure(
-                    base_settings=base_settings,
-                    committed_settings=committed_settings,
-                )
-                self.last_settings_mutation_result = (
-                    _stt_language_audio_save_failed_transaction_result(
-                        operation="apply_stt_language_audio_full_draft_save"
-                    )
-                )
-            except Exception:
-                self.last_settings_mutation_result = (
-                    _stt_language_audio_runtime_degraded_transaction_result()
-                )
-            else:
-                unavailable_result = _stt_language_audio_runtime_unavailable_result(
-                    state=self._settings_runtime_state(next_settings),
-                    settings=next_settings,
-                )
-                if unavailable_result is not None:
-                    self.last_settings_mutation_result = (
-                        _runtime_apply_result_as_degraded_transaction(unavailable_result)
-                    )
-        else:
-            self.settings = committed_settings
-            if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                self._sync_signature_caches(committed_settings)
-        self._settings_projection().remember_order22(self.settings)
-        return True
-
-    async def _apply_overlay_osc_output_settings_via_mutation_service(
-        self,
-        next_settings: AppSettings,
-    ) -> bool:
-        base_and_patch = self._settings_projection().order23_patch_base_and_values(next_settings)
-        if base_and_patch is None:
-            return False
-        base_settings, patch_values = base_and_patch
-        if not patch_values:
-            return False
-
-        next_settings = copy.deepcopy(next_settings)
-        await self._apply_desktop_size_preset_persistence_adjustment(
-            base_settings,
-            next_settings,
-        )
-        patch_values = build_overlay_osc_output_settings_path_patch(
-            base_settings,
-            next_settings,
-        )
-        committed_settings = copy.deepcopy(base_settings)
-        _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self._get_settings_owner().legacy_snapshot_values(
-            committed_settings
-        ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
-        repository = self._legacy_settings_patch_repository(
-            base_settings=base_settings,
-            committed_settings=committed_settings,
-            surface="overlay_osc_output",
-        )
-        runtime_apply = (
-            NoopRuntimeApply()
-            if has_out_of_scope_draft
-            else OverlayOscOutputRuntimeApplyAdapter(
-                apply_settings=self._apply_settings_runtime_effect,
-                settings=committed_settings,
-            )
-        )
-        command = OverlayOscOutputSettingsMutation(values=patch_values)
-        service = self.settings_mutation_service or SettingsMutationService(
-            settings_repository=repository,
-            runtime_apply=runtime_apply,
-            validator=settings_path_mutation_validator_for_command(command),
-        )
-        request = command.to_mutation_request(
-            expected_revision=None,
-            correlation_id=None,
-        )
-
-        result = await service.mutate(request)
-        self._get_settings_owner().complete()
-        self.last_settings_mutation_result = result
-        if not _settings_mutation_committed(result):
-            self.settings = copy.deepcopy(base_settings)
-            self._settings_projection().remember_order23(self.settings)
-            return True
-
-        if has_out_of_scope_draft:
-            try:
-                await self._apply_settings_direct(
-                    next_settings,
-                    strict_runtime_errors=True,
-                    strict_persistence_errors=True,
-                )
-            except _StrictSettingsSaveFailed:
-                await self._resync_committed_order23_settings_after_strict_save_failure(
-                    base_settings=base_settings,
-                    committed_settings=committed_settings,
-                )
-                self.last_settings_mutation_result = (
-                    _overlay_osc_output_save_failed_transaction_result(
-                        operation="apply_overlay_osc_output_full_draft_save"
-                    )
-                )
-            except Exception:
-                self.last_settings_mutation_result = (
-                    _overlay_osc_output_runtime_degraded_transaction_result()
-                )
-        else:
-            if self.settings is None or self.settings is base_settings:
-                self.settings = committed_settings
-        self._settings_projection().remember_order23(self.settings)
-        return True
-
-    async def _mutate_order24_settings_patch(
-        self,
-        *,
-        patch_values: Mapping[str, object],
-        committed_settings: AppSettings,
-        runtime_apply,
-    ) -> TransactionResult:
-        repository = self._legacy_settings_patch_repository(
-            base_settings=self.settings or committed_settings,
-            committed_settings=committed_settings,
-            surface="ui_prompt_clipboard_state",
-        )
-        command = UiPromptClipboardStateSettingsMutation(values=patch_values)
-        service = self.settings_mutation_service or SettingsMutationService(
-            settings_repository=repository,
-            runtime_apply=runtime_apply,
-            validator=settings_path_mutation_validator_for_command(command),
-        )
-        request = command.to_mutation_request(
-            expected_revision=None,
-            correlation_id=None,
-        )
-        result = await service.mutate(request)
-        self._get_settings_owner().complete()
-        return result
-
-    async def _apply_ui_prompt_clipboard_state_settings_via_mutation_service(
-        self,
-        next_settings: AppSettings,
-    ) -> bool:
-        base_and_patch = self._settings_projection().order24_patch_base_and_values(next_settings)
-        if base_and_patch is None:
-            return False
-        base_settings, patch_values = base_and_patch
-        if not patch_values:
-            return False
-
-        committed_settings = copy.deepcopy(base_settings)
-        _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self._get_settings_owner().legacy_snapshot_values(
-            committed_settings
-        ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
-        runtime_settings = copy.deepcopy(next_settings)
-        runtime_apply = (
-            NoopRuntimeApply()
-            if has_out_of_scope_draft
-            else UiPromptClipboardStateRuntimeApplyAdapter(
-                apply_settings=self._apply_settings_runtime_effect,
-                settings=runtime_settings,
-            )
-        )
-
-        result = await self._mutate_order24_settings_patch(
-            patch_values=patch_values,
-            committed_settings=committed_settings,
-            runtime_apply=runtime_apply,
-        )
-        self.last_settings_mutation_result = result
-        if not _settings_mutation_committed(result):
-            self.settings = copy.deepcopy(base_settings)
-            self._settings_projection().remember_order24(self.settings)
-            return True
-
-        if has_out_of_scope_draft:
-            try:
-                await self._apply_settings_direct(
-                    next_settings,
-                    strict_runtime_errors=True,
-                    strict_persistence_errors=True,
-                )
-            except _StrictSettingsSaveFailed:
-                await self._resync_committed_order24_settings_after_strict_save_failure(
-                    base_settings=base_settings,
-                    committed_settings=committed_settings,
-                )
-                self.last_settings_mutation_result = (
-                    _ui_prompt_clipboard_state_save_failed_transaction_result(
-                        operation="apply_ui_prompt_clipboard_state_full_draft_save"
-                    )
-                )
-            except Exception:
-                self.last_settings_mutation_result = (
-                    _ui_prompt_clipboard_state_runtime_degraded_transaction_result()
-                )
-        else:
-            self.settings = runtime_settings
-            if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                self._sync_signature_caches(runtime_settings)
-        self._settings_projection().remember_order24(self.settings)
-        return True
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
         return await self._get_provider_credential_verification_owner().verify(provider, key)
@@ -4941,26 +3874,23 @@ class GuiController:
                 ),
                 sync_ui=self._sync_ui_from_settings,
                 order24_patch_provider=(self._settings_projection().order24_patch_base_and_values),
-                apply_order24=(self._apply_ui_prompt_clipboard_state_settings_via_mutation_service),
+                apply_order24=(
+                    self._get_settings_application_owner().apply_ui_prompt_clipboard_state
+                ),
                 remember_order22=self._settings_projection().remember_order22,
                 mutation_service_provider=lambda: self.settings_mutation_service,
-                persist_current_settings=self._save_settings,
                 save_failure_sink=self._log_error,
-                result_sink=lambda result: setattr(
-                    self,
-                    "last_settings_mutation_result",
-                    result,
-                ),
-                result_provider=lambda: self.last_settings_mutation_result,
-                sync_memory=self._sync_memory_runtime_fields_from_settings,
+                results=self._get_settings_application_owner().results,
+                sync_memory=self._get_settings_application_owner().runtime_effects.restore_memory,
                 capture_runtime_signatures=(
                     self._capture_runtime_signatures_before_canonical_mutation
                 ),
                 sync_signatures=self._sync_signature_caches,
                 consume_superseded_settings=(self._consume_superseded_local_asr_settings),
                 active_local_asr_change=self._active_local_asr_change,
-                compensate_local_asr=self._compensate_failed_local_asr_settings_apply,
-                copy_runtime_only_ui_state=_copy_runtime_only_ui_state,
+                compensate_local_asr=(
+                    self._get_settings_application_owner().compensate_failed_local_asr_settings_apply
+                ),
                 llm_retry_pending=lambda: self._last_llm_provider_signature == (),
                 mark_llm_retry=self._mark_llm_provider_retry,
             )
@@ -5013,34 +3943,6 @@ class GuiController:
             peer_stt_available=hub is not None and hub.has_stt_provider("peer"),
             self_stt_desired=self._stt_desired,
             peer_stt_desired=self._peer_runtime_should_be_active(settings),
-        )
-
-    async def _apply_settings_runtime_effect(
-        self,
-        settings: object,
-        reload_settings_view: bool,
-    ) -> None:
-        if not isinstance(settings, AppSettings):
-            raise TypeError("settings runtime effect requires AppSettings")
-        await self._apply_settings_direct(
-            settings,
-            persist=False,
-            strict_runtime_errors=True,
-            reload_settings_view=reload_settings_view,
-        )
-
-    def _settings_runtime_state(self, settings: object) -> SettingsRuntimeState:
-        if not isinstance(settings, AppSettings):
-            raise TypeError("settings runtime state requires AppSettings")
-        hub = self.hub
-        return SettingsRuntimeState(
-            runtime_available=hub is not None,
-            self_stt_desired=self._stt_desired,
-            self_stt_available=hub is not None and hub.has_stt_provider("self"),
-            peer_stt_desired=self._peer_runtime_should_be_active(settings),
-            peer_stt_available=hub is not None and hub.has_stt_provider("peer"),
-            qwen_llm_desired=self._is_qwen_llm(settings),
-            llm_available=hub is not None and hub.llm is not None,
         )
 
     def _apply_provider_runtime_common_effects(self, settings: object) -> None:
@@ -5239,30 +4141,13 @@ class GuiController:
         )
         return projected
 
-    def _provider_verification_binding(
-        self,
-        provider: str,
-        key: str,
-        *,
-        flow: str,
-        context_values: Mapping[str, object] | None = None,
-    ) -> ProviderVerificationBinding:
-        return self._get_provider_settings_owner().verification_binding(
-            provider,
-            key,
-            flow=flow,
-            context_values=context_values,
-        )
-
     async def persist_provider_secret_change(
         self,
         secret_key: str,
         value: str,
     ) -> bool:
         owner = self._get_provider_settings_owner()
-        succeeded = await owner.change_secret(secret_key, value)
-        self.last_settings_mutation_result = owner.last_result
-        return succeeded
+        return await owner.change_secret(secret_key, value)
 
     def persist_api_key_verification(
         self,
@@ -5274,50 +4159,6 @@ class GuiController:
 
     def clear_provider_verification(self, provider: str) -> None:
         self.persist_api_key_verification(provider, "", False)
-
-    def _managed_identity_persistence_callback(
-        self,
-        bound_settings: AppSettings,
-    ) -> Callable[[AppSettings], None]:
-        bound_snapshot = copy.deepcopy(bound_settings.managed_identity)
-
-        def persist(settings: AppSettings) -> None:
-            nonlocal bound_snapshot
-            self._persist_active_controller_settings(
-                settings,
-                bound_managed_snapshot=bound_snapshot,
-            )
-            bound_snapshot = copy.deepcopy(settings.managed_identity)
-
-        return persist
-
-    def _persist_active_controller_settings(
-        self,
-        settings: AppSettings,
-        *,
-        bound_managed_snapshot: object | None = None,
-    ) -> None:
-        active_settings = self.settings or settings
-        baseline = self._get_settings_owner().projection_snapshot or active_settings
-        managed_baseline = (
-            bound_managed_snapshot
-            if bound_managed_snapshot is not None
-            else baseline.managed_identity
-        )
-        managed_delta = _managed_identity_delta(managed_baseline, settings.managed_identity)
-        next_settings = copy.deepcopy(active_settings)
-        _apply_managed_identity_delta(next_settings, managed_delta)
-        self._get_settings_owner().begin(legacy_snapshot=baseline)
-        self._get_settings_owner().apply_legacy_delta(baseline, next_settings)
-        try:
-            self._get_settings_owner().persist()
-        except Exception:
-            self._get_settings_owner().rollback()
-            _restore_managed_identity(settings, managed_baseline)
-            raise
-        self.settings = next_settings
-        self._get_settings_owner().remember_projection(next_settings)
-        self._get_settings_owner().complete()
 
     def _capture_runtime_signatures_before_canonical_mutation(self) -> None:
         if self.settings is None:
@@ -5386,6 +4227,7 @@ class GuiController:
                     config_path=self.config_path,
                 ).get(secret_key),
                 save_failure_sink=self._log_error,
+                results=self._get_settings_application_owner().results,
             )
             self.provider_settings_owner = owner
         return owner
@@ -6005,7 +4847,7 @@ class GuiController:
             openrouter_config=build_openrouter_release_runtime_config(release_settings),
             managed_state=build_managed_identity_state_port(
                 self.settings,
-                self._managed_identity_persistence_callback(self.settings),
+                self._get_settings_owner().managed_identity_persistence_callback(self.settings),
             ),
             secrets=secrets,
             client=client,
@@ -6021,6 +4863,26 @@ class GuiController:
                 client_factory=lambda: self._create_openrouter_pkce_client(),
             )
             self._openrouter_pkce_flow_owner = owner
+        return owner
+
+    def _get_openrouter_pkce_application_owner(self) -> OpenRouterPkceApplicationOwner:
+        owner = self._openrouter_pkce_application_owner
+        if owner is None:
+            owner = OpenRouterPkceApplicationOwner(
+                flow=self._get_openrouter_pkce_flow_owner(),
+                verifier=self._get_provider_verifier(),
+                settings=self._get_settings_owner(),
+                provider_settings=self._get_provider_settings_owner(),
+                provider_runtime=self._get_provider_runtime_owner(),
+                secret_store_factory=lambda settings: create_sync_secret_store_adapter(
+                    create_secret_store(settings.secrets, config_path=self.config_path)
+                ),
+                failure_message_sink=self._show_short_message,
+                failure_diagnostics_sink=self._log_error,
+                failure_route=self._maybe_show_founder_letter_after_pkce_failure,
+                results=self._get_settings_application_owner().results,
+            )
+            self._openrouter_pkce_application_owner = owner
         return owner
 
     async def _close_oauth_runtime(self) -> None:
@@ -6409,113 +5271,10 @@ class GuiController:
         target_settings: AppSettings,
         launch_source: str,
     ) -> bool:
-        assert self.settings is not None
-        selection_alias = target_settings.openrouter.selection_alias
-        if selection_alias is None:
-            raise ValueError("PKCE connection requires a BYOK OpenRouter alias")
-
-        profile = profile_for_alias(selection_alias.value)
-        if profile.openrouter_source != OpenRouterCredentialSource.BYOK.value:
-            raise ValueError("PKCE connection requires a BYOK OpenRouter alias")
-        if profile.openrouter_model is None:
-            raise ValueError("PKCE connection requires a BYOK OpenRouter model")
-
-        try:
-            result = await self._get_openrouter_pkce_flow_owner().run_flow()
-        except Exception:
-            self._show_short_message("openrouter.pkce.failed")
-            self._log_error("OpenRouter PKCE flow failed")
-            self._maybe_show_founder_letter_after_pkce_failure(launch_source)
-            return False
-
-        try:
-            verified = await self._get_provider_verifier().verify_api_key(
-                "openrouter",
-                result.api_key,
-            )
-        except Exception:
-            verified = False
-        if not verified:
-            self._show_short_message("openrouter.pkce.failed")
-            self._log_error("OpenRouter PKCE key verification failed")
-            self._maybe_show_founder_letter_after_pkce_failure(launch_source)
-            return False
-
-        updated = copy.deepcopy(target_settings)
-        updated.provider.llm = LLMProviderName.OPENROUTER
-        updated.openrouter.selection_alias = OpenRouterSelectionAlias(profile.alias)
-        updated.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-        updated.openrouter.llm_model = OpenRouterLLMModel(profile.openrouter_model)
-        updated.api_key_verified.openrouter = True
-
-        plan = self._get_provider_runtime_owner().build_plan(
-            updated,
-            force_rebuild_llm=True,
+        return await self._get_openrouter_pkce_application_owner().connect(
+            target_settings=target_settings,
+            launch_source=launch_source,
         )
-        secret_store = create_secret_store(self.settings.secrets, config_path=self.config_path)
-        secret_store_port = create_sync_secret_store_adapter(secret_store)
-        settings_repository = self._legacy_settings_patch_repository(
-            base_settings=self.settings,
-            committed_settings=updated,
-            surface="openrouter_pkce",
-            provider_verification_binding=self._provider_verification_binding(
-                "openrouter",
-                result.api_key,
-                flow="openrouter_pkce",
-                context_values={"launch_source": launch_source},
-            ),
-        )
-        transaction = SecretSettingsTransaction(
-            secret_store=secret_store_port,
-            settings_repository=settings_repository,
-        )
-        runtime_apply_port = ProviderRuntimeApplyAdapter(
-            owner=self._get_provider_runtime_owner(),
-            settings=updated,
-            plan=plan,
-            surface="openrouter_pkce",
-            operation="openrouter_pkce_runtime_apply",
-        )
-
-        commit_result = await transaction.set_provider_secret(
-            SecretSetRequest(
-                secret_key=OPENROUTER_BYOK_API_KEY_SECRET,
-                secret_value=result.api_key,
-                settings_values=self._get_settings_owner().legacy_snapshot_values(updated),
-                expected_settings_revision=None,
-                reason="openrouter_pkce",
-                correlation_id=None,
-            )
-        )
-        if commit_result.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-            self._show_short_message("openrouter.pkce.failed")
-            self._log_error("OpenRouter PKCE settings commit failed")
-            self.last_settings_mutation_result = commit_result
-            self._maybe_show_founder_letter_after_pkce_failure(launch_source)
-            self._get_settings_owner().complete()
-            return False
-
-        runtime_result = await runtime_apply_port.apply_runtime(
-            RuntimeApplyRequest(
-                settings_values=self._get_settings_owner().legacy_snapshot_values(updated),
-                reason="openrouter_pkce",
-                correlation_id=None,
-            )
-        )
-        if runtime_result.status == RUNTIME_APPLY_STATUS_APPLIED:
-            self.last_settings_mutation_result = TransactionResult(
-                status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
-                message=runtime_result.message,
-                diagnostics=runtime_result.diagnostics,
-            )
-            self._get_settings_owner().complete()
-            return True
-
-        self.last_settings_mutation_result = _runtime_apply_result_as_degraded_transaction(
-            runtime_result
-        )
-        self._get_settings_owner().complete()
-        return True
 
     def _maybe_show_founder_letter_after_pkce_failure(self, launch_source: str) -> None:
         if launch_source != "letter":
@@ -6524,44 +5283,6 @@ class GuiController:
         if callable(show_founder_letter_dialog):
             with contextlib.suppress(Exception):
                 show_founder_letter_dialog()
-
-    def _save_settings(self) -> bool:
-        assert self.settings is not None
-        owner = self._get_settings_owner()
-        owns_mutation = owner.mutation_depth == 0
-        baseline = owner.projection_snapshot or self.settings
-        if owns_mutation:
-            owner.begin(legacy_snapshot=baseline)
-        owner.apply_legacy_delta(baseline, self.settings)
-        try:
-            owner.persist()
-        except Exception as exc:
-            owner.rollback()
-            self._log_error(f"Failed to save settings: {exc}")
-            return False
-        else:
-            owner.remember_projection(self.settings)
-            if owns_mutation:
-                owner.complete()
-            return True
-
-    def persist_settings(self) -> None:
-        """Persist current settings, propagating persistence errors to the caller."""
-        assert self.settings is not None
-        owner = self._get_settings_owner()
-        owns_mutation = owner.mutation_depth == 0
-        baseline = owner.projection_snapshot or self.settings
-        if owns_mutation:
-            owner.begin(legacy_snapshot=baseline)
-        owner.apply_legacy_delta(baseline, self.settings)
-        try:
-            owner.persist()
-        except Exception:
-            owner.rollback()
-            raise
-        owner.remember_projection(self.settings)
-        if owns_mutation:
-            owner.complete()
 
     def _sync_ui_from_settings(self) -> None:
         settings = self.settings

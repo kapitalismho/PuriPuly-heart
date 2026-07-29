@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 
 from puripuly_heart.app.services.local_asr_selection import (
@@ -9,6 +10,7 @@ from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_QWEN_PROVIDER,
     resolve_local_asr_selection,
 )
+from puripuly_heart.config.settings import AppSettings, STTProviderName
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +35,30 @@ class ManualLocalASRFallbackPlan:
 
 
 class ManualLocalASRFallbackOwner:
+    @staticmethod
+    def state(
+        settings: AppSettings,
+        *,
+        cpu_auto_available: bool,
+    ) -> ManualLocalASRFallbackState:
+        return ManualLocalASRFallbackState(
+            self_provider=settings.provider.stt.value,
+            peer_provider=settings.provider.peer_stt.value,
+            self_source_language=settings.languages.source_language,
+            peer_source_language=settings.languages.effective_peer_source,
+            cpu_auto_available=cpu_auto_available,
+        )
+
+    @staticmethod
+    def apply(
+        settings: AppSettings,
+        plan: ManualLocalASRFallbackPlan,
+    ) -> AppSettings:
+        normalized = copy.deepcopy(settings)
+        normalized.provider.stt = STTProviderName(plan.self_provider)
+        normalized.provider.peer_stt = STTProviderName(plan.peer_provider)
+        return normalized
+
     def plan(
         self,
         state: ManualLocalASRFallbackState,

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
+from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeState
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_LIFECYCLE,
@@ -207,17 +208,6 @@ class ProviderRuntimeOwner:
                 surface=surface,
             )
         return None
-
-
-@dataclass(frozen=True, slots=True)
-class SettingsRuntimeState:
-    runtime_available: bool
-    self_stt_desired: bool
-    self_stt_available: bool
-    peer_stt_desired: bool
-    peer_stt_available: bool
-    qwen_llm_desired: bool
-    llm_available: bool
 
 
 SettingsRuntimeApplyEffect = Callable[[object, bool], Awaitable[None]]

@@ -170,6 +170,66 @@ def test_canonical_settings_persistence_port_covers_load_project_delta_save_and_
     assert restored == updated_canonical
     assert restored is not snapshot
 
+    owner = SettingsOwner(
+        path=path,
+        persistence=adapter,
+        canonical=projected,
+        current=copy.deepcopy(settings),
+        authoritative=True,
+        projection_snapshot=copy.deepcopy(settings),
+    )
+    owner.current.ui.locale = "ja"
+    assert owner.save_current()
+    assert owner.current.ui.locale == "ja"
+    assert owner.projection_snapshot is not None
+    assert owner.projection_snapshot.ui.locale == "ja"
+    assert owner.mutation_depth == 0
+
+    failures: list[BaseException] = []
+
+    def fail_save(_path: Path, _value: AppSettingsVNext) -> None:
+        raise OSError("injected save failure")
+
+    monkeypatch.setattr(adapter_module, "save_vnext_settings", fail_save)
+    owner.current.ui.locale = "ko"
+    assert not owner.save_current(failure_sink=failures.append)
+    assert len(failures) == 1
+    assert isinstance(failures[0], OSError)
+    assert owner.current.ui.locale == "ja"
+    assert owner.mutation_depth == 0
+
+    with pytest.raises(OSError, match="injected save failure"):
+        owner.persist_current()
+
+    monkeypatch.setattr(
+        adapter_module,
+        "save_vnext_settings",
+        lambda _path, value: saved.append(value) or SimpleNamespace(ok=True),
+    )
+    stale_settings = copy.deepcopy(owner.current)
+    persist_managed_identity = owner.managed_identity_persistence_callback(stale_settings)
+    active_settings = copy.deepcopy(stale_settings)
+    active_settings.ui.locale = "ru"
+    owner.current = active_settings
+    owner.remember_projection(active_settings)
+    owner.persist_current()
+
+    stale_settings.managed_identity.referral_id = "234567"
+    persist_managed_identity(stale_settings)
+
+    assert owner.current.ui.locale == "ru"
+    assert owner.current.managed_identity.referral_id == "234567"
+    assert owner.canonical.state.managed_connection.referral_id == "234567"
+
+    active_before_failure = copy.deepcopy(owner.current)
+    stale_before_failure = copy.deepcopy(stale_settings)
+    monkeypatch.setattr(adapter_module, "save_vnext_settings", fail_save)
+    stale_settings.managed_identity.referral_id = "345678"
+    with pytest.raises(OSError, match="injected save failure"):
+        persist_managed_identity(stale_settings)
+    assert owner.current == active_before_failure
+    assert stale_settings == stale_before_failure
+
 
 def test_canonical_delta_requires_bound_evidence_and_preserves_invalidation() -> None:
     adapter = SettingsVNextCanonicalPersistenceAdapter()

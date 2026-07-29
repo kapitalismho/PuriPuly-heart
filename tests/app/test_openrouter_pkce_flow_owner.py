@@ -1,13 +1,101 @@
 from __future__ import annotations
 
 import asyncio
+import copy
+import threading
+from pathlib import Path
 from typing import cast
 
 import pytest
 
-from puripuly_heart.app.services.openrouter_pkce_flow import OpenRouterPkceFlowOwner
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
+from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
+from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.openrouter_pkce_flow import (
+    OpenRouterPkceApplicationOwner,
+    OpenRouterPkceFlowOwner,
+)
+from puripuly_heart.app.services.provider_runtime_apply import (
+    ProviderRuntimeApplyPlan,
+)
+from puripuly_heart.app.services.provider_settings import (
+    ProviderSettingsOwner,
+    provider_verification_context,
+)
+from puripuly_heart.app.services.provider_verification_binding import (
+    ProviderVerificationBindingOwner,
+)
+from puripuly_heart.app.services.settings_transaction_result import (
+    SettingsTransactionResultOwner,
+)
+from puripuly_heart.config.settings import (
+    AppSettings,
+    LLMProviderName,
+    OpenRouterCredentialSource,
+    OpenRouterLLMModel,
+    OpenRouterSelectionAlias,
+)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.messages import (
+    TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+)
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
+from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
+
+
+class MemorySecretStore:
+    def __init__(self) -> None:
+        self.values: dict[str, str] = {}
+
+    def get(self, key: str) -> str | None:
+        return self.values.get(key)
+
+    def set(self, key: str, value: str) -> None:
+        self.values[key] = value
+
+    def delete(self, key: str) -> None:
+        self.values.pop(key, None)
+
+
+class AppliedProviderRuntime:
+    def __init__(self, settings: SettingsOwner) -> None:
+        self.settings = settings
+        self.applied: list[AppSettings] = []
+        self.cancel = False
+
+    def build_plan(
+        self,
+        _settings: AppSettings,
+        *,
+        force_rebuild_llm: bool,
+    ) -> ProviderRuntimeApplyPlan:
+        assert force_rebuild_llm is True
+        return ProviderRuntimeApplyPlan(
+            should_rebuild_llm=True,
+            should_refresh_peer=False,
+            should_refresh_self_stt=False,
+        )
+
+    async def apply(
+        self,
+        settings: AppSettings,
+        _plan: ProviderRuntimeApplyPlan,
+    ) -> None:
+        if self.cancel:
+            raise asyncio.CancelledError
+        self.settings.current = settings
+        self.applied.append(copy.deepcopy(settings))
+
+    def unavailable_result(
+        self,
+        _settings: AppSettings,
+        _plan: ProviderRuntimeApplyPlan,
+        **_kwargs: object,
+    ) -> None:
+        return None
 
 
 @pytest.mark.asyncio
@@ -102,3 +190,128 @@ async def test_owner_close_clears_client_when_runtime_close_fails() -> None:
         await owner.close()
 
     assert owner.active_client is None
+
+
+@pytest.mark.asyncio
+async def test_application_owner_commits_verified_pkce_secret_settings_and_runtime(
+    tmp_path: Path,
+) -> None:
+    current = AppSettings()
+    persistence = SettingsVNextCanonicalPersistenceAdapter()
+    settings = SettingsOwner(
+        path=tmp_path / "settings.json",
+        persistence=persistence,
+        canonical=AppSettingsVNext(),
+        current=current,
+        authoritative=True,
+        projection_snapshot=copy.deepcopy(current),
+    )
+    store = MemorySecretStore()
+    provider_settings = ProviderSettingsOwner(
+        settings=settings,
+        binding=ProviderVerificationBindingOwner(
+            context_provider=lambda provider: provider_verification_context(
+                settings.current,
+                provider,
+                low_latency=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
+            )
+        ),
+        secret_store_factory=lambda _settings: SyncSecretStoreAdapter(store),
+        active_secret_provider=lambda _settings, key: store.get(key),
+    )
+    runtime = AppliedProviderRuntime(settings)
+    target = copy.deepcopy(current)
+    target.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
+    results = SettingsTransactionResultOwner()
+
+    class Flow:
+        api_key = "sk-or-v1-user"
+
+        async def run_flow(self) -> OpenRouterPKCEExchangeResult:
+            return OpenRouterPKCEExchangeResult(
+                api_key=self.api_key,
+                user_id="user_123",
+            )
+
+    class Verifier:
+        async def verify_api_key(self, provider: str, api_key: str) -> bool:
+            return provider == "openrouter" and api_key.startswith("sk-or-v1-")
+
+    flow = Flow()
+    owner = OpenRouterPkceApplicationOwner(
+        flow=cast(OpenRouterPkceFlowOwner, flow),
+        verifier=Verifier(),
+        settings=settings,
+        provider_settings=provider_settings,
+        provider_runtime=runtime,
+        secret_store_factory=lambda _settings: SyncSecretStoreAdapter(store),
+        failure_message_sink=lambda _message: None,
+        failure_diagnostics_sink=lambda _message: None,
+        failure_route=lambda _source: None,
+        results=results,
+    )
+
+    assert await owner.connect(target_settings=target, launch_source="settings") is True
+    assert store.values["openrouter_api_key"] == "sk-or-v1-user"
+    assert settings.current is not None
+    assert settings.current.provider.llm == LLMProviderName.OPENROUTER
+    assert settings.current.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
+    assert settings.current.openrouter.selected_source == OpenRouterCredentialSource.BYOK
+    assert settings.current.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+    assert settings.current.api_key_verified.openrouter is True
+    assert len(runtime.applied) == 1
+    assert results.current is not None
+    assert results.current.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert settings.mutation_depth == 0
+    assert settings.rollback_pending is False
+
+    runtime.cancel = True
+    with pytest.raises(asyncio.CancelledError):
+        await owner.connect(target_settings=target, launch_source="settings")
+
+    assert settings.mutation_depth == 0
+    assert settings.rollback_pending is False
+    assert settings.current is not None
+    assert settings.current.provider.llm == LLMProviderName.OPENROUTER
+
+    runtime.cancel = False
+    results.current = None
+    flow.api_key = "sk-or-v1-replaced"
+    persist_entered = threading.Event()
+    persist_release = threading.Event()
+    persist = persistence.persist
+
+    def blocked_persist(path: Path, canonical: AppSettingsVNext) -> None:
+        persist_entered.set()
+        if not persist_release.wait(timeout=5):
+            raise TimeoutError("settings persistence was not released")
+        persist(path, canonical)
+
+    persistence.persist = blocked_persist
+    task = asyncio.create_task(owner.connect(target_settings=target, launch_source="settings"))
+    assert await asyncio.to_thread(persist_entered.wait, 5)
+    task.cancel()
+    await asyncio.sleep(0)
+    assert task.done() is False
+
+    persist_release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert store.values["openrouter_api_key"] == "sk-or-v1-replaced"
+    assert settings.mutation_depth == 0
+    assert settings.rollback_pending is False
+    assert results.current is not None
+    assert results.current.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert settings.canonical is not None
+    binding = provider_settings.verification_binding(
+        "openrouter",
+        "sk-or-v1-replaced",
+        flow="openrouter_pkce",
+        context_values={"launch_source": "settings"},
+    )
+    assert (
+        settings.canonical.state.provider_verification.openrouter.secret_fingerprint
+        == binding.secret_fingerprint
+    )
+    assert len(runtime.applied) == 2

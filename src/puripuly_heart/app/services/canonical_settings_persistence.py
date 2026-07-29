@@ -56,6 +56,29 @@ def legacy_settings_snapshot_values(settings: AppSettings) -> dict[str, object]:
     return cast(dict[str, object], _legacy_settings_snapshot_value(asdict(settings)))
 
 
+def _managed_identity_delta(baseline: object, current: object) -> dict[str, object]:
+    baseline_values = asdict(baseline)
+    current_values = asdict(current)
+    return {
+        field_name: copy.deepcopy(value)
+        for field_name, value in current_values.items()
+        if baseline_values.get(field_name) != value
+    }
+
+
+def _apply_managed_identity_delta(
+    settings: AppSettings,
+    values: Mapping[str, object],
+) -> None:
+    for field_name, value in values.items():
+        setattr(settings.managed_identity, field_name, copy.deepcopy(value))
+
+
+def _restore_managed_identity(settings: AppSettings, snapshot: object) -> None:
+    for field_name, value in asdict(snapshot).items():
+        setattr(settings.managed_identity, field_name, copy.deepcopy(value))
+
+
 def _apply_managed_pending_delivery_ack_patch(
     settings: AppSettings,
     values: Mapping[str, object],
@@ -116,6 +139,7 @@ class LegacySettingsPatchRepository:
     surface: str = "translation_provider"
     provider_verification_binding: ProviderVerificationBinding | None = None
     save_failure_sink: Callable[[str], None] | None = None
+    commit_succeeded: bool = False
 
     async def load(self) -> SettingsSnapshot:
         settings = self.owner.current or self.committed_settings
@@ -125,6 +149,7 @@ class LegacySettingsPatchRepository:
         )
 
     async def save(self, request: SettingsCommitRequest) -> SettingsCommitResult:
+        self.commit_succeeded = False
         base_settings = self.base_settings
         next_settings = copy.deepcopy(base_settings or self.committed_settings)
         if (
@@ -168,6 +193,7 @@ class LegacySettingsPatchRepository:
             )
         self.committed_settings = next_settings
         self.owner.remember_projection(next_settings)
+        self.commit_succeeded = True
         return SettingsCommitResult(
             succeeded=True,
             snapshot=SettingsSnapshot(
@@ -256,6 +282,83 @@ class SettingsOwner:
         if self.canonical is None:
             raise RuntimeError("settings owner has no canonical settings")
         self.persistence.persist(self.path, self.canonical)
+
+    def save_current(
+        self,
+        *,
+        failure_sink: Callable[[BaseException], None] | None = None,
+    ) -> bool:
+        try:
+            self.persist_current()
+        except Exception as exc:
+            if failure_sink is not None:
+                failure_sink(exc)
+            return False
+        return True
+
+    def persist_current(self) -> None:
+        if self.current is None:
+            raise RuntimeError("settings owner has no compatibility settings")
+        owns_mutation = self.mutation_depth == 0
+        baseline = self.projection_snapshot or self.current
+        if owns_mutation:
+            self.begin(legacy_snapshot=baseline)
+        self.apply_legacy_delta(baseline, self.current)
+        try:
+            self.persist()
+        except Exception:
+            self.rollback()
+            raise
+        self.remember_projection(self.current)
+        if owns_mutation:
+            self.complete()
+
+    def managed_identity_persistence_callback(
+        self,
+        bound_settings: AppSettings,
+    ) -> Callable[[AppSettings], None]:
+        bound_snapshot = copy.deepcopy(bound_settings.managed_identity)
+
+        def persist(settings: AppSettings) -> None:
+            nonlocal bound_snapshot
+            self.persist_managed_identity(
+                settings,
+                bound_managed_snapshot=bound_snapshot,
+            )
+            bound_snapshot = copy.deepcopy(settings.managed_identity)
+
+        return persist
+
+    def persist_managed_identity(
+        self,
+        settings: AppSettings,
+        *,
+        bound_managed_snapshot: object | None = None,
+    ) -> None:
+        active_settings = self.current or settings
+        baseline = self.projection_snapshot or active_settings
+        managed_baseline = (
+            bound_managed_snapshot
+            if bound_managed_snapshot is not None
+            else baseline.managed_identity
+        )
+        managed_delta = _managed_identity_delta(
+            managed_baseline,
+            settings.managed_identity,
+        )
+        next_settings = copy.deepcopy(active_settings)
+        _apply_managed_identity_delta(next_settings, managed_delta)
+        self.begin(legacy_snapshot=baseline)
+        self.apply_legacy_delta(baseline, next_settings)
+        try:
+            self.persist()
+        except Exception:
+            self.rollback()
+            _restore_managed_identity(settings, managed_baseline)
+            raise
+        self.current = next_settings
+        self.remember_projection(next_settings)
+        self.complete()
 
     def project(self, settings: AppSettings, *, authoritative: bool) -> AppSettingsVNext:
         self.normalize_compatibility(settings)

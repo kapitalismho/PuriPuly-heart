@@ -7,6 +7,9 @@ import pytest
 
 from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeApplyPlan
 from puripuly_heart.app.services.provider_settings import ProviderApplicationOwner
+from puripuly_heart.app.services.settings_transaction_result import (
+    SettingsTransactionResultOwner,
+)
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -54,6 +57,10 @@ class FakeSettingsOwner:
 
     def persist(self) -> None:
         self.events.append("persist")
+
+    def save_current(self, **_kwargs: object) -> bool:
+        self.events.append("persist_current")
+        return True
 
     def rollback(self) -> None:
         self.mutation_depth = 0
@@ -124,7 +131,7 @@ def _owner(
     settings: FakeSettingsOwner,
     runtime: FakeRuntimeOwner,
     service: RecordingMutationService,
-    external_result: list[TransactionResult | None],
+    results: SettingsTransactionResultOwner,
     order24_patch_provider=lambda _settings: None,
     apply_order24=None,
     events: list[object],
@@ -134,9 +141,6 @@ def _owner(
 
     async def no_order24(_settings: AppSettings) -> bool:
         return False
-
-    def set_result(result: TransactionResult) -> None:
-        external_result[0] = result
 
     return ProviderApplicationOwner(
         settings=settings,
@@ -148,27 +152,14 @@ def _owner(
         apply_order24=apply_order24 or no_order24,
         remember_order22=lambda _settings: events.append("remember"),
         mutation_service_provider=lambda: service,
-        persist_current_settings=lambda: (
-            events.append("persist_current"),
-            True,
-        )[1],
         save_failure_sink=lambda message: events.append(("failure", message)),
-        result_sink=set_result,
-        result_provider=lambda: external_result[0],
+        results=results,
         sync_memory=lambda _settings: events.append("sync_memory"),
         capture_runtime_signatures=lambda: events.append("capture"),
         sync_signatures=lambda _settings: events.append("signatures"),
         consume_superseded_settings=lambda _settings: False,
         active_local_asr_change=lambda _base, _next: False,
         compensate_local_asr=lambda **_kwargs: SimpleNamespace(),
-        copy_runtime_only_ui_state=lambda source, target: (
-            setattr(target.ui, "overlay_enabled", source.ui.overlay_enabled),
-            setattr(
-                target.ui,
-                "peer_translation_enabled",
-                source.ui.peer_translation_enabled,
-            ),
-        ),
         llm_retry_pending=lambda: False,
         mark_llm_retry=lambda: events.append("retry"),
     )
@@ -180,7 +171,7 @@ async def test_provider_application_owner_routes_translation_patch_through_mutat
 ):
     events: list[object] = []
     requests: list[object] = []
-    external_result: list[TransactionResult | None] = [None]
+    results = SettingsTransactionResultOwner()
     baseline = AppSettings()
     pending = copy.deepcopy(baseline)
     pending.llm.concurrency_limit = baseline.llm.concurrency_limit + 1
@@ -189,7 +180,7 @@ async def test_provider_application_owner_routes_translation_patch_through_mutat
         settings=settings,
         runtime=FakeRuntimeOwner(events),
         service=RecordingMutationService(requests),
-        external_result=external_result,
+        results=results,
         events=events,
     )
 
@@ -209,7 +200,7 @@ async def test_provider_application_owner_routes_translation_patch_through_mutat
 async def test_provider_application_owner_routes_combined_surfaces_in_order() -> None:
     events: list[object] = []
     requests: list[object] = []
-    external_result: list[TransactionResult | None] = [None]
+    results = SettingsTransactionResultOwner()
     baseline = AppSettings()
     pending = copy.deepcopy(baseline)
     pending.provider.llm = LLMProviderName.LOCAL_LLM
@@ -220,14 +211,14 @@ async def test_provider_application_owner_routes_combined_surfaces_in_order() ->
     async def apply_order24(next_settings: AppSettings) -> bool:
         events.append("order24")
         settings.current = next_settings
-        external_result[0] = _applied_result()
+        results.set(_applied_result())
         return True
 
     owner = _owner(
         settings=settings,
         runtime=FakeRuntimeOwner(events),
         service=RecordingMutationService(requests),
-        external_result=external_result,
+        results=results,
         order24_patch_provider=lambda _settings: (
             copy.deepcopy(settings.current),
             {"ui.locale": "ja"},
@@ -270,13 +261,13 @@ async def test_provider_application_owner_force_rebuild_owns_direct_apply_sequen
     ]
     for runtime_mode, expected_status, expected_code in cases:
         events: list[object] = []
-        external_result: list[TransactionResult | None] = [None]
+        results = SettingsTransactionResultOwner()
         settings = FakeSettingsOwner(AppSettings(), events)
         owner = _owner(
             settings=settings,
             runtime=FakeRuntimeOwner(events, mode=runtime_mode),
             service=RecordingMutationService([]),
-            external_result=external_result,
+            results=results,
             events=events,
         )
 
@@ -296,8 +287,8 @@ async def test_provider_application_owner_force_rebuild_owns_direct_apply_sequen
         assert events[-2:] == ["complete", "sync_ui"]
         assert settings.mutation_depth == 0
         assert settings.rollback_pending is False
-        assert external_result[0] is not None
-        assert external_result[0].status == expected_status
+        assert results.current is not None
+        assert results.current.status == expected_status
         assert (
-            None if external_result[0].diagnostics is None else external_result[0].diagnostics.code
+            None if results.current.diagnostics is None else results.current.diagnostics.code
         ) == expected_code

@@ -222,7 +222,11 @@ LAYER_RULES = (
             "puripuly_heart.app.services.canonical_settings_persistence",
             "puripuly_heart.app.services.capture_target_settings",
             "puripuly_heart.app.services.github_star_prompt_settings",
+            "puripuly_heart.app.services.manual_local_asr_fallback",
+            "puripuly_heart.app.services.openrouter_pkce_flow",
             "puripuly_heart.app.services.provider_settings",
+            "puripuly_heart.app.services.settings_application",
+            "puripuly_heart.app.services.settings_runtime_effects",
         ),
         forbidden_layers=frozenset(
             {
@@ -546,7 +550,11 @@ SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
     {
         "src/puripuly_heart/app/services/settings_mutation_legacy.py",
         "src/puripuly_heart/app/services/github_star_prompt_settings.py",
+        "src/puripuly_heart/app/services/manual_local_asr_fallback.py",
+        "src/puripuly_heart/app/services/openrouter_pkce_flow.py",
         "src/puripuly_heart/app/services/provider_settings.py",
+        "src/puripuly_heart/app/services/settings_application.py",
+        "src/puripuly_heart/app/services/settings_runtime_effects.py",
         "src/puripuly_heart/app/wiring_llm_factory.py",
         "src/puripuly_heart/app/wiring_managed_auth_factory.py",
         "src/puripuly_heart/app/wiring_overlay_factory.py",
@@ -1221,9 +1229,7 @@ def test_controller_consumes_only_settings_owner_and_public_binding_contract() -
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert imports["puripuly_heart.app.ports.canonical_settings_persistence"] == {
-        "ProviderVerificationBinding",
-    }
+    assert "puripuly_heart.app.ports.canonical_settings_persistence" not in imports
     assert imports["puripuly_heart.app.services.canonical_settings_persistence"] == {
         "SettingsOwner",
         "compose_settings_owner",

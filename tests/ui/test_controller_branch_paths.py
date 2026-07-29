@@ -41,10 +41,12 @@ from puripuly_heart.app.services import provider_runtime_apply as provider_runti
 from puripuly_heart.app.services import provider_settings as provider_settings_module
 from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.app.services.canonical_settings_persistence import (
+    SettingsOwner,
     legacy_settings_snapshot_values,
 )
 from puripuly_heart.app.services.managed_connection_auth import ManagedConnectionAuthService
 from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
+from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
 from puripuly_heart.app.wiring import (
     build_peer_capture_session_config,
     build_peer_stt_provider_request,
@@ -847,6 +849,10 @@ def _make_controller(*, app: object) -> GuiController:
         config_path=Path("settings.json"),
         local_asr_provisioning=ReadyProvisioningPort(),
     )
+
+
+def _settings_result(controller: GuiController) -> messages.TransactionResult | None:
+    return controller._get_settings_application_owner().results.current
 
 
 @pytest.mark.asyncio
@@ -1815,12 +1821,12 @@ def test_manual_local_asr_mismatches_persist_qwen_for_self_and_peer(
 
     monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
     monkeypatch.setattr(
-        GuiController,
-        "_save_settings",
-        lambda self: saved.append(self.settings) or True,
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: saved.append(self.current) or True,
     )
 
-    assert controller._persist_current_manual_local_asr_fallback() is True
+    assert controller._get_settings_application_owner().persist_manual_fallback() is True
     assert controller.settings.provider.stt == STTProviderName.LOCAL_QWEN
     assert controller.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN
     assert len(saved) == 1
@@ -2473,7 +2479,11 @@ async def test_apply_providers_clears_dashboard_pending_notice_when_switching_aw
     next_settings = AppSettings()
     next_settings.provider.llm = LLMProviderName.GEMINI
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         provider_runtime_apply_module.LlmProviderRebuildOwner,
         "rebuild",
@@ -2512,7 +2522,11 @@ async def test_apply_providers_force_rebuild_local_llm_reads_updated_secret(
     previous_llm = ClosableLLM()
     controller.hub = DummyHub(llm=previous_llm)
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_create_managed_openrouter_release_service",
@@ -2586,7 +2600,11 @@ async def test_apply_providers_resyncs_dashboard_pending_notice_when_staying_on_
     next_settings.provider.llm = LLMProviderName.OPENROUTER
     next_settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         provider_runtime_apply_module.LlmProviderRebuildOwner,
         "rebuild",
@@ -3676,7 +3694,7 @@ def test_unrelated_legacy_apply_preserves_canonical_peer_auto_intent_after_save_
     controller._get_settings_owner().begin()
     controller._get_settings_owner().apply_legacy_delta(controller.settings, pending)
     controller.settings = pending
-    controller.persist_settings()
+    controller._get_settings_owner().persist_current()
 
     loaded = load_vnext_settings(controller.config_path)
     runtime = _peer_runtime_config(controller, pending)
@@ -3722,92 +3740,13 @@ def test_failed_canonical_persistence_rolls_back_peer_auto_intent(
         lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("save failed")),
     )
 
-    controller._save_settings()
+    controller._get_settings_owner().save_current()
     runtime = _peer_runtime_config(controller, pending)
 
     assert controller.vnext_settings == canonical
     assert controller.settings == legacy_before_mutation
     assert runtime.backend.provider == "soniox"
     assert runtime.backend.provider_options["language_hints"] == ("ja",)
-
-
-def test_active_controller_persistence_preserves_canonical_peer_intent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    legacy = AppSettings()
-    controller.settings = legacy
-    vnext_settings = AppSettingsVNext()
-    canonical = replace(
-        vnext_settings,
-        intent=replace(
-            vnext_settings.intent,
-            peer_stt=replace(vnext_settings.intent.peer_stt, provider="soniox"),
-            languages=replace(
-                vnext_settings.intent.languages,
-                peer_source_mode="auto",
-                peer_expected_languages=["ja"],
-            ),
-        ),
-    )
-    controller.vnext_settings = canonical
-    controller._get_settings_owner().authoritative = True
-    controller._get_settings_owner().remember_projection(legacy)
-    saved: list[AppSettingsVNext] = []
-    monkeypatch.setattr(
-        canonical_persistence_adapter_module,
-        "save_vnext_settings",
-        lambda _path, settings: saved.append(settings) or SimpleNamespace(ok=True),
-    )
-
-    updated = copy.deepcopy(legacy)
-    updated.managed_identity.referral_id = "234567"
-    controller._persist_active_controller_settings(updated)
-
-    assert len(saved) == 1
-    assert saved[0].intent.peer_stt.provider == "soniox"
-    assert saved[0].intent.languages.peer_source_mode == "auto"
-    assert saved[0].intent.languages.peer_expected_languages == ["ja"]
-    assert saved[0].state.managed_connection.referral_id == "234567"
-
-
-def test_failed_active_in_place_managed_persistence_restores_legacy_and_canonical(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    legacy = AppSettings()
-    legacy_before_mutation = copy.deepcopy(legacy)
-    controller.settings = legacy
-    vnext_settings = AppSettingsVNext()
-    canonical = replace(
-        vnext_settings,
-        intent=replace(
-            vnext_settings.intent,
-            peer_stt=replace(vnext_settings.intent.peer_stt, provider="soniox"),
-            languages=replace(
-                vnext_settings.intent.languages,
-                peer_source_mode="auto",
-                peer_expected_languages=["ja"],
-            ),
-        ),
-    )
-    controller.vnext_settings = canonical
-    controller._get_settings_owner().authoritative = True
-    controller._get_settings_owner().remember_projection(legacy)
-    monkeypatch.setattr(
-        canonical_persistence_adapter_module,
-        "save_vnext_settings",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("save failed")),
-    )
-
-    controller.settings.managed_identity.referral_id = "234567"
-    with pytest.raises(OSError, match="save failed"):
-        controller._persist_active_controller_settings(controller.settings)
-
-    assert controller.settings == legacy_before_mutation
-    assert controller.settings.managed_identity.referral_id is None
-    assert controller.vnext_settings == canonical
-    assert controller.vnext_settings.state.managed_connection.referral_id is None
 
 
 def test_stale_managed_adapter_persists_only_managed_delta_on_current_settings(
@@ -3817,7 +3756,7 @@ def test_stale_managed_adapter_persists_only_managed_delta_on_current_settings(
     stale_settings = AppSettings()
     state = controller_module.build_managed_identity_state_port(
         stale_settings,
-        controller._managed_identity_persistence_callback(stale_settings),
+        controller._get_settings_owner().managed_identity_persistence_callback(stale_settings),
     )
     active_settings = copy.deepcopy(stale_settings)
     active_settings.ui.locale = "ja"
@@ -3865,7 +3804,7 @@ def test_failed_stale_managed_adapter_persistence_restores_active_and_bound_sett
     stale_settings = AppSettings()
     state = controller_module.build_managed_identity_state_port(
         stale_settings,
-        controller._managed_identity_persistence_callback(stale_settings),
+        controller._get_settings_owner().managed_identity_persistence_callback(stale_settings),
     )
     active_settings = copy.deepcopy(stale_settings)
     active_settings.ui.locale = "ja"
@@ -3902,55 +3841,6 @@ def test_failed_stale_managed_adapter_persistence_restores_active_and_bound_sett
     assert controller.settings == active_before_mutation
     assert stale_settings == stale_before_mutation
     assert controller.vnext_settings == canonical
-
-
-def test_direct_save_stages_legacy_delta_without_overwriting_canonical_peer_intent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    legacy = AppSettings()
-    controller.settings = legacy
-    vnext_settings = AppSettingsVNext()
-    controller.vnext_settings = replace(
-        vnext_settings,
-        intent=replace(
-            vnext_settings.intent,
-            peer_stt=replace(vnext_settings.intent.peer_stt, provider="soniox"),
-            languages=replace(
-                vnext_settings.intent.languages,
-                peer_source_mode="auto",
-                peer_expected_languages=["ja"],
-            ),
-        ),
-    )
-    controller._get_settings_owner().authoritative = True
-    controller._get_settings_owner().remember_projection(legacy)
-    saved: list[AppSettingsVNext] = []
-    monkeypatch.setattr(
-        canonical_persistence_adapter_module,
-        "save_vnext_settings",
-        lambda _path, settings: saved.append(settings) or SimpleNamespace(ok=True),
-    )
-
-    controller.settings.ui.locale = "ja"
-    controller.settings.managed_identity.referral_id = "234567"
-    assert controller._save_settings() is True
-
-    assert len(saved) == 1
-    assert saved[0].intent.ui.locale == "ja"
-    assert saved[0].state.managed_connection.referral_id == "234567"
-    assert saved[0].intent.peer_stt.provider == "soniox"
-    assert saved[0].intent.languages.peer_source_mode == "auto"
-    assert saved[0].intent.languages.peer_expected_languages == ["ja"]
-
-    controller.settings.ui.locale = "ko"
-    controller.persist_settings()
-
-    assert len(saved) == 2
-    assert saved[1].intent.ui.locale == "ko"
-    assert saved[1].intent.peer_stt.provider == "soniox"
-    assert saved[1].intent.languages.peer_source_mode == "auto"
-    assert saved[1].intent.languages.peer_expected_languages == ["ja"]
 
 
 def test_nested_canonical_completion_keeps_outer_rollback_snapshot() -> None:
@@ -4012,10 +3902,11 @@ async def test_settings_repository_commits_only_scoped_delta_to_canonical_vnext(
         "save_vnext_settings",
         lambda _path, settings: saved.append(settings) or SimpleNamespace(ok=True),
     )
-    repository = controller._legacy_settings_patch_repository(
+    repository = controller._get_settings_owner().create_legacy_patch_repository(
         base_settings=legacy,
         committed_settings=stale_full_draft,
         surface="ui_prompt_clipboard_state",
+        save_failure_sink=controller._log_error,
     )
 
     result = await repository.save(
@@ -4136,7 +4027,11 @@ async def test_apply_settings_updates_peer_translation_flags_on_hub(
     controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
     )
@@ -4166,7 +4061,11 @@ async def test_apply_settings_copies_self_and_peer_vad_hangovers_to_hub(
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
     )
@@ -4189,7 +4088,11 @@ async def test_set_peer_translation_enabled_enqueues_peer_disclosure_once(
         controller.settings.ui.peer_translation_eula_accepted = True
         controller.hub = DisclosureDummyHub(llm=object(), stt=object(), peer_stt=object())
         controller.overlay_state = "connected"
-        monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+        monkeypatch.setattr(
+            SettingsOwner,
+            "save_current",
+            lambda self, **_kwargs: True,
+        )
         monkeypatch.setattr(
             GuiController,
             "_refresh_overlay_runtime_dependencies",
@@ -4637,7 +4540,11 @@ async def test_overlay_toggle_starts_and_stops_overlay_runtime(
     tmp_path: Path,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(controller_module, "user_config_dir", lambda: tmp_path)
 
     controller = _make_controller(app=SimpleNamespace())
@@ -4825,7 +4732,7 @@ async def test_closing_overlay_runtime_rejects_direct_presenter_commands() -> No
         pending = copy.deepcopy(controller.settings)
         pending.overlay.show_translation = not pending.overlay.show_translation
 
-        await controller._apply_settings_direct(
+        await controller._get_settings_application_owner().apply_direct(
             pending,
             persist=False,
             reload_settings_view=False,
@@ -5101,9 +5008,9 @@ async def test_desktop_initial_control_manifest_centers_null_position_without_pe
     _patch_overlay_runtime(monkeypatch)
     saved_desktop: list[tuple[object, object, str, bool, float]] = []
 
-    def fake_save_settings(self: GuiController) -> None:
-        assert self.settings is not None
-        desktop = self.settings.overlay.desktop_flet
+    def fake_save_settings(self: SettingsOwner, **_kwargs: object) -> bool:
+        assert self.current is not None
+        desktop = self.current.overlay.desktop_flet
         saved_desktop.append(
             (
                 desktop.position.x,
@@ -5113,8 +5020,9 @@ async def test_desktop_initial_control_manifest_centers_null_position_without_pe
                 desktop.visual.background_alpha,
             )
         )
+        return True
 
-    monkeypatch.setattr(GuiController, "_save_settings", fake_save_settings)
+    monkeypatch.setattr(SettingsOwner, "save_current", fake_save_settings)
     monkeypatch.setattr(
         GuiController,
         "_desktop_work_area_for_current_launch",
@@ -5404,14 +5312,15 @@ async def test_desktop_lock_toggle_is_runtime_only_and_does_not_save_or_mutate_s
     saved_desktop: list[tuple[object, object, str, bool]] = []
     state_changes: list[dict[str, object]] = []
 
-    def fake_save_settings(self: GuiController) -> None:
-        assert self.settings is not None
-        desktop = self.settings.overlay.desktop_flet
+    def fake_save_settings(self: SettingsOwner, **_kwargs: object) -> bool:
+        assert self.current is not None
+        desktop = self.current.overlay.desktop_flet
         saved_desktop.append(
             (desktop.position.x, desktop.position.y, desktop.size_preset, desktop.locked)
         )
+        return True
 
-    monkeypatch.setattr(GuiController, "_save_settings", fake_save_settings)
+    monkeypatch.setattr(SettingsOwner, "save_current", fake_save_settings)
 
     controller = _make_controller(
         app=SimpleNamespace(
@@ -6446,7 +6355,11 @@ async def test_desktop_bounds_events_emit_diagnostics_only_in_detailed_mode() ->
 async def test_desktop_apply_settings_broadcasts_visual_config_for_background_alpha_change(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.settings.ui.overlay_enabled = True
@@ -6525,11 +6438,12 @@ async def test_desktop_interaction_mode_controls_are_desktop_only_and_update_loc
     _patch_overlay_runtime(monkeypatch)
     save_calls: list[bool] = []
 
-    def fake_save_settings(self: GuiController) -> None:
-        assert self.settings is not None
-        save_calls.append(self.settings.overlay.desktop_flet.locked)
+    def fake_save_settings(self: SettingsOwner, **_kwargs: object) -> bool:
+        assert self.current is not None
+        save_calls.append(self.current.overlay.desktop_flet.locked)
+        return True
 
-    monkeypatch.setattr(GuiController, "_save_settings", fake_save_settings)
+    monkeypatch.setattr(SettingsOwner, "save_current", fake_save_settings)
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -6584,11 +6498,12 @@ async def test_desktop_lock_request_is_ignored_without_active_desktop_renderer(
 ) -> None:
     saved_locked: list[bool] = []
 
-    def fake_save_settings(self: GuiController) -> None:
-        assert self.settings is not None
-        saved_locked.append(self.settings.overlay.desktop_flet.locked)
+    def fake_save_settings(self: SettingsOwner, **_kwargs: object) -> bool:
+        assert self.current is not None
+        saved_locked.append(self.current.overlay.desktop_flet.locked)
+        return True
 
-    monkeypatch.setattr(GuiController, "_save_settings", fake_save_settings)
+    monkeypatch.setattr(SettingsOwner, "save_current", fake_save_settings)
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -6608,11 +6523,12 @@ async def test_desktop_lock_request_is_ignored_until_desktop_renderer_connected(
 ) -> None:
     saved_locked: list[bool] = []
 
-    def fake_save_settings(self: GuiController) -> None:
-        assert self.settings is not None
-        saved_locked.append(self.settings.overlay.desktop_flet.locked)
+    def fake_save_settings(self: SettingsOwner, **_kwargs: object) -> bool:
+        assert self.current is not None
+        saved_locked.append(self.current.overlay.desktop_flet.locked)
+        return True
 
-    monkeypatch.setattr(GuiController, "_save_settings", fake_save_settings)
+    monkeypatch.setattr(SettingsOwner, "save_current", fake_save_settings)
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -6635,7 +6551,11 @@ async def test_overlay_target_routing_apply_settings_stops_before_switching_runn
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -6671,7 +6591,11 @@ async def test_overlay_target_routing_apply_settings_stops_after_in_place_target
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -6719,7 +6643,11 @@ async def test_overlay_toggle_does_not_persist_transient_button_state(
     ) -> None:
         _ = (self, preserve_failure_reason)
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: save_calls.append("save"))
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: save_calls.append("save") or True,
+    )
     monkeypatch.setattr(GuiController, "_begin_overlay_start", fake_begin_overlay_start)
     monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay_runtime)
 
@@ -6741,7 +6669,11 @@ async def test_peer_translation_toggle_does_not_persist_transient_button_state(
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
     controller.overlay_state = "connected"
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: save_calls.append("save"))
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: save_calls.append("save") or True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_refresh_overlay_runtime_dependencies",
@@ -6760,7 +6692,11 @@ async def test_overlay_start_keeps_compatibility_refresh_until_vr_capability_is_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -6782,7 +6718,11 @@ async def test_desktop_overlay_start_disables_peer_presentation_refresh_for_new_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -6807,7 +6747,11 @@ async def test_overlay_start_restores_compatibility_refresh_for_existing_present
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = GuiController(
         page=SimpleNamespace(),
@@ -6841,7 +6785,11 @@ async def test_preserved_presenter_restart_renegotiates_one_retry_owner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.hub = DummyHub()
@@ -6949,7 +6897,11 @@ async def test_desktop_overlay_start_disables_existing_peer_presentation_refresh
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = GuiController(
         page=SimpleNamespace(),
@@ -6987,7 +6939,11 @@ async def test_overlay_start_syncs_bridge_after_preserved_presenter_cleans_refre
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     bridge_start_released_burst = False
     clock = FakeClock(_now=10.0)
@@ -7102,7 +7058,11 @@ async def test_desktop_overlay_start_cleans_preserved_self_refresh_marker_before
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     clock = FakeClock(_now=10.0)
     sleep_events: list[asyncio.Event] = []
@@ -7183,7 +7143,11 @@ async def test_successful_overlay_start_refreshes_consumers_after_peer_runtime_b
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     contracts = []
     app = SimpleNamespace(
@@ -7232,7 +7196,11 @@ async def test_overlay_toggle_off_sends_shutdown_event_before_teardown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -7277,7 +7245,11 @@ async def test_begin_overlay_start_uses_empty_runtime_without_owned_presenter(
     from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     class ImmediateConnectedOverlayProcessManager(FakeOverlayProcessManager):
         instances: list["ImmediateConnectedOverlayProcessManager"] = []
@@ -7319,7 +7291,11 @@ async def test_overlay_start_uses_presenter_owned_by_runtime_handle(
     from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     class ImmediateConnectedOverlayProcessManager(FakeOverlayProcessManager):
         instances: list["ImmediateConnectedOverlayProcessManager"] = []
@@ -7374,7 +7350,11 @@ async def test_overlay_restart_reuses_presenter_scene_for_new_bridge(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -7422,7 +7402,11 @@ async def test_preserved_overlay_presenter_detaches_from_hub_ingress_until_resta
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -7469,7 +7453,11 @@ async def test_overlay_restart_detaches_preserved_presenter_from_old_runtime_bef
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -7527,7 +7515,11 @@ async def test_overlay_restart_applies_current_preferences_before_bridge_initial
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -7584,7 +7576,11 @@ async def test_explicit_overlay_disable_resets_presenter_scene_for_next_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -7627,7 +7623,11 @@ async def test_refresh_overlay_runtime_dependencies_does_not_clear_overlay_scene
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -7669,7 +7669,11 @@ async def test_refresh_overlay_runtime_dependencies_does_not_clear_overlay_scene
 async def test_explicit_overlay_off_clears_saved_peer_translation_toggle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -7706,7 +7710,11 @@ async def test_overlay_start_failure_keeps_saved_preferences_but_effective_state
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
     )
@@ -7747,7 +7755,11 @@ async def test_overlay_start_failure_preserves_specific_preflight_reason(
     failure_reason: str,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -7769,7 +7781,11 @@ async def test_overlay_runtime_disconnect_keeps_saved_preferences_without_auto_r
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
     )
@@ -7805,7 +7821,11 @@ async def test_overlay_runtime_crash_keeps_saved_preferences_without_auto_restar
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
     )
@@ -7863,7 +7883,11 @@ async def test_overlay_successful_recovery_clears_previous_failure_reason(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
     )
@@ -11646,7 +11670,11 @@ async def test_apply_settings_replaces_stt_provider_when_source_language_changes
         lambda locale: locale_calls.append(locale),
     )
     monkeypatch.setattr(presentation_adapter_module, "get_ui_locale", lambda: "en")
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: saved.append("saved"))
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: saved.append("saved") or True,
+    )
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
@@ -11680,7 +11708,11 @@ async def test_apply_settings_source_language_change_reloads_settings_view(
         _ = self
         replace_calls.append("replace")
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
@@ -11712,7 +11744,11 @@ async def test_apply_settings_reloads_settings_view_for_target_only_change(
     async def fake_refresh_peer_stt_runtime(self) -> None:
         _ = self
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
@@ -11751,7 +11787,11 @@ async def test_apply_settings_target_only_change_clears_self_language_runtime_st
         _ = self
         refresh_peer_calls.append("peer")
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -11800,7 +11840,11 @@ async def test_apply_settings_self_target_change_clears_peer_runtime_when_peer_t
         _ = self
         refresh_peer_calls.append("peer")
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -11849,7 +11893,11 @@ async def test_apply_settings_self_source_change_clears_peer_runtime_when_peer_s
         _ = self
         refresh_peer_calls.append("peer")
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -11897,7 +11945,11 @@ async def test_apply_settings_logs_and_continues_when_language_cleanup_fails(
     async def fake_refresh_peer_stt_runtime(self) -> None:
         raise AssertionError("peer runtime should not refresh for explicit peer target")
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_clear_local_stt_pending_enable_if_provider_switched_away",
@@ -11913,9 +11965,9 @@ async def test_apply_settings_logs_and_continues_when_language_cleanup_fails(
 
     assert controller.hub.clear_language_runtime_state_calls == ["self"]
     assert controller.hub.target_language == "ja"
-    assert controller.last_settings_mutation_result is not None
+    assert _settings_result(controller) is not None
     assert (
-        controller.last_settings_mutation_result.status
+        _settings_result(controller).status
         == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     )
     assert not any("cleanup boom" in message for message in errors)
@@ -11954,7 +12006,7 @@ async def test_order22_language_runtime_clear_failure_degrades_without_raw_log_t
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -11992,7 +12044,11 @@ async def test_order24_apply_settings_routes_ui_prompt_clipboard_state_paths(
     async def noop_sync_clipboard(_self: GuiController) -> None:
         return None
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: direct_saves.append("save"))
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: direct_saves.append("save") or True,
+    )
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", noop_sync_clipboard)
 
     updated = copy.deepcopy(controller.settings)
@@ -12070,7 +12126,7 @@ async def test_order24_locale_runtime_failure_degrades_without_raw_exception_tex
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -12132,7 +12188,7 @@ async def test_order24_clipboard_start_failure_degrades_without_raw_exception_te
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -12198,7 +12254,7 @@ async def test_order24_clipboard_stop_failure_degrades_without_raw_exception_tex
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -12241,7 +12297,11 @@ async def test_order24_runtime_only_overlay_and_peer_toggles_are_not_service_rou
     async def noop_sync_clipboard(_self: GuiController) -> None:
         return None
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: direct_saves.append("save"))
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: direct_saves.append("save") or True,
+    )
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", noop_sync_clipboard)
     monkeypatch.setattr(
         GuiController, "set_overlay_enabled", lambda self, enabled: asyncio.sleep(0)
@@ -12258,43 +12318,6 @@ async def test_order24_runtime_only_overlay_and_peer_toggles_are_not_service_rou
     assert service.requests == []
     assert direct_saves == ["save"]
     assert controller.settings is updated
-
-
-@pytest.mark.asyncio
-async def test_mixed_order22_order23_order24_apply_settings_routes_each_before_direct_fallback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(apply_locale=lambda: None))
-    controller.settings = AppSettings()
-    controller.settings_mutation_service = RecordingSettingsMutationService()
-    direct_saves: list[str] = []
-
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: direct_saves.append("save"))
-
-    updated = copy.deepcopy(controller.settings)
-    updated.languages.source_language = "ja"
-    updated.overlay.show_translation = False
-    updated.ui.locale = "ko"
-    updated.system_prompt = "mixed prompt"
-
-    await controller.apply_settings(updated)
-
-    service = controller.settings_mutation_service
-    assert service is not None
-    assert [request.reason for request in service.requests] == [
-        settings_mutation.SETTINGS_MUTATION_SURFACE_STT_LANGUAGE_AUDIO,
-        settings_mutation.SETTINGS_MUTATION_SURFACE_OVERLAY_OSC_OUTPUT,
-        settings_mutation.SETTINGS_MUTATION_SURFACE_UI_PROMPT_CLIPBOARD_STATE,
-    ]
-    assert service.requests[0].values == {"languages.source_language": "ja"}
-    assert service.requests[1].values == {"overlay.show_translation": False}
-    assert service.requests[2].values == {"ui.locale": "ko", "system_prompt": "mixed prompt"}
-    assert direct_saves == []
-    assert controller.settings is not None
-    assert controller.settings.languages.source_language == "ja"
-    assert controller.settings.overlay.show_translation is False
-    assert controller.settings.ui.locale == "ko"
-    assert controller.settings.system_prompt == "mixed prompt"
 
 
 @pytest.mark.asyncio
@@ -12336,7 +12359,11 @@ async def test_first_live_settings_view_order24_mutation_uses_synced_baseline(
     async def noop_sync_clipboard(_self: GuiController) -> None:
         return None
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: direct_saves.append("save"))
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: direct_saves.append("save") or True,
+    )
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", noop_sync_clipboard)
 
     controller._sync_ui_from_settings()
@@ -12377,7 +12404,11 @@ async def test_apply_settings_reload_updates_overlay_calibration_baseline_withou
     async def fake_refresh_peer_stt_runtime(self) -> None:
         _ = self
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
@@ -12463,7 +12494,11 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
         lambda locale: locale_calls.append(locale),
     )
     monkeypatch.setattr(presentation_adapter_module, "get_ui_locale", lambda: "en")
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
     )
@@ -12551,7 +12586,11 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
         _ = (self, enabled)
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -12622,7 +12661,11 @@ async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabular
         _ = (self, enabled)
 
     controller._self_capture_owner = FakeOwner()
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -12674,7 +12717,11 @@ async def test_apply_settings_does_not_restart_stt_for_qwen_custom_vocabulary_ch
         _ = self
         replace_calls.append("replace")
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -12723,7 +12770,11 @@ async def test_apply_settings_restarts_stt_for_local_qwen_custom_vocabulary_chan
         _ = self
         replace_calls.append("replace")
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -12771,7 +12822,11 @@ async def test_apply_settings_skips_vrc_sync_when_setting_is_unchanged(
         _ = self
         receiver_calls.append(enabled)
 
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -12860,87 +12915,6 @@ async def test_create_openrouter_pkce_client_uses_openrouter_documented_localhos
 
     assert client.callback_origin == "http://localhost:3000"
     assert "callback_url=http%3A%2F%2Flocalhost%3A3000%2Fcallback" in session.authorization_url
-
-
-@pytest.mark.asyncio
-async def test_connect_openrouter_via_pkce_stores_key_sets_alias_and_marks_verified(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=DummySettingsView())
-    )
-    controller.settings = AppSettings()
-    target_settings = copy.deepcopy(controller.settings)
-    target_settings.provider.llm = LLMProviderName.OPENROUTER
-    target_settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    target_settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    target_settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    store = DummySecrets({"openrouter_api_key": "legacy-key"})
-
-    class DummyPKCEClient:
-        async def run_desktop_flow(self) -> OpenRouterPKCEExchangeResult:
-            return OpenRouterPKCEExchangeResult(api_key="sk-or-v1-user", user_id="user_123")
-
-    monkeypatch.setattr(
-        GuiController,
-        "_create_openrouter_pkce_client",
-        lambda self: DummyPKCEClient(),
-    )
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: store)
-    _patch_settings_save(monkeypatch, lambda *_a, **_k: None)
-    verify_calls: list[str] = []
-
-    async def fake_verify_openrouter_api_key(api_key: str) -> bool:
-        verify_calls.append(api_key)
-        return True
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "verify_api_key",
-        fake_verify_openrouter_api_key,
-    )
-    applied_plans: list[object] = []
-
-    async def fake_apply_provider_runtime_plan(
-        _owner,
-        settings: AppSettings,
-        plan: object,
-    ) -> None:
-        _ = plan
-        controller.settings = settings
-        applied_plans.append(copy.deepcopy(settings))
-
-    monkeypatch.setattr(
-        provider_runtime_apply_module.ProviderRuntimeOwner,
-        "apply",
-        fake_apply_provider_runtime_plan,
-    )
-
-    ok = await controller.connect_openrouter_via_pkce(
-        target_settings=target_settings,
-        launch_source="settings",
-    )
-
-    assert ok is True
-    assert store.set_calls[-1] == ("openrouter_api_key", "sk-or-v1-user")
-    assert verify_calls == ["sk-or-v1-user"]
-    assert controller.settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
-    assert controller.settings.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert controller.settings.api_key_verified.openrouter is True
-    assert controller.vnext_settings is not None
-    verification = controller.vnext_settings.state.provider_verification.openrouter
-    assert verification.status == "verified"
-    assert verification.secret_key == "openrouter_api_key"
-    assert verification.secret_revision is None
-    assert verification.secret_fingerprint is not None
-    assert verification.secret_fingerprint.startswith("sha256:")
-    assert verification.secret_fingerprint != "sk-or-v1-user"
-    assert verification.verifier_context == {
-        "flow": "openrouter_pkce",
-        "launch_source": "settings",
-    }
-    assert verification.verifier_evidence == {"source": "provider_verifier"}
-    assert len(applied_plans) == 1
 
 
 @pytest.mark.asyncio
@@ -13242,8 +13216,8 @@ async def test_connect_openrouter_via_pkce_returns_degraded_on_runtime_apply_fai
     assert store.delete_calls == []
     assert controller.settings.api_key_verified.openrouter is True
     assert (
-        controller.last_settings_mutation_result is not None
-        and controller.last_settings_mutation_result.status
+        _settings_result(controller) is not None
+        and _settings_result(controller).status
         == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     )
 
@@ -13303,8 +13277,8 @@ async def test_connect_openrouter_via_pkce_restores_secret_on_settings_commit_fa
     ]
     assert store.delete_calls == []
     assert (
-        controller.last_settings_mutation_result is not None
-        and controller.last_settings_mutation_result.status
+        _settings_result(controller) is not None
+        and _settings_result(controller).status
         == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORED
     )
 
@@ -13445,17 +13419,14 @@ async def test_order21_validation_failure_does_not_leak_rejected_canonical_state
 
     await controller.apply_providers(pending)
 
-    assert controller.last_settings_mutation_result is not None
-    assert (
-        controller.last_settings_mutation_result.status
-        == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
-    )
+    assert _settings_result(controller) is not None
+    assert _settings_result(controller).status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
     assert controller.settings.llm.concurrency_limit == 2
     assert controller.vnext_settings is not None
     assert controller.vnext_settings.intent.translation.concurrency_limit == 2
 
     controller.settings.ui.locale = "ja"
-    assert controller._save_settings() is True
+    assert controller._get_settings_owner().save_current() is True
     persisted = (
         canonical_persistence_adapter_module.SettingsVNextCanonicalPersistenceAdapter().load_active(
             path
@@ -13493,7 +13464,7 @@ async def test_order21_plan_failure_does_not_leak_rejected_canonical_state(
     assert controller.vnext_settings.intent.translation.concurrency_limit == 2
 
     controller.settings.ui.locale = "ko"
-    assert controller._save_settings() is True
+    assert controller._get_settings_owner().save_current() is True
     persisted = (
         canonical_persistence_adapter_module.SettingsVNextCanonicalPersistenceAdapter().load_active(
             path
@@ -13515,9 +13486,10 @@ async def test_managed_auth_repository_persists_pending_delivery_ack_patch(
         saved.append(copy.deepcopy(settings))
 
     _patch_settings_save(monkeypatch, record_saved)
-    repository = controller._legacy_settings_patch_repository(
+    repository = controller._get_settings_owner().create_legacy_patch_repository(
         committed_settings=committed,
         surface="managed_connection_auth",
+        save_failure_sink=controller._log_error,
     )
 
     result = await repository.save(
@@ -13589,7 +13561,7 @@ async def test_apply_providers_failed_signature_retries_same_settings_without_ra
 
     await controller.apply_providers(pending)
 
-    first_result = controller.last_settings_mutation_result
+    first_result = _settings_result(controller)
     first_signature_after_failure = controller._last_llm_provider_signature
     first_basic_logs = "\n".join(
         message for _level, message in controller._runtime_logging.basic_messages
@@ -13816,9 +13788,9 @@ async def test_apply_providers_mixed_degraded_default_service_persists_full_prov
 
     await controller.apply_providers(pending)
 
-    assert controller.last_settings_mutation_result is not None
+    assert _settings_result(controller) is not None
     assert (
-        controller.last_settings_mutation_result.status
+        _settings_result(controller).status
         == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     )
     assert [settings.system_prompt for settings in saved_settings] == [
@@ -13980,7 +13952,7 @@ async def test_order22_apply_settings_runtime_failure_degrades_without_rollback_
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.message == messages.UserMessageRef(
@@ -14023,7 +13995,7 @@ async def test_order22_save_failure_surface_is_stt_language_audio(
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -14066,17 +14038,14 @@ async def test_order22_save_failure_does_not_leak_rejected_canonical_state(
 
     await controller.apply_settings(pending)
 
-    assert controller.last_settings_mutation_result is not None
-    assert (
-        controller.last_settings_mutation_result.status
-        == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
-    )
+    assert _settings_result(controller) is not None
+    assert _settings_result(controller).status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
     assert controller.settings.provider.stt == STTProviderName.DEEPGRAM
     assert controller.vnext_settings is not None
     assert controller.vnext_settings.intent.stt.provider == STTProviderName.DEEPGRAM.value
 
     controller.settings.ui.locale = "ja"
-    assert controller._save_settings() is True
+    assert controller._get_settings_owner().save_current() is True
     persisted = adapter_type().load_active(path)
     assert persisted.canonical_settings.intent.stt.provider == STTProviderName.DEEPGRAM.value
     assert persisted.canonical_settings.intent.ui.locale == "ja"
@@ -14119,7 +14088,7 @@ async def test_order22_live_settings_view_alias_save_failure_restores_legacy_and
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
     assert controller.settings.audio.input_device == "Built-in Mic"
@@ -14129,7 +14098,7 @@ async def test_order22_live_settings_view_alias_save_failure_restores_legacy_and
     assert raw_failure_text not in repr(controller._runtime_logging.basic_messages)
 
     controller.settings.ui.locale = "ja"
-    assert controller._save_settings() is True
+    assert controller._get_settings_owner().save_current() is True
     persisted = adapter_type().load_active(path)
     assert persisted.canonical_settings.intent.audio.input_device == "Built-in Mic"
     assert persisted.canonical_settings.intent.ui.locale == "ja"
@@ -14333,7 +14302,7 @@ async def test_mixed_order22_order23_order24_fallback_save_failure_restores_comm
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -14420,7 +14389,7 @@ async def test_order22_apply_settings_mixed_full_draft_save_failure_degrades_and
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -14588,7 +14557,7 @@ async def test_order21_provider_only_mixed_full_draft_save_failure_restores_comm
     assert len(requests) == 1
     assert requests[0].reason == settings_mutation.SETTINGS_MUTATION_SURFACE_TRANSLATION_PROVIDER
     assert requests[0].values == {"llm.concurrency_limit": 3}
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -14678,7 +14647,7 @@ async def test_order21_provider_only_mixed_full_draft_save_failure_preserves_ret
     assert len(requests) == 1
     assert requests[0].reason == settings_mutation.SETTINGS_MUTATION_SURFACE_TRANSLATION_PROVIDER
     assert requests[0].values == {"llm.concurrency_limit": 3}
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -14758,7 +14727,7 @@ async def test_order21_provider_only_mixed_full_draft_runtime_unavailable_degrad
 
     await controller.apply_providers(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -14824,7 +14793,7 @@ async def test_provider_order21_order24_fallback_save_failure_restores_committed
 
     await controller.apply_providers(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -14888,7 +14857,7 @@ async def test_order22_provider_mixed_fallback_failure_degrades_without_raw_valu
 
     await controller.apply_providers(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.message == messages.UserMessageRef(
@@ -14949,7 +14918,7 @@ async def test_order22_provider_mixed_full_draft_save_failure_degrades_and_resto
 
     applied = await controller.apply_providers(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert applied is False
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
@@ -15019,7 +14988,7 @@ async def test_order22_mixed_settings_direct_fallback_degrades_when_stt_unavaila
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -15130,7 +15099,7 @@ async def test_order22_qwen_historical_false_cannot_restore_non_fast_runtime(
 
     await controller.apply_settings(pending)
 
-    first_result = controller.last_settings_mutation_result
+    first_result = _settings_result(controller)
     assert first_result is not None
     assert (
         first_result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
@@ -15238,7 +15207,7 @@ async def test_order23_apply_settings_restore_baseline_on_live_settings_view_sav
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -15286,7 +15255,7 @@ async def test_order23_first_live_settings_view_mutation_after_sync_uses_baselin
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
     assert result.diagnostics == messages.ErrorDiagnostics(
@@ -15330,7 +15299,7 @@ async def test_order23_apply_settings_runtime_failure_degrades_without_rollback_
 
     await controller.apply_settings(pending)
 
-    result = controller.last_settings_mutation_result
+    result = _settings_result(controller)
     assert result is not None
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
     assert result.message == messages.UserMessageRef(
@@ -15391,46 +15360,6 @@ async def test_order23_runtime_only_overlay_active_flags_are_not_routed(
     assert controller.settings.ui.overlay_enabled is True
     assert controller.settings.ui.peer_translation_enabled is True
     assert saved_settings and to_dict(saved_settings[0])["ui"].get("overlay_enabled") is None
-
-
-@pytest.mark.asyncio
-async def test_combined_order22_and_order23_apply_settings_routes_both_services_without_direct_save(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.languages.source_language = "ko"
-    controller.settings.overlay.show_translation = True
-    controller.settings.osc.chatbox_include_source = False
-    service = RecordingSettingsMutationService()
-    controller.settings_mutation_service = service
-    direct_saves: list[AppSettings] = []
-
-    def record_direct_save(_path, settings) -> None:
-        direct_saves.append(copy.deepcopy(settings))
-
-    _patch_settings_save(monkeypatch, record_direct_save)
-
-    pending = copy.deepcopy(controller.settings)
-    pending.languages.source_language = "ja"
-    pending.overlay.show_translation = False
-    pending.osc.chatbox_include_source = True
-
-    await controller.apply_settings(pending)
-
-    assert [request.reason for request in service.requests] == [
-        settings_mutation.SETTINGS_MUTATION_SURFACE_STT_LANGUAGE_AUDIO,
-        settings_mutation.SETTINGS_MUTATION_SURFACE_OVERLAY_OSC_OUTPUT,
-    ]
-    assert service.requests[0].values == {"languages.source_language": "ja"}
-    assert service.requests[1].values == {
-        "overlay.show_translation": False,
-        "osc.chatbox_include_source": True,
-    }
-    assert direct_saves == []
-    assert controller.settings.languages.source_language == "ja"
-    assert controller.settings.overlay.show_translation is False
-    assert controller.settings.osc.chatbox_include_source is True
 
 
 @pytest.mark.asyncio
@@ -15546,10 +15475,14 @@ async def test_on_dashboard_language_change_routes_self_and_peer_updates_through
     controller.settings.languages.peer_target_language = "ja"
     captured: list[AppSettings] = []
 
-    async def fake_apply_settings(self, settings: AppSettings) -> None:
+    async def fake_apply_settings(
+        self: SettingsApplicationOwner,
+        settings: AppSettings,
+    ) -> bool:
         captured.append(settings)
+        return True
 
-    monkeypatch.setattr(GuiController, "apply_settings", fake_apply_settings)
+    monkeypatch.setattr(SettingsApplicationOwner, "apply", fake_apply_settings)
 
     await controller.on_dashboard_language_change(
         _language_selection_change(
@@ -15629,10 +15562,14 @@ async def test_on_dashboard_language_change_preserves_explicit_peer_override_whe
     controller.settings.languages.peer_target_language = "fr"
     captured: list[AppSettings] = []
 
-    async def fake_apply_settings(self, settings: AppSettings) -> None:
+    async def fake_apply_settings(
+        self: SettingsApplicationOwner,
+        settings: AppSettings,
+    ) -> bool:
         captured.append(settings)
+        return True
 
-    monkeypatch.setattr(GuiController, "apply_settings", fake_apply_settings)
+    monkeypatch.setattr(SettingsApplicationOwner, "apply", fake_apply_settings)
 
     await controller.on_dashboard_language_change(
         _language_selection_change(
@@ -15657,12 +15594,7 @@ async def test_on_dashboard_language_change_persists_explicit_automatic_peer_mod
     controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
     controller.settings = AppSettings()
     controller.settings.languages.peer_source_language = "ja"
-    captured: list[AppSettings] = []
-
-    async def fake_apply_settings(self, settings: AppSettings) -> None:
-        captured.append(settings)
-
-    monkeypatch.setattr(GuiController, "apply_settings", fake_apply_settings)
+    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
 
     await controller.on_dashboard_language_change(
         _language_selection_change(
@@ -15674,8 +15606,8 @@ async def test_on_dashboard_language_change_persists_explicit_automatic_peer_mod
         )
     )
 
-    assert captured[0].languages.peer_source_language == "ja"
-    assert captured[0].languages.peer_source_mode == "auto"
+    assert controller.settings.languages.peer_source_language == "ja"
+    assert controller.settings.languages.peer_source_mode == "auto"
     assert controller.vnext_settings is not None
     assert controller.vnext_settings.intent.languages.peer_source_mode == "auto"
 
@@ -16225,7 +16157,11 @@ async def test_apply_settings_pushes_updated_overlay_snapshot_to_bridge_and_rest
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
@@ -16324,7 +16260,11 @@ async def test_apply_settings_pushes_peer_overlay_snapshot_preferences_to_bridge
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
+    monkeypatch.setattr(
+        SettingsOwner,
+        "save_current",
+        lambda self, **_kwargs: True,
+    )
 
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()

@@ -43,6 +43,9 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
     build_translation_provider_settings_path_patch,
     settings_path_mutation_validator_for_command,
 )
+from puripuly_heart.app.services.settings_transaction_result import (
+    SettingsTransactionResultOwner,
+)
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
@@ -60,8 +63,6 @@ ProviderSettingsRoute = Callable[[AppSettings], Awaitable[bool]]
 ProviderSettingsSync = Callable[[AppSettings], None]
 ProviderSettingsPredicate = Callable[[AppSettings, AppSettings], bool]
 ProviderSettingsCompensation = Callable[..., Awaitable[None]]
-ProviderSettingsResultSink = Callable[[TransactionResult], None]
-ProviderSettingsResultProvider = Callable[[], TransactionResult | None]
 ProviderSettingsMutationServiceProvider = Callable[[], SettingsMutationService | None]
 ProviderOrder24PatchProvider = Callable[
     [AppSettings],
@@ -85,20 +86,16 @@ class ProviderApplicationOwner:
     apply_order24: ProviderSettingsRoute
     remember_order22: ProviderSettingsSync
     mutation_service_provider: ProviderSettingsMutationServiceProvider
-    persist_current_settings: Callable[[], bool]
     save_failure_sink: ProviderSettingsSaveFailureSink
-    result_sink: ProviderSettingsResultSink
-    result_provider: ProviderSettingsResultProvider
+    results: SettingsTransactionResultOwner
     sync_memory: ProviderSettingsSync
     capture_runtime_signatures: Callable[[], None]
     sync_signatures: ProviderSettingsSync
     consume_superseded_settings: ProviderSupersededSettingsConsumer
     active_local_asr_change: ProviderSettingsPredicate
     compensate_local_asr: ProviderSettingsCompensation
-    copy_runtime_only_ui_state: Callable[[AppSettings, AppSettings], None]
     llm_retry_pending: Callable[[], bool]
     mark_llm_retry: Callable[[], None]
-    last_result: TransactionResult | None = None
 
     async def apply(
         self,
@@ -117,7 +114,6 @@ class ProviderApplicationOwner:
                 if await self._apply_translation(next_settings):
                     return self._last_result_committed()
                 if await self.apply_order24(next_settings):
-                    self._adopt_external_result()
                     return self._last_result_committed()
             return await self._apply_direct(
                 next_settings,
@@ -157,7 +153,7 @@ class ProviderApplicationOwner:
             _apply_settings_path_patch(patch_settings, values)
             if not await route(patch_settings):
                 return False
-            result = self.last_result
+            result = self.results.current
             if result is not None and _settings_mutation_committed(result):
                 committed_results.append(result)
             return True
@@ -178,10 +174,12 @@ class ProviderApplicationOwner:
                 return True
             order24_settings = copy.deepcopy(current)
             _apply_settings_path_patch(order24_settings, order24_values)
-            self.copy_runtime_only_ui_state(next_settings, order24_settings)
+            order24_settings.ui.overlay_enabled = bool(next_settings.ui.overlay_enabled)
+            order24_settings.ui.peer_translation_enabled = bool(
+                next_settings.ui.peer_translation_enabled
+            )
             if not await self.apply_order24(order24_settings):
                 return False
-            self._adopt_external_result()
             if not self._last_result_committed():
                 return True
 
@@ -217,8 +215,8 @@ class ProviderApplicationOwner:
                     )
                 )
         if (
-            self.last_result is not None
-            and self.last_result.status
+            self.results.current is not None
+            and self.results.current.status
             == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
             and committed_results
         ):
@@ -273,13 +271,23 @@ class ProviderApplicationOwner:
             runtime_apply=runtime_apply,
             validator=settings_path_mutation_validator_for_command(command),
         )
-        result = await service.mutate(
-            command.to_mutation_request(
-                expected_revision=None,
-                correlation_id=None,
+        result: TransactionResult | None = None
+        try:
+            result = await service.mutate(
+                command.to_mutation_request(
+                    expected_revision=None,
+                    correlation_id=None,
+                )
             )
-        )
-        self.settings.complete()
+        finally:
+            if getattr(repository, "commit_succeeded", False) or (
+                result is not None and _settings_mutation_committed(result)
+            ):
+                self.settings.complete()
+            else:
+                self.settings.rollback()
+        if result is None:
+            raise RuntimeError("provider settings mutation completed without a result")
         self._set_result(result)
         if not _settings_mutation_committed(result):
             return True
@@ -380,13 +388,23 @@ class ProviderApplicationOwner:
             runtime_apply=runtime_apply,
             validator=settings_path_mutation_validator_for_command(command),
         )
-        result = await service.mutate(
-            command.to_mutation_request(
-                expected_revision=None,
-                correlation_id=None,
+        result: TransactionResult | None = None
+        try:
+            result = await service.mutate(
+                command.to_mutation_request(
+                    expected_revision=None,
+                    correlation_id=None,
+                )
             )
-        )
-        self.settings.complete()
+        finally:
+            if getattr(repository, "commit_succeeded", False) or (
+                result is not None and _settings_mutation_committed(result)
+            ):
+                self.settings.complete()
+            else:
+                self.settings.rollback()
+        if result is None:
+            raise RuntimeError("provider settings mutation completed without a result")
         self._set_result(result)
         if not _settings_mutation_committed(result):
             self.settings.current = copy.deepcopy(base_settings)
@@ -499,7 +517,14 @@ class ProviderApplicationOwner:
                     self.settings.rollback()
                     raise ProviderStrictSettingsSaveFailed from None
                 self.settings.remember_projection(next_settings)
-            elif self.persist_current_settings() is False:
+            elif (
+                self.settings.save_current(
+                    failure_sink=lambda exc: self.save_failure_sink(
+                        f"Failed to save settings: {exc}"
+                    )
+                )
+                is False
+            ):
                 self.settings.rollback()
                 return False
             committed = True
@@ -551,16 +576,10 @@ class ProviderApplicationOwner:
             self.sync_memory(committed_settings)
 
     def _set_result(self, result: TransactionResult) -> None:
-        self.last_result = result
-        self.result_sink(result)
-
-    def _adopt_external_result(self) -> None:
-        result = self.result_provider()
-        if result is not None:
-            self.last_result = result
+        self.results.set(result)
 
     def _last_result_committed(self) -> bool:
-        return self.last_result is not None and _settings_mutation_committed(self.last_result)
+        return self.results.committed()
 
 
 def _settings_mutation_committed(result: TransactionResult) -> bool:
@@ -603,7 +622,7 @@ class ProviderSettingsOwner:
     active_secret_provider: ProviderActiveSecretProvider
     save_failure_sink: ProviderSettingsSaveFailureSink | None = None
     secret_change: ProviderSecretChangeOwner = field(default_factory=ProviderSecretChangeOwner)
-    last_result: TransactionResult | None = None
+    results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
 
     def verification_binding(
         self,
@@ -689,7 +708,7 @@ class ProviderSettingsOwner:
         result: TransactionResult,
         succeeded: bool,
     ) -> None:
-        self.last_result = result
+        self.results.set(result)
         if not succeeded:
             return
         self.settings.current = committed_settings

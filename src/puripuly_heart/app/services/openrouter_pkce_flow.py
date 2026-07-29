@@ -1,8 +1,42 @@
 from __future__ import annotations
 
+import asyncio
+import copy
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
+from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
+from puripuly_heart.app.ports.secret_store import SecretStorePort
+from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.provider_runtime_apply import (
+    ProviderRuntimeApplyAdapter,
+    ProviderRuntimeOwner,
+    _runtime_apply_result_as_degraded_transaction,
+)
+from puripuly_heart.app.services.provider_settings import ProviderSettingsOwner
+from puripuly_heart.app.services.secret_settings_transaction import (
+    SecretSetRequest,
+    SecretSettingsTransaction,
+)
+from puripuly_heart.app.services.settings_transaction_result import (
+    SettingsTransactionResultOwner,
+)
+from puripuly_heart.config.llm_profiles import profile_for_alias
+from puripuly_heart.config.settings import (
+    AppSettings,
+    LLMProviderName,
+    OpenRouterCredentialSource,
+    OpenRouterLLMModel,
+    OpenRouterSelectionAlias,
+)
+from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import (
+    RUNTIME_APPLY_STATUS_APPLIED,
+    TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+    TransactionResult,
+)
+from puripuly_heart.core.openrouter_credentials import OPENROUTER_BYOK_API_KEY_SECRET
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 
@@ -71,4 +105,164 @@ class OpenRouterPkceFlowOwner:
             self._active_client = None
 
 
-__all__ = ["OpenRouterPkceFlowOwner"]
+@dataclass(slots=True)
+class OpenRouterPkceApplicationOwner:
+    flow: OpenRouterPkceFlowOwner
+    verifier: ProviderVerifierPort
+    settings: SettingsOwner
+    provider_settings: ProviderSettingsOwner
+    provider_runtime: ProviderRuntimeOwner
+    secret_store_factory: Callable[[AppSettings], SecretStorePort]
+    failure_message_sink: Callable[[str], None]
+    failure_diagnostics_sink: Callable[[str], None]
+    failure_route: Callable[[str], None]
+    results: SettingsTransactionResultOwner
+
+    async def connect(
+        self,
+        *,
+        target_settings: AppSettings,
+        launch_source: str,
+    ) -> bool:
+        current = self.settings.current
+        if current is None:
+            return False
+        selection_alias = target_settings.openrouter.selection_alias
+        if selection_alias is None:
+            raise ValueError("PKCE connection requires a BYOK OpenRouter alias")
+        profile = profile_for_alias(selection_alias.value)
+        if profile.openrouter_source != OpenRouterCredentialSource.BYOK.value:
+            raise ValueError("PKCE connection requires a BYOK OpenRouter alias")
+        if profile.openrouter_model is None:
+            raise ValueError("PKCE connection requires a BYOK OpenRouter model")
+
+        try:
+            result = await self.flow.run_flow()
+        except Exception:
+            self._fail(
+                launch_source,
+                "OpenRouter PKCE flow failed",
+            )
+            return False
+
+        try:
+            verified = await self.verifier.verify_api_key("openrouter", result.api_key)
+        except Exception:
+            verified = False
+        if not verified:
+            self._fail(
+                launch_source,
+                "OpenRouter PKCE key verification failed",
+            )
+            return False
+
+        updated = copy.deepcopy(target_settings)
+        updated.provider.llm = LLMProviderName.OPENROUTER
+        updated.openrouter.selection_alias = OpenRouterSelectionAlias(profile.alias)
+        updated.openrouter.selected_source = OpenRouterCredentialSource.BYOK
+        updated.openrouter.llm_model = OpenRouterLLMModel(profile.openrouter_model)
+        updated.api_key_verified.openrouter = True
+        plan = self.provider_runtime.build_plan(
+            updated,
+            force_rebuild_llm=True,
+        )
+        settings_repository = self.settings.create_legacy_patch_repository(
+            base_settings=current,
+            committed_settings=updated,
+            surface="openrouter_pkce",
+            provider_verification_binding=self.provider_settings.verification_binding(
+                "openrouter",
+                result.api_key,
+                flow="openrouter_pkce",
+                context_values={"launch_source": launch_source},
+            ),
+            save_failure_sink=self.failure_diagnostics_sink,
+        )
+        transaction = SecretSettingsTransaction(
+            secret_store=self.secret_store_factory(current),
+            settings_repository=settings_repository,
+        )
+        runtime_apply = ProviderRuntimeApplyAdapter(
+            owner=self.provider_runtime,
+            settings=updated,
+            plan=plan,
+            surface="openrouter_pkce",
+            operation="openrouter_pkce_runtime_apply",
+        )
+        values = self.settings.legacy_snapshot_values(updated)
+        scope = LifecycleScope("openrouter-pkce-commit")
+
+        async def commit_and_apply() -> bool:
+            try:
+                commit_result = await transaction.set_provider_secret(
+                    SecretSetRequest(
+                        secret_key=OPENROUTER_BYOK_API_KEY_SECRET,
+                        secret_value=result.api_key,
+                        settings_values=values,
+                        expected_settings_revision=None,
+                        reason="openrouter_pkce",
+                        correlation_id=None,
+                    )
+                )
+                if (
+                    commit_result.status
+                    != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+                ):
+                    self.results.set(commit_result)
+                    self._fail(
+                        launch_source,
+                        "OpenRouter PKCE settings commit failed",
+                    )
+                    return False
+
+                runtime_result = await runtime_apply.apply_runtime(
+                    RuntimeApplyRequest(
+                        settings_values=values,
+                        reason="openrouter_pkce",
+                        correlation_id=None,
+                    )
+                )
+                if runtime_result.status == RUNTIME_APPLY_STATUS_APPLIED:
+                    result_value = TransactionResult(
+                        status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+                        message=runtime_result.message,
+                        diagnostics=runtime_result.diagnostics,
+                    )
+                else:
+                    result_value = _runtime_apply_result_as_degraded_transaction(runtime_result)
+                self.results.set(result_value)
+                return True
+            finally:
+                if settings_repository.commit_succeeded:
+                    self.settings.complete()
+                else:
+                    self.settings.rollback()
+
+        operation = start_lifecycle_task(
+            scope,
+            commit_and_apply(),
+            name="transaction",
+        )
+        cancelled = False
+        try:
+            try:
+                succeeded = await asyncio.shield(operation)
+            except asyncio.CancelledError:
+                cancelled = True
+                succeeded = await operation
+        finally:
+            await scope.close()
+        if cancelled:
+            raise asyncio.CancelledError
+        return succeeded
+
+    def _fail(self, launch_source: str, diagnostics: str) -> None:
+        self.failure_message_sink("openrouter.pkce.failed")
+        self.failure_diagnostics_sink(diagnostics)
+        self.failure_route(launch_source)
+
+
+__all__ = [
+    "OpenRouterPkceApplicationOwner",
+    "OpenRouterPkceFlowOwner",
+]
