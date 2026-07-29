@@ -42,6 +42,9 @@ def test_output_runtime_is_the_only_production_output_owner_construction() -> No
 def test_hub_delegates_output_side_effects_to_output_runtime() -> None:
     hub_source = (SOURCE_ROOT / "core" / "orchestrator" / "hub.py").read_text(encoding="utf-8")
     controller_source = (SOURCE_ROOT / "ui" / "controller.py").read_text(encoding="utf-8")
+    overlay_source = (SOURCE_ROOT / "app" / "services" / "overlay_application.py").read_text(
+        encoding="utf-8"
+    )
     output_source = (SOURCE_ROOT / "core" / "runtime" / "output.py").read_text(encoding="utf-8")
 
     assert "self.overlay_sink.emit(" not in hub_source
@@ -68,7 +71,7 @@ def test_hub_delegates_output_side_effects_to_output_runtime() -> None:
     assert "self.chatbox.send_immediate(" in output_source
     assert "self.chatbox.set_typing_reason(" in output_source
     assert "self.chatbox.clear_typing_reasons(" in output_source
-    assert "await self._replace_hub_overlay_sink(" in controller_source
+    assert "await self.replace_hub_sink(" in overlay_source
 
 
 def test_flet_composition_uses_owner_without_importing_output_implementation() -> None:

@@ -114,22 +114,14 @@ from puripuly_heart.app.services.microphone_test import (
     MicrophoneTestSessionRequest,
 )
 from puripuly_heart.app.services.openrouter_pkce_flow import OpenRouterPkceFlowOwner
+from puripuly_heart.app.services.overlay_application import (
+    OverlayApplicationOwner,
+    OverlayApplicationState,
+)
 from puripuly_heart.app.services.overlay_calibration import OverlayCalibrationOwner
-from puripuly_heart.app.services.overlay_generation_start import (
-    OverlayGenerationStartDiagnostic,
-    OverlayGenerationStartEffects,
-    OverlayGenerationStartOwner,
-    OverlayGenerationStartRequest,
-)
-from puripuly_heart.app.services.overlay_session_transition import (
-    OverlaySessionShutdownExecution,
-    OverlaySessionStartExecution,
-    OverlaySessionTransitionDiagnostic,
-    OverlaySessionTransitionOwner,
-)
-from puripuly_heart.app.services.peer_capture_target import PeerCaptureTargetResolutionService
-from puripuly_heart.app.services.peer_process_capture_retry import (
-    PeerProcessCaptureRetryOwner,
+from puripuly_heart.app.services.peer_application import (
+    PeerApplicationOwner,
+    PeerApplicationState,
 )
 from puripuly_heart.app.services.provider_credential_verification import (
     ProviderCredentialVerificationInteractionOwner,
@@ -187,11 +179,13 @@ from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.app.wiring import (
     LocalASRProviderRuntimeFactory,
     ManagedSTTProviderFactory,
-    build_local_asr_session_options,
     build_managed_identity_state_port,
     build_openrouter_credential_runtime_config,
     build_openrouter_release_runtime_config,
+    build_peer_capture_session_config,
+    build_peer_stt_provider_request,
     build_peer_stt_provider_signature_from_vnext,
+    build_peer_stt_runtime_signature,
     build_self_capture_session_config,
     build_self_capture_vad_signature,
     build_self_stt_provider_request,
@@ -218,7 +212,6 @@ from puripuly_heart.app.wiring import (
     create_self_capture_vad_sink_adapter,
     create_sync_secret_store_adapter,
     resolve_overlay_config,
-    resolve_peer_stt_runtime_config_from_vnext,
 )
 from puripuly_heart.app.wiring_composition import (
     create_gpu_provider_recovery_application_owner,
@@ -234,7 +227,6 @@ from puripuly_heart.app.wiring_managed_auth_factory import (
     ManagedAuthRuntimeAdapter,
     ManagedTranslationRuntimeAdapter,
 )
-from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
 from puripuly_heart.config.llm_profiles import profile_for_alias
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.paths import user_config_dir
@@ -244,7 +236,6 @@ from puripuly_heart.config.process_capture_resolution import (
 from puripuly_heart.config.resolved import (
     ResolvedDesktopAudioCaptureTarget,
     ResolvedOverlayConfig,
-    ResolvedSTTConfig,
 )
 from puripuly_heart.config.settings import (
     DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
@@ -304,9 +295,6 @@ from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningSnapshot,
 )
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
-from puripuly_heart.core.local_stt_assets import (
-    LOCAL_QWEN_GPU_MODEL_ID,
-)
 from puripuly_heart.core.managed_openrouter_broker_client import (
     HttpManagedOpenRouterBrokerClient,
 )
@@ -337,37 +325,21 @@ from puripuly_heart.core.osc.receiver import (
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
-from puripuly_heart.core.overlay.process import (
-    DefaultOverlayProcessRunner,
-    DesktopFletOverlayRunner,
-    OverlayProcessManager,
-    OverlayProcessRunner,
-)
+from puripuly_heart.core.overlay.process import OverlayProcessRunner
 from puripuly_heart.core.peer_capture import (
     PeerCaptureDiagnostic,
-    PeerCaptureFailureReason,
-    PeerCaptureLanguageFacts,
-    PeerCaptureSessionConfig,
     PeerCaptureSessionSnapshot,
-    PeerCaptureTargetIntent,
 )
 from puripuly_heart.core.runtime.desktop_overlay_bounds import (
     DesktopOverlayBoundsOwner,
     is_finite_non_bool_number,
 )
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
-from puripuly_heart.core.runtime.local_asr_transition import LocalASRTransitionCoordinator
-from puripuly_heart.core.runtime.local_qwen_lifecycle import LOCAL_QWEN_IDLE_RELEASE_SECONDS
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
-from puripuly_heart.core.runtime.overlay_session_fallback import (
-    OverlaySessionFallbackOwner,
-)
 from puripuly_heart.core.runtime.peer_channel import (
     PeerCaptureSessionOwner,
-    PeerLocalASRTransitionSuperseded,
 )
-from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildService
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.vrchat_osc_presence import (
     VrchatOscPresenceProbeOwner,
@@ -443,16 +415,6 @@ LOCAL_QWEN_HALLUCINATION_GUIDANCE_TRIGGER_COUNT = 2
 
 def _canonical_json_signature(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def _callable_accepts_keyword(callable_obj: object, keyword: str) -> bool:
-    try:
-        parameters = inspect.signature(callable_obj).parameters
-    except (TypeError, ValueError):
-        return True
-    return keyword in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    )
 
 
 def _callable_accepts_positional_arguments(callable_obj: object, count: int) -> bool:
@@ -571,11 +533,6 @@ class GuiController:
     osc: ChatboxPaginator | None = None
     hub: ClientHub | None = None
     _self_capture_owner: SelfCaptureSessionOwner | None = field(init=False, default=None)
-    _provider_rebuild_runtime: ProviderRuntimeRebuildService = field(
-        init=False,
-        default_factory=ProviderRuntimeRebuildService,
-        repr=False,
-    )
     _provider_runtime_owner: ProviderRuntimeOwner | None = field(
         init=False,
         default=None,
@@ -591,13 +548,7 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _peer_capture_target_resolution: PeerCaptureTargetResolutionService = field(
-        init=False,
-        default_factory=PeerCaptureTargetResolutionService,
-        repr=False,
-    )
-    _peer_runtime: PeerCaptureSessionOwner | None = None
-    _peer_process_capture_retry_owner: PeerProcessCaptureRetryOwner | None = field(
+    _peer_application_owner: PeerApplicationOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -637,29 +588,16 @@ class GuiController:
     _stt_activation_generation: int = field(init=False, default=0)
     _stt_activation_starting: bool = field(init=False, default=False)
     _stt_activation_failed: bool = field(init=False, default=False)
-    _peer_local_asr_transition: LocalASRTransitionCoordinator = field(
-        init=False,
-        default_factory=lambda: LocalASRTransitionCoordinator(channel="peer"),
-        repr=False,
-    )
     _last_stt_runtime_signature: tuple[object, ...] | None = None
     _last_self_stt_runtime_signature: tuple[object, ...] | None = None
-    _last_peer_stt_runtime_signature: tuple[object, ...] | None = None
     _last_self_stt_provider_signature: tuple[object, ...] | None = None
-    _last_peer_stt_provider_signature: tuple[object, ...] | None = None
     _last_llm_provider_signature: tuple[object, ...] | None = None
-    _last_peer_translation_enabled: bool | None = None
-    _last_peer_translation_activation_requested: bool | None = None
-    _peer_activation_generation: int = field(init=False, default=0)
-    _peer_activation_starting: bool = field(init=False, default=False)
-    _peer_asr_model_loading: bool = field(init=False, default=False)
     _superseded_local_asr_settings_ids: set[int] = field(
         init=False,
         default_factory=set,
         repr=False,
     )
     _process_idle_preparation_scheduled: bool = field(init=False, default=False)
-    _peer_process_warning_reason: str | None = field(init=False, default=None)
     _settings_projection_owner: SettingsProjectionOwner | None = field(
         init=False,
         default=None,
@@ -697,19 +635,7 @@ class GuiController:
         repr=False,
     )
     # Overlay runtime internals are owned by OverlayRuntimeHandle.
-    _overlay_runtime: OverlayRuntimeHandle | None = None
-    _overlay_session_transition_owner: OverlaySessionTransitionOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _overlay_generation_start_owner: OverlayGenerationStartOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _active_overlay_target: str | None = field(init=False, default=None)
-    _overlay_session_fallback_owner: OverlaySessionFallbackOwner | None = field(
+    _overlay_application_owner: OverlayApplicationOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -773,9 +699,6 @@ class GuiController:
     _stop_complete: bool = field(init=False, default=False, repr=False)
     _stop_exception: BaseException | None = field(init=False, default=None, repr=False)
 
-    overlay_state: str = "off"
-    failure_reason: str | None = None
-    auto_restart_scheduled: bool = False
     desktop_overlay_interaction_mode: str = field(
         init=False,
         default=DESKTOP_INTERACTION_MODE_EDIT,
@@ -853,24 +776,311 @@ class GuiController:
         return owner.last_referral_bonus_applied if owner is not None else False
 
     @property
+    def _overlay_runtime(self) -> OverlayRuntimeHandle | None:
+        owner = self._overlay_application_owner
+        return owner.runtime if owner is not None else None
+
+    @_overlay_runtime.setter
+    def _overlay_runtime(self, runtime: OverlayRuntimeHandle | None) -> None:
+        self._get_overlay_application_owner().runtime = runtime
+
+    @property
+    def _active_overlay_target(self) -> str | None:
+        owner = self._overlay_application_owner
+        return owner.active_target if owner is not None else None
+
+    @_active_overlay_target.setter
+    def _active_overlay_target(self, target: str | None) -> None:
+        self._get_overlay_application_owner().active_target = target
+
+    @property
+    def overlay_state(self) -> str:
+        owner = self._overlay_application_owner
+        return owner.state if owner is not None else "off"
+
+    @overlay_state.setter
+    def overlay_state(self, state: str) -> None:
+        self._get_overlay_application_owner().state = state
+
+    @property
+    def failure_reason(self) -> str | None:
+        owner = self._overlay_application_owner
+        return owner.failure_reason if owner is not None else None
+
+    @failure_reason.setter
+    def failure_reason(self, reason: str | None) -> None:
+        self._get_overlay_application_owner().failure_reason = reason
+
+    @property
+    def auto_restart_scheduled(self) -> bool:
+        owner = self._overlay_application_owner
+        return owner.auto_restart_scheduled if owner is not None else False
+
+    @auto_restart_scheduled.setter
+    def auto_restart_scheduled(self, scheduled: bool) -> None:
+        self._get_overlay_application_owner().auto_restart_scheduled = scheduled
+
+    def _report_overlay_application_state(
+        self,
+        state: str,
+        failure_reason: str | None,
+    ) -> None:
+        bridge = self._ui_event_bridge
+        if bridge is not None:
+            bridge.report_overlay_state(state, failure_reason=failure_reason)
+
+    def _overlay_application_state(
+        self,
+        settings: AppSettings | None = None,
+    ) -> OverlayApplicationState:
+        resolved = settings or self.settings
+        return OverlayApplicationState(
+            settings_available=resolved is not None,
+            overlay_intent_enabled=bool(resolved is not None and resolved.ui.overlay_enabled),
+            configured_target=(
+                resolved.overlay.target if resolved is not None else OVERLAY_TARGET_STEAMVR
+            ),
+            locale=resolved.ui.locale if resolved is not None else "en",
+        )
+
+    def _get_overlay_application_owner(self) -> OverlayApplicationOwner:
+        owner = self._overlay_application_owner
+        if owner is None:
+            owner = OverlayApplicationOwner(
+                state_provider=self._overlay_application_state,
+                config_provider=lambda: resolve_overlay_config(cast(AppSettings, self.settings)),
+                overlay_intent_sink=lambda enabled: setattr(
+                    cast(AppSettings, self.settings).ui,
+                    "overlay_enabled",
+                    enabled,
+                ),
+                hub_provider=lambda: self.hub,
+                peer_snapshot_provider=lambda: self._get_peer_application_owner().snapshot(),
+                disable_peer_intent=lambda: self._get_peer_application_owner().disable_for_overlay(),
+                sync_peer_effective=lambda: self._get_peer_application_owner().sync_effective_flags(),
+                refresh_peer_dependencies=self._refresh_overlay_runtime_dependencies,
+                presentation_sink=self.app.refresh_overlay_peer_contract,
+                state_sink=self._report_overlay_application_state,
+                fallback_notice_sink=(self.app.set_dashboard_overlay_session_fallback_notice),
+                cancel_bounds_persistence=self._cancel_desktop_bounds_persistence,
+                clear_bounds_suppressed=lambda: self._get_desktop_overlay_bounds_owner().clear_suppressed(),
+                calibration_provider=lambda: self.overlay_calibration.copy(),
+                logging_mode_provider=lambda: self.runtime_logging_mode,
+                log_dir_provider=lambda: str(user_config_dir()),
+                desktop_controls_factory=(
+                    self._build_initial_desktop_runtime_controls_from_resolved_config
+                ),
+                interaction_mode_sink=self._set_desktop_overlay_interaction_mode,
+                bounds_control_sink=self._track_desktop_apply_window_bounds_control,
+                renderer_event_consumer=lambda queue, instance_id: (
+                    self._consume_desktop_renderer_events(
+                        queue,
+                        overlay_instance_id=instance_id,
+                    )
+                ),
+                edit_interaction_mode=DESKTOP_INTERACTION_MODE_EDIT,
+                clock=self.clock,
+                log_basic=lambda message, level: self.log_basic(
+                    message,
+                    level=level,
+                ),
+                log_detailed=lambda message, level, exception: self.log_detailed(
+                    message,
+                    level=level,
+                    exception=exception,
+                ),
+            )
+            self._overlay_application_owner = owner
+        return owner
+
+    @property
     def desktop_overlay_captions_locked(self) -> bool:
         return self.desktop_overlay_interaction_mode == DESKTOP_INTERACTION_MODE_PASS_THROUGH
 
+    @property
+    def _peer_runtime(self) -> PeerCaptureSessionOwner | None:
+        owner = self._peer_application_owner
+        return owner.runtime if owner is not None else None
+
+    @_peer_runtime.setter
+    def _peer_runtime(self, runtime: PeerCaptureSessionOwner | None) -> None:
+        self._get_peer_application_owner().bind_runtime(runtime)
+
+    @property
+    def _last_peer_stt_runtime_signature(self) -> tuple[object, ...] | None:
+        return self._get_peer_application_owner().last_runtime_signature
+
+    @_last_peer_stt_runtime_signature.setter
+    def _last_peer_stt_runtime_signature(self, value: tuple[object, ...] | None) -> None:
+        self._get_peer_application_owner().last_runtime_signature = value
+
+    @property
+    def _last_peer_stt_provider_signature(self) -> tuple[object, ...] | None:
+        return self._get_peer_application_owner().last_provider_signature
+
+    @_last_peer_stt_provider_signature.setter
+    def _last_peer_stt_provider_signature(self, value: tuple[object, ...] | None) -> None:
+        self._get_peer_application_owner().last_provider_signature = value
+
+    @property
+    def _last_peer_translation_enabled(self) -> bool | None:
+        return self._get_peer_application_owner().last_intent_enabled
+
+    @_last_peer_translation_enabled.setter
+    def _last_peer_translation_enabled(self, value: bool | None) -> None:
+        self._get_peer_application_owner().last_intent_enabled = value
+
+    @property
+    def _last_peer_translation_activation_requested(self) -> bool | None:
+        return self._get_peer_application_owner().last_activation_requested
+
+    @_last_peer_translation_activation_requested.setter
+    def _last_peer_translation_activation_requested(self, value: bool | None) -> None:
+        self._get_peer_application_owner().last_activation_requested = value
+
+    @property
+    def _peer_activation_generation(self) -> int:
+        return self._get_peer_application_owner().activation_generation
+
+    @_peer_activation_generation.setter
+    def _peer_activation_generation(self, value: int) -> None:
+        self._get_peer_application_owner().activation_generation = value
+
+    @property
+    def _peer_activation_starting(self) -> bool:
+        return self._get_peer_application_owner().activation_starting
+
+    @_peer_activation_starting.setter
+    def _peer_activation_starting(self, value: bool) -> None:
+        self._get_peer_application_owner().activation_starting = value
+
+    @property
+    def _peer_asr_model_loading(self) -> bool:
+        return self._get_peer_application_owner().model_loading
+
+    @_peer_asr_model_loading.setter
+    def _peer_asr_model_loading(self, value: bool) -> None:
+        self._get_peer_application_owner().model_loading = value
+
+    @property
+    def _peer_process_warning_reason(self) -> str | None:
+        return self._get_peer_application_owner().process_warning_reason
+
+    @_peer_process_warning_reason.setter
+    def _peer_process_warning_reason(self, value: str | None) -> None:
+        self._get_peer_application_owner().process_warning_reason = value
+
+    def _peer_application_state(
+        self,
+        settings: AppSettings | None = None,
+    ) -> PeerApplicationState:
+        resolved_settings = settings or self.settings
+        hub = self.hub
+        activation_requested = bool(
+            resolved_settings is not None
+            and PeerApplicationOwner.activation_requested(
+                intent_enabled=resolved_settings.ui.peer_translation_enabled,
+                eula_accepted=resolved_settings.ui.peer_translation_eula_accepted,
+            )
+        )
+        return PeerApplicationState(
+            settings_available=resolved_settings is not None,
+            peer_intent_enabled=bool(
+                resolved_settings is not None and resolved_settings.ui.peer_translation_enabled
+            ),
+            eula_accepted=bool(
+                resolved_settings is not None
+                and resolved_settings.ui.peer_translation_eula_accepted
+            ),
+            overlay_intent_enabled=bool(
+                resolved_settings is not None and resolved_settings.ui.overlay_enabled
+            ),
+            peer_provider_id=(
+                resolved_settings.provider.peer_stt.value if resolved_settings is not None else None
+            ),
+            runtime_available=hub is not None,
+            peer_provider_available=bool(
+                activation_requested and hub is not None and self._hub_has_stt_provider("peer")
+            ),
+            overlay_state=self.overlay_state,
+            overlay_command_available=(
+                self._current_overlay_bridge_for_direct_runtime_command() is not None
+            ),
+            ingress_frozen=self._shutdown_ingress_frozen,
+        )
+
+    def _apply_peer_effective_flags(
+        self,
+        peer_translation_enabled: bool,
+        integrated_context_enabled: bool,
+    ) -> None:
+        if self.hub is None:
+            return
+        self.hub.peer_translation_enabled = peer_translation_enabled
+        self.hub.integrated_context_enabled = integrated_context_enabled
+
+    def _get_peer_application_owner(self) -> PeerApplicationOwner:
+        owner = self._peer_application_owner
+        if owner is None:
+            owner = PeerApplicationOwner(
+                state_provider=self._peer_application_state,
+                config_factory=lambda: build_peer_capture_session_config(
+                    cast(AppSettings, self.settings),
+                    canonical_settings=self._canonical_vnext_settings_for(
+                        cast(AppSettings, self.settings)
+                    ),
+                ),
+                peer_intent_sink=lambda enabled: setattr(
+                    cast(AppSettings, self.settings).ui,
+                    "peer_translation_enabled",
+                    enabled,
+                ),
+                overlay_intent_sink=lambda enabled: setattr(
+                    cast(AppSettings, self.settings).ui,
+                    "overlay_enabled",
+                    enabled,
+                ),
+                persist_manual_fallback=lambda: self._persist_current_manual_local_asr_fallback(
+                    channel="peer"
+                ),
+                ensure_local_ready=lambda generation: self._ensure_peer_local_stt_ready(
+                    activation_generation=generation
+                ),
+                clear_cpu_pending=self._reset_local_stt_pending_peer_enable_after_install,
+                clear_gpu_pending=lambda: self._get_gpu_runtime_interaction_owner().clear_pending(
+                    "peer"
+                ),
+                clear_switched_pending=self._clear_local_stt_pending_enable_if_provider_switched_away,
+                sync_local_notice=self._sync_local_stt_notice,
+                presentation_changed=self._refresh_overlay_peer_consumers,
+                begin_overlay_start=self._begin_overlay_start,
+                effective_sink=self._apply_peer_effective_flags,
+                disclosure_sink=self._enqueue_peer_translation_disclosure,
+                superseded_sink=lambda: self._superseded_local_asr_settings_ids.add(
+                    id(self.settings)
+                ),
+                log_basic=self.log_basic,
+                log_detailed=self.log_detailed,
+                log_failure=lambda message: self.log_basic(
+                    message,
+                    level=logging.ERROR,
+                ),
+            )
+            self._peer_application_owner = owner
+        return owner
+
     def _effective_peer_translation_enabled_for(self, settings: AppSettings) -> bool:
-        return bool(
-            self._peer_translation_activation_requested_for(settings)
-            and self._effective_peer_overlay_enabled_for(settings)
-            and self.hub is not None
-            and self._hub_has_stt_provider("peer")
+        return self._get_peer_application_owner().effective_enabled(
+            self._peer_application_state(settings)
         )
 
     def _peer_translation_eula_accepted_for(self, settings: AppSettings) -> bool:
         return bool(settings.ui.peer_translation_eula_accepted)
 
     def _peer_translation_activation_requested_for(self, settings: AppSettings) -> bool:
-        return bool(
-            settings.ui.peer_translation_enabled
-            and self._peer_translation_eula_accepted_for(settings)
+        return self._get_peer_application_owner().activation_requested(
+            intent_enabled=settings.ui.peer_translation_enabled,
+            eula_accepted=settings.ui.peer_translation_eula_accepted,
         )
 
     def _effective_peer_overlay_enabled_for(self, settings: AppSettings) -> bool:
@@ -882,14 +1092,10 @@ class GuiController:
 
     def _sync_effective_hub_flags(self, settings: AppSettings | None = None) -> None:
         resolved_settings = settings or self.settings
-        if resolved_settings is None or self.hub is None:
+        if resolved_settings is None:
             return
-        self.hub.peer_translation_enabled = self._effective_peer_translation_enabled_for(
-            resolved_settings
-        )
-        self.hub.integrated_context_enabled = self._effective_integrated_context_enabled_for(
-            resolved_settings
-        )
+        state = self._peer_application_state(resolved_settings)
+        self._get_peer_application_owner().sync_effective_flags(state)
 
     def get_event_language_codes(self) -> tuple[str | None, str | None]:
         if self.settings is None:
@@ -897,40 +1103,21 @@ class GuiController:
         return self.settings.languages.source_language, self.settings.languages.target_language
 
     def overlay_peer_presentation_state(self) -> OverlayPeerPresentationState | None:
-        if self.settings is None:
-            return None
-        peer_effective = self._effective_peer_translation_enabled_for(self.settings)
-        if peer_effective or not self.settings.ui.peer_translation_enabled:
-            self._peer_process_warning_reason = None
-        return OverlayPeerPresentationState(
-            overlay_intent_enabled=bool(self.settings.ui.overlay_enabled),
-            overlay_state=self.overlay_state,
-            overlay_failure_reason=self.failure_reason,
-            peer_intent_enabled=bool(self.settings.ui.peer_translation_enabled),
-            peer_effective_enabled=peer_effective,
-            peer_warning_reason=self._peer_process_warning_reason,
-            peer_activation_starting=(
-                self._peer_activation_starting or self._peer_asr_model_loading
-            ),
-        )
+        return self._get_overlay_application_owner().presentation_state()
 
     def _refresh_overlay_peer_consumers(self) -> None:
-        with contextlib.suppress(Exception):
-            self.app.refresh_overlay_peer_contract(self.overlay_peer_presentation_state())
+        self._get_overlay_application_owner().publish_presentation()
 
     async def _refresh_overlay_runtime_dependencies(
         self,
         *,
         peer_stop_mode: str = "retain",
     ) -> None:
-        if self.settings is None or self.hub is None:
-            return
-
-        if peer_stop_mode == "retain":
-            await self._refresh_peer_stt_runtime()
-        else:
+        if peer_stop_mode == "release":
             await self._refresh_peer_stt_runtime(stop_mode="release")
-        self._sync_effective_hub_flags(self.settings)
+        else:
+            await self._refresh_peer_stt_runtime()
+        self._sync_effective_hub_flags()
         self._refresh_overlay_peer_consumers()
 
     async def start(self) -> None:
@@ -1257,19 +1444,6 @@ class GuiController:
         if provider is None:
             return not stt_available
         return self._stt_provider_requires_secret(provider) and not stt_available
-
-    def _build_peer_stt_runtime_signature(self, settings: AppSettings) -> tuple[object, ...]:
-        return self._build_peer_runtime_config(settings).runtime_signature
-
-    def _build_peer_stt_provider_signature(
-        self,
-        settings: AppSettings,
-        *,
-        canonical_settings: AppSettingsVNext | None = None,
-    ) -> tuple[object, ...]:
-        return build_peer_stt_provider_signature_from_vnext(
-            canonical_settings or self._canonical_vnext_settings_for(settings)
-        )
 
     def _managed_openrouter_can_attempt_translation(self) -> bool:
         return bool(
@@ -1776,9 +1950,14 @@ class GuiController:
         current_self_signature = build_self_stt_runtime_signature(settings)
         self._last_stt_runtime_signature = current_self_signature
         self._last_self_stt_runtime_signature = current_self_signature
-        self._last_peer_stt_runtime_signature = self._build_peer_stt_runtime_signature(settings)
+        self._last_peer_stt_runtime_signature = build_peer_stt_runtime_signature(
+            settings,
+            canonical_settings=self._canonical_vnext_settings_for(settings),
+        )
         self._last_self_stt_provider_signature = build_self_stt_provider_signature(settings)
-        self._last_peer_stt_provider_signature = self._build_peer_stt_provider_signature(settings)
+        self._last_peer_stt_provider_signature = build_peer_stt_provider_signature_from_vnext(
+            self._canonical_vnext_settings_for(settings)
+        )
         self._last_llm_provider_signature = self._build_llm_provider_signature(settings)
         self._last_microphone_test_audio_settings_signature = (
             self._microphone_test_audio_settings_signature(settings)
@@ -1849,11 +2028,8 @@ class GuiController:
         return merged
 
     def _peer_runtime_should_be_active(self, settings: AppSettings) -> bool:
-        return bool(
-            self._peer_translation_activation_requested_for(settings)
-            and self._effective_peer_overlay_enabled_for(settings)
-            and self.hub is not None
-            and self._current_overlay_bridge_for_direct_runtime_command() is not None
+        return self._get_peer_application_owner().desired_active(
+            self._peer_application_state(settings)
         )
 
     def _active_local_asr_change(
@@ -1880,8 +2056,14 @@ class GuiController:
                 base_settings.provider.peer_stt.value in local_providers
                 or next_settings.provider.peer_stt.value in local_providers
             )
-            and self._build_peer_stt_runtime_signature(base_settings)
-            != self._build_peer_stt_runtime_signature(next_settings)
+            and build_peer_stt_runtime_signature(
+                base_settings,
+                canonical_settings=self._canonical_vnext_settings_for(base_settings),
+            )
+            != build_peer_stt_runtime_signature(
+                next_settings,
+                canonical_settings=self._canonical_vnext_settings_for(next_settings),
+            )
         )
         return self_changed or peer_changed
 
@@ -1915,47 +2097,30 @@ class GuiController:
 
     @staticmethod
     def _normalized_overlay_target(value: object) -> str:
-        if value == OVERLAY_TARGET_DESKTOP:
-            return OVERLAY_TARGET_DESKTOP
-        return OVERLAY_TARGET_STEAMVR
+        return OverlayApplicationOwner.normalized_target(value)
 
     def _overlay_target_for_settings(self, settings: AppSettings | None = None) -> str:
-        resolved_settings = settings or self.settings
-        if resolved_settings is None:
-            return OVERLAY_TARGET_STEAMVR
-        return self._normalized_overlay_target(resolved_settings.overlay.target)
-
-    def _effective_overlay_target_for_start(self) -> str:
-        if self._get_overlay_session_fallback_owner().active:
-            return OVERLAY_TARGET_DESKTOP
-        return self._overlay_target_for_settings(self.settings)
-
-    def _clear_overlay_session_desktop_fallback(self) -> None:
-        self._get_overlay_session_fallback_owner().clear()
-
-    def _set_overlay_session_fallback_notice_active(self, active: bool) -> None:
-        self._get_overlay_session_fallback_owner().publish(active)
-
-    def _should_session_fallback_overlay_to_desktop(self, reason: str) -> bool:
-        return self._get_overlay_session_fallback_owner().should_fallback(
-            reason=reason,
-            active_target=self._active_overlay_target,
-            configured_enabled=bool(self.settings is not None and self.settings.ui.overlay_enabled),
-            configured_target=self._overlay_target_for_settings(self.settings),
-            desktop_target=OVERLAY_TARGET_DESKTOP,
-            steamvr_target=OVERLAY_TARGET_STEAMVR,
+        return self._get_overlay_application_owner().target_for_state(
+            self._overlay_application_state(settings)
         )
 
+    def _effective_overlay_target_for_start(self) -> str:
+        return self._get_overlay_application_owner().effective_target_for_start()
+
+    def _clear_overlay_session_desktop_fallback(self) -> None:
+        self._get_overlay_application_owner().clear_fallback()
+
+    def _set_overlay_session_fallback_notice_active(self, active: bool) -> None:
+        self._get_overlay_application_owner().publish_fallback(active)
+
+    def _should_session_fallback_overlay_to_desktop(self, reason: str) -> bool:
+        return self._get_overlay_application_owner().should_fallback(reason)
+
     def _new_overlay_runtime_handle(self) -> OverlayRuntimeHandle:
-        runtime = OverlayRuntimeHandle(shutdown_grace_s=OVERLAY_SHUTDOWN_GRACE_S)
-        self._overlay_runtime = runtime
-        return runtime
+        return self._get_overlay_application_owner().new_runtime()
 
     def _ensure_overlay_runtime_handle(self) -> OverlayRuntimeHandle:
-        runtime = self._overlay_runtime
-        if runtime is None:
-            runtime = self._new_overlay_runtime_handle()
-        return runtime
+        return self._get_overlay_application_owner().ensure_runtime()
 
     def _overlay_runtime_is_current(
         self,
@@ -1963,28 +2128,13 @@ class GuiController:
         *,
         overlay_instance_id: str | None = None,
     ) -> bool:
-        if self._overlay_runtime is not runtime:
-            return False
-        if overlay_instance_id is None:
-            return True
-        return runtime.is_current_instance_id(overlay_instance_id)
+        return self._get_overlay_application_owner().runtime_is_current(
+            runtime,
+            overlay_instance_id=overlay_instance_id,
+        )
 
     def _overlay_runtime_has_resources(self, runtime: OverlayRuntimeHandle | None) -> bool:
-        if runtime is None:
-            return False
-        return any(
-            resource is not None
-            for resource in (
-                runtime.presenter,
-                runtime.bridge,
-                runtime.process_manager,
-                runtime.diagnostics,
-                runtime.renderer_events,
-                runtime.start_task,
-                runtime.monitor_task,
-                runtime.renderer_event_task,
-            )
-        )
+        return OverlayApplicationOwner.runtime_has_resources(runtime)
 
     async def _replace_hub_overlay_sink(
         self,
@@ -1993,77 +2143,29 @@ class GuiController:
         expected_current: object | None = None,
         require_match: bool = False,
     ) -> bool:
-        hub = self.hub
-        if hub is None:
-            return False
-        replace_overlay_sink = getattr(hub, "replace_overlay_sink", None)
-        if callable(replace_overlay_sink):
-            return bool(
-                await replace_overlay_sink(
-                    overlay_sink,
-                    expected_current=expected_current,
-                    require_match=require_match,
-                )
-            )
-        if require_match and getattr(hub, "overlay_sink", None) is not expected_current:
-            return False
-        setattr(hub, "overlay_sink", overlay_sink)
-        return True
+        return await self._get_overlay_application_owner().replace_hub_sink(
+            overlay_sink,
+            expected_current=expected_current,
+            require_match=require_match,
+        )
 
     async def _close_stale_overlay_start_runtime(
         self,
         runtime: OverlayRuntimeHandle,
     ) -> None:
-        stale_presenter = runtime.presenter
-        stale_diagnostics = runtime.diagnostics
-        try:
-            await runtime.close(
-                preserve_presenter_state=True,
-                hub=self.hub,
-                emit_shutdown=False,
-            )
-        except Exception as exc:
-            self.log_detailed(
-                "[Overlay] Stale overlay start cleanup reported failure",
-                level=logging.WARNING,
-                exception=exc,
-            )
-        if self.hub is not None:
-            if getattr(self.hub, "overlay_sink", None) is stale_presenter:
-                await self._replace_hub_overlay_sink(
-                    None,
-                    expected_current=stale_presenter,
-                    require_match=True,
-                )
-            if getattr(self.hub, "overlay_diagnostics", None) is stale_diagnostics:
-                self.hub.overlay_diagnostics = None
+        await self._get_overlay_application_owner().close_stale_start(runtime)
 
     def _overlay_runtime_is_active(self) -> bool:
-        runtime = self._overlay_runtime
-        start_task = runtime.start_task if runtime is not None else None
-        return bool(
-            self.overlay_state in {"starting", "connected"}
-            or (runtime is not None and runtime.bridge is not None)
-            or (runtime is not None and runtime.process_manager is not None)
-            or (start_task is not None and not start_task.done())
-        )
+        return self._get_overlay_application_owner().runtime_is_active()
 
     def _current_overlay_presenter_for_direct_runtime_command(self) -> OverlayPresenter | None:
-        runtime = self._overlay_runtime
-        if runtime is None or self.overlay_state not in {"starting", "connected"}:
-            return None
-        return cast(OverlayPresenter | None, runtime.current_presenter_for_ingress())
+        return self._get_overlay_application_owner().current_presenter()
 
     def _current_overlay_bridge_for_direct_runtime_command(self) -> OverlayBridge | None:
-        runtime = self._overlay_runtime
-        if runtime is None:
-            return None
-        return cast(OverlayBridge | None, runtime.current_bridge_for_runtime_command())
+        return self._get_overlay_application_owner().current_bridge()
 
     def _previous_overlay_target_for_apply(self) -> str:
-        if self._overlay_runtime_is_active() and self._active_overlay_target is not None:
-            return self._active_overlay_target
-        return self._overlay_target_for_settings(self.settings)
+        return self._get_overlay_application_owner().previous_target_for_apply()
 
     def _overlay_process_runner_for_target(
         self,
@@ -2071,29 +2173,7 @@ class GuiController:
         *,
         task_factory: object | None = None,
     ) -> OverlayProcessRunner:
-        if target == OVERLAY_TARGET_DESKTOP:
-            return self._instantiate_overlay_process_runner(
-                DesktopFletOverlayRunner,
-                task_factory=task_factory,
-            )
-        return self._instantiate_overlay_process_runner(
-            DefaultOverlayProcessRunner,
-            task_factory=task_factory,
-        )
-
-    @staticmethod
-    def _instantiate_overlay_process_runner(
-        runner_cls: Callable[..., OverlayProcessRunner],
-        *,
-        task_factory: object | None,
-    ) -> OverlayProcessRunner:
-        try:
-            return runner_cls(task_factory=task_factory)
-        except TypeError:
-            runner = runner_cls()
-            with contextlib.suppress(Exception):
-                setattr(runner, "task_factory", task_factory)
-            return runner
+        return self._get_overlay_application_owner().process_runner(target, task_factory)
 
     def _build_initial_desktop_runtime_controls_from_resolved_config(
         self,
@@ -2708,112 +2788,33 @@ class GuiController:
         next_desktop.position.y = bounds["y"]
         next_desktop.position.validate()
 
-    def _build_peer_runtime_config(self, settings: AppSettings) -> PeerCaptureSessionConfig:
-        vnext_settings = self._canonical_vnext_settings_for(settings)
-        backend = resolve_peer_stt_runtime_config_from_vnext(vnext_settings)
-        provider_signature = build_peer_stt_provider_signature_from_vnext(vnext_settings)
-        desktop_audio = vnext_settings.intent.desktop_audio
-        capture_target = resolve_desktop_audio_capture_target(desktop_audio.capture_target)
-        model_id = None
-        if backend.provider == STTProviderName.LOCAL_QWEN_GPU.value:
-            model_id = LOCAL_QWEN_GPU_MODEL_ID
-        elif backend.provider in LOCAL_CPU_PROVIDERS:
-            decision = resolve_local_asr_selection(
-                backend.provider,
-                backend.source_language,
-            )
-            model_id = decision.model_id
-        session_options = (
-            build_local_asr_session_options(
-                source_language=backend.source_language,
-                source_mode=backend.source_mode,
-            )
-            if backend.provider in {*LOCAL_CPU_PROVIDERS, STTProviderName.LOCAL_QWEN_GPU.value}
-            else None
-        )
-        capture_vad_signature = (
-            desktop_audio.output_device,
-            capture_target,
-            desktop_audio.vad_speech_threshold,
-            desktop_audio.vad_hangover_ms,
-            desktop_audio.vad_pre_roll_ms,
-            backend.sample_rate_hz,
-        )
-        target = PeerCaptureTargetIntent(
-            kind=capture_target.kind,
-            device_name=capture_target.device_name,
-            process_kind=capture_target.process_kind,
-            executable_identity=capture_target.executable_identity,
-            discord_channel=capture_target.discord_channel,
-            executable_basename=capture_target.executable_basename,
-        )
-        return PeerCaptureSessionConfig(
-            provider_id=backend.provider,
-            output_device=desktop_audio.output_device,
-            vad_speech_threshold=desktop_audio.vad_speech_threshold,
-            vad_hangover_ms=desktop_audio.vad_hangover_ms,
-            vad_pre_roll_ms=desktop_audio.vad_pre_roll_ms,
-            provider_signature=provider_signature,
-            runtime_signature=(
-                backend.source_language,
-                desktop_audio.output_device,
-                target,
-                desktop_audio.vad_speech_threshold,
-                desktop_audio.vad_hangover_ms,
-                desktop_audio.vad_pre_roll_ms,
-                provider_signature,
-            ),
-            capture_signature=capture_vad_signature,
-            capture_target=target,
-            language=PeerCaptureLanguageFacts(
-                source_mode=backend.source_mode,
-                source_language=backend.source_language,
-                expected_languages=tuple(vnext_settings.intent.languages.peer_expected_languages),
-            ),
-            target_sample_rate_hz=backend.sample_rate_hz,
-            model_id=model_id,
-            session_options=session_options,
-            provider_context=backend,
-            local_provider=backend.provider
-            in {*LOCAL_CPU_PROVIDERS, STTProviderName.LOCAL_QWEN_GPU.value},
-            release_backend_after=(
-                LOCAL_QWEN_IDLE_RELEASE_SECONDS
-                if backend.provider == STTProviderName.LOCAL_QWEN.value
-                else None
-            ),
-            warmup=backend.provider != STTProviderName.LOCAL_QWEN.value,
-        )
-
     def _on_peer_capture_state_changed(
         self,
         snapshot: PeerCaptureSessionSnapshot,
     ) -> None:
-        if snapshot.state.value == "running":
-            self._peer_process_warning_reason = None
+        self._get_peer_application_owner().on_runtime_state_changed(snapshot)
 
     def _resolve_peer_capture_target(
         self,
         settings: AppSettings,
     ) -> ResolvedDesktopAudioCaptureTarget:
-        persisted_capture_target = getattr(settings.desktop_audio, "runtime_capture_target", None)
-        if not isinstance(persisted_capture_target, ResolvedDesktopAudioCaptureTarget):
-            persisted_capture_target = None
-        return self._peer_capture_target_resolution.resolve(
+        return self._get_peer_application_owner().resolve_capture_target(
             legacy_output_device=settings.desktop_audio.output_device,
-            persisted_capture_target=persisted_capture_target,
+            persisted_capture_target=getattr(
+                settings.desktop_audio,
+                "runtime_capture_target",
+                None,
+            ),
         )
 
     async def _close_peer_runtime_for_release(self, failures: list[Exception]) -> None:
-        peer_runtime = self._peer_runtime
-        if peer_runtime is None:
+        owner = self._peer_application_owner
+        if owner is None:
             return
         try:
-            await peer_runtime.close()
+            await owner.close()
         except Exception as exc:
             failures.append(exc)
-            return
-        if self._peer_runtime is peer_runtime:
-            self._peer_runtime = None
 
     async def _stop_hub_for_release(self, failures: list[Exception]) -> None:
         hub = self.hub
@@ -2909,27 +2910,15 @@ class GuiController:
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="OverlayRuntimeHandle",
+                owner_name="OverlayApplicationOwner",
                 callback_name="close",
                 callback=self._close_overlay_runtime,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="OverlaySessionFallbackOwner",
-                callback_name="close",
-                callback=self._close_overlay_session_fallback_owner,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="PeerCaptureSessionOwner",
+                owner_name="PeerApplicationOwner",
                 callback_name="close",
                 callback=self._close_peer_runtime,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="PeerLocalASRTransitionCoordinator",
-                callback_name="close",
-                callback=self._peer_local_asr_transition.close,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
@@ -3056,13 +3045,15 @@ class GuiController:
         self._shutdown_ingress_frozen = True
         self._stt_desired = False
         self._stt_activation_generation += 1
-        self._peer_activation_generation += 1
+        peer_owner = self._peer_application_owner
+        if peer_owner is not None:
+            peer_owner.stop_ingress()
         owner = self._vrchat_osc_presence_owner
         if owner is not None:
             owner.stop_ingress()
-        fallback_owner = self._overlay_session_fallback_owner
-        if fallback_owner is not None:
-            fallback_owner.stop_ingress()
+        overlay_owner = self._overlay_application_owner
+        if overlay_owner is not None:
+            overlay_owner.stop_ingress()
         vrc_mic_sync_owner = self._vrc_mic_sync_owner
         if vrc_mic_sync_owner is not None:
             vrc_mic_sync_owner.stop_ingress()
@@ -3143,13 +3134,11 @@ class GuiController:
         _raise_lifecycle_cleanup_failures("VRChat microphone receiver shutdown failed", failures)
 
     async def _close_overlay_runtime(self) -> None:
+        owner = self._get_overlay_application_owner()
+        owner.stop_ingress()
         await self._shutdown_overlay_runtime(preserve_failure_reason=True)
-        self._clear_overlay_session_desktop_fallback()
-
-    async def _close_overlay_session_fallback_owner(self) -> None:
-        owner = self._overlay_session_fallback_owner
-        if owner is not None:
-            await owner.close()
+        owner.clear_fallback()
+        await owner.fallback_owner.close()
 
     async def _close_peer_runtime(self) -> None:
         failures: list[Exception] = []
@@ -3202,128 +3191,13 @@ class GuiController:
         owner.emit_shutdown_diagnostic(diagnostic)
 
     async def set_overlay_enabled(self, enabled: bool) -> None:
-        if self.settings is None:
-            return
-
-        self.log_basic(f"[Overlay] Toggle request: enabled={enabled}")
-        runtime = self._overlay_runtime
-        self.log_detailed(
-            "[Overlay] Toggle detail: "
-            f"current_state={self.overlay_state} "
-            f"has_bridge={runtime is not None and runtime.bridge is not None} "
-            f"has_manager={runtime is not None and runtime.process_manager is not None}"
-        )
-        self.settings.ui.overlay_enabled = bool(enabled)
-        if not enabled:
-            self._peer_activation_generation += 1
-            self.settings.ui.peer_translation_enabled = False
-            self._last_peer_translation_enabled = False
-            self._last_peer_translation_activation_requested = False
-            self._clear_overlay_session_desktop_fallback()
-        self._refresh_overlay_peer_consumers()
-
-        if enabled:
-            await self._begin_overlay_start()
-            return
-
-        await self._shutdown_overlay_runtime(preserve_failure_reason=True)
+        await self._get_overlay_application_owner().set_enabled(enabled)
 
     async def set_peer_translation_enabled(self, enabled: bool) -> None:
-        if self.settings is None:
-            return
-
-        enabled = bool(enabled)
-        if (
-            enabled
-            and self.settings.provider.peer_stt != STTProviderName.LOCAL_CPU_AUTO
-            and not self._persist_current_manual_local_asr_fallback(channel="peer")
-        ):
-            return
-        self._peer_activation_generation += 1
-        activation_generation = self._peer_activation_generation
-        self.log_basic(f"[Peer] Toggle request: enabled={enabled}")
-        self.log_detailed(
-            "[Peer] Toggle detail: "
-            f"overlay_enabled={self.settings.ui.overlay_enabled} "
-            f"overlay_state={self.overlay_state} "
-            f"peer_stt_available={self.hub is not None and getattr(self.hub, 'peer_stt', None) is not None} "
-            f"eula_accepted={self.settings.ui.peer_translation_eula_accepted}"
-        )
-
-        if enabled and not self._peer_translation_eula_accepted_for(self.settings):
-            self.settings.ui.peer_translation_enabled = False
-            self._last_peer_translation_enabled = False
-            self._last_peer_translation_activation_requested = False
-            self._sync_effective_hub_flags(self.settings)
-            self._refresh_overlay_peer_consumers()
-            self.log_basic("[Peer] Toggle ignored: eula_accepted=False")
-            return
-
-        if enabled and not self.settings.ui.overlay_enabled:
-            self.settings.ui.overlay_enabled = True
-        self.settings.ui.peer_translation_enabled = enabled
-        self._last_peer_translation_enabled = enabled
-        self._last_peer_translation_activation_requested = (
-            self._peer_translation_activation_requested_for(self.settings)
-        )
-        self._peer_activation_starting = enabled
-        self._refresh_overlay_peer_consumers()
-        if enabled:
-            ready = await self._ensure_peer_local_stt_ready(
-                activation_generation=activation_generation
-            )
-            if activation_generation != self._peer_activation_generation:
-                return
-            if not ready:
-                self._peer_activation_starting = False
-        else:
-            self._reset_local_stt_pending_peer_enable_after_install()
-            self._get_gpu_runtime_interaction_owner().clear_pending("peer")
-        self._clear_local_stt_pending_enable_if_provider_switched_away()
-        self._sync_local_stt_notice()
-        self._refresh_overlay_peer_consumers()
-
-        if enabled and self.overlay_state not in {"starting", "connected"}:
-            await self._begin_overlay_start()
-        else:
-            refresh_dependencies = self._refresh_overlay_runtime_dependencies
-            if not enabled and _callable_accepts_keyword(
-                refresh_dependencies,
-                "peer_stop_mode",
-            ):
-                await refresh_dependencies(peer_stop_mode="release")
-            else:
-                await refresh_dependencies()
-        if activation_generation != self._peer_activation_generation:
-            return
-        self._sync_effective_hub_flags(self.settings)
-        self._peer_activation_starting = False
-        if enabled:
-            self._enqueue_peer_translation_disclosure()
-        self._refresh_overlay_peer_consumers()
+        await self._get_peer_application_owner().set_enabled(enabled)
 
     async def retry_peer_process_capture(self) -> bool:
-        return await self._get_peer_process_capture_retry_owner().retry()
-
-    def _get_peer_process_capture_retry_owner(self) -> PeerProcessCaptureRetryOwner:
-        owner = self._peer_process_capture_retry_owner
-        if owner is None:
-            owner = PeerProcessCaptureRetryOwner(
-                settings_provider=lambda: self.settings,
-                runtime_provider=lambda: self._peer_runtime,
-                should_be_active=lambda settings: self._peer_runtime_should_be_active(settings),
-                ensure_ready=lambda: self._ensure_peer_local_stt_ready(),
-                build_config=lambda settings: self._build_peer_runtime_config(settings),
-                on_retry_succeeded=lambda: setattr(
-                    self,
-                    "_peer_process_warning_reason",
-                    None,
-                ),
-                sync_effective_flags=lambda settings: self._sync_effective_hub_flags(settings),
-                refresh_consumers=lambda: self._refresh_overlay_peer_consumers(),
-            )
-            self._peer_process_capture_retry_owner = owner
-        return owner
+        return await self._get_peer_application_owner().retry_process_capture()
 
     def _enqueue_peer_translation_disclosure(self) -> None:
         hub = self.hub
@@ -3334,356 +3208,23 @@ class GuiController:
             enqueue_disclosure(self.app.localize("peer_translation.disclosure"))
 
     def on_overlay_start_failed(self, failure_reason: str | None) -> None:
-        previous_state = self.overlay_state
-        self.overlay_state = "failed"
-        self.failure_reason = self._normalize_overlay_failure_reason(failure_reason)
-        self.auto_restart_scheduled = False
-        self._log_overlay_state_transition(previous_state, self.overlay_state)
-        self._sync_effective_hub_flags()
-        self._notify_overlay_state()
+        self._get_overlay_application_owner().on_start_failed(failure_reason)
 
     def on_overlay_runtime_disconnected(self) -> None:
-        self.on_overlay_start_failed("runtime_disconnected")
+        self._get_overlay_application_owner().on_runtime_disconnected()
 
     def on_overlay_runtime_crashed(self) -> None:
-        self.on_overlay_start_failed("runtime_crashed")
+        self._get_overlay_application_owner().on_runtime_crashed()
 
     async def _begin_overlay_start(self) -> None:
-        await self._get_overlay_session_transition_owner().begin_start(
-            self._overlay_session_start_execution
-        )
-
-    def _get_overlay_session_transition_owner(self) -> OverlaySessionTransitionOwner:
-        owner = self._overlay_session_transition_owner
-        if owner is None:
-            owner = OverlaySessionTransitionOwner(
-                diagnostic_sink=self._on_overlay_session_transition_diagnostic,
-            )
-            self._overlay_session_transition_owner = owner
-        return owner
-
-    def _overlay_session_start_execution(self) -> OverlaySessionStartExecution:
-        return OverlaySessionStartExecution(
-            state=self.overlay_state,
-            previous_runtime=self._overlay_runtime,
-            teardown=lambda: self._teardown_overlay_runtime(
-                preserve_presenter_state=True,
-            ),
-            create_runtime=self._new_overlay_runtime_handle,
-            resolve_target=self._effective_overlay_target_for_start,
-            on_starting=self._mark_overlay_session_starting,
-            run_start=self._run_overlay_start,
-        )
-
-    def _mark_overlay_session_starting(
-        self,
-        runtime: OverlayRuntimeHandle,
-        target: str,
-    ) -> None:
-        if self._overlay_runtime is not runtime:
-            raise RuntimeError("overlay start transition runtime is not current")
-        self._active_overlay_target = target
-        previous_state = self.overlay_state
-        self.overlay_state = "starting"
-        self.auto_restart_scheduled = False
-        self._log_overlay_state_transition(previous_state, self.overlay_state)
-        self._notify_overlay_state()
-
-    async def _apply_overlay_retry_ownership(
-        self,
-        runtime: OverlayRuntimeHandle,
-        presenter: OverlayPresenter,
-        manager: OverlayProcessManager,
-        *,
-        confirmed: bool,
-    ) -> None:
-        if not self._overlay_runtime_is_current(runtime) or runtime.process_manager is not manager:
-            return
-        await presenter.update_native_retry_ownership(confirmed)
+        await self._get_overlay_application_owner().begin_start()
 
     async def _run_overlay_start(self, runtime: OverlayRuntimeHandle | None = None) -> None:
-        if runtime is None:
-            runtime = self._overlay_runtime
-            if runtime is None:
-                runtime = self._new_overlay_runtime_handle()
-        if self.settings is None or self.hub is None:
-            self._active_overlay_target = None
-            if self._overlay_runtime_is_current(runtime):
-                self.on_overlay_start_failed("unknown")
-            return
-        await self._get_overlay_generation_start_owner().start(
-            runtime,
-            self._overlay_generation_start_request,
-            self._overlay_generation_start_effects(),
-        )
-
-    def _get_overlay_generation_start_owner(self) -> OverlayGenerationStartOwner:
-        owner = self._overlay_generation_start_owner
-        if owner is None:
-            owner = OverlayGenerationStartOwner(
-                diagnostic_sink=self._on_overlay_generation_start_diagnostic,
-            )
-            self._overlay_generation_start_owner = owner
-        return owner
-
-    def _overlay_generation_start_request(self) -> OverlayGenerationStartRequest:
-        assert self.settings is not None
-        config = resolve_overlay_config(self.settings)
-        target = self._active_overlay_target or self._normalized_overlay_target(config.target)
-        return OverlayGenerationStartRequest(
-            config=config,
-            target=target,
-            clock=self.clock,
-            startup_timeout_ms=OVERLAY_STARTUP_TIMEOUT_MS,
-        )
-
-    def _overlay_generation_start_effects(self) -> OverlayGenerationStartEffects:
-        return OverlayGenerationStartEffects(
-            log_runtime=self.log_detailed,
-            log_failure=lambda message, level, exception: self.log_detailed(
-                message,
-                level=level,
-                exception=exception,
-            ),
-            is_current=lambda runtime, instance_id: self._overlay_runtime_is_current(
-                runtime,
-                overlay_instance_id=instance_id,
-            ),
-            close_stale=self._close_stale_overlay_start_runtime,
-            replace_sink=self._replace_hub_overlay_sink,
-            set_diagnostics=lambda diagnostics: setattr(
-                self.hub,
-                "overlay_diagnostics",
-                diagnostics,
-            ),
-            set_target=lambda target: setattr(self, "_active_overlay_target", target),
-            calibration_snapshot=self.overlay_calibration.copy,
-            logging_mode=lambda: self.runtime_logging_mode,
-            locale=lambda: cast(AppSettings, self.settings).ui.locale,
-            log_dir=lambda: str(user_config_dir()),
-            build_desktop_controls=(
-                self._build_initial_desktop_runtime_controls_from_resolved_config
-            ),
-            set_interaction_mode=self._set_desktop_overlay_interaction_mode,
-            track_bounds_control=self._track_desktop_apply_window_bounds_control,
-            process_runner=lambda target, task_factory: self._overlay_process_runner_for_target(
-                target,
-                task_factory=task_factory,
-            ),
-            run_renderer_events=lambda queue, instance_id: (
-                self._consume_desktop_renderer_events(
-                    queue,
-                    overlay_instance_id=instance_id,
-                )
-            ),
-            apply_retry_ownership=lambda runtime, presenter, manager, confirmed: (
-                self._apply_overlay_retry_ownership(
-                    runtime,
-                    presenter,
-                    manager,
-                    confirmed=confirmed,
-                )
-            ),
-            handle_failure=self._handle_overlay_start_failure,
-            mark_connected=self._mark_overlay_connected,
-            refresh_dependencies=self._refresh_overlay_runtime_dependencies,
-            watch_runtime=lambda manager, monitor, runtime, instance_id: (
-                self._watch_overlay_runtime(
-                    manager,
-                    monitor,
-                    runtime=runtime,
-                    overlay_instance_id=instance_id,
-                )
-            ),
-        )
-
-    def _on_overlay_generation_start_diagnostic(
-        self,
-        diagnostic: OverlayGenerationStartDiagnostic,
-    ) -> None:
-        fields = [
-            f"outcome={diagnostic.outcome}",
-            f"target={diagnostic.target or 'unknown'}",
-            f"overlay_instance_id={diagnostic.overlay_instance_id or 'unknown'}",
-        ]
-        if diagnostic.failure_type is not None:
-            fields.append(f"failure_type={diagnostic.failure_type}")
-        self.log_detailed(
-            f"[Overlay] generation_start {' '.join(fields)}",
-            level=logging.WARNING if diagnostic.outcome == "failed" else logging.INFO,
-        )
-
-    async def _watch_overlay_runtime(
-        self,
-        manager: OverlayProcessManager,
-        monitor_task: asyncio.Task[None],
-        *,
-        runtime: OverlayRuntimeHandle | None = None,
-        overlay_instance_id: str | None = None,
-    ) -> None:
-        if runtime is None:
-            runtime = self._overlay_runtime
-        try:
-            await monitor_task
-            if runtime is not None and not self._overlay_runtime_is_current(
-                runtime,
-                overlay_instance_id=overlay_instance_id,
-            ):
-                return
-            if runtime is None or runtime.process_manager is not manager:
-                return
-            if manager.state != "failed":
-                return
-
-            reason = self._normalize_overlay_failure_reason(manager.failure_reason)
-            if reason == "runtime_disconnected":
-                self.on_overlay_runtime_disconnected()
-            elif reason == "runtime_crashed":
-                self.on_overlay_runtime_crashed()
-            else:
-                self.on_overlay_start_failed(reason)
-            await self._teardown_overlay_runtime(preserve_presenter_state=True)
-            await self._refresh_overlay_runtime_dependencies()
-        except asyncio.CancelledError:
-            raise
-
-    async def _handle_overlay_start_failure(self, failure_reason: str | None) -> None:
-        reason = self._normalize_overlay_failure_reason(failure_reason)
-        if self._should_session_fallback_overlay_to_desktop(reason):
-            self.log_basic(f"[Overlay] Session fallback to desktop: reason={reason}")
-            self._get_overlay_session_fallback_owner().activate()
-            await self._teardown_overlay_runtime(preserve_presenter_state=True)
-            previous_state = self.overlay_state
-            self.overlay_state = "off"
-            self.failure_reason = None
-            self._log_overlay_state_transition(previous_state, self.overlay_state)
-            self._sync_effective_hub_flags()
-            await self._refresh_overlay_runtime_dependencies()
-            self._notify_overlay_state()
-            self._set_overlay_session_fallback_notice_active(True)
-            # Restart outside this start task so runtime close/reopen is not re-entrant.
-            self._schedule_overlay_session_desktop_fallback_start()
-            return
-        self.on_overlay_start_failed(failure_reason)
-        await self._teardown_overlay_runtime(preserve_presenter_state=True)
-        await self._refresh_overlay_runtime_dependencies()
-
-    def _schedule_overlay_session_desktop_fallback_start(self) -> None:
-        self._get_overlay_session_fallback_owner().schedule()
-
-    def _get_overlay_session_fallback_owner(self) -> OverlaySessionFallbackOwner:
-        owner = self._overlay_session_fallback_owner
-        if owner is None:
-            owner = OverlaySessionFallbackOwner(
-                can_start=lambda: bool(
-                    self.settings is not None
-                    and self.settings.ui.overlay_enabled
-                    and self.overlay_state not in {"starting", "connected"}
-                ),
-                start_overlay=self._begin_overlay_start,
-                publish_notice=self.app.set_dashboard_overlay_session_fallback_notice,
-                diagnostics_sink=lambda _event, _metadata, exception: self.log_detailed(
-                    "[Overlay] Failed to schedule session desktop fallback",
-                    level=logging.WARNING,
-                    exception=exception,
-                ),
-            )
-            self._overlay_session_fallback_owner = owner
-        return owner
+        await self._get_overlay_application_owner().run_start(runtime)
 
     async def _shutdown_overlay_runtime(self, *, preserve_failure_reason: bool) -> None:
-        self.log_basic("[Overlay] Shutdown requested")
-        runtime = self._overlay_runtime
-        self.log_detailed(
-            "[Overlay] Shutdown detail: "
-            f"preserve_failure_reason={preserve_failure_reason} "
-            f"state={self.overlay_state} "
-            f"has_bridge={runtime is not None and runtime.bridge is not None} "
-            f"has_manager={runtime is not None and runtime.process_manager is not None} "
-            f"presenter_attached={runtime is not None and runtime.presenter is not None}"
-        )
-        await self._get_overlay_session_transition_owner().shutdown(
-            lambda: self._overlay_session_shutdown_execution(
-                preserve_failure_reason=preserve_failure_reason,
-            )
-        )
-
-    def _overlay_session_shutdown_execution(
-        self,
-        *,
-        preserve_failure_reason: bool,
-    ) -> OverlaySessionShutdownExecution:
-        return OverlaySessionShutdownExecution(
-            state=self.overlay_state,
-            has_resources=self._overlay_runtime_has_resources(self._overlay_runtime),
-            teardown=lambda: self._teardown_overlay_runtime(
-                preserve_presenter_state=False,
-                emit_shutdown=True,
-            ),
-            has_resources_after_teardown=lambda: self._overlay_runtime_has_resources(
-                self._overlay_runtime
-            ),
-            on_stopping=self._mark_overlay_session_stopping,
-            on_failed=lambda: self._complete_overlay_session_shutdown_failure(
-                preserve_failure_reason=preserve_failure_reason,
-            ),
-            on_stopped=lambda: self._complete_overlay_session_shutdown(
-                preserve_failure_reason=preserve_failure_reason,
-            ),
-        )
-
-    def _mark_overlay_session_stopping(self) -> None:
-        previous_state = self.overlay_state
-        self.overlay_state = "stopping"
-        self.auto_restart_scheduled = False
-        self._log_overlay_state_transition(previous_state, self.overlay_state)
-        self._notify_overlay_state()
-
-    async def _complete_overlay_session_shutdown_failure(
-        self,
-        *,
-        preserve_failure_reason: bool,
-    ) -> None:
-        previous_state = self.overlay_state
-        self.overlay_state = "failed"
-        if not preserve_failure_reason or self.failure_reason is None:
-            self.failure_reason = self._normalize_overlay_failure_reason(None)
-        self._log_overlay_state_transition(previous_state, self.overlay_state)
-        self._sync_effective_hub_flags()
-        await self._refresh_overlay_runtime_dependencies()
-        self._notify_overlay_state()
-
-    async def _complete_overlay_session_shutdown(
-        self,
-        *,
-        preserve_failure_reason: bool,
-    ) -> None:
-        previous_state = self.overlay_state
-        self.overlay_state = "off"
-        if not preserve_failure_reason:
-            self.failure_reason = None
-        self._log_overlay_state_transition(previous_state, self.overlay_state)
-        self._sync_effective_hub_flags()
-        await self._refresh_overlay_runtime_dependencies()
-        self._notify_overlay_state()
-
-    def _on_overlay_session_transition_diagnostic(
-        self,
-        diagnostic: OverlaySessionTransitionDiagnostic,
-    ) -> None:
-        fields = [
-            f"operation={diagnostic.operation}",
-            f"outcome={diagnostic.outcome}",
-        ]
-        if diagnostic.failure_type is not None:
-            fields.append(f"failure_type={diagnostic.failure_type}")
-        self.log_detailed(
-            f"[Overlay] session_transition {' '.join(fields)}",
-            level=(
-                logging.WARNING
-                if diagnostic.outcome in {"failed", "teardown_failed"}
-                else logging.INFO
-            ),
+        await self._get_overlay_application_owner().shutdown(
+            preserve_failure_reason=preserve_failure_reason
         )
 
     async def _teardown_overlay_runtime(
@@ -3692,66 +3233,9 @@ class GuiController:
         preserve_presenter_state: bool,
         emit_shutdown: bool = False,
     ) -> bool:
-        runtime = self._ensure_overlay_runtime_handle()
-
-        await self._cancel_desktop_bounds_persistence()
-        close_succeeded = True
-        try:
-            await runtime.close(
-                preserve_presenter_state=preserve_presenter_state,
-                hub=self.hub,
-                emit_shutdown=emit_shutdown,
-            )
-        except Exception as exc:
-            close_succeeded = False
-            message = "[Overlay] Overlay runtime close reported cleanup failure"
-            detailed_emitted = self.log_detailed(
-                message,
-                level=logging.WARNING,
-                exception=exc,
-            )
-            if not detailed_emitted:
-                self.log_basic(message, level=logging.WARNING)
-        if close_succeeded and not self._overlay_runtime_has_resources(runtime):
-            self._overlay_runtime = None
-        self._active_overlay_target = None
-        self._get_desktop_overlay_bounds_owner().clear_suppressed()
-        if not preserve_presenter_state:
-            self._set_desktop_overlay_interaction_mode(DESKTOP_INTERACTION_MODE_EDIT)
-        return close_succeeded
-
-    def _mark_overlay_connected(self) -> None:
-        previous_state = self.overlay_state
-        self.overlay_state = "connected"
-        self.failure_reason = None
-        self.auto_restart_scheduled = False
-        self._log_overlay_state_transition(previous_state, self.overlay_state)
-        self._sync_effective_hub_flags()
-        self._notify_overlay_state()
-
-    def _normalize_overlay_failure_reason(self, failure_reason: str | None) -> str:
-        if isinstance(failure_reason, str) and failure_reason in _OVERLAY_FAILURE_REASONS:
-            return failure_reason
-        return "unknown"
-
-    def _notify_overlay_state(self) -> None:
-        bridge = self._ui_event_bridge
-        if bridge is not None:
-            bridge.report_overlay_state(self.overlay_state, failure_reason=self.failure_reason)
-        self._refresh_overlay_peer_consumers()
-
-    def _log_overlay_state_transition(self, previous_state: str, next_state: str) -> None:
-        runtime = self._overlay_runtime
-        manager = runtime.process_manager if runtime is not None else None
-        transition_message = f"[Overlay] State transition: {previous_state} -> {next_state}"
-        if self.failure_reason is not None:
-            transition_message = f"{transition_message} failure_reason={self.failure_reason}"
-        self.log_basic(transition_message)
-        self.log_detailed(
-            "[Overlay] State detail: "
-            f"presenter_attached={runtime is not None and runtime.presenter is not None} "
-            f"bridge_attached={runtime is not None and runtime.bridge is not None} "
-            f"manager_state={manager.state if manager is not None else None}"
+        return await self._get_overlay_application_owner().teardown(
+            preserve_presenter_state=preserve_presenter_state,
+            emit_shutdown=emit_shutdown,
         )
 
     def begin_overlay_calibration(self) -> OverlayCalibration:
@@ -4017,11 +3501,8 @@ class GuiController:
         )
 
     def _peer_local_stt_requested(self, settings: AppSettings | None = None) -> bool:
-        resolved_settings = settings or self.settings
-        return bool(
-            resolved_settings is not None
-            and resolved_settings.provider.peer_stt.value in LOCAL_CPU_PROVIDERS
-            and self._peer_translation_activation_requested_for(resolved_settings)
+        return self._get_peer_application_owner().local_stt_requested(
+            self._peer_application_state(settings)
         )
 
     def _local_asr_cpu_repair_state(self) -> LocalASRCpuRepairRuntimeState:
@@ -4138,11 +3619,9 @@ class GuiController:
             self._show_short_stt_message("local_stt.download_in_progress")
             return
         if effect.type is LocalASRReadinessEffectType.DISABLE_PEER_UNSUPPORTED:
-            if self.settings is not None:
-                self.settings.ui.peer_translation_enabled = False
-                self._last_peer_translation_enabled = False
-                self._last_peer_translation_activation_requested = False
-                self._sync_effective_hub_flags(self.settings)
+            owner = self._get_peer_application_owner()
+            owner.disable_intent()
+            owner.sync_effective_flags()
             self._show_short_stt_message("local_stt.language_unsupported")
             return
         if effect.type is LocalASRReadinessEffectType.SYNC_NOTICE:
@@ -4746,7 +4225,7 @@ class GuiController:
         )
         prev_settings_overlay_target = self._overlay_target_for_settings(self.settings)
         next_overlay_target = self._overlay_target_for_settings(settings)
-        if self._get_overlay_session_fallback_owner().active:
+        if self._get_overlay_application_owner().fallback_owner.active:
             # Session fallback keeps settings on SteamVR while runtime is desktop.
             # Compare settings targets so unrelated applies do not look like a switch.
             prev_overlay_target = prev_settings_overlay_target
@@ -4942,7 +4421,10 @@ class GuiController:
             await self._configure_vrc_mic_receiver(enabled=settings.osc.vrc_mic_intercept)
 
         current_self_signature = build_self_stt_runtime_signature(settings)
-        current_peer_signature = self._build_peer_stt_runtime_signature(settings)
+        current_peer_signature = build_peer_stt_runtime_signature(
+            settings,
+            canonical_settings=self._canonical_vnext_settings_for(settings),
+        )
         next_peer_activation_requested = self._peer_translation_activation_requested_for(settings)
         should_restart_stt = (
             prev_self_signature is not None and current_self_signature != prev_self_signature
@@ -5512,9 +4994,8 @@ class GuiController:
                 ),
                 self_signature_builder=build_self_stt_provider_signature,
                 peer_signature_builder=lambda settings, canonical: (
-                    self._build_peer_stt_provider_signature(
-                        settings,
-                        canonical_settings=canonical,
+                    build_peer_stt_provider_signature_from_vnext(
+                        canonical or self._canonical_vnext_settings_for(settings)
                     )
                 ),
                 llm_signature_builder=self._build_llm_provider_signature,
@@ -5688,13 +5169,17 @@ class GuiController:
             self_desired=self._stt_desired,
             peer_enabled=settings.ui.peer_translation_enabled,
             self_config_factory=lambda: build_self_capture_session_config(settings),
-            peer_config_factory=lambda: self._build_peer_runtime_config(settings),
+            peer_config_factory=lambda: build_peer_capture_session_config(
+                settings,
+                canonical_settings=self._canonical_vnext_settings_for(settings),
+            ),
             self_request_factory=lambda: build_self_stt_provider_request(
                 settings,
                 warmup=True,
             ),
-            peer_request_factory=lambda config: self._peer_stt_provider_request(
+            peer_request_factory=lambda config: build_peer_stt_provider_request(
                 config,
+                gpu_device_id=settings.stt.gpu_device_id,
                 warmup=True,
             ),
             should_refresh_self=bool(plan is not None and plan.should_refresh_self_stt),
@@ -5838,12 +5323,13 @@ class GuiController:
         if self.settings is None:
             return
         if self._last_peer_stt_provider_signature is None:
-            self._last_peer_stt_provider_signature = self._build_peer_stt_provider_signature(
-                self.settings
+            self._last_peer_stt_provider_signature = build_peer_stt_provider_signature_from_vnext(
+                self._canonical_vnext_settings_for(self.settings)
             )
         if self._last_peer_stt_runtime_signature is None:
-            self._last_peer_stt_runtime_signature = self._build_peer_stt_runtime_signature(
-                self.settings
+            self._last_peer_stt_runtime_signature = build_peer_stt_runtime_signature(
+                self.settings,
+                canonical_settings=self._canonical_vnext_settings_for(self.settings),
             )
 
     def _get_provider_verifier(self) -> ProviderVerifierPort:
@@ -5943,24 +5429,6 @@ class GuiController:
             runtime_logging=self.runtime_logging,
         )
 
-    def _peer_stt_provider_request(
-        self,
-        config: PeerCaptureSessionConfig,
-        *,
-        warmup: bool = False,
-    ) -> ProviderRuntimeBuildRequest:
-        assert self.settings is not None
-        backend = config.provider_context
-        if not isinstance(backend, ResolvedSTTConfig):
-            raise TypeError("Peer capture config requires a resolved STT provider context")
-        return ProviderRuntimeBuildRequest(
-            config=backend,
-            gpu_device_id=self.settings.stt.gpu_device_id,
-            warmup=warmup,
-            model_id=config.model_id or backend.model,
-            session_options=config.session_options,
-        )
-
     def _build_local_asr_provider_runtime_factory(
         self,
         *,
@@ -6011,49 +5479,7 @@ class GuiController:
         self.log_basic("[Settings] STT provider replacement completed successfully")
 
     def _on_peer_runtime_diagnostic(self, diagnostic: PeerCaptureDiagnostic) -> None:
-        unavailable_reason = getattr(
-            diagnostic,
-            "detail",
-            getattr(diagnostic, "process_unavailable_reason", None),
-        )
-        self.log_detailed(
-            "[PeerRuntime] "
-            f"reason={diagnostic.reason.value} "
-            f"capture_kind={diagnostic.capture_kind} "
-            f"unavailable_reason={unavailable_reason}"
-        )
-        if diagnostic.reason is not PeerCaptureFailureReason.PROCESS_PROVIDER_FAILED:
-            suffix = (
-                f" unavailable_reason={unavailable_reason}"
-                if unavailable_reason is not None
-                else ""
-            )
-            self.log_basic(
-                "[PeerRuntime] outcome=failed "
-                f"reason={diagnostic.reason.value} capture_kind={diagnostic.capture_kind}{suffix}",
-                level=logging.ERROR,
-            )
-        if diagnostic.capture_kind == "process":
-            self._peer_process_warning_reason = self._peer_process_warning_reason_for_diagnostic(
-                diagnostic
-            )
-            self._refresh_overlay_peer_consumers()
-
-    @staticmethod
-    def _peer_process_warning_reason_for_diagnostic(
-        diagnostic: PeerCaptureDiagnostic,
-    ) -> str:
-        if diagnostic.reason is PeerCaptureFailureReason.PROCESS_TARGET_UNAVAILABLE:
-            unavailable = (
-                getattr(
-                    diagnostic,
-                    "detail",
-                    getattr(diagnostic, "process_unavailable_reason", None),
-                )
-                or "no_process"
-            )
-            return f"process_unavailable_{unavailable}"
-        return diagnostic.reason.value
+        self._get_peer_application_owner().on_runtime_diagnostic(diagnostic)
 
     def loopback_capture_summary(self, settings: AppSettings | None = None) -> str:
         resolved_settings = settings or self.settings
@@ -6394,56 +5820,9 @@ class GuiController:
         )
 
     async def _refresh_peer_stt_runtime(self, *, stop_mode: str = "retain") -> None:
-        if self.settings is None or self.hub is None or self._peer_runtime is None:
-            return
-
-        config = self._build_peer_runtime_config(self.settings)
-        desired_active = self._peer_runtime_should_be_active(self.settings)
-        previous_signature = getattr(self._peer_runtime, "current_signature", None)
-        peer_local_provider = bool(desired_active and config.local_provider)
-        peer_local_transition = bool(
-            peer_local_provider
-            and previous_signature is not None
-            and previous_signature != config.runtime_signature
+        await self._get_peer_application_owner().refresh_runtime(
+            stop_mode="release" if stop_mode == "release" else "retain"
         )
-        peer_local_loading = bool(
-            peer_local_provider
-            and (
-                not self._hub_has_stt_provider("peer")
-                or previous_signature != config.runtime_signature
-            )
-        )
-        if peer_local_loading:
-            self._peer_asr_model_loading = True
-            self._sync_local_stt_notice()
-            self._refresh_overlay_peer_consumers()
-        transition_settings = self.settings
-        try:
-            await self._provider_rebuild_runtime.apply_peer_policy(
-                peer_runtime=self._peer_runtime,
-                config=config,
-                desired_active=desired_active,
-                stop_mode="release" if stop_mode == "release" else "retain",
-            )
-            transition_status = getattr(
-                self._peer_runtime,
-                "last_local_asr_transition_status",
-                "idle",
-            )
-            if peer_local_transition and transition_status == "superseded":
-                raise PeerLocalASRTransitionSuperseded
-            if peer_local_transition and transition_status == "failed":
-                raise RuntimeError("peer local ASR transition failed")
-        except PeerLocalASRTransitionSuperseded:
-            self._superseded_local_asr_settings_ids.add(id(transition_settings))
-            raise
-        finally:
-            if peer_local_loading:
-                self._peer_asr_model_loading = False
-                self._sync_local_stt_notice()
-                self._refresh_overlay_peer_consumers()
-        self._last_peer_stt_runtime_signature = config.runtime_signature
-        self._sync_effective_hub_flags(self.settings)
 
     async def _init_pipeline(self) -> None:
         assert self.settings is not None
@@ -6545,7 +5924,7 @@ class GuiController:
             if snapshot.provider_status.value != "ready":
                 self._log_error("STT backend not available")
 
-        self._peer_runtime = compose_peer_capture_session_owner(
+        peer_runtime = compose_peer_capture_session_owner(
             hub=hub,
             admission=create_peer_capture_admission_adapter(
                 runtime_available=lambda: self.settings is not None and self.hub is not None,
@@ -6553,8 +5932,9 @@ class GuiController:
             ),
             target_resolver=create_peer_capture_target_resolver_adapter(),
             clock=self.clock,
-            provider_request_factory=lambda config, warmup: self._peer_stt_provider_request(
+            provider_request_factory=lambda config, warmup: build_peer_stt_provider_request(
                 config,
+                gpu_device_id=self.settings.stt.gpu_device_id,
                 warmup=warmup,
             ),
             source_factory=create_peer_capture_source_adapter(
@@ -6580,6 +5960,7 @@ class GuiController:
                 self._get_local_asr_diagnostics_owner().transition_diagnostic
             ),
         )
+        await self._get_peer_application_owner().replace_runtime(peer_runtime)
         self._last_peer_translation_enabled = self.settings.ui.peer_translation_enabled
         await self._configure_vrc_mic_receiver(enabled=self.settings.osc.vrc_mic_intercept)
 

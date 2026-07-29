@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import ntpath
 import sys
@@ -9,9 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from puripuly_heart.app.services.peer_process_capture_retry import (
-    PeerProcessCaptureRetryOwner,
-)
+from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.release_evidence.windows_process_isolation import (
     CHANNELS,
     CONTROL_FREQUENCY_HZ,
@@ -25,6 +22,7 @@ from puripuly_heart.release_evidence.windows_process_isolation import (
     _worker_command,
     build_blocked_evidence,
     build_fixture_capture_target,
+    build_gui_process_retry_action,
     classify_native_capability,
     invoke_gui_process_retry,
     isolation_passes,
@@ -138,22 +136,14 @@ async def test_fixture_invokes_the_committed_gui_retry_action_contract() -> None
             assert config == "fresh-resolved-config"
             return True
 
-    settings = object()
     warning = ["process_target_exited"]
-    action = PeerProcessCaptureRetryOwner(
-        settings_provider=lambda: settings,
-        runtime_provider=Runtime,
-        should_be_active=lambda current: current is settings,
-        ensure_ready=lambda: asyncio.sleep(0, result=True),
-        build_config=lambda current: (
-            "fresh-resolved-config" if current is settings else "stale-config"
-        ),
-        on_retry_succeeded=lambda: warning.__setitem__(0, None),
-        sync_effective_flags=lambda _settings: None,
-        refresh_consumers=lambda: None,
+    action = build_gui_process_retry_action(
+        runtime=Runtime(),
+        config="fresh-resolved-config",
+        warning_clear=lambda: warning.__setitem__(0, None),
     )
 
-    assert GUI_PROCESS_RETRY_ACTION is PeerProcessCaptureRetryOwner.retry
+    assert GUI_PROCESS_RETRY_ACTION is PeerApplicationOwner.retry_process_capture
     assert await invoke_gui_process_retry(action) is True
     assert warning[0] is None
     source = (
@@ -164,7 +154,7 @@ async def test_fixture_invokes_the_committed_gui_retry_action_contract() -> None
         / "windows_process_isolation.py"
     ).read_text(encoding="utf-8")
     assert "puripuly_heart.ui.controller" not in source
-    assert '"retry_action": "PeerProcessCaptureRetryOwner.retry"' in source
+    assert '"retry_action": "PeerApplicationOwner.retry_process_capture"' in source
 
 
 def test_fixture_builds_the_committed_resolved_process_target_contract() -> None:

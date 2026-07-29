@@ -10,6 +10,9 @@ from puripuly_heart.app.services.local_asr_selection import (
 )
 from puripuly_heart.app.wiring_llm_factory import _qwen_api_key_for_resolved_credential
 from puripuly_heart.app.wiring_secrets_factory import require_secret
+from puripuly_heart.config.capture_target_resolution import (
+    resolve_desktop_audio_capture_target,
+)
 from puripuly_heart.config.resolved import ResolvedCredentialRequirement, ResolvedSTTConfig
 from puripuly_heart.config.runtime_resolution import (
     CREDENTIAL_REF_DEEPGRAM_STT,
@@ -46,6 +49,11 @@ from puripuly_heart.core.local_stt_assets import (
     PARAKEET_JAPANESE_MODEL_ID,
     PARAKEET_V3_MODEL_ID,
     default_local_stt_model_dir,
+)
+from puripuly_heart.core.peer_capture import (
+    PeerCaptureLanguageFacts,
+    PeerCaptureSessionConfig,
+    PeerCaptureTargetIntent,
 )
 from puripuly_heart.core.runtime.gpu_asr import SharedGpuASRRuntime
 from puripuly_heart.core.runtime.local_asr_transition import (
@@ -846,6 +854,127 @@ def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         ),
         resolved.provider_options.get("language_hints_strict", False),
         resolved.source_mode,
+    )
+
+
+def build_peer_capture_session_config(
+    settings: AppSettings,
+    *,
+    canonical_settings: AppSettingsVNext | None = None,
+) -> PeerCaptureSessionConfig:
+    if canonical_settings is None:
+        from puripuly_heart.config.settings_vnext.migration import from_legacy_app_settings
+
+        canonical_settings = from_legacy_app_settings(settings)
+    return build_peer_capture_session_config_from_vnext(canonical_settings)
+
+
+def build_peer_capture_session_config_from_vnext(
+    settings: AppSettingsVNext,
+) -> PeerCaptureSessionConfig:
+    backend = resolve_peer_stt_runtime_config_from_vnext(settings)
+    provider_signature = build_peer_stt_provider_signature_from_vnext(settings)
+    desktop_audio = settings.intent.desktop_audio
+    capture_target = resolve_desktop_audio_capture_target(desktop_audio.capture_target)
+    target = PeerCaptureTargetIntent(
+        kind=capture_target.kind,
+        device_name=capture_target.device_name,
+        process_kind=capture_target.process_kind,
+        executable_identity=capture_target.executable_identity,
+        discord_channel=capture_target.discord_channel,
+        executable_basename=capture_target.executable_basename,
+    )
+    model_id = None
+    if backend.provider == STTProviderName.LOCAL_QWEN_GPU.value:
+        model_id = LOCAL_QWEN_GPU_MODEL_ID
+    elif backend.provider in LOCAL_CPU_PROVIDERS:
+        model_id = resolve_local_asr_selection(
+            backend.provider,
+            backend.source_language,
+        ).model_id
+    local_provider = backend.provider in {
+        *LOCAL_CPU_PROVIDERS,
+        STTProviderName.LOCAL_QWEN_GPU.value,
+    }
+    session_options = (
+        build_local_asr_session_options(
+            source_language=backend.source_language,
+            source_mode=backend.source_mode,
+        )
+        if local_provider
+        else None
+    )
+    capture_signature = (
+        desktop_audio.output_device,
+        capture_target,
+        desktop_audio.vad_speech_threshold,
+        desktop_audio.vad_hangover_ms,
+        desktop_audio.vad_pre_roll_ms,
+        backend.sample_rate_hz,
+    )
+    return PeerCaptureSessionConfig(
+        provider_id=backend.provider,
+        output_device=desktop_audio.output_device,
+        vad_speech_threshold=desktop_audio.vad_speech_threshold,
+        vad_hangover_ms=desktop_audio.vad_hangover_ms,
+        vad_pre_roll_ms=desktop_audio.vad_pre_roll_ms,
+        provider_signature=provider_signature,
+        runtime_signature=(
+            backend.source_language,
+            desktop_audio.output_device,
+            target,
+            desktop_audio.vad_speech_threshold,
+            desktop_audio.vad_hangover_ms,
+            desktop_audio.vad_pre_roll_ms,
+            provider_signature,
+        ),
+        capture_signature=capture_signature,
+        capture_target=target,
+        language=PeerCaptureLanguageFacts(
+            source_mode=backend.source_mode,
+            source_language=backend.source_language,
+            expected_languages=tuple(settings.intent.languages.peer_expected_languages),
+        ),
+        target_sample_rate_hz=backend.sample_rate_hz,
+        model_id=model_id,
+        session_options=session_options,
+        provider_context=backend,
+        local_provider=local_provider,
+        release_backend_after=(
+            LOCAL_QWEN_IDLE_RELEASE_SECONDS
+            if backend.provider == STTProviderName.LOCAL_QWEN.value
+            else None
+        ),
+        warmup=backend.provider != STTProviderName.LOCAL_QWEN.value,
+    )
+
+
+def build_peer_stt_runtime_signature(
+    settings: AppSettings,
+    *,
+    canonical_settings: AppSettingsVNext | None = None,
+) -> tuple[object, ...]:
+    return build_peer_capture_session_config(
+        settings,
+        canonical_settings=canonical_settings,
+    ).runtime_signature
+
+
+def build_peer_stt_provider_request(
+    config: PeerCaptureSessionConfig,
+    *,
+    gpu_device_id: str,
+    warmup: bool = False,
+) -> ProviderRuntimeBuildRequest:
+    backend = config.provider_context
+    if not isinstance(backend, ResolvedSTTConfig):
+        raise TypeError("Peer capture config requires a resolved STT provider context")
+    return ProviderRuntimeBuildRequest(
+        config=backend,
+        gpu_device_id=gpu_device_id,
+        warmup=warmup,
+        model_id=config.model_id or backend.model,
+        session_options=config.session_options,
     )
 
 

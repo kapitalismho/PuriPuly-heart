@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 import puripuly_heart.composition.local_asr_production_evidence as composition_module
+from puripuly_heart.config.settings import AppSettings
 
 
 class FakeOwner:
@@ -20,7 +21,7 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
 ) -> None:
     captured: dict[str, object] = {}
     events: list[object] = []
-    settings = object()
+    settings = AppSettings()
     owner = FakeOwner()
 
     class FakeController:
@@ -37,28 +38,6 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
         async def _init_pipeline(self) -> None:
             events.append(("initialize", self.settings))
 
-        def _self_stt_provider_request(
-            self,
-            current: object,
-            *,
-            warmup: bool,
-        ) -> object:
-            events.append(("self-request", current, warmup))
-            return ("self-request", warmup)
-
-        def _build_peer_runtime_config(self, current: object) -> object:
-            events.append(("peer-config", current))
-            return "peer-config"
-
-        def _peer_stt_provider_request(
-            self,
-            config: object,
-            *,
-            warmup: bool,
-        ) -> object:
-            events.append(("peer-request", config, warmup))
-            return ("peer-request", warmup)
-
         async def retry_gpu_activation(self) -> None:
             events.append("retry")
 
@@ -70,6 +49,26 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
         composition_module,
         "LocalASRProviderRuntimeOwner",
         FakeOwner,
+    )
+    monkeypatch.setattr(
+        composition_module,
+        "build_self_stt_provider_request",
+        lambda current, warmup: (
+            events.append(("self-request", current, warmup)) or ("self-request", warmup)
+        ),
+    )
+    monkeypatch.setattr(
+        composition_module,
+        "build_peer_capture_session_config",
+        lambda current: events.append(("peer-config", current)) or "peer-config",
+    )
+    monkeypatch.setattr(
+        composition_module,
+        "build_peer_stt_provider_request",
+        lambda config, gpu_device_id, warmup: (
+            events.append(("peer-request", config, gpu_device_id, warmup))
+            or ("peer-request", warmup)
+        ),
     )
 
     application = composition_module.compose_local_asr_production_evidence(
@@ -106,7 +105,7 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
         ("initialize", settings),
         ("self-request", settings, True),
         ("peer-config", settings),
-        ("peer-request", "peer-config", False),
+        ("peer-request", "peer-config", settings.stt.gpu_device_id, False),
         "retry",
         "close",
     ]

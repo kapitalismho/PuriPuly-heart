@@ -22,8 +22,9 @@ from typing import Literal
 
 import numpy as np
 
-from puripuly_heart.app.services.peer_process_capture_retry import (
-    PeerProcessCaptureRetryOwner,
+from puripuly_heart.app.services.peer_application import (
+    PeerApplicationOwner,
+    PeerApplicationState,
 )
 from puripuly_heart.config.process_capture_platform import (
     PROCESS_CAPTURE_MIN_WINDOWS_BUILD,
@@ -40,7 +41,7 @@ EMITTER_AMPLITUDE = 0.18
 CAPTURE_SECONDS = 3.0
 PROTOCOL_VERSION = 1
 WORKER_MODULE = "puripuly_heart.release_evidence.windows_process_isolation"
-GUI_PROCESS_RETRY_ACTION = PeerProcessCaptureRetryOwner.retry
+GUI_PROCESS_RETRY_ACTION = PeerApplicationOwner.retry_process_capture
 
 EvidenceStatus = Literal["passed", "failed", "blocked"]
 
@@ -171,6 +172,55 @@ def lifecycle_passes(
 
 async def invoke_gui_process_retry(action: object) -> bool:
     return await GUI_PROCESS_RETRY_ACTION(action)
+
+
+def build_gui_process_retry_action(
+    *,
+    runtime: object,
+    config: object,
+    warning_clear: Callable[[], None],
+) -> PeerApplicationOwner:
+    owner = PeerApplicationOwner(
+        state_provider=lambda: PeerApplicationState(
+            settings_available=True,
+            peer_intent_enabled=True,
+            eula_accepted=True,
+            overlay_intent_enabled=True,
+            peer_provider_id="soniox",
+            runtime_available=True,
+            peer_provider_available=True,
+            overlay_state="connected",
+            overlay_command_available=True,
+        ),
+        config_factory=lambda: config,
+        peer_intent_sink=lambda _enabled: None,
+        overlay_intent_sink=lambda _enabled: None,
+        persist_manual_fallback=lambda: True,
+        ensure_local_ready=lambda _generation: asyncio.sleep(0, result=True),
+        clear_cpu_pending=lambda: None,
+        clear_gpu_pending=lambda: None,
+        clear_switched_pending=lambda: None,
+        sync_local_notice=lambda: None,
+        presentation_changed=lambda: None,
+        begin_overlay_start=lambda: asyncio.sleep(0),
+        effective_sink=lambda _peer, _context: None,
+        disclosure_sink=lambda: None,
+        superseded_sink=lambda: None,
+        log_basic=lambda _message: None,
+        log_detailed=lambda _message: None,
+        log_failure=lambda _message: None,
+    )
+    owner.bind_runtime(runtime)
+    owner.process_warning_reason = "process_target_exited"
+    original_presentation_changed = owner.presentation_changed
+
+    def publish_retry_result() -> None:
+        if owner.process_warning_reason is None:
+            warning_clear()
+        original_presentation_changed()
+
+    owner.presentation_changed = publish_retry_result
+    return owner
 
 
 def build_fixture_capture_target(executable: str) -> ResolvedDesktopAudioCaptureTarget:
@@ -799,17 +849,11 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
         second_pid = current_root.ready.pid
         retry_root_ready_s = current_root.ready_monotonic_s - fixture_started
 
-        retry_settings = object()
         retry_warning = ["process_target_exited"]
-        gui_action = PeerProcessCaptureRetryOwner(
-            settings_provider=lambda: retry_settings,
-            runtime_provider=lambda: runtime,
-            should_be_active=lambda _settings: True,
-            ensure_ready=lambda: asyncio.sleep(0, result=True),
-            build_config=lambda _settings: config,
-            on_retry_succeeded=lambda: retry_warning.__setitem__(0, None),
-            sync_effective_flags=lambda _settings: None,
-            refresh_consumers=lambda: None,
+        gui_action = build_gui_process_retry_action(
+            runtime=runtime,
+            config=config,
+            warning_clear=lambda: retry_warning.__setitem__(0, None),
         )
         retried = await invoke_gui_process_retry(gui_action)
         await asyncio.sleep(0.1)
@@ -922,7 +966,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
                     loop_task_at_warning and loop_task_at_warning[-1]
                 ),
                 "automatic_reconnect": not no_automatic_reconnect,
-                "retry_action": "PeerProcessCaptureRetryOwner.retry",
+                "retry_action": "PeerApplicationOwner.retry_process_capture",
                 "retry_succeeded": retried,
                 "fresh_pid": first_pid != second_pid,
             },

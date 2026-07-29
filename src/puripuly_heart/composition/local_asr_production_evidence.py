@@ -10,6 +10,11 @@ from puripuly_heart.app.ports.local_asr_production_evidence import (
 from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
 )
+from puripuly_heart.app.wiring_stt_factory import (
+    build_peer_capture_session_config,
+    build_peer_stt_provider_request,
+    build_self_stt_provider_request,
+)
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
@@ -67,7 +72,7 @@ class _ControllerBackedLocalASRProductionEvidence:
         *,
         warmup: bool,
     ) -> ProviderRuntimeBuildRequest:
-        return self.backend._self_stt_provider_request(settings, warmup=warmup)
+        return build_self_stt_provider_request(settings, warmup=warmup)
 
     def build_peer_provider_request(
         self,
@@ -75,8 +80,12 @@ class _ControllerBackedLocalASRProductionEvidence:
         *,
         warmup: bool,
     ) -> ProviderRuntimeBuildRequest:
-        config = self.backend._build_peer_runtime_config(settings)
-        return self.backend._peer_stt_provider_request(config, warmup=warmup)
+        config = build_peer_capture_session_config(settings)
+        return build_peer_stt_provider_request(
+            config,
+            gpu_device_id=settings.stt.gpu_device_id,
+            warmup=warmup,
+        )
 
     async def retry_gpu_activation(self) -> None:
         await self.backend.retry_gpu_activation()

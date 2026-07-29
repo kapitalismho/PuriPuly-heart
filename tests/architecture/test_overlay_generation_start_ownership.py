@@ -6,6 +6,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "services" / "overlay_generation_start.py"
+APPLICATION_OWNER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "services" / "overlay_application.py"
+)
 RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "overlay.py"
 
 
@@ -27,10 +30,12 @@ def _controller_method_source(method_name: str) -> str:
 
 def test_controller_delegates_overlay_generation_start_to_owner() -> None:
     source = _controller_method_source("_run_overlay_start")
+    application = APPLICATION_OWNER_PATH.read_text(encoding="utf-8")
 
-    assert "_get_overlay_generation_start_owner().start(" in source
-    assert "_overlay_generation_start_request" in source
-    assert "_overlay_generation_start_effects()" in source
+    assert "_get_overlay_application_owner().run_start(" in source
+    assert "self._generation_owner.start(" in application
+    assert "self._generation_request" in application
+    assert "self._generation_effects()" in application
     for constructor in (
         "OverlayDiagnosticsRecorder(",
         "OverlayPresenter(",
@@ -57,11 +62,14 @@ def test_generation_owner_has_no_ui_session_transition_or_fallback_dependency() 
 
 def test_generation_resource_and_cross_generation_owners_remain_separate() -> None:
     controller = CONTROLLER_PATH.read_text(encoding="utf-8")
+    application = APPLICATION_OWNER_PATH.read_text(encoding="utf-8")
     owner = OWNER_PATH.read_text(encoding="utf-8")
     runtime = RUNTIME_PATH.read_text(encoding="utf-8")
 
-    assert "OverlaySessionTransitionOwner" in controller
-    assert "OverlaySessionFallbackOwner" in controller
+    assert "OverlaySessionTransitionOwner" not in controller
+    assert "OverlaySessionFallbackOwner" not in controller
+    assert "OverlaySessionTransitionOwner" in application
+    assert "OverlaySessionFallbackOwner" in application
     assert "OverlayRuntimeHandle" in owner
     assert "async def close(" not in owner
     assert "class OverlayRuntimeHandle" in runtime

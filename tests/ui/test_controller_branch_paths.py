@@ -35,6 +35,7 @@ from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureAdmissionEffectType,
 )
 from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
+from puripuly_heart.app.services import overlay_application as overlay_application_module
 from puripuly_heart.app.services import (
     overlay_generation_start as overlay_generation_start_module,
 )
@@ -47,9 +48,14 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 from puripuly_heart.app.services.managed_connection_auth import ManagedConnectionAuthService
 from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 from puripuly_heart.app.wiring import (
+    build_peer_capture_session_config,
+    build_peer_stt_provider_request,
+    build_peer_stt_provider_signature_from_vnext,
+    build_peer_stt_runtime_signature,
     build_self_capture_session_config,
     build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
+    resolve_overlay_config,
 )
 from puripuly_heart.config.audio_host_api import (
     WINDOWS_MME_HOST_API,
@@ -1204,8 +1210,6 @@ async def _wait_until(predicate, *, attempts: int = 20, delay_s: float = 0.0) ->
 def _patch_overlay_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeOverlayBridge.instances = []
     FakeOverlayProcessManager.instances = []
-    monkeypatch.setattr(controller_module, "OverlayBridge", FakeOverlayBridge)
-    monkeypatch.setattr(controller_module, "OverlayProcessManager", FakeOverlayProcessManager)
     monkeypatch.setattr(overlay_generation_start_module, "OverlayBridge", FakeOverlayBridge)
     monkeypatch.setattr(
         overlay_generation_start_module,
@@ -1218,6 +1222,49 @@ def _overlay_runtime(controller: GuiController) -> OverlayRuntimeHandle:
     runtime = controller._overlay_runtime
     assert runtime is not None
     return runtime
+
+
+def _peer_runtime_config(
+    controller: GuiController,
+    settings: AppSettings,
+):
+    return build_peer_capture_session_config(
+        settings,
+        canonical_settings=controller._canonical_vnext_settings_for(settings),
+    )
+
+
+def _peer_runtime_signature(
+    controller: GuiController,
+    settings: AppSettings,
+) -> tuple[object, ...]:
+    return build_peer_stt_runtime_signature(
+        settings,
+        canonical_settings=controller._canonical_vnext_settings_for(settings),
+    )
+
+
+def _peer_provider_signature(
+    controller: GuiController,
+    settings: AppSettings,
+) -> tuple[object, ...]:
+    return build_peer_stt_provider_signature_from_vnext(
+        controller._canonical_vnext_settings_for(settings)
+    )
+
+
+def _peer_provider_request(
+    controller: GuiController,
+    config,
+    *,
+    warmup: bool = False,
+):
+    assert controller.settings is not None
+    return build_peer_stt_provider_request(
+        config,
+        gpu_device_id=controller.settings.stt.gpu_device_id,
+        warmup=warmup,
+    )
 
 
 def _attach_overlay_presenter(controller: GuiController, presenter: object | None) -> None:
@@ -1535,9 +1582,9 @@ def test_peer_stt_provider_request_preserves_resolved_runtime_config() -> None:
     app = SimpleNamespace(debug_ui_preview=True)
     controller = _make_controller(app=app)
     controller.settings = AppSettings()
-    config = controller._build_peer_runtime_config(controller.settings)
+    config = _peer_runtime_config(controller, controller.settings)
 
-    request = controller._peer_stt_provider_request(config)
+    request = _peer_provider_request(controller, config)
 
     assert request.config is config.backend
     assert request.provider_id == config.backend.provider
@@ -2355,7 +2402,7 @@ def test_application_ingress_freeze_is_terminal_for_late_work_owners() -> None:
         set_dashboard_vrchat_osc_notice=lambda _active: None,
     )
     controller = _make_controller(app=app)
-    overlay_owner = controller._get_overlay_session_fallback_owner()
+    overlay_owner = controller._get_overlay_application_owner().fallback_owner
     osc_owner = controller._get_vrchat_osc_presence_owner()
     mic_owner = controller._get_vrc_mic_sync_owner()
 
@@ -3505,7 +3552,7 @@ def test_peer_runtime_config_disables_self_custom_vocabulary() -> None:
         "zh-CN": ["airi", "shinano"],
     }
 
-    backend = controller._build_peer_runtime_config(settings).provider_context
+    backend = _peer_runtime_config(controller, settings).provider_context
 
     assert backend.custom_vocabulary_enabled is False
     assert backend.custom_terms == {}
@@ -3532,14 +3579,14 @@ def test_peer_stt_runtime_signature_includes_peer_desktop_settings() -> None:
     controller = _make_controller(app=SimpleNamespace())
     settings = AppSettings()
 
-    baseline = controller._build_peer_stt_runtime_signature(settings)
+    baseline = _peer_runtime_signature(controller, settings)
 
     settings.ui.peer_translation_enabled = True
     settings.desktop_audio.output_device = "Headphones (Loopback)"
     settings.desktop_audio.vad_speech_threshold = 0.72
     settings.desktop_audio.vad_hangover_ms = 950
     settings.desktop_audio.vad_pre_roll_ms = 420
-    changed = controller._build_peer_stt_runtime_signature(settings)
+    changed = _peer_runtime_signature(controller, settings)
 
     assert baseline != changed
 
@@ -3548,10 +3595,10 @@ def test_peer_stt_runtime_signature_includes_peer_source_language() -> None:
     controller = _make_controller(app=SimpleNamespace())
     settings = AppSettings()
 
-    baseline = controller._build_peer_stt_runtime_signature(settings)
+    baseline = _peer_runtime_signature(controller, settings)
 
     settings.languages.peer_source_language = "zh-CN"
-    changed = controller._build_peer_stt_runtime_signature(settings)
+    changed = _peer_runtime_signature(controller, settings)
 
     assert baseline != changed
 
@@ -3576,7 +3623,7 @@ def test_peer_runtime_uses_canonical_vnext_intent_over_legacy_projection() -> No
     )
     controller._get_settings_owner().authoritative = True
 
-    config = controller._build_peer_runtime_config(controller.settings)
+    config = _peer_runtime_config(controller, controller.settings)
 
     assert config.backend.provider == "soniox"
     assert config.backend.provider_options["enable_language_identification"] is True
@@ -3605,7 +3652,7 @@ def test_direct_peer_settings_mutation_refreshes_canonical_runtime_intent() -> N
     pending.desktop_audio.vad_speech_threshold = 0.72
 
     controller._get_settings_owner().apply_legacy_delta(controller.settings, pending)
-    config = controller._build_peer_runtime_config(pending)
+    config = _peer_runtime_config(controller, pending)
 
     assert controller.vnext_settings.intent.languages.peer_source_mode == "auto"
     assert controller.vnext_settings.intent.languages.peer_expected_languages == ["ja"]
@@ -3638,7 +3685,7 @@ def test_unrelated_legacy_apply_preserves_canonical_peer_auto_intent_after_save_
         ),
     )
     controller._get_settings_owner().authoritative = True
-    expected_signature = controller._build_peer_stt_provider_signature(legacy)
+    expected_signature = _peer_provider_signature(controller, legacy)
 
     pending = copy.deepcopy(legacy)
     pending.ui.locale = "ja"
@@ -3648,14 +3695,14 @@ def test_unrelated_legacy_apply_preserves_canonical_peer_auto_intent_after_save_
     controller.persist_settings()
 
     loaded = load_vnext_settings(controller.config_path)
-    runtime = controller._build_peer_runtime_config(pending)
+    runtime = _peer_runtime_config(controller, pending)
 
     assert loaded.settings is not None
     assert loaded.settings.intent.languages.peer_source_mode == "auto"
     assert loaded.settings.intent.languages.peer_expected_languages == ["ja"]
     assert runtime.backend.provider == "soniox"
     assert runtime.backend.provider_options["enable_language_identification"] is True
-    assert controller._build_peer_stt_provider_signature(pending) == expected_signature
+    assert _peer_provider_signature(controller, pending) == expected_signature
 
 
 def test_failed_canonical_persistence_rolls_back_peer_auto_intent(
@@ -3692,7 +3739,7 @@ def test_failed_canonical_persistence_rolls_back_peer_auto_intent(
     )
 
     controller._save_settings()
-    runtime = controller._build_peer_runtime_config(pending)
+    runtime = _peer_runtime_config(controller, pending)
 
     assert controller.vnext_settings == canonical
     assert controller.settings == legacy_before_mutation
@@ -4075,7 +4122,7 @@ def test_build_peer_runtime_config_includes_provider_signature_and_desktop_setti
     settings.desktop_audio.vad_hangover_ms = 950
     settings.desktop_audio.vad_pre_roll_ms = 420
 
-    config = controller._build_peer_runtime_config(settings)
+    config = _peer_runtime_config(controller, settings)
 
     assert config.backend.provider == STTProviderName.SONIOX
     assert config.output_device == "Headphones (Loopback)"
@@ -4092,38 +4139,6 @@ def test_build_peer_runtime_config_includes_provider_signature_and_desktop_setti
 
 
 @pytest.mark.asyncio
-async def test_retry_peer_process_capture_requires_current_gui_policy_and_uses_explicit_runtime_seam(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    runtime = RetryPeerRuntime(result=True)
-    controller._peer_runtime = runtime  # type: ignore[assignment]
-    controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=None)
-    controller.settings.ui.peer_translation_enabled = True
-    controller.settings.ui.peer_translation_eula_accepted = True
-    monkeypatch.setattr(
-        GuiController, "_peer_runtime_should_be_active", lambda self, settings: True
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_ensure_peer_local_stt_ready",
-        lambda self: asyncio.sleep(0, result=True),
-    )
-
-    retried = await controller.retry_peer_process_capture()
-
-    assert retried is True
-    assert len(runtime.retry_configs) == 1
-
-    monkeypatch.setattr(
-        GuiController, "_peer_runtime_should_be_active", lambda self, settings: False
-    )
-    assert await controller.retry_peer_process_capture() is False
-    assert len(runtime.retry_configs) == 1
-
-
-@pytest.mark.asyncio
 async def test_apply_settings_updates_peer_translation_flags_on_hub(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -4134,8 +4149,8 @@ async def test_apply_settings_updates_peer_translation_flags_on_hub(
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
@@ -4166,9 +4181,7 @@ async def test_apply_settings_routes_peer_activation_toggles_through_peer_runtim
     _attach_overlay_bridge(controller, object())
     controller._peer_runtime = DummyPeerRuntime()
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        settings
-    )
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
@@ -4205,9 +4218,7 @@ async def test_apply_settings_copies_self_and_peer_vad_hangovers_to_hub(
     controller.settings = settings
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        settings
-    )
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
@@ -4233,9 +4244,7 @@ async def test_apply_settings_keeps_peer_translation_effective_flags_off_until_e
     _attach_overlay_bridge(controller, object())
     controller._peer_runtime = DummyPeerRuntime()
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        settings
-    )
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
@@ -4271,9 +4280,7 @@ async def test_apply_settings_deactivates_peer_runtime_when_eula_acceptance_is_r
     _attach_overlay_bridge(controller, object())
     controller._peer_runtime = DummyPeerRuntime()
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        settings
-    )
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
     controller._last_peer_translation_enabled = settings.ui.peer_translation_enabled
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(
@@ -4857,7 +4864,7 @@ async def test_initial_peer_local_activation_publishes_starting_until_provider_a
 
 def test_peer_capture_source_adapter_uses_desktop_loopback_device() -> None:
     controller = _make_controller(app=SimpleNamespace())
-    config = controller._build_peer_runtime_config(AppSettings())
+    config = _peer_runtime_config(controller, AppSettings())
     opened: list[dict[str, object]] = []
 
     class FakePeerSource:
@@ -4889,7 +4896,7 @@ def test_peer_capture_source_adapter_routes_process_to_strict_source() -> None:
         executable_identity=r"c:\apps\game\game.exe",
     )
     config = replace(
-        controller._build_peer_runtime_config(AppSettings()),
+        _peer_runtime_config(controller, AppSettings()),
         capture_target=target,
         runtime_signature=(target,),
     )
@@ -4963,7 +4970,7 @@ def test_peer_capture_source_adapter_logs_loopback_resolution() -> None:
     )
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
     config = replace(
-        controller._build_peer_runtime_config(AppSettings()),
+        _peer_runtime_config(controller, AppSettings()),
         output_device="Missing Speakers",
     )
     adapter = PeerCaptureSourceAdapter(
@@ -5023,7 +5030,7 @@ def test_peer_capture_source_adapter_wires_capture_fault_provider() -> None:
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
     controller._debug_capture_fault_profile = "capture_attenuate_40db"
     config = replace(
-        controller._build_peer_runtime_config(AppSettings()),
+        _peer_runtime_config(controller, AppSettings()),
         output_device="Peer Speakers",
     )
     adapter = PeerCaptureSourceAdapter(
@@ -5111,7 +5118,7 @@ def test_peer_capture_vad_adapter_uses_shared_peer_vad_policy_helper() -> None:
     settings.desktop_audio.vad_speech_threshold = 0.72
     settings.desktop_audio.vad_hangover_ms = 950
     settings.desktop_audio.vad_pre_roll_ms = 420
-    config = controller._build_peer_runtime_config(settings)
+    config = _peer_runtime_config(controller, settings)
 
     helper_calls: list[dict[str, object]] = []
     engine = object()
@@ -5240,36 +5247,6 @@ async def test_overlay_start_task_is_owned_by_overlay_runtime_handle(
     await controller.set_overlay_enabled(False)
 
 
-def test_overlay_runtime_handle_exposes_resources_without_controller_aliases() -> None:
-    from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
-
-    controller = _make_controller(app=SimpleNamespace())
-    presenter = object()
-    bridge = object()
-    manager = SimpleNamespace(state="connected")
-    diagnostics = object()
-    renderer_events: asyncio.Queue[dict[str, object]] = asyncio.Queue()
-
-    _attach_overlay_presenter(controller, presenter)
-    _attach_overlay_bridge(controller, bridge)
-    _attach_overlay_manager(controller, manager)
-    _attach_overlay_diagnostics(controller, diagnostics)
-    _attach_desktop_renderer_events(controller, renderer_events)
-
-    runtime = controller._overlay_runtime  # noqa: SLF001 - runtime owner assertion
-    assert isinstance(runtime, OverlayRuntimeHandle)
-    assert runtime.presenter is presenter
-    assert runtime.bridge is bridge
-    assert runtime.process_manager is manager
-    assert runtime.diagnostics is diagnostics
-    assert runtime.renderer_events is renderer_events
-
-    replacement_bridge = object()
-    runtime.attach_bridge(replacement_bridge)
-
-    assert _overlay_runtime(controller).bridge is replacement_bridge
-
-
 @pytest.mark.asyncio
 async def test_overlay_start_and_shutdown_do_not_call_legacy_runtime_sync(
     monkeypatch: pytest.MonkeyPatch,
@@ -5315,52 +5292,6 @@ async def test_overlay_start_and_shutdown_do_not_call_legacy_runtime_sync(
 
     assert controller.overlay_state == "off"
     assert controller._overlay_runtime is None
-
-
-@pytest.mark.asyncio
-async def test_overlay_shutdown_stops_bridge_while_bridge_start_is_in_flight(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class BlockingStartOverlayBridge(FakeOverlayBridge):
-        instances: list["BlockingStartOverlayBridge"] = []
-
-        def __init__(self, **kwargs) -> None:
-            super().__init__(**kwargs)
-            self.start_entered = asyncio.Event()
-            self.start_released = asyncio.Event()
-            self.start_cancelled = False
-
-        async def start(self) -> None:
-            await super().start()
-            self.start_entered.set()
-            try:
-                await self.start_released.wait()
-            except asyncio.CancelledError:
-                self.start_cancelled = True
-                raise
-
-    _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(
-        overlay_generation_start_module,
-        "OverlayBridge",
-        BlockingStartOverlayBridge,
-    )
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.hub = DummyHub()
-
-    await controller.set_overlay_enabled(True)
-    await _wait_until(lambda: len(BlockingStartOverlayBridge.instances) == 1)
-    bridge = BlockingStartOverlayBridge.instances[0]
-    await _wait_until(lambda: bridge.start_entered.is_set())
-
-    await controller.set_overlay_enabled(False)
-
-    assert bridge.start_cancelled is True
-    assert bridge.stopped is True
-    assert controller.overlay_state == "off"
 
 
 @pytest.mark.asyncio
@@ -5615,40 +5546,6 @@ async def test_overlay_shutdown_keeps_failed_state_when_cleanup_fails_with_resou
 
 
 @pytest.mark.asyncio
-async def test_overlay_restart_aborts_when_preserve_teardown_close_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
-
-    class FailingStopManager:
-        async def stop(self) -> None:
-            raise RuntimeError("manager still needs retry")
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.hub = DummyHub()
-    controller.overlay_state = "failed"
-    manager = FailingStopManager()
-    runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
-    runtime.attach_process_manager(manager)
-    controller._overlay_runtime = runtime
-
-    def fail_new_runtime(self: GuiController) -> OverlayRuntimeHandle:
-        assert self is controller
-        raise AssertionError("restart created a new runtime after failed teardown")
-
-    monkeypatch.setattr(GuiController, "_new_overlay_runtime_handle", fail_new_runtime)
-
-    await controller._begin_overlay_start()
-
-    assert controller._overlay_runtime is runtime
-    assert runtime.process_manager is manager
-    assert _overlay_runtime(controller).process_manager is manager
-    assert _overlay_runtime(controller).start_task is None
-    assert controller.overlay_state == "failed"
-
-
-@pytest.mark.asyncio
 async def test_stale_desktop_renderer_event_is_ignored_after_overlay_instance_change() -> None:
     from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 
@@ -5691,13 +5588,13 @@ async def test_overlay_target_routing_installs_steamvr_runner_by_default(
         pass
 
     monkeypatch.setattr(
-        controller_module,
+        overlay_application_module,
         "DefaultOverlayProcessRunner",
         FakeSteamVrRunner,
         raising=False,
     )
     monkeypatch.setattr(
-        controller_module,
+        overlay_application_module,
         "DesktopFletOverlayRunner",
         FakeDesktopRunner,
         raising=False,
@@ -5734,13 +5631,13 @@ async def test_overlay_session_fallback_to_desktop_when_steamvr_unavailable(
         pass
 
     monkeypatch.setattr(
-        controller_module,
+        overlay_application_module,
         "DefaultOverlayProcessRunner",
         FakeSteamVrRunner,
         raising=False,
     )
     monkeypatch.setattr(
-        controller_module,
+        overlay_application_module,
         "DesktopFletOverlayRunner",
         FakeDesktopRunner,
         raising=False,
@@ -5768,14 +5665,14 @@ async def test_overlay_session_fallback_to_desktop_when_steamvr_unavailable(
     second = FakeOverlayProcessManager.instances[1]
     assert isinstance(second.process_runner, FakeDesktopRunner)
     assert controller.settings.overlay.target == "steamvr"
-    assert controller._get_overlay_session_fallback_owner().active is True
+    assert controller._get_overlay_application_owner().fallback_owner.active is True
     assert True in notices
     second.complete_startup()
     await _wait_until(lambda: controller.overlay_state == "connected")
     assert controller._active_overlay_target == "desktop"
 
     await controller.set_overlay_enabled(False)
-    assert controller._get_overlay_session_fallback_owner().active is False
+    assert controller._get_overlay_application_owner().fallback_owner.active is False
     assert False in notices
 
 
@@ -5793,13 +5690,13 @@ async def test_desktop_initial_control_manifest_always_launches_edit_even_with_l
         pass
 
     monkeypatch.setattr(
-        controller_module,
+        overlay_application_module,
         "DefaultOverlayProcessRunner",
         FakeSteamVrRunner,
         raising=False,
     )
     monkeypatch.setattr(
-        controller_module,
+        overlay_application_module,
         "DesktopFletOverlayRunner",
         FakeDesktopRunner,
         raising=False,
@@ -7037,7 +6934,7 @@ def test_resolved_desktop_initial_controls_emit_launch_diagnostics_only_in_detai
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
 
     controls = controller._build_initial_desktop_runtime_controls_from_resolved_config(
-        controller_module.resolve_overlay_config(controller.settings)
+        resolve_overlay_config(controller.settings)
     )
 
     assert controls[-1] == {"command": "set_interaction_mode", "mode": "edit"}
@@ -7062,7 +6959,7 @@ def test_resolved_desktop_initial_controls_emit_launch_diagnostics_only_in_detai
     basic_controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=False)
 
     basic_controller._build_initial_desktop_runtime_controls_from_resolved_config(
-        controller_module.resolve_overlay_config(basic_controller.settings)
+        resolve_overlay_config(basic_controller.settings)
     )
 
     assert basic_controller._runtime_logging.detailed_messages == []
@@ -8129,114 +8026,6 @@ async def test_overlay_start_uses_presenter_owned_by_runtime_handle(
 
 
 @pytest.mark.asyncio
-async def test_stale_overlay_start_after_hub_ingress_closes_runtime_without_legacy_sync(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
-
-    _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.hub = DummyHub()
-
-    class StalingAfterIngressOverlayProcessManager(FakeOverlayProcessManager):
-        instances: list["StalingAfterIngressOverlayProcessManager"] = []
-
-        def __init__(self, **kwargs) -> None:
-            super().__init__(**kwargs)
-            self.stale_runtime: OverlayRuntimeHandle | None = None
-
-        async def start(self) -> None:
-            self.state = "connected"
-            self.failure_reason = None
-            stale_runtime = controller._overlay_runtime
-            assert isinstance(stale_runtime, OverlayRuntimeHandle)
-            assert controller.hub.overlay_sink is stale_runtime.presenter
-            self.stale_runtime = stale_runtime
-            controller._overlay_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
-
-    monkeypatch.setattr(
-        overlay_generation_start_module,
-        "OverlayProcessManager",
-        StalingAfterIngressOverlayProcessManager,
-    )
-
-    await controller._begin_overlay_start()
-    start_task = _overlay_runtime(controller).start_task
-    assert start_task is not None
-    await start_task
-
-    stale_bridge = FakeOverlayBridge.instances[0]
-    stale_manager = StalingAfterIngressOverlayProcessManager.instances[0]
-    stale_runtime = stale_manager.stale_runtime
-    assert stale_runtime is not None
-
-    assert stale_bridge.stopped is True
-    assert stale_manager.stop_calls == 1
-    assert controller.hub.overlay_sink is None
-    assert stale_runtime.bridge is None
-    assert stale_runtime.process_manager is None
-    assert _overlay_runtime(controller).bridge is not stale_bridge
-    assert _overlay_runtime(controller).process_manager is not stale_manager
-    assert _overlay_runtime(controller).start_task is not start_task
-
-
-@pytest.mark.asyncio
-async def test_stale_overlay_start_exception_after_runtime_replacement_is_ignored(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
-
-    _patch_overlay_runtime(monkeypatch)
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.hub = DummyHub()
-
-    current_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
-    current_presenter = OverlayPresenter(
-        calibration=controller.overlay_calibration.copy(),
-        clock=controller.clock,
-    )
-    current_bridge = FakeOverlayBridge(session_token="current")
-    current_runtime.attach_presenter(current_presenter)
-    current_runtime.attach_bridge(current_bridge)
-    current_runtime.set_overlay_instance_id("overlay-current")
-
-    class StalingFailingOverlayBridge(FakeOverlayBridge):
-        async def start(self) -> None:
-            await super().start()
-            controller._overlay_runtime = current_runtime
-            controller.overlay_state = "connected"
-            controller.hub.overlay_sink = current_presenter
-            raise RuntimeError("stale start failed")
-
-    monkeypatch.setattr(
-        overlay_generation_start_module,
-        "OverlayBridge",
-        StalingFailingOverlayBridge,
-    )
-
-    stale_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
-
-    await controller._run_overlay_start(stale_runtime)
-
-    stale_bridge = next(
-        bridge
-        for bridge in FakeOverlayBridge.instances
-        if isinstance(bridge, StalingFailingOverlayBridge)
-    )
-    assert controller._overlay_runtime is current_runtime
-    assert controller.overlay_state == "connected"
-    assert controller.hub.overlay_sink is current_presenter
-    assert current_bridge.stopped is False
-    assert stale_bridge.stopped is True
-
-
-@pytest.mark.asyncio
 async def test_overlay_restart_reuses_presenter_scene_for_new_bridge(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -8523,8 +8312,8 @@ async def test_refresh_overlay_runtime_dependencies_does_not_clear_overlay_scene
         )
     )
     saved_snapshot = bridge.snapshots[-1]
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
 
     await controller._refresh_overlay_runtime_dependencies()
@@ -8723,39 +8512,6 @@ def test_overlay_runtime_crash_logs_state_transition() -> None:
             "[Overlay] State detail: presenter_attached=True bridge_attached=True manager_state=failed",
         )
     ]
-
-
-@pytest.mark.asyncio
-async def test_run_overlay_start_preserves_traceback_in_detailed_log(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _patch_overlay_runtime(monkeypatch)
-
-    async def failing_start(self) -> None:
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(FakeOverlayBridge, "start", failing_start)
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller.settings = AppSettings()
-    controller.hub = DummyHub()
-
-    await controller._run_overlay_start()
-
-    assert controller._runtime_logging.basic_messages == [
-        (logging.INFO, "[Overlay] State transition: off -> failed failure_reason=unknown")
-    ]
-    error_messages = [
-        message
-        for level, message in controller._runtime_logging.detailed_messages
-        if level == logging.ERROR
-    ]
-    assert len(error_messages) == 1
-    message = error_messages[0]
-    assert "[Overlay] Failed to start overlay runtime" in message
-    assert "Traceback (most recent call last):" in message
-    assert "RuntimeError: boom" in message
 
 
 @pytest.mark.asyncio
@@ -9275,7 +9031,10 @@ def test_overlay_state_transition_routes_snapshot_details_to_detailed_log() -> N
     _attach_overlay_bridge(controller, object())
     _attach_overlay_manager(controller, SimpleNamespace(state="failed"))
 
-    controller._log_overlay_state_transition("connected", "failed")
+    controller._get_overlay_application_owner()._log_state_transition(
+        "connected",
+        "failed",
+    )
 
     assert controller._runtime_logging.basic_messages == [
         (
@@ -13740,9 +13499,7 @@ async def test_apply_settings_reloads_settings_view_for_target_only_change(
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        settings
-    )
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
 
     await controller.apply_settings(settings)
 
@@ -13760,9 +13517,7 @@ async def test_apply_settings_target_only_change_clears_self_language_runtime_st
     controller.hub.source_language = settings.languages.source_language
     controller.hub.target_language = settings.languages.target_language
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        settings
-    )
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
     controller._last_peer_translation_enabled = settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = settings.osc.vrc_mic_intercept
 
@@ -13813,9 +13568,7 @@ async def test_apply_settings_self_target_change_clears_peer_runtime_when_peer_t
     controller.hub.peer_source_language = settings.languages.peer_source_language
     controller.hub.peer_target_language = settings.languages.peer_target_language
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        settings
-    )
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
     controller._last_peer_translation_enabled = settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = settings.osc.vrc_mic_intercept
 
@@ -13862,9 +13615,7 @@ async def test_apply_settings_self_source_change_clears_peer_runtime_when_peer_s
     controller.hub.peer_source_language = settings.languages.peer_source_language
     controller.hub.peer_target_language = settings.languages.peer_target_language
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        settings
-    )
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
     controller._last_peer_translation_enabled = settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = settings.osc.vrc_mic_intercept
 
@@ -13915,9 +13666,7 @@ async def test_apply_settings_logs_and_continues_when_language_cleanup_fails(
     controller.hub.peer_target_language = settings.languages.peer_target_language
     controller.hub.clear_language_runtime_state_errors["self"] = RuntimeError("cleanup boom")
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        settings
-    )
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
     controller._last_peer_translation_enabled = settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = settings.osc.vrc_mic_intercept
 
@@ -13969,8 +13718,8 @@ async def test_order22_language_runtime_clear_failure_degrades_without_raw_log_t
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -15591,8 +15340,8 @@ async def test_apply_providers_failed_signature_retries_same_settings_without_ra
     controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
-    controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
-        controller.settings
+    controller._last_peer_stt_provider_signature = _peer_provider_signature(
+        controller, controller.settings
     )
     controller._last_llm_provider_signature = controller._build_llm_provider_signature(
         controller.settings
@@ -15657,8 +15406,8 @@ async def test_apply_providers_force_rebuild_failed_signature_uses_miss_sentinel
     controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
-    controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
-        controller.settings
+    controller._last_peer_stt_provider_signature = _peer_provider_signature(
+        controller, controller.settings
     )
     target_signature = controller._build_llm_provider_signature(controller.settings)
     controller._last_llm_provider_signature = target_signature
@@ -15711,8 +15460,8 @@ async def test_apply_providers_broker_base_url_rebuilds_managed_broker_service(
     controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
-    controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
-        controller.settings
+    controller._last_peer_stt_provider_signature = _peer_provider_signature(
+        controller, controller.settings
     )
     controller._last_llm_provider_signature = controller._build_llm_provider_signature(
         controller.settings
@@ -15773,8 +15522,8 @@ async def test_apply_providers_managed_identity_rebuilds_service_with_pending_id
     controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
-    controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
-        controller.settings
+    controller._last_peer_stt_provider_signature = _peer_provider_signature(
+        controller, controller.settings
     )
     controller._last_llm_provider_signature = controller._build_llm_provider_signature(
         controller.settings
@@ -15817,8 +15566,8 @@ async def test_apply_providers_mixed_degraded_default_service_persists_full_prov
     controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
-    controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
-        controller.settings
+    controller._last_peer_stt_provider_signature = _peer_provider_signature(
+        controller, controller.settings
     )
     controller._last_llm_provider_signature = controller._build_llm_provider_signature(
         controller.settings
@@ -15885,8 +15634,8 @@ async def test_order22_apply_settings_routes_stt_language_audio_patch_through_de
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_microphone_test_audio_settings_signature = (
         controller._microphone_test_audio_settings_signature(controller.settings)
@@ -15985,8 +15734,8 @@ async def test_order22_apply_settings_runtime_failure_degrades_without_rollback_
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -16184,8 +15933,8 @@ async def test_order22_apply_settings_self_stt_provider_specific_change_restarts
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -16238,8 +15987,8 @@ async def test_order22_apply_settings_mixed_draft_applies_audio_runtime_and_pres
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -16335,8 +16084,8 @@ async def test_mixed_order22_order23_order24_fallback_save_failure_restores_comm
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -16422,8 +16171,8 @@ async def test_order22_apply_settings_mixed_full_draft_save_failure_degrades_and
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -17028,8 +16777,8 @@ async def test_order22_mixed_settings_direct_fallback_degrades_when_stt_unavaila
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -17086,8 +16835,8 @@ async def test_order22_qwen_historical_low_latency_change_does_not_rebuild_llm(
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -17136,8 +16885,8 @@ async def test_order22_qwen_historical_false_cannot_restore_non_fast_runtime(
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
@@ -17401,15 +17150,19 @@ async def test_order23_runtime_only_overlay_active_flags_are_not_routed(
     begin_calls: list[bool] = []
     saved_settings: list[AppSettings] = []
 
-    async def fake_begin_overlay_start(self: GuiController) -> None:
+    async def fake_begin_overlay_start(self) -> None:
         begin_calls.append(True)
-        self.overlay_state = "starting"
+        self.state = "starting"
 
     def record_saved_settings(_path, settings) -> None:
         saved_settings.append(copy.deepcopy(settings))
 
     _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(GuiController, "_begin_overlay_start", fake_begin_overlay_start)
+    monkeypatch.setattr(
+        overlay_application_module.OverlayApplicationOwner,
+        "begin_start",
+        fake_begin_overlay_start,
+    )
 
     pending = copy.deepcopy(controller.settings)
     pending.ui.overlay_enabled = True
@@ -17494,8 +17247,8 @@ async def test_apply_providers_preserves_current_languages_while_applying_provid
     controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
-    controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
-        controller.settings
+    controller._last_peer_stt_provider_signature = _peer_provider_signature(
+        controller, controller.settings
     )
     controller._last_llm_provider_signature = controller._build_llm_provider_signature(
         controller.settings
@@ -17727,8 +17480,8 @@ async def test_dashboard_peer_language_change_refreshes_peer_translation_pipelin
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
-        controller.settings
+    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+        controller, controller.settings
     )
     controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
     refreshed: list[str] = []

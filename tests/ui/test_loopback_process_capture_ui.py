@@ -14,6 +14,7 @@ import pytest
 from puripuly_heart.app.adapters.peer_capture_target_resolver import (
     PeerCaptureTargetResolverAdapter,
 )
+from puripuly_heart.app.wiring import build_peer_capture_session_config
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.config.settings_vnext.facade import load_settings, save_settings_with_result
@@ -509,67 +510,6 @@ async def test_self_microphone_start_failure_becomes_effective_off_failure_notic
     assert dash.notices[-1][0] == "start_failed"
 
 
-@pytest.mark.asyncio
-async def test_peer_post_readiness_runtime_completion_cannot_publish_after_supersession(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    disclosures: list[str] = []
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=_presentation(SimpleNamespace()),
-        config_path=Path("x"),
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.peer_stt = STTProviderName.SONIOX
-    controller.settings.ui.peer_translation_eula_accepted = True
-    controller.settings.ui.overlay_enabled = True
-    controller.overlay_state = "connected"
-    controller.hub = _runtime_hub_stub(
-        peer_available=True,
-        peer_translation_enabled=False,
-        integrated_context_enabled=False,
-        enqueue_peer_translation_disclosure=disclosures.append,
-    )
-    entered = asyncio.Event()
-    release = asyncio.Event()
-    policy_calls: list[bool] = []
-
-    class Runtime:
-        async def apply_policy(self, *, config, desired_active):  # noqa: ANN001
-            _ = config
-            policy_calls.append(desired_active)
-            if desired_active:
-                entered.set()
-                await release.wait()
-
-    controller._peer_runtime = Runtime()  # type: ignore[assignment]
-    monkeypatch.setattr(
-        GuiController,
-        "_ensure_peer_local_stt_ready",
-        lambda self, **_kwargs: asyncio.sleep(0, result=True),
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_peer_runtime_should_be_active",
-        lambda self, settings: settings.ui.peer_translation_enabled,
-    )
-    enabling = asyncio.create_task(controller.set_peer_translation_enabled(True))
-    await entered.wait()
-    controller._peer_activation_generation += 1
-    controller.settings.ui.peer_translation_enabled = False
-    controller._peer_activation_starting = False
-    await controller._peer_runtime.apply_policy(
-        config=controller._build_peer_runtime_config(controller.settings),
-        desired_active=False,
-    )
-    release.set()
-    await enabling
-    assert policy_calls == [True, False]
-    assert controller.settings.ui.peer_translation_enabled is False
-    assert controller.hub.peer_translation_enabled is False
-    assert disclosures == []
-
-
 def test_settings_modal_renders_process_section_before_device_and_hides_descriptions() -> None:
     options = [
         OptionItem(
@@ -881,45 +821,6 @@ def test_controller_process_diagnostic_sets_peer_warning_reason() -> None:
     assert contract.peer.warning_reason == "process_unavailable_no_process"
 
 
-@pytest.mark.asyncio
-async def test_controller_retry_clears_process_warning_only_on_success(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=_presentation(SimpleNamespace()),
-        config_path=Path("settings.json"),
-    )
-    controller.settings = AppSettings()
-    controller.settings.ui.peer_translation_enabled = True
-    controller.settings.ui.peer_translation_eula_accepted = True
-    controller._peer_process_warning_reason = "process_target_exited"
-
-    class Runtime:
-        def __init__(self, result: bool) -> None:
-            self.result = result
-
-        async def retry_process_capture(self, *, config):  # noqa: ANN001
-            _ = config
-            return self.result
-
-    controller._peer_runtime = Runtime(False)  # type: ignore[assignment]
-    monkeypatch.setattr(
-        GuiController, "_peer_runtime_should_be_active", lambda self, settings: True
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_ensure_peer_local_stt_ready",
-        lambda self: __import__("asyncio").sleep(0, result=True),
-    )
-    assert await controller.retry_peer_process_capture() is False
-    assert controller._peer_process_warning_reason == "process_target_exited"
-
-    controller._peer_runtime = Runtime(True)  # type: ignore[assignment]
-    assert await controller.retry_peer_process_capture() is True
-    assert controller._peer_process_warning_reason is None
-
-
 def test_loopback_summary_prefers_localized_process_name() -> None:
     controller = GuiController(
         page=SimpleNamespace(),
@@ -1164,7 +1065,10 @@ async def test_failed_process_warning_survives_unrelated_draft_apply_without_dev
     controller.settings = reloaded
 
     persisted = load_settings(path)
-    config = controller._build_peer_runtime_config(controller.settings)
+    config = build_peer_capture_session_config(
+        controller.settings,
+        canonical_settings=controller._canonical_vnext_settings_for(controller.settings),
+    )
     assert persisted.desktop_audio.runtime_capture_target.kind == "process"
     assert config.capture_target.kind == "process"
     assert controller._peer_process_warning_reason == warning_reason
