@@ -92,7 +92,7 @@ def _controller_for(settings: AppSettings) -> GuiController:
 
 def _eligible_managed_controller() -> GuiController:
     controller = _controller_for(_settings_for_connection(TranslationConnection.MANAGED))
-    controller._managed_trial_usage_metadata = OpenRouterKeyMetadata(  # noqa: SLF001
+    controller._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=50.0,
         usage_usd=50.0,
@@ -117,7 +117,7 @@ def _eligible_app(
         config_path=Path("settings.json"),
     )
     controller.settings = settings or _settings_for_connection(TranslationConnection.MANAGED)
-    controller._managed_trial_usage_metadata = OpenRouterKeyMetadata(  # noqa: SLF001
+    controller._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=50.0,
         usage_usd=50.0,
@@ -203,7 +203,7 @@ async def test_launch_github_star_snackbar_does_not_count_ineligible_launch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app, page, controller = _eligible_app()
-    controller._managed_trial_usage_metadata = None  # noqa: SLF001
+    controller._get_managed_usage_owner().usage_metadata = None
     saved_payloads: list[dict[str, object]] = []
 
     async def fail_sleep(_seconds: float) -> None:

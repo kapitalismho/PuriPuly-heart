@@ -410,23 +410,21 @@ def test_order40_named_owner_allowlist_adds_vrchat_osc_presence_owner() -> None:
 
 def test_order41_managed_refresh_scheduling_uses_its_named_owner() -> None:
     controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
-    tree = ast.parse(controller_path.read_text(encoding="utf-8"))
-    methods = {
+    owner_path = REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed_usage.py"
+    controller_methods = {
         node.name: ast.unparse(node)
-        for node in ast.walk(tree)
+        for node in ast.walk(ast.parse(controller_path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+    owner_methods = {
+        node.name: ast.unparse(node)
+        for node in ast.walk(ast.parse(owner_path.read_text(encoding="utf-8")))
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     }
 
-    for method_name in (
-        "_schedule_owned_referral_id_status_refresh",
-        "_schedule_managed_trial_usage_refresh",
-    ):
-        method_source = methods[method_name]
-        assert "_start_ui_background_task" not in method_source
-        assert "_ui_background_scope" not in method_source
-
-    assert "schedule_status_refresh" in methods["_schedule_owned_referral_id_status_refresh"]
-    assert "schedule_trial_usage_refresh" in methods["_schedule_managed_trial_usage_refresh"]
+    assert "_schedule_owned_referral_id_status_refresh" not in controller_methods
+    assert "schedule_status_refresh" in owner_methods["schedule_status_refresh"]
+    assert "schedule_trial_usage_refresh" in owner_methods["schedule_usage_refresh"]
 
 
 def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:
@@ -474,13 +472,17 @@ def test_order44_local_asr_owner_retires_controller_background_scope() -> None:
     assert "LocalASRProvisioningOwner:install-result-" in provisioning_source
 
 
-def test_controller_does_not_retain_dead_shutdown_or_stt_switch_locks() -> None:
+def test_controller_does_not_retain_dead_shutdown_stt_or_provider_ownership() -> None:
     controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
     provider_settings_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_settings.py"
     )
+    provider_runtime_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_runtime_apply.py"
+    )
     source = controller_path.read_text(encoding="utf-8")
     provider_settings_source = provider_settings_path.read_text(encoding="utf-8")
+    provider_runtime_source = provider_runtime_path.read_text(encoding="utf-8")
 
     assert "_stop_lock" not in source
     assert "_stt_switch_lock" not in source
@@ -489,6 +491,18 @@ def test_controller_does_not_retain_dead_shutdown_or_stt_switch_locks() -> None:
     assert "_provider_secret_change_owner" not in source
     assert "provider_settings_owner: ProviderSettingsOwner" in source
     assert "secret_change: ProviderSecretChangeOwner" in provider_settings_source
+    assert "class ProviderApplicationOwner" in provider_settings_source
+    assert "class ProviderRuntimeOwner" in provider_runtime_source
+    assert "class LlmProviderRebuildOwner" in provider_runtime_source
+    assert "_build_provider_runtime_apply_plan" not in source
+    assert "_apply_provider_runtime_plan" not in source
+    assert "_apply_order21_order22_order24_provider_settings" not in source
+    assert "_apply_translation_provider_settings_via_mutation_service" not in source
+    assert "_apply_stt_language_audio_provider_settings_via_mutation_service" not in source
+    assert "_apply_providers_direct" not in source
+    assert "_rebuild_llm_provider" not in source
+    assert "SettingsRuntimeApplyBoundary" not in provider_runtime_source
+    assert "_ControllerSttLanguageAudioRuntimeApply" not in provider_runtime_source
     assert "_gpu_provider_recovery_lock" not in source
     assert "_gpu_provider_recovery_owner" in source
     assert "_overlay_lock" not in source

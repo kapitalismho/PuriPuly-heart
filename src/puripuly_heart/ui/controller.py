@@ -61,9 +61,6 @@ from puripuly_heart.app.services.clipboard_auto_translation import (
 from puripuly_heart.app.services.github_star_prompt import (
     GithubStarPromptOwner,
 )
-from puripuly_heart.app.services.github_star_prompt import (
-    github_star_prompt_utc_timestamp as _github_star_prompt_utc_timestamp,
-)
 from puripuly_heart.app.services.github_star_prompt_settings import (
     compose_github_star_prompt_owner,
 )
@@ -96,15 +93,13 @@ from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
     resolve_local_asr_selection,
 )
-from puripuly_heart.app.services.managed_auth_claims import (
-    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
-    ManagedAuthClaimGuard,
+from puripuly_heart.app.services.managed_auth import ManagedAuthOwner
+from puripuly_heart.app.services.managed_usage import (
+    ManagedUsageMetadataResult,
+    ManagedUsageOwner,
+    ManagedUsageState,
+    ManagedUsageViewState,
 )
-from puripuly_heart.app.services.managed_connection_auth import (
-    ManagedConnectionAuthRequest,
-    ManagedConnectionAuthService,
-)
-from puripuly_heart.app.services.managed_status_refresh import ManagedStatusRefreshOwner
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
     ManualLocalASRFallbackPlan,
@@ -138,32 +133,34 @@ from puripuly_heart.app.services.provider_credential_verification import (
     ProviderCredentialVerificationInteractionOwner,
 )
 from puripuly_heart.app.services.provider_runtime_apply import (
-    _ControllerNoopRuntimeApply,
-    _ControllerOverlayOscOutputRuntimeApply,
-    _ControllerProviderRuntimeApply,
-    _ControllerSttLanguageAudioRuntimeApply,
-    _ControllerUiPromptClipboardStateRuntimeApply,
+    LlmProviderRebuildContext,
+    LlmProviderRebuildOwner,
+    NoopRuntimeApply,
+    OverlayOscOutputRuntimeApplyAdapter,
+    ProviderRuntimeApplyAdapter,
+    ProviderRuntimeApplyPlan,
+    ProviderRuntimeOwner,
+    ProviderRuntimeState,
+    SettingsRuntimeState,
+    SttLanguageAudioRuntimeApplyAdapter,
+    UiPromptClipboardStateRuntimeApplyAdapter,
     _overlay_osc_output_runtime_degraded_transaction_result,
     _overlay_osc_output_save_failed_transaction_result,
-    _provider_runtime_apply_unavailable_result,
-    _ProviderRuntimeApplyPlan,
-    _runtime_apply_failed_result,
     _runtime_apply_result_as_degraded_transaction,
     _stt_language_audio_runtime_degraded_transaction_result,
     _stt_language_audio_runtime_unavailable_result,
     _stt_language_audio_save_failed_transaction_result,
-    _translation_provider_save_failed_transaction_result,
     _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
     _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
 from puripuly_heart.app.services.provider_settings import (
+    ProviderApplicationOwner,
     ProviderSettingsOwner,
     provider_verification_context,
 )
 from puripuly_heart.app.services.provider_verification_binding import (
     ProviderVerificationBindingOwner,
 )
-from puripuly_heart.app.services.qq_managed_auth import QqManagedAuthRequest, QqManagedAuthService
 from puripuly_heart.app.services.secret_settings_transaction import (
     SecretSetRequest,
     SecretSettingsTransaction,
@@ -172,26 +169,21 @@ from puripuly_heart.app.services.settings_mutation import (
     OverlayOscOutputSettingsMutation,
     SettingsMutationService,
     SttLanguageAudioSettingsMutation,
-    TranslationProviderSettingsMutation,
     UiPromptClipboardStateSettingsMutation,
 )
 from puripuly_heart.app.services.settings_mutation_legacy import (
     _apply_settings_path_patch,
     build_overlay_osc_output_settings_path_patch,
-    build_stt_language_audio_settings_path_patch,
-    build_translation_provider_settings_path_patch,
     settings_path_mutation_validator_for_command,
 )
 from puripuly_heart.app.services.settings_projection import (
     SettingsProjectionOwner,
     SettingsViewSettingsChange,
 )
+from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.app.wiring import (
-    DiscordManagedBrokerClientAdapter,
-    DiscordOAuthAuthAdapter,
     LocalASRProviderRuntimeFactory,
-    ManagedIdentityPreflightAdapter,
     ManagedSTTProviderFactory,
     build_custom_vocabulary_runtime_config,
     build_managed_identity_state_port,
@@ -229,6 +221,10 @@ from puripuly_heart.app.wiring_composition import (
     create_manual_typing_owner,
     create_provider_credential_verification_interaction_owner,
     create_vrchat_osc_presence_probe_owner,
+)
+from puripuly_heart.app.wiring_managed_auth_factory import (
+    ManagedAuthRuntimeAdapter,
+    ManagedTranslationRuntimeAdapter,
 )
 from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
 from puripuly_heart.config.llm_profiles import profile_for_alias
@@ -288,7 +284,6 @@ from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
-from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     LocalASRProviderRuntimeSnapshot,
@@ -317,31 +312,20 @@ from puripuly_heart.core.managed_openrouter_broker_client import (
     HttpManagedOpenRouterBrokerClient,
 )
 from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterReleaseBehavior,
     ManagedOpenRouterReleaseService,
-    ManagedOpenRouterStatusRefreshResult,
-    TalkTogetherPassStatus,
     UnavailableManagedOpenRouterReleaseClient,
-    format_managed_openrouter_diagnostics,
 )
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
-    TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
     TransactionResult,
 )
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_SECRET,
-    OPENROUTER_MANAGED_API_KEY_SECRET,
     resolve_openrouter_credentials,
 )
-from puripuly_heart.core.openrouter_handoff import (
-    is_effectively_exhausted,
-    mark_founder_letter_shown,
-    should_auto_show_founder_letter,
-)
-from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
+from puripuly_heart.core.openrouter_handoff import should_auto_show_founder_letter
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEClient
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
@@ -417,19 +401,6 @@ from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 logger = logging.getLogger(__name__)
 
-QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY = {
-    "qq_managed_auth.already_claimed_discord": "qq_auth.error.already_claimed_discord",
-    "qq_managed_auth.invalid_credential": "qq_auth.error.credential_mismatch",
-    "qq_managed_auth.mismatch": "qq_auth.error.credential_mismatch",
-    "qq_managed_auth.lifetime_used": "qq_auth.error.lifetime_used",
-    "qq_managed_auth.rate_limited": "qq_auth.error.rate_limited",
-    "qq_managed_auth.key_unavailable": "qq_auth.error.key_unavailable",
-    "qq_managed_auth.broker_unavailable": "qq_auth.error.broker_unavailable",
-    "qq_managed_auth.settings_commit_failed": "qq_auth.error.settings_commit_failed",
-    "qq_managed_auth.secret_write_failed": "qq_auth.error.secret_write_failed",
-    "qq_managed_auth.error.retry": "qq_auth.error.retry",
-}
-
 # Hardcoded STT session reset deadline (not configurable via settings)
 STT_RESET_DEADLINE_S = 300.0
 OVERLAY_STARTUP_TIMEOUT_MS = 3000
@@ -442,7 +413,6 @@ DESKTOP_INTERACTION_MODE_PASS_THROUGH = "pass_through"
 DESKTOP_INTERACTION_MODES = frozenset(
     {DESKTOP_INTERACTION_MODE_EDIT, DESKTOP_INTERACTION_MODE_PASS_THROUGH}
 )
-_PASS_STATUS_UNSET = object()
 _OVERLAY_FAILURE_REASONS = frozenset(
     {
         "missing_executable",
@@ -473,49 +443,12 @@ _MANAGED_OPENROUTER_CONNECTIONS = frozenset(
         TranslationConnection.MANAGED_CHINA,
     }
 )
-DISCORD_AUTH_ERROR_KEY_BY_SUBCODE = {
-    "discord_email_unverified": "discord_auth.error.email_unverified",
-    "discord_account_too_new": "discord_auth.error.account_too_new",
-    "discord_lifetime_used": "discord_auth.error.lifetime_used",
-    "hardware_duplicate": "discord_auth.error.hardware_duplicate",
-    "global_cap_reached": "discord_auth.error.daily_cap",
-    "oauth_session_expired": "discord_auth.error.expired",
-    "loopback_unavailable": "discord_auth.error.loopback_unavailable",
-}
 _MICROPHONE_TEST_LEVEL_INTERVAL_S = 1.0
 LOCAL_QWEN_HALLUCINATION_GUIDANCE_TRIGGER_COUNT = 2
 
 
 def _canonical_json_signature(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def _managed_connection_auth_settings_values(settings: AppSettings) -> dict[str, Any]:
-    managed = settings.managed_identity
-    selection_alias = settings.openrouter.selection_alias
-    return {
-        "intent": {
-            "translation": {
-                "connection": settings.translation.connection.value,
-                "model": settings.translation.model.value,
-            },
-            "openrouter": {
-                "selected_source": settings.openrouter.selected_source.value,
-                "llm_model": settings.openrouter.llm_model.value,
-                "selection_alias": selection_alias.value if selection_alias is not None else None,
-            },
-        },
-        "state": {
-            "managed_connection": {
-                "installation_id": managed.installation_id,
-                "active_managed_credential_ref": managed.active_managed_credential_ref,
-                "active_managed_expires_at": managed.active_managed_expires_at,
-                "founder_letter_seen_credential_ref": managed.founder_letter_seen_credential_ref,
-                "referral_id": managed.referral_id,
-                "local_managed_claim_sources": list(managed.local_managed_claim_sources),
-            }
-        },
-    }
 
 
 def _callable_accepts_keyword(callable_obj: object, keyword: str) -> bool:
@@ -647,6 +580,21 @@ class GuiController:
     _provider_rebuild_runtime: ProviderRuntimeRebuildService = field(
         init=False,
         default_factory=ProviderRuntimeRebuildService,
+        repr=False,
+    )
+    _provider_runtime_owner: ProviderRuntimeOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _provider_application_owner: ProviderApplicationOwner | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _llm_provider_rebuild_owner: LlmProviderRebuildOwner | None = field(
+        init=False,
+        default=None,
         repr=False,
     )
     _peer_capture_target_resolution: PeerCaptureTargetResolutionService = field(
@@ -789,7 +737,7 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _managed_status_refresh_owner: ManagedStatusRefreshOwner | None = field(
+    _managed_usage_owner: ManagedUsageOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -797,32 +745,26 @@ class GuiController:
     _provider_credential_verification_owner: (
         ProviderCredentialVerificationInteractionOwner | None
     ) = field(init=False, default=None, repr=False)
-    _managed_trial_pending_auth: bool = field(init=False, default=False)
-    _discord_managed_auth_in_progress: bool = field(init=False, default=False)
-    _discord_managed_auth_callback_received_hook: Callable[[], None] | None = field(
+    _managed_auth_runtime_adapter: ManagedAuthRuntimeAdapter | None = field(
         init=False,
         default=None,
         repr=False,
     )
-    last_discord_managed_auth_referral_bonus_applied: bool = field(
-        init=False,
-        default=False,
-    )
-    _managed_trial_usage_metadata: OpenRouterKeyMetadata | None = field(init=False, default=None)
-    _managed_trial_usage_metadata_entitlement_ref: str | None = field(
+    _managed_auth_owner: ManagedAuthOwner | None = field(
         init=False,
         default=None,
+        repr=False,
     )
-    _talk_together_pass_status: TalkTogetherPassStatus | None = field(
+    _managed_translation_runtime_adapter: ManagedTranslationRuntimeAdapter | None = field(
         init=False,
         default=None,
+        repr=False,
     )
-    _talk_together_pass_status_key: tuple[str | None, str | None, str | None] | None = field(
+    _translation_enable_owner: TranslationEnableOwner | None = field(
         init=False,
         default=None,
+        repr=False,
     )
-    _translation_toggle_intent_enabled: bool = field(init=False, default=False)
-    _translation_toggle_generation: int = field(init=False, default=0)
     _github_star_prompt_owner: GithubStarPromptOwner | None = field(
         init=False,
         default=None,
@@ -915,7 +857,13 @@ class GuiController:
 
     @property
     def managed_auth_pending(self) -> bool:
-        return self._managed_trial_pending_auth
+        owner = self._managed_auth_owner
+        return owner.pending if owner is not None else False
+
+    @property
+    def last_discord_managed_auth_referral_bonus_applied(self) -> bool:
+        owner = self._managed_auth_owner
+        return owner.last_referral_bonus_applied if owner is not None else False
 
     @property
     def desktop_overlay_captions_locked(self) -> bool:
@@ -1098,8 +1046,9 @@ class GuiController:
         await self._sync_clipboard_watcher()
 
     async def refresh_openrouter_usage_after_launch(self) -> bool:
-        await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=True)
-        return is_effectively_exhausted(self._managed_trial_usage_metadata)
+        owner = self._get_managed_usage_owner()
+        await owner.refresh(auto_show_founder_letter=True)
+        return owner.is_exhausted
 
     async def prepare_runtime_after_launch(self) -> None:
         self._schedule_process_discovery_idle_preparation()
@@ -1630,25 +1579,152 @@ class GuiController:
             and self.hub.llm is not None
         )
 
-    def _sync_managed_auth_dashboard_notice(self) -> None:
-        self.app.set_dashboard_managed_auth_pending(self._managed_trial_pending_auth)
+    def _get_managed_auth_runtime_adapter(self) -> ManagedAuthRuntimeAdapter:
+        adapter = self._managed_auth_runtime_adapter
+        if adapter is None:
+            adapter = ManagedAuthRuntimeAdapter(
+                config_path=self.config_path,
+                secret_store_factory=create_secret_store,
+                settings_provider=lambda: self.settings,
+                settings_sink=lambda settings: setattr(self, "settings", settings),
+                release_service_provider=lambda: self._managed_openrouter_release_service,
+                persistence_callback_factory=self._managed_identity_persistence_callback,
+                settings_repository_factory=lambda base, committed, surface: (
+                    self._legacy_settings_patch_repository(
+                        base_settings=base,
+                        committed_settings=committed,
+                        surface=surface,
+                    )
+                ),
+                settings_owner_complete=self._get_settings_owner().complete,
+                runtime_presence_provider=lambda: (
+                    self.hub is not None,
+                    self.hub is not None and self.hub.llm is not None,
+                ),
+                ingress_provider=lambda: self._shutdown_ingress_frozen,
+            )
+            self._managed_auth_runtime_adapter = adapter
+        return adapter
+
+    def _get_managed_auth_owner(self) -> ManagedAuthOwner:
+        owner = self._managed_auth_owner
+        if owner is None:
+            adapter = self._get_managed_auth_runtime_adapter()
+            owner = ManagedAuthOwner(
+                state_provider=adapter.state,
+                pending_sink=self.app.set_dashboard_managed_auth_pending,
+                qq_executor=adapter.execute_qq,
+                discord_executor=adapter.execute_discord,
+                runtime_ensurer=self._ensure_managed_auth_runtime,
+                usage_view_sink=self._apply_managed_auth_usage_view,
+                usage_refresh_sink=self._get_managed_usage_owner().schedule_usage_refresh,
+                message_sink=lambda key, values: self._show_short_message(
+                    key,
+                    **dict(values),
+                ),
+                result_sink=lambda result: setattr(
+                    self,
+                    "last_settings_mutation_result",
+                    result,
+                ),
+                log_sink=lambda message: self.log_basic(
+                    message,
+                    level=logging.ERROR,
+                ),
+            )
+            self._managed_auth_owner = owner
+        return owner
+
+    async def _ensure_managed_auth_runtime(self, mode: str) -> bool:
+        if self.hub is None:
+            return False
+        if mode == "always" or (mode == "if_missing" and self.hub.llm is None):
+            await self._get_llm_provider_rebuild_owner().rebuild()
+        return self.hub.llm is not None
+
+    def _apply_managed_auth_usage_view(
+        self,
+        referral_id: str | None,
+        pass_status,
+    ) -> None:
+        owner = self._get_managed_usage_owner()
+        owner.set_view_state(
+            visible=True,
+            remaining_percent=None,
+            referral_id=referral_id or owner.current_referral_id,
+            pass_status=pass_status,
+        )
 
     def _set_managed_trial_pending_auth(self, pending: bool) -> None:
-        self._managed_trial_pending_auth = bool(pending)
-        self._sync_managed_auth_dashboard_notice()
+        self._get_managed_auth_owner().set_pending(pending)
 
     def clear_managed_auth_pending_state(self) -> None:
-        self._set_managed_trial_pending_auth(False)
+        self._get_managed_auth_owner().clear_pending()
 
-    def _record_translation_toggle_intent(self, enabled: bool) -> int:
-        self._translation_toggle_intent_enabled = bool(enabled)
-        self._translation_toggle_generation += 1
-        return self._translation_toggle_generation
+    def _get_managed_translation_runtime_adapter(
+        self,
+    ) -> ManagedTranslationRuntimeAdapter:
+        adapter = self._managed_translation_runtime_adapter
+        if adapter is None:
+            adapter = ManagedTranslationRuntimeAdapter(
+                auth=self._get_managed_auth_runtime_adapter(),
+                settings_provider=lambda: self.settings,
+                release_service_provider=lambda: self._managed_openrouter_release_service,
+                runtime_snapshot_provider=lambda: (
+                    self.hub is not None,
+                    self.hub.translation_enabled if self.hub is not None else False,
+                    self.hub.llm if self.hub is not None else None,
+                ),
+                ingress_provider=lambda: self._shutdown_ingress_frozen,
+                founder_dialog=self.app.show_founder_letter_dialog,
+                persist_settings=self._save_settings,
+            )
+            self._managed_translation_runtime_adapter = adapter
+        return adapter
 
-    def _translation_toggle_intent_matches(self, *, enabled: bool, generation: int) -> bool:
-        return generation == self._translation_toggle_generation and (
-            self._translation_toggle_intent_enabled == bool(enabled)
-        )
+    def _get_translation_enable_owner(self) -> TranslationEnableOwner:
+        owner = self._translation_enable_owner
+        if owner is None:
+            adapter = self._get_managed_translation_runtime_adapter()
+            owner = TranslationEnableOwner(
+                state_provider=adapter.state,
+                managed_prepare=adapter.prepare,
+                founder_route=self._get_managed_usage_owner().should_route_to_founder_letter,
+                pending_sink=self._set_managed_trial_pending_auth,
+                runtime_ensurer=self._ensure_managed_auth_runtime,
+                usage_refresh_sink=self._get_managed_usage_owner().schedule_usage_refresh,
+                usage_refresh_now=lambda: self._get_managed_usage_owner().refresh(
+                    auto_show_founder_letter=False
+                ),
+                runtime_sink=self._set_translation_runtime_state,
+                dashboard_sink=self.app.set_dashboard_translation_enabled,
+                clear_context=lambda: self.hub.clear_context() if self.hub is not None else None,
+                warmup=adapter.warmup,
+                message_sink=lambda key, values: self._show_short_message(
+                    key,
+                    **dict(values),
+                ),
+                qq_dialog_sink=lambda: (
+                    self.app.show_qq_managed_auth_dialog()
+                    if callable(getattr(self.app, "show_qq_managed_auth_dialog", None))
+                    else None
+                ),
+                result_sink=lambda result: setattr(
+                    self,
+                    "last_settings_mutation_result",
+                    result,
+                ),
+                log_basic=self.log_basic,
+                log_detailed=self.log_detailed,
+                log_error=self._log_error,
+                founder_letter_sink=adapter.show_founder_letter,
+            )
+            self._translation_enable_owner = owner
+        return owner
+
+    def _set_translation_runtime_state(self, enabled: bool) -> None:
+        if self.hub is not None:
+            self.hub.translation_enabled = bool(enabled)
 
     def _managed_openrouter_release_settings(self) -> AppSettings | None:
         if self.settings is None:
@@ -1656,24 +1732,6 @@ class GuiController:
         if not self._managed_openrouter_selected():
             return None
         return self.settings
-
-    def _should_show_managed_auth_pending_before_prepare(self) -> bool:
-        if self.settings is None:
-            return False
-        if not self._managed_openrouter_selected():
-            return False
-        try:
-            secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
-            resolution = resolve_openrouter_credentials(
-                build_openrouter_credential_runtime_config(self.settings),
-                secrets=secrets,
-                request_intent="TRANS",
-            )
-            if resolution.api_key is None:
-                return True
-        except Exception:
-            return True
-        return False
 
     def _managed_openrouter_selected(self) -> bool:
         return bool(
@@ -1683,64 +1741,11 @@ class GuiController:
             and self.settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
         )
 
-    def _managed_openrouter_local_key_available(self) -> bool:
-        if self.settings is None:
-            return False
-        if not self._managed_openrouter_selected():
-            return False
-        try:
-            secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
-            resolution = resolve_openrouter_credentials(
-                build_openrouter_credential_runtime_config(self.settings),
-                secrets=secrets,
-                request_intent="TRANS",
-            )
-            if resolution.api_key is None:
-                return False
-        except Exception:
-            return False
-        return True
-
     def dashboard_managed_auth_action(self) -> str:
-        if not self._managed_openrouter_selected():
-            return "continue"
-        if self._discord_managed_auth_in_progress or self._managed_trial_pending_auth:
-            return "in_progress"
-        if self._managed_openrouter_local_key_available():
-            return "continue"
-        return "prompt"
+        return self._get_managed_auth_owner().dashboard_action()
 
     def dashboard_managed_auth_prompt_kind(self) -> str:
-        if self._managed_china_auth_relevant_for_translation_enable():
-            return "qq"
-        return "discord"
-
-    def _managed_china_auth_relevant_for_translation_enable(self) -> bool:
-        if self.settings is None:
-            return False
-        return self.settings.translation.connection == TranslationConnection.MANAGED_CHINA
-
-    def _show_qq_managed_auth_dialog(self) -> None:
-        if not self._managed_china_auth_relevant_for_translation_enable():
-            return
-        show_dialog = getattr(self.app, "show_qq_managed_auth_dialog", None)
-        if callable(show_dialog):
-            show_dialog()
-
-    def _managed_auth_claim_guard_for_settings(
-        self,
-        settings: AppSettings,
-    ) -> ManagedAuthClaimGuard:
-        secret_store = create_secret_store(settings.secrets, config_path=self.config_path)
-        secret_store_port = create_sync_secret_store_adapter(secret_store)
-        managed_state = build_managed_identity_state_port(
-            settings,
-            self._managed_identity_persistence_callback(settings),
-        )
-        return ManagedAuthClaimGuard(
-            managed_state=managed_state,
-            secret_store=secret_store_port,
-        )
+        return self._get_managed_auth_owner().dashboard_prompt_kind()
 
     async def start_qq_managed_auth_from_dialog(
         self,
@@ -1748,60 +1753,10 @@ class GuiController:
         qq_identity: str,
         credential: str,
     ) -> bool | tuple[str, dict[str, object]]:
-        if not self._managed_china_auth_relevant_for_translation_enable() or self.settings is None:
-            return "qq_auth.error.retry", {}
-        service = self._managed_openrouter_release_service
-        broker_client = getattr(service, "client", None)
-        if broker_client is None:
-            return "qq_auth.error.retry", {}
-        secret_store = create_secret_store(self.settings.secrets, config_path=self.config_path)
-        secret_store_port = create_sync_secret_store_adapter(secret_store)
-        managed_state = build_managed_identity_state_port(
-            self.settings,
-            self._managed_identity_persistence_callback(self.settings),
+        return await self._get_managed_auth_owner().start_qq(
+            qq_identity=qq_identity,
+            credential=credential,
         )
-        auth_service = QqManagedAuthService(
-            broker_client=broker_client,
-            secret_store=secret_store_port,
-            managed_state=managed_state,
-            claim_guard=ManagedAuthClaimGuard(
-                managed_state=managed_state,
-                secret_store=secret_store_port,
-            ),
-        )
-        result = await auth_service.authenticate(
-            QqManagedAuthRequest(
-                qq_identity=qq_identity,
-                credential=credential,
-                asserted_at=_github_star_prompt_utc_timestamp(),
-                metadata={"flow": "qq_managed_auth_dialog"},
-            )
-        )
-        if _settings_mutation_committed(result):
-            self._set_managed_trial_pending_auth(False)
-            if self.hub is not None and self.hub.llm is None:
-                await self._rebuild_llm_provider()
-            else:
-                self._schedule_managed_trial_usage_refresh()
-            return True
-        message = result.message
-        if message is None:
-            return "qq_auth.error.retry", {}
-        return (
-            QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY.get(message.key, message.key),
-            dict(message.params),
-        )
-
-    def _discord_auth_message_key(self, result) -> str:  # noqa: ANN001
-        diagnostics = getattr(result, "diagnostics", None)
-        subcode = getattr(diagnostics, "subcode", None)
-        if subcode is not None:
-            mapped_key = DISCORD_AUTH_ERROR_KEY_BY_SUBCODE.get(subcode)
-            if mapped_key is not None:
-                return mapped_key
-        if getattr(diagnostics, "code", None) == "discord_loopback_unavailable":
-            return DISCORD_AUTH_ERROR_KEY_BY_SUBCODE["loopback_unavailable"]
-        return getattr(result, "message_key", "discord_auth.error.retry")
 
     async def start_discord_managed_auth_from_dialog(
         self,
@@ -1809,229 +1764,9 @@ class GuiController:
         on_callback_received: Callable[[], None] | None = None,
         referral_id: str | None = None,
     ) -> bool:
-        self.last_discord_managed_auth_referral_bonus_applied = False
-        release_service = self._managed_openrouter_release_service
-        if release_service is None or self.settings is None:
-            self._discord_managed_auth_in_progress = False
-            self._set_managed_trial_pending_auth(False)
-            self._show_short_message("discord_auth.error.retry")
-            return False
-
-        previous_callback = self._discord_managed_auth_callback_received_hook
-        self._discord_managed_auth_callback_received_hook = on_callback_received
-        self._discord_managed_auth_in_progress = True
-        self._set_managed_trial_pending_auth(True)
-        try:
-            if not self._discord_release_service_supports_transaction_auth(release_service):
-                return await self._start_discord_managed_auth_via_release_service(
-                    release_service,
-                    referral_id=referral_id,
-                )
-            updated = copy.deepcopy(self.settings)
-            secret_store = create_secret_store(updated.secrets, config_path=self.config_path)
-            secret_store_port = create_sync_secret_store_adapter(secret_store)
-            managed_state = build_managed_identity_state_port(
-                updated,
-                self._managed_identity_persistence_callback(updated),
-            )
-            identity = ManagedIdentityPreflightAdapter(
-                managed_state=managed_state,
-                secrets=secret_store,
-            )
-            discord_auth = DiscordOAuthAuthAdapter(
-                identity=identity,
-                client=release_service.client,
-                app_version=release_service.app_version,
-                raw_hardware_fingerprint_provider=release_service.raw_hardware_fingerprint_provider,
-                hardware_hash_provider=getattr(
-                    release_service,
-                    "_legacy_hardware_hash_provider",
-                    None,
-                ),
-                oauth_runtime=release_service.oauth_runtime,
-                listener_factory=release_service.discord_oauth_listener_factory,
-                callback_runner=release_service.discord_oauth_callback_runner,
-                referral_id=referral_id,
-                on_callback_received=on_callback_received,
-            )
-            broker = DiscordManagedBrokerClientAdapter(
-                identity=identity,
-                client=release_service.client,
-                openrouter_config=release_service.openrouter_config,
-                app_version=release_service.app_version,
-                signed_at_provider=release_service.signed_at_provider,
-            )
-            auth_service = ManagedConnectionAuthService(
-                local_identity=identity,
-                discord_auth=discord_auth,
-                broker_client=broker,
-                secret_store=secret_store_port,
-                settings_repository=self._legacy_settings_patch_repository(
-                    base_settings=self.settings,
-                    committed_settings=updated,
-                    surface="managed_connection_auth",
-                ),
-                claim_guard=ManagedAuthClaimGuard(
-                    managed_state=managed_state,
-                    secret_store=secret_store_port,
-                ),
-            )
-            result = await auth_service.authorize(
-                ManagedConnectionAuthRequest(
-                    local_secret_key=OPENROUTER_MANAGED_API_KEY_SECRET,
-                    settings_values=_managed_connection_auth_settings_values(updated),
-                    expected_settings_revision=None,
-                    reason="managed_connection_auth",
-                    correlation_id=None,
-                    broker_metadata={"flow": "managed_connection_auth"},
-                )
-            )
-            self._get_settings_owner().complete()
-            self.last_settings_mutation_result = result
-            if result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING:
-                self.settings = updated
-            if _settings_mutation_committed(result):
-                issue = broker.last_issue_response
-                self.settings = updated
-                self.last_discord_managed_auth_referral_bonus_applied = bool(
-                    getattr(issue, "referral_bonus_applied", False)
-                )
-                if self.hub is None:
-                    self._show_short_message("discord_auth.error.retry")
-                    return False
-                await self._rebuild_llm_provider()
-                if self.hub.llm is None:
-                    self._show_short_message("discord_auth.error.retry")
-                    return False
-                result_referral_id = normalize_owned_referral_id(
-                    getattr(issue, "referral_id", None)
-                )
-                self._set_managed_usage_view_state(
-                    visible=True,
-                    remaining_percent=None,
-                    referral_id=result_referral_id or self._current_owned_referral_id(),
-                    pass_status=getattr(issue, "pass_status", None),
-                )
-                self._schedule_managed_trial_usage_refresh()
-                return True
-
-            message = result.message
-            message_key = message.key if message is not None else "discord_auth.error.retry"
-            message_kwargs = dict(message.params) if message is not None else {}
-            diagnostics = result.diagnostics
-            error_class = getattr(diagnostics, "category", None)
-            self.log_basic(
-                "[ManagedAuth] Discord auth failed: "
-                f"message_key={message_key} class={error_class or 'unknown'}",
-                level=logging.ERROR,
-            )
-            self._show_short_message(
-                message_key,
-                **message_kwargs,
-            )
-            return False
-        finally:
-            if self._discord_managed_auth_callback_received_hook is on_callback_received:
-                self._discord_managed_auth_callback_received_hook = previous_callback
-            self._discord_managed_auth_in_progress = False
-            self._set_managed_trial_pending_auth(False)
-
-    def _discord_release_service_supports_transaction_auth(self, release_service: object) -> bool:
-        return all(
-            hasattr(release_service, attr)
-            for attr in (
-                "app_version",
-                "client",
-                "discord_oauth_callback_runner",
-                "discord_oauth_listener_factory",
-                "oauth_runtime",
-                "openrouter_config",
-                "signed_at_provider",
-            )
-        )
-
-    async def _start_discord_managed_auth_via_release_service(
-        self,
-        release_service: object,
-        *,
-        referral_id: str | None,
-    ) -> bool:
-        claim_guard: ManagedAuthClaimGuard | None = None
-        if self.settings is not None:
-            try:
-                claim_guard = self._managed_auth_claim_guard_for_settings(self.settings)
-                claim_result = await claim_guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
-            except Exception:
-                self._show_short_message("discord_auth.error.retry")
-                return False
-            if claim_result is not None:
-                self.last_settings_mutation_result = claim_result
-                message = claim_result.message
-                message_key = message.key if message is not None else "discord_auth.error.retry"
-                message_kwargs = dict(message.params) if message is not None else {}
-                self._show_short_message(message_key, **message_kwargs)
-                return False
-        try:
-            result = await release_service.prepare_for_translation(referral_id=referral_id)
-        except Exception as exc:
-            self.log_basic(
-                f"[ManagedAuth] Discord auth start failed: {exc}",
-                level=logging.ERROR,
-            )
-            self._show_short_message("discord_auth.error.retry")
-            return False
-
-        if result.behavior == ManagedOpenRouterReleaseBehavior.READY and result.local_key_available:
-            if claim_guard is not None:
-                with contextlib.suppress(Exception):
-                    claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
-                    claim_guard.managed_state.persist()
-            self.last_discord_managed_auth_referral_bonus_applied = (
-                getattr(result, "referral_bonus_applied", False) is True
-            )
-            if self.hub is None:
-                self._show_short_message("discord_auth.error.retry")
-                return False
-            if self.hub.llm is None:
-                await self._rebuild_llm_provider()
-            if self.hub.llm is None:
-                self._show_short_message("discord_auth.error.retry")
-                return False
-            result_referral_id = normalize_owned_referral_id(getattr(result, "referral_id", None))
-            self._set_managed_usage_view_state(
-                visible=True,
-                remaining_percent=None,
-                referral_id=result_referral_id or self._current_owned_referral_id(),
-                pass_status=getattr(result, "pass_status", None),
-            )
-            self._schedule_managed_trial_usage_refresh()
-            return True
-
-        message_key = self._discord_auth_message_key(result)
-        diagnostics = result.diagnostics
-        error_class = getattr(diagnostics, "error_class", None)
-        self.log_basic(
-            "[ManagedAuth] Discord auth failed: "
-            f"message_key={message_key} class={error_class or 'unknown'}",
-            level=logging.ERROR,
-        )
-        self._show_short_message(
-            message_key,
-            **dict(result.message_kwargs),
-        )
-        return False
-
-    def _managed_trial_remaining_percent(
-        self, usage_metadata: OpenRouterKeyMetadata | None
-    ) -> int | None:
-        if usage_metadata is None:
-            return None
-        if usage_metadata.limit_usd is None or usage_metadata.remaining_usd is None:
-            return None
-        if usage_metadata.limit_usd <= 0:
-            return None
-        return max(
-            0, min(100, round((usage_metadata.remaining_usd / usage_metadata.limit_usd) * 100))
+        return await self._get_managed_auth_owner().start_discord(
+            on_callback_received=on_callback_received,
+            referral_id=referral_id,
         )
 
     def is_github_star_prompt_eligible(self) -> bool:
@@ -2076,9 +1811,7 @@ class GuiController:
         if owner is None:
             owner = compose_github_star_prompt_owner(
                 settings=self._get_settings_owner(),
-                managed_remaining_percent=lambda: self._managed_trial_remaining_percent(
-                    self._managed_trial_usage_metadata
-                ),
+                managed_remaining_percent=lambda: self._get_managed_usage_owner().remaining_percent,
                 transaction_result_sink=lambda result: setattr(
                     self,
                     "last_settings_mutation_result",
@@ -2173,376 +1906,108 @@ class GuiController:
             replacement_settings
         )
 
-    def _current_owned_referral_id(self) -> str | None:
-        if self.settings is None:
-            return None
-        return normalize_owned_referral_id(self.settings.managed_identity.referral_id)
-
-    def _managed_identity_scope(
-        self,
-        referral_id: str | None,
-    ) -> tuple[str | None, str | None, str | None] | None:
-        if self.settings is None:
-            return None
-        installation_id = self.settings.managed_identity.installation_id.strip() or None
-        active_ref = self.settings.managed_identity.active_managed_credential_ref
-        normalized_active_ref = active_ref.strip() if isinstance(active_ref, str) else None
-        normalized_referral_id = normalize_owned_referral_id(referral_id)
-        return (installation_id, normalized_active_ref or None, normalized_referral_id)
-
-    def _talk_together_pass_cache_key(
-        self,
-        referral_id: str | None,
-    ) -> tuple[str | None, str | None, str | None] | None:
-        normalized_referral_id = normalize_owned_referral_id(referral_id)
-        if normalized_referral_id is None:
-            return None
-        return self._managed_identity_scope(normalized_referral_id)
-
-    def _clear_talk_together_pass_status_cache(self) -> None:
-        self._talk_together_pass_status = None
-        self._talk_together_pass_status_key = None
-
-    def _cached_talk_together_pass_status_for(
-        self,
-        referral_id: str | None,
-    ) -> TalkTogetherPassStatus | None:
-        cache_key = self._talk_together_pass_cache_key(referral_id)
-        if cache_key is None or cache_key != self._talk_together_pass_status_key:
-            self._clear_talk_together_pass_status_cache()
-            return None
-        return self._talk_together_pass_status
-
-    def _set_managed_usage_view_state(
-        self,
-        *,
-        visible: bool,
-        remaining_percent: int | None,
-        referral_id: str | None,
-        pass_status: TalkTogetherPassStatus | None | object = _PASS_STATUS_UNSET,
-    ) -> None:
-        normalized_referral_id = normalize_owned_referral_id(referral_id)
-        if not visible or normalized_referral_id is None:
-            self._clear_talk_together_pass_status_cache()
-        elif pass_status is _PASS_STATUS_UNSET:
-            pass
-        elif (
-            isinstance(pass_status, TalkTogetherPassStatus)
-            and pass_status.pass_id == normalized_referral_id
-        ):
-            self._talk_together_pass_status = pass_status
-            self._talk_together_pass_status_key = self._talk_together_pass_cache_key(
-                normalized_referral_id
+    def _managed_usage_state(self) -> ManagedUsageState:
+        settings = self.settings
+        if settings is None:
+            return ManagedUsageState(
+                settings_available=False,
+                managed_key_visible=False,
+                release_settings_available=False,
+                installation_id=None,
+                entitlement_ref=None,
+                referral_id=None,
+                ingress_frozen=self._shutdown_ingress_frozen,
             )
-        else:
-            self._clear_talk_together_pass_status_cache()
-
-        effective_pass_status = self._cached_talk_together_pass_status_for(normalized_referral_id)
-        self.app.set_settings_managed_key_state(
-            visible=visible,
-            remaining_percent=remaining_percent,
-            referral_id=normalized_referral_id,
-            pass_status=effective_pass_status,
+        active_ref = settings.managed_identity.active_managed_credential_ref
+        entitlement_ref = active_ref.strip() if isinstance(active_ref, str) else None
+        return ManagedUsageState(
+            settings_available=True,
+            managed_key_visible=self._managed_openrouter_selected(),
+            release_settings_available=self._managed_openrouter_release_settings() is not None,
+            installation_id=settings.managed_identity.installation_id.strip() or None,
+            entitlement_ref=entitlement_ref or None,
+            referral_id=normalize_owned_referral_id(settings.managed_identity.referral_id),
+            ingress_frozen=self._shutdown_ingress_frozen,
         )
 
-    def _managed_key_card_visible_from_settings(self) -> bool:
-        if self.settings is None:
-            return False
-        return self._managed_openrouter_selected()
-
-    async def _refresh_managed_status_best_effort(
-        self,
-        *,
-        service: object | None = None,
-    ) -> ManagedOpenRouterStatusRefreshResult:
-        current_referral_id = self._current_owned_referral_id()
-        if service is None:
-            service = self._managed_openrouter_release_service
-        if service is None:
-            return ManagedOpenRouterStatusRefreshResult(
-                referral_id=current_referral_id,
-                pass_status=self._cached_talk_together_pass_status_for(current_referral_id),
-                succeeded=False,
-            )
-        refresh_status = getattr(service, "refresh_managed_status", None)
-        if callable(refresh_status):
-            try:
-                return await refresh_status()
-            except Exception as exc:
-                self.log_basic(
-                    f"[ManagedAuth] Managed status refresh failed: {exc}",
-                    level=logging.WARNING,
-                )
-                return ManagedOpenRouterStatusRefreshResult(
-                    referral_id=current_referral_id,
-                    pass_status=self._cached_talk_together_pass_status_for(current_referral_id),
-                    succeeded=False,
-                )
-        refresh_status = getattr(service, "refresh_owned_referral_id_from_status", None)
-        if callable(refresh_status):
-            try:
-                return ManagedOpenRouterStatusRefreshResult(
-                    referral_id=normalize_owned_referral_id(await refresh_status())
-                    or current_referral_id,
-                    pass_status=None,
-                    succeeded=True,
-                )
-            except Exception as exc:
-                self.log_basic(
-                    f"[ManagedAuth] Referral ID status refresh failed: {exc}",
-                    level=logging.WARNING,
-                )
-        return ManagedOpenRouterStatusRefreshResult(
-            referral_id=current_referral_id,
-            pass_status=self._cached_talk_together_pass_status_for(current_referral_id),
-            succeeded=False,
-        )
-
-    def _schedule_owned_referral_id_status_refresh(
-        self,
-        *,
-        remaining_percent: int | None,
-        current_referral_id: str | None,
-    ) -> None:
-        if self._shutdown_ingress_frozen:
-            return
-        service = self._managed_openrouter_release_service
-        if service is None:
-            return
-        refresh_status = getattr(service, "refresh_managed_status", None)
-        legacy_refresh_status = getattr(service, "refresh_owned_referral_id_from_status", None)
-        if not callable(refresh_status) and not callable(legacy_refresh_status):
-            return
-        scheduled_identity_scope = self._managed_identity_scope(current_referral_id)
-        scheduled_identity_base = (
-            scheduled_identity_scope[:2] if scheduled_identity_scope is not None else None
-        )
-
-        async def _run_status_refresh() -> None:
-            try:
-                result = await self._refresh_managed_status_best_effort(
-                    service=service,
-                )
-                if self._shutdown_ingress_frozen:
-                    return
-                if service is not self._managed_openrouter_release_service:
-                    return
-                if (
-                    self.settings is None
-                    or self._managed_openrouter_release_settings() is None
-                    or not self._managed_key_card_visible_from_settings()
-                ):
-                    return
-                refreshed_referral_id = (
-                    normalize_owned_referral_id(result.referral_id) or current_referral_id
-                )
-                current_identity_scope = self._managed_identity_scope(
-                    self._current_owned_referral_id()
-                )
-                allowed_identity_scopes = {scheduled_identity_scope}
-                if scheduled_identity_base is not None:
-                    allowed_identity_scopes.add((*scheduled_identity_base, refreshed_referral_id))
-                if current_identity_scope not in allowed_identity_scopes:
-                    return
-                if result.succeeded:
-                    self._set_managed_usage_view_state(
-                        visible=True,
-                        remaining_percent=remaining_percent,
-                        referral_id=refreshed_referral_id,
-                        pass_status=result.pass_status,
-                    )
-                    return
-                self._set_managed_usage_view_state(
-                    visible=True,
-                    remaining_percent=remaining_percent,
-                    referral_id=refreshed_referral_id,
-                )
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                self.log_basic(
-                    f"[ManagedAuth] Referral ID status refresh failed: {exc}",
-                    level=logging.WARNING,
-                )
-
-        self._get_managed_status_refresh_owner().schedule_status_refresh(_run_status_refresh)
-
-    def _schedule_managed_trial_usage_refresh(self) -> None:
-        if self._shutdown_ingress_frozen:
-            return
-
-        self._get_managed_status_refresh_owner().schedule_trial_usage_refresh(
-            self._refresh_managed_trial_usage_state_best_effort
-        )
-
-    def _get_managed_status_refresh_owner(self) -> ManagedStatusRefreshOwner:
-        owner = self._managed_status_refresh_owner
-        if owner is None:
-            owner = ManagedStatusRefreshOwner(
-                diagnostics_sink=lambda event, metadata, exception: self.log_detailed(
-                    "[ManagedAuth] Background refresh failed "
-                    f"event={event} kind={metadata.get('kind')} "
-                    f"error_type={metadata.get('error_type')}",
-                    level=logging.WARNING,
-                    exception=exception,
-                )
-            )
-            self._managed_status_refresh_owner = owner
-        return owner
-
-    def _on_managed_trial_delegate_ready(self) -> None:
-        if self._shutdown_ingress_frozen:
-            return
-        self._set_managed_trial_pending_auth(False)
-        self._schedule_managed_trial_usage_refresh()
-
-    async def _refresh_managed_trial_usage_state_best_effort(self) -> None:
-        try:
-            await self._refresh_managed_trial_usage_state()
-        except Exception as exc:
-            self.log_basic(
-                f"[ManagedAuth] Usage refresh failed: {exc}",
-                level=logging.WARNING,
-            )
-
-    async def _refresh_managed_trial_usage_state(self) -> None:
-        await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=True)
-
-    def _clear_managed_trial_usage_metadata_cache(self) -> None:
-        self._managed_trial_usage_metadata = None
-        self._managed_trial_usage_metadata_entitlement_ref = None
-
-    def _sync_managed_trial_usage_metadata_scope(self) -> str | None:
-        if self.settings is None:
-            self._clear_managed_trial_usage_metadata_cache()
-            return None
-        entitlement_ref = self.settings.managed_identity.active_managed_credential_ref
-        if entitlement_ref != self._managed_trial_usage_metadata_entitlement_ref:
-            self._managed_trial_usage_metadata = None
-            self._managed_trial_usage_metadata_entitlement_ref = entitlement_ref
-        return entitlement_ref
-
-    async def _refresh_managed_trial_usage_state_impl(
-        self,
-        *,
-        auto_show_founder_letter: bool,
-    ) -> None:
-        if self._shutdown_ingress_frozen:
-            return
-        if self.settings is None:
-            self._clear_managed_trial_usage_metadata_cache()
-            self._set_managed_trial_pending_auth(False)
-            self._set_managed_usage_view_state(
-                visible=False,
-                remaining_percent=None,
-                referral_id=self._current_owned_referral_id(),
-            )
-            return
-        managed_key_visible = self._managed_key_card_visible_from_settings()
-        if not managed_key_visible:
-            self._clear_managed_trial_usage_metadata_cache()
-            self._set_managed_trial_pending_auth(False)
-            self._set_managed_usage_view_state(
-                visible=False,
-                remaining_percent=None,
-                referral_id=self._current_owned_referral_id(),
-            )
-            return
+    async def _fetch_managed_usage_metadata(self) -> ManagedUsageMetadataResult:
+        settings = self.settings
         release_settings = self._managed_openrouter_release_settings()
-        if release_settings is None:
-            self._clear_managed_trial_usage_metadata_cache()
-            self._set_managed_trial_pending_auth(False)
-            self._set_managed_usage_view_state(
-                visible=True,
-                remaining_percent=None,
-                referral_id=self._current_owned_referral_id(),
-            )
-            return
-
-        entitlement_ref = self._sync_managed_trial_usage_metadata_scope()
-
+        if settings is None or release_settings is None:
+            return ManagedUsageMetadataResult(key_available=False, metadata=None)
         try:
-            secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
+            secrets = create_secret_store(settings.secrets, config_path=self.config_path)
             resolution = resolve_openrouter_credentials(
-                build_openrouter_credential_runtime_config(release_settings), secrets=secrets
+                build_openrouter_credential_runtime_config(release_settings),
+                secrets=secrets,
             )
         except Exception:
-            resolution = None
+            return ManagedUsageMetadataResult(key_available=False, metadata=None)
+        api_key = resolution.api_key
+        if not api_key:
+            return ManagedUsageMetadataResult(key_available=False, metadata=None)
+        metadata = await self._get_provider_verifier().fetch_openrouter_key_metadata(api_key)
+        return ManagedUsageMetadataResult(key_available=True, metadata=metadata)
 
-        usage_metadata: OpenRouterKeyMetadata | None = None
-        api_key = resolution.api_key if resolution is not None else None
-        if api_key:
-            self._set_managed_trial_pending_auth(False)
-            usage_metadata = await self._get_provider_verifier().fetch_openrouter_key_metadata(
-                api_key
-            )
-            if self._shutdown_ingress_frozen:
-                return
-
-        self._managed_trial_usage_metadata = usage_metadata
-        self._managed_trial_usage_metadata_entitlement_ref = entitlement_ref
-
-        remaining_percent = self._managed_trial_remaining_percent(usage_metadata)
-        current_referral_id = self._current_owned_referral_id()
-        self._set_managed_usage_view_state(
-            visible=True,
-            remaining_percent=remaining_percent,
-            referral_id=current_referral_id,
+    def _apply_managed_usage_view_state(self, state: ManagedUsageViewState) -> None:
+        self.app.set_settings_managed_key_state(
+            visible=state.visible,
+            remaining_percent=state.remaining_percent,
+            referral_id=state.referral_id,
+            pass_status=state.pass_status,
         )
 
-        if auto_show_founder_letter and is_effectively_exhausted(usage_metadata):
-            self._disable_translation_for_managed_exhaustion(
-                reopen_founder_letter=should_auto_show_founder_letter(
-                    build_managed_identity_state_port(
-                        self.settings,
-                        lambda _settings: None,
-                    ),
-                    usage_metadata,
-                )
-            )
-
-        self._schedule_owned_referral_id_status_refresh(
-            remaining_percent=remaining_percent,
-            current_referral_id=current_referral_id,
-        )
-
-    def _show_founder_letter_dialog(self) -> None:
+    def _managed_usage_auto_show_founder_letter(self, metadata) -> bool:
         if self.settings is None:
-            return
-        if not self.app.show_founder_letter_dialog():
-            return
-        mark_founder_letter_shown(
+            return False
+        return should_auto_show_founder_letter(
             build_managed_identity_state_port(
                 self.settings,
                 lambda _settings: None,
-            )
+            ),
+            metadata,
         )
-        with contextlib.suppress(Exception):
-            self._save_settings()
 
-    def _disable_translation_for_managed_exhaustion(
+    def _managed_usage_warning_sink(
         self,
-        *,
-        reopen_founder_letter: bool,
+        message: str,
+        exception: BaseException | None,
     ) -> None:
-        self._record_translation_toggle_intent(False)
-        self._set_managed_trial_pending_auth(False)
-        if reopen_founder_letter:
-            self._show_founder_letter_dialog()
-        if self.hub is not None:
-            self.hub.translation_enabled = False
-        self.app.set_dashboard_translation_enabled(False)
+        if message.startswith("[ManagedAuth] Background refresh failed"):
+            self.log_detailed(
+                message,
+                level=logging.WARNING,
+                exception=exception,
+            )
+            return
+        self.log_basic(message, level=logging.WARNING)
 
-    async def _should_route_managed_trans_to_founder_letter(self) -> bool:
-        if self.settings is None:
-            return False
-        with contextlib.suppress(Exception):
-            await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=False)
-        if not is_effectively_exhausted(self._managed_trial_usage_metadata):
-            return False
+    def _get_managed_usage_owner(self) -> ManagedUsageOwner:
+        owner = self._managed_usage_owner
+        if owner is None:
+            owner = ManagedUsageOwner(
+                state_provider=self._managed_usage_state,
+                release_service_provider=lambda: self._managed_openrouter_release_service,
+                metadata_fetcher=self._fetch_managed_usage_metadata,
+                pending_sink=self._set_managed_trial_pending_auth,
+                view_sink=self._apply_managed_usage_view_state,
+                disable_translation_sink=lambda reopen: (
+                    self._get_translation_enable_owner().disable_for_managed_exhaustion(
+                        reopen_founder_letter=reopen
+                    )
+                ),
+                auto_show_founder_letter_provider=self._managed_usage_auto_show_founder_letter,
+                normalize_referral_id=normalize_owned_referral_id,
+                warning_sink=self._managed_usage_warning_sink,
+            )
+            self._managed_usage_owner = owner
+        return owner
 
-        self._disable_translation_for_managed_exhaustion(reopen_founder_letter=True)
-        return True
+    def _on_managed_trial_delegate_ready(self) -> None:
+        self._get_managed_usage_owner().delegate_ready()
+
+    async def _refresh_managed_trial_usage_state_best_effort(self) -> None:
+        await self._get_managed_usage_owner().refresh_best_effort()
 
     def _build_llm_provider_signature(self, settings: AppSettings) -> tuple[object, ...]:
         primary_uses_openrouter = settings.provider.llm == LLMProviderName.OPENROUTER
@@ -3803,9 +3268,21 @@ class GuiController:
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="ManagedStatusRefreshOwner",
+                owner_name="ManagedAuthOwner",
                 callback_name="close",
-                callback=self._close_managed_status_refresh_owner,
+                callback=self._close_managed_auth_owner,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="TranslationEnableOwner",
+                callback_name="close",
+                callback=self._close_translation_enable_owner,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="ManagedUsageOwner",
+                callback_name="close",
+                callback=self._close_managed_usage_owner,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
@@ -3892,9 +3369,15 @@ class GuiController:
         logging_owner = self._runtime_logging_owner
         if logging_owner is not None:
             logging_owner.stop_ingress()
-        managed_status_owner = self._managed_status_refresh_owner
-        if managed_status_owner is not None:
-            managed_status_owner.stop_ingress()
+        managed_usage_owner = self._managed_usage_owner
+        if managed_usage_owner is not None:
+            managed_usage_owner.stop_ingress()
+        managed_auth_owner = self._managed_auth_owner
+        if managed_auth_owner is not None:
+            managed_auth_owner.stop_ingress()
+        translation_enable_owner = self._translation_enable_owner
+        if translation_enable_owner is not None:
+            translation_enable_owner.stop_ingress()
 
     def _stop_github_star_prompt_ingress(self) -> None:
         owner = self._github_star_prompt_owner
@@ -3921,8 +3404,18 @@ class GuiController:
         if owner is not None:
             await owner.close_background_tasks()
 
-    async def _close_managed_status_refresh_owner(self) -> None:
-        owner = self._managed_status_refresh_owner
+    async def _close_managed_usage_owner(self) -> None:
+        owner = self._managed_usage_owner
+        if owner is not None:
+            await owner.close()
+
+    async def _close_managed_auth_owner(self) -> None:
+        owner = self._managed_auth_owner
+        if owner is not None:
+            await owner.close()
+
+    async def _close_translation_enable_owner(self) -> None:
+        owner = self._translation_enable_owner
         if owner is not None:
             await owner.close()
 
@@ -4634,59 +4127,7 @@ class GuiController:
         self.cancel_overlay_calibration()
 
     async def set_translation_enabled(self, enabled: bool) -> bool:
-        request_generation = self._record_translation_toggle_intent(enabled)
-        if not enabled:
-            self._set_managed_trial_pending_auth(False)
-        if self.hub is None:
-            return False
-        self.log_basic(f"[Translation] Toggle request: enabled={enabled}")
-        self.log_detailed(
-            "[Translation] Toggle detail: "
-            f"current_enabled={self.hub.translation_enabled} "
-            f"llm_available={self.hub.llm is not None}"
-        )
-        if enabled and await self._handle_managed_translation_enable(request_generation) is False:
-            return False
-        if enabled and not self._translation_toggle_intent_matches(
-            enabled=True,
-            generation=request_generation,
-        ):
-            self.log_detailed(
-                "[Translation] Skipping stale enable request after newer toggle intent"
-            )
-            return False
-        if enabled and self.hub.llm is None:
-            self.hub.translation_enabled = False
-            self.app.set_dashboard_translation_enabled(False)
-            self._log_error("Translation is ON but LLM provider is not configured.")
-            return False
-
-        # Log provider info when enabling
-        if enabled and self.settings is not None:
-            provider = self.settings.provider.llm.value
-            if provider == "qwen":
-                region = self.settings.qwen.region.value
-                self.log_basic(f"[Translation] Enabled with provider: {provider}")
-                self.log_detailed(
-                    f"[Translation] Provider detail: provider={provider} region={region}"
-                )
-            else:
-                self.log_basic(f"[Translation] Enabled with provider: {provider}")
-
-        # Clear context history when toggling translation
-        self.hub.clear_context()
-        self.hub.translation_enabled = bool(enabled)
-        if enabled and self.hub.llm is not None:
-            llm = self.hub.llm
-            if isinstance(llm, SemaphoreLLMProvider):
-                llm = llm.inner
-            warmup = getattr(llm, "warmup", None)
-            if callable(warmup):
-                with contextlib.suppress(Exception):
-                    result = warmup()
-                    if inspect.isawaitable(result):
-                        await result
-        return bool(self.hub.translation_enabled)
+        return await self._get_translation_enable_owner().set_enabled(enabled)
 
     async def set_stt_enabled(self, enabled: bool, *, force_immediate: bool = False) -> None:
         if enabled and not self._persist_current_manual_local_asr_fallback(channel="self"):
@@ -4770,80 +4211,6 @@ class GuiController:
             self.app.show_message(message_key, **message_kwargs)
         except Exception:
             self._log_error(self.app.localize(message_key, **message_kwargs))
-
-    async def _handle_managed_translation_enable(self, request_generation: int) -> bool:
-        if self.settings is None or self.hub is None:
-            return True
-        if not self._managed_openrouter_selected():
-            return True
-        if await self._should_route_managed_trans_to_founder_letter():
-            return False
-        service = self._managed_openrouter_release_service
-        if service is None:
-            return True
-        discord_claim_guard: ManagedAuthClaimGuard | None = None
-        if not self._managed_china_auth_relevant_for_translation_enable():
-            try:
-                discord_claim_guard = self._managed_auth_claim_guard_for_settings(self.settings)
-                claim_result = await discord_claim_guard.preflight(
-                    MANAGED_AUTH_CLAIM_SOURCE_DISCORD
-                )
-            except Exception:
-                self._show_short_message("discord_auth.error.retry")
-                return False
-            if claim_result is not None:
-                self.last_settings_mutation_result = claim_result
-                message = claim_result.message
-                message_key = message.key if message is not None else "discord_auth.error.retry"
-                message_kwargs = dict(message.params) if message is not None else {}
-                self._show_short_message(message_key, **message_kwargs)
-                return False
-
-        self._set_managed_trial_pending_auth(
-            self._should_show_managed_auth_pending_before_prepare()
-        )
-        try:
-            result = await service.prepare_for_translation()
-        except Exception:
-            self._set_managed_trial_pending_auth(False)
-            raise
-
-        self._set_managed_trial_pending_auth(False)
-
-        if not self._translation_toggle_intent_matches(
-            enabled=True,
-            generation=request_generation,
-        ):
-            self.log_detailed(
-                "[Translation] Skipping stale managed enable result after newer toggle intent"
-            )
-            return False
-
-        if result.behavior == ManagedOpenRouterReleaseBehavior.READY and result.local_key_available:
-            if discord_claim_guard is not None:
-                with contextlib.suppress(Exception):
-                    discord_claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
-                    discord_claim_guard.managed_state.persist()
-            if self.hub.llm is None:
-                await self._rebuild_llm_provider()
-            else:
-                self._schedule_managed_trial_usage_refresh()
-            return True
-
-        diagnostics_text = format_managed_openrouter_diagnostics(result.diagnostics)
-        if diagnostics_text:
-            self.log_basic(f"[ManagedAuth] {diagnostics_text}", level=logging.ERROR)
-        await self._refresh_managed_trial_usage_state_impl(auto_show_founder_letter=False)
-        self.hub.translation_enabled = False
-        self.app.set_dashboard_translation_enabled(False)
-        if (
-            result.message_key == "qq_managed_auth.required"
-            and self._managed_china_auth_relevant_for_translation_enable()
-        ):
-            self._show_qq_managed_auth_dialog()
-            return False
-        self._show_short_message(result.message_key, **dict(result.message_kwargs))
-        return False
 
     def _manual_local_asr_fallback_state(
         self,
@@ -5644,11 +5011,14 @@ class GuiController:
         *,
         base_settings: AppSettings,
         committed_settings: AppSettings,
-        plan: _ProviderRuntimeApplyPlan,
+        plan: ProviderRuntimeApplyPlan,
     ) -> None:
         self._sync_memory_runtime_fields_from_settings(base_settings)
         try:
-            await self._apply_provider_runtime_plan(copy.deepcopy(committed_settings), plan)
+            await self._get_provider_runtime_owner().apply(
+                copy.deepcopy(committed_settings),
+                plan,
+            )
         except Exception:
             self._log_error("Failed to resync committed order22 provider runtime")
             self._sync_memory_runtime_fields_from_settings(committed_settings)
@@ -6251,10 +5621,11 @@ class GuiController:
             surface="stt_language_audio",
         )
         runtime_apply = (
-            _ControllerNoopRuntimeApply()
+            NoopRuntimeApply()
             if has_out_of_scope_draft
-            else _ControllerSttLanguageAudioRuntimeApply(
-                controller=self,
+            else SttLanguageAudioRuntimeApplyAdapter(
+                apply_settings=self._apply_settings_runtime_effect,
+                state_provider=self._settings_runtime_state,
                 settings=committed_settings,
                 reload_settings_view=reload_settings_view,
             )
@@ -6320,7 +5691,7 @@ class GuiController:
                 )
             else:
                 unavailable_result = _stt_language_audio_runtime_unavailable_result(
-                    controller=self,
+                    state=self._settings_runtime_state(next_settings),
                     settings=next_settings,
                 )
                 if unavailable_result is not None:
@@ -6365,10 +5736,10 @@ class GuiController:
             surface="overlay_osc_output",
         )
         runtime_apply = (
-            _ControllerNoopRuntimeApply()
+            NoopRuntimeApply()
             if has_out_of_scope_draft
-            else _ControllerOverlayOscOutputRuntimeApply(
-                controller=self,
+            else OverlayOscOutputRuntimeApplyAdapter(
+                apply_settings=self._apply_settings_runtime_effect,
                 settings=committed_settings,
             )
         )
@@ -6462,10 +5833,10 @@ class GuiController:
         ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
         runtime_settings = copy.deepcopy(next_settings)
         runtime_apply = (
-            _ControllerNoopRuntimeApply()
+            NoopRuntimeApply()
             if has_out_of_scope_draft
-            else _ControllerUiPromptClipboardStateRuntimeApply(
-                controller=self,
+            else UiPromptClipboardStateRuntimeApplyAdapter(
+                apply_settings=self._apply_settings_runtime_effect,
                 settings=runtime_settings,
             )
         )
@@ -6518,547 +5889,131 @@ class GuiController:
         *,
         force_rebuild_llm: bool = False,
     ) -> bool:
-        next_settings = (
-            self.settings
-            if settings is None
-            else self.merge_settings_tab_apply_with_current_languages(settings)
-        )
-        if next_settings is None:
-            return False
-
-        await self._preserve_github_star_prompt_observation_before_settings_replace(next_settings)
-
-        try:
-            if settings is not None and not force_rebuild_llm:
-                routed = await self._apply_order21_order22_order24_provider_settings_via_mutation_services(
-                    next_settings,
-                )
-                if routed:
-                    return bool(
-                        self.last_settings_mutation_result is not None
-                        and _settings_mutation_committed(self.last_settings_mutation_result)
-                    )
-                routed = await self._apply_translation_provider_settings_via_mutation_service(
-                    next_settings,
-                )
-                if routed:
-                    return bool(
-                        self.last_settings_mutation_result is not None
-                        and _settings_mutation_committed(self.last_settings_mutation_result)
-                    )
-                routed = await self._apply_ui_prompt_clipboard_state_settings_via_mutation_service(
-                    next_settings,
-                )
-                if routed:
-                    return bool(
-                        self.last_settings_mutation_result is not None
-                        and _settings_mutation_committed(self.last_settings_mutation_result)
-                    )
-
-            return await self._apply_providers_direct(
-                next_settings,
-                force_rebuild_llm=force_rebuild_llm,
-            )
-        finally:
-            self._sync_ui_from_settings()
-
-    def _build_provider_runtime_apply_plan(
-        self,
-        next_settings: AppSettings,
-        *,
-        force_rebuild_llm: bool,
-        canonical_settings: AppSettingsVNext | None = None,
-    ) -> _ProviderRuntimeApplyPlan:
-        prev_settings = self.settings
-        prev_self_provider_signature = self._last_self_stt_provider_signature
-        prev_peer_provider_signature = self._last_peer_stt_provider_signature
-        prev_llm_provider_signature = self._last_llm_provider_signature
-
-        if prev_settings is not None:
-            if prev_self_provider_signature is None:
-                prev_self_provider_signature = self._build_self_stt_provider_signature(
-                    prev_settings
-                )
-            if prev_peer_provider_signature is None:
-                prev_peer_provider_signature = self._build_peer_stt_provider_signature(
-                    prev_settings
-                )
-            if prev_llm_provider_signature is None:
-                prev_llm_provider_signature = self._build_llm_provider_signature(prev_settings)
-
-        next_self_provider_signature = self._build_self_stt_provider_signature(next_settings)
-        next_peer_provider_signature = self._build_peer_stt_provider_signature(
-            next_settings,
-            canonical_settings=canonical_settings,
-        )
-        next_llm_provider_signature = self._build_llm_provider_signature(next_settings)
-
-        return _ProviderRuntimeApplyPlan(
-            should_rebuild_llm=force_rebuild_llm
-            or (
-                prev_llm_provider_signature is None
-                or next_llm_provider_signature != prev_llm_provider_signature
-            ),
-            should_refresh_peer=(
-                prev_peer_provider_signature is None
-                or next_peer_provider_signature != prev_peer_provider_signature
-            ),
-            should_refresh_self_stt=(
-                prev_self_provider_signature is None
-                or next_self_provider_signature != prev_self_provider_signature
-            ),
-            coordinated_gpu_restart=(
-                prev_settings is not None
-                and prev_settings.stt.gpu_device_id != next_settings.stt.gpu_device_id
-                and (
-                    prev_settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-                    or prev_settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-                    or next_settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-                    or next_settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-                )
-            ),
+        return await self._get_provider_application_owner().apply(
+            settings,
+            force_rebuild_llm=force_rebuild_llm,
         )
 
-    async def _apply_order21_order22_order24_provider_settings_via_mutation_services(
-        self,
-        next_settings: AppSettings,
-    ) -> bool:
-        base_settings = self.settings
-        if base_settings is None:
-            return False
-
-        order21_patch_values = build_translation_provider_settings_path_patch(
-            base_settings,
-            next_settings,
-        )
-        order22_patch_values = build_stt_language_audio_settings_path_patch(
-            base_settings,
-            next_settings,
-        )
-        order24_base_and_patch = self._settings_projection().order24_patch_base_and_values(
-            next_settings
-        )
-        if order24_base_and_patch is None:
-            return False
-        _order24_base_settings, order24_patch_values = order24_base_and_patch
-        patch_count = sum(
-            1
-            for patch_values in (
-                order21_patch_values,
-                order22_patch_values,
-                order24_patch_values,
-            )
-            if patch_values
-        )
-        if patch_count < 2:
-            return False
-
-        committed_results: list[TransactionResult] = []
-
-        async def _route_provider_patch_only(patch_values: dict[str, object], route) -> bool:
-            if self.settings is None:
-                return False
-            patch_only_settings = copy.deepcopy(self.settings)
-            _apply_settings_path_patch(patch_only_settings, patch_values)
-            routed = await route(patch_only_settings)
-            if not routed:
-                return False
-            result = self.last_settings_mutation_result
-            if result is None or not _settings_mutation_committed(result):
-                return True
-            committed_results.append(result)
-            return True
-
-        if order21_patch_values:
-            routed_order21 = await _route_provider_patch_only(
-                order21_patch_values,
-                self._apply_translation_provider_settings_via_mutation_service,
-            )
-            if not routed_order21:
-                return False
-            if self.last_settings_mutation_result is None or not _settings_mutation_committed(
-                self.last_settings_mutation_result,
-            ):
-                return True
-
-        if order22_patch_values:
-            routed_order22 = await _route_provider_patch_only(
-                order22_patch_values,
-                self._apply_stt_language_audio_provider_settings_via_mutation_service,
-            )
-            if not routed_order22:
-                return False
-            if self.last_settings_mutation_result is None or not _settings_mutation_committed(
-                self.last_settings_mutation_result,
-            ):
-                return True
-
-        if order24_patch_values:
-            if self.settings is None:
-                return True
-            order24_only_settings = copy.deepcopy(self.settings)
-            _apply_settings_path_patch(order24_only_settings, order24_patch_values)
-            _copy_runtime_only_ui_state(next_settings, order24_only_settings)
-            routed_order24 = (
-                await self._apply_ui_prompt_clipboard_state_settings_via_mutation_service(
-                    order24_only_settings,
-                )
-            )
-            if not routed_order24:
-                return False
-            if self.last_settings_mutation_result is None or not _settings_mutation_committed(
-                self.last_settings_mutation_result,
-            ):
-                return True
-
-        committed_settings_before_full_draft = (
-            copy.deepcopy(self.settings) if self.settings is not None else None
-        )
-        if self.settings is not None and self._get_settings_owner().legacy_snapshot_values(
-            self.settings
-        ) != self._get_settings_owner().legacy_snapshot_values(next_settings):
-            try:
-                await self._apply_providers_direct(
-                    next_settings,
-                    force_rebuild_llm=False,
-                    route_order22=False,
-                    strict_persistence_errors=True,
-                )
-            except _StrictSettingsSaveFailed:
-                if committed_settings_before_full_draft is not None:
-                    self._sync_memory_runtime_fields_from_settings(
-                        committed_settings_before_full_draft
-                    )
-                self.last_settings_mutation_result = (
-                    _translation_provider_save_failed_transaction_result(
-                        operation="apply_order21_order22_order24_provider_full_draft_save"
-                    )
-                )
-            except Exception:
-                self.last_settings_mutation_result = _runtime_apply_result_as_degraded_transaction(
-                    _runtime_apply_failed_result(
-                        operation="apply_order21_order22_order24_provider_runtime",
-                        code="provider_runtime_apply_exception",
-                        surface="translation_provider",
-                    )
-                )
-
-        if (
-            self.last_settings_mutation_result is not None
-            and self.last_settings_mutation_result.status
-            == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-            and committed_results
-        ):
-            degraded_result = next(
-                (
-                    result
-                    for result in committed_results
-                    if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
+    def _get_provider_application_owner(self) -> ProviderApplicationOwner:
+        owner = self._provider_application_owner
+        if owner is None:
+            owner = ProviderApplicationOwner(
+                settings=self._get_settings_owner(),
+                runtime=self._get_provider_runtime_owner(),
+                merge_settings=self.merge_settings_tab_apply_with_current_languages,
+                preserve_before_replace=(
+                    self._preserve_github_star_prompt_observation_before_settings_replace
                 ),
-                None,
-            )
-            if degraded_result is not None:
-                self.last_settings_mutation_result = degraded_result
-        return True
-
-    async def _apply_translation_provider_settings_via_mutation_service(
-        self,
-        next_settings: AppSettings,
-    ) -> bool:
-        base_settings = self.settings
-        if base_settings is None:
-            return False
-
-        patch_values = build_translation_provider_settings_path_patch(
-            base_settings,
-            next_settings,
-        )
-        if not patch_values:
-            return False
-
-        committed_settings = copy.deepcopy(base_settings)
-        _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self._get_settings_owner().legacy_snapshot_values(
-            committed_settings
-        ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
-        plan = self._build_provider_runtime_apply_plan(
-            committed_settings,
-            force_rebuild_llm=False,
-            canonical_settings=self._get_settings_owner().project_legacy_delta(
-                base_settings,
-                committed_settings,
-            ),
-        )
-        repository = self._legacy_settings_patch_repository(
-            base_settings=base_settings,
-            committed_settings=committed_settings,
-        )
-        runtime_apply = _ControllerProviderRuntimeApply(
-            controller=self,
-            settings=committed_settings,
-            plan=plan,
-        )
-        command = TranslationProviderSettingsMutation(values=patch_values)
-        service = self.settings_mutation_service or SettingsMutationService(
-            settings_repository=repository,
-            runtime_apply=runtime_apply,
-            validator=settings_path_mutation_validator_for_command(command),
-        )
-        request = command.to_mutation_request(
-            expected_revision=None,
-            correlation_id=None,
-        )
-
-        result = await service.mutate(request)
-        self._get_settings_owner().complete()
-        self.last_settings_mutation_result = result
-        if not _settings_mutation_committed(result):
-            return True
-
-        self.settings = committed_settings
-        if has_out_of_scope_draft:
-            fallback_plan = self._build_provider_runtime_apply_plan(
-                next_settings,
-                force_rebuild_llm=False,
-                canonical_settings=self._get_settings_owner().project_legacy_delta(
-                    committed_settings,
-                    next_settings,
+                sync_ui=self._sync_ui_from_settings,
+                order24_patch_provider=(self._settings_projection().order24_patch_base_and_values),
+                apply_order24=(self._apply_ui_prompt_clipboard_state_settings_via_mutation_service),
+                remember_order22=self._settings_projection().remember_order22,
+                mutation_service_provider=lambda: self.settings_mutation_service,
+                persist_current_settings=self._save_settings,
+                save_failure_sink=self._log_error,
+                result_sink=lambda result: setattr(
+                    self,
+                    "last_settings_mutation_result",
+                    result,
                 ),
-            )
-            try:
-                await self._apply_providers_direct(
-                    next_settings,
-                    force_rebuild_llm=False,
-                    plan=fallback_plan,
-                    route_order22=False,
-                    strict_persistence_errors=True,
-                )
-            except _StrictSettingsSaveFailed:
-                preserve_llm_provider_retry_marker = self._last_llm_provider_signature == ()
-                self._sync_memory_runtime_fields_from_settings(committed_settings)
-                if preserve_llm_provider_retry_marker:
-                    self._last_llm_provider_signature = ()
-                self.last_settings_mutation_result = (
-                    _translation_provider_save_failed_transaction_result(
-                        operation="apply_translation_provider_full_draft_save"
-                    )
-                )
-            except Exception:
-                self.last_settings_mutation_result = _runtime_apply_result_as_degraded_transaction(
-                    _runtime_apply_failed_result(
-                        operation="apply_translation_provider_runtime",
-                        code="provider_runtime_apply_exception",
-                        surface="translation_provider",
-                    )
-                )
-            else:
-                unavailable_result = _provider_runtime_apply_unavailable_result(
-                    controller=self,
-                    settings=next_settings,
-                    plan=fallback_plan,
-                    operation="apply_translation_provider_runtime",
-                    surface="translation_provider",
-                )
-                if unavailable_result is not None:
-                    self.last_settings_mutation_result = (
-                        _runtime_apply_result_as_degraded_transaction(unavailable_result)
-                    )
-        elif result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-            self._sync_signature_caches(committed_settings)
-        self._settings_projection().remember_order22(self.settings)
-        return True
-
-    async def _apply_stt_language_audio_provider_settings_via_mutation_service(
-        self,
-        next_settings: AppSettings,
-    ) -> bool:
-        base_settings = self.settings
-        if base_settings is None:
-            return False
-
-        patch_values = build_stt_language_audio_settings_path_patch(
-            base_settings,
-            next_settings,
-        )
-        if not patch_values:
-            return False
-
-        committed_settings = copy.deepcopy(base_settings)
-        _apply_settings_path_patch(committed_settings, patch_values)
-        has_out_of_scope_draft = self._get_settings_owner().legacy_snapshot_values(
-            committed_settings
-        ) != self._get_settings_owner().legacy_snapshot_values(next_settings)
-        plan = self._build_provider_runtime_apply_plan(
-            committed_settings,
-            force_rebuild_llm=False,
-            canonical_settings=self._get_settings_owner().project_legacy_delta(
-                base_settings,
-                committed_settings,
-            ),
-        )
-        repository = self._legacy_settings_patch_repository(
-            base_settings=base_settings,
-            committed_settings=committed_settings,
-            surface="stt_language_audio",
-        )
-        runtime_apply = (
-            _ControllerNoopRuntimeApply()
-            if has_out_of_scope_draft
-            else _ControllerProviderRuntimeApply(
-                controller=self,
-                settings=committed_settings,
-                plan=plan,
-                surface="stt_language_audio",
-                operation="apply_stt_language_audio_provider_runtime",
-            )
-        )
-        command = SttLanguageAudioSettingsMutation(values=patch_values)
-        service = self.settings_mutation_service or SettingsMutationService(
-            settings_repository=repository,
-            runtime_apply=runtime_apply,
-            validator=settings_path_mutation_validator_for_command(command),
-        )
-        request = command.to_mutation_request(
-            expected_revision=None,
-            correlation_id=None,
-        )
-
-        result = await service.mutate(request)
-        self._get_settings_owner().complete()
-        self.last_settings_mutation_result = result
-        if not _settings_mutation_committed(result):
-            self.settings = copy.deepcopy(base_settings)
-            self._settings_projection().remember_order22(self.settings)
-            return True
-        if id(committed_settings) in self._superseded_local_asr_settings_ids:
-            self._superseded_local_asr_settings_ids.discard(id(committed_settings))
-            self._settings_projection().remember_order22(self.settings)
-            return True
-        if (
-            not has_out_of_scope_draft
-            and result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-            and self._active_local_asr_change(base_settings, committed_settings)
-        ):
-            try:
-                await self._compensate_failed_local_asr_settings_apply(
-                    base_settings=base_settings,
-                    committed_settings=committed_settings,
-                )
-            except Exception:
-                self._log_error("Failed to compensate local ASR provider settings apply")
-            self._settings_projection().remember_order22(self.settings)
-            return True
-
-        if has_out_of_scope_draft:
-            fallback_plan = self._build_provider_runtime_apply_plan(
-                next_settings,
-                force_rebuild_llm=False,
-                canonical_settings=self._get_settings_owner().project_legacy_delta(
-                    committed_settings,
-                    next_settings,
+                result_provider=lambda: self.last_settings_mutation_result,
+                sync_memory=self._sync_memory_runtime_fields_from_settings,
+                capture_runtime_signatures=(
+                    self._capture_runtime_signatures_before_canonical_mutation
                 ),
+                sync_signatures=self._sync_signature_caches,
+                consume_superseded_settings=(self._consume_superseded_local_asr_settings),
+                active_local_asr_change=self._active_local_asr_change,
+                compensate_local_asr=self._compensate_failed_local_asr_settings_apply,
+                copy_runtime_only_ui_state=_copy_runtime_only_ui_state,
+                llm_retry_pending=lambda: self._last_llm_provider_signature == (),
+                mark_llm_retry=self._mark_llm_provider_retry,
             )
-            try:
-                await self._apply_providers_direct(
-                    next_settings,
-                    force_rebuild_llm=False,
-                    plan=fallback_plan,
-                    route_order22=False,
-                    strict_persistence_errors=True,
-                )
-            except _StrictSettingsSaveFailed:
-                await self._resync_committed_order22_provider_runtime_after_strict_save_failure(
-                    base_settings=base_settings,
-                    committed_settings=committed_settings,
-                    plan=plan,
-                )
-                self.last_settings_mutation_result = (
-                    _stt_language_audio_save_failed_transaction_result(
-                        operation="apply_stt_language_audio_provider_full_draft_save"
-                    )
-                )
-            except Exception:
-                self.last_settings_mutation_result = _runtime_apply_result_as_degraded_transaction(
-                    _runtime_apply_failed_result(
-                        operation="apply_stt_language_audio_provider_runtime",
-                        code="provider_runtime_apply_exception",
-                        surface="stt_language_audio",
-                    )
-                )
-            else:
-                unavailable_result = _provider_runtime_apply_unavailable_result(
-                    controller=self,
-                    settings=next_settings,
-                    plan=fallback_plan,
-                    operation="apply_stt_language_audio_provider_runtime",
-                    surface="stt_language_audio",
-                )
-                if unavailable_result is not None:
-                    self.last_settings_mutation_result = (
-                        _runtime_apply_result_as_degraded_transaction(unavailable_result)
-                    )
-        else:
-            self.settings = committed_settings
-            if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                self._sync_signature_caches(committed_settings)
-        self._settings_projection().remember_order22(self.settings)
+            self._provider_application_owner = owner
+        return owner
+
+    def _consume_superseded_local_asr_settings(self, settings: AppSettings) -> bool:
+        settings_id = id(settings)
+        if settings_id not in self._superseded_local_asr_settings_ids:
+            return False
+        self._superseded_local_asr_settings_ids.discard(settings_id)
         return True
 
-    async def _apply_providers_direct(
-        self,
-        next_settings: AppSettings,
-        *,
-        force_rebuild_llm: bool,
-        plan: _ProviderRuntimeApplyPlan | None = None,
-        route_order22: bool = True,
-        strict_persistence_errors: bool = False,
-    ) -> bool:
-        if route_order22 and not force_rebuild_llm and plan is None:
-            routed = await self._apply_stt_language_audio_provider_settings_via_mutation_service(
-                next_settings,
+    def _get_provider_runtime_owner(self) -> ProviderRuntimeOwner:
+        owner = self._provider_runtime_owner
+        if owner is None:
+            owner = ProviderRuntimeOwner(
+                state_provider=self._provider_runtime_state,
+                common_effect=self._apply_provider_runtime_common_effects,
+                rebuild_llm=self._get_llm_provider_rebuild_owner().rebuild,
+                recover_gpu=self._apply_gpu_runtime_owner_recovery,
+                refresh_peer=self._refresh_provider_runtime_peer_effect,
+                refresh_self_stt=self._refresh_provider_runtime_self_stt_effect,
+                signature_sink=self._sync_signature_caches,
+                llm_retry_sink=self._mark_llm_provider_retry,
+                current_settings_provider=lambda: self.settings,
+                signature_cache_provider=lambda: (
+                    self._last_self_stt_provider_signature,
+                    self._last_peer_stt_provider_signature,
+                    self._last_llm_provider_signature,
+                ),
+                self_signature_builder=self._build_self_stt_provider_signature,
+                peer_signature_builder=lambda settings, canonical: (
+                    self._build_peer_stt_provider_signature(
+                        settings,
+                        canonical_settings=canonical,
+                    )
+                ),
+                llm_signature_builder=self._build_llm_provider_signature,
+                gpu_restart_decision=self._provider_runtime_requires_gpu_restart,
             )
-            if routed:
-                return bool(
-                    self.last_settings_mutation_result is not None
-                    and _settings_mutation_committed(self.last_settings_mutation_result)
-                )
-        self._get_settings_owner().begin(
-            legacy_snapshot=self._get_settings_owner().projection_snapshot or self.settings
-        )
-        self._capture_runtime_signatures_before_canonical_mutation()
-        self._get_settings_owner().apply_legacy_delta(
-            self._get_settings_owner().projection_snapshot or self.settings,
-            next_settings,
-        )
-        if plan is None:
-            plan = self._build_provider_runtime_apply_plan(
-                next_settings,
-                force_rebuild_llm=force_rebuild_llm,
-            )
-        self.settings = next_settings
-        if strict_persistence_errors:
-            try:
-                self._get_settings_owner().persist()
-            except Exception:
-                self._get_settings_owner().rollback()
-                raise _StrictSettingsSaveFailed from None
-            else:
-                self._get_settings_owner().remember_projection(self.settings)
-        else:
-            if self._save_settings() is False:
-                return False
-        await self._apply_provider_runtime_plan(next_settings, plan)
-        self._settings_projection().remember_order22(self.settings)
-        self._get_settings_owner().complete()
-        return True
+            self._provider_runtime_owner = owner
+        return owner
 
-    async def _apply_provider_runtime_plan(
+    def _provider_runtime_state(self, settings: object) -> ProviderRuntimeState:
+        hub = self.hub
+        return ProviderRuntimeState(
+            runtime_available=hub is not None,
+            llm_available=hub is not None and hub.llm is not None,
+            self_stt_available=hub is not None and hub.has_stt_provider("self"),
+            peer_stt_available=hub is not None and hub.has_stt_provider("peer"),
+            self_stt_desired=self._stt_desired,
+            peer_stt_desired=self._peer_runtime_should_be_active(settings),
+        )
+
+    async def _apply_settings_runtime_effect(
         self,
-        next_settings: AppSettings,
-        plan: _ProviderRuntimeApplyPlan,
+        settings: object,
+        reload_settings_view: bool,
     ) -> None:
-        self.settings = next_settings
+        if not isinstance(settings, AppSettings):
+            raise TypeError("settings runtime effect requires AppSettings")
+        await self._apply_settings_direct(
+            settings,
+            persist=False,
+            strict_runtime_errors=True,
+            reload_settings_view=reload_settings_view,
+        )
 
+    def _settings_runtime_state(self, settings: object) -> SettingsRuntimeState:
+        if not isinstance(settings, AppSettings):
+            raise TypeError("settings runtime state requires AppSettings")
+        hub = self.hub
+        return SettingsRuntimeState(
+            runtime_available=hub is not None,
+            self_stt_desired=self._stt_desired,
+            self_stt_available=hub is not None and hub.has_stt_provider("self"),
+            peer_stt_desired=self._peer_runtime_should_be_active(settings),
+            peer_stt_available=hub is not None and hub.has_stt_provider("peer"),
+            qwen_llm_desired=self._is_qwen_llm(settings),
+            llm_available=hub is not None and hub.llm is not None,
+        )
+
+    def _apply_provider_runtime_common_effects(self, settings: object) -> None:
+        if not isinstance(settings, AppSettings):
+            raise TypeError("provider runtime settings must be AppSettings")
+        next_settings = settings
+        self.settings = next_settings
         self._clear_local_stt_pending_enable_if_provider_switched_away()
         self._sync_local_stt_notice()
         if (
@@ -7067,7 +6022,7 @@ class GuiController:
         ):
             self._set_managed_trial_pending_auth(False)
         else:
-            self._sync_managed_auth_dashboard_notice()
+            self.app.set_dashboard_managed_auth_pending(self.managed_auth_pending)
 
         if self.hub is not None:
             self.hub.source_language = next_settings.languages.source_language
@@ -7087,35 +6042,42 @@ class GuiController:
             self.hub.chatbox_include_source = next_settings.osc.chatbox_include_source
             self._sync_effective_hub_flags(next_settings)
 
-        if plan.should_rebuild_llm:
-            await self._rebuild_llm_provider()
+    async def _refresh_provider_runtime_peer_effect(self) -> None:
+        await self._refresh_peer_stt_runtime()
+        if self.settings is not None:
+            self._sync_effective_hub_flags(self.settings)
+        self._refresh_overlay_peer_consumers()
 
-        if plan.coordinated_gpu_restart:
-            await self._apply_gpu_runtime_owner_recovery(next_settings, plan)
-            self._sync_signature_caches(next_settings)
-            if plan.should_rebuild_llm and self.hub is not None and self.hub.llm is None:
-                self._last_llm_provider_signature = ()
-            return
+    async def _refresh_provider_runtime_self_stt_effect(self) -> None:
+        if self._stt_desired:
+            await self._apply_stt_runtime_replacement(smooth_local=True)
+        else:
+            await self._rebuild_stt_provider()
 
-        if plan.should_refresh_peer:
-            await self._refresh_peer_stt_runtime()
-            self._sync_effective_hub_flags(next_settings)
-            self._refresh_overlay_peer_consumers()
+    def _mark_llm_provider_retry(self) -> None:
+        self._last_llm_provider_signature = ()
 
-        if plan.should_refresh_self_stt:
-            if self._stt_desired:
-                await self._apply_stt_runtime_replacement(smooth_local=True)
-            else:
-                await self._rebuild_stt_provider()
-
-        self._sync_signature_caches(next_settings)
-        if plan.should_rebuild_llm and self.hub is not None and self.hub.llm is None:
-            self._last_llm_provider_signature = ()
+    @staticmethod
+    def _provider_runtime_requires_gpu_restart(
+        current_settings: object,
+        next_settings: object,
+    ) -> bool:
+        if not isinstance(current_settings, AppSettings) or not isinstance(
+            next_settings,
+            AppSettings,
+        ):
+            return False
+        return current_settings.stt.gpu_device_id != next_settings.stt.gpu_device_id and (
+            current_settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
+            or current_settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
+            or next_settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
+            or next_settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
+        )
 
     async def _apply_gpu_runtime_owner_recovery(
         self,
         next_settings: AppSettings,
-        plan: _ProviderRuntimeApplyPlan,
+        plan: ProviderRuntimeApplyPlan,
     ) -> None:
         await self._get_gpu_provider_recovery_owner().recover(
             lambda: self._gpu_provider_recovery_execution(
@@ -7139,7 +6101,7 @@ class GuiController:
         settings: AppSettings,
         *,
         reason: Literal["manual_retry", "settings_restart"],
-        plan: _ProviderRuntimeApplyPlan | None,
+        plan: ProviderRuntimeApplyPlan | None,
     ) -> GpuProviderRecoveryExecution:
         runtime = self._hub_local_asr_provider_runtime()
         if runtime is None:
@@ -7181,7 +6143,7 @@ class GuiController:
         *,
         settings: AppSettings,
         reason: Literal["manual_retry", "settings_restart"],
-        plan: _ProviderRuntimeApplyPlan | None,
+        plan: ProviderRuntimeApplyPlan | None,
         recovered_channels: frozenset[ProviderRuntimeChannel],
     ) -> None:
         if reason == "manual_retry":
@@ -7481,42 +6443,44 @@ class GuiController:
             self.provider_settings_owner = owner
         return owner
 
-    async def _rebuild_llm_provider(self) -> None:
-        """Rebuild only the LLM provider without tearing down the entire pipeline."""
+    def _get_llm_provider_rebuild_owner(self) -> LlmProviderRebuildOwner:
+        owner = self._llm_provider_rebuild_owner
+        if owner is None:
+            owner = LlmProviderRebuildOwner(
+                context_provider=self._llm_provider_rebuild_context,
+                provider_factory=self._create_llm_provider_for_rebuild,
+                availability_sink=self.app.set_dashboard_translation_needs_key,
+                usage_refresh=self._refresh_managed_trial_usage_state_best_effort,
+                failure_sink=self._log_error,
+                success_sink=self.log_basic,
+            )
+            self._llm_provider_rebuild_owner = owner
+        return owner
+
+    def _llm_provider_rebuild_context(self) -> LlmProviderRebuildContext | None:
         if self.hub is None or self.settings is None:
-            return
-
-        async def create_provider() -> object | None:
-            secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
-            new_managed_release_service = self._create_managed_openrouter_release_service(
-                secrets=secrets
-            )
-            await self._replace_managed_openrouter_release_service(new_managed_release_service)
-            return create_llm_provider(
-                self.settings,
-                secrets=secrets,
-                managed_release_service=self._managed_openrouter_release_service,
-                managed_delegate_ready=self._on_managed_trial_delegate_ready,
-                runtime_logging=self.runtime_logging,
-            )
-
-        outcome = await self._provider_rebuild_runtime.rebuild_llm_provider(
+            return None
+        return LlmProviderRebuildContext(
+            settings=self.settings,
             replace_provider=self.hub.replace_llm_provider,
-            create_provider=create_provider,
-        )
-        llm = outcome.provider
-
-        self.app.set_dashboard_translation_needs_key(
-            (llm is None) and self._llm_provider_requires_secret(self.settings.provider.llm)
+            requires_secret=self._llm_provider_requires_secret(self.settings.provider.llm),
         )
 
-        await self._refresh_managed_trial_usage_state_best_effort()
-
-        if llm is None:
-            self._log_error("LLM provider not available")
-            return
-
-        self.log_basic("[Settings] LLM provider rebuilt successfully")
+    async def _create_llm_provider_for_rebuild(self, settings: object) -> object | None:
+        if not isinstance(settings, AppSettings):
+            raise TypeError("LLM provider rebuild settings must be AppSettings")
+        secrets = create_secret_store(settings.secrets, config_path=self.config_path)
+        new_managed_release_service = self._create_managed_openrouter_release_service(
+            secrets=secrets
+        )
+        await self._replace_managed_openrouter_release_service(new_managed_release_service)
+        return create_llm_provider(
+            settings,
+            secrets=secrets,
+            managed_release_service=self._managed_openrouter_release_service,
+            managed_delegate_ready=self._on_managed_trial_delegate_ready,
+            runtime_logging=self.runtime_logging,
+        )
 
     def _self_stt_provider_request(
         self,
@@ -8315,9 +7279,7 @@ class GuiController:
             failures.append(exc)
 
     def _on_discord_managed_auth_callback_received(self) -> None:
-        hook = self._discord_managed_auth_callback_received_hook
-        if callable(hook):
-            hook()
+        self._get_managed_auth_owner().on_callback_received()
 
     @property
     def _last_microphone_test_audio_settings_signature(
@@ -8758,7 +7720,10 @@ class GuiController:
         updated.openrouter.llm_model = OpenRouterLLMModel(profile.openrouter_model)
         updated.api_key_verified.openrouter = True
 
-        plan = self._build_provider_runtime_apply_plan(updated, force_rebuild_llm=True)
+        plan = self._get_provider_runtime_owner().build_plan(
+            updated,
+            force_rebuild_llm=True,
+        )
         secret_store = create_secret_store(self.settings.secrets, config_path=self.config_path)
         secret_store_port = create_sync_secret_store_adapter(secret_store)
         settings_repository = self._legacy_settings_patch_repository(
@@ -8776,8 +7741,8 @@ class GuiController:
             secret_store=secret_store_port,
             settings_repository=settings_repository,
         )
-        runtime_apply_port = _ControllerProviderRuntimeApply(
-            controller=self,
+        runtime_apply_port = ProviderRuntimeApplyAdapter(
+            owner=self._get_provider_runtime_owner(),
             settings=updated,
             plan=plan,
             surface="openrouter_pkce",

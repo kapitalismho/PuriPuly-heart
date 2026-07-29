@@ -98,7 +98,7 @@ def test_official_byok_fixture_uses_supported_model_provider_combo() -> None:
 
 def test_github_star_prompt_is_eligible_for_managed_remaining_percent_at_threshold() -> None:
     controller = _controller_for(_settings_for_connection(TranslationConnection.MANAGED))
-    controller._managed_trial_usage_metadata = OpenRouterKeyMetadata(  # noqa: SLF001
+    controller._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=60.0,
         usage_usd=40.0,
@@ -120,7 +120,7 @@ def test_github_star_prompt_skips_managed_when_usage_metadata_is_unavailable(
     metadata: OpenRouterKeyMetadata | None,
 ) -> None:
     controller = _controller_for(_settings_for_connection(TranslationConnection.MANAGED))
-    controller._managed_trial_usage_metadata = metadata  # noqa: SLF001
+    controller._get_managed_usage_owner().usage_metadata = metadata
 
     assert controller.is_github_star_prompt_eligible() is False
 
@@ -442,7 +442,7 @@ async def test_apply_providers_drains_pending_observation_before_settings_replac
 
     _patch_settings_save(monkeypatch, fake_save_settings)
     monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_to_thread)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", _async_noop)
+    monkeypatch.setattr(controller_module.LlmProviderRebuildOwner, "rebuild", _async_noop)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", _async_noop)
     monkeypatch.setattr(GuiController, "_replace_runtime_stt_provider", _async_noop)
     monkeypatch.setattr(GuiController, "_rebuild_stt_provider", _async_noop)

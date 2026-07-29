@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from puripuly_heart.app.ports.canonical_settings_persistence import (
     ProviderVerificationBinding,
 )
+from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort, RuntimeApplyRequest
 from puripuly_heart.app.ports.secret_store import SecretStorePort
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.provider_runtime_apply import (
+    NoopRuntimeApply,
+    ProviderRuntimeApplyAdapter,
+    ProviderRuntimeApplyPlan,
+    ProviderRuntimeOwner,
+    _provider_runtime_apply_unavailable_result,
+    _runtime_apply_failed_result,
+    _runtime_apply_result_as_degraded_transaction,
+    _stt_language_audio_save_failed_transaction_result,
+    _translation_provider_save_failed_transaction_result,
+)
 from puripuly_heart.app.services.provider_secret_change import (
     ProviderSecretChangeExecution,
     ProviderSecretChangeOwner,
@@ -20,12 +32,542 @@ from puripuly_heart.app.services.provider_verification_binding import (
 from puripuly_heart.app.services.secret_settings_transaction import (
     SecretSettingsTransaction,
 )
+from puripuly_heart.app.services.settings_mutation import (
+    SettingsMutationService,
+    SttLanguageAudioSettingsMutation,
+    TranslationProviderSettingsMutation,
+)
+from puripuly_heart.app.services.settings_mutation_legacy import (
+    _apply_settings_path_patch,
+    build_stt_language_audio_settings_path_patch,
+    build_translation_provider_settings_path_patch,
+    settings_path_mutation_validator_for_command,
+)
 from puripuly_heart.config.settings import AppSettings
-from puripuly_heart.core.messages import TransactionResult
+from puripuly_heart.core.messages import (
+    RUNTIME_APPLY_STATUS_APPLIED,
+    TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+    TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
+    TransactionResult,
+)
 
 ProviderSecretStoreFactory = Callable[[AppSettings], SecretStorePort]
 ProviderActiveSecretProvider = Callable[[AppSettings, str], str | None]
 ProviderSettingsSaveFailureSink = Callable[[str], None]
+ProviderSettingsMerge = Callable[[AppSettings], AppSettings]
+ProviderSettingsAsyncEffect = Callable[[AppSettings], Awaitable[None]]
+ProviderSettingsRoute = Callable[[AppSettings], Awaitable[bool]]
+ProviderSettingsSync = Callable[[AppSettings], None]
+ProviderSettingsPredicate = Callable[[AppSettings, AppSettings], bool]
+ProviderSettingsCompensation = Callable[..., Awaitable[None]]
+ProviderSettingsResultSink = Callable[[TransactionResult], None]
+ProviderSettingsResultProvider = Callable[[], TransactionResult | None]
+ProviderSettingsMutationServiceProvider = Callable[[], SettingsMutationService | None]
+ProviderOrder24PatchProvider = Callable[
+    [AppSettings],
+    tuple[AppSettings, dict[str, object]] | None,
+]
+ProviderSupersededSettingsConsumer = Callable[[AppSettings], bool]
+
+
+class ProviderStrictSettingsSaveFailed(Exception):
+    pass
+
+
+@dataclass(slots=True)
+class ProviderApplicationOwner:
+    settings: SettingsOwner
+    runtime: ProviderRuntimeOwner
+    merge_settings: ProviderSettingsMerge
+    preserve_before_replace: ProviderSettingsAsyncEffect
+    sync_ui: Callable[[], None]
+    order24_patch_provider: ProviderOrder24PatchProvider
+    apply_order24: ProviderSettingsRoute
+    remember_order22: ProviderSettingsSync
+    mutation_service_provider: ProviderSettingsMutationServiceProvider
+    persist_current_settings: Callable[[], bool]
+    save_failure_sink: ProviderSettingsSaveFailureSink
+    result_sink: ProviderSettingsResultSink
+    result_provider: ProviderSettingsResultProvider
+    sync_memory: ProviderSettingsSync
+    capture_runtime_signatures: Callable[[], None]
+    sync_signatures: ProviderSettingsSync
+    consume_superseded_settings: ProviderSupersededSettingsConsumer
+    active_local_asr_change: ProviderSettingsPredicate
+    compensate_local_asr: ProviderSettingsCompensation
+    copy_runtime_only_ui_state: Callable[[AppSettings, AppSettings], None]
+    llm_retry_pending: Callable[[], bool]
+    mark_llm_retry: Callable[[], None]
+    last_result: TransactionResult | None = None
+
+    async def apply(
+        self,
+        pending: AppSettings | None = None,
+        *,
+        force_rebuild_llm: bool = False,
+    ) -> bool:
+        next_settings = self.settings.current if pending is None else self.merge_settings(pending)
+        if next_settings is None:
+            return False
+        await self.preserve_before_replace(next_settings)
+        try:
+            if pending is not None and not force_rebuild_llm:
+                if await self._apply_combined(next_settings):
+                    return self._last_result_committed()
+                if await self._apply_translation(next_settings):
+                    return self._last_result_committed()
+                if await self.apply_order24(next_settings):
+                    self._adopt_external_result()
+                    return self._last_result_committed()
+            return await self._apply_direct(
+                next_settings,
+                force_rebuild_llm=force_rebuild_llm,
+            )
+        finally:
+            self.sync_ui()
+
+    async def _apply_combined(self, next_settings: AppSettings) -> bool:
+        base_settings = self.settings.current
+        if base_settings is None:
+            return False
+        order21_values = build_translation_provider_settings_path_patch(
+            base_settings,
+            next_settings,
+        )
+        order22_values = build_stt_language_audio_settings_path_patch(
+            base_settings,
+            next_settings,
+        )
+        order24_base_and_patch = self.order24_patch_provider(next_settings)
+        if order24_base_and_patch is None:
+            return False
+        _, order24_values = order24_base_and_patch
+        if sum(bool(values) for values in (order21_values, order22_values, order24_values)) < 2:
+            return False
+        committed_results: list[TransactionResult] = []
+
+        async def route_patch(
+            values: dict[str, object],
+            route: ProviderSettingsRoute,
+        ) -> bool:
+            current = self.settings.current
+            if current is None:
+                return False
+            patch_settings = copy.deepcopy(current)
+            _apply_settings_path_patch(patch_settings, values)
+            if not await route(patch_settings):
+                return False
+            result = self.last_result
+            if result is not None and _settings_mutation_committed(result):
+                committed_results.append(result)
+            return True
+
+        if order21_values:
+            if not await route_patch(order21_values, self._apply_translation):
+                return False
+            if not self._last_result_committed():
+                return True
+        if order22_values:
+            if not await route_patch(order22_values, self._apply_stt_language_audio):
+                return False
+            if not self._last_result_committed():
+                return True
+        if order24_values:
+            current = self.settings.current
+            if current is None:
+                return True
+            order24_settings = copy.deepcopy(current)
+            _apply_settings_path_patch(order24_settings, order24_values)
+            self.copy_runtime_only_ui_state(next_settings, order24_settings)
+            if not await self.apply_order24(order24_settings):
+                return False
+            self._adopt_external_result()
+            if not self._last_result_committed():
+                return True
+
+        committed_before_full_draft = (
+            copy.deepcopy(self.settings.current) if self.settings.current is not None else None
+        )
+        if self.settings.current is not None and self.settings.legacy_snapshot_values(
+            self.settings.current
+        ) != self.settings.legacy_snapshot_values(next_settings):
+            try:
+                await self._apply_direct(
+                    next_settings,
+                    force_rebuild_llm=False,
+                    route_order22=False,
+                    strict_persistence_errors=True,
+                )
+            except ProviderStrictSettingsSaveFailed:
+                if committed_before_full_draft is not None:
+                    self.sync_memory(committed_before_full_draft)
+                self._set_result(
+                    _translation_provider_save_failed_transaction_result(
+                        operation="apply_order21_order22_order24_provider_full_draft_save"
+                    )
+                )
+            except Exception:
+                self._set_result(
+                    _runtime_apply_result_as_degraded_transaction(
+                        _runtime_apply_failed_result(
+                            operation="apply_order21_order22_order24_provider_runtime",
+                            code="provider_runtime_apply_exception",
+                            surface="translation_provider",
+                        )
+                    )
+                )
+        if (
+            self.last_result is not None
+            and self.last_result.status
+            == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+            and committed_results
+        ):
+            degraded = next(
+                (
+                    result
+                    for result in committed_results
+                    if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
+                ),
+                None,
+            )
+            if degraded is not None:
+                self._set_result(degraded)
+        return True
+
+    async def _apply_translation(self, next_settings: AppSettings) -> bool:
+        base_settings = self.settings.current
+        if base_settings is None:
+            return False
+        patch_values = build_translation_provider_settings_path_patch(
+            base_settings,
+            next_settings,
+        )
+        if not patch_values:
+            return False
+        committed_settings = copy.deepcopy(base_settings)
+        _apply_settings_path_patch(committed_settings, patch_values)
+        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+            committed_settings
+        ) != self.settings.legacy_snapshot_values(next_settings)
+        plan = self.runtime.build_plan(
+            committed_settings,
+            force_rebuild_llm=False,
+            canonical_settings=self.settings.project_legacy_delta(
+                base_settings,
+                committed_settings,
+            ),
+        )
+        repository = self.settings.create_legacy_patch_repository(
+            base_settings=base_settings,
+            committed_settings=committed_settings,
+            save_failure_sink=self.save_failure_sink,
+        )
+        runtime_apply = ProviderRuntimeApplyAdapter(
+            owner=self.runtime,
+            settings=committed_settings,
+            plan=plan,
+        )
+        command = TranslationProviderSettingsMutation(values=patch_values)
+        service = self.mutation_service_provider() or SettingsMutationService(
+            settings_repository=repository,
+            runtime_apply=runtime_apply,
+            validator=settings_path_mutation_validator_for_command(command),
+        )
+        result = await service.mutate(
+            command.to_mutation_request(
+                expected_revision=None,
+                correlation_id=None,
+            )
+        )
+        self.settings.complete()
+        self._set_result(result)
+        if not _settings_mutation_committed(result):
+            return True
+        self.settings.current = committed_settings
+        if has_out_of_scope_draft:
+            fallback_plan = self.runtime.build_plan(
+                next_settings,
+                force_rebuild_llm=False,
+                canonical_settings=self.settings.project_legacy_delta(
+                    committed_settings,
+                    next_settings,
+                ),
+            )
+            try:
+                await self._apply_direct(
+                    next_settings,
+                    force_rebuild_llm=False,
+                    plan=fallback_plan,
+                    route_order22=False,
+                    strict_persistence_errors=True,
+                )
+            except ProviderStrictSettingsSaveFailed:
+                preserve_retry = self.llm_retry_pending()
+                self.sync_memory(committed_settings)
+                if preserve_retry:
+                    self.mark_llm_retry()
+                self._set_result(
+                    _translation_provider_save_failed_transaction_result(
+                        operation="apply_translation_provider_full_draft_save"
+                    )
+                )
+            except Exception:
+                self._set_result(
+                    _runtime_apply_result_as_degraded_transaction(
+                        _runtime_apply_failed_result(
+                            operation="apply_translation_provider_runtime",
+                            code="provider_runtime_apply_exception",
+                            surface="translation_provider",
+                        )
+                    )
+                )
+            else:
+                unavailable = _provider_runtime_apply_unavailable_result(
+                    owner=self.runtime,
+                    settings=next_settings,
+                    plan=fallback_plan,
+                    operation="apply_translation_provider_runtime",
+                    surface="translation_provider",
+                )
+                if unavailable is not None:
+                    self._set_result(_runtime_apply_result_as_degraded_transaction(unavailable))
+        elif result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
+            self.sync_signatures(committed_settings)
+        self.remember_order22(self.settings.current)
+        return True
+
+    async def _apply_stt_language_audio(self, next_settings: AppSettings) -> bool:
+        base_settings = self.settings.current
+        if base_settings is None:
+            return False
+        patch_values = build_stt_language_audio_settings_path_patch(
+            base_settings,
+            next_settings,
+        )
+        if not patch_values:
+            return False
+        committed_settings = copy.deepcopy(base_settings)
+        _apply_settings_path_patch(committed_settings, patch_values)
+        has_out_of_scope_draft = self.settings.legacy_snapshot_values(
+            committed_settings
+        ) != self.settings.legacy_snapshot_values(next_settings)
+        plan = self.runtime.build_plan(
+            committed_settings,
+            force_rebuild_llm=False,
+            canonical_settings=self.settings.project_legacy_delta(
+                base_settings,
+                committed_settings,
+            ),
+        )
+        repository = self.settings.create_legacy_patch_repository(
+            base_settings=base_settings,
+            committed_settings=committed_settings,
+            surface="stt_language_audio",
+            save_failure_sink=self.save_failure_sink,
+        )
+        runtime_apply: RuntimeApplyPort = ProviderRuntimeApplyAdapter(
+            owner=self.runtime,
+            settings=committed_settings,
+            plan=plan,
+            surface="stt_language_audio",
+            operation="apply_stt_language_audio_provider_runtime",
+        )
+        if has_out_of_scope_draft:
+            runtime_apply = NoopRuntimeApply()
+        command = SttLanguageAudioSettingsMutation(values=patch_values)
+        service = self.mutation_service_provider() or SettingsMutationService(
+            settings_repository=repository,
+            runtime_apply=runtime_apply,
+            validator=settings_path_mutation_validator_for_command(command),
+        )
+        result = await service.mutate(
+            command.to_mutation_request(
+                expected_revision=None,
+                correlation_id=None,
+            )
+        )
+        self.settings.complete()
+        self._set_result(result)
+        if not _settings_mutation_committed(result):
+            self.settings.current = copy.deepcopy(base_settings)
+            self.remember_order22(self.settings.current)
+            return True
+        if self.consume_superseded_settings(committed_settings):
+            self.remember_order22(self.settings.current)
+            return True
+        if (
+            not has_out_of_scope_draft
+            and result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
+            and self.active_local_asr_change(base_settings, committed_settings)
+        ):
+            try:
+                await self.compensate_local_asr(
+                    base_settings=base_settings,
+                    committed_settings=committed_settings,
+                )
+            except Exception:
+                self.save_failure_sink("Failed to compensate local ASR provider settings apply")
+            self.remember_order22(self.settings.current)
+            return True
+        if has_out_of_scope_draft:
+            fallback_plan = self.runtime.build_plan(
+                next_settings,
+                force_rebuild_llm=False,
+                canonical_settings=self.settings.project_legacy_delta(
+                    committed_settings,
+                    next_settings,
+                ),
+            )
+            try:
+                await self._apply_direct(
+                    next_settings,
+                    force_rebuild_llm=False,
+                    plan=fallback_plan,
+                    route_order22=False,
+                    strict_persistence_errors=True,
+                )
+            except ProviderStrictSettingsSaveFailed:
+                await self._resync_committed_provider_runtime(
+                    base_settings=base_settings,
+                    committed_settings=committed_settings,
+                    plan=plan,
+                )
+                self._set_result(
+                    _stt_language_audio_save_failed_transaction_result(
+                        operation="apply_stt_language_audio_provider_full_draft_save"
+                    )
+                )
+            except Exception:
+                self._set_result(
+                    _runtime_apply_result_as_degraded_transaction(
+                        _runtime_apply_failed_result(
+                            operation="apply_stt_language_audio_provider_runtime",
+                            code="provider_runtime_apply_exception",
+                            surface="stt_language_audio",
+                        )
+                    )
+                )
+            else:
+                unavailable = _provider_runtime_apply_unavailable_result(
+                    owner=self.runtime,
+                    settings=next_settings,
+                    plan=fallback_plan,
+                    operation="apply_stt_language_audio_provider_runtime",
+                    surface="stt_language_audio",
+                )
+                if unavailable is not None:
+                    self._set_result(_runtime_apply_result_as_degraded_transaction(unavailable))
+        else:
+            self.settings.current = committed_settings
+            if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
+                self.sync_signatures(committed_settings)
+        self.remember_order22(self.settings.current)
+        return True
+
+    async def _apply_direct(
+        self,
+        next_settings: AppSettings,
+        *,
+        force_rebuild_llm: bool,
+        plan: ProviderRuntimeApplyPlan | None = None,
+        route_order22: bool = True,
+        strict_persistence_errors: bool = False,
+    ) -> bool:
+        if route_order22 and not force_rebuild_llm and plan is None:
+            if await self._apply_stt_language_audio(next_settings):
+                return self._last_result_committed()
+        self.settings.begin(
+            legacy_snapshot=self.settings.projection_snapshot or self.settings.current
+        )
+        committed = False
+        try:
+            self.capture_runtime_signatures()
+            self.settings.apply_legacy_delta(
+                self.settings.projection_snapshot or self.settings.current,
+                next_settings,
+            )
+            if plan is None:
+                plan = self.runtime.build_plan(
+                    next_settings,
+                    force_rebuild_llm=force_rebuild_llm,
+                )
+            self.settings.current = next_settings
+            if strict_persistence_errors:
+                try:
+                    self.settings.persist()
+                except Exception:
+                    self.settings.rollback()
+                    raise ProviderStrictSettingsSaveFailed from None
+                self.settings.remember_projection(next_settings)
+            elif self.persist_current_settings() is False:
+                self.settings.rollback()
+                return False
+            committed = True
+            runtime_result = await ProviderRuntimeApplyAdapter(
+                owner=self.runtime,
+                settings=next_settings,
+                plan=plan,
+            ).apply_runtime(
+                RuntimeApplyRequest(
+                    settings_values=self.settings.legacy_snapshot_values(next_settings),
+                    reason="provider_direct",
+                    correlation_id=None,
+                )
+            )
+            if runtime_result.status == RUNTIME_APPLY_STATUS_APPLIED:
+                self._set_result(
+                    TransactionResult(
+                        status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+                        message=runtime_result.message,
+                        diagnostics=runtime_result.diagnostics,
+                    )
+                )
+            else:
+                self._set_result(_runtime_apply_result_as_degraded_transaction(runtime_result))
+            self.remember_order22(self.settings.current)
+            return True
+        except ProviderStrictSettingsSaveFailed:
+            raise
+        except BaseException:
+            if not committed:
+                self.settings.rollback()
+            raise
+        finally:
+            if committed:
+                self.settings.complete()
+
+    async def _resync_committed_provider_runtime(
+        self,
+        *,
+        base_settings: AppSettings,
+        committed_settings: AppSettings,
+        plan: ProviderRuntimeApplyPlan,
+    ) -> None:
+        self.sync_memory(base_settings)
+        try:
+            await self.runtime.apply(copy.deepcopy(committed_settings), plan)
+        except Exception:
+            self.save_failure_sink("Failed to resync committed order22 provider runtime")
+            self.sync_memory(committed_settings)
+
+    def _set_result(self, result: TransactionResult) -> None:
+        self.last_result = result
+        self.result_sink(result)
+
+    def _adopt_external_result(self) -> None:
+        result = self.result_provider()
+        if result is not None:
+            self.last_result = result
+
+    def _last_result_committed(self) -> bool:
+        return self.last_result is not None and _settings_mutation_committed(self.last_result)
+
+
+def _settings_mutation_committed(result: TransactionResult) -> bool:
+    return result.status in {
+        TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+        TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
+    }
 
 
 def provider_verification_context(
@@ -161,7 +703,9 @@ class ProviderSettingsOwner:
 
 
 __all__ = [
+    "ProviderApplicationOwner",
     "ProviderActiveSecretProvider",
+    "ProviderStrictSettingsSaveFailed",
     "ProviderSecretStoreFactory",
     "ProviderSettingsSaveFailureSink",
     "ProviderSettingsOwner",

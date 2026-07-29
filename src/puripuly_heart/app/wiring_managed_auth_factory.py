@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
+from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
 from puripuly_heart.app.ports.broker_client import (
     BrokerIssueRequest,
     BrokerIssueResult,
@@ -21,17 +25,48 @@ from puripuly_heart.app.ports.managed_identity_state import (
     ManagedIdentitySnapshot,
     ManagedIdentityStatePort,
 )
+from puripuly_heart.app.ports.settings_repository import SettingsRepositoryPort
+from puripuly_heart.app.services.github_star_prompt import (
+    github_star_prompt_utc_timestamp,
+)
+from puripuly_heart.app.services.managed_auth import (
+    ManagedAuthExecutionResult,
+    ManagedAuthState,
+)
+from puripuly_heart.app.services.managed_auth_claims import (
+    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+    ManagedAuthClaimGuard,
+)
+from puripuly_heart.app.services.managed_connection_auth import (
+    ManagedConnectionAuthRequest,
+    ManagedConnectionAuthService,
+)
+from puripuly_heart.app.services.qq_managed_auth import (
+    QqManagedAuthRequest,
+    QqManagedAuthService,
+)
+from puripuly_heart.app.services.translation_enable import (
+    ManagedTranslationPreparation,
+    TranslationEnableState,
+)
 from puripuly_heart.config.llm_profiles import (
     get_openrouter_llm_profile,
     openrouter_alias_for_fields,
 )
-from puripuly_heart.config.settings import AppSettings, TranslationConnection
+from puripuly_heart.config.settings import (
+    AppSettings,
+    LLMProviderName,
+    OpenRouterCredentialSource,
+    TranslationConnection,
+    normalize_owned_referral_id,
+)
 from puripuly_heart.core.discord_oauth_loopback import (
     DiscordOAuthCallbackError,
     DiscordOAuthLoopbackClosedError,
     DiscordOAuthLoopbackListener,
 )
 from puripuly_heart.core.hardware_fingerprint import compute_hardware_hash
+from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.managed_identity import (
     ManagedIdentityBundle,
     ensure_managed_identity_bundle,
@@ -40,8 +75,10 @@ from puripuly_heart.core.managed_openrouter_release import (
     MANAGED_OPENROUTER_TRIAL_BUDGET_USD,
     ManagedOpenRouterDiscordStartSuccess,
     ManagedOpenRouterIssueSuccess,
+    ManagedOpenRouterReleaseBehavior,
     ManagedOpenRouterReleaseError,
     OpenRouterReleaseRuntimeConfig,
+    format_managed_openrouter_diagnostics,
 )
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
@@ -50,11 +87,20 @@ from puripuly_heart.core.messages import (
     DIAGNOSTIC_CATEGORY_TRANSACTION,
     DIAGNOSTIC_VISIBILITY_BASIC,
     SEVERITY_ERROR,
+    TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
+    TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+    TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
     DiagnosticCategory,
     ErrorDiagnostics,
+    TransactionResult,
     UserMessageRef,
 )
-from puripuly_heart.core.openrouter_credentials import OpenRouterCredentialRuntimeConfig
+from puripuly_heart.core.openrouter_credentials import (
+    OPENROUTER_MANAGED_API_KEY_SECRET,
+    OpenRouterCredentialRuntimeConfig,
+    resolve_openrouter_credentials,
+)
+from puripuly_heart.core.openrouter_handoff import mark_founder_letter_shown
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.storage.secrets import SecretStore
 
@@ -739,3 +785,501 @@ def _managed_release_service_for_alias(
         signed_at_provider=managed_release_service.signed_at_provider,
         monotonic_ms_provider=managed_release_service.monotonic_ms_provider,
     )
+
+
+DISCORD_AUTH_ERROR_KEY_BY_SUBCODE = {
+    "discord_email_unverified": "discord_auth.error.email_unverified",
+    "discord_account_too_new": "discord_auth.error.account_too_new",
+    "discord_lifetime_used": "discord_auth.error.lifetime_used",
+    "hardware_duplicate": "discord_auth.error.hardware_duplicate",
+    "global_cap_reached": "discord_auth.error.daily_cap",
+    "oauth_session_expired": "discord_auth.error.expired",
+    "loopback_unavailable": "discord_auth.error.loopback_unavailable",
+}
+
+ManagedAuthSettingsProvider = Callable[[], AppSettings | None]
+ManagedAuthSettingsSink = Callable[[AppSettings], None]
+ManagedAuthSecretStoreFactory = Callable[..., object]
+ManagedAuthReleaseServiceProvider = Callable[[], object | None]
+ManagedAuthPersistenceCallbackFactory = Callable[
+    [AppSettings],
+    Callable[[AppSettings], None],
+]
+ManagedAuthSettingsRepositoryFactory = Callable[
+    [AppSettings, AppSettings, str],
+    SettingsRepositoryPort,
+]
+ManagedAuthSettingsOwnerComplete = Callable[[], None]
+ManagedAuthRuntimePresenceProvider = Callable[[], tuple[bool, bool]]
+ManagedAuthIngressProvider = Callable[[], bool]
+
+
+@dataclass(slots=True)
+class ManagedAuthRuntimeAdapter:
+    config_path: Path
+    secret_store_factory: ManagedAuthSecretStoreFactory
+    settings_provider: ManagedAuthSettingsProvider
+    settings_sink: ManagedAuthSettingsSink
+    release_service_provider: ManagedAuthReleaseServiceProvider
+    persistence_callback_factory: ManagedAuthPersistenceCallbackFactory
+    settings_repository_factory: ManagedAuthSettingsRepositoryFactory
+    settings_owner_complete: ManagedAuthSettingsOwnerComplete
+    runtime_presence_provider: ManagedAuthRuntimePresenceProvider
+    ingress_provider: ManagedAuthIngressProvider
+
+    def state(self) -> ManagedAuthState:
+        settings = self.settings_provider()
+        runtime_owner_available, runtime_available = self.runtime_presence_provider()
+        if settings is None:
+            return ManagedAuthState(
+                settings_available=False,
+                managed_selected=False,
+                managed_china=False,
+                local_key_available=False,
+                release_service_available=False,
+                runtime_available=runtime_available,
+                ingress_frozen=self.ingress_provider(),
+            )
+        managed_selected = _managed_openrouter_selected(settings)
+        return ManagedAuthState(
+            settings_available=True,
+            managed_selected=managed_selected,
+            managed_china=(settings.translation.connection == TranslationConnection.MANAGED_CHINA),
+            local_key_available=(
+                self._local_key_available(settings) if managed_selected else False
+            ),
+            release_service_available=self.release_service_provider() is not None,
+            runtime_available=runtime_available if runtime_owner_available else False,
+            ingress_frozen=self.ingress_provider(),
+        )
+
+    async def execute_qq(
+        self,
+        qq_identity: str,
+        credential: str,
+    ) -> ManagedAuthExecutionResult:
+        settings = self.settings_provider()
+        release_service = self.release_service_provider()
+        broker_client = getattr(release_service, "client", None)
+        if settings is None or broker_client is None:
+            return ManagedAuthExecutionResult(
+                succeeded=False,
+                message_key="qq_managed_auth.error.retry",
+            )
+        secret_store = self.secret_store_factory(
+            settings.secrets,
+            config_path=self.config_path,
+        )
+        secret_store_port = SyncSecretStoreAdapter(secret_store)
+        managed_state = build_managed_identity_state_port(
+            settings,
+            self.persistence_callback_factory(settings),
+        )
+        result = await QqManagedAuthService(
+            broker_client=broker_client,
+            secret_store=secret_store_port,
+            managed_state=managed_state,
+            claim_guard=ManagedAuthClaimGuard(
+                managed_state=managed_state,
+                secret_store=secret_store_port,
+            ),
+        ).authenticate(
+            QqManagedAuthRequest(
+                qq_identity=qq_identity,
+                credential=credential,
+                asserted_at=github_star_prompt_utc_timestamp(),
+                metadata={"flow": "qq_managed_auth_dialog"},
+            )
+        )
+        if _settings_mutation_committed(result):
+            runtime_owner_available, runtime_available = self.runtime_presence_provider()
+            return ManagedAuthExecutionResult(
+                succeeded=True,
+                transaction_result=result,
+                runtime_rebuild=(
+                    "if_missing" if runtime_owner_available and not runtime_available else "never"
+                ),
+            )
+        message = result.message
+        return ManagedAuthExecutionResult(
+            succeeded=False,
+            transaction_result=result,
+            message_key=(message.key if message is not None else "qq_managed_auth.error.retry"),
+            message_kwargs=dict(message.params) if message is not None else {},
+        )
+
+    async def execute_discord(
+        self,
+        referral_id: str | None,
+        on_callback_received: Callable[[], None] | None,
+    ) -> ManagedAuthExecutionResult:
+        release_service = self.release_service_provider()
+        settings = self.settings_provider()
+        if release_service is None or settings is None:
+            return ManagedAuthExecutionResult(succeeded=False)
+        if not _supports_transaction_auth(release_service):
+            return await self._execute_legacy_discord(
+                release_service,
+                settings,
+                referral_id=referral_id,
+            )
+        return await self._execute_transaction_discord(
+            release_service,
+            settings,
+            referral_id=referral_id,
+            on_callback_received=on_callback_received,
+        )
+
+    async def _execute_transaction_discord(
+        self,
+        release_service: object,
+        settings: AppSettings,
+        *,
+        referral_id: str | None,
+        on_callback_received: Callable[[], None] | None,
+    ) -> ManagedAuthExecutionResult:
+        updated = copy.deepcopy(settings)
+        secret_store = self.secret_store_factory(
+            updated.secrets,
+            config_path=self.config_path,
+        )
+        secret_store_port = SyncSecretStoreAdapter(secret_store)
+        managed_state = build_managed_identity_state_port(
+            updated,
+            self.persistence_callback_factory(updated),
+        )
+        identity = ManagedIdentityPreflightAdapter(
+            managed_state=managed_state,
+            secrets=secret_store,
+        )
+        discord_auth = DiscordOAuthAuthAdapter(
+            identity=identity,
+            client=release_service.client,
+            app_version=release_service.app_version,
+            raw_hardware_fingerprint_provider=release_service.raw_hardware_fingerprint_provider,
+            hardware_hash_provider=getattr(
+                release_service,
+                "_legacy_hardware_hash_provider",
+                None,
+            ),
+            oauth_runtime=release_service.oauth_runtime,
+            listener_factory=release_service.discord_oauth_listener_factory,
+            callback_runner=release_service.discord_oauth_callback_runner,
+            referral_id=referral_id,
+            on_callback_received=on_callback_received,
+        )
+        broker = DiscordManagedBrokerClientAdapter(
+            identity=identity,
+            client=release_service.client,
+            openrouter_config=release_service.openrouter_config,
+            app_version=release_service.app_version,
+            signed_at_provider=release_service.signed_at_provider,
+        )
+        result = await ManagedConnectionAuthService(
+            local_identity=identity,
+            discord_auth=discord_auth,
+            broker_client=broker,
+            secret_store=secret_store_port,
+            settings_repository=self.settings_repository_factory(
+                settings,
+                updated,
+                "managed_connection_auth",
+            ),
+            claim_guard=ManagedAuthClaimGuard(
+                managed_state=managed_state,
+                secret_store=secret_store_port,
+            ),
+        ).authorize(
+            ManagedConnectionAuthRequest(
+                local_secret_key=OPENROUTER_MANAGED_API_KEY_SECRET,
+                settings_values=_managed_connection_auth_settings_values(updated),
+                expected_settings_revision=None,
+                reason="managed_connection_auth",
+                correlation_id=None,
+                broker_metadata={"flow": "managed_connection_auth"},
+            )
+        )
+        self.settings_owner_complete()
+        if result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING:
+            self.settings_sink(updated)
+        if not _settings_mutation_committed(result):
+            message = result.message
+            diagnostics = result.diagnostics
+            return ManagedAuthExecutionResult(
+                succeeded=False,
+                transaction_result=result,
+                delivery_ack_pending=(
+                    result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
+                ),
+                message_key=(message.key if message is not None else "discord_auth.error.retry"),
+                message_kwargs=dict(message.params) if message is not None else {},
+                error_class=getattr(diagnostics, "category", None),
+            )
+        issue = broker.last_issue_response
+        self.settings_sink(updated)
+        return ManagedAuthExecutionResult(
+            succeeded=True,
+            transaction_result=result,
+            referral_bonus_applied=bool(getattr(issue, "referral_bonus_applied", False)),
+            referral_id=normalize_owned_referral_id(getattr(issue, "referral_id", None)),
+            pass_status=getattr(issue, "pass_status", None),
+            runtime_rebuild="always",
+        )
+
+    async def _execute_legacy_discord(
+        self,
+        release_service: object,
+        settings: AppSettings,
+        *,
+        referral_id: str | None,
+    ) -> ManagedAuthExecutionResult:
+        try:
+            claim_guard = self.claim_guard(settings)
+            claim_result = await claim_guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
+        except Exception:
+            return ManagedAuthExecutionResult(succeeded=False, log_failure=False)
+        if claim_result is not None:
+            message = claim_result.message
+            return ManagedAuthExecutionResult(
+                succeeded=False,
+                transaction_result=claim_result,
+                message_key=(message.key if message is not None else "discord_auth.error.retry"),
+                message_kwargs=dict(message.params) if message is not None else {},
+                log_failure=False,
+            )
+        try:
+            result = await release_service.prepare_for_translation(referral_id=referral_id)
+        except Exception as exc:
+            return ManagedAuthExecutionResult(
+                succeeded=False,
+                log_message=f"[ManagedAuth] Discord auth start failed: {exc}",
+                log_failure=False,
+            )
+        if result.behavior == ManagedOpenRouterReleaseBehavior.READY and result.local_key_available:
+            with contextlib.suppress(Exception):
+                claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
+                claim_guard.managed_state.persist()
+            return ManagedAuthExecutionResult(
+                succeeded=True,
+                referral_bonus_applied=(getattr(result, "referral_bonus_applied", False) is True),
+                referral_id=normalize_owned_referral_id(getattr(result, "referral_id", None)),
+                pass_status=getattr(result, "pass_status", None),
+                runtime_rebuild="if_missing",
+            )
+        diagnostics = result.diagnostics
+        return ManagedAuthExecutionResult(
+            succeeded=False,
+            message_key=_discord_auth_message_key(result),
+            message_kwargs=dict(result.message_kwargs),
+            error_class=getattr(diagnostics, "error_class", None),
+        )
+
+    def claim_guard(self, settings: AppSettings) -> ManagedAuthClaimGuard:
+        secret_store = self.secret_store_factory(
+            settings.secrets,
+            config_path=self.config_path,
+        )
+        secret_store_port = SyncSecretStoreAdapter(secret_store)
+        managed_state = build_managed_identity_state_port(
+            settings,
+            self.persistence_callback_factory(settings),
+        )
+        return ManagedAuthClaimGuard(
+            managed_state=managed_state,
+            secret_store=secret_store_port,
+        )
+
+    def _local_key_available(self, settings: AppSettings) -> bool:
+        try:
+            secrets = self.secret_store_factory(
+                settings.secrets,
+                config_path=self.config_path,
+            )
+            resolution = resolve_openrouter_credentials(
+                build_openrouter_credential_runtime_config(settings),
+                secrets=secrets,
+                request_intent="TRANS",
+            )
+        except Exception:
+            return False
+        return resolution.api_key is not None
+
+
+def _supports_transaction_auth(release_service: object) -> bool:
+    return all(
+        hasattr(release_service, attr)
+        for attr in (
+            "app_version",
+            "client",
+            "discord_oauth_callback_runner",
+            "discord_oauth_listener_factory",
+            "oauth_runtime",
+            "openrouter_config",
+            "signed_at_provider",
+        )
+    )
+
+
+def _discord_auth_message_key(result: object) -> str:
+    diagnostics = getattr(result, "diagnostics", None)
+    subcode = getattr(diagnostics, "subcode", None)
+    if subcode is not None:
+        mapped_key = DISCORD_AUTH_ERROR_KEY_BY_SUBCODE.get(subcode)
+        if mapped_key is not None:
+            return mapped_key
+    if getattr(diagnostics, "code", None) == "discord_loopback_unavailable":
+        return DISCORD_AUTH_ERROR_KEY_BY_SUBCODE["loopback_unavailable"]
+    return getattr(result, "message_key", "discord_auth.error.retry")
+
+
+def _managed_openrouter_selected(settings: AppSettings) -> bool:
+    return bool(
+        settings.provider.llm == LLMProviderName.OPENROUTER
+        and settings.translation.connection
+        in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
+        and settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
+    )
+
+
+def _managed_connection_auth_settings_values(
+    settings: AppSettings,
+) -> dict[str, Any]:
+    managed = settings.managed_identity
+    selection_alias = settings.openrouter.selection_alias
+    return {
+        "intent": {
+            "translation": {
+                "connection": settings.translation.connection.value,
+                "model": settings.translation.model.value,
+            },
+            "openrouter": {
+                "selected_source": settings.openrouter.selected_source.value,
+                "llm_model": settings.openrouter.llm_model.value,
+                "selection_alias": (selection_alias.value if selection_alias is not None else None),
+            },
+        },
+        "state": {
+            "managed_connection": {
+                "installation_id": managed.installation_id,
+                "active_managed_credential_ref": (managed.active_managed_credential_ref),
+                "active_managed_expires_at": managed.active_managed_expires_at,
+                "founder_letter_seen_credential_ref": (managed.founder_letter_seen_credential_ref),
+                "referral_id": managed.referral_id,
+                "local_managed_claim_sources": list(managed.local_managed_claim_sources),
+            }
+        },
+    }
+
+
+def _settings_mutation_committed(result: TransactionResult) -> bool:
+    return result.status in {
+        TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+        TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
+    }
+
+
+ManagedTranslationSettingsProvider = Callable[[], AppSettings | None]
+ManagedTranslationReleaseServiceProvider = Callable[[], object | None]
+ManagedTranslationRuntimeSnapshotProvider = Callable[
+    [],
+    tuple[bool, bool, object | None],
+]
+ManagedTranslationIngressProvider = Callable[[], bool]
+ManagedTranslationFounderDialog = Callable[[], bool]
+ManagedTranslationPersistSettings = Callable[[], object]
+
+
+@dataclass(slots=True)
+class ManagedTranslationRuntimeAdapter:
+    auth: ManagedAuthRuntimeAdapter
+    settings_provider: ManagedTranslationSettingsProvider
+    release_service_provider: ManagedTranslationReleaseServiceProvider
+    runtime_snapshot_provider: ManagedTranslationRuntimeSnapshotProvider
+    ingress_provider: ManagedTranslationIngressProvider
+    founder_dialog: ManagedTranslationFounderDialog
+    persist_settings: ManagedTranslationPersistSettings
+
+    def state(self) -> TranslationEnableState:
+        settings = self.settings_provider()
+        runtime_available, translation_enabled, llm = self.runtime_snapshot_provider()
+        auth_state = self.auth.state()
+        return TranslationEnableState(
+            runtime_available=runtime_available,
+            translation_enabled=translation_enabled,
+            llm_available=llm is not None,
+            settings_available=settings is not None,
+            provider_name=(settings.provider.llm.value if settings is not None else None),
+            qwen_region=(settings.qwen.region.value if settings is not None else None),
+            managed_selected=auth_state.managed_selected,
+            managed_china=auth_state.managed_china,
+            managed_local_key_available=auth_state.local_key_available,
+            managed_release_service_available=(auth_state.release_service_available),
+            ingress_frozen=self.ingress_provider(),
+        )
+
+    async def prepare(self) -> ManagedTranslationPreparation:
+        settings = self.settings_provider()
+        service = self.release_service_provider()
+        if settings is None or service is None:
+            return ManagedTranslationPreparation(ready=True)
+        claim_guard = None
+        if not self.auth.state().managed_china:
+            try:
+                claim_guard = self.auth.claim_guard(settings)
+                claim_result = await claim_guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
+            except Exception:
+                return ManagedTranslationPreparation(
+                    ready=False,
+                    message_key="discord_auth.error.retry",
+                )
+            if claim_result is not None:
+                message = claim_result.message
+                return ManagedTranslationPreparation(
+                    ready=False,
+                    transaction_result=claim_result,
+                    message_key=(
+                        message.key if message is not None else "discord_auth.error.retry"
+                    ),
+                    message_kwargs=(dict(message.params) if message is not None else {}),
+                )
+        result = await service.prepare_for_translation()
+        if result.behavior == ManagedOpenRouterReleaseBehavior.READY and result.local_key_available:
+            if claim_guard is not None:
+                with contextlib.suppress(Exception):
+                    claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
+                    claim_guard.managed_state.persist()
+            return ManagedTranslationPreparation(ready=True)
+        return ManagedTranslationPreparation(
+            ready=False,
+            message_key=result.message_key,
+            message_kwargs=dict(result.message_kwargs),
+            diagnostics_text=format_managed_openrouter_diagnostics(result.diagnostics),
+            show_qq_dialog=(
+                result.message_key == "qq_managed_auth.required" and self.auth.state().managed_china
+            ),
+        )
+
+    def show_founder_letter(self) -> None:
+        settings = self.settings_provider()
+        if settings is None or not self.founder_dialog():
+            return
+        mark_founder_letter_shown(
+            build_managed_identity_state_port(
+                settings,
+                lambda _settings: None,
+            )
+        )
+        with contextlib.suppress(Exception):
+            self.persist_settings()
+
+    async def warmup(self) -> None:
+        _runtime_available, _translation_enabled, llm = self.runtime_snapshot_provider()
+        if isinstance(llm, SemaphoreLLMProvider):
+            llm = llm.inner
+        warmup = getattr(llm, "warmup", None)
+        if not callable(warmup):
+            return
+        with contextlib.suppress(Exception):
+            result = warmup()
+            if inspect.isawaitable(result):
+                await result

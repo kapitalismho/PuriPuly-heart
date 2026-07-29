@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from puripuly_heart.app.ports.gpu_worker import GpuWorkerDevice
-from puripuly_heart.app.services.provider_runtime_apply import _ProviderRuntimeApplyPlan
+from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeApplyPlan
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeSnapshot,
@@ -419,8 +419,8 @@ async def test_saved_gpu_preload_skips_non_gpu_and_runs_once_for_gpu(
     assert calls == ["startup"]
 
 
-def _gpu_restart_plan() -> _ProviderRuntimeApplyPlan:
-    return _ProviderRuntimeApplyPlan(
+def _gpu_restart_plan() -> ProviderRuntimeApplyPlan:
+    return ProviderRuntimeApplyPlan(
         should_rebuild_llm=False,
         should_refresh_peer=True,
         should_refresh_self_stt=True,
@@ -743,7 +743,7 @@ async def test_manual_and_settings_recovery_serialize_through_adoption(
 
     owner = Owner()
     controller.hub = SimpleNamespace(local_asr_provider_runtime=owner)
-    plan = _ProviderRuntimeApplyPlan(
+    plan = ProviderRuntimeApplyPlan(
         should_rebuild_llm=False,
         should_refresh_peer=False,
         should_refresh_self_stt=False,

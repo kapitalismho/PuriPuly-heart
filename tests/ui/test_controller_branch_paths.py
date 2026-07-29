@@ -5,7 +5,6 @@ import contextlib
 import copy
 import logging
 import re
-import threading
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,6 +17,7 @@ import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.app import wiring_managed_auth_factory as managed_auth_runtime_module
 from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as canonical_persistence_adapter_module,
 )
@@ -39,10 +39,13 @@ from puripuly_heart.app.services import (
     overlay_generation_start as overlay_generation_start_module,
 )
 from puripuly_heart.app.services import provider_runtime_apply as provider_runtime_apply_module
+from puripuly_heart.app.services import provider_settings as provider_settings_module
 from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.app.services.canonical_settings_persistence import (
     legacy_settings_snapshot_values,
 )
+from puripuly_heart.app.services.managed_connection_auth import ManagedConnectionAuthService
+from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 from puripuly_heart.config.audio_host_api import (
     WINDOWS_MME_HOST_API,
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,
@@ -58,7 +61,6 @@ from puripuly_heart.config.settings import (
     LocalLLMBackend,
     LocalLLMSettings,
     OpenRouterCredentialSource,
-    OpenRouterFallbackSelectionAlias,
     OpenRouterLLMModel,
     OpenRouterProviderRouting,
     OpenRouterRoutingMode,
@@ -110,6 +112,7 @@ from puripuly_heart.core.managed_openrouter_release import (
     TalkTogetherPassStatus,
     UnavailableManagedOpenRouterReleaseClient,
 )
+from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
@@ -1099,8 +1102,6 @@ async def test_managed_china_required_prepare_opens_qq_dialog_instead_of_snackba
     controller = _make_controller(app=app)
     controller.settings = _managed_china_settings()
     controller.hub = SimpleNamespace(llm=None, translation_enabled=False)
-    controller._translation_toggle_generation = 1
-    controller._translation_toggle_intent_enabled = True
 
     async def prepare_required() -> ManagedOpenRouterReleaseResult:
         return ManagedOpenRouterReleaseResult(
@@ -1119,170 +1120,17 @@ async def test_managed_china_required_prepare_opens_qq_dialog_instead_of_snackba
     async def refresh_noop(_self, **_kwargs) -> None:
         return None
 
-    monkeypatch.setattr(
-        GuiController, "_should_route_managed_trans_to_founder_letter", no_founder_letter
-    )
-    monkeypatch.setattr(GuiController, "_refresh_managed_trial_usage_state_impl", refresh_noop)
+    monkeypatch.setattr(ManagedUsageOwner, "should_route_to_founder_letter", no_founder_letter)
+    monkeypatch.setattr(ManagedUsageOwner, "refresh", refresh_noop)
     monkeypatch.setattr(GuiController, "log_detailed", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(GuiController, "log_basic", lambda *_args, **_kwargs: None)
 
-    result = await controller._handle_managed_translation_enable(1)
+    result = await controller.set_translation_enabled(True)
 
     assert result is False
     assert qq_dialog_calls == ["show"]
     assert snackbars == []
     assert dashboard_enabled == [False]
-
-
-@pytest.mark.asyncio
-async def test_managed_china_required_prepare_does_not_open_qq_dialog_when_not_relevant(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    qq_dialog_calls: list[str] = []
-    snackbars: list[tuple[str, object]] = []
-    app = SimpleNamespace(
-        view_dashboard=SimpleNamespace(set_translation_enabled=lambda _enabled: None),
-        show_qq_managed_auth_dialog=lambda: qq_dialog_calls.append("show"),
-        _show_snackbar=lambda *args: snackbars.append(args),
-    )
-    controller = _make_controller(app=app)
-    controller.settings = _managed_china_settings()
-    controller.settings.translation.connection = TranslationConnection.MANAGED
-    controller.hub = SimpleNamespace(llm=None, translation_enabled=False)
-    controller._translation_toggle_generation = 1
-    controller._translation_toggle_intent_enabled = True
-
-    async def prepare_required() -> ManagedOpenRouterReleaseResult:
-        return ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-            message_key="qq_managed_auth.required",
-            local_key_available=False,
-        )
-
-    controller._managed_openrouter_release_service = SimpleNamespace(
-        prepare_for_translation=prepare_required
-    )
-
-    async def no_founder_letter(_self) -> bool:
-        return False
-
-    async def refresh_noop(_self, **_kwargs) -> None:
-        return None
-
-    monkeypatch.setattr(
-        GuiController, "_should_route_managed_trans_to_founder_letter", no_founder_letter
-    )
-    monkeypatch.setattr(GuiController, "_refresh_managed_trial_usage_state_impl", refresh_noop)
-    monkeypatch.setattr(GuiController, "log_detailed", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(GuiController, "log_basic", lambda *_args, **_kwargs: None)
-
-    result = await controller._handle_managed_translation_enable(1)
-
-    assert result is False
-    assert qq_dialog_calls == []
-    assert snackbars != []
-
-
-@pytest.mark.asyncio
-async def test_standard_managed_prepare_blocks_existing_qq_claim_before_release_service(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    snackbars: list[tuple[str, object]] = []
-    saved_settings: list[AppSettings] = []
-    app = SimpleNamespace(
-        view_dashboard=SimpleNamespace(set_translation_enabled=lambda _enabled: None),
-        _show_snackbar=lambda *args: snackbars.append(args),
-    )
-    controller = _make_controller(app=app)
-    controller.settings = _managed_china_settings()
-    controller.settings.translation.connection = TranslationConnection.MANAGED
-    controller.hub = SimpleNamespace(llm=None, translation_enabled=False)
-    controller._translation_toggle_generation = 1
-    controller._translation_toggle_intent_enabled = True
-    prepare_calls = 0
-
-    async def prepare_unexpected() -> ManagedOpenRouterReleaseResult:
-        nonlocal prepare_calls
-        prepare_calls += 1
-        return ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            local_key_available=True,
-        )
-
-    controller._managed_openrouter_release_service = SimpleNamespace(
-        prepare_for_translation=prepare_unexpected
-    )
-
-    async def no_founder_letter(_self) -> bool:
-        return False
-
-    monkeypatch.setattr(
-        GuiController, "_should_route_managed_trans_to_founder_letter", no_founder_letter
-    )
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({"openrouter_managed_qq_api_key": "qq-key"}),
-    )
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, settings: saved_settings.append(copy.deepcopy(settings)),
-    )
-
-    result = await controller._handle_managed_translation_enable(1)
-
-    assert result is False
-    assert prepare_calls == 0
-    assert controller.settings.managed_identity.local_managed_claim_sources == ("qq",)
-    assert saved_settings[-1].managed_identity.local_managed_claim_sources == ("qq",)
-    assert snackbars[0][0] == t("discord_auth.error.already_claimed_qq")
-
-
-@pytest.mark.asyncio
-async def test_standard_managed_prepare_records_discord_claim_after_release_ready(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    saved_settings: list[AppSettings] = []
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = _managed_china_settings()
-    controller.settings.translation.connection = TranslationConnection.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._translation_toggle_generation = 1
-    controller._translation_toggle_intent_enabled = True
-
-    async def prepare_ready() -> ManagedOpenRouterReleaseResult:
-        return ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            local_key_available=True,
-        )
-
-    controller._managed_openrouter_release_service = SimpleNamespace(
-        prepare_for_translation=prepare_ready
-    )
-
-    async def no_founder_letter(_self) -> bool:
-        return False
-
-    monkeypatch.setattr(
-        GuiController, "_should_route_managed_trans_to_founder_letter", no_founder_letter
-    )
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, settings: saved_settings.append(copy.deepcopy(settings)),
-    )
-
-    result = await controller._handle_managed_translation_enable(1)
-
-    assert result is True
-    assert controller.settings.managed_identity.local_managed_claim_sources == ("discord",)
-    assert saved_settings[-1].managed_identity.local_managed_claim_sources == ("discord",)
 
 
 def test_local_qwen_suppression_first_gui_detection_counts_without_modal() -> None:
@@ -2169,23 +2017,6 @@ def test_sync_ui_from_settings_updates_dashboard_and_settings_view() -> None:
 
 
 @pytest.mark.asyncio
-async def test_set_translation_enabled_disables_when_llm_missing() -> None:
-    logs = DummyLogsView()
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash, view_logs=logs))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.GEMINI
-    controller.hub = DummyHub(llm=None)
-
-    await controller.set_translation_enabled(True)
-
-    assert controller.hub.translation_enabled is False
-    assert controller.hub.clear_context_calls == 0
-    assert dash.translation_enabled is False
-    assert any("Translation is ON" in line for line in logs.logs)
-
-
-@pytest.mark.asyncio
 async def test_set_translation_enabled_warms_supported_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2297,8 +2128,8 @@ async def test_set_translation_enabled_transitions_pending_true_to_false_after_m
         lambda *_args, **_kwargs: DummySecrets({}),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_schedule_managed_trial_usage_refresh",
+        ManagedUsageOwner,
+        "schedule_usage_refresh",
         lambda self: scheduled_refreshes.append("scheduled"),
     )
 
@@ -2341,10 +2172,14 @@ async def test_set_translation_enabled_rebuild_path_keeps_success_when_managed_u
         lambda self, *, secrets: None,
     )
     monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: object())
+
+    async def fail_usage_refresh(self):
+        raise RuntimeError("usage refresh boom")
+
     monkeypatch.setattr(
         GuiController,
-        "_refresh_managed_trial_usage_state",
-        lambda self: (_ for _ in ()).throw(RuntimeError("usage refresh boom")),
+        "_fetch_managed_usage_metadata",
+        fail_usage_refresh,
     )
 
     await controller.set_translation_enabled(True)
@@ -2397,12 +2232,12 @@ async def test_set_translation_enabled_rebuild_path_turns_translation_back_off_w
     )
 
     metadata_responses = [
-        controller_module.OpenRouterKeyMetadata(
+        OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.05,
             usage_usd=0.02,
         ),
-        controller_module.OpenRouterKeyMetadata(
+        OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.0007,
             usage_usd=0.0693,
@@ -2513,142 +2348,15 @@ async def test_set_translation_enabled_keeps_managed_translation_disabled_on_ret
     assert dash.managed_trial_calls == []
 
 
-@pytest.mark.asyncio
-async def test_set_translation_enabled_shows_brake_snackbar_without_dashboard_trial_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    snackbar_calls: list[tuple[str, str]] = []
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(
-            _show_snackbar=lambda message, color: snackbar_calls.append((message, color)),
-            view_dashboard=dash,
-            view_settings=settings_view,
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-            message_key="managed_release.brake",
-            message_kwargs={"retry_after_ms": 5000},
-            diagnostics=ManagedOpenRouterReleaseDiagnostics(
-                operation="issue",
-                code="issuance_suspended",
-                error_class="retryable",
-                subcode="asn_fast_path",
-                retry_after_ms=5000,
-                message="new entitlement issuance is temporarily suspended",
-            ),
-            retry_after_ms=5000,
-        )
-    )
-
-    async def fail_fetch_key_metadata(_api_key: str):
-        raise AssertionError("fetch_key_metadata should not run without a managed key")
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fail_fetch_key_metadata),
-    )
-
-    await controller.set_translation_enabled(True)
-
-    assert controller._managed_openrouter_release_service.prepare_calls == 1
-    assert controller.hub.translation_enabled is False
-    assert dash.managed_auth_pending is False
-    assert dash.managed_trial_calls == []
-    assert dash.managed_trial_state is None
-    assert snackbar_calls == [(t("managed_release.brake"), ft.Colors.ORANGE_700)]
-    assert settings_view.managed_trial_usage_state == {
-        "visible": True,
-        "remaining_percent": None,
-    }
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_shows_revoked_snackbar_without_dashboard_trial_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    snackbar_calls: list[tuple[str, str]] = []
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(
-            _show_snackbar=lambda message, color: snackbar_calls.append((message, color)),
-            view_dashboard=dash,
-            view_settings=settings_view,
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.STOP,
-            message_key="managed_release.revoked_contact",
-            diagnostics=ManagedOpenRouterReleaseDiagnostics(
-                operation="issue",
-                code="trial_not_eligible",
-                error_class="terminal",
-                subcode=None,
-                retry_after_ms=None,
-                message="revoked by policy",
-            ),
-        )
-    )
-
-    async def fail_fetch_key_metadata(_api_key: str):
-        raise AssertionError("fetch_key_metadata should not run without a managed key")
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fail_fetch_key_metadata),
-    )
-
-    await controller.set_translation_enabled(True)
-
-    assert controller._managed_openrouter_release_service.prepare_calls == 1
-    assert controller.hub.translation_enabled is False
-    assert dash.managed_auth_pending is False
-    assert dash.managed_trial_calls == []
-    assert dash.managed_trial_state is None
-    assert snackbar_calls == [(t("managed_release.revoked_contact"), ft.Colors.ORANGE_700)]
-    assert settings_view.managed_trial_usage_state == {
-        "visible": True,
-        "remaining_percent": None,
-    }
-
-
 def test_on_managed_trial_delegate_ready_clears_dashboard_pending_notice() -> None:
     dash = DummyDashboard()
     controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
 
-    controller._managed_trial_pending_auth = True
-    controller._sync_managed_auth_dashboard_notice()
+    controller._get_managed_auth_owner().set_pending(True)
 
     controller._on_managed_trial_delegate_ready()
 
-    assert controller._managed_trial_pending_auth is False
+    assert controller.managed_auth_pending is False
     assert dash.managed_auth_pending is False
     assert dash.managed_auth_pending_calls == [True, False]
 
@@ -2672,16 +2380,17 @@ async def test_managed_trial_delegate_refresh_is_cancelled_by_managed_status_own
             raise
 
     monkeypatch.setattr(
-        GuiController,
-        "_refresh_managed_trial_usage_state_best_effort",
+        ManagedUsageOwner,
+        "refresh_best_effort",
         blocked_refresh,
     )
 
     controller._on_managed_trial_delegate_ready()
     await entered.wait()
 
-    owner = controller._managed_status_refresh_owner
-    assert owner is not None
+    managed_usage_owner = controller._managed_usage_owner
+    assert managed_usage_owner is not None
+    owner = managed_usage_owner.refresh_owner
     assert owner.active_task_names
     controller._freeze_application_ingress()
     await owner.close()
@@ -2708,25 +2417,6 @@ def test_application_ingress_freeze_is_terminal_for_late_work_owners() -> None:
     assert overlay_owner.accepting_ingress is False
     assert osc_owner.accepting_ingress is False
     assert mic_owner.accepting_ingress is False
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_false_clears_dashboard_managed_auth_pending() -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-
-    controller._managed_trial_pending_auth = True
-    controller._sync_managed_auth_dashboard_notice()
-
-    await controller.set_translation_enabled(False)
-
-    assert controller._managed_trial_pending_auth is False
-    assert dash.managed_auth_pending is False
-    assert dash.managed_auth_pending_calls == [True, False]
 
 
 @pytest.mark.asyncio
@@ -2763,8 +2453,8 @@ async def test_set_translation_enabled_off_wins_against_inflight_managed_enable(
         lambda *_args, **_kwargs: DummySecrets({}),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_schedule_managed_trial_usage_refresh",
+        ManagedUsageOwner,
+        "schedule_usage_refresh",
         lambda self: None,
     )
 
@@ -2774,7 +2464,7 @@ async def test_set_translation_enabled_off_wins_against_inflight_managed_enable(
     await controller.set_translation_enabled(False)
 
     assert controller.hub.translation_enabled is False
-    assert controller._managed_trial_pending_auth is False
+    assert controller.managed_auth_pending is False
     assert dash.managed_auth_pending is False
 
     release_prepare.set()
@@ -2783,130 +2473,10 @@ async def test_set_translation_enabled_off_wins_against_inflight_managed_enable(
     assert controller._managed_openrouter_release_service.prepare_calls == 1
     assert controller.hub.translation_enabled is False
     assert controller.hub.clear_context_calls == 1
-    assert controller._managed_trial_pending_auth is False
+    assert controller.managed_auth_pending is False
     assert dash.managed_auth_pending is False
     assert dash.managed_auth_pending_calls[:2] == [True, False]
     assert dash.managed_auth_pending_calls[-1] is False
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_off_wins_before_stale_ready_rebuild_side_effects(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=None)
-    prepare_started = asyncio.Event()
-    release_prepare = asyncio.Event()
-    rebuild_calls: list[str] = []
-
-    async def block_prepare() -> None:
-        prepare_started.set()
-        await release_prepare.wait()
-
-    async def fake_rebuild_llm_provider(self) -> None:
-        _ = self
-        rebuild_calls.append("rebuild")
-
-    controller._managed_openrouter_release_service = InspectingManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-            pending_issue=False,
-        ),
-        on_prepare=block_prepare,
-    )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-
-    enable_task = asyncio.create_task(controller.set_translation_enabled(True))
-    await prepare_started.wait()
-
-    await controller.set_translation_enabled(False)
-
-    release_prepare.set()
-    await enable_task
-
-    assert rebuild_calls == []
-    assert controller.hub.llm is None
-    assert controller.hub.translation_enabled is False
-    assert controller._managed_trial_pending_auth is False
-    assert dash.managed_auth_pending is False
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_off_wins_before_stale_retry_side_effects(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    snackbar_calls: list[tuple[str, str]] = []
-    dash = DummyDashboard()
-    controller = _make_controller(
-        app=SimpleNamespace(
-            _show_snackbar=lambda message, color: snackbar_calls.append((message, color)),
-            view_dashboard=dash,
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    prepare_started = asyncio.Event()
-    release_prepare = asyncio.Event()
-    refresh_calls: list[str] = []
-
-    async def block_prepare() -> None:
-        prepare_started.set()
-        await release_prepare.wait()
-
-    async def fake_refresh_managed_trial_usage_state(self) -> None:
-        _ = self
-        refresh_calls.append("refresh")
-
-    controller._managed_openrouter_release_service = InspectingManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-            message_key="managed_release.retry_after_ms",
-            message_kwargs={"retry_after_ms": 5000},
-        ),
-        on_prepare=block_prepare,
-    )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_refresh_managed_trial_usage_state",
-        fake_refresh_managed_trial_usage_state,
-    )
-
-    enable_task = asyncio.create_task(controller.set_translation_enabled(True))
-    await prepare_started.wait()
-
-    await controller.set_translation_enabled(False)
-
-    release_prepare.set()
-    await enable_task
-
-    assert controller.hub.translation_enabled is False
-    assert controller._managed_trial_pending_auth is False
-    assert dash.managed_auth_pending is False
-    assert dash.managed_trial_calls == []
-    assert dash.managed_trial_state is None
-    assert snackbar_calls == []
-    assert refresh_calls == []
 
 
 @pytest.mark.asyncio
@@ -2920,18 +2490,21 @@ async def test_apply_providers_clears_dashboard_pending_notice_when_switching_aw
     controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     controller.hub = DummyHub(llm=object())
 
-    controller._managed_trial_pending_auth = True
-    controller._sync_managed_auth_dashboard_notice()
+    controller._get_managed_auth_owner().set_pending(True)
 
     next_settings = AppSettings()
     next_settings.provider.llm = LLMProviderName.GEMINI
 
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner,
+        "rebuild",
+        lambda self: asyncio.sleep(0),
+    )
 
     await controller.apply_providers(next_settings)
 
-    assert controller._managed_trial_pending_auth is False
+    assert controller.managed_auth_pending is False
     assert dash.managed_auth_pending is False
     assert dash.managed_auth_pending_calls == [True, False]
 
@@ -3013,7 +2586,7 @@ async def test_set_translation_enabled_clears_dashboard_pending_notice_when_prep
     with pytest.raises(RuntimeError, match="boom"):
         await controller.set_translation_enabled(True)
 
-    assert controller._managed_trial_pending_auth is False
+    assert controller.managed_auth_pending is False
     assert dash.managed_auth_pending is False
     assert dash.managed_auth_pending_calls == [True, False]
 
@@ -3029,19 +2602,22 @@ async def test_apply_providers_resyncs_dashboard_pending_notice_when_staying_on_
     controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     controller.hub = DummyHub(llm=object())
 
-    controller._managed_trial_pending_auth = True
-    controller._sync_managed_auth_dashboard_notice()
+    controller._get_managed_auth_owner().set_pending(True)
 
     next_settings = AppSettings()
     next_settings.provider.llm = LLMProviderName.OPENROUTER
     next_settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner,
+        "rebuild",
+        lambda self: asyncio.sleep(0),
+    )
 
     await controller.apply_providers(next_settings)
 
-    assert controller._managed_trial_pending_auth is True
+    assert controller.managed_auth_pending is True
     assert dash.managed_auth_pending is True
     assert dash.managed_auth_pending_calls == [True, True]
 
@@ -3162,7 +2738,7 @@ def test_dashboard_trans_in_progress_managed_oauth_prevents_second_dialog(
     controller.settings.provider.llm = LLMProviderName.OPENROUTER
     controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     controller.hub = DummyHub(llm=object())
-    controller._managed_trial_pending_auth = True
+    controller._get_managed_auth_owner().set_pending(True)
     controller._managed_openrouter_release_service = DummyManagedReleaseService(
         ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,
@@ -3193,90 +2769,12 @@ def test_managed_connection_auth_settings_values_are_service_safe() -> None:
     settings = AppSettings()
     settings.secrets.backend = SecretsBackend.ENCRYPTED_FILE
 
-    values = controller_module._managed_connection_auth_settings_values(settings)
+    values = managed_auth_runtime_module._managed_connection_auth_settings_values(settings)
 
     assert managed_connection_auth._caller_settings_values_are_unsafe(
         legacy_settings_snapshot_values(settings)
     )
     assert not managed_connection_auth._caller_settings_values_are_unsafe(values)
-
-
-@pytest.mark.asyncio
-async def test_discord_managed_auth_fallback_blocks_existing_qq_claim_before_prepare(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    snackbars: list[tuple[str, object]] = []
-    saved_settings: list[AppSettings] = []
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=DummyDashboard(), _show_snackbar=lambda *args: snackbars.append(args)
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            local_key_available=True,
-        )
-    )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({"openrouter_managed_qq_api_key": "qq-key"}),
-    )
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, settings: saved_settings.append(copy.deepcopy(settings)),
-    )
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is False
-    assert controller._managed_openrouter_release_service.prepare_calls == 0
-    assert controller.settings.managed_identity.local_managed_claim_sources == ("qq",)
-    assert saved_settings[-1].managed_identity.local_managed_claim_sources == ("qq",)
-    assert snackbars[0][0] == t("discord_auth.error.already_claimed_qq")
-
-
-@pytest.mark.asyncio
-async def test_discord_managed_auth_fallback_records_discord_claim_after_ready(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    saved_settings: list[AppSettings] = []
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            local_key_available=True,
-        )
-    )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, settings: saved_settings.append(copy.deepcopy(settings)),
-    )
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is True
-    assert controller._managed_openrouter_release_service.prepare_calls == 1
-    assert controller.settings.managed_identity.local_managed_claim_sources == ("discord",)
-    assert saved_settings[-1].managed_identity.local_managed_claim_sources == ("discord",)
 
 
 @pytest.mark.asyncio
@@ -3310,17 +2808,19 @@ async def test_discord_managed_auth_transaction_rebuilds_existing_provider(
             diagnostics=None,
         )
 
-    async def fake_rebuild_llm_provider(self: GuiController) -> None:
+    async def fake_rebuild_llm_provider(_owner) -> None:
         rebuild_calls.append("rebuild")
-        assert self.hub is not None
-        self.hub.llm = object()
+        assert controller.hub is not None
+        controller.hub.llm = object()
 
     monkeypatch.setattr(
         controller_module, "create_secret_store", lambda *_args, **_kwargs: DummySecrets({})
     )
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(controller_module.ManagedConnectionAuthService, "authorize", fake_authorize)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(ManagedConnectionAuthService, "authorize", fake_authorize)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
 
     ok = await controller.start_discord_managed_auth_from_dialog()
 
@@ -3375,8 +2875,10 @@ async def test_discord_managed_auth_pending_ack_installs_runtime_settings_withou
         controller_module, "create_secret_store", lambda *_args, **_kwargs: DummySecrets({})
     )
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(controller_module.ManagedConnectionAuthService, "authorize", fake_authorize)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(ManagedConnectionAuthService, "authorize", fake_authorize)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
 
     ok = await controller.start_discord_managed_auth_from_dialog()
 
@@ -3408,11 +2910,13 @@ async def test_start_discord_managed_auth_from_dialog_success_rebuilds_missing_p
     )
     rebuild_calls: list[str] = []
 
-    async def fake_rebuild_llm_provider(self: GuiController) -> None:
+    async def fake_rebuild_llm_provider(_owner) -> None:
         rebuild_calls.append("rebuild")
-        self.hub.llm = object()
+        controller.hub.llm = object()
 
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
 
     ok = await controller.start_discord_managed_auth_from_dialog()
 
@@ -3540,8 +3044,8 @@ async def test_start_discord_managed_auth_from_dialog_updates_managed_key_referr
     )
     scheduled_refreshes: list[str] = []
     monkeypatch.setattr(
-        GuiController,
-        "_schedule_managed_trial_usage_refresh",
+        ManagedUsageOwner,
+        "schedule_usage_refresh",
         lambda self: scheduled_refreshes.append("usage"),
     )
 
@@ -3590,8 +3094,8 @@ async def test_start_discord_managed_auth_from_dialog_repaints_pass_status_immed
     )
     scheduled_refreshes: list[str] = []
     monkeypatch.setattr(
-        GuiController,
-        "_schedule_managed_trial_usage_refresh",
+        ManagedUsageOwner,
+        "schedule_usage_refresh",
         lambda self: scheduled_refreshes.append("usage"),
     )
 
@@ -3646,14 +3150,12 @@ async def test_start_discord_managed_auth_from_dialog_issue_success_does_not_rep
     controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     controller.settings.managed_identity.active_managed_credential_ref = "new-ref"
     controller.hub = DummyHub(llm=object())
-    controller._managed_trial_usage_metadata = (
-        controller_module.OpenRouterKeyMetadata(  # noqa: SLF001
-            limit_usd=0.10,
-            remaining_usd=0.02,
-            usage_usd=0.08,
-        )
+    controller._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
+        limit_usd=0.10,
+        remaining_usd=0.02,
+        usage_usd=0.08,
     )
-    controller._managed_trial_usage_metadata_entitlement_ref = "old-ref"  # noqa: SLF001
+    controller._get_managed_usage_owner().usage_metadata_entitlement_ref = "old-ref"
     controller._managed_openrouter_release_service = DummyManagedReleaseService(  # noqa: SLF001
         ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,
@@ -3665,8 +3167,8 @@ async def test_start_discord_managed_auth_from_dialog_issue_success_does_not_rep
     )
     scheduled_refreshes: list[str] = []
     monkeypatch.setattr(
-        GuiController,
-        "_schedule_managed_trial_usage_refresh",
+        ManagedUsageOwner,
+        "schedule_usage_refresh",
         lambda self: scheduled_refreshes.append("usage"),
     )
 
@@ -3687,46 +3189,11 @@ async def test_start_discord_managed_auth_from_dialog_issue_success_does_not_rep
 def test_discord_managed_auth_callback_received_runs_active_hook_only() -> None:
     calls: list[str] = []
     controller = _make_controller(app=SimpleNamespace())
-    controller._discord_managed_auth_callback_received_hook = lambda: calls.append("received")
+    controller._get_managed_auth_owner().callback_received_hook = lambda: calls.append("received")
 
     controller._on_discord_managed_auth_callback_received()
 
     assert calls == ["received"]
-
-
-@pytest.mark.asyncio
-async def test_start_discord_managed_auth_from_dialog_routes_callback_hook(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=None)
-    callback_calls: list[str] = []
-
-    async def fake_rebuild_llm_provider(self: GuiController) -> None:
-        self.hub.llm = object()
-
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-    controller._managed_openrouter_release_service = InspectingManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-        ),
-        on_prepare=controller._on_discord_managed_auth_callback_received,
-    )
-
-    ok = await controller.start_discord_managed_auth_from_dialog(
-        on_callback_received=lambda: callback_calls.append("received")
-    )
-
-    assert ok is True
-    assert callback_calls == ["received"]
-    assert controller._discord_managed_auth_callback_received_hook is None
 
 
 @pytest.mark.asyncio
@@ -3753,11 +3220,13 @@ async def test_start_discord_managed_auth_from_dialog_rebuild_failure_returns_fa
     )
     rebuild_calls: list[str] = []
 
-    async def fake_rebuild_llm_provider(self: GuiController) -> None:
+    async def fake_rebuild_llm_provider(_owner) -> None:
         rebuild_calls.append("rebuild")
-        self.hub.llm = None
+        controller.hub.llm = None
 
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
     monkeypatch.setattr(presentation_adapter_module, "t", lambda key, **_kwargs: key)
 
     ok = await controller.start_discord_managed_auth_from_dialog()
@@ -3766,77 +3235,6 @@ async def test_start_discord_managed_auth_from_dialog_rebuild_failure_returns_fa
     assert rebuild_calls == ["rebuild"]
     assert controller.hub.llm is None
     assert snackbar_calls == [("discord_auth.error.retry", ft.Colors.ORANGE_700)]
-
-
-@pytest.mark.asyncio
-async def test_start_discord_managed_auth_from_dialog_missing_service_shows_retry_message(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    snackbar_calls: list[tuple[str, str]] = []
-    controller = _make_controller(
-        app=SimpleNamespace(
-            _show_snackbar=lambda message, color: snackbar_calls.append((message, color))
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    monkeypatch.setattr(presentation_adapter_module, "t", lambda key, **_kwargs: key)
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is False
-    assert snackbar_calls == [("discord_auth.error.retry", ft.Colors.ORANGE_700)]
-
-
-@pytest.mark.parametrize(
-    ("subcode", "expected_key"),
-    [
-        ("discord_email_unverified", "discord_auth.error.email_unverified"),
-        ("discord_account_too_new", "discord_auth.error.account_too_new"),
-        ("discord_lifetime_used", "discord_auth.error.lifetime_used"),
-        ("hardware_duplicate", "discord_auth.error.hardware_duplicate"),
-        ("global_cap_reached", "discord_auth.error.daily_cap"),
-        ("oauth_session_expired", "discord_auth.error.expired"),
-        ("loopback_unavailable", "discord_auth.error.loopback_unavailable"),
-    ],
-)
-@pytest.mark.asyncio
-async def test_start_discord_managed_auth_from_dialog_maps_error_subcodes_to_messages(
-    monkeypatch: pytest.MonkeyPatch,
-    subcode: str,
-    expected_key: str,
-) -> None:
-    snackbar_calls: list[tuple[str, str]] = []
-    controller = _make_controller(
-        app=SimpleNamespace(
-            _show_snackbar=lambda message, color: snackbar_calls.append((message, color))
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-            message_key="managed_release.retry",
-            diagnostics=ManagedOpenRouterReleaseDiagnostics(
-                operation="discord_issue",
-                code="trial_not_eligible",
-                error_class="terminal",
-                subcode=subcode,
-                message="not eligible",
-            ),
-        )
-    )
-    monkeypatch.setattr(presentation_adapter_module, "t", lambda key, **_kwargs: key)
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is False
-    assert snackbar_calls == [(expected_key, ft.Colors.ORANGE_700)]
 
 
 @pytest.mark.asyncio
@@ -3881,18 +3279,19 @@ async def test_start_discord_managed_auth_from_dialog_does_not_log_raw_broker_di
 
 
 def test_discord_auth_message_key_falls_back_to_result_message_key() -> None:
-    controller = _make_controller(app=SimpleNamespace())
     result = ManagedOpenRouterReleaseResult(
         behavior=ManagedOpenRouterReleaseBehavior.RETRY,
         message_key="managed_release.retry_after_ms",
         message_kwargs={"retry_after_ms": 5000},
     )
 
-    assert controller._discord_auth_message_key(result) == "managed_release.retry_after_ms"
+    assert (
+        managed_auth_runtime_module._discord_auth_message_key(result)
+        == "managed_release.retry_after_ms"
+    )
 
 
 def test_discord_auth_message_key_maps_loopback_bind_failure_diagnostic() -> None:
-    controller = _make_controller(app=SimpleNamespace())
     result = ManagedOpenRouterReleaseResult(
         behavior=ManagedOpenRouterReleaseBehavior.RETRY,
         message_key="managed_release.retry",
@@ -3904,7 +3303,7 @@ def test_discord_auth_message_key_maps_loopback_bind_failure_diagnostic() -> Non
         ),
     )
 
-    assert controller._discord_auth_message_key(result) == (
+    assert managed_auth_runtime_module._discord_auth_message_key(result) == (
         "discord_auth.error.loopback_unavailable"
     )
 
@@ -13062,7 +12461,7 @@ async def test_exhausted_managed_start_does_not_auto_show_founder_letter(
     )
 
     async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
+        return OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.0007,
             usage_usd=0.0693,
@@ -13146,7 +12545,7 @@ def _install_managed_usage_metadata_stubs(monkeypatch: pytest.MonkeyPatch) -> No
             return None
 
     async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
+        return OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.05,
             usage_usd=0.02,
@@ -13208,7 +12607,7 @@ async def test_status_refresh_updates_pass_status_when_referral_id_is_unchanged(
         status_service=status_service,
     )
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
 
     await _wait_until(lambda: status_service.calls == 1)
     assert settings_view.managed_key_state_calls[-1] == {
@@ -13252,7 +12651,7 @@ async def test_status_refresh_skips_fallback_only_managed_branch(
         connection=TranslationConnection.MANAGED,
     )
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
 
     assert status_service.calls == 0
 
@@ -13274,15 +12673,15 @@ async def test_status_refresh_clears_pass_status_on_successful_absent_status(
         settings_view=settings_view,
         status_service=status_service,
     )
-    controller._talk_together_pass_status = TalkTogetherPassStatus(  # noqa: SLF001
+    controller._get_managed_usage_owner().pass_status = TalkTogetherPassStatus(
         pass_id="7KQ9M2",
         invite_count=2,
         invite_limit=5,
         bonus_translations_per_friend=200,
     )
-    controller._talk_together_pass_status_key = (None, None, "7KQ9M2")  # noqa: SLF001
+    controller._get_managed_usage_owner().pass_status_key = (None, None, "7KQ9M2")
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
 
     await _wait_until(lambda: status_service.calls == 1)
     assert settings_view.managed_key_state_calls[-1] == {
@@ -13316,10 +12715,10 @@ async def test_status_refresh_preserves_pass_status_on_network_failure(
         settings_view=settings_view,
         status_service=status_service,
     )
-    controller._talk_together_pass_status = cached_pass_status  # noqa: SLF001
-    controller._talk_together_pass_status_key = (None, None, "7KQ9M2")  # noqa: SLF001
+    controller._get_managed_usage_owner().pass_status = cached_pass_status
+    controller._get_managed_usage_owner().pass_status_key = (None, None, "7KQ9M2")
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
 
     await _wait_until(lambda: status_service.calls == 1)
     assert settings_view.managed_key_state_calls[-1] == {
@@ -13327,38 +12726,6 @@ async def test_status_refresh_preserves_pass_status_on_network_failure(
         "remaining_percent": 71,
         "referral_id": "7KQ9M2",
         "pass_status": cached_pass_status,
-    }
-
-
-def test_managed_usage_view_state_clears_pass_status_when_identity_key_changes() -> None:
-    settings_view = CapturingManagedKeySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.managed_identity.referral_id = "7KQ9M2"
-    controller.settings.managed_identity.active_managed_credential_ref = "new-ref"
-    controller._talk_together_pass_status = TalkTogetherPassStatus(  # noqa: SLF001
-        pass_id="7KQ9M2",
-        invite_count=2,
-        invite_limit=5,
-        bonus_translations_per_friend=200,
-    )
-    controller._talk_together_pass_status_key = (None, "old-ref", "7KQ9M2")  # noqa: SLF001
-
-    controller._set_managed_usage_view_state(  # noqa: SLF001
-        visible=True,
-        remaining_percent=71,
-        referral_id="7KQ9M2",
-    )
-
-    assert settings_view.managed_key_state_calls[-1] == {
-        "visible": True,
-        "remaining_percent": 71,
-        "referral_id": "7KQ9M2",
-        "pass_status": None,
     }
 
 
@@ -13400,20 +12767,21 @@ async def test_status_refresh_drops_stale_pass_status_when_identity_scope_change
     )
     controller.settings.managed_identity.active_managed_credential_ref = "old-ref"
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
     await asyncio.wait_for(status_service.started.wait(), timeout=1.0)
 
     controller.settings.managed_identity.active_managed_credential_ref = "new-ref"
     status_service.release.set()
     await asyncio.wait_for(status_service.finished.wait(), timeout=1.0)
-    owner = controller._managed_status_refresh_owner
-    assert owner is not None
+    managed_usage_owner = controller._managed_usage_owner
+    assert managed_usage_owner is not None
+    owner = managed_usage_owner.refresh_owner
     await _wait_until(lambda: not owner.active_task_names)
 
     assert status_service.calls == 1
     assert settings_view.managed_key_state_calls
     assert settings_view.managed_key_state_calls[-1]["pass_status"] is None
-    assert controller._talk_together_pass_status is None  # noqa: SLF001
+    assert controller._get_managed_usage_owner().pass_status is None
 
 
 def test_status_refresh_managed_key_setter_type_error_is_not_masked() -> None:
@@ -13444,7 +12812,7 @@ def test_status_refresh_managed_key_setter_type_error_is_not_masked() -> None:
     controller.settings.managed_identity.referral_id = "7KQ9M2"
 
     with pytest.raises(TypeError, match="pass_status setter internals failed"):
-        controller._set_managed_usage_view_state(  # noqa: SLF001
+        controller._get_managed_usage_owner().set_view_state(
             visible=True,
             remaining_percent=71,
             referral_id="7KQ9M2",
@@ -13474,7 +12842,7 @@ async def test_refresh_managed_trial_usage_state_uses_settings_view_live_openrou
             return None
 
     async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
+        return OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.05,
             usage_usd=0.02,
@@ -13491,7 +12859,7 @@ async def test_refresh_managed_trial_usage_state_uses_settings_view_live_openrou
         staticmethod(fake_fetch_key_metadata),
     )
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
 
     assert settings_view.managed_trial_usage_state == {
         "visible": True,
@@ -13554,7 +12922,7 @@ async def test_refresh_managed_trial_usage_state_exposes_refreshed_referral_id_t
             return None
 
     async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
+        return OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.05,
             usage_usd=0.02,
@@ -13571,7 +12939,7 @@ async def test_refresh_managed_trial_usage_state_exposes_refreshed_referral_id_t
         staticmethod(fake_fetch_key_metadata),
     )
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
 
     await _wait_until(lambda: status_service.calls == 1)
     assert status_service.calls == 1
@@ -13642,7 +13010,7 @@ async def test_refresh_managed_trial_usage_state_preserves_known_referral_id_whe
             return None
 
     async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
+        return OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.05,
             usage_usd=0.02,
@@ -13659,7 +13027,7 @@ async def test_refresh_managed_trial_usage_state_preserves_known_referral_id_whe
         staticmethod(fake_fetch_key_metadata),
     )
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
 
     await _wait_until(lambda: status_service.calls == 1)
     assert status_service.calls == 1
@@ -13715,7 +13083,7 @@ async def test_refresh_managed_trial_usage_state_hides_referral_card_when_openro
     controller.settings.managed_identity.referral_id = "7KQ9M2"
     controller.hub = DummyHub(llm=object())
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
 
     assert settings_view.managed_key_state_calls == [
         {
@@ -13778,7 +13146,7 @@ async def test_refresh_managed_trial_usage_state_hides_card_when_connection_is_o
         lambda *_args, **_kwargs: EmptySecrets(),
     )
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
 
     assert settings_view.managed_key_state_calls == [
         {
@@ -13844,7 +13212,7 @@ async def test_status_refresh_background_view_update_error_is_logged_not_left_on
     )
 
     async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
+        return OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.05,
             usage_usd=0.02,
@@ -13856,10 +13224,11 @@ async def test_status_refresh_background_view_update_error_is_logged_not_left_on
         staticmethod(fake_fetch_key_metadata),
     )
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
     await _wait_until(lambda: bool(log_messages))
-    owner = controller._managed_status_refresh_owner
-    assert owner is not None
+    managed_usage_owner = controller._managed_usage_owner
+    assert managed_usage_owner is not None
+    owner = managed_usage_owner.refresh_owner
     await _wait_until(lambda: not owner.active_task_names)
 
     assert owner.active_task_names == ()
@@ -13872,7 +13241,7 @@ async def test_status_refresh_background_view_update_error_is_logged_not_left_on
 
 
 @pytest.mark.asyncio
-async def test_refresh_managed_trial_usage_state_runs_exhaustion_side_effects_before_slow_status(
+async def test_managed_usage_owner_founder_route_does_not_wait_for_slow_status(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     shown: list[str] = []
@@ -13913,7 +13282,7 @@ async def test_refresh_managed_trial_usage_state_runs_exhaustion_side_effects_be
     )
 
     async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
+        return OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.0007,
             usage_usd=0.0693,
@@ -13925,72 +13294,9 @@ async def test_refresh_managed_trial_usage_state_runs_exhaustion_side_effects_be
         staticmethod(fake_fetch_key_metadata),
     )
 
-    refresh_task = asyncio.create_task(controller._refresh_managed_trial_usage_state())
-    try:
-        await asyncio.wait_for(status_service.started.wait(), timeout=1.0)
-
-        assert shown == ["shown"]
-    finally:
-        status_service.release.set()
-        await asyncio.wait_for(status_service.finished.wait(), timeout=1.0)
-        await refresh_task
-
-
-@pytest.mark.asyncio
-async def test_should_route_managed_trans_to_founder_letter_does_not_wait_for_slow_status(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    shown: list[str] = []
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=dash,
-            view_settings=settings_view,
-            show_founder_letter_dialog=lambda: shown.append("shown"),
-        )
+    route_task = asyncio.create_task(
+        controller._get_managed_usage_owner().should_route_to_founder_letter()
     )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.managed_identity.active_managed_credential_ref = "hash_123"
-    controller.hub = DummyHub(llm=object())
-
-    class SlowStatusRefreshService:
-        def __init__(self) -> None:
-            self.started = asyncio.Event()
-            self.release = asyncio.Event()
-            self.finished = asyncio.Event()
-
-        async def refresh_owned_referral_id_from_status(self) -> str | None:
-            self.started.set()
-            await self.release.wait()
-            self.finished.set()
-            return None
-
-    status_service = SlowStatusRefreshService()
-    controller._managed_openrouter_release_service = status_service  # noqa: SLF001
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_a, **_k: DummySecrets({"openrouter_managed_api_key": "managed-key"}),
-    )
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.0007,
-            usage_usd=0.0693,
-        )
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    route_task = asyncio.create_task(controller._should_route_managed_trans_to_founder_letter())
     try:
         await asyncio.wait_for(status_service.started.wait(), timeout=1.0)
 
@@ -14004,163 +13310,6 @@ async def test_should_route_managed_trans_to_founder_letter_does_not_wait_for_sl
             route_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await route_task
-
-
-@pytest.mark.asyncio
-async def test_refresh_managed_trial_usage_state_computes_remaining_percent_without_usage_usd(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-
-    class DummySecretsForTrial:
-        def get(self, key: str) -> str | None:
-            if key == "openrouter_managed_api_key":
-                return "managed-key"
-            return None
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.05,
-            usage_usd=None,
-        )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecretsForTrial(),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller._refresh_managed_trial_usage_state()
-
-    assert settings_view.managed_trial_usage_state == {
-        "visible": True,
-        "remaining_percent": 71,
-    }
-    assert dash.managed_trial_calls == []
-
-
-@pytest.mark.asyncio
-async def test_refresh_managed_trial_usage_state_marks_usage_unavailable_when_metadata_missing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-
-    class DummySecretsForTrial:
-        def get(self, key: str) -> str | None:
-            if key == "openrouter_managed_api_key":
-                return "managed-key"
-            return None
-
-    metadata_responses = [
-        controller_module.OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.05,
-            usage_usd=0.02,
-        ),
-        None,
-    ]
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return metadata_responses.pop(0)
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecretsForTrial(),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller._refresh_managed_trial_usage_state()
-    await controller._refresh_managed_trial_usage_state()
-
-    assert settings_view.managed_trial_usage_state == {
-        "visible": True,
-        "remaining_percent": None,
-    }
-    assert dash.managed_trial_calls == []
-
-
-@pytest.mark.asyncio
-async def test_refresh_managed_trial_usage_state_marks_usage_unavailable_when_limit_or_remaining_is_missing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-
-    class DummySecretsForTrial:
-        def get(self, key: str) -> str | None:
-            if key == "openrouter_managed_api_key":
-                return "managed-key"
-            return None
-
-    metadata_responses = [
-        controller_module.OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.05,
-            usage_usd=0.02,
-        ),
-        controller_module.OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=None,
-            usage_usd=0.02,
-        ),
-    ]
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return metadata_responses.pop(0)
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecretsForTrial(),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller._refresh_managed_trial_usage_state()
-    await controller._refresh_managed_trial_usage_state()
-
-    assert settings_view.managed_trial_usage_state == {
-        "visible": True,
-        "remaining_percent": None,
-    }
-    assert dash.managed_trial_calls == []
 
 
 @pytest.mark.asyncio
@@ -14189,7 +13338,7 @@ async def test_refresh_managed_trial_usage_state_auto_shows_founder_letter_once(
     )
 
     async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
+        return OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.0007,
             usage_usd=0.0693,
@@ -14201,8 +13350,8 @@ async def test_refresh_managed_trial_usage_state_auto_shows_founder_letter_once(
         staticmethod(fake_fetch_key_metadata),
     )
 
-    await controller._refresh_managed_trial_usage_state()
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
 
     assert shown == ["shown"]
 
@@ -14230,7 +13379,7 @@ async def test_set_translation_enabled_reopens_founder_letter_on_exhausted_manag
     )
 
     async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
+        return OpenRouterKeyMetadata(
             limit_usd=0.07,
             remaining_usd=0.0007,
             usage_usd=0.0693,
@@ -14246,61 +13395,6 @@ async def test_set_translation_enabled_reopens_founder_letter_on_exhausted_manag
 
     assert shown == ["shown"]
     assert controller.hub.translation_enabled is False
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_exhausted_managed_does_not_prepare_release_service(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=DummyDashboard(),
-            view_settings=DummySettingsView(),
-            show_founder_letter_dialog=lambda: None,
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_a, **_k: DummySecrets({"openrouter_managed_api_key": "managed-key"}),
-    )
-
-    class DummyService:
-        def __init__(self) -> None:
-            self.calls = 0
-
-        async def prepare_for_translation(self):
-            self.calls += 1
-            return ManagedOpenRouterReleaseResult(
-                behavior=ManagedOpenRouterReleaseBehavior.READY,
-                message_key="managed_release.ready",
-                api_key="managed-key",
-                local_key_available=True,
-            )
-
-    service = DummyService()
-    controller._managed_openrouter_release_service = service
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return controller_module.OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.0007,
-            usage_usd=0.0693,
-        )
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller.set_translation_enabled(True)
-
-    assert service.calls == 0
 
 
 @pytest.mark.asyncio
@@ -14332,7 +13426,7 @@ async def test_set_translation_enabled_does_not_route_stale_exhausted_metadata_a
         nonlocal metadata_calls
         metadata_calls += 1
         if metadata_calls == 1:
-            return controller_module.OpenRouterKeyMetadata(
+            return OpenRouterKeyMetadata(
                 limit_usd=0.07,
                 remaining_usd=0.0007,
                 usage_usd=0.0693,
@@ -14345,7 +13439,7 @@ async def test_set_translation_enabled_does_not_route_stale_exhausted_metadata_a
         staticmethod(fake_fetch_key_metadata),
     )
 
-    await controller._refresh_managed_trial_usage_state()
+    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
     assert shown == ["shown"]
 
     shown.clear()
@@ -14366,45 +13460,13 @@ async def test_set_translation_enabled_does_not_route_stale_exhausted_metadata_a
 
     service = DummyService()
     controller._managed_openrouter_release_service = service
-    monkeypatch.setattr(GuiController, "_schedule_managed_trial_usage_refresh", lambda self: None)
+    monkeypatch.setattr(ManagedUsageOwner, "schedule_usage_refresh", lambda self: None)
 
     await controller.set_translation_enabled(True)
 
     assert shown == []
     assert service.calls == 1
     assert controller.hub.translation_enabled is True
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_returns_when_hub_missing() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-
-    await controller.set_translation_enabled(True)
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_logs_non_qwen_provider() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.GEMINI
-    controller.hub = DummyHub(llm=object())
-
-    await controller.set_translation_enabled(True)
-
-    assert controller.hub.translation_enabled is True
-    assert controller.hub.clear_context_calls == 1
-    assert controller._runtime_logging.basic_messages == [
-        (logging.INFO, "[Translation] Toggle request: enabled=True"),
-        (logging.INFO, "[Translation] Enabled with provider: gemini"),
-    ]
-    assert controller._runtime_logging.detailed_messages == [
-        (
-            logging.INFO,
-            "[Translation] Toggle detail: current_enabled=True llm_available=True",
-        )
-    ]
 
 
 @pytest.mark.asyncio
@@ -15349,59 +14411,6 @@ async def test_mixed_order22_order23_order24_apply_settings_routes_each_before_d
 
 
 @pytest.mark.asyncio
-async def test_apply_providers_routes_prompt_only_changes_through_order24_service(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings_mutation_service = RecordingSettingsMutationService()
-    direct_saves: list[str] = []
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: direct_saves.append("save"))
-
-    pending = copy.deepcopy(controller.settings)
-    pending.system_prompt = "settings tab prompt"
-
-    await controller.apply_providers(pending)
-
-    service = controller.settings_mutation_service
-    assert service is not None
-    assert [request.reason for request in service.requests] == [
-        settings_mutation.SETTINGS_MUTATION_SURFACE_UI_PROMPT_CLIPBOARD_STATE
-    ]
-    assert service.requests[0].values == {"system_prompt": "settings tab prompt"}
-    assert controller.settings is not None
-    assert controller.settings.system_prompt == "settings tab prompt"
-    assert direct_saves == []
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_routes_provider_and_prompt_changes_as_order21_then_order24(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings_mutation_service = RecordingSettingsMutationService()
-    direct_saves: list[str] = []
-    monkeypatch.setattr(GuiController, "_save_settings", lambda self: direct_saves.append("save"))
-
-    pending = copy.deepcopy(controller.settings)
-    pending.llm.concurrency_limit = 3
-    pending.system_prompt = "provider prompt"
-
-    await controller.apply_providers(pending)
-
-    service = controller.settings_mutation_service
-    assert service is not None
-    assert [request.reason for request in service.requests] == [
-        settings_mutation.SETTINGS_MUTATION_SURFACE_TRANSLATION_PROVIDER,
-        settings_mutation.SETTINGS_MUTATION_SURFACE_UI_PROMPT_CLIPBOARD_STATE,
-    ]
-    assert service.requests[0].values == {"llm.concurrency_limit": 3}
-    assert service.requests[1].values == {"system_prompt": "provider prompt"}
-    assert direct_saves == []
-
-
-@pytest.mark.asyncio
 async def test_github_star_prompt_click_persistence_routes_through_order24_service(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -15568,7 +14577,9 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
     )
     monkeypatch.setattr(presentation_adapter_module, "get_ui_locale", lambda: "en")
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
     monkeypatch.setattr(
         GuiController,
         "_configure_vrc_mic_receiver",
@@ -16004,16 +15015,18 @@ async def test_connect_openrouter_via_pkce_stores_key_sets_alias_and_marks_verif
     applied_plans: list[object] = []
 
     async def fake_apply_provider_runtime_plan(
-        self,
+        _owner,
         settings: AppSettings,
         plan: object,
     ) -> None:
         _ = plan
-        self.settings = settings
+        controller.settings = settings
         applied_plans.append(copy.deepcopy(settings))
 
     monkeypatch.setattr(
-        GuiController, "_apply_provider_runtime_plan", fake_apply_provider_runtime_plan
+        provider_runtime_apply_module.ProviderRuntimeOwner,
+        "apply",
+        fake_apply_provider_runtime_plan,
     )
 
     ok = await controller.connect_openrouter_via_pkce(
@@ -16317,16 +15330,18 @@ async def test_connect_openrouter_via_pkce_returns_degraded_on_runtime_apply_fai
     )
 
     async def fake_apply_provider_runtime_plan(
-        self,
+        _owner,
         settings: AppSettings,
         plan: object,
     ) -> None:
         _ = plan
-        self.settings = copy.deepcopy(settings)
+        controller.settings = copy.deepcopy(settings)
         raise RuntimeError("apply failed after mutation")
 
     monkeypatch.setattr(
-        GuiController, "_apply_provider_runtime_plan", fake_apply_provider_runtime_plan
+        provider_runtime_apply_module.ProviderRuntimeOwner,
+        "apply",
+        fake_apply_provider_runtime_plan,
     )
 
     ok = await controller.connect_openrouter_via_pkce(
@@ -16516,295 +15531,6 @@ def test_peer_auto_mode_falls_back_to_manual_without_replacing_saved_language() 
 
 
 @pytest.mark.asyncio
-async def test_apply_providers_routes_translation_provider_patch_through_settings_service(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.GEMINI
-    controller.settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_31_FLASH_LITE,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-        connection_history={
-            TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.OFFICIAL_BYOK,
-        },
-    )
-    service = RecordingSettingsMutationService()
-    controller.settings_mutation_service = service
-
-    pending = copy.deepcopy(controller.settings)
-    pending.provider.llm = LLMProviderName.OPENROUTER
-    pending.translation = TranslationSettings(
-        model=TranslationModel.GEMMA4,
-        connection=TranslationConnection.OPENROUTER,
-        connection_history={
-            TranslationModel.GEMINI_31_FLASH_LITE.value: TranslationConnection.OFFICIAL_BYOK,
-            TranslationModel.GEMMA4.value: TranslationConnection.OPENROUTER,
-        },
-    )
-    pending.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    pending.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    pending.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.OPENROUTER,
-    )
-
-    def fail_direct_save(*_args, **_kwargs) -> None:
-        raise AssertionError("direct save should not persist routed translation/provider settings")
-
-    _patch_settings_save(monkeypatch, fail_direct_save)
-
-    await controller.apply_providers(pending)
-
-    assert len(service.requests) == 1
-    request = service.requests[0]
-    assert request.reason == settings_mutation.SETTINGS_MUTATION_SURFACE_TRANSLATION_PROVIDER
-    assert request.values["provider.llm"] == LLMProviderName.OPENROUTER
-    assert request.values["translation.model"] == TranslationModel.GEMMA4
-    assert request.values["translation.connection"] == TranslationConnection.OPENROUTER
-    assert request.values["openrouter.selected_source"] == OpenRouterCredentialSource.BYOK
-    assert request.values["openrouter.selection_alias"] == OpenRouterSelectionAlias.GEMMA4_BYOK
-    assert request.values["translation.fallback"] == TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.OPENROUTER,
-    )
-    assert "provider.stt" not in request.values
-    assert "stt.low_latency_mode" not in request.values
-    assert controller.settings.provider.llm == LLMProviderName.OPENROUTER
-    assert controller.settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_surfaces_degraded_service_result_without_rollback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    degraded_result = messages.TransactionResult(
-        status=messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
-        message=messages.UserMessageRef(
-            key="settings.mutation.runtime_apply_failed",
-            params={"phase": "runtime_apply"},
-            severity=messages.SEVERITY_WARNING,
-        ),
-        diagnostics=messages.ErrorDiagnostics(
-            component="settings_mutation",
-            operation="runtime_apply",
-            code="runtime_failed",
-            category=messages.DIAGNOSTIC_CATEGORY_LIFECYCLE,
-            visibility=messages.DIAGNOSTIC_VISIBILITY_BASIC,
-            content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
-            status_code=None,
-            retry_after_ms=None,
-            fields={"surface": "translation_provider"},
-        ),
-    )
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.translation.fallback = TranslationFallbackSettings(enabled=False)
-    controller.settings_mutation_service = RecordingSettingsMutationService(degraded_result)
-
-    pending = copy.deepcopy(controller.settings)
-    pending.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.GEMMA4_31B_CEREBRAS,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-    )
-
-    def fail_direct_save(*_args, **_kwargs) -> None:
-        raise AssertionError("direct save should not run after routed service commit")
-
-    _patch_settings_save(monkeypatch, fail_direct_save)
-
-    await controller.apply_providers(pending)
-
-    assert controller.last_settings_mutation_result == degraded_result
-    assert controller.settings.translation.fallback == TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.GEMMA4_31B_CEREBRAS,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-    )
-    assert degraded_result.message.key == "settings.mutation.runtime_apply_failed"
-    assert "runtime_failed" in repr(controller.last_settings_mutation_result)
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_routes_local_llm_endpoint_config_through_settings_service(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.LOCAL_LLM
-    controller.settings.translation = TranslationSettings(
-        model=TranslationModel.LOCAL_LLM,
-        connection=TranslationConnection.OLLAMA,
-        connection_history={TranslationModel.LOCAL_LLM.value: TranslationConnection.OLLAMA},
-    )
-    service = RecordingSettingsMutationService()
-    controller.settings_mutation_service = service
-
-    pending = copy.deepcopy(controller.settings)
-    pending.local_llm.base_url = "http://127.0.0.1:8080/v1"
-    pending.local_llm.model = "llama3.3:70b"
-    pending.local_llm.extra_body = {"reasoning_effort": "low", "temperature": 0.2}
-
-    def fail_direct_save(*_args, **_kwargs) -> None:
-        raise AssertionError("direct save should not persist routed local LLM settings")
-
-    _patch_settings_save(monkeypatch, fail_direct_save)
-
-    await controller.apply_providers(pending)
-
-    assert len(service.requests) == 1
-    request = service.requests[0]
-    assert request.values["local_llm.base_url"] == "http://127.0.0.1:8080/v1"
-    assert request.values["local_llm.model"] == "llama3.3:70b"
-    assert request.values["local_llm.extra_body"] == {
-        "reasoning_effort": "low",
-        "temperature": 0.2,
-    }
-    assert "secrets.local_llm_api_key" not in request.values
-    assert controller.settings.local_llm.base_url == "http://127.0.0.1:8080/v1"
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_routes_stt_provider_patch_through_order22_settings_service(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
-    service = RecordingSettingsMutationService()
-    controller.settings_mutation_service = service
-
-    pending = copy.deepcopy(controller.settings)
-    pending.provider.stt = STTProviderName.SONIOX
-
-    def fail_direct_save(*_args, **_kwargs) -> None:
-        raise AssertionError("direct save should not persist routed STT provider settings")
-
-    _patch_settings_save(monkeypatch, fail_direct_save)
-
-    await controller.apply_providers(pending)
-
-    assert len(service.requests) == 1
-    request = service.requests[0]
-    assert request.reason == settings_mutation.SETTINGS_MUTATION_SURFACE_STT_LANGUAGE_AUDIO
-    assert request.values == {"provider.stt": STTProviderName.SONIOX}
-    assert "provider.llm" not in request.values
-    assert "translation.model" not in request.values
-    assert controller.settings.provider.stt == STTProviderName.SONIOX
-
-
-@pytest.mark.asyncio
-async def test_order21_snapshot_full_default_service_runtime_adapter_receives_committed_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.languages.source_language = "ja"
-    controller.settings.languages.target_language = "en"
-    controller.settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
-    pending = copy.deepcopy(controller.settings)
-    pending.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.OPENROUTER,
-    )
-    runtime_snapshots: list[object] = []
-
-    async def capture_apply_runtime(self, request) -> messages.RuntimeApplyResult:
-        _ = self
-        runtime_snapshots.append(request.settings_values)
-        return messages.RuntimeApplyResult(
-            status=messages.RUNTIME_APPLY_STATUS_APPLIED,
-            message=None,
-            diagnostics=None,
-        )
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        provider_runtime_apply_module._ControllerProviderRuntimeApply,
-        "apply_runtime",
-        capture_apply_runtime,
-    )
-
-    await controller.apply_providers(pending)
-
-    assert len(runtime_snapshots) == 1
-    values = runtime_snapshots[0]
-    assert "openrouter.fallback_selection_alias" not in values
-    assert values["provider"]["llm"] == LLMProviderName.OPENROUTER.value
-    assert values["languages"]["source_language"] == "ja"
-    assert values["languages"]["target_language"] == "en"
-    assert values["openrouter"]["fallback_selection_alias"] == (
-        OpenRouterFallbackSelectionAlias.NONE.value
-    )
-    assert values["translation"]["fallback"] == {
-        "enabled": True,
-        "model": TranslationModel.DEEPSEEK_V4_FLASH.value,
-        "connection": TranslationConnection.OPENROUTER.value,
-    }
-    assert values["llm"]["concurrency_limit"] == pending.llm.concurrency_limit
-
-
-@pytest.mark.asyncio
-async def test_order21_snapshot_full_repository_save_offloads_persistence_thread(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    committed = AppSettings()
-    committed.provider.llm = LLMProviderName.OPENROUTER
-    committed.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.OPENROUTER,
-    )
-    event_loop_thread_id = threading.get_ident()
-    save_thread_ids: list[int] = []
-
-    def record_save_thread(*_args, **_kwargs) -> None:
-        save_thread_ids.append(threading.get_ident())
-
-    _patch_settings_save(monkeypatch, record_save_thread)
-    repository = controller._legacy_settings_patch_repository(
-        committed_settings=committed,
-    )
-
-    result = await repository.save(
-        SettingsCommitRequest(
-            values={
-                "provider.llm": LLMProviderName.OPENROUTER,
-                "translation.fallback": {
-                    "enabled": True,
-                    "model": TranslationModel.DEEPSEEK_V4_FLASH.value,
-                    "connection": TranslationConnection.OPENROUTER.value,
-                },
-            },
-            expected_revision=None,
-            reason=settings_mutation.SETTINGS_MUTATION_SURFACE_TRANSLATION_PROVIDER,
-        )
-    )
-
-    assert result.succeeded is True
-    assert save_thread_ids and save_thread_ids[0] != event_loop_thread_id
-    assert result.snapshot is not None
-    assert "openrouter.fallback_selection_alias" not in result.snapshot.values
-    assert result.snapshot.values["provider"]["llm"] == LLMProviderName.OPENROUTER.value
-    assert (
-        result.snapshot.values["openrouter"]["fallback_selection_alias"]
-        == OpenRouterFallbackSelectionAlias.NONE.value
-    )
-    assert result.snapshot.values["translation"]["fallback"] == {
-        "enabled": True,
-        "model": TranslationModel.DEEPSEEK_V4_FLASH.value,
-        "connection": TranslationConnection.OPENROUTER.value,
-    }
-
-
-@pytest.mark.asyncio
 async def test_order21_validation_failure_does_not_leak_rejected_canonical_state(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -16825,7 +15551,7 @@ async def test_order21_validation_failure_does_not_leak_rejected_canonical_state
             )
 
     monkeypatch.setattr(
-        controller_module,
+        provider_settings_module,
         "settings_path_mutation_validator_for_command",
         lambda _command: RejectingValidator(),
     )
@@ -16866,7 +15592,11 @@ async def test_order21_plan_failure_does_not_leak_rejected_canonical_state(
     def fail_plan(*_args, **_kwargs):
         raise RuntimeError("injected provider plan failure")
 
-    monkeypatch.setattr(GuiController, "_build_provider_runtime_apply_plan", fail_plan)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.ProviderRuntimeOwner,
+        "build_plan",
+        fail_plan,
+    )
 
     with pytest.raises(RuntimeError, match="injected provider plan failure"):
         await controller.apply_providers(pending)
@@ -16925,70 +15655,6 @@ async def test_managed_auth_repository_persists_pending_delivery_ack_patch(
     assert saved[0].managed_identity.pending_delivery_ack_delivery_id == "delivery-1"
     assert saved[0].managed_identity.pending_delivery_ack_managed_credential_ref == "managed-ref-1"
     assert "delivery_ack_token" not in repr(result.snapshot.values if result.snapshot else {})
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_provider_unavailable_default_service_degrades_without_rollback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.GEMINI
-    controller.hub = DummyHub(llm=object())
-    controller._last_self_stt_provider_signature = controller._build_self_stt_provider_signature(
-        controller.settings
-    )
-    controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
-        controller.settings
-    )
-    controller._last_llm_provider_signature = controller._build_llm_provider_signature(
-        controller.settings
-    )
-    pending = copy.deepcopy(controller.settings)
-    pending.provider.llm = LLMProviderName.OPENROUTER
-    pending.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    pending.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    saved_settings: list[AppSettings] = []
-
-    def record_saved_settings(_path, settings) -> None:
-        saved_settings.append(copy.deepcopy(settings))
-
-    def fail_create_llm_provider(*_args, **_kwargs) -> object:
-        raise RuntimeError("provider unavailable secret-token-must-not-leak")
-
-    _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(
-        controller_module, "create_secret_store", lambda *_args, **_kwargs: DummySecrets({})
-    )
-    monkeypatch.setattr(controller_module, "create_llm_provider", fail_create_llm_provider)
-
-    applied = await controller.apply_providers(pending)
-
-    result = controller.last_settings_mutation_result
-    assert applied is True
-    assert result is not None
-    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-    assert result.message == messages.UserMessageRef(
-        key="settings.mutation.runtime_apply_failed",
-        params={"phase": "runtime_apply"},
-        severity=messages.SEVERITY_WARNING,
-    )
-    assert result.diagnostics == messages.ErrorDiagnostics(
-        component="gui_controller",
-        operation="apply_provider_runtime",
-        code="provider_runtime_apply_unavailable",
-        category=messages.DIAGNOSTIC_CATEGORY_LIFECYCLE,
-        visibility=messages.DIAGNOSTIC_VISIBILITY_BASIC,
-        content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
-        status_code=None,
-        retry_after_ms=None,
-        fields={"surface": "translation_provider"},
-    )
-    assert "secret-token-must-not-leak" not in repr(result)
-    assert len(saved_settings) == 1
-    assert saved_settings[0].provider.llm == LLMProviderName.OPENROUTER
-    assert controller.settings.provider.llm == LLMProviderName.OPENROUTER
-    assert controller.hub.llm is None
 
 
 @pytest.mark.asyncio
@@ -17103,40 +15769,6 @@ async def test_apply_providers_force_rebuild_failed_signature_uses_miss_sentinel
 
 
 @pytest.mark.asyncio
-async def test_apply_providers_concurrency_limit_rebuilds_llm_runtime_through_default_service(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.GEMINI
-    controller.hub = DummyHub()
-    controller._last_self_stt_provider_signature = controller._build_self_stt_provider_signature(
-        controller.settings
-    )
-    controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
-        controller.settings
-    )
-    controller._last_llm_provider_signature = controller._build_llm_provider_signature(
-        controller.settings
-    )
-    pending = copy.deepcopy(controller.settings)
-    pending.llm.concurrency_limit = controller.settings.llm.concurrency_limit + 2
-    calls: list[str] = []
-
-    async def fake_rebuild_llm_provider(self) -> None:
-        _ = self
-        calls.append("llm")
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-
-    await controller.apply_providers(pending)
-
-    assert controller.settings.llm.concurrency_limit == pending.llm.concurrency_limit
-    assert calls == ["llm"]
-
-
-@pytest.mark.asyncio
 async def test_apply_providers_broker_base_url_rebuilds_managed_broker_service(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -17202,51 +15834,6 @@ def test_create_managed_openrouter_release_service_skips_managed_fallback_branch
     service = controller._create_managed_openrouter_release_service(secrets=DummySecrets({}))
 
     assert service is None
-
-
-@pytest.mark.asyncio
-async def test_handle_managed_translation_enable_skips_managed_fallback_branch(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.GEMINI
-    controller.settings.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.MANAGED_CHINA,
-    )
-    controller.hub = DummyHub(llm=object())
-    service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            local_key_available=True,
-        )
-    )
-    controller._managed_openrouter_release_service = service
-
-    async def no_founder_letter(self) -> bool:
-        _ = self
-        return False
-
-    monkeypatch.setattr(
-        GuiController,
-        "_should_route_managed_trans_to_founder_letter",
-        no_founder_letter,
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_schedule_managed_trial_usage_refresh",
-        lambda self: None,
-    )
-
-    generation = controller._record_translation_toggle_intent(True)
-    result = await controller._handle_managed_translation_enable(generation)
-
-    assert result is True
-    assert service.prepare_calls == 0
-    assert controller._managed_china_auth_relevant_for_translation_enable() is False
 
 
 @pytest.mark.asyncio
@@ -17327,14 +15914,18 @@ async def test_apply_providers_mixed_degraded_default_service_persists_full_prov
     def record_saved_settings(_path, settings) -> None:
         saved_settings.append(copy.deepcopy(settings))
 
-    async def fail_first_rebuild_llm_provider(self) -> None:
-        assert self.settings is not None
-        rebuild_prompts.append(self.settings.system_prompt)
+    async def fail_first_rebuild_llm_provider(_owner) -> None:
+        assert controller.settings is not None
+        rebuild_prompts.append(controller.settings.system_prompt)
         if len(rebuild_prompts) == 1:
             raise RuntimeError("first runtime apply failed")
 
     _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fail_first_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner,
+        "rebuild",
+        fail_first_rebuild_llm_provider,
+    )
 
     await controller.apply_providers(pending)
 
@@ -17427,7 +16018,9 @@ async def test_order22_apply_settings_routes_stt_language_audio_patch_through_de
         "stop_microphone_test_for_audio_settings_change",
         fake_stop_microphone_test_for_audio_settings_change,
     )
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
@@ -18033,7 +16626,9 @@ async def test_order22_mixed_provider_draft_rebuilds_self_stt_from_pre_mutation_
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
     )
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
 
     await controller.apply_providers(pending)
 
@@ -18097,7 +16692,9 @@ async def test_order21_provider_only_mixed_full_draft_save_failure_restores_comm
 
     monkeypatch.setattr(settings_mutation.SettingsMutationService, "mutate", capture_mutate)
     _patch_settings_save(monkeypatch, fail_uncommitted_full_draft_save)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
 
     await controller.apply_providers(pending)
 
@@ -18177,13 +16774,17 @@ async def test_order21_provider_only_mixed_full_draft_save_failure_preserves_ret
         ):
             raise RuntimeError(raw_failure_text)
 
-    async def unavailable_rebuild_llm_provider(self) -> None:
-        assert self.hub is not None
-        self.hub.llm = None
+    async def unavailable_rebuild_llm_provider(_owner) -> None:
+        assert controller.hub is not None
+        controller.hub.llm = None
 
     monkeypatch.setattr(settings_mutation.SettingsMutationService, "mutate", capture_mutate)
     _patch_settings_save(monkeypatch, fail_uncommitted_full_draft_save)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", unavailable_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner,
+        "rebuild",
+        unavailable_rebuild_llm_provider,
+    )
 
     await controller.apply_providers(pending)
 
@@ -18250,21 +16851,21 @@ async def test_order21_provider_only_mixed_full_draft_runtime_unavailable_degrad
     def record_saved_settings(_path, incoming: AppSettings) -> None:
         saved_settings.append(copy.deepcopy(incoming))
 
-    async def conditionally_unavailable_rebuild_llm_provider(self) -> None:
-        assert self.settings is not None
-        assert self.hub is not None
+    async def conditionally_unavailable_rebuild_llm_provider(_owner) -> None:
+        assert controller.settings is not None
+        assert controller.hub is not None
         if (
-            self.settings.managed_identity.verified_hardware_hash
+            controller.settings.managed_identity.verified_hardware_hash
             == pending.managed_identity.verified_hardware_hash
         ):
-            self.hub.llm = None
+            controller.hub.llm = None
         else:
-            self.hub.llm = object()
+            controller.hub.llm = object()
 
     _patch_settings_save(monkeypatch, record_saved_settings)
     monkeypatch.setattr(
-        GuiController,
-        "_rebuild_llm_provider",
+        provider_runtime_apply_module.LlmProviderRebuildOwner,
+        "rebuild",
         conditionally_unavailable_rebuild_llm_provider,
     )
 
@@ -18330,7 +16931,9 @@ async def test_provider_order21_order24_fallback_save_failure_restores_committed
 
     _patch_settings_save(monkeypatch, fail_uncommitted_full_draft_save)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
 
     await controller.apply_providers(pending)
 
@@ -18582,7 +17185,11 @@ async def test_order22_qwen_historical_low_latency_change_does_not_rebuild_llm(
         "_clear_local_stt_pending_enable_if_provider_switched_away",
         lambda self: None,
     )
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", unavailable_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner,
+        "rebuild",
+        unavailable_rebuild_llm_provider,
+    )
 
     await controller.apply_settings(pending)
 
@@ -18629,7 +17236,9 @@ async def test_order22_qwen_historical_false_cannot_restore_non_fast_runtime(
         lambda self: None,
     )
     monkeypatch.setattr(
-        GuiController, "_rebuild_llm_provider", fail_then_recover_rebuild_llm_provider
+        provider_runtime_apply_module.LlmProviderRebuildOwner,
+        "rebuild",
+        fail_then_recover_rebuild_llm_provider,
     )
 
     await controller.apply_settings(pending)
@@ -19003,7 +17612,9 @@ async def test_apply_providers_preserves_current_languages_while_applying_provid
 
     monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
 
     await controller.apply_providers(pending)
 
@@ -19032,103 +17643,6 @@ async def test_apply_providers_preserves_current_languages_while_applying_provid
     assert controller.hub.hangover_s == 0.65
     assert controller.hub.peer_hangover_s == 0.95
     assert calls == ["llm", "peer", "rebuild_stt"]
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_rebuilds_only_llm_for_translation_fallback_branch_change(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
-    controller.settings.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.OPENROUTER,
-    )
-    controller.hub = DummyHub()
-    controller._last_self_stt_provider_signature = controller._build_self_stt_provider_signature(
-        controller.settings
-    )
-    controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
-        controller.settings
-    )
-    controller._last_llm_provider_signature = controller._build_llm_provider_signature(
-        controller.settings
-    )
-    calls: list[str] = []
-
-    updated = copy.deepcopy(controller.settings)
-    updated.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.GEMMA4_31B_CEREBRAS,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-    )
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-
-    async def fake_rebuild_llm_provider(self) -> None:
-        calls.append("llm")
-
-    async def fake_refresh_peer_stt_runtime(self) -> None:
-        calls.append("peer")
-
-    async def fake_replace_runtime_stt_provider(self) -> None:
-        calls.append("replace")
-
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
-    monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
-    )
-    await controller.apply_providers(updated)
-
-    assert controller.settings.translation.fallback == TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.GEMMA4_31B_CEREBRAS,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-    )
-    assert calls == ["llm"]
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_replaces_runtime_self_stt_once_when_enabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.hub = DummyHub()
-    controller._stt_desired = True
-    calls: list[str] = []
-
-    updated = AppSettings()
-    updated.provider.stt = STTProviderName.SONIOX
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-
-    async def fake_replace_runtime_stt_provider(self) -> None:
-        calls.append("replace")
-
-    async def fake_rebuild_stt_provider(self) -> None:
-        calls.append("rebuild_stt")
-
-    async def fake_refresh_peer_stt_runtime(self) -> None:
-        calls.append("peer")
-
-    async def fake_rebuild_llm_provider(self) -> None:
-        calls.append("llm")
-
-    monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
-    )
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-    await controller.apply_providers(updated)
-
-    assert controller.settings.provider.stt == STTProviderName.SONIOX
-    assert calls == ["replace"]
 
 
 @pytest.mark.asyncio
@@ -19335,69 +17849,6 @@ async def test_dashboard_peer_language_change_refreshes_peer_translation_pipelin
 
 
 @pytest.mark.asyncio
-async def test_apply_providers_rebuilds_self_stt_only_when_disabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.hub = DummyHub()
-    controller._stt_desired = False
-    calls: list[str] = []
-
-    updated = AppSettings()
-    updated.provider.stt = STTProviderName.SONIOX
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-
-    async def fake_replace_runtime_stt_provider(self) -> None:
-        calls.append("replace")
-
-    async def fake_rebuild_stt_provider(self) -> None:
-        calls.append("rebuild_stt")
-
-    monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
-    )
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
-    await controller.apply_providers(updated)
-
-    assert calls == ["rebuild_stt"]
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_refreshes_only_peer_runtime_for_peer_provider_draft(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.hub = DummyHub()
-    calls: list[str] = []
-
-    updated = AppSettings()
-    updated.provider.peer_stt = STTProviderName.SONIOX
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-
-    async def fake_refresh_peer_stt_runtime(self) -> None:
-        calls.append("peer")
-
-    async def fake_replace_runtime_stt_provider(self) -> None:
-        calls.append("replace")
-
-    async def fake_rebuild_llm_provider(self) -> None:
-        calls.append("llm")
-
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
-    monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
-    )
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-    await controller.apply_providers(updated)
-
-    assert calls == ["peer"]
-
-
-@pytest.mark.asyncio
 async def test_apply_providers_republishes_overlay_peer_contract_after_peer_refresh(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -19436,77 +17887,6 @@ async def test_apply_providers_republishes_overlay_peer_contract_after_peer_refr
 
 
 @pytest.mark.asyncio
-async def test_apply_providers_rebuilds_only_llm_for_openrouter_provider_routing_change(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.hub = DummyHub()
-    calls: list[str] = []
-
-    updated = AppSettings()
-    updated.provider.llm = LLMProviderName.OPENROUTER
-    updated.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-
-    async def fake_rebuild_llm_provider(self) -> None:
-        calls.append("llm")
-
-    async def fake_refresh_peer_stt_runtime(self) -> None:
-        calls.append("peer")
-
-    async def fake_replace_runtime_stt_provider(self) -> None:
-        calls.append("replace")
-
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
-    monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
-    )
-    await controller.apply_providers(updated)
-
-    assert calls == ["llm"]
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_rebuilds_only_llm_for_openrouter_selected_source_change(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    controller.hub = DummyHub()
-    calls: list[str] = []
-
-    updated = AppSettings()
-    updated.provider.llm = LLMProviderName.OPENROUTER
-    updated.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-
-    async def fake_rebuild_llm_provider(self) -> None:
-        calls.append("llm")
-
-    async def fake_refresh_peer_stt_runtime(self) -> None:
-        calls.append("peer")
-
-    async def fake_replace_runtime_stt_provider(self) -> None:
-        calls.append("replace")
-
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
-    monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
-    )
-    await controller.apply_providers(updated)
-
-    assert calls == ["llm"]
-
-
-@pytest.mark.asyncio
 async def test_apply_providers_clears_local_qwen_pending_enable_after_switch_away(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -19520,7 +17900,11 @@ async def test_apply_providers_clears_local_qwen_pending_enable_after_switch_awa
     updated.provider.stt = STTProviderName.DEEPGRAM
 
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner,
+        "rebuild",
+        lambda self: asyncio.sleep(0),
+    )
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(GuiController, "_rebuild_stt_provider", lambda self: asyncio.sleep(0))
 
@@ -19600,7 +17984,9 @@ async def test_apply_providers_splits_qwen_region_refresh_by_active_consumers(
     async def fake_replace_runtime_stt_provider(self) -> None:
         calls.append("replace")
 
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", fake_rebuild_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
+    )
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
         GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
@@ -19648,121 +18034,6 @@ def test_load_or_init_settings_creates_default_file(
     assert reloaded.compatibility_settings.system_prompts == {}
 
 
-@pytest.mark.asyncio
-async def test_rebuild_llm_provider_closes_existing_provider_and_updates_dashboard(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    close_calls: list[str] = []
-
-    class FakeLlm:
-        async def close(self) -> None:
-            close_calls.append("close")
-
-    new_llm = object()
-    llm_create_kwargs: dict[str, object] = {}
-    controller.hub = DummyHub(llm=FakeLlm())
-
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-
-    def fake_create_llm_provider(*_args, **kwargs):
-        llm_create_kwargs.update(kwargs)
-        return new_llm
-
-    monkeypatch.setattr(controller_module, "create_llm_provider", fake_create_llm_provider)
-
-    await controller._rebuild_llm_provider()
-
-    assert close_calls == ["close"]
-    assert controller.hub.llm is new_llm
-    assert dash.translation_needs_key is False
-    assert llm_create_kwargs["runtime_logging"] is controller.runtime_logging
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("factory", "expected_message"),
-    [
-        (lambda *_a, **_k: None, "LLM provider not available"),
-        (
-            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
-            "LLM provider not available",
-        ),
-    ],
-)
-async def test_rebuild_llm_provider_logs_basic_failure_when_provider_unavailable(
-    monkeypatch: pytest.MonkeyPatch,
-    factory,
-    expected_message: str,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller.settings = AppSettings()
-    controller.hub = DummyHub(llm=object())
-
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(controller_module, "create_llm_provider", factory)
-
-    await controller._rebuild_llm_provider()
-
-    assert controller.hub.llm is None
-    assert dash.translation_needs_key is True
-    assert controller._runtime_logging.basic_messages == [(logging.ERROR, expected_message)]
-
-
-@pytest.mark.asyncio
-async def test_rebuild_llm_provider_logs_basic_failure_when_secret_store_setup_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller.settings = AppSettings()
-    controller.hub = DummyHub(llm=object())
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
-    )
-
-    await controller._rebuild_llm_provider()
-
-    assert controller.hub.llm is None
-    assert dash.translation_needs_key is True
-    assert controller._runtime_logging.basic_messages == [
-        (logging.ERROR, "LLM provider not available")
-    ]
-
-
-@pytest.mark.asyncio
-async def test_rebuild_llm_provider_local_llm_unavailable_does_not_show_api_key_warning(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.LOCAL_LLM
-    controller.hub = DummyHub(llm=object())
-
-    monkeypatch.setattr(
-        controller_module, "create_secret_store", lambda *_a, **_k: DummySecrets({})
-    )
-    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: None)
-
-    await controller._rebuild_llm_provider()
-
-    assert controller.hub.llm is None
-    assert dash.translation_needs_key is False
-    assert controller._runtime_logging.basic_messages == [
-        (logging.ERROR, "LLM provider not available")
-    ]
-
-
 def test_create_managed_openrouter_release_service_uses_http_broker_client_and_raw_fingerprint_provider() -> (
     None
 ):
@@ -19795,44 +18066,6 @@ def test_create_managed_openrouter_release_service_degrades_to_unavailable_clien
 
     assert isinstance(service, ManagedOpenRouterReleaseService)
     assert isinstance(service.client, UnavailableManagedOpenRouterReleaseClient)
-
-
-@pytest.mark.asyncio
-async def test_rebuild_llm_provider_closes_previous_managed_release_service(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    old_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-        )
-    )
-    new_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-        )
-    )
-    controller._managed_openrouter_release_service = old_service
-
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        GuiController,
-        "_create_managed_openrouter_release_service",
-        lambda self, *, secrets: new_service,
-    )
-    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: object())
-
-    await controller._rebuild_llm_provider()
-
-    assert old_service.close_calls == 1
-    assert controller._managed_openrouter_release_service is new_service
 
 
 @pytest.mark.asyncio
