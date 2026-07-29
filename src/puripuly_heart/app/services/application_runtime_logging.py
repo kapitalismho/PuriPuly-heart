@@ -73,6 +73,9 @@ class ApplicationRuntimeLoggingOwner:
             detailed_enabled()
         mode_changed(normalized_mode)
 
+    def initialize_mode(self, mode: object) -> None:
+        self.service.set_mode(mode)
+
     @property
     def active_task_names(self) -> tuple[str, ...]:
         return self._task_scope.active_task_names

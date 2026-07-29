@@ -106,7 +106,7 @@ class ApplicationStartupAdapter:
         )
         with contextlib.suppress(Exception):
             self.presentation.apply_locale()
-        self.runtime_logging.set_mode(SessionLoggingMode.BASIC)
+        self.runtime_logging.initialize_mode(SessionLoggingMode.BASIC)
         self.presentation.attach_runtime_log_sink(self.runtime_logging)
 
     async def launch_startup_runtime(self, state: ApplicationStartupState) -> None:

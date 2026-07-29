@@ -74,6 +74,17 @@ def test_owner_controls_mode_transition_and_presentation_attachment() -> None:
     assert attached == [service, service]
 
 
+def test_owner_initializes_mode_without_ui_transition_effects() -> None:
+    owner, attached = _owner()
+    service = RecordingRuntimeLogging()
+    owner.install_service(service)
+
+    owner.initialize_mode("detailed")
+
+    assert service.mode is SessionLoggingMode.DETAILED
+    assert attached == [service]
+
+
 def test_owner_formats_exception_detail_and_preserves_lazy_evaluation() -> None:
     owner, _ = _owner()
     service = RecordingRuntimeLogging()
