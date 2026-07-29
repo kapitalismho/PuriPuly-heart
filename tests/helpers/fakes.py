@@ -5,12 +5,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from puripuly_heart.app.wiring_application_runtime_logging import (
-    compose_application_runtime_logging,
-)
-from puripuly_heart.composition.controller_application_startup import (
-    compose_controller_application_startup,
-)
 from puripuly_heart.core.self_capture import (
     SelfCaptureProviderStatus,
     SelfCaptureSessionSnapshot,
@@ -18,38 +12,6 @@ from puripuly_heart.core.self_capture import (
 )
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.domain.models import OSCMessage
-
-
-class DeferredRuntimeComposition:
-    def __init__(self, controller: object) -> None:
-        self._controller = controller
-
-    def __getattr__(self, name: str):
-        from puripuly_heart.composition.ui_application import (
-            compose_gui_runtime_components,
-        )
-
-        components = compose_gui_runtime_components(self._controller)
-        self._controller._runtime_composition = components
-        return getattr(components, name)
-
-
-def install_test_runtime_composition(controller):
-    if controller._runtime_logging_owner is None:
-        controller.install_runtime_logging_owner(
-            compose_application_runtime_logging(
-                presentation=controller.app,
-                sinks=controller.runtime_logging_sinks,
-                overlay_logging_mode_update=controller._emit_overlay_runtime_logging_mode_update,
-                overlay_logging_mode_update_available=lambda: (
-                    controller._get_overlay_application_owner().current_bridge() is not None
-                ),
-            )
-        )
-    if controller._startup_owner is None:
-        controller.install_startup_owner(compose_controller_application_startup(controller))
-    controller._runtime_composition = DeferredRuntimeComposition(controller)
-    return controller
 
 
 @dataclass(slots=True)

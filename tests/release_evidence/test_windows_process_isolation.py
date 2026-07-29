@@ -153,7 +153,6 @@ async def test_fixture_invokes_the_committed_gui_retry_action_contract() -> None
         / "release_evidence"
         / "windows_process_isolation.py"
     ).read_text(encoding="utf-8")
-    assert "puripuly_heart.ui.controller" not in source
     assert '"retry_action": "PeerApplicationOwner.retry_process_capture"' in source
 
 

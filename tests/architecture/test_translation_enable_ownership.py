@@ -26,11 +26,12 @@ def test_translation_enable_owner_and_adapter_do_not_import_ui_or_controller() -
     for path in paths:
         imports = _imports(path)
         assert not any(name.startswith("puripuly_heart.ui") for name in imports)
-        assert "puripuly_heart.ui.controller" not in imports
 
 
 def test_controller_no_longer_owns_translation_enable_state_or_algorithms() -> None:
-    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    controller_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
+    )
     tree = ast.parse(controller_path.read_text(encoding="utf-8"))
     methods = {
         node.name

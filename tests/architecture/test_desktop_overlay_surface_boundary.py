@@ -14,7 +14,6 @@ SURFACE_MODULES = (overlay_contract, overlay_renderer)
 FORBIDDEN_IMPORT_PREFIXES = (
     "puripuly_heart.runtime",
     "puripuly_heart.ui.app",
-    "puripuly_heart.ui.controller",
     "puripuly_heart.ui.views",
     "puripuly_heart.app.services",
     "puripuly_heart.app.wiring",

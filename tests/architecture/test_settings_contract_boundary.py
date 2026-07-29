@@ -11,7 +11,6 @@ SOURCE_ROOT = pathlib.Path(puripuly_heart.__file__).resolve().parent
 FORBIDDEN_IMPORT_PREFIXES = (
     "puripuly_heart.core",
     "puripuly_heart.runtime",
-    "puripuly_heart.ui.controller",
     "puripuly_heart.app.services",
     "puripuly_heart.app.wiring",
     "puripuly_heart.config",

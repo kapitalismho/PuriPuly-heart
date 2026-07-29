@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+UI_RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "ui_runtime.py"
 OWNER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_credential_verification.py"
 )
@@ -25,9 +25,13 @@ def _method_source(path: Path, class_name: str, method_name: str) -> str:
     return ast.get_source_segment(source, method) or ""
 
 
-def test_controller_interactive_verification_is_an_owner_delegate() -> None:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
-    method = _method_source(CONTROLLER_PATH, "GuiController", "verify_api_key")
+def test_ui_interactive_verification_is_an_owner_delegate() -> None:
+    source = UI_RUNTIME_PATH.read_text(encoding="utf-8")
+    method = _method_source(
+        UI_RUNTIME_PATH,
+        "UiProviderRuntimeAdapter",
+        "verify_api_key",
+    )
     interaction = _method_source(
         OWNER_PATH,
         "ProviderCredentialVerificationInteractionOwner",
@@ -37,7 +41,7 @@ def test_controller_interactive_verification_is_an_owner_delegate() -> None:
     assert "def _verify_qwen_llm_api_key(" not in source
     assert "ProviderCredentialVerificationRequest(" not in method
     assert "ProviderCredentialVerificationRequest(" in interaction
-    assert "_get_provider_credential_verification_owner().verify(provider, key)" in method
+    assert "self.credential_verification.verify(provider, key)" in method
     assert "verifier.verify_api_key(" not in method
     assert "verifier.verify_qwen_llm_api_key(" not in method
 

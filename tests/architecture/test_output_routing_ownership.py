@@ -41,7 +41,9 @@ def test_output_runtime_is_the_only_production_output_owner_construction() -> No
 
 def test_hub_delegates_output_side_effects_to_output_runtime() -> None:
     hub_source = (SOURCE_ROOT / "core" / "orchestrator" / "hub.py").read_text(encoding="utf-8")
-    controller_source = (SOURCE_ROOT / "ui" / "controller.py").read_text(encoding="utf-8")
+    composition_source = (SOURCE_ROOT / "composition" / "application_runtime.py").read_text(
+        encoding="utf-8"
+    )
     overlay_source = (SOURCE_ROOT / "app" / "services" / "overlay_application.py").read_text(
         encoding="utf-8"
     )
@@ -58,7 +60,7 @@ def test_hub_delegates_output_side_effects_to_output_runtime() -> None:
         "drop_pending",
     ):
         assert f"self.osc.{side_effect}(" not in hub_source
-        assert f"self.osc.{side_effect}(" not in controller_source
+        assert f"self.osc.{side_effect}(" not in composition_source
     assert "self.output_runtime.publish_overlay_event(" in hub_source
     assert "self.output_runtime.replace_overlay_sink(" in hub_source
     assert "self.output_runtime.publish_chatbox(" in hub_source
@@ -75,8 +77,10 @@ def test_hub_delegates_output_side_effects_to_output_runtime() -> None:
 
 
 def test_flet_composition_uses_owner_without_importing_output_implementation() -> None:
-    controller_source = (SOURCE_ROOT / "ui" / "controller.py").read_text(encoding="utf-8")
-    composition_source = (SOURCE_ROOT / "composition" / "ui_application.py").read_text(
+    composition_source = (SOURCE_ROOT / "composition" / "application_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    ui_composition_source = (SOURCE_ROOT / "composition" / "ui_application.py").read_text(
         encoding="utf-8"
     )
     pipeline_source = (SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py").read_text(
@@ -91,7 +95,7 @@ def test_flet_composition_uses_owner_without_importing_output_implementation() -
             elif isinstance(node, ast.ImportFrom) and node.module is not None:
                 imported_modules.add(node.module)
 
-    assert "_init_pipeline" not in controller_source
+    assert "_init_pipeline" not in composition_source
     for retired_assembly in (
         "_get_managed_account_components",
         "_get_provider_application_owner",
@@ -100,21 +104,22 @@ def test_flet_composition_uses_owner_without_importing_output_implementation() -
         "_get_self_capture_owner",
         "_get_capture_owner_factory",
     ):
-        assert retired_assembly not in controller_source
+        assert retired_assembly not in composition_source
     for extracted_construction in (
         "compose_managed_account(",
         "compose_provider_runtime(",
         "CaptureOwnerFactory(",
         "RuntimePipelineLauncher(",
     ):
-        assert extracted_construction not in controller_source
+        assert composition_source.count(extracted_construction) == 1
     assert "compose_runtime_pipeline(" in pipeline_source
     assert "ClientHub(" in pipeline_source
+    assert "compose_application_runtime(" in ui_composition_source
     assert "compose_managed_account(" in composition_source
     assert "compose_provider_runtime(" in composition_source
     assert "CaptureOwnerFactory(" in composition_source
     assert "RuntimePipelineLauncher(" in composition_source
     assert "RuntimeCompositionComponents(" in composition_source
-    assert "hub.output_runtime.start_ui_event_bridge(" in controller_source
+    assert "hub.output_runtime.start_ui_event_bridge(" in composition_source
     assert "puripuly_heart.core.runtime.output" not in imported_modules
     assert "puripuly_heart.core.output.router" not in imported_modules

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "services" / "overlay_session_transition.py"
 APPLICATION_OWNER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "services" / "overlay_application.py"
@@ -28,7 +28,6 @@ def test_transition_owner_preserves_overlay_runtime_handle_resource_ownership() 
     source = OWNER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "OverlayBridge" not in source
     assert "OverlayProcessManager" not in source
     assert "OverlayPresenter" not in source

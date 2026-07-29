@@ -4,12 +4,13 @@ from collections.abc import Callable
 from typing import Protocol
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
-from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.ports.ui_models import (
+    GpuNoticeAction,
+    OverlayPeerPresentationState,
+)
 
 
-class UiApplicationRuntimePort(Protocol):
-    async def start(self) -> None: ...
-
+class UiInputRuntimePort(Protocol):
     async def submit_text(self, text: str) -> None: ...
 
     def set_manual_input_activity(self, has_text: bool) -> None: ...
@@ -18,9 +19,9 @@ class UiApplicationRuntimePort(Protocol):
 
     async def set_stt_enabled(self, enabled: bool) -> object: ...
 
-    async def set_peer_translation_enabled(self, enabled: bool) -> object: ...
 
-    async def set_overlay_enabled(self, enabled: bool) -> object: ...
+class UiPeerCaptureRuntimePort(Protocol):
+    async def set_peer_translation_enabled(self, enabled: bool) -> object: ...
 
     async def retry_peer_process_capture(self) -> bool: ...
 
@@ -36,6 +37,10 @@ class UiApplicationRuntimePort(Protocol):
 
     def loopback_capture_summary(self) -> object: ...
 
+    def overlay_peer_presentation_state(self) -> OverlayPeerPresentationState | None: ...
+
+
+class UiSettingsRuntimePort(Protocol):
     async def on_dashboard_language_change(
         self,
         change: LanguageSelectionChange,
@@ -60,6 +65,10 @@ class UiApplicationRuntimePort(Protocol):
 
     async def apply_settings(self, settings: object) -> object: ...
 
+    async def apply_telemetry_consent(self, consent: str) -> object | None: ...
+
+
+class UiProviderRuntimePort(Protocol):
     async def apply_providers(
         self,
         settings: object | None = None,
@@ -70,42 +79,6 @@ class UiApplicationRuntimePort(Protocol):
     async def install_selected_gpu_model_if_needed(self) -> None: ...
 
     async def ensure_gpu_device_discovery(self) -> None: ...
-
-    async def start_microphone_test(
-        self,
-        *,
-        meter_callback: Callable[[float], None] | None = None,
-    ) -> bool: ...
-
-    async def stop_microphone_test(self) -> None: ...
-
-    def set_runtime_logging_mode(self, mode: str) -> None: ...
-
-    async def set_desktop_overlay_captions_locked(self, locked: bool) -> None: ...
-
-    async def set_desktop_overlay_size_preset(self, size_preset: str) -> None: ...
-
-    async def reset_desktop_overlay_position(self) -> None: ...
-
-    def begin_overlay_calibration(self) -> object: ...
-
-    def set_overlay_calibration_field(
-        self,
-        *args: object,
-        **kwargs: object,
-    ) -> object: ...
-
-    def apply_overlay_calibration(self) -> object: ...
-
-    def cancel_overlay_calibration(self) -> object: ...
-
-    def overlay_peer_presentation_state(self) -> OverlayPeerPresentationState | None: ...
-
-    def dashboard_managed_auth_action(self) -> str: ...
-
-    def dashboard_managed_auth_prompt_kind(self) -> str: ...
-
-    async def apply_telemetry_consent(self, consent: str) -> object | None: ...
 
     async def connect_openrouter_via_pkce(
         self,
@@ -131,6 +104,46 @@ class UiApplicationRuntimePort(Protocol):
 
     def clear_provider_verification(self, provider: str) -> None: ...
 
+    def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object: ...
+
+
+class UiMicrophoneRuntimePort(Protocol):
+    async def start_microphone_test(
+        self,
+        *,
+        meter_callback: Callable[[float], None] | None = None,
+    ) -> bool: ...
+
+    async def stop_microphone_test(self) -> None: ...
+
+
+class UiOverlayRuntimePort(Protocol):
+    async def set_overlay_enabled(self, enabled: bool) -> object: ...
+
+    async def set_desktop_overlay_captions_locked(self, locked: bool) -> None: ...
+
+    async def set_desktop_overlay_size_preset(self, size_preset: str) -> None: ...
+
+    async def reset_desktop_overlay_position(self) -> None: ...
+
+    def begin_overlay_calibration(self) -> object: ...
+
+    def set_overlay_calibration_field(
+        self,
+        field_name: str,
+        value: object,
+    ) -> object: ...
+
+    def apply_overlay_calibration(self) -> object: ...
+
+    def cancel_overlay_calibration(self) -> object: ...
+
+
+class UiManagedRuntimePort(Protocol):
+    def dashboard_managed_auth_action(self) -> str: ...
+
+    def dashboard_managed_auth_prompt_kind(self) -> str: ...
+
     async def start_qq_managed_auth_from_dialog(
         self,
         **kwargs: object,
@@ -143,6 +156,10 @@ class UiApplicationRuntimePort(Protocol):
 
     def clear_managed_auth_pending_state(self) -> None: ...
 
+    async def refresh_openrouter_usage_after_launch(self) -> bool: ...
+
+
+class UiEngagementRuntimePort(Protocol):
     def get_event_language_codes(self) -> tuple[str | None, str | None]: ...
 
     def schedule_github_star_prompt_translation_success_observed(self) -> None: ...
@@ -152,8 +169,6 @@ class UiApplicationRuntimePort(Protocol):
     def should_show_github_star_prompt(self) -> bool: ...
 
     async def persist_github_star_prompt_eligible_launch(self) -> bool: ...
-
-    async def refresh_openrouter_usage_after_launch(self) -> bool: ...
 
     async def prepare_runtime_after_launch(self) -> None: ...
 
@@ -165,10 +180,25 @@ class UiApplicationRuntimePort(Protocol):
 
     async def persist_github_star_prompt_clicked(self) -> None: ...
 
+
+class UiDiagnosticsRuntimePort(Protocol):
+    def set_runtime_logging_mode(self, mode: str) -> None: ...
+
     def cycle_debug_capture_fault_profile(self) -> str: ...
 
     def cycle_debug_stt_fault_profile(self) -> str: ...
 
     def clear_debug_audio_fault_profiles(self) -> None: ...
 
-    def handle_gpu_notice_action(self) -> object: ...
+
+__all__ = [
+    "UiDiagnosticsRuntimePort",
+    "UiEngagementRuntimePort",
+    "UiInputRuntimePort",
+    "UiManagedRuntimePort",
+    "UiMicrophoneRuntimePort",
+    "UiOverlayRuntimePort",
+    "UiPeerCaptureRuntimePort",
+    "UiProviderRuntimePort",
+    "UiSettingsRuntimePort",
+]

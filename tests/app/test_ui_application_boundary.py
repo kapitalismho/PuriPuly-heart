@@ -193,8 +193,8 @@ class RecordingBackend:
     def clear_debug_audio_fault_profiles(self) -> None:
         self.events.append(("fault-clear",))
 
-    def handle_gpu_notice_action(self) -> object:
-        self.events.append(("gpu-retry",))
+    def handle_gpu_notice_action(self, action: str) -> object:
+        self.events.append(("gpu-retry", action))
         return "retrying"
 
     async def persist_github_star_prompt_opened(
@@ -440,7 +440,7 @@ async def test_local_asr_gpu_install_discovery_failure_and_retry_intents_delegat
     assert boundary.cycle_debug_capture_fault_profile() == "capture-failure"
     assert boundary.cycle_debug_stt_fault_profile() == "stt-failure"
     boundary.clear_debug_audio_fault_profiles()
-    assert boundary.handle_gpu_notice_action() == "retrying"
+    assert boundary.handle_gpu_notice_action("restart") == "retrying"
 
     assert backend.events == [
         ("gpu-install",),
@@ -448,7 +448,7 @@ async def test_local_asr_gpu_install_discovery_failure_and_retry_intents_delegat
         ("capture-fault",),
         ("stt-fault",),
         ("fault-clear",),
-        ("gpu-retry",),
+        ("gpu-retry", "restart"),
     ]
 
 

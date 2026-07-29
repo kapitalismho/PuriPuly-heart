@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 
 
 def _method_source(path: Path, method_name: str) -> str:
@@ -16,13 +16,17 @@ def _method_source(path: Path, method_name: str) -> str:
     raise AssertionError(f"method not found: {method_name}")
 
 
-def test_controller_vrc_mic_stop_compatibility_helper_is_absent() -> None:
+def test_application_has_no_vrc_mic_stop_compatibility_helper() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
 
     assert "def _stop_vrc_mic_receiver(" not in source
 
 
-def test_controller_vrc_mic_configure_remains_owner_delegate() -> None:
-    method = _method_source(CONTROLLER_PATH, "_configure_vrc_mic_receiver")
+def test_application_vrc_mic_configure_remains_owner_delegate() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
 
-    assert "_get_vrc_mic_sync_owner().configure(enabled=enabled)" in method
+    assert source.count("compose_vrc_mic_sync(") == 1
+    assert (
+        "configure_vrc_mic=lambda *, enabled: "
+        "(require_vrc_mic_sync().configure(enabled=enabled))"
+    ) in source

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
 ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_source.py"
 VAD_ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_vad.py"
@@ -29,7 +29,6 @@ def test_self_capture_source_adapter_has_no_ui_settings_or_lifecycle_ownership()
     source = ADAPTER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "AppSettings" not in source
     assert "asyncio" not in source
     assert "async def close(" not in source
@@ -65,7 +64,6 @@ def test_self_vad_adapter_has_no_ui_peer_vad_or_session_lifecycle_ownership() ->
     source = VAD_ADAPTER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "AppSettings" not in source
     assert "PeerCaptureSessionConfig" not in source
     assert "run_audio_vad_loop" not in source
@@ -98,7 +96,6 @@ def test_self_audio_loop_adapter_has_no_ui_task_or_gate_lifecycle_ownership() ->
     source = AUDIO_LOOP_ADAPTER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "AppSettings" not in source
     assert "VrcMicSyncOwner" not in source
     assert "asyncio.create_task" not in source

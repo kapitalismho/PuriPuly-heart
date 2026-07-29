@@ -24,8 +24,6 @@ UI_COMPOSITION_PATH = REPO_ROOT / "src" / "puripuly_heart" / "composition" / "ui
 def test_local_asr_evidence_driver_has_no_controller_dependency() -> None:
     source = DRIVER_PATH.read_text(encoding="utf-8")
 
-    assert "puripuly_heart.ui.controller" not in source
-    assert "GuiController" not in source
     for private_name in (
         "_load_or_init_settings",
         "_init_pipeline",
@@ -42,8 +40,10 @@ def test_evidence_contract_is_ui_neutral_and_composition_is_page_free() -> None:
     ui_composition_source = UI_COMPOSITION_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in port_source
-    assert "compose_gui_controller(" in composition_source
-    assert "page=None" in ui_composition_source
+    assert "compose_application_runtime(" in composition_source
+    assert "local_asr_evidence_sink=captured.append" in composition_source
+    assert "page" not in composition_source
+    assert "page" not in ui_composition_source
     imported_modules = {
         node.module
         for node in ast.walk(ast.parse(composition_source))
@@ -56,7 +56,7 @@ def test_evidence_contract_is_ui_neutral_and_composition_is_page_free() -> None:
         for alias in node.names
     )
     assert "flet" not in imported_modules
-    assert "_ControllerBackedLocalASRProductionEvidence" in composition_source
+    assert "_ApplicationLocalASRProductionEvidence" in composition_source
     required_presentation_members = {
         name for name in UiPresentationPort.__dict__ if not name.startswith("_")
     }

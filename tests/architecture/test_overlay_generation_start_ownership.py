@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "services" / "overlay_generation_start.py"
 APPLICATION_OWNER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "services" / "overlay_application.py"
@@ -34,7 +34,6 @@ def test_generation_owner_has_no_ui_session_transition_or_fallback_dependency() 
     source = OWNER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "OverlaySessionTransitionOwner" not in source
     assert "OverlaySessionFallbackOwner" not in source
     assert "OverlayDiagnosticsRecorder(" in source

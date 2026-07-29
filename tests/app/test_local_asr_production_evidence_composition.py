@@ -17,65 +17,40 @@ class FakeHub:
 
 
 @pytest.mark.asyncio
-async def test_composition_is_page_free_and_delegates_the_complete_evidence_contract(
+async def test_composition_delegates_the_evidence_specific_access_contract(
     monkeypatch,
-    tmp_path: Path,
 ) -> None:
-    actual_path = tmp_path / "actual-settings.json"
-    actual_application = composition_module.compose_local_asr_production_evidence(
-        config_path=actual_path,
-    )
-    assert actual_application.config_path == actual_path
-
-    captured: dict[str, object] = {}
     events: list[object] = []
     settings = AppSettings()
     owner = FakeOwner()
+    access = SimpleNamespace(
+        config_path=Path("settings.json"),
+        load_compatibility_settings=lambda: (
+            events.append(("load", Path("settings.json"))) or settings
+        ),
+        initialize=lambda value: _record_async(
+            events,
+            ("initialize", value),
+        ),
+        hub=FakeHub(owner),
+        retry_gpu_activation=lambda: _record_async(events, "retry"),
+    )
 
-    class FakeController:
-        def __init__(self, config_path: Path) -> None:
-            self.config_path = config_path
-            self.settings = None
-            self.hub = FakeHub(owner)
-            self.vrc_mic_state = None
-            self.vrc_mic_audio_gate = None
-            self.receiver = None
-            self.runtime_composition = SimpleNamespace(
-                pipeline_launcher=SimpleNamespace(launch=self._launch),
-            )
-
-        async def _launch(self, settings: object, **_kwargs) -> None:
-            events.append(("initialize", settings))
-
-        def _load_or_init_settings(self, path: Path) -> object:
-            events.append(("load", path))
-            return settings
-
-        def _get_local_asr_provisioning_owner(self) -> object:
-            return object()
-
-        def _sync_signature_caches(self, settings: object) -> None:
-            _ = settings
-
-        async def retry_gpu_activation(self) -> None:
-            events.append("retry")
-
+    class FakeApplication:
         async def stop(self) -> None:
             events.append("close")
 
-    def compose_controller(**kwargs) -> FakeController:
+    captured: dict[str, object] = {}
+
+    def compose_runtime(**kwargs):
         captured.update(kwargs)
-        return FakeController(kwargs["config_path"])
+        kwargs["local_asr_evidence_sink"](access)
+        return FakeApplication()
 
     monkeypatch.setattr(
         composition_module,
-        "compose_gui_controller",
-        compose_controller,
-    )
-    monkeypatch.setattr(
-        composition_module,
-        "compose_gui_application_boundary",
-        lambda backend: SimpleNamespace(stop=backend.stop),
+        "compose_application_runtime",
+        compose_runtime,
     )
     monkeypatch.setattr(
         composition_module,
@@ -103,31 +78,30 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
         ),
     )
 
-    application = composition_module.compose_local_asr_production_evidence(
+    evidence = composition_module.compose_local_asr_production_evidence(
         config_path=Path("settings.json"),
     )
 
-    assert application.config_path == Path("settings.json")
-    assert application.load_compatibility_settings() is settings
-    await application.initialize(settings)
-    assert application.hub.local_asr_provider_runtime is owner
-    assert application.owner is owner
-    assert application.composition_facts() == {
-        "controller": "FakeController",
+    assert evidence.load_compatibility_settings() is settings
+    await evidence.initialize(settings)
+    assert evidence.hub.local_asr_provider_runtime is owner
+    assert evidence.owner is owner
+    assert evidence.composition_facts() == {
+        "application": "FakeApplication",
         "hub": "FakeHub",
         "factory": "LocalASRProviderRuntimeFactory",
         "owner": "FakeOwner",
     }
-    assert application.build_self_provider_request(settings, warmup=True) == (
+    assert evidence.build_self_provider_request(settings, warmup=True) == (
         "self-request",
         True,
     )
-    assert application.build_peer_provider_request(settings, warmup=False) == (
+    assert evidence.build_peer_provider_request(settings, warmup=False) == (
         "peer-request",
         False,
     )
-    await application.retry_gpu_activation()
-    await application.close()
+    await evidence.retry_gpu_activation()
+    await evidence.close()
 
     assert captured["config_path"] == Path("settings.json")
     assert captured["presentation"].debug_ui_preview is False
@@ -143,47 +117,36 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
 
 
 @pytest.mark.asyncio
-async def test_initialize_preserves_canonical_owner_failure_contract(monkeypatch) -> None:
-    async def close() -> None:
-        return None
+async def test_initialize_preserves_canonical_owner_failure_contract(
+    monkeypatch,
+) -> None:
+    access = SimpleNamespace(
+        config_path=Path("settings.json"),
+        load_compatibility_settings=lambda: object(),
+        initialize=lambda _value: _record_async([], None),
+        hub=FakeHub(object()),
+        retry_gpu_activation=lambda: _record_async([], None),
+    )
 
-    class FakeController:
-        def __init__(self, config_path: Path) -> None:
-            self.config_path = config_path
-            self.settings = None
-            self.hub = FakeHub(object())
-            self.vrc_mic_state = None
-            self.vrc_mic_audio_gate = None
-            self.receiver = None
-            self.runtime_composition = SimpleNamespace(
-                pipeline_launcher=SimpleNamespace(launch=self._launch),
-            )
-
-        async def _launch(self, _settings: object, **_kwargs) -> None:
-            return None
-
-        def _get_local_asr_provisioning_owner(self) -> object:
-            return object()
-
-        def _sync_signature_caches(self, settings: object) -> None:
-            _ = settings
+    def compose_runtime(**kwargs):
+        kwargs["local_asr_evidence_sink"](access)
+        return SimpleNamespace(stop=lambda: _record_async([], None))
 
     monkeypatch.setattr(
         composition_module,
-        "compose_gui_controller",
-        lambda **kwargs: FakeController(kwargs["config_path"]),
+        "compose_application_runtime",
+        compose_runtime,
     )
-    monkeypatch.setattr(
-        composition_module,
-        "compose_gui_application_boundary",
-        lambda _backend: SimpleNamespace(stop=close),
-    )
-    application = composition_module.compose_local_asr_production_evidence(
+    evidence = composition_module.compose_local_asr_production_evidence(
         config_path=Path("settings.json"),
     )
 
     with pytest.raises(
         RuntimeError,
-        match="production controller did not compose the canonical owner",
+        match="production application did not compose the canonical owner",
     ):
-        await application.initialize(object())
+        await evidence.initialize(object())
+
+
+async def _record_async(events: list[object], value: object) -> None:
+    events.append(value)

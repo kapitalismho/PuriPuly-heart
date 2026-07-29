@@ -46,6 +46,20 @@ class LocalASRProductionEvidencePort(Protocol):
     async def close(self) -> None: ...
 
 
+class LocalASRProductionCompositionAccessPort(Protocol):
+    @property
+    def config_path(self) -> Path: ...
+
+    def load_compatibility_settings(self) -> object: ...
+
+    async def initialize(self, settings: object) -> None: ...
+
+    @property
+    def hub(self) -> ClientHub: ...
+
+    async def retry_gpu_activation(self) -> None: ...
+
+
 class LocalASRProductionEvidenceFactoryPort(Protocol):
     def __call__(
         self,

@@ -317,7 +317,6 @@ def test_foundation_modules_remain_below_the_ui_boundary_and_do_not_cut_over_vie
         "puripuly_heart.config",
         "puripuly_heart.core.orchestrator",
         "puripuly_heart.providers",
-        "puripuly_heart.ui.controller",
     )
     for path in FOUNDATION_ROOT.glob("*.py"):
         source = path.read_text(encoding="utf-8")

@@ -873,7 +873,7 @@
     {
       "module": "puripuly_heart.providers.llm.gemini",
       "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/providers/llm/gemini.py", "tests/ui/test_controller_branch_paths.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/providers/llm/gemini.py", "tests/providers/test_gemini_provider.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [{"name": "GeminiLLMProvider", "kind": "attribute"}]
@@ -1274,7 +1274,7 @@
       "modules": [
         "puripuly_heart.ui.presentation_adapter"
       ],
-      "rationale": "The Flet presentation adapter is the internal G10 production composition boundary passed to GuiController. It is not an external import compatibility surface."
+      "rationale": "The Flet presentation adapter is the internal production UI composition boundary. It is not an external import compatibility surface."
     },
     {
       "surface": "puripuly_heart.ui.dashboard modules",

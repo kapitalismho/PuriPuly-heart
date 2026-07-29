@@ -70,7 +70,7 @@ def test_main_run_gui_invokes_flet_run(monkeypatch, tmp_path) -> None:
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
 
-    async def main_gui(page, *, config_path, debug_ui_preview=False):
+    async def main_gui(page, *, config_path, debug_ui_preview=False, **_kwargs):
         _ = page
         calls["config_path"] = config_path
         calls["debug_ui_preview"] = debug_ui_preview
@@ -236,7 +236,7 @@ def test_main_default_invokes_gui(monkeypatch, tmp_path) -> None:
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
 
-    async def main_gui(page, *, config_path, debug_ui_preview=False):
+    async def main_gui(page, *, config_path, debug_ui_preview=False, **_kwargs):
         _ = page
         calls["config_path"] = config_path
         calls["debug_ui_preview"] = debug_ui_preview
@@ -273,7 +273,7 @@ def test_main_run_gui_passes_debug_ui_preview_flag(monkeypatch, tmp_path) -> Non
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
 
-    async def main_gui(page, *, config_path, debug_ui_preview=False):
+    async def main_gui(page, *, config_path, debug_ui_preview=False, **_kwargs):
         _ = page
         calls["config_path"] = config_path
         calls["debug_ui_preview"] = debug_ui_preview
@@ -311,6 +311,7 @@ def test_run_gui_debug_preview_constructs_vrchat_presence(monkeypatch, tmp_path)
         page,
         *,
         config_path,
+        application_factory=None,
         debug_ui_preview=False,
         runtime_logging_sinks=None,
         vrchat_osc_presence=None,
@@ -369,7 +370,7 @@ def test_main_run_gui_force_closes_logging_when_gui_runtime_logging_leaks(
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
 
-    async def main_gui(page, *, config_path, debug_ui_preview=False):
+    async def main_gui(page, *, config_path, debug_ui_preview=False, **_kwargs):
         _ = page, config_path, debug_ui_preview
         leaked_services.append(SessionRuntimeLoggingService(root_logger=root_logger))
 
@@ -407,7 +408,7 @@ def test_main_default_gui_passes_debug_ui_preview_flag(monkeypatch, tmp_path) ->
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
 
-    async def main_gui(page, *, config_path, debug_ui_preview=False):
+    async def main_gui(page, *, config_path, debug_ui_preview=False, **_kwargs):
         _ = page
         calls["config_path"] = config_path
         calls["debug_ui_preview"] = debug_ui_preview

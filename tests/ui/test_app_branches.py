@@ -1506,12 +1506,34 @@ async def test_main_gui_routes_update_check_through_app_log_helper(
             seen["started"] = True
 
     class FakeApp:
-        def __init__(self, incoming_page, *, config_path, debug_ui_preview=False):
+        def __init__(
+            self,
+            incoming_page,
+            *,
+            config_path,
+            application_factory,
+            debug_ui_preview=False,
+            allow_stable_settings_import=False,
+            runtime_logging_sinks=None,
+            vrchat_osc_presence=None,
+        ):
             seen["init"] = (incoming_page, config_path, debug_ui_preview)
             seen["app"] = self
             self.page = incoming_page
-            self.controller = FakeController()
-            self.application = compose_test_ui_application_boundary(self.controller)
+            _ = (
+                application_factory,
+                allow_stable_settings_import,
+                runtime_logging_sinks,
+                vrchat_osc_presence,
+            )
+            backend = FakeController()
+            self.application = compose_test_ui_application_boundary(backend)
+
+        async def _on_page_lifecycle_end(self, _event=None) -> None:
+            return None
+
+        async def shutdown(self) -> None:
+            await self.application.stop()
 
         def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
@@ -1557,11 +1579,33 @@ async def test_main_gui_forwards_debug_ui_preview_flag(
             seen["started"] = True
 
     class FakeApp:
-        def __init__(self, incoming_page, *, config_path, debug_ui_preview=False):
+        def __init__(
+            self,
+            incoming_page,
+            *,
+            config_path,
+            application_factory,
+            debug_ui_preview=False,
+            allow_stable_settings_import=False,
+            runtime_logging_sinks=None,
+            vrchat_osc_presence=None,
+        ):
             seen["init"] = (incoming_page, config_path, debug_ui_preview)
             self.page = incoming_page
-            self.controller = FakeController()
-            self.application = compose_test_ui_application_boundary(self.controller)
+            _ = (
+                application_factory,
+                allow_stable_settings_import,
+                runtime_logging_sinks,
+                vrchat_osc_presence,
+            )
+            backend = FakeController()
+            self.application = compose_test_ui_application_boundary(backend)
+
+        async def _on_page_lifecycle_end(self, _event=None) -> None:
+            return None
+
+        async def shutdown(self) -> None:
+            await self.application.stop()
 
         def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
@@ -4451,6 +4495,7 @@ async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
         incoming_page,
         *,
         config_path,
+        application_factory,
         debug_ui_preview=False,
         allow_stable_settings_import=False,
         runtime_logging_sinks=None,
@@ -4458,14 +4503,15 @@ async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
     ) -> None:
         _ = (
             config_path,
+            application_factory,
             debug_ui_preview,
             allow_stable_settings_import,
             runtime_logging_sinks,
             vrchat_osc_presence,
         )
         self.page = incoming_page
-        self.controller = Controller()
-        self._ui_application = _application_boundary_with_stop(self.controller)
+        backend = Controller()
+        self._ui_application = _application_boundary_with_stop(backend)
         self._tracked_page_tasks = set()
         self._shutdown_lock = None
         self._shutdown_complete = False

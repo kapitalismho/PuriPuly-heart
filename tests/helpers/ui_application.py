@@ -10,7 +10,17 @@ from puripuly_heart.app.ports.application_runtime_logging import (
 from puripuly_heart.app.ports.application_runtime_shutdown import (
     ApplicationRuntimeShutdownPort,
 )
-from puripuly_heart.app.ports.ui_application_runtime import UiApplicationRuntimePort
+from puripuly_heart.app.ports.ui_application_intents import (
+    UiDiagnosticsRuntimePort,
+    UiEngagementRuntimePort,
+    UiInputRuntimePort,
+    UiManagedRuntimePort,
+    UiMicrophoneRuntimePort,
+    UiOverlayRuntimePort,
+    UiPeerCaptureRuntimePort,
+    UiProviderRuntimePort,
+    UiSettingsRuntimePort,
+)
 from puripuly_heart.app.ports.ui_application_state import (
     UiApplicationStateRuntimePort,
 )
@@ -18,6 +28,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownContext,
     ApplicationShutdownDiagnostic,
 )
+from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
 
@@ -344,8 +355,18 @@ def compose_test_ui_application_boundary(
         UiApplicationStateRuntimePort,
         UiApplicationStateRuntimeStub(backend),
     )
+    runtime = UiApplicationRuntimeStub(backend)
     return UiApplicationBoundary(
-        cast(UiApplicationRuntimePort, UiApplicationRuntimeStub(backend)),
+        startup=cast(ApplicationStartupOwner, runtime),
+        input_runtime=cast(UiInputRuntimePort, runtime),
+        peer_capture=cast(UiPeerCaptureRuntimePort, runtime),
+        settings=cast(UiSettingsRuntimePort, runtime),
+        provider=cast(UiProviderRuntimePort, runtime),
+        microphone=cast(UiMicrophoneRuntimePort, runtime),
+        overlay=cast(UiOverlayRuntimePort, runtime),
+        managed=cast(UiManagedRuntimePort, runtime),
+        engagement=cast(UiEngagementRuntimePort, runtime),
+        diagnostics=cast(UiDiagnosticsRuntimePort, runtime),
         state=UiApplicationStateOwner(
             state_runtime,
             runtime_logging=logging_port,

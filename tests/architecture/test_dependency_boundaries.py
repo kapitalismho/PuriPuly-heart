@@ -425,54 +425,6 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
         ),
         ImportViolation(
             rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.app.wiring",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.config.settings",
-            importer_layer="UI adapters/renderers",
-            imported_layer="migration/serialization",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.chatbox_paginator",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.receiver",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.udp_sender",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
             importer="src/puripuly_heart/ui/desktop_overlay.py",
             imported="puripuly_heart.config.settings",
             importer_layer="UI adapters/renderers",
@@ -619,9 +571,9 @@ KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementVio
     {
         SettingsRuntimeConfinementViolation(
             "legacy-settings-api-import",
-            "src/puripuly_heart/ui/controller.py",
+            "src/puripuly_heart/composition/application_runtime.py",
             "AppSettings",
-            "GuiController retains the AppSettings compatibility DTO for view and runtime handoff while SettingsOwner exclusively owns load, normalization, migration, backup, and persistence.",
+            "The production composition root uses the AppSettings compatibility DTO only to connect focused owners while SettingsOwner exclusively owns load, normalization, migration, backup, and persistence.",
         ),
         SettingsRuntimeConfinementViolation(
             "legacy-settings-api-import",
@@ -1223,7 +1175,7 @@ def test_settings_public_facade_delegates_persistence_helpers_to_vnext_facade() 
 
 
 def test_controller_consumes_only_settings_owner_and_public_binding_contract() -> None:
-    controller_path = SOURCE_PACKAGE_ROOT / "ui" / "controller.py"
+    controller_path = SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py"
     tree = ast.parse(controller_path.read_text(encoding="utf-8"))
     imports = {
         node.module: {alias.name for alias in node.names}
@@ -1233,7 +1185,6 @@ def test_controller_consumes_only_settings_owner_and_public_binding_contract() -
 
     assert "puripuly_heart.app.ports.canonical_settings_persistence" not in imports
     assert imports["puripuly_heart.app.services.canonical_settings_persistence"] == {
-        "SettingsOwner",
         "compose_settings_owner",
     }
     forbidden_modules = {
@@ -1378,12 +1329,12 @@ def test_internal_source_imports_canonical_overlay_calibration_not_ui_facade() -
     assert offenders == set()
 
 
-def test_ui_controller_uses_adapter_seam_instead_of_concrete_provider_imports() -> None:
-    controller_path = SOURCE_PACKAGE_ROOT / "ui" / "controller.py"
+def test_application_composition_uses_adapter_seam_instead_of_provider_imports() -> None:
+    composition_path = SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py"
     imported_modules = set(
         _imported_modules(
-            "puripuly_heart.ui.controller",
-            controller_path,
+            "puripuly_heart.composition.application_runtime",
+            composition_path,
             _internal_module_names(),
         )
     )
@@ -1396,9 +1347,9 @@ def test_ui_controller_uses_adapter_seam_instead_of_concrete_provider_imports() 
     }
 
 
-def test_ui_controller_active_overlay_logic_avoids_legacy_resource_mirrors() -> None:
-    controller_path = SOURCE_PACKAGE_ROOT / "ui" / "controller.py"
-    tree = ast.parse(controller_path.read_text(encoding="utf-8"))
+def test_application_composition_avoids_legacy_overlay_resource_mirrors() -> None:
+    composition_path = SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py"
+    tree = ast.parse(composition_path.read_text(encoding="utf-8"))
     legacy_mirror_fields = {
         "_overlay_presenter",
         "_overlay_bridge",
@@ -1431,37 +1382,13 @@ def test_ui_controller_active_overlay_logic_avoids_legacy_resource_mirrors() -> 
     assert offenders == []
 
 
-def test_current_concrete_osc_imports_are_adapter_boundary_violations() -> None:
+def test_application_composition_has_no_concrete_osc_import_violations() -> None:
     orchestrator_rule = _rule_for_layer(ORCHESTRATOR)
-    ui_rule = _rule_for_layer(UI_ADAPTERS_RENDERERS)
-    expected = {
-        ImportViolation(
-            rule_id=ui_rule.rule_id,
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.chatbox_paginator",
-            importer_layer=UI_ADAPTERS_RENDERERS,
-            imported_layer=ADAPTERS,
-            reason=ui_rule.reason,
-        ),
-        ImportViolation(
-            rule_id=ui_rule.rule_id,
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.receiver",
-            importer_layer=UI_ADAPTERS_RENDERERS,
-            imported_layer=ADAPTERS,
-            reason=ui_rule.reason,
-        ),
-        ImportViolation(
-            rule_id=ui_rule.rule_id,
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.udp_sender",
-            importer_layer=UI_ADAPTERS_RENDERERS,
-            imported_layer=ADAPTERS,
-            reason=ui_rule.reason,
-        ),
-    }
-
-    assert expected <= _dependency_violations()
+    assert not any(
+        violation.importer == "src/puripuly_heart/composition/application_runtime.py"
+        and ".core.osc." in violation.imported
+        for violation in _dependency_violations()
+    )
     assert (
         ImportViolation(
             rule_id=orchestrator_rule.rule_id,
@@ -1512,7 +1439,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
         "_desktop_renderer_events_task",
     }
     disallowed_private_shims = {
-        "src/puripuly_heart/ui/controller.py": (
+        "src/puripuly_heart/composition/application_runtime.py": (
             "_overlay_runtime_for_private_alias",
             "def _get_github_star_prompt_runtime(",
             "def _github_star_prompt_runtime(",
@@ -1553,7 +1480,6 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "_overlay_calibration_owner:",
             "def _overlay_runtime(",
             "def _active_overlay_target(",
-            "def overlay_state(",
             "def failure_reason(",
             "def auto_restart_scheduled(",
             "@overlay_calibration.setter",
@@ -1701,18 +1627,21 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
 
     offenders: list[str] = []
     for relative_path, forbidden_tokens in disallowed_private_shims.items():
-        source = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        path = REPO_ROOT / relative_path
+        if not path.exists():
+            continue
+        source = path.read_text(encoding="utf-8")
         offenders.extend(
             f"{relative_path}: {token}" for token in forbidden_tokens if token in source
         )
 
-    controller_path = REPO_ROOT / "src/puripuly_heart/ui/controller.py"
-    controller_tree = ast.parse(controller_path.read_text(encoding="utf-8"))
-    for node in ast.walk(controller_tree):
+    composition_path = REPO_ROOT / "src/puripuly_heart/composition/application_runtime.py"
+    composition_tree = ast.parse(composition_path.read_text(encoding="utf-8"))
+    for node in ast.walk(composition_tree):
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             if node.name in controller_overlay_alias_shims:
                 offenders.append(
-                    f"src/puripuly_heart/ui/controller.py: def {node.name} "
+                    f"src/puripuly_heart/composition/application_runtime.py: def {node.name} "
                     f"at line {node.lineno}"
                 )
             continue
@@ -1723,14 +1652,15 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             and node.value.id == "self"
         ):
             offenders.append(
-                f"src/puripuly_heart/ui/controller.py: self.{node.attr} " f"at line {node.lineno}"
+                "src/puripuly_heart/composition/application_runtime.py: "
+                f"self.{node.attr} at line {node.lineno}"
             )
         if isinstance(node, ast.Assign | ast.AnnAssign):
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             for target in targets:
                 if isinstance(target, ast.Name) and target.id in controller_overlay_alias_shims:
                     offenders.append(
-                        "src/puripuly_heart/ui/controller.py: "
+                        "src/puripuly_heart/composition/application_runtime.py: "
                         f"field {target.id} at line {target.lineno}"
                     )
 

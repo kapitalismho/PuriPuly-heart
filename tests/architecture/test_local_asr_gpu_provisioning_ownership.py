@@ -5,7 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = ROOT / "src" / "puripuly_heart"
-CONTROLLER_PATH = SOURCE_ROOT / "ui" / "controller.py"
+COMPOSITION_PATH = SOURCE_ROOT / "composition" / "application_runtime.py"
+UI_RUNTIME_PATH = SOURCE_ROOT / "app" / "adapters" / "ui_runtime.py"
 INTERACTION_PATH = SOURCE_ROOT / "app" / "services" / "gpu_runtime_interaction.py"
 COMPOSITION_PATH = SOURCE_ROOT / "app" / "wiring_composition.py"
 
@@ -35,17 +36,12 @@ def test_gpu_provisioning_owner_is_constructed_only_by_gpu_interaction_owner() -
     assert constructions == ["src/puripuly_heart/app/services/gpu_runtime_interaction.py"]
 
 
-def test_controller_gpu_provisioning_commands_are_compatibility_delegates() -> None:
-    selected = _method_source(CONTROLLER_PATH, "install_selected_gpu_model_if_needed")
-    repair = _method_source(CONTROLLER_PATH, "install_or_repair_gpu_model")
-    getter = _method_source(CONTROLLER_PATH, "_get_gpu_runtime_interaction_owner")
+def test_ui_gpu_provisioning_command_delegates_to_composed_interaction_owner() -> None:
+    selected = _method_source(UI_RUNTIME_PATH, "install_selected_gpu_model_if_needed")
+    composition = COMPOSITION_PATH.read_text(encoding="utf-8")
 
-    assert "install_selected_model_if_needed()" in selected
-    assert "_get_gpu_runtime_interaction_owner()" in selected
+    assert "self.gpu.install_selected_model_if_needed()" in selected
     assert "LocalASRInstallRequest" not in selected
-    assert ".install_or_repair(" in repair
-    assert "_get_gpu_runtime_interaction_owner()" in repair
-    assert "LocalASRInstallRequest" not in repair
-    assert "create_gpu_runtime_interaction_owner(" in getter
-    assert "LocalASRGpuProvisioningOwner(" not in getter
+    assert composition.count("create_gpu_runtime_interaction_owner(") == 1
+    assert "LocalASRGpuProvisioningOwner(" not in composition
     assert "LocalASRGpuProvisioningOwner(" in INTERACTION_PATH.read_text(encoding="utf-8")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Awaitable, Callable
-from typing import Any, Protocol
+from dataclasses import dataclass
 
 from puripuly_heart.app.ports.desktop_overlay import DesktopOverlayRuntimeEffectsPort
 from puripuly_heart.app.ports.overlay_calibration import (
@@ -12,101 +12,86 @@ from puripuly_heart.app.ports.settings_runtime_effects import (
     SettingsRuntimeState,
     SettingsRuntimeTransition,
 )
+from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
+from puripuly_heart.app.services.application_runtime_logging import (
+    ApplicationRuntimeLoggingOwner,
+)
+from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.clipboard_auto_translation import (
+    ClipboardAutoTranslationOwner,
+)
+from puripuly_heart.app.services.github_star_prompt import GithubStarPromptOwner
+from puripuly_heart.app.services.gpu_runtime_interaction import GpuRuntimeInteractionOwner
 from puripuly_heart.app.services.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
-from puripuly_heart.app.services.peer_application import PeerApplicationOwner
+from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
+from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
+from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
+from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
+from puripuly_heart.app.wiring_provider_runtime import ProviderRuntimeSignatures
+from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.app.wiring_stt_factory import (
     build_peer_stt_runtime_signature,
     build_self_capture_vad_signature,
     build_self_stt_runtime_signature,
 )
-from puripuly_heart.config.settings import OVERLAY_TARGET_DESKTOP, AppSettings
+from puripuly_heart.config.settings import (
+    OVERLAY_TARGET_DESKTOP,
+    AppSettings,
+    LLMProviderName,
+)
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
+from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 
-class SettingsRuntimeEffectsHost(Protocol):
-    app: Any
-    hub: Any
-    settings: AppSettings | None
-    vrc_mic_audio_gate: Any
-    _last_microphone_test_audio_settings_signature: object | None
-    _last_self_stt_runtime_signature: object | None
-    _last_stt_runtime_signature: object | None
-    _last_vrc_mic_sync_enabled: bool | None
-
-    async def _preserve_github_star_prompt_observation_before_settings_replace(
-        self,
-        settings: AppSettings,
-    ) -> None: ...
-
-    def _capture_runtime_signatures_before_canonical_mutation(self) -> None: ...
-
-    def _microphone_test_audio_settings_signature(
-        self,
-        settings: AppSettings | None,
-    ) -> object | None: ...
-
-    async def stop_microphone_test_for_audio_settings_change(self) -> None: ...
-
-    def _peer_translation_activation_requested_for(
-        self,
-        settings: AppSettings,
-    ) -> bool: ...
-
-    def _peer_runtime_should_be_active(self, settings: object) -> bool: ...
-
-    def _is_qwen_llm(self, settings: AppSettings) -> bool: ...
-
-    def log_basic(self, message: str) -> None: ...
-
-    def log_detailed(self, message: str) -> None: ...
-
-    async def _sync_clipboard_watcher_with_policy(
-        self,
-        *,
-        strict_runtime_errors: bool,
-    ) -> None: ...
-
-    def _get_local_asr_provisioning_owner(self) -> Any: ...
-
-    def _gpu_runtime_interaction_state(self) -> Any: ...
-
-    def _sync_effective_hub_flags(self, settings: AppSettings) -> None: ...
-
-    def _log_error(self, message: str) -> None: ...
-
-    async def set_overlay_enabled(self, enabled: bool) -> None: ...
-
-    async def _configure_vrc_mic_receiver(self, *, enabled: bool) -> None: ...
-
-    def _canonical_vnext_settings_for(self, settings: AppSettings) -> object: ...
-
-    def _sync_signature_caches(self, settings: AppSettings) -> None: ...
-
-    def _settings_projection(self) -> Any: ...
-
-    def _refresh_overlay_peer_consumers(self) -> None: ...
+@dataclass(slots=True)
+class SettingsRuntimeEffectsState:
+    microphone_audio_signature: object | None = None
 
 
 class SettingsRuntimeEffectsAdapter:
     def __init__(
         self,
-        host: SettingsRuntimeEffectsHost,
         *,
+        state: SettingsRuntimeEffectsState,
+        settings: SettingsOwner,
+        presentation: UiPresentationPort,
+        runtime_logging: ApplicationRuntimeLoggingOwner,
+        pipeline: RuntimePipelineHandle,
+        runtime_signatures: ProviderRuntimeSignatures,
+        microphone: MicrophoneTestRuntime,
+        clipboard: ClipboardAutoTranslationOwner,
+        provisioning: LocalASRProvisioningPort,
+        gpu: GpuRuntimeInteractionOwner,
+        vrc_mic_sync: VrcMicSyncOwner,
+        projection: SettingsProjectionOwner,
+        github_prompt: Callable[[], GithubStarPromptOwner],
         desktop_overlay: DesktopOverlayRuntimeEffectsPort[AppSettings],
         calibration: OverlayCalibrationRuntimeEffectsPort,
         overlay: OverlayApplicationOwner,
         overlay_state_provider: Callable[[AppSettings | None], OverlayApplicationState],
-        peer: Callable[[], PeerApplicationOwner],
+        peer: PeerApplicationRuntime,
         self_capture: Callable[[], SelfCaptureSessionOwner | None],
         clear_local_pending: Callable[[], None],
         replace_self_stt: Callable[[bool], Awaitable[None]],
     ) -> None:
-        self._host = host
+        self._state = state
+        self._settings = settings
+        self._presentation = presentation
+        self._runtime_logging = runtime_logging
+        self._pipeline = pipeline
+        self._runtime_signatures = runtime_signatures
+        self._microphone = microphone
+        self._clipboard = clipboard
+        self._provisioning = provisioning
+        self._gpu = gpu
+        self._vrc_mic_sync = vrc_mic_sync
+        self._projection = projection
+        self._github_prompt = github_prompt
         self._desktop_overlay = desktop_overlay
         self._calibration = calibration
         self._overlay = overlay
@@ -117,29 +102,37 @@ class SettingsRuntimeEffectsAdapter:
         self._replace_self_stt = replace_self_stt
 
     async def preserve_before_replace(self, settings: AppSettings) -> None:
-        await self._host._preserve_github_star_prompt_observation_before_settings_replace(settings)
+        await self._github_prompt().preserve_before_settings_replace(settings)
 
     def capture_runtime_signatures(self) -> None:
-        self._host._capture_runtime_signatures_before_canonical_mutation()
+        settings = self._settings.current
+        if settings is None:
+            return
+        self._runtime_signatures.capture_peer_before_canonical_mutation(
+            settings,
+            canonical=self._canonical_settings(settings),
+            peer=self._peer.owner,
+        )
 
     async def prepare(
         self,
         current_settings: AppSettings | None,
         next_settings: AppSettings,
     ) -> SettingsRuntimeTransition[AppSettings]:
-        host = self._host
+        microphone_owner = self._microphone.owner_if_created
         previous_microphone_signature = (
-            host._last_microphone_test_audio_settings_signature
-            or host._microphone_test_audio_settings_signature(current_settings)
+            self._state.microphone_audio_signature
+            or (microphone_owner.audio_signature if microphone_owner is not None else None)
+            or self._microphone.audio_signature(current_settings)
         )
-        next_microphone_signature = host._microphone_test_audio_settings_signature(next_settings)
+        next_microphone_signature = self._microphone.audio_signature(next_settings)
         if (
             previous_microphone_signature is not None
             and previous_microphone_signature != next_microphone_signature
         ):
-            await host.stop_microphone_test_for_audio_settings_change()
+            await self._microphone.stop()
 
-        previous_locale = host.app.current_locale()
+        previous_locale = self._presentation.current_locale()
         previous_overlay_enabled = (
             current_settings.ui.overlay_enabled if current_settings is not None else False
         )
@@ -164,7 +157,7 @@ class SettingsRuntimeEffectsAdapter:
             and next_settings.ui.overlay_enabled
             and self._overlay.runtime_is_active()
         ):
-            host.log_basic(
+            self._runtime_logging.emit_basic(
                 "[Overlay] Target changed while running; stopping current overlay before switch"
             )
             next_settings = copy.deepcopy(next_settings)
@@ -176,7 +169,7 @@ class SettingsRuntimeEffectsAdapter:
                 next_settings,
             )
         )
-        peer = self._peer()
+        peer = self._peer.owner
         previous_peer_translation_enabled = (
             peer.last_intent_enabled
             if peer.last_intent_enabled is not None
@@ -190,23 +183,21 @@ class SettingsRuntimeEffectsAdapter:
             peer.last_activation_requested
             if peer.last_activation_requested is not None
             else (
-                host._peer_translation_activation_requested_for(current_settings)
+                peer.activation_requested(
+                    intent_enabled=current_settings.ui.peer_translation_enabled,
+                    eula_accepted=current_settings.ui.peer_translation_eula_accepted,
+                )
                 if current_settings is not None
                 else False
             )
         )
-        previous_self_signature = (
-            host._last_self_stt_runtime_signature or host._last_stt_runtime_signature
-        )
+        previous_self_signature = self._runtime_signatures.last_self_runtime
         previous_peer_signature = peer.last_runtime_signature
-        previous_source_language = host.hub.source_language if host.hub else None
-        previous_target_language = host.hub.target_language if host.hub else None
-        previous_peer_source_language = (
-            getattr(host.hub, "peer_source_language", None) if host.hub else None
-        )
-        previous_peer_target_language = (
-            getattr(host.hub, "peer_target_language", None) if host.hub else None
-        )
+        hub = self._pipeline.hub
+        previous_source_language = hub.source_language if hub else None
+        previous_target_language = hub.target_language if hub else None
+        previous_peer_source_language = getattr(hub, "peer_source_language", None) if hub else None
+        previous_peer_target_language = getattr(hub, "peer_target_language", None) if hub else None
         previous_peer_source_mode = (
             previous_settings.languages.peer_source_mode if previous_settings is not None else None
         )
@@ -265,18 +256,18 @@ class SettingsRuntimeEffectsAdapter:
         if source_language_changed or target_language_changed:
             presenter = self._overlay.current_presenter()
             bridge = self._overlay.current_bridge()
-            host.log_basic(
+            self._runtime_logging.emit_basic(
                 "[Settings] Applying languages: "
                 f"source={previous_source_language}->{next_settings.languages.source_language} "
                 f"target={previous_target_language}->{next_settings.languages.target_language}"
             )
-            host.log_detailed(
+            self._runtime_logging.emit_detailed(
                 "[Settings] Language apply detail: "
                 f"overlay_state={self._overlay.snapshot.state} "
                 f"presenter_attached={presenter is not None} "
                 f"bridge_attached={bridge is not None} "
                 "overlay_sink_matches_presenter="
-                f"{host.hub is not None and presenter is not None and getattr(host.hub, 'overlay_sink', None) is presenter}"
+                f"{hub is not None and presenter is not None and getattr(hub, 'overlay_sink', None) is presenter}"
             )
         return SettingsRuntimeTransition(
             settings=next_settings,
@@ -301,11 +292,8 @@ class SettingsRuntimeEffectsAdapter:
         self,
         transition: SettingsRuntimeTransition[AppSettings],
     ) -> None:
-        host = self._host
         settings = transition.settings
-        host._last_microphone_test_audio_settings_signature = (
-            host._microphone_test_audio_settings_signature(settings)
-        )
+        self._state.microphone_audio_signature = self._microphone.audio_signature(settings)
         self._calibration.sync_from_settings(settings)
         self._desktop_overlay.sync_from_settings(settings)
 
@@ -320,35 +308,34 @@ class SettingsRuntimeEffectsAdapter:
         )
 
     def restore_memory(self, settings: AppSettings) -> None:
-        host = self._host
         restored_settings = copy.deepcopy(settings)
-        host.settings = restored_settings
+        self._settings.current = restored_settings
         self._calibration.sync_from_settings(restored_settings)
-        if host.hub is not None:
-            host.hub.source_language = restored_settings.languages.source_language
-            host.hub.target_language = restored_settings.languages.target_language
-            host.hub.peer_source_language = restored_settings.languages.peer_source_language
-            host.hub.peer_target_language = restored_settings.languages.peer_target_language
-            host.hub.system_prompt = restored_settings.system_prompt
-            host.hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            host.hub.low_latency_merge_gap_ms = restored_settings.stt.low_latency_merge_gap_ms
-            host.hub.low_latency_spec_retry_max = restored_settings.stt.low_latency_spec_retry_max
-            host.hub.hangover_s = (
+        hub = self._pipeline.hub
+        if hub is not None:
+            hub.source_language = restored_settings.languages.source_language
+            hub.target_language = restored_settings.languages.target_language
+            hub.peer_source_language = restored_settings.languages.peer_source_language
+            hub.peer_target_language = restored_settings.languages.peer_target_language
+            hub.system_prompt = restored_settings.system_prompt
+            hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
+            hub.low_latency_merge_gap_ms = restored_settings.stt.low_latency_merge_gap_ms
+            hub.low_latency_spec_retry_max = restored_settings.stt.low_latency_spec_retry_max
+            hub.hangover_s = (
                 restored_settings.stt.low_latency_vad_hangover_ms / 1000.0
                 if FIXED_TRANSLATION_POLICY.fast_translation_enabled
                 else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
             )
-            host.hub.peer_hangover_s = restored_settings.desktop_audio.vad_hangover_ms / 1000.0
-            host.hub.chatbox_include_source = restored_settings.osc.chatbox_include_source
-            host._sync_effective_hub_flags(restored_settings)
-        host._sync_signature_caches(restored_settings)
+            hub.peer_hangover_s = restored_settings.desktop_audio.vad_hangover_ms / 1000.0
+            hub.chatbox_include_source = restored_settings.osc.chatbox_include_source
+            self._sync_effective_hub_flags(restored_settings)
+        self._sync_signatures(restored_settings)
 
     def sync_signatures(self, settings: AppSettings) -> None:
-        self._host._sync_signature_caches(settings)
+        self._sync_signatures(settings)
 
     def state(self, settings: AppSettings) -> SettingsRuntimeState:
-        host = self._host
-        hub = host.hub
+        hub = self._pipeline.hub
         self_capture = self._self_capture()
         return SettingsRuntimeState(
             runtime_available=hub is not None,
@@ -356,9 +343,9 @@ class SettingsRuntimeEffectsAdapter:
                 self_capture is not None and self_capture.snapshot.desired_active
             ),
             self_stt_available=hub is not None and hub.has_stt_provider("self"),
-            peer_stt_desired=host._peer_runtime_should_be_active(settings),
+            peer_stt_desired=self._peer.owner.desired_active(self._peer.state_for(settings)),
             peer_stt_available=hub is not None and hub.has_stt_provider("peer"),
-            qwen_llm_desired=host._is_qwen_llm(settings),
+            qwen_llm_desired=settings.provider.llm == LLMProviderName.QWEN,
             llm_available=hub is not None and hub.llm is not None,
         )
 
@@ -369,36 +356,40 @@ class SettingsRuntimeEffectsAdapter:
         strict_runtime_errors: bool,
         reload_settings_view: bool,
     ) -> None:
-        host = self._host
         settings = transition.settings
         await self._desktop_overlay.apply_controls(transition.desktop_runtime_controls)
-        await host._sync_clipboard_watcher_with_policy(
-            strict_runtime_errors=strict_runtime_errors,
-        )
-        provisioning = host._get_local_asr_provisioning_owner()
-        await provisioning.inspect_cpu()
-        await provisioning.inspect_gpu(
-            explicit_intent=host._gpu_runtime_interaction_state().selected_provider_requires_model,
+        previous_strict_runtime_errors = self._clipboard.strict_runtime_errors
+        self._clipboard.strict_runtime_errors = strict_runtime_errors
+        try:
+            await self._clipboard.sync(
+                enabled=settings.ui.clipboard_auto_translate_enabled,
+            )
+        finally:
+            self._clipboard.strict_runtime_errors = previous_strict_runtime_errors
+        await self._provisioning.inspect_cpu()
+        await self._provisioning.inspect_gpu(
+            explicit_intent=self._gpu.state_provider().selected_provider_requires_model,
         )
         self._clear_local_pending()
 
-        if host.hub is not None:
-            host.hub.source_language = settings.languages.source_language
-            host.hub.target_language = settings.languages.target_language
-            host.hub.peer_source_language = settings.languages.peer_source_language
-            host.hub.peer_target_language = settings.languages.peer_target_language
-            host.hub.system_prompt = settings.system_prompt
-            host.hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            host.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
-            host.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-            host.hub.hangover_s = (
+        hub = self._pipeline.hub
+        if hub is not None:
+            hub.source_language = settings.languages.source_language
+            hub.target_language = settings.languages.target_language
+            hub.peer_source_language = settings.languages.peer_source_language
+            hub.peer_target_language = settings.languages.peer_target_language
+            hub.system_prompt = settings.system_prompt
+            hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
+            hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
+            hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
+            hub.hangover_s = (
                 settings.stt.low_latency_vad_hangover_ms / 1000.0
                 if FIXED_TRANSLATION_POLICY.fast_translation_enabled
                 else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
             )
-            host.hub.peer_hangover_s = settings.desktop_audio.vad_hangover_ms / 1000.0
-            host.hub.chatbox_include_source = settings.osc.chatbox_include_source
-            host._sync_effective_hub_flags(settings)
+            hub.peer_hangover_s = settings.desktop_audio.vad_hangover_ms / 1000.0
+            hub.chatbox_include_source = settings.osc.chatbox_include_source
+            self._sync_effective_hub_flags(settings)
 
             if transition.source_language_changed or transition.target_language_changed:
                 await self._clear_language_runtime_state(
@@ -419,20 +410,23 @@ class SettingsRuntimeEffectsAdapter:
             )
 
         if transition.previous_overlay_enabled != settings.ui.overlay_enabled:
-            await host.set_overlay_enabled(settings.ui.overlay_enabled)
+            await self._overlay.set_enabled(settings.ui.overlay_enabled)
 
-        if host._last_vrc_mic_sync_enabled != settings.osc.vrc_mic_intercept:
-            if host.vrc_mic_audio_gate is not None:
-                host.vrc_mic_audio_gate.set_enabled(settings.osc.vrc_mic_intercept)
-            host.log_detailed(f"[Settings] VRC mic sync enabled: {settings.osc.vrc_mic_intercept}")
-            await host._configure_vrc_mic_receiver(enabled=settings.osc.vrc_mic_intercept)
+        if self._vrc_mic_sync.last_enabled != settings.osc.vrc_mic_intercept:
+            self._runtime_logging.emit_detailed(
+                f"[Settings] VRC mic sync enabled: {settings.osc.vrc_mic_intercept}"
+            )
+            await self._vrc_mic_sync.configure(enabled=settings.osc.vrc_mic_intercept)
 
         current_self_signature = build_self_stt_runtime_signature(settings)
         current_peer_signature = build_peer_stt_runtime_signature(
             settings,
-            canonical_settings=host._canonical_vnext_settings_for(settings),
+            canonical_settings=self._canonical_settings(settings),
         )
-        next_peer_activation_requested = host._peer_translation_activation_requested_for(settings)
+        next_peer_activation_requested = self._peer.owner.activation_requested(
+            intent_enabled=settings.ui.peer_translation_enabled,
+            eula_accepted=settings.ui.peer_translation_eula_accepted,
+        )
         should_restart_stt = (
             transition.previous_self_signature is not None
             and current_self_signature != transition.previous_self_signature
@@ -444,10 +438,10 @@ class SettingsRuntimeEffectsAdapter:
             or transition.previous_peer_activation_requested != next_peer_activation_requested
         )
 
-        host._sync_signature_caches(settings)
+        self._sync_signatures(settings)
 
         if transition.source_language_changed or transition.target_language_changed:
-            host.log_detailed(
+            self._runtime_logging.emit_detailed(
                 "[Settings] Language runtime impact: "
                 f"should_restart_stt={should_restart_stt} "
                 f"should_refresh_peer={should_refresh_peer} "
@@ -455,9 +449,9 @@ class SettingsRuntimeEffectsAdapter:
                 f"next_overlay_enabled={settings.ui.overlay_enabled}"
             )
 
-        if should_refresh_peer and host.hub is not None:
-            await self._peer().refresh_runtime()
-            host._sync_effective_hub_flags(settings)
+        if should_refresh_peer and hub is not None:
+            await self._peer.owner.refresh_runtime()
+            self._sync_effective_hub_flags(settings)
 
         if should_restart_stt:
             smooth_local = bool(
@@ -474,21 +468,21 @@ class SettingsRuntimeEffectsAdapter:
             or transition.peer_target_language_changed
             or transition.peer_source_mode_changed
         ):
-            host._settings_projection().render(
+            self._projection.render(
                 settings,
                 preserve_custom_vocab_draft=True,
             )
 
         if transition.previous_locale != settings.ui.locale:
-            host.app.set_locale(settings.ui.locale)
+            self._presentation.set_locale(settings.ui.locale)
             try:
-                host.app.apply_locale()
+                self._presentation.apply_locale()
             except Exception:
-                host._log_error("Failed to apply locale")
+                self._runtime_logging.emit_basic("Failed to apply locale")
                 if strict_runtime_errors:
                     raise
 
-        host._refresh_overlay_peer_consumers()
+        self._overlay.publish_presentation()
 
     async def _clear_language_runtime_state(
         self,
@@ -496,16 +490,39 @@ class SettingsRuntimeEffectsAdapter:
         *,
         strict_runtime_errors: bool,
     ) -> None:
-        host = self._host
+        hub = self._pipeline.hub
+        if hub is None:
+            return
         try:
-            await host.hub.clear_language_runtime_state(channel=channel)
+            await hub.clear_language_runtime_state(channel=channel)
         except Exception as exc:
             if strict_runtime_errors:
-                host._log_error(f"Failed to clear language runtime state for {channel}")
+                self._runtime_logging.emit_basic(
+                    f"Failed to clear language runtime state for {channel}"
+                )
             else:
-                host._log_error(f"Failed to clear language runtime state for {channel}: {exc}")
+                self._runtime_logging.emit_basic(
+                    f"Failed to clear language runtime state for {channel}: {exc}"
+                )
             if strict_runtime_errors:
                 raise
+
+    def _canonical_settings(self, settings: AppSettings) -> object:
+        return self._settings.project(
+            settings,
+            authoritative=self._settings.authoritative,
+        )
+
+    def _sync_signatures(self, settings: AppSettings) -> None:
+        self._runtime_signatures.sync(
+            settings,
+            canonical=self._canonical_settings(settings),
+            peer=self._peer.owner,
+        )
+        self._state.microphone_audio_signature = self._microphone.audio_signature(settings)
+
+    def _sync_effective_hub_flags(self, settings: AppSettings) -> None:
+        self._peer.owner.sync_effective_flags(self._peer.state_for(settings))
 
     @staticmethod
     def _effective_peer_language(language: str, peer_language: str) -> str:
@@ -514,5 +531,5 @@ class SettingsRuntimeEffectsAdapter:
 
 __all__ = [
     "SettingsRuntimeEffectsAdapter",
-    "SettingsRuntimeEffectsHost",
+    "SettingsRuntimeEffectsState",
 ]

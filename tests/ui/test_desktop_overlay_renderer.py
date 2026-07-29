@@ -1922,7 +1922,6 @@ def test_desktop_overlay_preview_guard_avoids_provider_broker_stt_translation_se
         "puripuly_heart.core.storage.secrets",
         "puripuly_heart.core.stt",
         "puripuly_heart.providers",
-        "puripuly_heart.ui.controller",
     )
     original_import = builtins.__import__
 

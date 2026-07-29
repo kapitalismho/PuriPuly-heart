@@ -342,10 +342,6 @@ def test_order34_named_owner_allowlist_does_not_claim_stt_controller_legacy_task
 
 def test_order37_named_owner_allowlist_retires_controller_bounds_task_debt() -> None:
     assert (
-        "src/puripuly_heart/ui/controller.py",
-        ASYNCIO_CREATE_TASK,
-    ) not in LEGACY_TASK_CREATION_ALLOWLIST
-    assert (
         "src/puripuly_heart/ui/foundation/runtime.py",
         RUN_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
@@ -388,10 +384,6 @@ def test_order39_named_owner_allowlist_adds_receiver_prompt_and_bounds_owners() 
         ASYNCIO_CREATE_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
     assert (
-        "src/puripuly_heart/ui/controller.py",
-        ASYNCIO_CREATE_TASK,
-    ) not in LEGACY_TASK_CREATION_ALLOWLIST
-    assert (
         "src/puripuly_heart/core/runtime/desktop_overlay_bounds.py",
         ASYNCIO_CREATE_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
@@ -409,7 +401,9 @@ def test_order40_named_owner_allowlist_adds_vrchat_osc_presence_owner() -> None:
 
 
 def test_order41_managed_refresh_scheduling_uses_its_named_owner() -> None:
-    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    controller_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
+    )
     owner_path = REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed_usage.py"
     controller_methods = {
         node.name: ast.unparse(node)
@@ -428,7 +422,9 @@ def test_order41_managed_refresh_scheduling_uses_its_named_owner() -> None:
 
 
 def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:
-    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    controller_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
+    )
     output_path = REPO_ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "output.py"
     controller_tree = ast.parse(controller_path.read_text(encoding="utf-8"))
     output_tree = ast.parse(output_path.read_text(encoding="utf-8"))
@@ -443,9 +439,9 @@ def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     }
 
-    controller_wait = controller_methods["_wait_for_ui_event_bridge_started"]
-    assert "_ui_background_scope" not in controller_wait
-    assert "wait_for_ui_event_bridge_started" in controller_wait
+    composition_wait = controller_methods["wait_for_event_bridge"]
+    assert "_ui_background_scope" not in composition_wait
+    assert "hub.output_runtime.wait_for_ui_event_bridge_started" in composition_wait
     assert (
         "_ui_event_bridge_started_wait_task" in output_methods["wait_for_ui_event_bridge_started"]
     )
@@ -453,7 +449,9 @@ def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:
 
 
 def test_order44_local_asr_owner_retires_controller_background_scope() -> None:
-    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    controller_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
+    )
     cpu_repair_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "local_asr_cpu_repair.py"
     )
@@ -465,15 +463,16 @@ def test_order44_local_asr_owner_retires_controller_background_scope() -> None:
     provisioning_source = provisioning_path.read_text(encoding="utf-8")
 
     assert "_ui_background_scope" not in controller_source
-    assert "GuiControllerBackgroundScope" not in controller_source
     assert "result_handler=" not in controller_source
     assert "result_handler=lambda result: self.handle_install_result(" in cpu_repair_source
     assert "_result_delivery_tasks" in provisioning_source
     assert "LocalASRProvisioningOwner:install-result-" in provisioning_source
 
 
-def test_controller_does_not_retain_dead_shutdown_stt_or_provider_ownership() -> None:
-    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+def test_application_composition_does_not_retain_dead_shutdown_or_provider_algorithms() -> None:
+    controller_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
+    )
     provider_settings_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_settings.py"
     )
@@ -484,7 +483,7 @@ def test_controller_does_not_retain_dead_shutdown_stt_or_provider_ownership() ->
         REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "application_startup.py"
     )
     startup_adapter_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "controller_application_startup.py"
+        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_startup.py"
     )
     shutdown_path = (
         REPO_ROOT
@@ -506,7 +505,7 @@ def test_controller_does_not_retain_dead_shutdown_stt_or_provider_ownership() ->
     assert "_provider_secret_change_lock" not in source
     assert "_provider_secret_change_serialization_owner" not in source
     assert "_provider_secret_change_owner" not in source
-    assert "provider_settings_owner: ProviderSettingsOwner" in source
+    assert "provider_settings: ProviderSettingsOwner | None" in source
     assert "secret_change: ProviderSecretChangeOwner" in provider_settings_source
     assert "class ProviderApplicationOwner" in provider_settings_source
     assert "class ProviderRuntimeOwner" in provider_runtime_source
@@ -521,16 +520,16 @@ def test_controller_does_not_retain_dead_shutdown_stt_or_provider_ownership() ->
     assert "SettingsRuntimeApplyBoundary" not in provider_runtime_source
     assert "_ControllerSttLanguageAudioRuntimeApply" not in provider_runtime_source
     assert "_gpu_provider_recovery_lock" not in source
-    assert "_gpu_provider_recovery_owner" in source
+    assert "gpu_recovery: GpuProviderRecoveryApplicationOwner | None" in source
     assert "_overlay_lock" not in source
-    assert "_overlay_application_owner" in source
+    assert "overlay: OverlayApplicationOwner | None" in source
     assert "def application_shutdown_callbacks" not in source
     assert "ApplicationShutdownCoordinator" not in source
     assert "application_shutdown_callback(" not in source
     assert "class ApplicationStartupOwner" in startup_source
     assert "_get_" not in startup_source
     assert "Any" not in startup_source
-    assert "await provisioning.inspect_cpu()" in startup_adapter_source
-    assert "await runtime.runtime_composition.pipeline_launcher.launch(" in startup_adapter_source
+    assert "await self.provisioning.inspect_cpu()" in startup_adapter_source
+    assert "await self.pipeline_launcher.launch(" in startup_adapter_source
     assert "compose_application_runtime_shutdown_callbacks" in shutdown_source
     assert "SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS" in shutdown_source

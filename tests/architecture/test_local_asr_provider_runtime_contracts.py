@@ -94,8 +94,8 @@ def test_contract_owner_consumes_provisioning_only_through_public_port() -> None
     assert "inspect_local_gpu_install" not in source
 
 
-def test_controller_has_no_provider_construction_or_gpu_runtime_lifecycle_path() -> None:
-    source = (SOURCE_ROOT / "ui" / "controller.py").read_text(encoding="utf-8")
+def test_application_composition_has_no_provider_runtime_lifecycle_algorithm() -> None:
+    source = (SOURCE_ROOT / "composition" / "application_runtime.py").read_text(encoding="utf-8")
 
     for retired_name in (
         "_gpu_asr_runtime",

@@ -23,12 +23,13 @@ def test_managed_usage_owner_is_independent_of_controller_ui_and_settings_shapes
     imports = _imports(owner_path)
 
     assert not any(name.startswith("puripuly_heart.ui") for name in imports)
-    assert "puripuly_heart.ui.controller" not in imports
     assert "puripuly_heart.config.settings" not in imports
 
 
 def test_controller_no_longer_owns_managed_usage_state_or_refresh_algorithms() -> None:
-    controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    controller_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
+    )
     tree = ast.parse(controller_path.read_text(encoding="utf-8"))
     methods = {
         node.name

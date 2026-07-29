@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+COMPOSITION_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
+UI_RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "ui_runtime.py"
 PROVIDER_SETTINGS_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_settings.py"
 )
@@ -16,8 +17,9 @@ OPENROUTER_PKCE_PATH = (
 MANAGED_ACCOUNT_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_managed_account.py"
 
 
-def test_controller_composes_application_settings_patch_repository() -> None:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+def test_application_composes_settings_patch_repository_owners() -> None:
+    source = COMPOSITION_PATH.read_text(encoding="utf-8")
+    ui_runtime_source = UI_RUNTIME_PATH.read_text(encoding="utf-8")
     provider_settings_source = PROVIDER_SETTINGS_PATH.read_text(encoding="utf-8")
     settings_application_source = SETTINGS_APPLICATION_PATH.read_text(encoding="utf-8")
     openrouter_pkce_source = OPENROUTER_PKCE_PATH.read_text(encoding="utf-8")
@@ -62,10 +64,10 @@ def test_controller_composes_application_settings_patch_repository() -> None:
     ):
         assert f"def {method_name}(" not in source
 
-    language_change_source = source.split(
+    language_change_source = ui_runtime_source.split(
         "    async def on_dashboard_language_change(",
         maxsplit=1,
-    )[1].split("\n    async def ", maxsplit=1)[0]
+    )[1].split("\n    def ", maxsplit=1)[0]
     assert "apply_language_selection" in language_change_source
     assert ".begin(" not in language_change_source
     assert ".apply_legacy_delta(" not in language_change_source

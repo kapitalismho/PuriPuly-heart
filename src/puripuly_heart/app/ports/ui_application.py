@@ -7,7 +7,10 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
-from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.ports.ui_models import (
+    GpuNoticeAction,
+    OverlayPeerPresentationState,
+)
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
 from puripuly_heart.app.services.application_shutdown import (
@@ -269,7 +272,7 @@ class UiApplicationPort(Protocol):
 
     def clear_debug_audio_fault_profiles(self) -> None: ...
 
-    def handle_gpu_notice_action(self) -> object: ...
+    def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object: ...
 
 
 __all__ = ["UiApplicationPort", "UiApplicationState"]

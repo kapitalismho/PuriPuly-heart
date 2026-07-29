@@ -15,7 +15,7 @@ from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 
 ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "peer_channel.py"
-CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
 SOURCE_ADAPTER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_source.py"
@@ -59,7 +59,7 @@ def test_peer_capture_owner_has_no_ui_hub_or_settings_dependency() -> None:
     assert "puripuly_heart.config.settings" not in imports
 
 
-def test_production_controller_composes_one_peer_owner_through_ports() -> None:
+def test_production_composition_composes_one_peer_owner_through_ports() -> None:
     tree = ast.parse(CAPTURE_WIRING_PATH.read_text(encoding="utf-8"))
     calls = [
         node
@@ -92,23 +92,12 @@ def test_production_controller_composes_one_peer_owner_through_ports() -> None:
     assert "PeerRuntimeConfig" not in controller_source
 
 
-def test_controller_does_not_construct_peer_owner_resources_outside_adapters() -> None:
-    tree = ast.parse(CONTROLLER_PATH.read_text(encoding="utf-8"))
-    controller = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.ClassDef) and node.name == "GuiController"
-    )
-    resource_methods = {
-        node.name
-        for node in controller.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and node.name
-        in {
-            "_run_peer_audio_vad_loop",
-        }
-    }
-    assert resource_methods == set()
+def test_composition_does_not_construct_peer_owner_resources_outside_adapters() -> None:
+    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+
+    assert "def _run_peer_audio_vad_loop(" not in source
+    assert "DesktopLoopbackAudioSource(" not in source
+    assert "ProcessAudioCaptureSource(" not in source
 
 
 def test_controller_composes_peer_capture_source_adapter_without_source_algorithm() -> None:
@@ -127,7 +116,6 @@ def test_peer_capture_source_adapter_has_no_ui_resolution_or_lifecycle_ownership
     source = SOURCE_ADAPTER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "AppSettings" not in source
     assert "ProcessCaptureResolver" not in source
     assert "asyncio" not in source
@@ -159,7 +147,6 @@ def test_peer_target_resolver_has_no_ui_source_or_session_lifecycle_ownership() 
     source = TARGET_RESOLVER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "AppSettings" not in source
     assert "DesktopLoopbackAudioSource" not in source
     assert "ProcessAudioCaptureSource" not in source
@@ -191,7 +178,6 @@ def test_peer_vad_adapter_has_no_ui_self_vad_or_session_lifecycle_ownership() ->
     source = VAD_ADAPTER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "AppSettings" not in source
     assert "SelfCaptureSessionConfig" not in source
     assert "run_audio_vad_loop" not in source
@@ -221,7 +207,6 @@ def test_peer_audio_loop_adapter_has_no_ui_task_or_session_lifecycle_ownership()
     source = AUDIO_LOOP_ADAPTER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "AppSettings" not in source
     assert "asyncio.create_task" not in source
     assert "async def close(" not in source
@@ -276,7 +261,6 @@ def test_peer_admission_adapter_has_no_ui_resource_or_lifecycle_ownership() -> N
     source = ADMISSION_ADAPTER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "AppSettings" not in source
     assert "ClientHub" not in source
     assert "PeerCaptureSessionOwner" not in source
@@ -307,7 +291,6 @@ def test_peer_vad_sink_adapter_routes_only_peer_events_without_lifecycle_ownersh
     source = VAD_SINK_ADAPTER_PATH.read_text(encoding="utf-8")
 
     assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
     assert "ClientHub" not in source
     assert "chatbox" not in source.casefold()
     assert "output" not in source.casefold()

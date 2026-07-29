@@ -281,10 +281,7 @@ class TranslatorApp:
 
     @property
     def application(self) -> UiApplicationPort:
-        boundary = getattr(self, "_ui_application", None)
-        if boundary is None:
-            raise RuntimeError("TranslatorApp application boundary is not composed")
-        return boundary
+        return self._ui_application
 
     def _run_page_task(self, coroutine, *args):
         if getattr(self, "_shutting_down", False):
@@ -1610,9 +1607,6 @@ class TranslatorApp:
             and self.application.managed_auth_tasks_open()
         )
 
-    def _translation_enable_succeeded(self, _controller: object, result: object) -> bool:
-        return self.application.translation_enable_succeeded(result)
-
     def _start_discord_managed_auth(self) -> None:
         dialog = getattr(self, "_discord_managed_auth_dialog", None)
         raw_referral_id = getattr(dialog, "referral_id", "")
@@ -1923,51 +1917,24 @@ async def main_gui(
     runtime_logging_sinks=None,
     vrchat_osc_presence=None,
 ):
-    app_kwargs = {
-        "config_path": config_path,
-        "debug_ui_preview": debug_ui_preview,
-    }
-    parameters = inspect.signature(TranslatorApp).parameters
-    if "application_factory" in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    ):
-        app_kwargs["application_factory"] = application_factory
-    if "allow_stable_settings_import" in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    ):
-        app_kwargs["allow_stable_settings_import"] = allow_stable_settings_import
-    if "runtime_logging_sinks" in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    ):
-        app_kwargs["runtime_logging_sinks"] = runtime_logging_sinks
-    if "vrchat_osc_presence" in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    ):
-        app_kwargs["vrchat_osc_presence"] = vrchat_osc_presence
-    app = TranslatorApp(page, **app_kwargs)
-    lifecycle_handler = getattr(app, "_on_page_lifecycle_end", None)
-    if callable(lifecycle_handler):
-        page.on_disconnect = lifecycle_handler
-        page.on_close = lifecycle_handler
-    application = getattr(app, "application", None)
-    if application is None:
-        raise RuntimeError("TranslatorApp did not expose an application boundary")
+    app = TranslatorApp(
+        page,
+        config_path=config_path,
+        application_factory=application_factory,
+        debug_ui_preview=debug_ui_preview,
+        allow_stable_settings_import=allow_stable_settings_import,
+        runtime_logging_sinks=runtime_logging_sinks,
+        vrchat_osc_presence=vrchat_osc_presence,
+    )
+    page.on_disconnect = app._on_page_lifecycle_end
+    page.on_close = app._on_page_lifecycle_end
     try:
-        await application.start()
+        await app.application.start()
     except BaseException:
-        shutdown = getattr(app, "shutdown", None)
-        if callable(shutdown):
-            with contextlib.suppress(BaseException):
-                await shutdown()
-        else:
-            stop = getattr(application, "stop", None)
-            if callable(stop):
-                with contextlib.suppress(BaseException):
-                    await stop()
+        with contextlib.suppress(BaseException):
+            await app.shutdown()
         raise
-    schedule_after_launch = getattr(app, "schedule_after_launch_tasks", None)
-    if callable(schedule_after_launch):
-        schedule_after_launch()
+    app.schedule_after_launch_tasks()
 
 
 async def _check_and_notify_update(

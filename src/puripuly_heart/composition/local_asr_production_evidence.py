@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from puripuly_heart.app.ports.local_asr_production_evidence import (
+    LocalASRProductionCompositionAccessPort,
     LocalASRProductionEvidencePort,
 )
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
@@ -17,52 +18,42 @@ from puripuly_heart.app.wiring_stt_factory import (
     build_peer_stt_provider_request,
     build_self_stt_provider_request,
 )
-from puripuly_heart.composition.ui_application import (
-    compose_gui_application_boundary,
-    compose_gui_controller,
+from puripuly_heart.composition.application_runtime import (
+    compose_application_runtime,
 )
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
-from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
 @dataclass(slots=True)
-class _ControllerBackedLocalASRProductionEvidence:
-    backend: GuiController
+class _ApplicationLocalASRProductionEvidence:
+    access: LocalASRProductionCompositionAccessPort
     application: UiApplicationPort
 
     @property
     def config_path(self) -> Path:
-        return self.backend.config_path
+        return self.access.config_path
 
     def load_compatibility_settings(self) -> object:
-        return self.backend._load_or_init_settings(self.backend.config_path)
+        return self.access.load_compatibility_settings()
 
     async def initialize(self, settings: object) -> None:
-        self.backend.settings = settings
-        self.backend._get_local_asr_provisioning_owner()
-        self.backend._sync_signature_caches(settings)
-        await self.backend.runtime_composition.pipeline_launcher.launch(
-            settings,
-            vrc_mic_state=self.backend.vrc_mic_state,
-            vrc_mic_audio_gate=self.backend.vrc_mic_audio_gate,
-            receiver_active=self.backend.receiver is not None,
-        )
+        await self.access.initialize(settings)
         self._validated_hub_and_owner()
 
     def _validated_hub_and_owner(
         self,
     ) -> tuple[ClientHub, LocalASRProviderRuntimeOwner]:
-        hub = self.backend.hub
-        if hub is None or not isinstance(
+        hub = self.access.hub
+        if not isinstance(
             hub.local_asr_provider_runtime,
             LocalASRProviderRuntimeOwner,
         ):
-            raise RuntimeError("production controller did not compose the canonical owner")
+            raise RuntimeError("production application did not compose the canonical owner")
         return hub, hub.local_asr_provider_runtime
 
     @property
@@ -75,7 +66,7 @@ class _ControllerBackedLocalASRProductionEvidence:
 
     def composition_facts(self) -> dict[str, object]:
         return {
-            "controller": type(self.backend).__name__,
+            "application": type(self.application).__name__,
             "hub": type(self.hub).__name__,
             "factory": LocalASRProviderRuntimeFactory.__name__,
             "owner": type(self.owner).__name__,
@@ -103,7 +94,7 @@ class _ControllerBackedLocalASRProductionEvidence:
         )
 
     async def retry_gpu_activation(self) -> None:
-        await self.backend.retry_gpu_activation()
+        await self.access.retry_gpu_activation()
 
     async def close(self) -> None:
         await self.application.stop()
@@ -116,11 +107,15 @@ def compose_local_asr_production_evidence(
     presentation: UiPresentationPort = FletUiPresentationAdapter(
         SimpleNamespace(debug_ui_preview=False),
     )
-    backend = compose_gui_controller(
+    captured: list[LocalASRProductionCompositionAccessPort] = []
+    application = compose_application_runtime(
         presentation=presentation,
         config_path=config_path,
+        local_asr_evidence_sink=captured.append,
     )
-    return _ControllerBackedLocalASRProductionEvidence(
-        backend,
-        compose_gui_application_boundary(backend),
+    if len(captured) != 1:
+        raise RuntimeError("production application did not expose Local ASR evidence")
+    return _ApplicationLocalASRProductionEvidence(
+        access=captured[0],
+        application=application,
     )

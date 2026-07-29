@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import inspect
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -190,25 +189,15 @@ def _run_gui(
     vrchat_osc_presence = PsutilVrchatOscPresenceAdapter()
 
     async def _target(page: ft.Page):
-        gui_kwargs = {
-            "config_path": config_path,
-            "debug_ui_preview": debug_ui_preview,
-        }
-        parameters = inspect.signature(main_gui).parameters
-        if "application_factory" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            gui_kwargs["application_factory"] = compose_ui_application
-        if "runtime_logging_sinks" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            gui_kwargs["runtime_logging_sinks"] = runtime_logging_sinks
-        if "vrchat_osc_presence" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            gui_kwargs["vrchat_osc_presence"] = vrchat_osc_presence
         try:
-            return await main_gui(page, **gui_kwargs)
+            return await main_gui(
+                page,
+                config_path=config_path,
+                application_factory=compose_ui_application,
+                debug_ui_preview=debug_ui_preview,
+                runtime_logging_sinks=runtime_logging_sinks,
+                vrchat_osc_presence=vrchat_osc_presence,
+            )
         except Exception as exc:
             logger.exception(
                 "GUI startup failed: exception_type=%s exception_message=%s",

@@ -27,10 +27,8 @@ def test_production_constructs_one_local_asr_provisioning_owner_in_composition()
 
 
 def test_application_owners_delegate_provisioning_without_asset_or_task_ownership() -> None:
-    source = (SOURCE_ROOT / "ui" / "controller.py").read_text(encoding="utf-8")
-    startup = (SOURCE_ROOT / "composition" / "controller_application_startup.py").read_text(
-        encoding="utf-8"
-    )
+    source = (SOURCE_ROOT / "composition" / "application_runtime.py").read_text(encoding="utf-8")
+    startup = (SOURCE_ROOT / "composition" / "application_startup.py").read_text(encoding="utf-8")
     cpu_repair = (SOURCE_ROOT / "app" / "services" / "local_asr_cpu_repair.py").read_text(
         encoding="utf-8"
     )

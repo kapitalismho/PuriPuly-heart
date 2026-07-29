@@ -108,6 +108,40 @@ class RuntimePipelineComponents:
 
 
 @dataclass(slots=True)
+class RuntimePipelineHandle:
+    current: RuntimePipelineComponents | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    sender: VrchatOscUdpSender | None = field(init=False, default=None)
+    osc: ChatboxPaginator | None = field(init=False, default=None)
+    hub: ClientHub | None = field(init=False, default=None)
+    self_capture: SelfCaptureSessionOwner | None = field(init=False, default=None)
+    vrc_mic_state: VrcMicState | None = field(init=False, default=None)
+    vrc_mic_audio_gate: VrcMicAudioGate | None = field(init=False, default=None)
+
+    def install(self, components: RuntimePipelineComponents) -> None:
+        self.current = components
+        self.sender = components.sender
+        self.osc = components.osc
+        self.hub = components.hub
+        self.self_capture = components.self_capture
+        self.vrc_mic_state = components.vrc_mic_state
+        self.vrc_mic_audio_gate = components.vrc_mic_audio_gate
+
+    def clear(self, components: RuntimePipelineComponents | None = None) -> None:
+        if components is None or self.current is components:
+            self.current = None
+            self.sender = None
+            self.osc = None
+            self.hub = None
+            self.self_capture = None
+            self.vrc_mic_state = None
+            self.vrc_mic_audio_gate = None
+
+
+@dataclass(slots=True)
 class RuntimePipelineLauncher:
     config_path: Path
     clock: Clock
@@ -385,6 +419,7 @@ async def _compose_runtime_pipeline(
 
 __all__ = [
     "RuntimePipelineComponents",
+    "RuntimePipelineHandle",
     "RuntimePipelineLauncher",
     "RuntimePipelineResources",
     "compose_runtime_pipeline",

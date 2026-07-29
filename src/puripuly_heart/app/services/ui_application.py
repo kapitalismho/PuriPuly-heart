@@ -14,9 +14,22 @@ from puripuly_heart.app.ports.application_runtime_shutdown import (
     ApplicationRuntimeShutdownPort,
 )
 from puripuly_heart.app.ports.ui_application import UiApplicationState
-from puripuly_heart.app.ports.ui_application_runtime import UiApplicationRuntimePort
+from puripuly_heart.app.ports.ui_application_intents import (
+    UiDiagnosticsRuntimePort,
+    UiEngagementRuntimePort,
+    UiInputRuntimePort,
+    UiManagedRuntimePort,
+    UiMicrophoneRuntimePort,
+    UiOverlayRuntimePort,
+    UiPeerCaptureRuntimePort,
+    UiProviderRuntimePort,
+    UiSettingsRuntimePort,
+)
 from puripuly_heart.app.ports.ui_application_state import UiApplicationStatePort
-from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.ports.ui_models import (
+    GpuNoticeAction,
+    OverlayPeerPresentationState,
+)
 from puripuly_heart.app.services.application_runtime_shutdown import (
     compose_application_runtime_shutdown_callbacks,
 )
@@ -26,6 +39,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownDiagnostic,
     application_shutdown_callback,
 )
+from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
@@ -113,13 +127,31 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
 class UiApplicationBoundary:
     def __init__(
         self,
-        runtime: UiApplicationRuntimePort,
         *,
+        startup: ApplicationStartupOwner,
+        input_runtime: UiInputRuntimePort,
+        peer_capture: UiPeerCaptureRuntimePort,
+        settings: UiSettingsRuntimePort,
+        provider: UiProviderRuntimePort,
+        microphone: UiMicrophoneRuntimePort,
+        overlay: UiOverlayRuntimePort,
+        managed: UiManagedRuntimePort,
+        engagement: UiEngagementRuntimePort,
+        diagnostics: UiDiagnosticsRuntimePort,
         state: UiApplicationStatePort,
         runtime_shutdown: ApplicationRuntimeShutdownPort,
         runtime_logging: ApplicationRuntimeLoggingPort,
     ) -> None:
-        self._runtime = runtime
+        self._startup = startup
+        self._input_runtime = input_runtime
+        self._peer_capture = peer_capture
+        self._settings = settings
+        self._provider = provider
+        self._microphone = microphone
+        self._overlay = overlay
+        self._managed = managed
+        self._engagement = engagement
+        self._diagnostics = diagnostics
         self._runtime_logging = runtime_logging
         self._runtime_shutdown = runtime_shutdown
         self._state_owner = state
@@ -170,7 +202,7 @@ class UiApplicationBoundary:
 
     async def start(self) -> None:
         try:
-            await self._runtime.start()
+            await self._startup.start()
         except BaseException:
             try:
                 await self.stop()
@@ -223,52 +255,52 @@ class UiApplicationBoundary:
         self._runtime_logging.emit_detailed(message, level=level)
 
     async def submit_text(self, text: str) -> None:
-        await self._runtime.submit_text(text)
+        await self._input_runtime.submit_text(text)
 
     def set_manual_input_activity(self, has_text: bool) -> None:
-        self._runtime.set_manual_input_activity(has_text)
+        self._input_runtime.set_manual_input_activity(has_text)
 
     async def set_translation_enabled(self, enabled: bool) -> object:
-        return await self._runtime.set_translation_enabled(enabled)
+        return await self._input_runtime.set_translation_enabled(enabled)
 
     async def set_stt_enabled(self, enabled: bool) -> object:
-        return await self._runtime.set_stt_enabled(enabled)
+        return await self._input_runtime.set_stt_enabled(enabled)
 
     async def set_peer_translation_enabled(self, enabled: bool) -> object:
-        return await self._runtime.set_peer_translation_enabled(enabled)
+        return await self._peer_capture.set_peer_translation_enabled(enabled)
 
     async def set_overlay_enabled(self, enabled: bool) -> object:
-        return await self._runtime.set_overlay_enabled(enabled)
+        return await self._overlay.set_overlay_enabled(enabled)
 
     async def retry_peer_process_capture(self) -> bool:
-        return bool(await self._runtime.retry_peer_process_capture())
+        return bool(await self._peer_capture.retry_peer_process_capture())
 
     async def apply_loopback_capture_option(self, value: str) -> None:
-        await self._runtime.apply_loopback_capture_option(value)
+        await self._peer_capture.apply_loopback_capture_option(value)
 
     def list_loopback_capture_options(self) -> object:
-        return self._runtime.list_loopback_capture_options()
+        return self._peer_capture.list_loopback_capture_options()
 
     def list_loopback_process_options(self) -> object:
-        return self._runtime.list_loopback_process_options()
+        return self._peer_capture.list_loopback_process_options()
 
     def list_loopback_device_options(self) -> object:
-        return self._runtime.list_loopback_device_options()
+        return self._peer_capture.list_loopback_device_options()
 
     def current_loopback_capture_option_value(self) -> object:
-        return self._runtime.current_loopback_capture_option_value()
+        return self._peer_capture.current_loopback_capture_option_value()
 
     def loopback_capture_summary(self) -> object:
-        return self._runtime.loopback_capture_summary()
+        return self._peer_capture.loopback_capture_summary()
 
     async def on_dashboard_language_change(self, change: LanguageSelectionChange) -> None:
-        await self._runtime.on_dashboard_language_change(change)
+        await self._settings.on_dashboard_language_change(change)
 
     def capture_settings_view_change(self, settings: Any) -> object:
-        return self._runtime.capture_settings_view_change(settings)
+        return self._settings.capture_settings_view_change(settings)
 
     def merge_settings_view_change_with_current(self, captured: object) -> Any:
-        return self._runtime.merge_settings_view_change_with_current(captured)
+        return self._settings.merge_settings_view_change_with_current(captured)
 
     def refresh_settings_projection(
         self,
@@ -276,19 +308,19 @@ class UiApplicationBoundary:
         preserve_custom_vocab_draft: bool = False,
     ) -> bool:
         return bool(
-            self._runtime.refresh_settings_projection(
+            self._settings.refresh_settings_projection(
                 preserve_custom_vocab_draft=preserve_custom_vocab_draft,
             )
         )
 
     def refresh_settings_after_openrouter_pkce_success(self) -> bool:
-        return bool(self._runtime.refresh_settings_after_openrouter_pkce_success())
+        return bool(self._settings.refresh_settings_after_openrouter_pkce_success())
 
     def merge_settings_tab_apply_with_current_languages(self, settings: Any) -> Any:
-        return self._runtime.merge_settings_tab_apply_with_current_languages(settings)
+        return self._settings.merge_settings_tab_apply_with_current_languages(settings)
 
     async def apply_settings(self, settings: Any) -> object:
-        return await self._runtime.apply_settings(settings)
+        return await self._settings.apply_settings(settings)
 
     async def apply_providers(
         self,
@@ -298,27 +330,27 @@ class UiApplicationBoundary:
     ) -> object:
         if force_rebuild_llm:
             if settings is None:
-                return await self._runtime.apply_providers(force_rebuild_llm=True)
-            return await self._runtime.apply_providers(
+                return await self._provider.apply_providers(force_rebuild_llm=True)
+            return await self._provider.apply_providers(
                 settings,
                 force_rebuild_llm=True,
             )
         if settings is None:
-            return await self._runtime.apply_providers()
-        return await self._runtime.apply_providers(settings)
+            return await self._provider.apply_providers()
+        return await self._provider.apply_providers(settings)
 
     async def install_selected_gpu_model_if_needed(self) -> None:
-        await self._runtime.install_selected_gpu_model_if_needed()
+        await self._provider.install_selected_gpu_model_if_needed()
 
     async def ensure_gpu_device_discovery(self) -> None:
-        await self._runtime.ensure_gpu_device_discovery()
+        await self._provider.ensure_gpu_device_discovery()
 
     async def start_microphone_test(
         self,
         *,
         meter_callback: Callable[[float], None] | None = None,
     ) -> bool:
-        start = self._runtime.start_microphone_test
+        start = self._microphone.start_microphone_test
         if meter_callback is not None and _accepts_keyword(start, "meter_callback"):
             result = start(meter_callback=meter_callback)
         else:
@@ -326,46 +358,46 @@ class UiApplicationBoundary:
         return bool(await result if inspect.isawaitable(result) else result)
 
     async def stop_microphone_test(self) -> None:
-        result = self._runtime.stop_microphone_test()
+        result = self._microphone.stop_microphone_test()
         if inspect.isawaitable(result):
             await result
 
     def set_runtime_logging_mode(self, mode: str) -> str:
-        self._runtime.set_runtime_logging_mode(mode)
+        self._diagnostics.set_runtime_logging_mode(mode)
         return self.state().runtime_logging_mode
 
     async def set_desktop_overlay_captions_locked(self, locked: bool) -> None:
-        await self._runtime.set_desktop_overlay_captions_locked(locked)
+        await self._overlay.set_desktop_overlay_captions_locked(locked)
 
     async def set_desktop_overlay_size_preset(self, size_preset: str) -> None:
-        await self._runtime.set_desktop_overlay_size_preset(size_preset)
+        await self._overlay.set_desktop_overlay_size_preset(size_preset)
 
     async def reset_desktop_overlay_position(self) -> None:
-        await self._runtime.reset_desktop_overlay_position()
+        await self._overlay.reset_desktop_overlay_position()
 
     def begin_overlay_calibration(self) -> object:
-        return self._runtime.begin_overlay_calibration()
+        return self._overlay.begin_overlay_calibration()
 
     def set_overlay_calibration_field(self, *args: Any, **kwargs: Any) -> object:
-        return self._runtime.set_overlay_calibration_field(*args, **kwargs)
+        return self._overlay.set_overlay_calibration_field(*args, **kwargs)
 
     def apply_overlay_calibration(self) -> object:
-        return self._runtime.apply_overlay_calibration()
+        return self._overlay.apply_overlay_calibration()
 
     def cancel_overlay_calibration(self) -> object:
-        return self._runtime.cancel_overlay_calibration()
+        return self._overlay.cancel_overlay_calibration()
 
     def overlay_peer_presentation_state(self) -> OverlayPeerPresentationState | None:
-        return self._runtime.overlay_peer_presentation_state()
+        return self._peer_capture.overlay_peer_presentation_state()
 
     def dashboard_managed_auth_action(self) -> str:
-        return str(self._runtime.dashboard_managed_auth_action())
+        return str(self._managed.dashboard_managed_auth_action())
 
     def dashboard_managed_auth_prompt_kind(self) -> str:
-        return str(self._runtime.dashboard_managed_auth_prompt_kind())
+        return str(self._managed.dashboard_managed_auth_prompt_kind())
 
     async def apply_telemetry_consent(self, consent: str) -> Any | None:
-        return await self._runtime.apply_telemetry_consent(consent)
+        return await self._settings.apply_telemetry_consent(consent)
 
     async def accept_peer_translation_eula_and_enable(self) -> object:
         settings = self.compatibility_settings()
@@ -381,35 +413,35 @@ class UiApplicationBoundary:
         self, *, target_settings: Any, launch_source: str
     ) -> bool:
         return bool(
-            await self._runtime.connect_openrouter_via_pkce(
+            await self._provider.connect_openrouter_via_pkce(
                 target_settings=target_settings,
                 launch_source=launch_source,
             )
         )
 
     def reopen_openrouter_pkce_authorization_url(self) -> None:
-        self._runtime.reopen_openrouter_pkce_authorization_url()
+        self._provider.reopen_openrouter_pkce_authorization_url()
 
     def build_managed_openrouter_byok_target_settings(self) -> Any | None:
-        return self._runtime.build_managed_openrouter_byok_target_settings()
+        return self._provider.build_managed_openrouter_byok_target_settings()
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
-        return await self._runtime.verify_api_key(provider, key)
+        return await self._provider.verify_api_key(provider, key)
 
     def persist_api_key_verification(self, provider: str, key: str, success: bool) -> None:
-        self._runtime.persist_api_key_verification(provider, key, success)
+        self._provider.persist_api_key_verification(provider, key, success)
 
     async def persist_provider_secret_change(self, key: str, value: str) -> bool:
-        return bool(await self._runtime.persist_provider_secret_change(key, value))
+        return bool(await self._provider.persist_provider_secret_change(key, value))
 
     def clear_provider_verification(self, provider: str) -> None:
-        self._runtime.clear_provider_verification(provider)
+        self._provider.clear_provider_verification(provider)
 
     async def start_qq_managed_auth_from_dialog(self, **kwargs: Any) -> object:
-        return await self._runtime.start_qq_managed_auth_from_dialog(**kwargs)
+        return await self._managed.start_qq_managed_auth_from_dialog(**kwargs)
 
     async def start_discord_managed_auth_from_dialog(self, **kwargs: Any) -> object:
-        return await self._runtime.start_discord_managed_auth_from_dialog(**kwargs)
+        return await self._managed.start_discord_managed_auth_from_dialog(**kwargs)
 
     def reopen_discord_managed_auth_browser(self) -> object:
         return None
@@ -429,28 +461,28 @@ class UiApplicationBoundary:
         return result is True
 
     def clear_managed_auth_pending_state(self) -> None:
-        self._runtime.clear_managed_auth_pending_state()
+        self._managed.clear_managed_auth_pending_state()
 
     def get_event_language_codes(self) -> tuple[str | None, str | None]:
-        return self._runtime.get_event_language_codes()
+        return self._engagement.get_event_language_codes()
 
     def schedule_github_star_prompt_translation_success_observed(self) -> None:
-        self._runtime.schedule_github_star_prompt_translation_success_observed()
+        self._engagement.schedule_github_star_prompt_translation_success_observed()
 
     async def record_telemetry_translation_success_day(self) -> None:
-        await self._runtime.record_telemetry_translation_success_day()
+        await self._engagement.record_telemetry_translation_success_day()
 
     def should_show_github_star_prompt(self) -> bool:
-        return bool(self._runtime.should_show_github_star_prompt())
+        return bool(self._engagement.should_show_github_star_prompt())
 
     async def persist_github_star_prompt_eligible_launch(self) -> bool:
-        return bool(await self._runtime.persist_github_star_prompt_eligible_launch())
+        return bool(await self._engagement.persist_github_star_prompt_eligible_launch())
 
     async def refresh_openrouter_usage_after_launch(self) -> bool:
-        return bool(await self._runtime.refresh_openrouter_usage_after_launch())
+        return bool(await self._managed.refresh_openrouter_usage_after_launch())
 
     async def prepare_runtime_after_launch(self) -> None:
-        await self._runtime.prepare_runtime_after_launch()
+        await self._engagement.prepare_runtime_after_launch()
 
     async def check_for_update(self) -> object | None:
         return await check_for_update()
@@ -522,25 +554,25 @@ class UiApplicationBoundary:
         should_open: Callable[[], bool] | None = None,
     ) -> bool:
         return bool(
-            await self._runtime.persist_github_star_prompt_opened(
+            await self._engagement.persist_github_star_prompt_opened(
                 should_open=should_open,
             )
         )
 
     async def persist_github_star_prompt_clicked(self) -> None:
-        await self._runtime.persist_github_star_prompt_clicked()
+        await self._engagement.persist_github_star_prompt_clicked()
 
     def cycle_debug_capture_fault_profile(self) -> str:
-        return str(self._runtime.cycle_debug_capture_fault_profile())
+        return str(self._diagnostics.cycle_debug_capture_fault_profile())
 
     def cycle_debug_stt_fault_profile(self) -> str:
-        return str(self._runtime.cycle_debug_stt_fault_profile())
+        return str(self._diagnostics.cycle_debug_stt_fault_profile())
 
     def clear_debug_audio_fault_profiles(self) -> None:
-        self._runtime.clear_debug_audio_fault_profiles()
+        self._diagnostics.clear_debug_audio_fault_profiles()
 
-    def handle_gpu_notice_action(self) -> object:
-        return self._runtime.handle_gpu_notice_action()
+    def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object:
+        return self._provider.handle_gpu_notice_action(action)
 
 
 for _intent_method_name in UI_APPLICATION_USER_INTENT_METHODS:
