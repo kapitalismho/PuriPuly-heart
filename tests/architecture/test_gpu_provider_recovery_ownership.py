@@ -6,6 +6,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "services" / "gpu_provider_recovery.py"
+APPLICATION_OWNER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "services" / "gpu_provider_recovery_application.py"
+)
 
 
 def _controller_method_source(method_name: str) -> str:
@@ -31,6 +34,8 @@ def test_controller_delegates_manual_and_settings_gpu_recovery_to_owner() -> Non
 
     assert "_get_gpu_provider_recovery_owner().recover(" in manual
     assert "_get_gpu_provider_recovery_owner().recover(" in settings
+    assert "_gpu_provider_recovery_request(" in manual
+    assert "_gpu_provider_recovery_request(" in settings
     for retired_name in (
         "_gpu_provider_recovery_lock",
         "_get_gpu_provider_recovery_lock",
@@ -39,17 +44,26 @@ def test_controller_delegates_manual_and_settings_gpu_recovery_to_owner() -> Non
         "_build_gpu_recovery_request",
         "_abort_provider_recoveries",
         "_resume_gpu_provider_consumers",
+        "_gpu_provider_recovery_execution",
+        "_complete_gpu_provider_recovery",
+        "_desired_gpu_channels",
+        "_gpu_provider_recovery_channel_plans",
     ):
         assert retired_name not in source
 
 
 def test_gpu_provider_recovery_owner_has_no_ui_controller_or_settings_dependency() -> None:
     source = OWNER_PATH.read_text(encoding="utf-8")
+    application_source = APPLICATION_OWNER_PATH.read_text(encoding="utf-8")
 
-    assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
-    assert "AppSettings" not in source
+    for owned_source in (source, application_source):
+        assert "puripuly_heart.ui" not in owned_source
+        assert "GuiController" not in owned_source
+        assert "AppSettings" not in owned_source
     assert "asyncio.Lock" in source
     assert "runtime.recover_gpu(" in source
     assert "await item.plan.adopt(" in source
     assert "self._abort_channels(prepared)" in source
+    assert "GpuProviderRecoveryExecution(" in application_source
+    assert "self_owner.adopt_recovered_provider(" in application_source
+    assert "peer_owner.adopt_recovered_provider(" in application_source

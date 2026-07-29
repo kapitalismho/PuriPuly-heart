@@ -9,10 +9,8 @@ import pytest
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningDiagnostic,
     LocalASRGpuProvisioningEffect,
+    LocalASRGpuProvisioningOwner,
     LocalASRGpuProvisioningState,
-)
-from puripuly_heart.app.wiring_composition import (
-    create_local_asr_gpu_provisioning_owner,
 )
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRInstallRequest,
@@ -144,7 +142,7 @@ def _owner(
     async def retry() -> None:
         recorded_retries.append("retry")
 
-    return create_local_asr_gpu_provisioning_owner(
+    return LocalASRGpuProvisioningOwner(
         provisioning_provider=lambda: provisioning,
         state_provider=lambda: state_box[0],
         effect_sink=recorded_effects.append,
@@ -387,7 +385,7 @@ async def test_diagnostic_sink_failure_is_contained() -> None:
         failure=RuntimeError("install"),
     )
     effects: list[LocalASRGpuProvisioningEffect] = []
-    owner = create_local_asr_gpu_provisioning_owner(
+    owner = LocalASRGpuProvisioningOwner(
         provisioning_provider=lambda: provisioning,
         state_provider=lambda: state_box[0],
         effect_sink=effects.append,

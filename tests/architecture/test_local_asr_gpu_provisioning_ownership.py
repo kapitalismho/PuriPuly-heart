@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = ROOT / "src" / "puripuly_heart"
 CONTROLLER_PATH = SOURCE_ROOT / "ui" / "controller.py"
 OWNER_PATH = SOURCE_ROOT / "app" / "services" / "local_asr_gpu_provisioning.py"
+INTERACTION_PATH = SOURCE_ROOT / "app" / "services" / "gpu_runtime_interaction.py"
 COMPOSITION_PATH = SOURCE_ROOT / "app" / "wiring_composition.py"
 
 
@@ -29,7 +30,7 @@ def test_gpu_provisioning_owner_is_ui_and_settings_neutral() -> None:
     assert "flet" not in source
 
 
-def test_gpu_provisioning_owner_is_constructed_only_by_application_composition() -> None:
+def test_gpu_provisioning_owner_is_constructed_only_by_gpu_interaction_owner() -> None:
     constructions: list[str] = []
     for source_file in sorted(SOURCE_ROOT.rglob("*.py")):
         source = source_file.read_text(encoding="utf-8")
@@ -42,19 +43,20 @@ def test_gpu_provisioning_owner_is_constructed_only_by_application_composition()
             ):
                 constructions.append(source_file.relative_to(ROOT).as_posix())
 
-    assert constructions == ["src/puripuly_heart/app/wiring_composition.py"]
+    assert constructions == ["src/puripuly_heart/app/services/gpu_runtime_interaction.py"]
 
 
 def test_controller_gpu_provisioning_commands_are_compatibility_delegates() -> None:
     selected = _method_source(CONTROLLER_PATH, "install_selected_gpu_model_if_needed")
     repair = _method_source(CONTROLLER_PATH, "install_or_repair_gpu_model")
-    getter = _method_source(CONTROLLER_PATH, "_get_local_asr_gpu_provisioning_owner")
+    getter = _method_source(CONTROLLER_PATH, "_get_gpu_runtime_interaction_owner")
 
     assert "install_selected_model_if_needed()" in selected
-    assert "_get_local_asr_gpu_provisioning_owner()" in selected
+    assert "_get_gpu_runtime_interaction_owner()" in selected
     assert "LocalASRInstallRequest" not in selected
     assert ".install_or_repair(" in repair
-    assert "_get_local_asr_gpu_provisioning_owner()" in repair
+    assert "_get_gpu_runtime_interaction_owner()" in repair
     assert "LocalASRInstallRequest" not in repair
-    assert "create_local_asr_gpu_provisioning_owner(" in getter
+    assert "create_gpu_runtime_interaction_owner(" in getter
     assert "LocalASRGpuProvisioningOwner(" not in getter
+    assert "LocalASRGpuProvisioningOwner(" in INTERACTION_PATH.read_text(encoding="utf-8")

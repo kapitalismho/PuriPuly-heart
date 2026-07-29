@@ -46,6 +46,11 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 )
 from puripuly_heart.app.services.managed_connection_auth import ManagedConnectionAuthService
 from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
+from puripuly_heart.app.wiring import (
+    build_self_capture_session_config,
+    build_self_stt_provider_signature,
+    build_self_stt_runtime_signature,
+)
 from puripuly_heart.config.audio_host_api import (
     WINDOWS_MME_HOST_API,
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,
@@ -844,66 +849,6 @@ def _make_controller(*, app: object) -> GuiController:
     )
 
 
-def test_self_capture_admission_state_projects_current_controller_inputs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
-    controller.hub = SimpleNamespace()
-    controller._gpu_ui_state = "installing"
-    controller._stt_activation_generation = 17
-    monkeypatch.setattr(
-        GuiController,
-        "_current_local_stt_runtime_status",
-        lambda _self: "downloading",
-    )
-
-    state = controller._self_capture_admission_state(
-        controller._build_self_capture_session_config(controller.settings)
-    )
-
-    assert state.settings_available is True
-    assert state.runtime_available is True
-    assert state.gpu_status == "installing"
-    assert state.local_cpu_supported is True
-    assert state.local_runtime_status == "downloading"
-    assert state.activation_generation == 17
-
-
-@pytest.mark.parametrize("settings_available", [False, True])
-def test_self_capture_admission_state_skips_local_probes_outside_local_cpu(
-    monkeypatch: pytest.MonkeyPatch,
-    settings_available: bool,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings() if settings_available else None
-
-    def unexpected(*_args: object, **_kwargs: object) -> object:
-        raise AssertionError("local admission state must remain lazy")
-
-    monkeypatch.setattr(controller_module, "resolve_local_asr_selection", unexpected)
-    monkeypatch.setattr(
-        GuiController,
-        "_current_local_stt_runtime_status",
-        unexpected,
-    )
-
-    state = controller._self_capture_admission_state(
-        SelfCaptureSessionConfig(
-            provider_id="soniox",
-            provider_signature=("provider",),
-            runtime_signature=("runtime",),
-            capture_signature=("capture",),
-            target_sample_rate_hz=16000,
-        )
-    )
-
-    assert state.settings_available is settings_available
-    assert state.local_cpu_supported is True
-    assert state.local_runtime_status == "ready"
-
-
 @pytest.mark.asyncio
 async def test_self_capture_admission_rejects_unsupported_language_before_status_probe(
     monkeypatch: pytest.MonkeyPatch,
@@ -953,7 +898,7 @@ def test_self_capture_admission_effects_preserve_controller_compatibility(
 ) -> None:
     dashboard = DummyDashboard()
     controller = _make_controller(app=SimpleNamespace(view_dashboard=dashboard))
-    controller._gpu_pending_enable_channels = frozenset({"peer"})
+    controller._get_gpu_runtime_interaction_owner().retain_pending("peer")
     messages: list[str] = []
     repairs: list[tuple[str, str, int | None]] = []
 
@@ -1005,7 +950,9 @@ def test_self_capture_admission_effects_preserve_controller_compatibility(
         )
     )
 
-    assert controller._gpu_pending_enable_channels == frozenset({"peer", "self"})
+    assert controller._get_gpu_runtime_interaction_owner().snapshot.pending_channels == frozenset(
+        {"peer", "self"}
+    )
     assert controller._local_stt_pending_enable_after_install is True
     assert controller._get_local_asr_cpu_repair_owner().snapshot.self_activation_generation == 21
     assert dashboard.stt_enabled is False
@@ -1580,7 +1527,7 @@ async def test_rebuild_stt_provider_delegates_immutable_owner_request() -> None:
     assert request.config.source_language == controller.settings.languages.source_language
     assert (
         config.provider_signature
-        == controller._build_self_capture_session_config(controller.settings).provider_signature
+        == build_self_capture_session_config(controller.settings).provider_signature
     )
 
 
@@ -3318,9 +3265,9 @@ def test_verified_key_and_runtime_signature_depend_on_region_and_settings() -> N
     settings.qwen.region = QwenRegion.SINGAPORE
     key_singapore = controller._get_alibaba_verified_key()
 
-    baseline = controller._build_self_stt_runtime_signature(settings)
+    baseline = build_self_stt_runtime_signature(settings)
     settings.audio.input_device = "Microphone 2"
-    changed = controller._build_self_stt_runtime_signature(settings)
+    changed = build_self_stt_runtime_signature(settings)
 
     assert key_beijing == "alibaba_beijing"
     assert key_singapore == "alibaba_singapore"
@@ -3476,17 +3423,16 @@ def test_merge_settings_tab_apply_copies_local_llm_settings_for_provider_apply()
 
 
 def test_stt_runtime_signature_includes_custom_vocabulary_state() -> None:
-    controller = _make_controller(app=SimpleNamespace())
     settings = AppSettings()
     settings.provider.stt = STTProviderName.DEEPGRAM
     settings.languages.source_language = "ko"
     settings.stt.custom_terms = {"ko": [" Puripuly ", "VRChat", "Puripuly"], "en": ["Avatar"]}
     settings.stt.custom_vocabulary_enabled = False
 
-    disabled_signature = controller._build_self_stt_runtime_signature(settings)
+    disabled_signature = build_self_stt_runtime_signature(settings)
 
     settings.stt.custom_vocabulary_enabled = True
-    enabled_signature = controller._build_self_stt_runtime_signature(settings)
+    enabled_signature = build_self_stt_runtime_signature(settings)
 
     assert disabled_signature != enabled_signature
     assert enabled_signature[-2] is True
@@ -3494,14 +3440,13 @@ def test_stt_runtime_signature_includes_custom_vocabulary_state() -> None:
 
 
 def test_stt_runtime_signature_includes_source_language() -> None:
-    controller = _make_controller(app=SimpleNamespace())
     settings = AppSettings()
     settings.provider.stt = STTProviderName.DEEPGRAM
     settings.languages.source_language = "ko"
 
-    ko_signature = controller._build_self_stt_runtime_signature(settings)
+    ko_signature = build_self_stt_runtime_signature(settings)
     settings.languages.source_language = "en"
-    en_signature = controller._build_self_stt_runtime_signature(settings)
+    en_signature = build_self_stt_runtime_signature(settings)
 
     assert ko_signature != en_signature
     assert ko_signature[0] == "ko"
@@ -3509,28 +3454,24 @@ def test_stt_runtime_signature_includes_source_language() -> None:
 
 
 def test_stt_runtime_signature_differs_between_plain_wasapi_and_compatibility_mode() -> None:
-    controller = _make_controller(app=SimpleNamespace())
     plain = AppSettings()
     plain.audio.input_host_api = WINDOWS_WASAPI_HOST_API
     compat = copy.deepcopy(plain)
     compat.audio.input_host_api = WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 
-    assert controller._build_self_stt_runtime_signature(
-        plain
-    ) != controller._build_self_stt_runtime_signature(compat)
+    assert build_self_stt_runtime_signature(plain) != build_self_stt_runtime_signature(compat)
 
 
 def test_stt_runtime_signature_ignores_custom_vocabulary_for_qwen_asr() -> None:
-    controller = _make_controller(app=SimpleNamespace())
     settings = AppSettings()
     settings.provider.stt = STTProviderName.QWEN_ASR
     settings.languages.source_language = "ko"
     settings.stt.custom_terms = {"ko": ["Puripuly", "VRChat"]}
 
-    disabled_signature = controller._build_self_stt_runtime_signature(settings)
+    disabled_signature = build_self_stt_runtime_signature(settings)
 
     settings.stt.custom_vocabulary_enabled = True
-    enabled_signature = controller._build_self_stt_runtime_signature(settings)
+    enabled_signature = build_self_stt_runtime_signature(settings)
 
     assert disabled_signature == enabled_signature
     assert enabled_signature[-2] is False
@@ -3538,17 +3479,16 @@ def test_stt_runtime_signature_ignores_custom_vocabulary_for_qwen_asr() -> None:
 
 
 def test_stt_runtime_signature_uses_capped_custom_vocabulary_for_local_qwen() -> None:
-    controller = _make_controller(app=SimpleNamespace())
     settings = AppSettings()
     settings.provider.stt = STTProviderName.LOCAL_QWEN
     settings.languages.source_language = "ko"
     settings.stt.custom_terms = {"ko": [f"term-{i:02d}" for i in range(20)]}
     settings.stt.custom_vocabulary_enabled = False
 
-    disabled_signature = controller._build_self_stt_runtime_signature(settings)
+    disabled_signature = build_self_stt_runtime_signature(settings)
 
     settings.stt.custom_vocabulary_enabled = True
-    enabled_signature = controller._build_self_stt_runtime_signature(settings)
+    enabled_signature = build_self_stt_runtime_signature(settings)
 
     assert disabled_signature != enabled_signature
     assert enabled_signature[-2] is True
@@ -3575,7 +3515,7 @@ def test_self_stt_runtime_signature_ignores_overlay_and_peer_desktop_settings() 
     controller = _make_controller(app=SimpleNamespace())
     settings = AppSettings()
 
-    baseline = controller._build_self_stt_runtime_signature(settings)
+    baseline = build_self_stt_runtime_signature(settings)
 
     settings.ui.peer_translation_enabled = True
     controller.overlay_state = "connected"
@@ -3583,7 +3523,7 @@ def test_self_stt_runtime_signature_ignores_overlay_and_peer_desktop_settings() 
     settings.desktop_audio.vad_speech_threshold = 0.72
     settings.desktop_audio.vad_hangover_ms = 950
     settings.desktop_audio.vad_pre_roll_ms = 420
-    changed = controller._build_self_stt_runtime_signature(settings)
+    changed = build_self_stt_runtime_signature(settings)
 
     assert baseline == changed
 
@@ -4191,7 +4131,7 @@ async def test_apply_settings_updates_peer_translation_flags_on_hub(
     controller.settings = AppSettings()
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
     controller.overlay_state = "connected"
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -4225,9 +4165,7 @@ async def test_apply_settings_routes_peer_activation_toggles_through_peer_runtim
     controller.overlay_state = "connected"
     _attach_overlay_bridge(controller, object())
     controller._peer_runtime = DummyPeerRuntime()
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
-        settings
-    )
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
         settings
     )
@@ -4266,9 +4204,7 @@ async def test_apply_settings_copies_self_and_peer_vad_hangovers_to_hub(
     settings.desktop_audio.vad_hangover_ms = 950
     controller.settings = settings
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
-        settings
-    )
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
         settings
     )
@@ -4296,9 +4232,7 @@ async def test_apply_settings_keeps_peer_translation_effective_flags_off_until_e
     controller.overlay_state = "connected"
     _attach_overlay_bridge(controller, object())
     controller._peer_runtime = DummyPeerRuntime()
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
-        settings
-    )
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
         settings
     )
@@ -4336,9 +4270,7 @@ async def test_apply_settings_deactivates_peer_runtime_when_eula_acceptance_is_r
     controller.overlay_state = "connected"
     _attach_overlay_bridge(controller, object())
     controller._peer_runtime = DummyPeerRuntime()
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
-        settings
-    )
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
         settings
     )
@@ -9373,7 +9305,7 @@ async def test_apply_settings_updates_vrc_gate_and_reconfigures_receiver(
     controller.hub.low_latency_mode = settings.stt.low_latency_mode
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
 
     gate = DummyGate()
     configure_calls: list[bool] = []
@@ -9546,7 +9478,7 @@ def _create_self_capture_source_via_adapter_for_test(controller: GuiController) 
             channel_label="self",
         ),
     )(
-        controller._build_self_capture_session_config(controller.settings),
+        build_self_capture_session_config(controller.settings),
     )
     controller._audio_source = source
     return source
@@ -11167,7 +11099,7 @@ def test_self_capture_vad_adapter_wires_self_diagnostics() -> None:
         log_detailed=controller.log_detailed,
         diagnostics_enabled=controller._detailed_audio_diag_enabled,
     )
-    controller._vad = adapter(controller._build_self_capture_session_config(controller.settings))
+    controller._vad = adapter(build_self_capture_session_config(controller.settings))
 
     assert vad_calls[0].get("max_segment_ms") is None
     assert vad_calls[0]["diagnostic_label"] == "self"
@@ -13807,9 +13739,7 @@ async def test_apply_settings_reloads_settings_view_for_target_only_change(
 
     monkeypatch.setattr(GuiController, "_save_settings", lambda self: None)
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
-        settings
-    )
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
         settings
     )
@@ -13829,9 +13759,7 @@ async def test_apply_settings_target_only_change_clears_self_language_runtime_st
     controller.hub = DummyHub()
     controller.hub.source_language = settings.languages.source_language
     controller.hub.target_language = settings.languages.target_language
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
-        settings
-    )
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
         settings
     )
@@ -13884,9 +13812,7 @@ async def test_apply_settings_self_target_change_clears_peer_runtime_when_peer_t
     controller.hub.target_language = settings.languages.target_language
     controller.hub.peer_source_language = settings.languages.peer_source_language
     controller.hub.peer_target_language = settings.languages.peer_target_language
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
-        settings
-    )
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
         settings
     )
@@ -13935,9 +13861,7 @@ async def test_apply_settings_self_source_change_clears_peer_runtime_when_peer_s
     controller.hub.target_language = settings.languages.target_language
     controller.hub.peer_source_language = settings.languages.peer_source_language
     controller.hub.peer_target_language = settings.languages.peer_target_language
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
-        settings
-    )
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
         settings
     )
@@ -13990,9 +13914,7 @@ async def test_apply_settings_logs_and_continues_when_language_cleanup_fails(
     controller.hub.peer_source_language = settings.languages.peer_source_language
     controller.hub.peer_target_language = settings.languages.peer_target_language
     controller.hub.clear_language_runtime_state_errors["self"] = RuntimeError("cleanup boom")
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
-        settings
-    )
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
         settings
     )
@@ -14044,7 +13966,7 @@ async def test_order22_language_runtime_clear_failure_degrades_without_raw_log_t
     controller.hub = DummyHub(stt=object())
     controller.hub.source_language = controller.settings.languages.source_language
     controller.hub.target_language = controller.settings.languages.target_language
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -14653,7 +14575,7 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
-    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._stt_desired = False
     controller._mic_task = None
     controller._self_capture_owner = FakeOwner()
@@ -14697,7 +14619,7 @@ async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabular
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
-    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._stt_desired = True
 
     settings.stt.custom_vocabulary_enabled = True
@@ -14773,7 +14695,7 @@ async def test_apply_settings_does_not_restart_stt_for_qwen_custom_vocabulary_ch
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
-    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._stt_desired = True
     controller._mic_task = object()
 
@@ -14822,7 +14744,7 @@ async def test_apply_settings_restarts_stt_for_local_qwen_custom_vocabulary_chan
     controller.hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
-    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._stt_desired = True
     controller._mic_task = object()
 
@@ -14874,7 +14796,7 @@ async def test_apply_settings_skips_vrc_sync_when_setting_is_unchanged(
         hangover_s=1.1,
         peer_stt=None,
     )
-    controller._last_stt_runtime_signature = controller._build_self_stt_runtime_signature(settings)
+    controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
     controller._last_vrc_mic_sync_enabled = settings.osc.vrc_mic_intercept
 
     settings.stt.custom_vocabulary_enabled = True
@@ -15666,7 +15588,7 @@ async def test_apply_providers_failed_signature_retries_same_settings_without_ra
     controller.settings = AppSettings()
     controller.settings.provider.llm = LLMProviderName.GEMINI
     controller.hub = DummyHub(llm=object())
-    controller._last_self_stt_provider_signature = controller._build_self_stt_provider_signature(
+    controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
     controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
@@ -15732,7 +15654,7 @@ async def test_apply_providers_force_rebuild_failed_signature_uses_miss_sentinel
     controller.settings = AppSettings()
     controller.settings.provider.llm = LLMProviderName.GEMINI
     controller.hub = DummyHub(llm=object())
-    controller._last_self_stt_provider_signature = controller._build_self_stt_provider_signature(
+    controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
     controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
@@ -15786,7 +15708,7 @@ async def test_apply_providers_broker_base_url_rebuilds_managed_broker_service(
         )
     )
     controller._managed_openrouter_release_service = old_service
-    controller._last_self_stt_provider_signature = controller._build_self_stt_provider_signature(
+    controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
     controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
@@ -15848,7 +15770,7 @@ async def test_apply_providers_managed_identity_rebuilds_service_with_pending_id
     controller.settings.managed_identity.verified_hardware_hash = "old-hardware-hash"
     controller.settings.managed_identity.verified_hardware_hash_salt_version = 1
     controller.hub = DummyHub()
-    controller._last_self_stt_provider_signature = controller._build_self_stt_provider_signature(
+    controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
     controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
@@ -15892,7 +15814,7 @@ async def test_apply_providers_mixed_degraded_default_service_persists_full_prov
     controller.settings.translation.fallback = TranslationFallbackSettings(enabled=False)
     controller.settings.system_prompt = "base prompt"
     controller.hub = DummyHub()
-    controller._last_self_stt_provider_signature = controller._build_self_stt_provider_signature(
+    controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
     controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
@@ -15960,7 +15882,7 @@ async def test_order22_apply_settings_routes_stt_language_audio_patch_through_de
     controller.hub.peer_target_language = controller.settings.languages.peer_target_language
     controller.hub.low_latency_mode = controller.settings.stt.low_latency_mode
     controller._peer_runtime = DummyPeerRuntime()
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -16060,7 +15982,7 @@ async def test_order22_apply_settings_runtime_failure_degrades_without_rollback_
     controller.hub = DummyHub(stt=object())
     controller.hub.source_language = controller.settings.languages.source_language
     controller.hub.target_language = controller.settings.languages.target_language
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -16259,7 +16181,7 @@ async def test_order22_apply_settings_self_stt_provider_specific_change_restarts
     controller.hub = DummyHub(stt=object())
     controller.hub.source_language = controller.settings.languages.source_language
     controller.hub.target_language = controller.settings.languages.target_language
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -16313,7 +16235,7 @@ async def test_order22_apply_settings_mixed_draft_applies_audio_runtime_and_pres
     controller.hub.source_language = controller.settings.languages.source_language
     controller.hub.target_language = controller.settings.languages.target_language
     controller.hub.system_prompt = controller.settings.system_prompt
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -16410,7 +16332,7 @@ async def test_mixed_order22_order23_order24_fallback_save_failure_restores_comm
     controller.hub.source_language = controller.settings.languages.source_language
     controller.hub.target_language = controller.settings.languages.target_language
     controller.hub.system_prompt = controller.settings.system_prompt
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -16497,7 +16419,7 @@ async def test_order22_apply_settings_mixed_full_draft_save_failure_degrades_and
     controller.hub.source_language = controller.settings.languages.source_language
     controller.hub.target_language = controller.settings.languages.target_language
     controller.hub.system_prompt = controller.settings.system_prompt
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -17103,7 +17025,7 @@ async def test_order22_mixed_settings_direct_fallback_degrades_when_stt_unavaila
     controller.hub.source_language = controller.settings.languages.source_language
     controller.hub.target_language = controller.settings.languages.target_language
     controller._stt_desired = True
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -17161,7 +17083,7 @@ async def test_order22_qwen_historical_low_latency_change_does_not_rebuild_llm(
     controller.hub.source_language = controller.settings.languages.source_language
     controller.hub.target_language = controller.settings.languages.target_language
     controller.hub.low_latency_mode = controller.settings.stt.low_latency_mode
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -17211,7 +17133,7 @@ async def test_order22_qwen_historical_false_cannot_restore_non_fast_runtime(
     controller.hub.source_language = controller.settings.languages.source_language
     controller.hub.target_language = controller.settings.languages.target_language
     controller.hub.low_latency_mode = controller.settings.stt.low_latency_mode
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(
@@ -17569,7 +17491,7 @@ async def test_apply_providers_preserves_current_languages_while_applying_provid
     controller.hub.peer_source_language = "zh-CN"
     controller.hub.peer_target_language = "nl"
     controller._stt_desired = False
-    controller._last_self_stt_provider_signature = controller._build_self_stt_provider_signature(
+    controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
     controller._last_peer_stt_provider_signature = controller._build_peer_stt_provider_signature(
@@ -17802,7 +17724,7 @@ async def test_dashboard_peer_language_change_refreshes_peer_translation_pipelin
     )
     controller.settings = AppSettings()
     controller.hub = DummyHub()
-    controller._last_self_stt_runtime_signature = controller._build_self_stt_runtime_signature(
+    controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
     controller._last_peer_stt_runtime_signature = controller._build_peer_stt_runtime_signature(

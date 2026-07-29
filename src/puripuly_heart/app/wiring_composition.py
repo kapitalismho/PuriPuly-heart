@@ -14,6 +14,32 @@ from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureGpuActivationValidator,
 )
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
+from puripuly_heart.app.services.gpu_provider_recovery import (
+    GpuProviderRecoveryDiagnosticSink,
+    GpuProviderRecoveryOwner,
+)
+from puripuly_heart.app.services.gpu_provider_recovery_application import (
+    GpuProviderRecoveryApplicationOwner,
+    GpuProviderRecoveryAsyncEffect,
+    GpuProviderRecoveryFailureSink,
+    GpuProviderRecoveryPeerOwnerProvider,
+    GpuProviderRecoveryPendingClear,
+    GpuProviderRecoveryPendingProvider,
+    GpuProviderRecoveryRuntimeProvider,
+    GpuProviderRecoverySelfOwnerFactory,
+    GpuProviderRecoverySelfStateSink,
+    GpuProviderRecoveryStateSink,
+)
+from puripuly_heart.app.services.gpu_runtime_interaction import (
+    GpuRuntimeActivationRetry,
+    GpuRuntimeDetailedLogSink,
+    GpuRuntimeInstallDiagnosticSink,
+    GpuRuntimeInteractionOwner,
+    GpuRuntimeInteractionStateProvider,
+    GpuRuntimePresentationSink,
+    GpuRuntimeProvider,
+    GpuRuntimeProvisioningProvider,
+)
 from puripuly_heart.app.services.local_asr_cpu_repair import (
     LocalASRCpuModelIdsForProvider,
     LocalASRCpuPeerResume,
@@ -32,13 +58,19 @@ from puripuly_heart.app.services.local_asr_diagnostics import (
     LocalASRDiagnosticsOwner,
     LocalASRGpuDiscoveryOriginProvider,
 )
-from puripuly_heart.app.services.local_asr_gpu_provisioning import (
-    LocalASRGpuActivationRetry,
-    LocalASRGpuProvisioningDiagnosticSink,
-    LocalASRGpuProvisioningEffectSink,
-    LocalASRGpuProvisioningOwner,
-    LocalASRGpuProvisioningStateProvider,
-    LocalASRProvisioningProvider,
+from puripuly_heart.app.services.local_asr_readiness import (
+    LocalASRReadinessAsyncEffect,
+    LocalASRReadinessChannelProvider,
+    LocalASRReadinessEffectSink,
+    LocalASRReadinessFallback,
+    LocalASRReadinessGpuPendingSink,
+    LocalASRReadinessGpuStateProvider,
+    LocalASRReadinessGpuValidator,
+    LocalASRReadinessLoadLogSink,
+    LocalASRReadinessOwner,
+    LocalASRReadinessProviderAvailable,
+    LocalASRReadinessProvisioningProvider,
+    LocalASRReadinessStateProvider,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.provider_credential_verification import (
@@ -48,6 +80,7 @@ from puripuly_heart.app.services.provider_credential_verification import (
     ProviderCredentialVerificationInteractionOwner,
     ProviderCredentialVerificationOwner,
 )
+from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeRecoveryQuiesce
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
     PeerCaptureTargetResolverPort,
@@ -135,20 +168,59 @@ def create_provider_credential_verification_interaction_owner(
     )
 
 
-def create_local_asr_gpu_provisioning_owner(
+def create_gpu_runtime_interaction_owner(
     *,
-    provisioning_provider: LocalASRProvisioningProvider,
-    state_provider: LocalASRGpuProvisioningStateProvider,
-    effect_sink: LocalASRGpuProvisioningEffectSink,
-    retry_activation: LocalASRGpuActivationRetry,
-    diagnostic_sink: LocalASRGpuProvisioningDiagnosticSink | None = None,
-) -> LocalASRGpuProvisioningOwner:
-    return LocalASRGpuProvisioningOwner(
+    runtime_provider: GpuRuntimeProvider,
+    provisioning_provider: GpuRuntimeProvisioningProvider,
+    state_provider: GpuRuntimeInteractionStateProvider,
+    presentation_sink: GpuRuntimePresentationSink,
+    detailed_log_sink: GpuRuntimeDetailedLogSink,
+    retry_activation: GpuRuntimeActivationRetry,
+    install_diagnostic_sink: GpuRuntimeInstallDiagnosticSink | None = None,
+) -> GpuRuntimeInteractionOwner:
+    return GpuRuntimeInteractionOwner(
+        runtime_provider=runtime_provider,
         provisioning_provider=provisioning_provider,
         state_provider=state_provider,
-        effect_sink=effect_sink,
+        presentation_sink=presentation_sink,
+        detailed_log_sink=detailed_log_sink,
         retry_activation=retry_activation,
-        diagnostic_sink=diagnostic_sink,
+        install_diagnostic_sink=install_diagnostic_sink,
+    )
+
+
+def create_gpu_provider_recovery_application_owner(
+    *,
+    runtime_provider: GpuProviderRecoveryRuntimeProvider,
+    pending_provider: GpuProviderRecoveryPendingProvider,
+    pending_clear: GpuProviderRecoveryPendingClear,
+    failure_sink: GpuProviderRecoveryFailureSink,
+    runtime_state_sink: GpuProviderRecoveryStateSink,
+    quiesce: ProviderRuntimeRecoveryQuiesce,
+    self_owner_factory: GpuProviderRecoverySelfOwnerFactory,
+    peer_owner_provider: GpuProviderRecoveryPeerOwnerProvider,
+    self_state_sink: GpuProviderRecoverySelfStateSink,
+    ensure_self_switch: GpuProviderRecoveryAsyncEffect,
+    refresh_self: GpuProviderRecoveryAsyncEffect,
+    refresh_peer: GpuProviderRecoveryAsyncEffect,
+    diagnostic_sink: GpuProviderRecoveryDiagnosticSink,
+) -> GpuProviderRecoveryApplicationOwner:
+    return GpuProviderRecoveryApplicationOwner(
+        recovery_owner=GpuProviderRecoveryOwner(
+            diagnostic_sink=diagnostic_sink,
+        ),
+        runtime_provider=runtime_provider,
+        pending_provider=pending_provider,
+        pending_clear=pending_clear,
+        failure_sink=failure_sink,
+        runtime_state_sink=runtime_state_sink,
+        quiesce=quiesce,
+        self_owner_factory=self_owner_factory,
+        peer_owner_provider=peer_owner_provider,
+        self_state_sink=self_state_sink,
+        ensure_self_switch=ensure_self_switch,
+        refresh_self=refresh_self,
+        refresh_peer=refresh_peer,
     )
 
 
@@ -189,6 +261,39 @@ def create_local_asr_cpu_repair_owner(
         rebuild_self_provider=rebuild_self_provider,
         resume_self=resume_self,
         resume_peer=resume_peer,
+    )
+
+
+def create_local_asr_readiness_owner(
+    *,
+    provisioning_provider: LocalASRReadinessProvisioningProvider,
+    cpu_repair_owner: LocalASRCpuRepairOwner,
+    state_provider: LocalASRReadinessStateProvider,
+    effect_sink: LocalASRReadinessEffectSink,
+    self_provider_available: LocalASRReadinessProviderAvailable,
+    self_channel_provider: LocalASRReadinessChannelProvider,
+    rebuild_self_provider: LocalASRReadinessAsyncEffect,
+    probe_self_provider: LocalASRReadinessAsyncEffect,
+    persist_manual_fallback: LocalASRReadinessFallback,
+    validate_gpu_activation: LocalASRReadinessGpuValidator,
+    gpu_state_provider: LocalASRReadinessGpuStateProvider,
+    retain_gpu_pending: LocalASRReadinessGpuPendingSink,
+    load_log_sink: LocalASRReadinessLoadLogSink,
+) -> LocalASRReadinessOwner:
+    return LocalASRReadinessOwner(
+        provisioning_provider=provisioning_provider,
+        cpu_repair_owner=cpu_repair_owner,
+        state_provider=state_provider,
+        effect_sink=effect_sink,
+        self_provider_available=self_provider_available,
+        self_channel_provider=self_channel_provider,
+        rebuild_self_provider=rebuild_self_provider,
+        probe_self_provider=probe_self_provider,
+        persist_manual_fallback=persist_manual_fallback,
+        validate_gpu_activation=validate_gpu_activation,
+        gpu_state_provider=gpu_state_provider,
+        retain_gpu_pending=retain_gpu_pending,
+        load_log_sink=load_log_sink,
     )
 
 
