@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable
 from typing import Any, Protocol
 
+from puripuly_heart.app.ports.desktop_overlay import DesktopOverlayRuntimeEffectsPort
+from puripuly_heart.app.ports.overlay_calibration import (
+    OverlayCalibrationRuntimeEffectsPort,
+)
 from puripuly_heart.app.ports.settings_runtime_effects import (
     SettingsRuntimeState,
     SettingsRuntimeTransition,
+)
+from puripuly_heart.app.services.overlay_application import (
+    OverlayApplicationOwner,
+    OverlayApplicationState,
 )
 from puripuly_heart.app.wiring_stt_factory import (
     build_peer_stt_runtime_signature,
@@ -20,7 +29,6 @@ from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 class SettingsRuntimeEffectsHost(Protocol):
     app: Any
     hub: Any
-    overlay_state: str
     settings: AppSettings | None
     vrc_mic_audio_gate: Any
     _last_microphone_test_audio_settings_signature: object | None
@@ -46,22 +54,6 @@ class SettingsRuntimeEffectsHost(Protocol):
 
     async def stop_microphone_test_for_audio_settings_change(self) -> None: ...
 
-    def _overlay_target_for_settings(self, settings: AppSettings | None) -> str: ...
-
-    def _get_overlay_application_owner(self) -> Any: ...
-
-    def _previous_overlay_target_for_apply(self) -> str: ...
-
-    def _overlay_runtime_is_active(self) -> bool: ...
-
-    def _clear_overlay_session_desktop_fallback(self) -> None: ...
-
-    def _prepare_desktop_runtime_settings_update(
-        self,
-        previous_settings: AppSettings | None,
-        next_settings: AppSettings,
-    ) -> list[dict[str, object]]: ...
-
     def _peer_translation_activation_requested_for(
         self,
         settings: AppSettings,
@@ -71,31 +63,9 @@ class SettingsRuntimeEffectsHost(Protocol):
 
     def _is_qwen_llm(self, settings: AppSettings) -> bool: ...
 
-    def _current_overlay_presenter_for_direct_runtime_command(self) -> Any: ...
-
-    def _current_overlay_bridge_for_direct_runtime_command(self) -> Any: ...
-
     def log_basic(self, message: str) -> None: ...
 
     def log_detailed(self, message: str) -> None: ...
-
-    def _sync_overlay_calibration_cache(self, settings: AppSettings) -> None: ...
-
-    def _sync_desktop_overlay_interaction_mode_from_settings(
-        self,
-        settings: AppSettings,
-    ) -> None: ...
-
-    async def _apply_desktop_size_preset_persistence_adjustment(
-        self,
-        previous_settings: AppSettings,
-        next_settings: AppSettings,
-    ) -> None: ...
-
-    async def _broadcast_desktop_runtime_control_payloads(
-        self,
-        payloads: list[dict[str, object]],
-    ) -> None: ...
 
     async def _sync_clipboard_watcher_with_policy(
         self,
@@ -131,8 +101,20 @@ class SettingsRuntimeEffectsHost(Protocol):
 
 
 class SettingsRuntimeEffectsAdapter:
-    def __init__(self, host: SettingsRuntimeEffectsHost) -> None:
+    def __init__(
+        self,
+        host: SettingsRuntimeEffectsHost,
+        *,
+        desktop_overlay: DesktopOverlayRuntimeEffectsPort[AppSettings],
+        calibration: OverlayCalibrationRuntimeEffectsPort,
+        overlay: OverlayApplicationOwner,
+        overlay_state_provider: Callable[[AppSettings | None], OverlayApplicationState],
+    ) -> None:
         self._host = host
+        self._desktop_overlay = desktop_overlay
+        self._calibration = calibration
+        self._overlay = overlay
+        self._overlay_state_provider = overlay_state_provider
 
     async def preserve_before_replace(self, settings: AppSettings) -> None:
         await self._host._preserve_github_star_prompt_observation_before_settings_replace(settings)
@@ -164,28 +146,32 @@ class SettingsRuntimeEffectsAdapter:
         previous_settings = (
             copy.deepcopy(current_settings) if current_settings is not None else None
         )
-        previous_settings_overlay_target = host._overlay_target_for_settings(current_settings)
-        next_overlay_target = host._overlay_target_for_settings(next_settings)
-        if host._get_overlay_application_owner().fallback_owner.active:
+        previous_settings_overlay_target = self._overlay.target_for_state(
+            self._overlay_state_provider(current_settings)
+        )
+        next_overlay_target = self._overlay.target_for_state(
+            self._overlay_state_provider(next_settings)
+        )
+        if self._overlay.snapshot.fallback_active:
             previous_overlay_target = previous_settings_overlay_target
         else:
-            previous_overlay_target = host._previous_overlay_target_for_apply()
+            previous_overlay_target = self._overlay.previous_target_for_apply()
         if next_overlay_target == OVERLAY_TARGET_DESKTOP:
-            host._clear_overlay_session_desktop_fallback()
+            self._overlay.clear_fallback()
         if (
             previous_overlay_target != next_overlay_target
             and previous_overlay_enabled
             and next_settings.ui.overlay_enabled
-            and host._overlay_runtime_is_active()
+            and self._overlay.runtime_is_active()
         ):
             host.log_basic(
                 "[Overlay] Target changed while running; stopping current overlay before switch"
             )
             next_settings = copy.deepcopy(next_settings)
             next_settings.ui.overlay_enabled = False
-            host._clear_overlay_session_desktop_fallback()
+            self._overlay.clear_fallback()
         desktop_runtime_controls = tuple(
-            host._prepare_desktop_runtime_settings_update(
+            self._desktop_overlay.prepare_settings_update(
                 previous_settings,
                 next_settings,
             )
@@ -276,8 +262,8 @@ class SettingsRuntimeEffectsAdapter:
             and previous_peer_source_mode != next_settings.languages.peer_source_mode
         )
         if source_language_changed or target_language_changed:
-            presenter = host._current_overlay_presenter_for_direct_runtime_command()
-            bridge = host._current_overlay_bridge_for_direct_runtime_command()
+            presenter = self._overlay.current_presenter()
+            bridge = self._overlay.current_bridge()
             host.log_basic(
                 "[Settings] Applying languages: "
                 f"source={previous_source_language}->{next_settings.languages.source_language} "
@@ -285,7 +271,7 @@ class SettingsRuntimeEffectsAdapter:
             )
             host.log_detailed(
                 "[Settings] Language apply detail: "
-                f"overlay_state={host.overlay_state} "
+                f"overlay_state={self._overlay.snapshot.state} "
                 f"presenter_attached={presenter is not None} "
                 f"bridge_attached={bridge is not None} "
                 "overlay_sink_matches_presenter="
@@ -319,15 +305,15 @@ class SettingsRuntimeEffectsAdapter:
         host._last_microphone_test_audio_settings_signature = (
             host._microphone_test_audio_settings_signature(settings)
         )
-        host._sync_overlay_calibration_cache(settings)
-        host._sync_desktop_overlay_interaction_mode_from_settings(settings)
+        self._calibration.sync_from_settings(settings)
+        self._desktop_overlay.sync_from_settings(settings)
 
     async def prepare_overlay_persistence(
         self,
         previous_settings: AppSettings,
         next_settings: AppSettings,
     ) -> None:
-        await self._host._apply_desktop_size_preset_persistence_adjustment(
+        await self._desktop_overlay.prepare_persistence(
             previous_settings,
             next_settings,
         )
@@ -336,7 +322,7 @@ class SettingsRuntimeEffectsAdapter:
         host = self._host
         restored_settings = copy.deepcopy(settings)
         host.settings = restored_settings
-        host._sync_overlay_calibration_cache(restored_settings)
+        self._calibration.sync_from_settings(restored_settings)
         if host.hub is not None:
             host.hub.source_language = restored_settings.languages.source_language
             host.hub.target_language = restored_settings.languages.target_language
@@ -381,9 +367,7 @@ class SettingsRuntimeEffectsAdapter:
     ) -> None:
         host = self._host
         settings = transition.settings
-        await host._broadcast_desktop_runtime_control_payloads(
-            list(transition.desktop_runtime_controls)
-        )
+        await self._desktop_overlay.apply_controls(transition.desktop_runtime_controls)
         await host._sync_clipboard_watcher_with_policy(
             strict_runtime_errors=strict_runtime_errors,
         )
@@ -423,7 +407,7 @@ class SettingsRuntimeEffectsAdapter:
                     strict_runtime_errors=strict_runtime_errors,
                 )
 
-        presenter = host._current_overlay_presenter_for_direct_runtime_command()
+        presenter = self._overlay.current_presenter()
         if presenter is not None:
             await presenter.update_display_preferences(
                 show_translation=settings.overlay.show_translation,

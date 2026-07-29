@@ -50,6 +50,10 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 from puripuly_heart.app.services.clipboard_auto_translation import (
     ClipboardAutoTranslationOwner,
 )
+from puripuly_heart.app.services.desktop_overlay_application import (
+    DESKTOP_INTERACTION_MODE_EDIT,
+    DesktopOverlayApplicationOwner,
+)
 from puripuly_heart.app.services.github_star_prompt import (
     GithubStarPromptOwner,
 )
@@ -114,7 +118,9 @@ from puripuly_heart.app.services.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
-from puripuly_heart.app.services.overlay_calibration import OverlayCalibrationOwner
+from puripuly_heart.app.services.overlay_calibration_application import (
+    OverlayCalibrationApplicationOwner,
+)
 from puripuly_heart.app.services.peer_application import (
     PeerApplicationOwner,
     PeerApplicationState,
@@ -185,6 +191,7 @@ from puripuly_heart.app.wiring import (
     resolve_overlay_config,
 )
 from puripuly_heart.app.wiring_composition import (
+    create_desktop_overlay_policy,
     create_gpu_provider_recovery_application_owner,
     create_gpu_runtime_interaction_owner,
     create_local_asr_cpu_repair_owner,
@@ -193,6 +200,7 @@ from puripuly_heart.app.wiring_composition import (
     create_manual_typing_owner,
     create_provider_credential_verification_interaction_owner,
     create_vrchat_osc_presence_probe_owner,
+    create_windows_desktop_work_area,
 )
 from puripuly_heart.app.wiring_managed_auth_factory import (
     ManagedAuthRuntimeAdapter,
@@ -203,17 +211,8 @@ from puripuly_heart.config.paths import user_config_dir
 from puripuly_heart.config.process_capture_resolution import (
     ProcessCaptureResolver,
 )
-from puripuly_heart.config.resolved import (
-    ResolvedDesktopAudioCaptureTarget,
-    ResolvedOverlayConfig,
-)
+from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import (
-    DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
-    DESKTOP_FLET_DEFAULT_TEXT_SCALE,
-    DESKTOP_FLET_MIN_HEIGHT,
-    DESKTOP_FLET_MIN_WIDTH,
-    DESKTOP_FLET_SIZE_PRESETS,
-    OVERLAY_TARGET_DESKTOP,
     OVERLAY_TARGET_STEAMVR,
     AppSettings,
     LLMProviderName,
@@ -287,20 +286,12 @@ from puripuly_heart.core.osc.receiver import (
     VrcOscReceiver,
 )
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
-from puripuly_heart.core.overlay.bridge import OverlayBridge
-from puripuly_heart.core.overlay.presenter import OverlayPresenter
-from puripuly_heart.core.overlay.process import OverlayProcessRunner
 from puripuly_heart.core.peer_capture import (
     PeerCaptureDiagnostic,
     PeerCaptureSessionSnapshot,
 )
-from puripuly_heart.core.runtime.desktop_overlay_bounds import (
-    DesktopOverlayBoundsOwner,
-    is_finite_non_bool_number,
-)
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
-from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.core.runtime.peer_channel import (
     PeerCaptureSessionOwner,
 )
@@ -335,14 +326,8 @@ logger = logging.getLogger(__name__)
 STT_RESET_DEADLINE_S = 300.0
 OVERLAY_STARTUP_TIMEOUT_MS = 3000
 OVERLAY_SHUTDOWN_GRACE_S = 0.05
-DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S = 0.05
 MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S = 3.0
 MANUAL_SUBMIT_TYPING_TIMEOUT_S = 10.0
-DESKTOP_INTERACTION_MODE_EDIT = "edit"
-DESKTOP_INTERACTION_MODE_PASS_THROUGH = "pass_through"
-DESKTOP_INTERACTION_MODES = frozenset(
-    {DESKTOP_INTERACTION_MODE_EDIT, DESKTOP_INTERACTION_MODE_PASS_THROUGH}
-)
 _OVERLAY_FAILURE_REASONS = frozenset(
     {
         "missing_executable",
@@ -586,7 +571,7 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _desktop_overlay_bounds_owner: DesktopOverlayBoundsOwner | None = field(
+    _desktop_overlay_application_owner: DesktopOverlayApplicationOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -640,11 +625,7 @@ class GuiController:
     _stop_complete: bool = field(init=False, default=False, repr=False)
     _stop_exception: BaseException | None = field(init=False, default=None, repr=False)
 
-    desktop_overlay_interaction_mode: str = field(
-        init=False,
-        default=DESKTOP_INTERACTION_MODE_EDIT,
-    )
-    _overlay_calibration_owner: OverlayCalibrationOwner | None = field(
+    _overlay_calibration_application_owner: OverlayCalibrationApplicationOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -652,22 +633,7 @@ class GuiController:
 
     @property
     def overlay_calibration(self) -> OverlayCalibration:
-        return self._get_overlay_calibration_owner().current
-
-    @overlay_calibration.setter
-    def overlay_calibration(self, calibration: OverlayCalibration) -> None:
-        self._get_overlay_calibration_owner().replace_current(calibration)
-
-    @property
-    def _overlay_calibration_draft(self) -> OverlayCalibration | None:
-        return self._get_overlay_calibration_owner().draft
-
-    @_overlay_calibration_draft.setter
-    def _overlay_calibration_draft(
-        self,
-        calibration: OverlayCalibration | None,
-    ) -> None:
-        self._get_overlay_calibration_owner().replace_draft(calibration)
+        return self._get_overlay_calibration_application_owner().current
 
     def _get_settings_owner(self) -> SettingsOwner:
         if self.settings_owner is None:
@@ -700,51 +666,6 @@ class GuiController:
         owner = self._managed_auth_owner
         return owner.last_referral_bonus_applied if owner is not None else False
 
-    @property
-    def _overlay_runtime(self) -> OverlayRuntimeHandle | None:
-        owner = self._overlay_application_owner
-        return owner.runtime if owner is not None else None
-
-    @_overlay_runtime.setter
-    def _overlay_runtime(self, runtime: OverlayRuntimeHandle | None) -> None:
-        self._get_overlay_application_owner().runtime = runtime
-
-    @property
-    def _active_overlay_target(self) -> str | None:
-        owner = self._overlay_application_owner
-        return owner.active_target if owner is not None else None
-
-    @_active_overlay_target.setter
-    def _active_overlay_target(self, target: str | None) -> None:
-        self._get_overlay_application_owner().active_target = target
-
-    @property
-    def overlay_state(self) -> str:
-        owner = self._overlay_application_owner
-        return owner.state if owner is not None else "off"
-
-    @overlay_state.setter
-    def overlay_state(self, state: str) -> None:
-        self._get_overlay_application_owner().state = state
-
-    @property
-    def failure_reason(self) -> str | None:
-        owner = self._overlay_application_owner
-        return owner.failure_reason if owner is not None else None
-
-    @failure_reason.setter
-    def failure_reason(self, reason: str | None) -> None:
-        self._get_overlay_application_owner().failure_reason = reason
-
-    @property
-    def auto_restart_scheduled(self) -> bool:
-        owner = self._overlay_application_owner
-        return owner.auto_restart_scheduled if owner is not None else False
-
-    @auto_restart_scheduled.setter
-    def auto_restart_scheduled(self, scheduled: bool) -> None:
-        self._get_overlay_application_owner().auto_restart_scheduled = scheduled
-
     def _report_overlay_application_state(
         self,
         state: str,
@@ -771,6 +692,8 @@ class GuiController:
     def _get_overlay_application_owner(self) -> OverlayApplicationOwner:
         owner = self._overlay_application_owner
         if owner is None:
+            desktop = self._get_desktop_overlay_application_owner()
+            calibration = self._get_overlay_calibration_application_owner()
             owner = OverlayApplicationOwner(
                 state_provider=self._overlay_application_state,
                 config_provider=lambda: resolve_overlay_config(cast(AppSettings, self.settings)),
@@ -787,22 +710,15 @@ class GuiController:
                 presentation_sink=self.app.refresh_overlay_peer_contract,
                 state_sink=self._report_overlay_application_state,
                 fallback_notice_sink=(self.app.set_dashboard_overlay_session_fallback_notice),
-                cancel_bounds_persistence=self._cancel_desktop_bounds_persistence,
-                clear_bounds_suppressed=lambda: self._get_desktop_overlay_bounds_owner().clear_suppressed(),
-                calibration_provider=lambda: self.overlay_calibration.copy(),
+                cancel_bounds_persistence=desktop.bounds_owner.cancel,
+                clear_bounds_suppressed=desktop.bounds_owner.clear_suppressed,
+                calibration_provider=lambda: calibration.current.copy(),
                 logging_mode_provider=lambda: self.runtime_logging_mode,
                 log_dir_provider=lambda: str(user_config_dir()),
-                desktop_controls_factory=(
-                    self._build_initial_desktop_runtime_controls_from_resolved_config
-                ),
-                interaction_mode_sink=self._set_desktop_overlay_interaction_mode,
-                bounds_control_sink=self._track_desktop_apply_window_bounds_control,
-                renderer_event_consumer=lambda queue, instance_id: (
-                    self._consume_desktop_renderer_events(
-                        queue,
-                        overlay_instance_id=instance_id,
-                    )
-                ),
+                desktop_controls_factory=desktop.initial_controls,
+                interaction_mode_sink=desktop.set_interaction_mode,
+                bounds_control_sink=desktop.bounds_owner.track_apply_control,
+                renderer_event_consumer=desktop.consume_renderer_events,
                 edit_interaction_mode=DESKTOP_INTERACTION_MODE_EDIT,
                 clock=self.clock,
                 log_basic=lambda message, level: self.log_basic(
@@ -820,7 +736,47 @@ class GuiController:
 
     @property
     def desktop_overlay_captions_locked(self) -> bool:
-        return self.desktop_overlay_interaction_mode == DESKTOP_INTERACTION_MODE_PASS_THROUGH
+        return self._get_desktop_overlay_application_owner().captions_locked
+
+    def _get_desktop_overlay_application_owner(self) -> DesktopOverlayApplicationOwner:
+        owner = self._desktop_overlay_application_owner
+        if owner is None:
+            owner = DesktopOverlayApplicationOwner(
+                settings=self._get_settings_owner(),
+                settings_application_provider=self._get_settings_application_owner,
+                overlay_provider=self._get_overlay_application_owner,
+                work_area=create_windows_desktop_work_area(),
+                policy=create_desktop_overlay_policy(),
+                presentation_sink=lambda mode, locked: (
+                    self.app.on_desktop_overlay_state_changed(
+                        interaction_mode=mode,
+                        captions_locked=locked,
+                    )
+                ),
+                log_detailed=lambda message, level, exception: self.log_detailed(
+                    message,
+                    level=level,
+                    exception=exception,
+                ),
+            )
+            self._desktop_overlay_application_owner = owner
+        return owner
+
+    def _get_overlay_calibration_application_owner(
+        self,
+    ) -> OverlayCalibrationApplicationOwner:
+        owner = self._overlay_calibration_application_owner
+        if owner is None:
+            owner = OverlayCalibrationApplicationOwner(
+                settings=self._get_settings_owner(),
+                settings_application_provider=self._get_settings_application_owner,
+                overlay_provider=self._get_overlay_application_owner,
+                schedule_task=lambda task: self.app.schedule_task(task),
+                log_detailed=self.log_detailed,
+                ingress_available=lambda: not self._shutdown_ingress_frozen,
+            )
+            self._overlay_calibration_application_owner = owner
+        return owner
 
     @property
     def _peer_runtime(self) -> PeerCaptureSessionOwner | None:
@@ -927,9 +883,9 @@ class GuiController:
             peer_provider_available=bool(
                 activation_requested and hub is not None and self._hub_has_stt_provider("peer")
             ),
-            overlay_state=self.overlay_state,
+            overlay_state=self._get_overlay_application_owner().snapshot.state,
             overlay_command_available=(
-                self._current_overlay_bridge_for_direct_runtime_command() is not None
+                self._get_overlay_application_owner().current_bridge() is not None
             ),
             ingress_frozen=self._shutdown_ingress_frozen,
         )
@@ -978,7 +934,7 @@ class GuiController:
                 clear_switched_pending=self._clear_local_stt_pending_enable_if_provider_switched_away,
                 sync_local_notice=self._sync_local_stt_notice,
                 presentation_changed=self._refresh_overlay_peer_consumers,
-                begin_overlay_start=self._begin_overlay_start,
+                begin_overlay_start=self._get_overlay_application_owner().begin_start,
                 effective_sink=self._apply_peer_effective_flags,
                 disclosure_sink=self._enqueue_peer_translation_disclosure,
                 superseded_sink=lambda: self._superseded_local_asr_settings_ids.add(
@@ -1010,7 +966,7 @@ class GuiController:
 
     def _effective_peer_overlay_enabled_for(self, settings: AppSettings) -> bool:
         _ = settings
-        return self.overlay_state == "connected"
+        return self._get_overlay_application_owner().snapshot.state == "connected"
 
     def _effective_integrated_context_enabled_for(self, settings: AppSettings) -> bool:
         return self._effective_peer_translation_enabled_for(settings)
@@ -1088,8 +1044,8 @@ class GuiController:
                 self.settings = loaded_settings
         self.settings.ui.overlay_enabled = False
         self.settings.ui.peer_translation_enabled = False
-        self._sync_overlay_calibration_cache(self.settings)
-        self._overlay_calibration_draft = None
+        self._get_overlay_calibration_application_owner().sync_from_settings(self.settings)
+        self._get_overlay_calibration_application_owner().replace_draft(None)
         self.app.set_locale(self.settings.ui.locale)
         self._sync_ui_from_settings()
         self._get_settings_application_owner().notify_fallback(
@@ -1996,701 +1952,14 @@ class GuiController:
             isinstance(settings, AppSettings) and settings.provider.llm == LLMProviderName.QWEN
         )
 
-    @staticmethod
-    def _normalized_overlay_target(value: object) -> str:
-        return OverlayApplicationOwner.normalized_target(value)
-
-    def _overlay_target_for_settings(self, settings: AppSettings | None = None) -> str:
-        return self._get_overlay_application_owner().target_for_state(
-            self._overlay_application_state(settings)
-        )
-
-    def _effective_overlay_target_for_start(self) -> str:
-        return self._get_overlay_application_owner().effective_target_for_start()
-
-    def _clear_overlay_session_desktop_fallback(self) -> None:
-        self._get_overlay_application_owner().clear_fallback()
-
-    def _set_overlay_session_fallback_notice_active(self, active: bool) -> None:
-        self._get_overlay_application_owner().publish_fallback(active)
-
-    def _should_session_fallback_overlay_to_desktop(self, reason: str) -> bool:
-        return self._get_overlay_application_owner().should_fallback(reason)
-
-    def _new_overlay_runtime_handle(self) -> OverlayRuntimeHandle:
-        return self._get_overlay_application_owner().new_runtime()
-
-    def _ensure_overlay_runtime_handle(self) -> OverlayRuntimeHandle:
-        return self._get_overlay_application_owner().ensure_runtime()
-
-    def _overlay_runtime_is_current(
-        self,
-        runtime: OverlayRuntimeHandle,
-        *,
-        overlay_instance_id: str | None = None,
-    ) -> bool:
-        return self._get_overlay_application_owner().runtime_is_current(
-            runtime,
-            overlay_instance_id=overlay_instance_id,
-        )
-
-    def _overlay_runtime_has_resources(self, runtime: OverlayRuntimeHandle | None) -> bool:
-        return OverlayApplicationOwner.runtime_has_resources(runtime)
-
-    async def _replace_hub_overlay_sink(
-        self,
-        overlay_sink: object | None,
-        *,
-        expected_current: object | None = None,
-        require_match: bool = False,
-    ) -> bool:
-        return await self._get_overlay_application_owner().replace_hub_sink(
-            overlay_sink,
-            expected_current=expected_current,
-            require_match=require_match,
-        )
-
-    async def _close_stale_overlay_start_runtime(
-        self,
-        runtime: OverlayRuntimeHandle,
-    ) -> None:
-        await self._get_overlay_application_owner().close_stale_start(runtime)
-
-    def _overlay_runtime_is_active(self) -> bool:
-        return self._get_overlay_application_owner().runtime_is_active()
-
-    def _current_overlay_presenter_for_direct_runtime_command(self) -> OverlayPresenter | None:
-        return self._get_overlay_application_owner().current_presenter()
-
-    def _current_overlay_bridge_for_direct_runtime_command(self) -> OverlayBridge | None:
-        return self._get_overlay_application_owner().current_bridge()
-
-    def _previous_overlay_target_for_apply(self) -> str:
-        return self._get_overlay_application_owner().previous_target_for_apply()
-
-    def _overlay_process_runner_for_target(
-        self,
-        target: str,
-        *,
-        task_factory: object | None = None,
-    ) -> OverlayProcessRunner:
-        return self._get_overlay_application_owner().process_runner(target, task_factory)
-
-    def _build_initial_desktop_runtime_controls_from_resolved_config(
-        self,
-        config: ResolvedOverlayConfig,
-    ) -> list[dict[str, object]]:
-        desktop_options = config.desktop_overlay_options
-        position = desktop_options.get("position")
-        if not isinstance(position, Mapping):
-            position = {}
-        visual_options = desktop_options.get("visual")
-        if not isinstance(visual_options, Mapping):
-            visual_options = {}
-
-        width, height = self._desktop_dimensions_for_size_preset(desktop_options.get("size_preset"))
-        x = position.get("x")
-        y = position.get("y")
-        if self._is_finite_non_bool_number(x) and self._is_finite_non_bool_number(y):
-            bounds = {"x": x, "y": y, "width": width, "height": height}
-        else:
-            bounds = self._desktop_centered_bounds_for_dimensions(width=width, height=height)
-
-        text_scale = visual_options.get("text_scale", DESKTOP_FLET_DEFAULT_TEXT_SCALE)
-        background_alpha = visual_options.get(
-            "background_alpha",
-            DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
-        )
-        outline_width = visual_options.get("outline_width")
-        interaction_mode = DESKTOP_INTERACTION_MODE_EDIT
-        self.log_detailed(
-            "[DesktopOverlay][Launch] "
-            f"target=desktop locked={bool(desktop_options.get('locked', False))} "
-            f"interaction_mode={interaction_mode} "
-            f"size_preset={desktop_options.get('size_preset')} "
-            f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-            f"height={bounds['height']} "
-            f"text_scale={text_scale} "
-            f"background_alpha={background_alpha} "
-            f"outline_width={outline_width}"
-        )
-        return [
-            {
-                "command": "apply_window_bounds",
-                "x": bounds["x"],
-                "y": bounds["y"],
-                "width": bounds["width"],
-                "height": bounds["height"],
-            },
-            {
-                "command": "apply_visual_config",
-                "text_scale": text_scale,
-                "background_alpha": background_alpha,
-                "outline_width": outline_width,
-            },
-            {"command": "set_interaction_mode", "mode": interaction_mode},
-        ]
-
-    @staticmethod
-    def _desktop_dimensions_for_size_preset(size_preset: object) -> tuple[int, int]:
-        if isinstance(size_preset, str) and size_preset in DESKTOP_FLET_SIZE_PRESETS:
-            return DESKTOP_FLET_SIZE_PRESETS[size_preset]
-        return DESKTOP_FLET_SIZE_PRESETS["medium"]
-
-    def _desktop_launch_bounds_for_current_launch(
-        self,
-        desktop_settings: object,
-    ) -> dict[str, int | float]:
-        position = getattr(desktop_settings, "position", None)
-        x = getattr(position, "x", None)
-        y = getattr(position, "y", None)
-        width, height = self._desktop_dimensions_for_size_preset(
-            getattr(desktop_settings, "size_preset", None)
-        )
-        if self._is_finite_non_bool_number(x) and self._is_finite_non_bool_number(y):
-            return {"x": x, "y": y, "width": width, "height": height}  # type: ignore[dict-item]
-        return self._desktop_centered_bounds_for_dimensions(width=width, height=height)
-
-    def _desktop_centered_bounds_for_dimensions(
-        self,
-        *,
-        width: int | float,
-        height: int | float,
-    ) -> dict[str, int | float]:
-        work_area = self._desktop_work_area_for_current_launch()
-        if work_area is None:
-            return {"x": 0, "y": 0, "width": width, "height": height}
-        left, top, work_width, work_height = work_area
-        if not (
-            self._is_finite_non_bool_number(left)
-            and self._is_finite_non_bool_number(top)
-            and self._is_finite_non_bool_number(work_width)
-            and self._is_finite_non_bool_number(work_height)
-            and work_width > 0
-            and work_height > 0
-        ):
-            return {"x": 0, "y": 0, "width": width, "height": height}
-
-        return {
-            "x": left + ((work_width - width) / 2),
-            "y": top + ((work_height - height) / 2),
-            "width": width,
-            "height": height,
-        }
-
-    @staticmethod
-    def _is_finite_non_bool_number(value: object) -> bool:
-        return is_finite_non_bool_number(value)
-
-    def _desktop_bounds_from_payload(
-        self,
-        payload: dict[object, object],
-    ) -> dict[str, int | float] | None:
-        return self._get_desktop_overlay_bounds_owner().bounds_from_payload(payload)
-
-    def _is_valid_desktop_window_bounds_event_payload(
-        self,
-        payload: dict[object, object],
-    ) -> bool:
-        return self._get_desktop_overlay_bounds_owner().is_valid_event_payload(payload)
-
-    def _track_desktop_apply_window_bounds_control(self, payload: dict[str, object]) -> None:
-        self._get_desktop_overlay_bounds_owner().track_apply_control(payload)
-
-    def _consume_suppressed_desktop_bounds(self, bounds: dict[str, int | float]) -> bool:
-        return self._get_desktop_overlay_bounds_owner().consume_suppressed(bounds)
-
-    def _discard_suppressed_desktop_bounds(self, bounds: dict[str, int | float]) -> None:
-        self._get_desktop_overlay_bounds_owner().discard_suppressed(bounds)
-
-    @staticmethod
-    def _is_desktop_user_window_bounds_event(event: object) -> bool:
-        if not isinstance(event, dict):
-            return False
-        payload = event.get("payload")
-        if not isinstance(payload, dict):
-            return False
-        return bool(
-            payload.get("event") == "window_bounds_changed"
-            and payload.get("source") == "user"
-            and payload.get("persist") is True
-        )
-
-    def _drain_pending_desktop_user_bounds_events(self) -> None:
-        runtime = self._overlay_runtime
-        queue = runtime.renderer_events_or_none() if runtime is not None else None
-        if queue is None:
-            return
-        retained: list[dict[str, object]] = []
-        dropped = 0
-        while True:
-            try:
-                event = queue.get_nowait()
-            except asyncio.QueueEmpty:
-                break
-            if self._is_desktop_user_window_bounds_event(event):
-                dropped += 1
-                continue
-            retained.append(event)
-        for event in retained:
-            queue.put_nowait(event)
-        if dropped:
-            self.log_detailed(
-                f"[DesktopOverlay][Bounds] drained_pending_user_bounds count={dropped}"
-            )
-
-    def _set_desktop_overlay_interaction_mode(self, mode: object) -> bool:
-        if not isinstance(mode, str) or mode not in DESKTOP_INTERACTION_MODES:
-            return False
-        previous_mode = self.desktop_overlay_interaction_mode
-        self.desktop_overlay_interaction_mode = mode
-        if previous_mode != mode:
-            self._notify_desktop_overlay_interaction_mode()
-        return True
-
-    def _notify_desktop_overlay_interaction_mode(self) -> None:
-        handler = getattr(self.app, "on_desktop_overlay_state_changed", None)
-        if callable(handler):
-            handler(
-                interaction_mode=self.desktop_overlay_interaction_mode,
-                captions_locked=self.desktop_overlay_captions_locked,
-            )
-
     async def set_desktop_overlay_captions_locked(self, locked: bool) -> None:
-        if self.settings is None:
-            return
-        if self.overlay_state != "connected":
-            return
-        if (
-            self._active_overlay_target != OVERLAY_TARGET_DESKTOP
-            or self._current_overlay_bridge_for_direct_runtime_command() is None
-        ):
-            return
-
-        mode = DESKTOP_INTERACTION_MODE_PASS_THROUGH if locked else DESKTOP_INTERACTION_MODE_EDIT
-        if not await self._broadcast_desktop_runtime_control(
-            {
-                "command": "set_interaction_mode",
-                "mode": mode,
-            }
-        ):
-            return
-        self._set_desktop_overlay_interaction_mode(mode)
+        await self._get_desktop_overlay_application_owner().set_captions_locked(locked)
 
     async def set_desktop_overlay_size_preset(self, size_preset: str) -> None:
-        if self.settings is None:
-            return
-        normalized_size_preset = (
-            size_preset if size_preset in DESKTOP_FLET_SIZE_PRESETS else "medium"
-        )
-        if self.settings.overlay.desktop_flet.size_preset == normalized_size_preset:
-            return
-        updated = copy.deepcopy(self.settings)
-        updated.overlay.desktop_flet.size_preset = normalized_size_preset
-        await self.apply_settings(updated)
+        await self._get_desktop_overlay_application_owner().set_size_preset(size_preset)
 
     async def reset_desktop_overlay_position(self) -> None:
-        await self._handle_desktop_overlay_reset_requested()
-
-    async def _broadcast_desktop_runtime_control(self, payload: dict[str, object]) -> bool:
-        if self._active_overlay_target != OVERLAY_TARGET_DESKTOP:
-            return False
-        bridge = self._current_overlay_bridge_for_direct_runtime_command()
-        if bridge is None:
-            return False
-        broadcast = getattr(bridge, "broadcast_desktop_runtime_control", None)
-        if not callable(broadcast):
-            return False
-        try:
-            await broadcast(payload)
-        except Exception as exc:
-            self.log_detailed(
-                "[Overlay] Failed to send desktop runtime control",
-                level=logging.WARNING,
-                exception=exc,
-            )
-            return False
-        return True
-
-    async def _broadcast_desktop_window_bounds_control(
-        self,
-        bounds: dict[str, int | float],
-    ) -> None:
-        payload: dict[str, object] = {
-            "command": "apply_window_bounds",
-            "x": bounds["x"],
-            "y": bounds["y"],
-            "width": bounds["width"],
-            "height": bounds["height"],
-        }
-        if await self._broadcast_desktop_runtime_control(payload):
-            self._track_desktop_apply_window_bounds_control(payload)
-
-    async def _consume_desktop_renderer_events(
-        self,
-        queue: asyncio.Queue[dict[str, object]],
-        *,
-        overlay_instance_id: str | None = None,
-    ) -> None:
-        try:
-            while True:
-                event = await queue.get()
-                try:
-                    await self._handle_desktop_renderer_event(
-                        event,
-                        overlay_instance_id=overlay_instance_id,
-                    )
-                except asyncio.CancelledError:
-                    raise
-                except Exception as exc:
-                    self.log_detailed(
-                        "[Overlay] Ignoring desktop renderer event after controller error",
-                        level=logging.WARNING,
-                        exception=exc,
-                    )
-        except asyncio.CancelledError:
-            raise
-
-    async def _handle_desktop_renderer_event(
-        self,
-        event: object,
-        *,
-        overlay_instance_id: str | None = None,
-    ) -> None:
-        if overlay_instance_id is not None:
-            runtime = self._overlay_runtime
-            if runtime is None or not runtime.is_current_instance_id(overlay_instance_id):
-                return
-        if self._active_overlay_target != OVERLAY_TARGET_DESKTOP:
-            return
-        if not isinstance(event, dict):
-            return
-        payload = event.get("payload")
-        if not isinstance(payload, dict):
-            return
-        event_type = payload.get("event")
-        if event_type == "window_bounds_changed":
-            await self._handle_desktop_window_bounds_changed(payload)
-            return
-        if event_type == "reset_to_bottom_center_requested":
-            await self._handle_desktop_overlay_reset_requested()
-            return
-        if event_type == "interaction_mode_changed":
-            self._set_desktop_overlay_interaction_mode(payload.get("mode"))
-
-    async def _handle_desktop_window_bounds_changed(
-        self,
-        payload: dict[object, object],
-    ) -> None:
-        if not self._is_valid_desktop_window_bounds_event_payload(payload):
-            self.log_detailed(
-                "[DesktopOverlay][Bounds] ignored reason=invalid_payload "
-                f"keys={sorted(str(key) for key in payload)} "
-                f"source={payload.get('source')} persist={payload.get('persist')}"
-            )
-            return
-        bounds = self._desktop_bounds_from_payload(payload)
-        if bounds is None:
-            self.log_detailed(
-                "[DesktopOverlay][Bounds] ignored reason=invalid_bounds "
-                f"source={payload.get('source')} persist={payload.get('persist')}"
-            )
-            return
-        source = payload.get("source")
-        interaction_mode = self.desktop_overlay_interaction_mode
-        self.log_detailed(
-            "[DesktopOverlay][Bounds] received "
-            f"source={source} persist={payload.get('persist')} "
-            f"interaction_mode={interaction_mode} "
-            f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-            f"height={bounds['height']}"
-        )
-        if source in {"programmatic", "launch_repair"}:
-            self.log_detailed(
-                "[DesktopOverlay][Bounds] ignored reason=programmatic_source "
-                f"source={source} x={bounds['x']} y={bounds['y']} "
-                f"width={bounds['width']} height={bounds['height']}"
-            )
-            self._discard_suppressed_desktop_bounds(bounds)
-            return
-        if source == "reset":
-            self.log_detailed(
-                "[DesktopOverlay][Bounds] reset_requested "
-                f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-                f"height={bounds['height']}"
-            )
-            await self._handle_desktop_overlay_reset_requested(bounds=bounds)
-            return
-        if source == "user" and interaction_mode != DESKTOP_INTERACTION_MODE_EDIT:
-            self.log_detailed(
-                "[DesktopOverlay][Bounds] ignored reason=locked_interaction_mode "
-                f"interaction_mode={interaction_mode} x={bounds['x']} y={bounds['y']} "
-                f"width={bounds['width']} height={bounds['height']}"
-            )
-            return
-        if self._consume_suppressed_desktop_bounds(bounds):
-            self.log_detailed(
-                "[DesktopOverlay][Bounds] ignored reason=suppressed_signature "
-                f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-                f"height={bounds['height']}"
-            )
-            return
-        self._schedule_desktop_bounds_persistence(bounds)
-        self.log_detailed(
-            "[DesktopOverlay][Bounds] scheduled_persist "
-            f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-            f"height={bounds['height']}"
-        )
-
-    def _schedule_desktop_bounds_persistence(
-        self,
-        bounds: dict[str, int | float],
-    ) -> None:
-        self._get_desktop_overlay_bounds_owner().schedule_persistence(bounds)
-
-    async def _persist_desktop_bounds(self, bounds: dict[str, int | float]) -> None:
-        if self.settings is None or self._active_overlay_target != OVERLAY_TARGET_DESKTOP:
-            return
-        if self._desktop_bounds_from_payload({"event": "window_bounds_changed", **bounds}) is None:
-            return
-        next_settings = copy.deepcopy(self.settings)
-        desktop_settings = next_settings.overlay.desktop_flet
-        desktop_settings.position.x = bounds["x"]
-        desktop_settings.position.y = bounds["y"]
-        desktop_settings.position.validate()
-        routed = await self._get_settings_application_owner().apply_overlay_osc_output(
-            next_settings
-        )
-        result = self._get_settings_application_owner().results.current
-        if not routed or result is None:
-            return
-        if not _settings_mutation_committed(result):
-            return
-        self.log_detailed(
-            "[DesktopOverlay][Bounds] persisted "
-            f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
-            f"height={bounds['height']} size_preset={desktop_settings.size_preset}"
-        )
-
-    async def _handle_desktop_overlay_reset_requested(
-        self,
-        *,
-        bounds: dict[str, int | float] | None = None,
-    ) -> None:
-        if self.settings is None:
-            return
-        configured_for_desktop = (
-            self._overlay_target_for_settings(self.settings) == OVERLAY_TARGET_DESKTOP
-        )
-        desktop_renderer_active = bool(
-            self._active_overlay_target == OVERLAY_TARGET_DESKTOP
-            and self._current_overlay_bridge_for_direct_runtime_command() is not None
-        )
-        if not configured_for_desktop and not desktop_renderer_active:
-            return
-        await self._cancel_desktop_bounds_persistence()
-        self._drain_pending_desktop_user_bounds_events()
-        _ = bounds
-        next_settings = copy.deepcopy(self.settings)
-        desktop_settings = next_settings.overlay.desktop_flet
-        desktop_settings.position.x = None
-        desktop_settings.position.y = None
-        desktop_settings.validate()
-        routed = await self._get_settings_application_owner().apply_overlay_osc_output(
-            next_settings
-        )
-        result = self._get_settings_application_owner().results.current
-        if routed and (result is None or not _settings_mutation_committed(result)):
-            return
-        if self.settings is not None:
-            self.settings.overlay.desktop_flet.locked = False
-        self._set_desktop_overlay_interaction_mode(DESKTOP_INTERACTION_MODE_EDIT)
-        if not desktop_renderer_active:
-            return
-        await self._broadcast_desktop_runtime_control(
-            {
-                "command": "set_interaction_mode",
-                "mode": DESKTOP_INTERACTION_MODE_EDIT,
-            }
-        )
-        await self._broadcast_desktop_window_bounds_control(
-            self._desktop_center_bounds_for_current_preset()
-        )
-
-    def _desktop_center_bounds_for_current_preset(self) -> dict[str, int | float]:
-        assert self.settings is not None
-        width, height = self._desktop_dimensions_for_size_preset(
-            self.settings.overlay.desktop_flet.size_preset
-        )
-        return self._desktop_centered_bounds_for_dimensions(width=width, height=height)
-
-    def _desktop_work_area_for_current_launch(
-        self,
-    ) -> tuple[int | float, int | float, int | float, int | float] | None:
-        _ = self
-        if sys.platform != "win32":
-            return None
-        try:
-            import ctypes
-            from ctypes import wintypes
-
-            rect = wintypes.RECT()
-            # SPI_GETWORKAREA returns the primary monitor work area excluding taskbars.
-            if not ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0):
-                return None
-            return (
-                rect.left,
-                rect.top,
-                rect.right - rect.left,
-                rect.bottom - rect.top,
-            )
-        except Exception:
-            return None
-
-    async def _cancel_desktop_bounds_persistence(self) -> None:
-        await self._get_desktop_overlay_bounds_owner().cancel()
-
-    def _discard_pending_desktop_bounds_persistence(self) -> None:
-        self._get_desktop_overlay_bounds_owner().discard()
-
-    def _get_desktop_overlay_bounds_owner(self) -> DesktopOverlayBoundsOwner:
-        owner = self._desktop_overlay_bounds_owner
-        if owner is None:
-            owner = DesktopOverlayBoundsOwner(
-                persist_bounds=self._persist_desktop_bounds,
-                debounce_seconds=lambda: DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S,
-                minimum_width=DESKTOP_FLET_MIN_WIDTH,
-                minimum_height=DESKTOP_FLET_MIN_HEIGHT,
-                diagnostics_sink=lambda event, metadata: self.log_detailed(
-                    f"[DesktopOverlay][Bounds] event={event} metadata={dict(metadata)}",
-                    level=logging.WARNING,
-                ),
-            )
-            self._desktop_overlay_bounds_owner = owner
-        return owner
-
-    def _desktop_runtime_is_running_for_settings_update(
-        self,
-        settings: AppSettings,
-    ) -> bool:
-        return bool(
-            settings.ui.overlay_enabled
-            and self._active_overlay_target == OVERLAY_TARGET_DESKTOP
-            and self._current_overlay_bridge_for_direct_runtime_command() is not None
-        )
-
-    def _desktop_center_preserving_bounds_for_size_preset_change(
-        self,
-        *,
-        previous_desktop_settings: object,
-        next_size_preset: object,
-    ) -> dict[str, int | float]:
-        previous_bounds = self._desktop_launch_bounds_for_current_launch(previous_desktop_settings)
-        next_width, next_height = self._desktop_dimensions_for_size_preset(next_size_preset)
-        old_center_x = previous_bounds["x"] + (previous_bounds["width"] / 2)
-        old_center_y = previous_bounds["y"] + (previous_bounds["height"] / 2)
-        return {
-            "x": old_center_x - (next_width / 2),
-            "y": old_center_y - (next_height / 2),
-            "width": next_width,
-            "height": next_height,
-        }
-
-    def _prepare_desktop_runtime_settings_update(
-        self,
-        previous_settings: AppSettings | None,
-        next_settings: AppSettings,
-    ) -> list[dict[str, object]]:
-        if previous_settings is None:
-            return []
-        previous_desktop = copy.deepcopy(previous_settings.overlay.desktop_flet)
-        previous_desktop.validate()
-        next_desktop = next_settings.overlay.desktop_flet
-        next_desktop.validate()
-
-        if not self._desktop_runtime_is_running_for_settings_update(next_settings):
-            return []
-
-        controls: list[dict[str, object]] = []
-        if previous_desktop.size_preset != next_desktop.size_preset:
-            self._discard_pending_desktop_bounds_persistence()
-            self._drain_pending_desktop_user_bounds_events()
-            bounds = self._desktop_center_preserving_bounds_for_size_preset_change(
-                previous_desktop_settings=previous_desktop,
-                next_size_preset=next_desktop.size_preset,
-            )
-            if previous_desktop.position.x is not None and previous_desktop.position.y is not None:
-                next_desktop.position.x = bounds["x"]
-                next_desktop.position.y = bounds["y"]
-                next_desktop.position.validate()
-            controls.append({"command": "apply_window_bounds", **bounds})
-
-        previous_visual = previous_desktop.visual
-        next_visual = next_desktop.visual
-        if (
-            previous_visual.text_scale != next_visual.text_scale
-            or previous_visual.background_alpha != next_visual.background_alpha
-            or previous_visual.outline_width != next_visual.outline_width
-        ):
-            controls.append(
-                {
-                    "command": "apply_visual_config",
-                    "text_scale": next_visual.text_scale,
-                    "background_alpha": next_visual.background_alpha,
-                    "outline_width": next_visual.outline_width,
-                }
-            )
-        return controls
-
-    def _sync_desktop_overlay_interaction_mode_from_settings(
-        self,
-        settings: AppSettings,
-    ) -> None:
-        if self._overlay_target_for_settings(settings) != OVERLAY_TARGET_DESKTOP:
-            return
-        if (
-            self._active_overlay_target == OVERLAY_TARGET_DESKTOP
-            and self._current_overlay_bridge_for_direct_runtime_command() is not None
-        ):
-            return
-        self._set_desktop_overlay_interaction_mode(DESKTOP_INTERACTION_MODE_EDIT)
-
-    async def _broadcast_desktop_runtime_control_payloads(
-        self,
-        payloads: list[dict[str, object]],
-    ) -> None:
-        for payload in payloads:
-            if payload.get("command") == "apply_window_bounds":
-                bounds = self._desktop_bounds_from_payload(payload)
-                if bounds is not None:
-                    await self._broadcast_desktop_window_bounds_control(bounds)
-                continue
-            await self._broadcast_desktop_runtime_control(payload)
-
-    async def _apply_desktop_size_preset_persistence_adjustment(
-        self,
-        previous_settings: AppSettings,
-        next_settings: AppSettings,
-    ) -> None:
-        previous_desktop = copy.deepcopy(previous_settings.overlay.desktop_flet)
-        previous_desktop.validate()
-        next_desktop = next_settings.overlay.desktop_flet
-        next_desktop.validate()
-        if previous_desktop.size_preset == next_desktop.size_preset:
-            return
-        if not self._desktop_runtime_is_running_for_settings_update(next_settings):
-            return
-        await self._cancel_desktop_bounds_persistence()
-        self._drain_pending_desktop_user_bounds_events()
-        if previous_desktop.position.x is None or previous_desktop.position.y is None:
-            return
-        bounds = self._desktop_center_preserving_bounds_for_size_preset_change(
-            previous_desktop_settings=previous_desktop,
-            next_size_preset=next_desktop.size_preset,
-        )
-        next_desktop.position.x = bounds["x"]
-        next_desktop.position.y = bounds["y"]
-        next_desktop.position.validate()
+        await self._get_desktop_overlay_application_owner().reset_position()
 
     def _on_peer_capture_state_changed(
         self,
@@ -3040,7 +2309,7 @@ class GuiController:
     async def _close_overlay_runtime(self) -> None:
         owner = self._get_overlay_application_owner()
         owner.stop_ingress()
-        await self._shutdown_overlay_runtime(preserve_failure_reason=True)
+        await owner.shutdown(preserve_failure_reason=True)
         owner.clear_fallback()
         await owner.fallback_owner.close()
 
@@ -3111,106 +2380,24 @@ class GuiController:
         if callable(enqueue_disclosure):
             enqueue_disclosure(self.app.localize("peer_translation.disclosure"))
 
-    def on_overlay_start_failed(self, failure_reason: str | None) -> None:
-        self._get_overlay_application_owner().on_start_failed(failure_reason)
-
-    def on_overlay_runtime_disconnected(self) -> None:
-        self._get_overlay_application_owner().on_runtime_disconnected()
-
-    def on_overlay_runtime_crashed(self) -> None:
-        self._get_overlay_application_owner().on_runtime_crashed()
-
-    async def _begin_overlay_start(self) -> None:
-        await self._get_overlay_application_owner().begin_start()
-
-    async def _run_overlay_start(self, runtime: OverlayRuntimeHandle | None = None) -> None:
-        await self._get_overlay_application_owner().run_start(runtime)
-
-    async def _shutdown_overlay_runtime(self, *, preserve_failure_reason: bool) -> None:
-        await self._get_overlay_application_owner().shutdown(
-            preserve_failure_reason=preserve_failure_reason
-        )
-
-    async def _teardown_overlay_runtime(
-        self,
-        *,
-        preserve_presenter_state: bool,
-        emit_shutdown: bool = False,
-    ) -> bool:
-        return await self._get_overlay_application_owner().teardown(
-            preserve_presenter_state=preserve_presenter_state,
-            emit_shutdown=emit_shutdown,
-        )
-
     def begin_overlay_calibration(self) -> OverlayCalibration:
-        return self._get_overlay_calibration_owner().begin()
+        return self._get_overlay_calibration_application_owner().begin()
 
     def set_overlay_calibration_field(
         self,
         field_name: str,
         value: object,
     ) -> OverlayCalibration:
-        return self._get_overlay_calibration_owner().set_field(field_name, value)
+        return self._get_overlay_calibration_application_owner().set_field(
+            field_name,
+            value,
+        )
 
     def apply_overlay_calibration(self) -> OverlayCalibration:
-        return self._get_overlay_calibration_owner().apply()
-
-    async def _persist_overlay_calibration(
-        self,
-        calibration: OverlayCalibration,
-    ) -> None:
-        if self.settings is None:
-            return
-        next_settings = copy.deepcopy(self.settings)
-        next_settings.overlay.calibration = calibration.copy()
-        await self._get_settings_application_owner().apply_overlay_osc_output(next_settings)
+        return self._get_overlay_calibration_application_owner().apply()
 
     def cancel_overlay_calibration(self) -> OverlayCalibration:
-        return self._get_overlay_calibration_owner().cancel()
-
-    def _sync_overlay_calibration_cache(self, settings: AppSettings | None = None) -> None:
-        resolved_settings = settings or self.settings
-        if resolved_settings is None:
-            return
-        self._get_overlay_calibration_owner().replace_current(resolved_settings.overlay.calibration)
-
-    async def _emit_overlay_calibration_to_runtime(
-        self,
-        calibration: OverlayCalibration,
-    ) -> None:
-        presenter = self._current_overlay_presenter_for_direct_runtime_command()
-        if presenter is None:
-            return
-        await presenter.update_calibration(calibration.copy())
-
-    def _get_overlay_calibration_owner(self) -> OverlayCalibrationOwner:
-        owner = self._overlay_calibration_owner
-        if owner is None:
-            owner = OverlayCalibrationOwner(
-                schedule_task=lambda task: self.app.schedule_task(task),
-                persist=self._persist_overlay_calibration,
-                emit=self._emit_overlay_calibration_to_runtime,
-                can_persist=lambda: self.settings is not None,
-                can_emit=lambda: (
-                    not self._shutdown_ingress_frozen
-                    and self._current_overlay_presenter_for_direct_runtime_command() is not None
-                ),
-                log_detailed=self.log_detailed,
-            )
-            self._overlay_calibration_owner = owner
-        return owner
-
-    def begin_overlay_calibration_for_test(self) -> None:
-        self.begin_overlay_calibration()
-
-    def set_overlay_calibration_field_for_test(self, field_name: str, value: object) -> None:
-        self.set_overlay_calibration_field(field_name, value)
-
-    def apply_overlay_calibration_for_test(self) -> None:
-        self.apply_overlay_calibration()
-
-    def cancel_overlay_calibration_for_test(self) -> None:
-        self.cancel_overlay_calibration()
+        return self._get_overlay_calibration_application_owner().cancel()
 
     async def set_translation_enabled(self, enabled: bool) -> bool:
         return await self._get_translation_enable_owner().set_enabled(enabled)
@@ -3224,7 +2411,9 @@ class GuiController:
         self.log_basic(f"[STT] Toggle request: enabled={enabled}")
         self.log_detailed(
             "[STT] Toggle detail: "
-            f"desired_before={self._stt_desired} overlay_state={self.overlay_state}"
+            "desired_before="
+            f"{self._stt_desired} "
+            f"overlay_state={self._get_overlay_application_owner().snapshot.state}"
         )
         self._stt_activation_starting = bool(enabled)
         self._stt_activation_failed = False
@@ -3781,7 +2970,13 @@ class GuiController:
             owner = SettingsApplicationOwner(
                 settings=self._get_settings_owner(),
                 projection=self._settings_projection(),
-                runtime_effects=SettingsRuntimeEffectsAdapter(self),
+                runtime_effects=SettingsRuntimeEffectsAdapter(
+                    self,
+                    desktop_overlay=self._get_desktop_overlay_application_owner(),
+                    calibration=self._get_overlay_calibration_application_owner(),
+                    overlay=self._get_overlay_application_owner(),
+                    overlay_state_provider=self._overlay_application_state,
+                ),
                 manual_fallback=self.manual_local_asr_fallback_owner,
                 cpu_auto_available=lambda: (
                     self._get_local_asr_provisioning_owner().snapshot.cpu_auto_available
@@ -5327,7 +4522,7 @@ class GuiController:
                 fallback_logger=logger,
                 overlay_logging_mode_update=self._emit_overlay_runtime_logging_mode_update,
                 overlay_logging_mode_update_available=lambda: (
-                    self._current_overlay_bridge_for_direct_runtime_command() is not None
+                    self._get_overlay_application_owner().current_bridge() is not None
                 ),
             )
             self._runtime_logging_owner = owner
@@ -5352,7 +4547,7 @@ class GuiController:
 
     def set_runtime_logging_mode(self, mode: SessionLoggingMode | str) -> None:
         def mode_changed(normalized_mode: str) -> None:
-            runtime = self._overlay_runtime
+            runtime = self._get_overlay_application_owner().runtime
             manager = runtime.process_manager if runtime is not None else None
             if manager is not None:
                 set_logging_mode = getattr(manager, "set_logging_mode", None)
@@ -5370,7 +4565,7 @@ class GuiController:
         self._get_runtime_logging_owner().schedule_audio_environment_snapshot()
 
     async def _emit_overlay_runtime_logging_mode_update(self) -> None:
-        bridge = self._current_overlay_bridge_for_direct_runtime_command()
+        bridge = self._get_overlay_application_owner().current_bridge()
         if bridge is None:
             return
         await bridge.broadcast_runtime_control(logging_mode=self.runtime_logging_mode)

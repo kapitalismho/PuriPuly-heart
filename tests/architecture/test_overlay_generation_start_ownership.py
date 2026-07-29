@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -12,27 +11,12 @@ APPLICATION_OWNER_PATH = (
 RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "overlay.py"
 
 
-def _controller_method_source(method_name: str) -> str:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    controller = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.ClassDef) and node.name == "GuiController"
-    )
-    method = next(
-        node
-        for node in controller.body
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == method_name
-    )
-    return ast.get_source_segment(source, method) or ""
-
-
-def test_controller_delegates_overlay_generation_start_to_owner() -> None:
-    source = _controller_method_source("_run_overlay_start")
+def test_overlay_application_owns_generation_start_without_controller_wrapper() -> None:
+    controller = CONTROLLER_PATH.read_text(encoding="utf-8")
     application = APPLICATION_OWNER_PATH.read_text(encoding="utf-8")
 
-    assert "_get_overlay_application_owner().run_start(" in source
+    assert "async def _run_overlay_start(" not in controller
+    assert "async def run_start(" in application
     assert "self._generation_owner.start(" in application
     assert "self._generation_request" in application
     assert "self._generation_effects()" in application
@@ -43,7 +27,7 @@ def test_controller_delegates_overlay_generation_start_to_owner() -> None:
         "asyncio.Queue(",
         "OverlayProcessManager(",
     ):
-        assert constructor not in source
+        assert constructor not in controller
 
 
 def test_generation_owner_has_no_ui_session_transition_or_fallback_dependency() -> None:

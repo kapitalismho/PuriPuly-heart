@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -11,30 +10,14 @@ APPLICATION_OWNER_PATH = (
 )
 
 
-def _controller_method_source(method_name: str) -> str:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    controller = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.ClassDef) and node.name == "GuiController"
-    )
-    method = next(
-        node
-        for node in controller.body
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == method_name
-    )
-    return ast.get_source_segment(source, method) or ""
-
-
-def test_controller_delegates_overlay_start_and_shutdown_transitions() -> None:
+def test_overlay_application_owns_start_and_shutdown_transitions() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
     application = APPLICATION_OWNER_PATH.read_text(encoding="utf-8")
-    start = _controller_method_source("_begin_overlay_start")
-    shutdown = _controller_method_source("_shutdown_overlay_runtime")
 
-    assert "_get_overlay_application_owner().begin_start()" in start
-    assert "_get_overlay_application_owner().shutdown(" in shutdown
+    assert "async def _begin_overlay_start(" not in source
+    assert "async def _shutdown_overlay_runtime(" not in source
+    assert "async def begin_start(" in application
+    assert "async def shutdown(" in application
     assert "self._transition_owner.begin_start(" in application
     assert "self._transition_owner.shutdown(" in application
     assert "_overlay_lock" not in source

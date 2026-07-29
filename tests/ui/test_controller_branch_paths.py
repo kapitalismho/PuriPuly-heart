@@ -23,6 +23,9 @@ from puripuly_heart.app.adapters import (
 )
 from puripuly_heart.app.adapters.self_capture_source import SelfCaptureSourceAdapter
 from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
+from puripuly_heart.app.adapters.windows_desktop_work_area import (
+    WindowsDesktopWorkAreaAdapter,
+)
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestCaptureRequest,
@@ -33,6 +36,9 @@ from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureAdmissionEffectType,
 )
 from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
+from puripuly_heart.app.services import (
+    desktop_overlay_application as desktop_overlay_application_module,
+)
 from puripuly_heart.app.services import overlay_application as overlay_application_module
 from puripuly_heart.app.services import (
     overlay_generation_start as overlay_generation_start_module,
@@ -44,8 +50,12 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
     SettingsOwner,
     legacy_settings_snapshot_values,
 )
+from puripuly_heart.app.services.desktop_overlay_application import (
+    DesktopOverlayApplicationOwner,
+)
 from puripuly_heart.app.services.managed_connection_auth import ManagedConnectionAuthService
 from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
+from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
 from puripuly_heart.app.wiring import (
     build_peer_capture_session_config,
@@ -57,6 +67,7 @@ from puripuly_heart.app.wiring import (
     build_self_stt_runtime_signature,
     resolve_overlay_config,
 )
+from puripuly_heart.app.wiring_composition import create_desktop_overlay_policy
 from puripuly_heart.config.audio_host_api import (
     WINDOWS_MME_HOST_API,
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,
@@ -65,7 +76,6 @@ from puripuly_heart.config.audio_host_api import (
 )
 from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.settings import (
-    DESKTOP_FLET_SIZE_PRESETS,
     OVERLAY_TARGET_DESKTOP,
     AppSettings,
     LLMProviderName,
@@ -1219,9 +1229,13 @@ def _patch_overlay_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _overlay_runtime(controller: GuiController) -> OverlayRuntimeHandle:
-    runtime = controller._overlay_runtime
+    runtime = _overlay_owner(controller).runtime
     assert runtime is not None
     return runtime
+
+
+def _overlay_owner(controller: GuiController) -> OverlayApplicationOwner:
+    return controller._get_overlay_application_owner()
 
 
 def _peer_runtime_config(
@@ -1268,31 +1282,31 @@ def _peer_provider_request(
 
 
 def _attach_overlay_presenter(controller: GuiController, presenter: object | None) -> None:
-    controller._ensure_overlay_runtime_handle().attach_presenter(presenter)
+    _overlay_owner(controller).ensure_runtime().attach_presenter(presenter)
 
 
 def _attach_overlay_bridge(controller: GuiController, bridge: object | None) -> None:
     if bridge is None:
-        runtime = controller._overlay_runtime
+        runtime = _overlay_owner(controller).runtime
         if runtime is not None:
             runtime.attach_bridge(None)
         return
-    controller._ensure_overlay_runtime_handle().attach_bridge(bridge)
+    _overlay_owner(controller).ensure_runtime().attach_bridge(bridge)
 
 
 def _attach_overlay_manager(controller: GuiController, manager: object | None) -> None:
-    controller._ensure_overlay_runtime_handle().attach_process_manager(manager)
+    _overlay_owner(controller).ensure_runtime().attach_process_manager(manager)
 
 
 def _attach_overlay_diagnostics(controller: GuiController, diagnostics: object | None) -> None:
-    controller._ensure_overlay_runtime_handle().attach_diagnostics(diagnostics)
+    _overlay_owner(controller).ensure_runtime().attach_diagnostics(diagnostics)
 
 
 def _attach_desktop_renderer_events(
     controller: GuiController,
     renderer_events: asyncio.Queue[dict[str, object]] | None,
 ) -> None:
-    controller._ensure_overlay_runtime_handle().attach_renderer_events(renderer_events)
+    _overlay_owner(controller).ensure_runtime().attach_renderer_events(renderer_events)
 
 
 def _microphone_test_task(controller: GuiController) -> asyncio.Task[None] | None:
@@ -1414,10 +1428,10 @@ def test_desktop_gui_overlay_failure_i18n_reasons_survive_controller_normalizati
         )
     )
 
-    controller.on_overlay_start_failed(failure_reason)
+    _overlay_owner(controller).on_start_failed(failure_reason)
 
-    assert controller.overlay_state == "failed"
-    assert controller.failure_reason == failure_reason
+    assert _overlay_owner(controller).snapshot.state == "failed"
+    assert _overlay_owner(controller).snapshot.failure_reason == failure_reason
     assert reported == [("failed", failure_reason)]
 
 
@@ -3567,7 +3581,7 @@ def test_self_stt_runtime_signature_ignores_overlay_and_peer_desktop_settings() 
     baseline = build_self_stt_runtime_signature(settings)
 
     settings.ui.peer_translation_enabled = True
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     settings.desktop_audio.output_device = "Headphones (Loopback)"
     settings.desktop_audio.vad_speech_threshold = 0.72
     settings.desktop_audio.vad_hangover_ms = 950
@@ -4020,7 +4034,7 @@ async def test_apply_settings_updates_peer_translation_flags_on_hub(
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
@@ -4087,7 +4101,7 @@ async def test_set_peer_translation_enabled_enqueues_peer_disclosure_once(
         controller.settings = AppSettings()
         controller.settings.ui.peer_translation_eula_accepted = True
         controller.hub = DisclosureDummyHub(llm=object(), stt=object(), peer_stt=object())
-        controller.overlay_state = "connected"
+        _overlay_owner(controller).state = "connected"
         monkeypatch.setattr(
             SettingsOwner,
             "save_current",
@@ -4157,7 +4171,7 @@ async def test_overlay_composition_replacement_cancels_old_owner_delivery() -> N
     await hub.start()
     old_publication = asyncio.create_task(hub._emit_overlay_event(old_event))
     await asyncio.wait_for(old_sink.started.wait(), timeout=0.5)
-    replaced = await controller._replace_hub_overlay_sink(replacement)
+    replaced = await _overlay_owner(controller).replace_hub_sink(replacement)
     await old_publication
     new_id = await hub.submit_text("replacement composition", source="You")
 
@@ -4186,7 +4200,7 @@ async def test_init_pipeline_keeps_peer_original_runtime_available_without_peer_
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.settings.ui.overlay_enabled = True
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
 
     await controller._init_pipeline()
 
@@ -4386,7 +4400,7 @@ async def test_real_controller_composition_routes_all_output_channels_once(
     await controller._init_pipeline()
     hub = controller.hub
     assert type(hub) is controller_module.ClientHub
-    await controller._replace_hub_overlay_sink(overlay)
+    await _overlay_owner(controller).replace_hub_sink(overlay)
     await controller.submit_text("manual self text")
     manual_id = getattr(chatbox.messages[0], "utterance_id")
     peer_id = await hub.handle_peer_transcript_final_for_test("peer presentation text")
@@ -4450,7 +4464,7 @@ async def test_initial_peer_local_activation_publishes_starting_until_provider_a
     controller.settings.ui.peer_translation_enabled = True
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=None)
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     _attach_overlay_bridge(controller, object())
     activation_started = asyncio.Event()
     finish_activation = asyncio.Event()
@@ -4492,7 +4506,7 @@ async def test_refresh_overlay_runtime_dependencies_applies_peer_runtime_policy(
     controller.settings.ui.peer_translation_enabled = True
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=None)
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     _attach_overlay_bridge(controller, object())
 
     peer_runtime = DummyPeerRuntime()
@@ -4513,7 +4527,7 @@ async def test_refresh_overlay_runtime_dependencies_disables_peer_runtime_when_o
     controller.settings.ui.peer_translation_enabled = True
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-    controller.overlay_state = "failed"
+    _overlay_owner(controller).state = "failed"
     _attach_overlay_bridge(controller, None)
 
     peer_runtime = DummyPeerRuntime()
@@ -4559,19 +4573,19 @@ async def test_overlay_toggle_starts_and_stops_overlay_runtime(
 
     assert manager.extra_kwargs["log_dir"] == str(tmp_path)
     assert controller.settings.ui.overlay_enabled is True
-    assert controller.overlay_state == "starting"
+    assert _overlay_owner(controller).snapshot.state == "starting"
     assert controller.hub.overlay_sink is _overlay_runtime(controller).presenter
     assert bridge.started is True
 
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
-    assert controller.failure_reason is None
+    assert _overlay_owner(controller).snapshot.failure_reason is None
 
     await controller.set_overlay_enabled(False)
 
     assert controller.settings.ui.overlay_enabled is False
-    assert controller.overlay_state == "off"
+    assert _overlay_owner(controller).snapshot.state == "off"
     assert controller.hub.overlay_sink is None
     assert controller.hub.reset_overlay_preview_calls == 1
     assert bridge.stopped is True
@@ -4609,15 +4623,15 @@ async def test_closing_desktop_overlay_runtime_rejects_direct_bridge_commands() 
     controller.settings = AppSettings()
     controller.settings.ui.overlay_enabled = True
     controller.settings.overlay.target = OVERLAY_TARGET_DESKTOP
-    controller._active_overlay_target = OVERLAY_TARGET_DESKTOP
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).active_target = OVERLAY_TARGET_DESKTOP
+    _overlay_owner(controller).state = "connected"
     controller.hub = DummyHub()
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
 
     bridge = BlockingShutdownOverlayBridge(session_token="token")
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     runtime.attach_bridge(bridge)
-    controller._overlay_runtime = runtime
+    _overlay_owner(controller).runtime = runtime
     _attach_overlay_bridge(controller, bridge)
 
     close_task = asyncio.create_task(
@@ -4633,14 +4647,17 @@ async def test_closing_desktop_overlay_runtime_rejects_direct_bridge_commands() 
         assert runtime.is_closing is True
         assert _overlay_runtime(controller).bridge is bridge
 
-        sent = await controller._broadcast_desktop_runtime_control(
+        sent = await controller._get_desktop_overlay_application_owner().broadcast(
             {"command": "set_interaction_mode", "mode": "edit"}
         )
 
         assert sent is False
         assert bridge.desktop_runtime_control_payloads == []
         assert (
-            controller._desktop_runtime_is_running_for_settings_update(controller.settings) is False
+            controller._get_desktop_overlay_application_owner().runtime_is_running_for_settings(
+                controller.settings
+            )
+            is False
         )
 
         await controller._emit_overlay_runtime_logging_mode_update()
@@ -4700,12 +4717,12 @@ async def test_closing_overlay_runtime_rejects_direct_presenter_commands() -> No
         config_path=Path("settings.json"),
     )
     controller.settings = AppSettings()
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     presenter = BlockingShutdownPresenter()
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     runtime.attach_presenter(presenter)
-    controller._overlay_runtime = runtime
+    _overlay_owner(controller).runtime = runtime
     _attach_overlay_presenter(controller, presenter)
 
     close_task = asyncio.create_task(
@@ -4721,11 +4738,11 @@ async def test_closing_overlay_runtime_rejects_direct_presenter_commands() -> No
         assert runtime.is_closing is True
         assert _overlay_runtime(controller).presenter is presenter
 
-        controller._get_overlay_calibration_owner().schedule_emit()
+        controller._get_overlay_calibration_application_owner().schedule_emit()
 
         assert page.tasks == []
 
-        await controller._get_overlay_calibration_owner().emit_current()
+        await controller._get_overlay_calibration_application_owner().emit_current()
 
         assert presenter.calibration_updates == []
 
@@ -4760,7 +4777,7 @@ async def test_overlay_teardown_close_failure_falls_back_to_basic_runtime_log(
     controller.hub = DummyHub()
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     runtime.attach_process_manager(FailingStopManager())
-    controller._overlay_runtime = runtime
+    _overlay_owner(controller).runtime = runtime
 
     def fake_log_detailed(
         self: GuiController,
@@ -4785,7 +4802,7 @@ async def test_overlay_teardown_close_failure_falls_back_to_basic_runtime_log(
     monkeypatch.setattr(GuiController, "log_detailed", fake_log_detailed)
     monkeypatch.setattr(GuiController, "log_basic", fake_log_basic)
 
-    await controller._teardown_overlay_runtime(preserve_presenter_state=True)
+    await _overlay_owner(controller).teardown(preserve_presenter_state=True)
 
     warning = "[Overlay] Overlay runtime close reported cleanup failure"
     assert len(detailed_calls) == 1
@@ -4803,11 +4820,11 @@ async def test_stale_desktop_renderer_event_is_ignored_after_overlay_instance_ch
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.settings.overlay.target = OVERLAY_TARGET_DESKTOP
-    controller._active_overlay_target = OVERLAY_TARGET_DESKTOP
+    _overlay_owner(controller).active_target = OVERLAY_TARGET_DESKTOP
     _attach_overlay_bridge(controller, FakeOverlayBridge(session_token="token"))
-    controller._overlay_runtime = OverlayRuntimeHandle(overlay_instance_id="overlay-new")
+    _overlay_owner(controller).runtime = OverlayRuntimeHandle(overlay_instance_id="overlay-new")
 
-    await controller._handle_desktop_renderer_event(
+    await controller._get_desktop_overlay_application_owner().handle_renderer_event(
         {
             "type": "overlay_event",
             "payload": {
@@ -4823,7 +4840,7 @@ async def test_stale_desktop_renderer_event_is_ignored_after_overlay_instance_ch
         overlay_instance_id="overlay-old",
     )
 
-    assert controller._desktop_overlay_bounds_owner is None
+    assert controller._get_desktop_overlay_application_owner().bounds_owner.pending_bounds is None
 
 
 @pytest.mark.asyncio
@@ -4864,7 +4881,7 @@ async def test_overlay_target_routing_installs_steamvr_runner_by_default(
     assert not isinstance(manager.process_runner, FakeDesktopRunner)
 
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await controller.set_overlay_enabled(False)
 
 
@@ -4919,8 +4936,8 @@ async def test_overlay_session_fallback_to_desktop_when_steamvr_unavailable(
     assert controller._get_overlay_application_owner().fallback_owner.active is True
     assert True in notices
     second.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
-    assert controller._active_overlay_target == "desktop"
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
+    assert _overlay_owner(controller).snapshot.active_target == "desktop"
 
     await controller.set_overlay_enabled(False)
     assert controller._get_overlay_application_owner().fallback_owner.active is False
@@ -4993,118 +5010,11 @@ async def test_desktop_initial_control_manifest_always_launches_edit_even_with_l
         {"command": "set_interaction_mode", "mode": "edit"},
     ]
     assert controller.desktop_overlay_captions_locked is False
-    assert controller.desktop_overlay_interaction_mode == "edit"
+    assert controller._get_desktop_overlay_application_owner().interaction_mode == "edit"
     assert state_changes == []
 
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
-    await controller.set_overlay_enabled(False)
-
-
-@pytest.mark.asyncio
-async def test_desktop_initial_control_manifest_centers_null_position_without_persisting(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _patch_overlay_runtime(monkeypatch)
-    saved_desktop: list[tuple[object, object, str, bool, float]] = []
-
-    def fake_save_settings(self: SettingsOwner, **_kwargs: object) -> bool:
-        assert self.current is not None
-        desktop = self.current.overlay.desktop_flet
-        saved_desktop.append(
-            (
-                desktop.position.x,
-                desktop.position.y,
-                desktop.size_preset,
-                desktop.locked,
-                desktop.visual.background_alpha,
-            )
-        )
-        return True
-
-    monkeypatch.setattr(SettingsOwner, "save_current", fake_save_settings)
-    monkeypatch.setattr(
-        GuiController,
-        "_desktop_work_area_for_current_launch",
-        lambda self: (0, 0, 1920, 1080),
-        raising=False,
-    )
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.overlay.target = "desktop"
-    controller.hub = DummyHub()
-
-    await controller.set_overlay_enabled(True)
-    await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
-
-    bridge = FakeOverlayBridge.instances[0]
-    medium_width, medium_height = DESKTOP_FLET_SIZE_PRESETS["medium"]
-    assert bridge.initial_desktop_runtime_controls[0] == {
-        "command": "apply_window_bounds",
-        "x": pytest.approx((1920 - medium_width) / 2),
-        "y": pytest.approx((1080 - medium_height) / 2),
-        "width": medium_width,
-        "height": medium_height,
-    }
-    assert controller.settings.overlay.desktop_flet.position.x is None
-    assert controller.settings.overlay.desktop_flet.position.y is None
-    assert saved_desktop == []
-
-    manager = FakeOverlayProcessManager.instances[0]
-    manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
-    await controller.set_overlay_enabled(False)
-
-
-@pytest.mark.asyncio
-async def test_desktop_initial_control_manifest_uses_saved_position_without_clamping(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _patch_overlay_runtime(monkeypatch)
-    saved_desktop: list[tuple[object, object, str]] = []
-
-    def record_saved_settings(_path, settings) -> None:
-        desktop = settings.overlay.desktop_flet
-        saved_desktop.append((desktop.position.x, desktop.position.y, desktop.size_preset))
-
-    _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(
-        GuiController,
-        "_desktop_work_area_for_current_launch",
-        lambda self: (100, 50, 800, 600),
-        raising=False,
-    )
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.overlay.target = "desktop"
-    controller.settings.overlay.desktop_flet.size_preset = "xlarge"
-    controller.settings.overlay.desktop_flet.position.x = -5000
-    controller.settings.overlay.desktop_flet.position.y = 9999
-    controller.hub = DummyHub()
-
-    await controller.set_overlay_enabled(True)
-    await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
-
-    bridge = FakeOverlayBridge.instances[0]
-    assert bridge.initial_desktop_runtime_controls[0] == {
-        "command": "apply_window_bounds",
-        "x": -5000,
-        "y": 9999,
-        "width": 1792,
-        "height": 448,
-    }
-    assert (
-        controller.settings.overlay.desktop_flet.position.x,
-        controller.settings.overlay.desktop_flet.position.y,
-        controller.settings.overlay.desktop_flet.size_preset,
-    ) == (-5000, 9999, "xlarge")
-    assert saved_desktop == []
-
-    manager = FakeOverlayProcessManager.instances[0]
-    manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await controller.set_overlay_enabled(False)
 
 
@@ -5130,7 +5040,7 @@ async def test_desktop_move_persistence_debounces_position_only_and_ignores_prog
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     renderer_events = manager.renderer_events
     assert isinstance(renderer_events, asyncio.Queue)
@@ -5217,7 +5127,7 @@ async def test_desktop_bounds_debounce_routes_position_through_order23_service(
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.settings.overlay.target = "desktop"
-    controller._active_overlay_target = OVERLAY_TARGET_DESKTOP
+    _overlay_owner(controller).active_target = OVERLAY_TARGET_DESKTOP
     service = RecordingSettingsMutationService()
     controller.settings_mutation_service = service
 
@@ -5225,8 +5135,12 @@ async def test_desktop_bounds_debounce_routes_position_through_order23_service(
         raise AssertionError("desktop bounds must not use direct settings save")
 
     _patch_settings_save(monkeypatch, fail_direct_save)
-    monkeypatch.setattr(controller_module, "DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S", 0)
-    bounds_owner = controller._get_desktop_overlay_bounds_owner()
+    monkeypatch.setattr(
+        desktop_overlay_application_module,
+        "DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S",
+        0,
+    )
+    bounds_owner = controller._get_desktop_overlay_application_owner().bounds_owner
     bounds_owner.replace_pending_bounds(
         {
             "x": 321,
@@ -5274,7 +5188,7 @@ async def test_desktop_locked_mode_user_bounds_events_do_not_persist(
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await controller.set_desktop_overlay_captions_locked(True)
     assert controller.desktop_overlay_captions_locked is True
     assert saved_desktop == []
@@ -5339,7 +5253,7 @@ async def test_desktop_lock_toggle_is_runtime_only_and_does_not_save_or_mutate_s
     manager = FakeOverlayProcessManager.instances[0]
     bridge = FakeOverlayBridge.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     saved_desktop.clear()
 
     await controller.set_desktop_overlay_captions_locked(True)
@@ -5387,8 +5301,8 @@ async def test_desktop_size_preset_change_preserves_current_center_without_clamp
         lambda self, *, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_desktop_work_area_for_current_launch",
+        WindowsDesktopWorkAreaAdapter,
+        "primary_work_area",
         lambda self: (0, 0, 800, 600),
         raising=False,
     )
@@ -5406,7 +5320,7 @@ async def test_desktop_size_preset_change_preserves_current_center_without_clamp
     manager = FakeOverlayProcessManager.instances[0]
     bridge = FakeOverlayBridge.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     saved_desktop.clear()
 
     await controller.set_desktop_overlay_size_preset("xlarge")
@@ -5476,7 +5390,7 @@ async def test_desktop_size_preset_change_drains_queued_pre_resize_user_bounds(
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     runtime = _overlay_runtime(controller)
     event_task = runtime.renderer_event_task
@@ -5540,7 +5454,7 @@ async def test_desktop_size_preset_change_supersedes_pending_user_position_debou
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     saved_desktop.clear()
 
     renderer_events = manager.renderer_events
@@ -5559,7 +5473,7 @@ async def test_desktop_size_preset_change_supersedes_pending_user_position_debou
             },
         }
     )
-    bounds_owner = controller._get_desktop_overlay_bounds_owner()
+    bounds_owner = controller._get_desktop_overlay_application_owner().bounds_owner
     await _wait_until(
         lambda: bounds_owner.persist_task is not None and bounds_owner.pending_bounds is not None
     )
@@ -5568,7 +5482,7 @@ async def test_desktop_size_preset_change_supersedes_pending_user_position_debou
     updated.overlay.desktop_flet.size_preset = "xlarge"
 
     await controller.apply_settings(updated)
-    await asyncio.sleep(controller_module.DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S * 2)
+    await asyncio.sleep(desktop_overlay_application_module.DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S * 2)
 
     expected_x = -420
     expected_y = -60
@@ -5603,7 +5517,7 @@ async def test_desktop_size_preset_change_cancels_pending_bounds_before_order23_
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     renderer_events = manager.renderer_events
     assert isinstance(renderer_events, asyncio.Queue)
@@ -5621,7 +5535,7 @@ async def test_desktop_size_preset_change_cancels_pending_bounds_before_order23_
             },
         }
     )
-    bounds_owner = controller._get_desktop_overlay_bounds_owner()
+    bounds_owner = controller._get_desktop_overlay_application_owner().bounds_owner
     await _wait_until(
         lambda: bounds_owner.persist_task is not None and bounds_owner.pending_bounds is not None
     )
@@ -5640,7 +5554,7 @@ async def test_desktop_size_preset_change_cancels_pending_bounds_before_order23_
     controller.settings_mutation_service = InspectingOrder23Service()
 
     await controller.set_desktop_overlay_size_preset("xlarge")
-    await asyncio.sleep(controller_module.DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S * 2)
+    await asyncio.sleep(desktop_overlay_application_module.DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S * 2)
 
     request = controller.settings_mutation_service.requests[0]
     assert request.values["overlay.desktop_flet.size_preset"] == "xlarge"
@@ -5672,8 +5586,8 @@ async def test_desktop_reset_clears_position_unlocks_preserves_size_and_alpha_an
 
     _patch_settings_save(monkeypatch, record_saved_settings)
     monkeypatch.setattr(
-        GuiController,
-        "_desktop_work_area_for_current_launch",
+        WindowsDesktopWorkAreaAdapter,
+        "primary_work_area",
         lambda self: (0, 0, 1920, 1080),
         raising=False,
     )
@@ -5697,7 +5611,7 @@ async def test_desktop_reset_clears_position_unlocks_preserves_size_and_alpha_an
     manager = FakeOverlayProcessManager.instances[0]
     bridge = FakeOverlayBridge.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await controller.set_desktop_overlay_captions_locked(True)
     saved_desktop.clear()
     bridge.desktop_runtime_control_payloads.clear()
@@ -5749,7 +5663,7 @@ async def test_desktop_reset_persists_configured_desktop_target_without_running_
         )
 
     async def fake_broadcast_runtime_control(
-        self: GuiController,
+        self: DesktopOverlayApplicationOwner,
         payload: dict[str, object],
     ) -> bool:
         _ = self
@@ -5757,7 +5671,7 @@ async def test_desktop_reset_persists_configured_desktop_target_without_running_
         return True
 
     async def fake_broadcast_window_bounds_control(
-        self: GuiController,
+        self: DesktopOverlayApplicationOwner,
         bounds: dict[str, int | float],
     ) -> None:
         _ = self
@@ -5765,13 +5679,13 @@ async def test_desktop_reset_persists_configured_desktop_target_without_running_
 
     _patch_settings_save(monkeypatch, record_saved_settings)
     monkeypatch.setattr(
-        GuiController,
-        "_broadcast_desktop_runtime_control",
+        DesktopOverlayApplicationOwner,
+        "broadcast",
         fake_broadcast_runtime_control,
     )
     monkeypatch.setattr(
-        GuiController,
-        "_broadcast_desktop_window_bounds_control",
+        DesktopOverlayApplicationOwner,
+        "broadcast_bounds",
         fake_broadcast_window_bounds_control,
     )
 
@@ -5807,7 +5721,7 @@ async def test_desktop_reset_routes_position_clear_through_order23_service(
     controller.settings.overlay.desktop_flet.position.x = 80
     controller.settings.overlay.desktop_flet.position.y = 90
     controller.settings.overlay.desktop_flet.locked = True
-    controller._set_desktop_overlay_interaction_mode("pass_through")
+    controller._get_desktop_overlay_application_owner().set_interaction_mode("pass_through")
     service = RecordingSettingsMutationService()
     controller.settings_mutation_service = service
 
@@ -5841,7 +5755,7 @@ async def test_desktop_reset_keeps_runtime_state_when_order23_commit_fails(
     bounds_payloads: list[dict[str, int | float]] = []
 
     async def fake_broadcast_runtime_control(
-        self: GuiController,
+        self: DesktopOverlayApplicationOwner,
         payload: dict[str, object],
     ) -> bool:
         _ = self
@@ -5849,20 +5763,20 @@ async def test_desktop_reset_keeps_runtime_state_when_order23_commit_fails(
         return True
 
     async def fake_broadcast_window_bounds_control(
-        self: GuiController,
+        self: DesktopOverlayApplicationOwner,
         bounds: dict[str, int | float],
     ) -> None:
         _ = self
         bounds_payloads.append(dict(bounds))
 
     monkeypatch.setattr(
-        GuiController,
-        "_broadcast_desktop_runtime_control",
+        DesktopOverlayApplicationOwner,
+        "broadcast",
         fake_broadcast_runtime_control,
     )
     monkeypatch.setattr(
-        GuiController,
-        "_broadcast_desktop_window_bounds_control",
+        DesktopOverlayApplicationOwner,
+        "broadcast_bounds",
         fake_broadcast_window_bounds_control,
     )
 
@@ -5873,9 +5787,9 @@ async def test_desktop_reset_keeps_runtime_state_when_order23_commit_fails(
     controller.settings.overlay.desktop_flet.position.x = 80
     controller.settings.overlay.desktop_flet.position.y = 90
     controller.settings.overlay.desktop_flet.locked = True
-    controller._active_overlay_target = OVERLAY_TARGET_DESKTOP
+    _overlay_owner(controller).active_target = OVERLAY_TARGET_DESKTOP
     _attach_overlay_bridge(controller, object())
-    controller._set_desktop_overlay_interaction_mode("pass_through")
+    controller._get_desktop_overlay_application_owner().set_interaction_mode("pass_through")
     failed_result = messages.TransactionResult(
         status=messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
         message=None,
@@ -5896,7 +5810,7 @@ async def test_desktop_reset_keeps_runtime_state_when_order23_commit_fails(
     assert controller.settings.overlay.desktop_flet.position.x == 80
     assert controller.settings.overlay.desktop_flet.position.y == 90
     assert controller.settings.overlay.desktop_flet.locked is True
-    assert controller.desktop_overlay_interaction_mode == "pass_through"
+    assert controller._get_desktop_overlay_application_owner().interaction_mode == "pass_through"
     assert controller.desktop_overlay_captions_locked is True
     assert runtime_payloads == []
     assert bounds_payloads == []
@@ -5917,8 +5831,8 @@ async def test_desktop_reset_persistence_cancels_pending_user_position_debounce(
 
     _patch_settings_save(monkeypatch, record_saved_settings)
     monkeypatch.setattr(
-        GuiController,
-        "_desktop_work_area_for_current_launch",
+        WindowsDesktopWorkAreaAdapter,
+        "primary_work_area",
         lambda self: (0, 0, 1920, 1080),
         raising=False,
     )
@@ -5933,7 +5847,7 @@ async def test_desktop_reset_persistence_cancels_pending_user_position_debounce(
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     renderer_events = manager.renderer_events
     assert isinstance(renderer_events, asyncio.Queue)
@@ -5958,13 +5872,13 @@ async def test_desktop_reset_persistence_cancels_pending_user_position_debounce(
         }
     )
 
-    bounds_owner = controller._get_desktop_overlay_bounds_owner()
+    bounds_owner = controller._get_desktop_overlay_application_owner().bounds_owner
     await _wait_until(
         lambda: bounds_owner.persist_task is None and bounds_owner.pending_bounds is None,
         attempts=20,
         delay_s=0.02,
     )
-    await asyncio.sleep(controller_module.DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S * 2)
+    await asyncio.sleep(desktop_overlay_application_module.DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S * 2)
 
     assert saved_desktop == []
     assert controller.settings.overlay.desktop_flet.position.x is None
@@ -5988,8 +5902,8 @@ async def test_desktop_reset_drains_queued_pre_reset_user_bounds(
 
     _patch_settings_save(monkeypatch, record_saved_settings)
     monkeypatch.setattr(
-        GuiController,
-        "_desktop_work_area_for_current_launch",
+        WindowsDesktopWorkAreaAdapter,
+        "primary_work_area",
         lambda self: (0, 0, 1920, 1080),
         raising=False,
     )
@@ -6006,7 +5920,7 @@ async def test_desktop_reset_drains_queued_pre_reset_user_bounds(
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     runtime = _overlay_runtime(controller)
     event_task = runtime.renderer_event_task
@@ -6055,8 +5969,8 @@ async def test_desktop_source_reset_ignores_event_size_and_cancels_pending_user_
 
     _patch_settings_save(monkeypatch, record_saved_settings)
     monkeypatch.setattr(
-        GuiController,
-        "_desktop_work_area_for_current_launch",
+        WindowsDesktopWorkAreaAdapter,
+        "primary_work_area",
         lambda self: (0, 0, 1920, 1080),
         raising=False,
     )
@@ -6072,7 +5986,7 @@ async def test_desktop_source_reset_ignores_event_size_and_cancels_pending_user_
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     renderer_events = manager.renderer_events
     assert isinstance(renderer_events, asyncio.Queue)
@@ -6105,13 +6019,13 @@ async def test_desktop_source_reset_ignores_event_size_and_cancels_pending_user_
         }
     )
 
-    bounds_owner = controller._get_desktop_overlay_bounds_owner()
+    bounds_owner = controller._get_desktop_overlay_application_owner().bounds_owner
     await _wait_until(
         lambda: bounds_owner.persist_task is None and bounds_owner.pending_bounds is None,
         attempts=20,
         delay_s=0.02,
     )
-    await asyncio.sleep(controller_module.DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S * 2)
+    await asyncio.sleep(desktop_overlay_application_module.DESKTOP_BOUNDS_PERSIST_DEBOUNCE_S * 2)
 
     assert saved_desktop == []
     assert controller.settings.overlay.desktop_flet.position.x is None
@@ -6150,9 +6064,11 @@ def test_vr_overlay_calibration_reset_does_not_mutate_desktop_overlay_settings(
     controller.settings.overlay.desktop_flet.position.y = 456
     controller.settings.overlay.desktop_flet.locked = True
     controller.settings.overlay.desktop_flet.visual.background_alpha = 0.33
-    controller.overlay_calibration = OverlayCalibration(distance=3.0, offset_x=2.0)
+    controller._get_overlay_calibration_application_owner().replace_current(
+        OverlayCalibration(distance=3.0, offset_x=2.0)
+    )
     controller.settings.overlay.calibration = controller.overlay_calibration.copy()
-    controller._overlay_calibration_draft = OverlayCalibration()
+    controller._get_overlay_calibration_application_owner().replace_draft(OverlayCalibration())
 
     controller.apply_overlay_calibration()
 
@@ -6186,7 +6102,7 @@ def test_resolved_desktop_initial_controls_emit_launch_diagnostics_only_in_detai
     controller.settings.overlay.desktop_flet.visual.background_alpha = 0.5
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
 
-    controls = controller._build_initial_desktop_runtime_controls_from_resolved_config(
+    controls = controller._get_desktop_overlay_application_owner().initial_controls(
         resolve_overlay_config(controller.settings)
     )
 
@@ -6211,7 +6127,7 @@ def test_resolved_desktop_initial_controls_emit_launch_diagnostics_only_in_detai
     basic_controller.settings = copy.deepcopy(controller.settings)
     basic_controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=False)
 
-    basic_controller._build_initial_desktop_runtime_controls_from_resolved_config(
+    basic_controller._get_desktop_overlay_application_owner().initial_controls(
         resolve_overlay_config(basic_controller.settings)
     )
 
@@ -6221,8 +6137,15 @@ def test_resolved_desktop_initial_controls_emit_launch_diagnostics_only_in_detai
 def test_desktop_initial_controls_can_be_built_from_resolved_overlay_config() -> None:
     from puripuly_heart.config.resolved import ResolvedOverlayConfig  # noqa: PLC0415
 
-    controller = _make_controller(app=SimpleNamespace())
-    controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
+    owner = DesktopOverlayApplicationOwner(
+        settings=SimpleNamespace(current=None),
+        settings_application_provider=lambda: SimpleNamespace(),
+        overlay_provider=lambda: SimpleNamespace(),
+        work_area=SimpleNamespace(primary_work_area=lambda: (0, 0, 1920, 1080)),
+        policy=create_desktop_overlay_policy(),
+        presentation_sink=lambda _mode, _locked: None,
+        log_detailed=lambda _message, _level, _exception: None,
+    )
     resolved = ResolvedOverlayConfig(
         enabled=True,
         target="desktop",
@@ -6241,7 +6164,7 @@ def test_desktop_initial_controls_can_be_built_from_resolved_overlay_config() ->
         },
     )
 
-    controls = controller._build_initial_desktop_runtime_controls_from_resolved_config(resolved)
+    controls = owner.initial_controls(resolved)
 
     assert controls == [
         {
@@ -6260,6 +6183,29 @@ def test_desktop_initial_controls_can_be_built_from_resolved_overlay_config() ->
         {"command": "set_interaction_mode", "mode": "edit"},
     ]
     assert "desktop_flet" not in resolved.desktop_overlay_options
+
+    centered = owner.initial_controls(
+        ResolvedOverlayConfig(
+            enabled=True,
+            target="desktop",
+            show_translation=False,
+            show_peer_original=True,
+            calibration={},
+            desktop_overlay_options={
+                "size_preset": "medium",
+                "position": {"x": None, "y": None},
+                "locked": False,
+                "visual": {},
+            },
+        )
+    )
+    assert centered[0] == {
+        "command": "apply_window_bounds",
+        "x": 288,
+        "y": 372,
+        "width": 1344,
+        "height": 336,
+    }
 
 
 @pytest.mark.asyncio
@@ -6294,7 +6240,7 @@ async def test_overlay_start_logs_selected_target_refresh_flags_for_experiment_b
     )
 
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await controller.set_overlay_enabled(False)
 
 
@@ -6304,7 +6250,7 @@ async def test_desktop_bounds_events_emit_diagnostics_only_in_detailed_mode() ->
     controller.settings = AppSettings()
     controller.settings.overlay.target = "desktop"
     controller.settings.overlay.desktop_flet.locked = False
-    controller._active_overlay_target = "desktop"
+    _overlay_owner(controller).active_target = "desktop"
     controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=True)
     payload: dict[object, object] = {
         "event": "window_bounds_changed",
@@ -6317,7 +6263,7 @@ async def test_desktop_bounds_events_emit_diagnostics_only_in_detailed_mode() ->
     }
 
     try:
-        await controller._handle_desktop_window_bounds_changed(payload)
+        await controller._get_desktop_overlay_application_owner().handle_bounds_changed(payload)
 
         messages = [message for _level, message in controller._runtime_logging.detailed_messages]
         assert any(
@@ -6335,18 +6281,20 @@ async def test_desktop_bounds_events_emit_diagnostics_only_in_detailed_mode() ->
             message.startswith("[DesktopOverlay][Bounds] scheduled_persist") for message in messages
         )
     finally:
-        await controller._cancel_desktop_bounds_persistence()
+        await controller._get_desktop_overlay_application_owner().bounds_owner.cancel()
 
     basic_controller = _make_controller(app=SimpleNamespace())
     basic_controller.settings = AppSettings()
     basic_controller.settings.overlay.target = "desktop"
-    basic_controller._active_overlay_target = "desktop"
+    _overlay_owner(basic_controller).active_target = "desktop"
     basic_controller._runtime_logging = RuntimeLoggingSpy(detailed_enabled=False)
 
     try:
-        await basic_controller._handle_desktop_window_bounds_changed(payload)
+        await basic_controller._get_desktop_overlay_application_owner().handle_bounds_changed(
+            payload
+        )
     finally:
-        await basic_controller._cancel_desktop_bounds_persistence()
+        await basic_controller._get_desktop_overlay_application_owner().bounds_owner.cancel()
 
     assert basic_controller._runtime_logging.detailed_messages == []
 
@@ -6365,7 +6313,7 @@ async def test_desktop_apply_settings_broadcasts_visual_config_for_background_al
     controller.settings.ui.overlay_enabled = True
     controller.settings.overlay.target = "desktop"
     controller.settings.overlay.desktop_flet.visual.background_alpha = 0.5
-    controller._active_overlay_target = "desktop"
+    _overlay_owner(controller).active_target = "desktop"
     bridge = FakeOverlayBridge(session_token="desktop")
     _attach_overlay_bridge(controller, bridge)
 
@@ -6399,8 +6347,8 @@ async def test_desktop_apply_settings_preserves_runtime_lock_without_persisting_
     controller.settings.ui.overlay_enabled = True
     controller.settings.overlay.target = "desktop"
     controller.settings.overlay.desktop_flet.locked = False
-    controller._active_overlay_target = "desktop"
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).active_target = "desktop"
+    _overlay_owner(controller).state = "connected"
     bridge = FakeOverlayBridge(session_token="desktop")
     _attach_overlay_bridge(controller, bridge)
     await controller.set_desktop_overlay_captions_locked(True)
@@ -6455,7 +6403,7 @@ async def test_desktop_interaction_mode_controls_are_desktop_only_and_update_loc
     manager = FakeOverlayProcessManager.instances[0]
     bridge = FakeOverlayBridge.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     renderer_events = manager.renderer_events
     assert isinstance(renderer_events, asyncio.Queue)
@@ -6480,7 +6428,7 @@ async def test_desktop_interaction_mode_controls_are_desktop_only_and_update_loc
     steam_controller = _make_controller(app=SimpleNamespace())
     steam_controller.settings = AppSettings()
     steam_controller.settings.overlay.target = "steamvr"
-    steam_controller._active_overlay_target = "steamvr"
+    _overlay_owner(steam_controller).active_target = "steamvr"
     steam_bridge = FakeOverlayBridge(session_token="steamvr")
     _attach_overlay_bridge(steam_controller, steam_bridge)
 
@@ -6512,7 +6460,7 @@ async def test_desktop_lock_request_is_ignored_without_active_desktop_renderer(
     await controller.set_desktop_overlay_captions_locked(True)
 
     assert controller.desktop_overlay_captions_locked is False
-    assert controller.desktop_overlay_interaction_mode == "edit"
+    assert controller._get_desktop_overlay_application_owner().interaction_mode == "edit"
     assert controller.settings.overlay.desktop_flet.locked is False
     assert saved_locked == []
 
@@ -6533,14 +6481,14 @@ async def test_desktop_lock_request_is_ignored_until_desktop_renderer_connected(
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.settings.overlay.target = "desktop"
-    controller._active_overlay_target = "desktop"
+    _overlay_owner(controller).active_target = "desktop"
     _attach_overlay_bridge(controller, FakeOverlayBridge(session_token="desktop"))
-    controller.overlay_state = "starting"
+    _overlay_owner(controller).state = "starting"
 
     await controller.set_desktop_overlay_captions_locked(True)
 
     assert controller.desktop_overlay_captions_locked is False
-    assert controller.desktop_overlay_interaction_mode == "edit"
+    assert controller._get_desktop_overlay_application_owner().interaction_mode == "edit"
     assert controller.settings.overlay.desktop_flet.locked is False
     assert _overlay_runtime(controller).bridge.desktop_runtime_control_payloads == []
     assert saved_locked == []
@@ -6571,7 +6519,7 @@ async def test_overlay_target_routing_apply_settings_stops_before_switching_runn
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     updated = copy.deepcopy(controller.settings)
     updated.overlay.target = "desktop"
@@ -6581,7 +6529,7 @@ async def test_overlay_target_routing_apply_settings_stops_before_switching_runn
 
     assert controller.settings.overlay.target == "desktop"
     assert controller.settings.ui.overlay_enabled is False
-    assert controller.overlay_state == "off"
+    assert _overlay_owner(controller).snapshot.state == "off"
     assert manager.stop_calls == 1
     assert len(FakeOverlayProcessManager.instances) == 1
 
@@ -6611,7 +6559,7 @@ async def test_overlay_target_routing_apply_settings_stops_after_in_place_target
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     shared_settings = controller.settings
     shared_settings.overlay.target = "desktop"
@@ -6621,7 +6569,7 @@ async def test_overlay_target_routing_apply_settings_stops_after_in_place_target
 
     assert controller.settings.overlay.target == "desktop"
     assert controller.settings.ui.overlay_enabled is False
-    assert controller.overlay_state == "off"
+    assert _overlay_owner(controller).snapshot.state == "off"
     assert manager.stop_calls == 1
     assert len(FakeOverlayProcessManager.instances) == 1
 
@@ -6648,8 +6596,8 @@ async def test_overlay_toggle_does_not_persist_transient_button_state(
         "save_current",
         lambda self, **_kwargs: save_calls.append("save") or True,
     )
-    monkeypatch.setattr(GuiController, "_begin_overlay_start", fake_begin_overlay_start)
-    monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay_runtime)
+    monkeypatch.setattr(OverlayApplicationOwner, "begin_start", fake_begin_overlay_start)
+    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay_runtime)
 
     await controller.set_overlay_enabled(True)
     await controller.set_overlay_enabled(False)
@@ -6667,7 +6615,7 @@ async def test_peer_translation_toggle_does_not_persist_transient_button_state(
     controller.settings = AppSettings()
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
 
     monkeypatch.setattr(
         SettingsOwner,
@@ -6709,7 +6657,7 @@ async def test_overlay_start_keeps_compatibility_refresh_until_vr_capability_is_
     assert _overlay_runtime(controller).presenter.peer_presentation_refresh_burst is True
     assert _overlay_runtime(controller).presenter.self_presentation_refresh_burst is True
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await controller.set_overlay_enabled(False)
 
 
@@ -6732,13 +6680,13 @@ async def test_desktop_overlay_start_disables_peer_presentation_refresh_for_new_
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
 
-    assert controller._overlay_runtime is not None
-    presenter = controller._overlay_runtime.presenter
+    assert _overlay_owner(controller).runtime is not None
+    presenter = _overlay_owner(controller).runtime.presenter
     assert isinstance(presenter, OverlayPresenter)
     assert presenter.peer_presentation_refresh_burst is False
     assert presenter.self_presentation_refresh_burst is False
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await controller.set_overlay_enabled(False)
 
 
@@ -6776,7 +6724,7 @@ async def test_overlay_start_restores_compatibility_refresh_for_existing_present
     assert _overlay_runtime(controller).presenter.peer_presentation_refresh_burst is True
     assert _overlay_runtime(controller).presenter.self_presentation_refresh_burst is True
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await controller.set_overlay_enabled(False)
 
 
@@ -6798,7 +6746,7 @@ async def test_preserved_presenter_restart_renegotiates_one_retry_owner(
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     first_manager = FakeOverlayProcessManager.instances[0]
     first_manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     presenter = _overlay_runtime(controller).presenter
     assert isinstance(presenter, OverlayPresenter)
     adapter = OverlayEventAdapter(clock=controller.clock)
@@ -6839,8 +6787,8 @@ async def test_preserved_presenter_restart_renegotiates_one_retry_owner(
     assert first_native_snapshot.native_fresh_render_targets.peer == target_identity
     assert presenter._peer_presentation_refresh_burst_task is None
 
-    controller.overlay_state = "failed"
-    await controller._begin_overlay_start()
+    _overlay_owner(controller).state = "failed"
+    await _overlay_owner(controller).begin_start()
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 2)
     second_manager = FakeOverlayProcessManager.instances[1]
     restarted = _overlay_runtime(controller).presenter
@@ -6854,7 +6802,7 @@ async def test_preserved_presenter_restart_renegotiates_one_retry_owner(
     assert presenter._presentation_state.peer_presentation_refresh_target_key == target_key
     assert presenter._peer_presentation_refresh_burst_task is not None
     second_manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await second_manager.confirm_native_retry_ownership()
     assert presenter.native_retry_trigger_emission is True
     assert presenter.peer_presentation_refresh_burst is False
@@ -6865,8 +6813,8 @@ async def test_preserved_presenter_restart_renegotiates_one_retry_owner(
     assert presenter._presentation_state.peer_presentation_refresh_target_key is None
     assert presenter._peer_presentation_refresh_burst_task is None
 
-    controller.overlay_state = "failed"
-    await controller._begin_overlay_start()
+    _overlay_owner(controller).state = "failed"
+    await _overlay_owner(controller).begin_start()
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 3)
     old_manager = FakeOverlayProcessManager.instances[2]
     assert _overlay_runtime(controller).presenter is presenter
@@ -6879,7 +6827,7 @@ async def test_preserved_presenter_restart_renegotiates_one_retry_owner(
     assert presenter._presentation_state.peer_presentation_refresh_target_key == target_key
     assert presenter._peer_presentation_refresh_burst_task is not None
     old_manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await first_manager.confirm_native_retry_ownership()
     assert presenter.native_retry_trigger_emission is False
     assert presenter.peer_presentation_refresh_burst is True
@@ -6924,13 +6872,13 @@ async def test_desktop_overlay_start_disables_existing_peer_presentation_refresh
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
 
-    assert controller._overlay_runtime is not None
-    presenter = controller._overlay_runtime.presenter
+    assert _overlay_owner(controller).runtime is not None
+    presenter = _overlay_owner(controller).runtime.presenter
     assert isinstance(presenter, OverlayPresenter)
     assert presenter.peer_presentation_refresh_burst is False
     assert presenter.self_presentation_refresh_burst is False
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     await controller.set_overlay_enabled(False)
 
 
@@ -7037,10 +6985,10 @@ async def test_overlay_start_syncs_bridge_after_preserved_presenter_cleans_refre
     controller.settings = AppSettings()
     controller.settings.overlay.target = "desktop"
     controller.hub = DummyHub()
-    runtime = controller._new_overlay_runtime_handle()
+    runtime = _overlay_owner(controller).new_runtime()
     runtime.adopt_presenter(presenter)
 
-    await controller._run_overlay_start(runtime)
+    await _overlay_owner(controller).run_start(runtime)
 
     bridge = CleaningDuringStartOverlayBridge.instances[0]
     assert bridge_start_released_burst is True
@@ -7050,7 +6998,7 @@ async def test_overlay_start_syncs_bridge_after_preserved_presenter_cleans_refre
     assert bridge.current_snapshot == presenter.snapshot()
     assert bridge.snapshots == []
 
-    await controller._teardown_overlay_runtime(preserve_presenter_state=False)
+    await _overlay_owner(controller).teardown(preserve_presenter_state=False)
 
 
 @pytest.mark.asyncio
@@ -7123,11 +7071,11 @@ async def test_desktop_overlay_start_cleans_preserved_self_refresh_marker_before
     controller.settings = AppSettings()
     controller.settings.overlay.target = OVERLAY_TARGET_DESKTOP
     controller.hub = DummyHub()
-    runtime = controller._new_overlay_runtime_handle()
+    runtime = _overlay_owner(controller).new_runtime()
     runtime.adopt_presenter(presenter)
 
     try:
-        await controller._run_overlay_start(runtime)
+        await _overlay_owner(controller).run_start(runtime)
 
         bridge = FakeOverlayBridge.instances[0]
         assert presenter.self_presentation_refresh_burst is False
@@ -7135,7 +7083,7 @@ async def test_desktop_overlay_start_cleans_preserved_self_refresh_marker_before
         assert presenter.snapshot().blocks[0].session_scope is None
         assert bridge.current_snapshot == presenter.snapshot()
     finally:
-        await controller._teardown_overlay_runtime(preserve_presenter_state=False)
+        await _overlay_owner(controller).teardown(preserve_presenter_state=False)
 
 
 @pytest.mark.asyncio
@@ -7183,7 +7131,7 @@ async def test_successful_overlay_start_refreshes_consumers_after_peer_runtime_b
 
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     assert len(contracts) >= 2
     assert any(contract.peer.warning_reason == "runtime_unavailable" for contract in contracts)
@@ -7213,7 +7161,7 @@ async def test_overlay_toggle_off_sends_shutdown_event_before_teardown(
     manager = FakeOverlayProcessManager.instances[0]
     bridge = FakeOverlayBridge.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     presenter = _overlay_runtime(controller).presenter
     assert presenter is not None
@@ -7267,21 +7215,21 @@ async def test_begin_overlay_start_uses_empty_runtime_without_owned_presenter(
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.hub = DummyHub()
-    controller.overlay_state = "failed"
+    _overlay_owner(controller).state = "failed"
 
-    controller._overlay_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    _overlay_owner(controller).runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
 
     try:
-        await controller._begin_overlay_start()
+        await _overlay_owner(controller).begin_start()
         await _wait_until(lambda: len(FakeOverlayBridge.instances) == 1)
-        await _wait_until(lambda: controller.overlay_state == "connected")
+        await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
-        runtime = controller._overlay_runtime
+        runtime = _overlay_owner(controller).runtime
         assert runtime is not None
         assert controller.hub.overlay_sink is runtime.presenter
         assert FakeOverlayBridge.instances[0].initial_snapshot.blocks == []
     finally:
-        await controller._teardown_overlay_runtime(preserve_presenter_state=False)
+        await _overlay_owner(controller).teardown(preserve_presenter_state=False)
 
 
 @pytest.mark.asyncio
@@ -7333,16 +7281,16 @@ async def test_overlay_start_uses_presenter_owned_by_runtime_handle(
     )
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     runtime.attach_presenter(stale_presenter)
-    controller._overlay_runtime = runtime
+    _overlay_owner(controller).runtime = runtime
 
     try:
-        await controller._run_overlay_start(runtime)
+        await _overlay_owner(controller).run_start(runtime)
 
         assert runtime.presenter is stale_presenter
         assert controller.hub.overlay_sink is runtime.presenter
         assert FakeOverlayBridge.instances[0].initial_snapshot.blocks != []
     finally:
-        await controller._teardown_overlay_runtime(preserve_presenter_state=False)
+        await _overlay_owner(controller).teardown(preserve_presenter_state=False)
 
 
 @pytest.mark.asyncio
@@ -7363,7 +7311,7 @@ async def test_overlay_restart_reuses_presenter_scene_for_new_bridge(
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     presenter = _overlay_runtime(controller).presenter
     assert presenter is not None
@@ -7384,13 +7332,13 @@ async def test_overlay_restart_reuses_presenter_scene_for_new_bridge(
     )
     saved_snapshot = presenter.snapshot()
 
-    await controller._teardown_overlay_runtime(preserve_presenter_state=True)
+    await _overlay_owner(controller).teardown(preserve_presenter_state=True)
 
     assert _overlay_runtime(controller).presenter is presenter
     assert controller.hub.overlay_sink is None
 
-    controller.overlay_state = "failed"
-    await controller._begin_overlay_start()
+    _overlay_owner(controller).state = "failed"
+    await _overlay_owner(controller).begin_start()
     await _wait_until(lambda: len(FakeOverlayBridge.instances) == 2)
 
     assert FakeOverlayBridge.instances[1].initial_snapshot == saved_snapshot
@@ -7415,7 +7363,7 @@ async def test_preserved_overlay_presenter_detaches_from_hub_ingress_until_resta
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     presenter = _overlay_runtime(controller).presenter
     assert presenter is not None
@@ -7435,13 +7383,13 @@ async def test_preserved_overlay_presenter_detaches_from_hub_ingress_until_resta
     )
     saved_snapshot = presenter.snapshot()
 
-    await controller._teardown_overlay_runtime(preserve_presenter_state=True)
+    await _overlay_owner(controller).teardown(preserve_presenter_state=True)
 
     assert _overlay_runtime(controller).presenter is presenter
     assert controller.hub.overlay_sink is None
 
-    controller.overlay_state = "failed"
-    await controller._begin_overlay_start()
+    _overlay_owner(controller).state = "failed"
+    await _overlay_owner(controller).begin_start()
     await _wait_until(lambda: len(FakeOverlayBridge.instances) == 2)
 
     assert _overlay_runtime(controller).presenter is presenter
@@ -7466,7 +7414,7 @@ async def test_overlay_restart_detaches_preserved_presenter_from_old_runtime_bef
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     presenter = _overlay_runtime(controller).presenter
     assert presenter is not None
@@ -7485,18 +7433,18 @@ async def test_overlay_restart_detaches_preserved_presenter_from_old_runtime_bef
     )
     saved_snapshot = presenter.snapshot()
 
-    await controller._teardown_overlay_runtime(preserve_presenter_state=True)
-    old_runtime = controller._overlay_runtime
+    await _overlay_owner(controller).teardown(preserve_presenter_state=True)
+    old_runtime = _overlay_owner(controller).runtime
     assert old_runtime is not None
     assert old_runtime.presenter is presenter
 
-    controller.overlay_state = "failed"
+    _overlay_owner(controller).state = "failed"
 
     try:
-        await controller._begin_overlay_start()
+        await _overlay_owner(controller).begin_start()
         await _wait_until(lambda: len(FakeOverlayBridge.instances) == 2)
 
-        new_runtime = controller._overlay_runtime
+        new_runtime = _overlay_owner(controller).runtime
         assert new_runtime is not None
         assert new_runtime is not old_runtime
         assert old_runtime.presenter is None
@@ -7506,8 +7454,8 @@ async def test_overlay_restart_detaches_preserved_presenter_from_old_runtime_bef
         if len(FakeOverlayProcessManager.instances) >= 2:
             FakeOverlayProcessManager.instances[1].complete_startup()
             with contextlib.suppress(AssertionError):
-                await _wait_until(lambda: controller.overlay_state == "connected")
-        await controller._teardown_overlay_runtime(preserve_presenter_state=False)
+                await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
+        await _overlay_owner(controller).teardown(preserve_presenter_state=False)
 
 
 @pytest.mark.asyncio
@@ -7528,7 +7476,7 @@ async def test_overlay_restart_applies_current_preferences_before_bridge_initial
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     presenter = _overlay_runtime(controller).presenter
     assert presenter is not None
@@ -7547,16 +7495,18 @@ async def test_overlay_restart_applies_current_preferences_before_bridge_initial
     )
     assert FakeOverlayBridge.instances[0].snapshots[-1].blocks[0].secondary_enabled is True
 
-    await controller._teardown_overlay_runtime(preserve_presenter_state=True)
+    await _overlay_owner(controller).teardown(preserve_presenter_state=True)
 
     controller.settings.overlay.show_translation = False
     controller.settings.overlay.show_peer_original = False
     controller.settings.overlay.calibration = OverlayCalibration(distance=1.7, offset_x=0.4)
-    controller.overlay_calibration = controller.settings.overlay.calibration.copy()
-    controller.overlay_state = "failed"
+    controller._get_overlay_calibration_application_owner().replace_current(
+        controller.settings.overlay.calibration.copy()
+    )
+    _overlay_owner(controller).state = "failed"
 
     try:
-        await controller._begin_overlay_start()
+        await _overlay_owner(controller).begin_start()
         await _wait_until(lambda: len(FakeOverlayBridge.instances) == 2)
 
         restarted_bridge = FakeOverlayBridge.instances[1]
@@ -7567,8 +7517,8 @@ async def test_overlay_restart_applies_current_preferences_before_bridge_initial
         if len(FakeOverlayProcessManager.instances) >= 2:
             FakeOverlayProcessManager.instances[1].complete_startup()
             with contextlib.suppress(AssertionError):
-                await _wait_until(lambda: controller.overlay_state == "connected")
-        await controller._teardown_overlay_runtime(preserve_presenter_state=False)
+                await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
+        await _overlay_owner(controller).teardown(preserve_presenter_state=False)
 
 
 @pytest.mark.asyncio
@@ -7589,7 +7539,7 @@ async def test_explicit_overlay_disable_resets_presenter_scene_for_next_session(
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     presenter = _overlay_runtime(controller).presenter
     assert presenter is not None
@@ -7609,7 +7559,7 @@ async def test_explicit_overlay_disable_resets_presenter_scene_for_next_session(
 
     await controller.set_overlay_enabled(False)
 
-    assert controller._overlay_runtime is None
+    assert _overlay_owner(controller).runtime is None
     assert FakeOverlayBridge.instances[0].snapshots[-1].blocks == []
 
     await controller.set_overlay_enabled(True)
@@ -7636,7 +7586,7 @@ async def test_refresh_overlay_runtime_dependencies_does_not_clear_overlay_scene
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     presenter = _overlay_runtime(controller).presenter
     bridge = FakeOverlayBridge.instances[0]
@@ -7694,7 +7644,7 @@ def test_effective_integrated_context_falls_back_until_peer_translation_is_effec
 
     assert controller._effective_integrated_context_enabled_for(controller.settings) is False
 
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     controller.settings.ui.peer_translation_enabled = True
     controller.settings.ui.peer_translation_eula_accepted = True
 
@@ -7730,10 +7680,10 @@ async def test_overlay_start_failure_keeps_saved_preferences_but_effective_state
 
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup(failure_reason="renderer_init_failed")
-    await _wait_until(lambda: controller.overlay_state == "failed")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "failed")
 
     assert controller.settings.ui.overlay_enabled is True
-    assert controller.failure_reason == "renderer_init_failed"
+    assert _overlay_owner(controller).snapshot.failure_reason == "renderer_init_failed"
     presentation = controller.overlay_peer_presentation_state()
     assert presentation is not None
     assert presentation.peer_effective_enabled is False
@@ -7770,10 +7720,10 @@ async def test_overlay_start_failure_preserves_specific_preflight_reason(
 
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup(failure_reason=failure_reason)
-    await _wait_until(lambda: controller.overlay_state == "failed")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "failed")
 
     assert controller.settings.ui.overlay_enabled is True
-    assert controller.failure_reason == failure_reason
+    assert _overlay_owner(controller).snapshot.failure_reason == failure_reason
 
 
 @pytest.mark.asyncio
@@ -7800,20 +7750,20 @@ async def test_overlay_runtime_disconnect_keeps_saved_preferences_without_auto_r
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     assert controller.hub.peer_translation_enabled is True
 
     manager.trigger_runtime_failure("runtime_disconnected")
-    await _wait_until(lambda: controller.overlay_state == "failed")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "failed")
 
     assert controller.settings.ui.overlay_enabled is True
     assert controller.settings.ui.peer_translation_enabled is True
-    assert controller.failure_reason == "runtime_disconnected"
+    assert _overlay_owner(controller).snapshot.failure_reason == "runtime_disconnected"
     presentation = controller.overlay_peer_presentation_state()
     assert presentation is not None
     assert presentation.peer_effective_enabled is False
     assert controller.hub.peer_translation_enabled is False
-    assert controller.auto_restart_scheduled is False
+    assert _overlay_owner(controller).snapshot.auto_restart_scheduled is False
 
 
 @pytest.mark.asyncio
@@ -7840,30 +7790,30 @@ async def test_overlay_runtime_crash_keeps_saved_preferences_without_auto_restar
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     manager = FakeOverlayProcessManager.instances[0]
     manager.complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
     assert controller.hub.peer_translation_enabled is True
 
     manager.trigger_runtime_failure("runtime_crashed")
-    await _wait_until(lambda: controller.overlay_state == "failed")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "failed")
 
     assert controller.settings.ui.overlay_enabled is True
     assert controller.settings.ui.peer_translation_enabled is True
-    assert controller.failure_reason == "runtime_crashed"
+    assert _overlay_owner(controller).snapshot.failure_reason == "runtime_crashed"
     assert controller.hub.peer_translation_enabled is False
-    assert controller.auto_restart_scheduled is False
+    assert _overlay_owner(controller).snapshot.auto_restart_scheduled is False
 
 
 def test_overlay_runtime_crash_logs_state_transition() -> None:
     controller = _make_controller(app=SimpleNamespace())
     controller._runtime_logging = RuntimeLoggingSpy()
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     _attach_overlay_manager(controller, SimpleNamespace(state="failed"))
     _attach_overlay_presenter(controller, object())
     _attach_overlay_bridge(controller, object())
 
-    controller.on_overlay_runtime_crashed()
+    _overlay_owner(controller).on_runtime_crashed()
 
-    assert controller.overlay_state == "failed"
+    assert _overlay_owner(controller).snapshot.state == "failed"
     assert controller._runtime_logging.basic_messages == [
         (
             logging.INFO,
@@ -7899,20 +7849,20 @@ async def test_overlay_successful_recovery_clears_previous_failure_reason(
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
     FakeOverlayProcessManager.instances[0].complete_startup(failure_reason="bridge_auth_failed")
-    await _wait_until(lambda: controller.overlay_state == "failed")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "failed")
 
-    assert controller.failure_reason == "bridge_auth_failed"
+    assert _overlay_owner(controller).snapshot.failure_reason == "bridge_auth_failed"
 
     await controller.set_overlay_enabled(False)
-    assert controller.overlay_state == "off"
-    assert controller.failure_reason == "bridge_auth_failed"
+    assert _overlay_owner(controller).snapshot.state == "off"
+    assert _overlay_owner(controller).snapshot.failure_reason == "bridge_auth_failed"
 
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 2)
     FakeOverlayProcessManager.instances[1].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
-    assert controller.failure_reason is None
+    assert _overlay_owner(controller).snapshot.failure_reason is None
 
 
 @pytest.mark.asyncio
@@ -7998,7 +7948,7 @@ async def test_stop_aggregates_vrc_receiver_close_failure_and_still_stops_hub(
     controller.sender = FakeSender()
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay)
+    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay)
 
     with pytest.raises(RuntimeError, match="receiver close failed"):
         await controller.stop()
@@ -8026,8 +7976,8 @@ async def test_stop_closes_peer_runtime_without_replacing_self_stt(
         lambda self, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_shutdown_overlay_runtime",
+        OverlayApplicationOwner,
+        "shutdown",
         lambda self, preserve_failure_reason: asyncio.sleep(0),
     )
 
@@ -8060,8 +8010,8 @@ async def test_stop_preserves_peer_runtime_when_close_fails_and_stops_hub(
         lambda self, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_shutdown_overlay_runtime",
+        OverlayApplicationOwner,
+        "shutdown",
         lambda self, preserve_failure_reason: asyncio.sleep(0),
     )
 
@@ -8095,8 +8045,8 @@ async def test_stop_preserves_hub_when_hub_stop_fails(
         lambda self, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_shutdown_overlay_runtime",
+        OverlayApplicationOwner,
+        "shutdown",
         lambda self, preserve_failure_reason: asyncio.sleep(0),
     )
 
@@ -8127,8 +8077,8 @@ async def test_stop_closes_runtime_logging_service(monkeypatch: pytest.MonkeyPat
         lambda self, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_shutdown_overlay_runtime",
+        OverlayApplicationOwner,
+        "shutdown",
         lambda self, preserve_failure_reason: asyncio.sleep(0),
     )
 
@@ -8173,8 +8123,8 @@ async def test_stop_emits_shutdown_summary_after_hub_failure_before_logging_clos
         lambda self, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_shutdown_overlay_runtime",
+        OverlayApplicationOwner,
+        "shutdown",
         lambda self, preserve_failure_reason: asyncio.sleep(0),
     )
 
@@ -8214,8 +8164,8 @@ async def test_log_basic_after_stop_uses_closed_logging_owner_without_recreation
         lambda self, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_shutdown_overlay_runtime",
+        OverlayApplicationOwner,
+        "shutdown",
         lambda self, preserve_failure_reason: asyncio.sleep(0),
     )
 
@@ -8262,8 +8212,8 @@ async def test_runtime_logging_close_failure_is_aggregated_not_suppressed(
         lambda self, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_shutdown_overlay_runtime",
+        OverlayApplicationOwner,
+        "shutdown",
         lambda self, preserve_failure_reason: asyncio.sleep(0),
     )
 
@@ -8327,7 +8277,7 @@ async def test_stop_aggregates_oauth_runtime_close_failure_and_continues_later_s
     controller._runtime_logging = FakeRuntimeLogging()
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", fake_set_stt_enabled)
-    monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay)
+    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay)
 
     with pytest.raises(ExceptionGroup) as exc_info:
         await controller.stop()
@@ -8366,8 +8316,8 @@ async def test_stop_closes_app_owned_oauth_runtime(monkeypatch: pytest.MonkeyPat
         lambda self, enabled: asyncio.sleep(0),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_shutdown_overlay_runtime",
+        OverlayApplicationOwner,
+        "shutdown",
         lambda self, preserve_failure_reason: asyncio.sleep(0),
     )
 
@@ -8394,7 +8344,7 @@ def test_log_error_fallback_does_not_append_duplicate_ui_line(
 def test_overlay_state_transition_routes_snapshot_details_to_detailed_log() -> None:
     controller = _make_controller(app=SimpleNamespace())
     controller._runtime_logging = RuntimeLoggingSpy()
-    controller.failure_reason = "runtime_crashed"
+    _overlay_owner(controller).failure_reason = "runtime_crashed"
     _attach_overlay_presenter(controller, object())
     _attach_overlay_bridge(controller, object())
     _attach_overlay_manager(controller, SimpleNamespace(state="failed"))
@@ -9134,7 +9084,7 @@ async def test_controller_stop_closes_mic_test_runtime_and_continues_after_close
         "_close_vrc_mic_receiver_runtime_for_release",
         fake_close_vrc_mic_receiver_runtime_for_release,
     )
-    monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay_runtime)
+    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay_runtime)
 
     with pytest.raises(RuntimeError, match="mic source close failed"):
         await controller.stop()
@@ -10080,7 +10030,7 @@ async def test_controller_stop_closes_vrc_mic_receiver_before_hub_shutdown(
     monkeypatch.setattr(GuiController, "_close_oauth_runtime", fake_noop)
     monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", fake_noop)
     monkeypatch.setattr(GuiController, "_close_microphone_test_runtime_for_release", fake_noop)
-    monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay)
+    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay)
     monkeypatch.setattr(GuiController, "_close_peer_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_stop_hub_for_release", fake_stop_hub_for_release)
     monkeypatch.setattr(GuiController, "_replace_managed_openrouter_release_service", fake_noop)
@@ -10139,7 +10089,7 @@ async def test_controller_stop_uses_bounded_prompt_runtime_close_and_still_stops
     monkeypatch.setattr(GuiController, "_close_oauth_runtime", fake_noop)
     monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", fake_noop)
     monkeypatch.setattr(GuiController, "_close_microphone_test_runtime_for_release", fake_noop)
-    monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", fake_shutdown_overlay)
+    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay)
     monkeypatch.setattr(GuiController, "_close_peer_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_replace_managed_openrouter_release_service", fake_noop)
 
@@ -11699,7 +11649,9 @@ async def test_apply_settings_source_language_change_reloads_settings_view(
         app=SimpleNamespace(view_settings=settings_view, apply_locale=lambda: None)
     )
     controller.settings = settings
-    controller.overlay_calibration = settings.overlay.calibration.copy()
+    controller._get_overlay_calibration_application_owner().replace_current(
+        settings.overlay.calibration.copy()
+    )
     controller.hub = DummyHub()
     controller.hub.source_language = "en"
     replace_calls: list[str] = []
@@ -11736,7 +11688,9 @@ async def test_apply_settings_reloads_settings_view_for_target_only_change(
         app=SimpleNamespace(view_settings=settings_view, apply_locale=lambda: None)
     )
     controller.settings = settings
-    controller.overlay_calibration = settings.overlay.calibration.copy()
+    controller._get_overlay_calibration_application_owner().replace_current(
+        settings.overlay.calibration.copy()
+    )
     controller.hub = DummyHub()
     controller.hub.source_language = "en"
     controller.hub.target_language = "ko"
@@ -12393,7 +12347,9 @@ async def test_apply_settings_reload_updates_overlay_calibration_baseline_withou
         app=SimpleNamespace(view_settings=settings_view, apply_locale=lambda: None)
     )
     controller.settings = settings
-    controller.overlay_calibration = settings.overlay.calibration.copy()
+    controller._get_overlay_calibration_application_owner().replace_current(
+        settings.overlay.calibration.copy()
+    )
     controller.hub = DummyHub()
     controller.hub.source_language = settings.languages.source_language
     controller.hub.target_language = settings.languages.target_language
@@ -12414,8 +12370,8 @@ async def test_apply_settings_reload_updates_overlay_calibration_baseline_withou
     )
     monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
 
-    controller.begin_overlay_calibration_for_test()
-    controller.set_overlay_calibration_field_for_test("distance", 1.2)
+    controller.begin_overlay_calibration()
+    controller.set_overlay_calibration_field("distance", 1.2)
 
     updated = AppSettings()
     updated.languages.source_language = "ja"
@@ -14259,7 +14215,9 @@ async def test_mixed_order22_order23_order24_fallback_save_failure_restores_comm
     controller.settings = AppSettings()
     controller.settings.llm.concurrency_limit = 2
     controller.settings.overlay.calibration = OverlayCalibration(distance=0.8, offset_x=0.2)
-    controller.overlay_calibration = controller.settings.overlay.calibration.copy()
+    controller._get_overlay_calibration_application_owner().replace_current(
+        controller.settings.overlay.calibration.copy()
+    )
     controller.settings.overlay.show_translation = True
     controller.settings.system_prompt = "base prompt"
     controller.hub = DummyHub(stt=object())
@@ -14346,7 +14304,9 @@ async def test_order22_apply_settings_mixed_full_draft_save_failure_degrades_and
     controller.settings = AppSettings()
     controller.settings.audio.input_device = "Base Mic"
     controller.settings.overlay.calibration = OverlayCalibration(distance=0.8, offset_x=0.2)
-    controller.overlay_calibration = controller.settings.overlay.calibration.copy()
+    controller._get_overlay_calibration_application_owner().replace_current(
+        controller.settings.overlay.calibration.copy()
+    )
     controller.settings.overlay.show_translation = True
     controller.settings.system_prompt = "base prompt"
     controller.hub = DummyHub(stt=object())
@@ -15286,7 +15246,7 @@ async def test_order23_apply_settings_runtime_failure_degrades_without_rollback_
     controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
     controller.settings = AppSettings()
     controller.hub = DummyHub()
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     _attach_overlay_presenter(controller, FailingOverlayPresenter())
     pending = copy.deepcopy(controller.settings)
     pending.overlay.show_translation = False
@@ -15687,7 +15647,7 @@ async def test_apply_providers_republishes_overlay_peer_contract_after_peer_refr
     controller.settings.ui.peer_translation_enabled = True
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.hub = DummyHub(peer_stt=None)
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     updated = AppSettings()
     updated.ui.overlay_enabled = True
     updated.ui.peer_translation_enabled = True
@@ -15937,15 +15897,15 @@ async def test_stop_closes_managed_openrouter_release_service() -> None:
 def test_overlay_calibration_controls_follow_apply_cancel_contract() -> None:
     controller = _make_controller(app=SimpleNamespace())
 
-    controller.begin_overlay_calibration_for_test()
-    controller.set_overlay_calibration_field_for_test("distance", 1.2)
-    controller.cancel_overlay_calibration_for_test()
+    controller.begin_overlay_calibration()
+    controller.set_overlay_calibration_field("distance", 1.2)
+    controller.cancel_overlay_calibration()
 
     assert controller.overlay_calibration.distance != 1.2
 
-    controller.begin_overlay_calibration_for_test()
-    controller.set_overlay_calibration_field_for_test("distance", 1.2)
-    controller.apply_overlay_calibration_for_test()
+    controller.begin_overlay_calibration()
+    controller.set_overlay_calibration_field("distance", 1.2)
+    controller.apply_overlay_calibration()
 
     assert controller.overlay_calibration.distance == 1.2
 
@@ -15972,7 +15932,7 @@ def test_apply_overlay_calibration_uses_page_run_task_when_available(
         config_path=Path("settings.json"),
     )
     controller.settings = AppSettings()
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     service = RecordingSettingsMutationService()
     controller.settings_mutation_service = service
     bridge = FakeOverlayBridge(session_token="token")
@@ -15986,8 +15946,8 @@ def test_apply_overlay_calibration_uses_page_run_task_when_available(
         ),
     )
 
-    controller.begin_overlay_calibration_for_test()
-    controller.set_overlay_calibration_field_for_test("offset_x", 0.25)
+    controller.begin_overlay_calibration()
+    controller.set_overlay_calibration_field("offset_x", 0.25)
     applied = controller.apply_overlay_calibration()
 
     assert applied.offset_x == 0.25
@@ -16004,7 +15964,7 @@ def test_apply_overlay_calibration_uses_page_run_task_when_available(
     )
     assert service.requests[0].values == {"overlay.calibration.offset_x": 0.25}
     assert controller.settings.overlay.calibration.offset_x == 0.25
-    runtime = controller._overlay_runtime
+    runtime = _overlay_owner(controller).runtime
     assert runtime is not None
     assert runtime.bridge.snapshots[-1].calibration.offset_x == 0.25
 
@@ -16023,8 +15983,8 @@ def test_apply_overlay_calibration_without_page_run_task_skips_persistence_and_l
     service = RecordingSettingsMutationService()
     controller.settings_mutation_service = service
 
-    controller.begin_overlay_calibration_for_test()
-    controller.set_overlay_calibration_field_for_test("distance", 1.2)
+    controller.begin_overlay_calibration()
+    controller.set_overlay_calibration_field("distance", 1.2)
     applied = controller.apply_overlay_calibration()
 
     assert applied.distance == 1.2
@@ -16051,10 +16011,10 @@ def test_schedule_overlay_calibration_emit_preserves_traceback_in_detailed_log()
         config_path=Path("settings.json"),
     )
     controller._runtime_logging = RuntimeLoggingSpy()
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     _attach_overlay_presenter(controller, object())
 
-    controller._get_overlay_calibration_owner().schedule_emit()
+    controller._get_overlay_calibration_application_owner().schedule_emit()
 
     assert controller._runtime_logging.basic_messages == []
     assert len(controller._runtime_logging.detailed_messages) == 1
@@ -16088,7 +16048,7 @@ async def test_apply_overlay_calibration_persists_settings_and_emits_overlay_eve
         config_path=Path("settings.json"),
     )
     controller.settings = AppSettings()
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     service = RecordingSettingsMutationService()
     controller.settings_mutation_service = service
     bridge = FakeOverlayBridge(session_token="token")
@@ -16102,9 +16062,9 @@ async def test_apply_overlay_calibration_persists_settings_and_emits_overlay_eve
         ),
     )
 
-    controller.begin_overlay_calibration_for_test()
-    controller.set_overlay_calibration_field_for_test("distance", 1.2)
-    controller.apply_overlay_calibration_for_test()
+    controller.begin_overlay_calibration()
+    controller.set_overlay_calibration_field("distance", 1.2)
+    controller.apply_overlay_calibration()
 
     assert len(page.tasks) == 2
 
@@ -16114,7 +16074,7 @@ async def test_apply_overlay_calibration_persists_settings_and_emits_overlay_eve
     assert controller.settings.overlay.calibration.distance == 1.2
     assert len(service.requests) == 1
     assert service.requests[0].values == {"overlay.calibration.distance": 1.2}
-    runtime = controller._overlay_runtime
+    runtime = _overlay_owner(controller).runtime
     assert runtime is not None
     assert runtime.bridge.snapshots[-1].calibration.distance == 1.2
 
@@ -16124,7 +16084,7 @@ async def test_apply_settings_updates_overlay_presenter_display_preferences() ->
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.hub = DummyHub()
-    controller.overlay_state = "connected"
+    _overlay_owner(controller).state = "connected"
     bridge = FakeOverlayBridge(session_token="token")
     _attach_overlay_bridge(controller, bridge)
     _attach_overlay_presenter(
@@ -16143,7 +16103,7 @@ async def test_apply_settings_updates_overlay_presenter_display_preferences() ->
 
     await controller.apply_settings(updated)
 
-    runtime = controller._overlay_runtime
+    runtime = _overlay_owner(controller).runtime
     assert runtime is not None
     presenter = runtime.presenter
     assert presenter.show_translation is False
@@ -16171,7 +16131,7 @@ async def test_apply_settings_pushes_updated_overlay_snapshot_to_bridge_and_rest
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayBridge.instances) == 1)
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     presenter = _overlay_runtime(controller).presenter
     assert presenter is not None
@@ -16203,9 +16163,9 @@ async def test_apply_settings_pushes_updated_overlay_snapshot_to_bridge_and_rest
 
     assert initial_bridge.snapshots[-1].blocks[0].secondary_enabled is False
 
-    await controller._teardown_overlay_runtime(preserve_presenter_state=True)
-    controller.overlay_state = "failed"
-    await controller._begin_overlay_start()
+    await _overlay_owner(controller).teardown(preserve_presenter_state=True)
+    _overlay_owner(controller).state = "failed"
+    await _overlay_owner(controller).begin_start()
     await _wait_until(lambda: len(FakeOverlayBridge.instances) == 2)
 
     restarted_bridge = FakeOverlayBridge.instances[1]
@@ -16274,7 +16234,7 @@ async def test_apply_settings_pushes_peer_overlay_snapshot_preferences_to_bridge
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayBridge.instances) == 1)
     FakeOverlayProcessManager.instances[0].complete_startup()
-    await _wait_until(lambda: controller.overlay_state == "connected")
+    await _wait_until(lambda: _overlay_owner(controller).snapshot.state == "connected")
 
     presenter = _overlay_runtime(controller).presenter
     assert presenter is not None
@@ -16320,9 +16280,9 @@ async def test_apply_settings_pushes_peer_overlay_snapshot_preferences_to_bridge
 
     assert initial_bridge.snapshots[-1].blocks[0].secondary_enabled is False
 
-    await controller._teardown_overlay_runtime(preserve_presenter_state=True)
-    controller.overlay_state = "failed"
-    await controller._begin_overlay_start()
+    await _overlay_owner(controller).teardown(preserve_presenter_state=True)
+    _overlay_owner(controller).state = "failed"
+    await _overlay_owner(controller).begin_start()
     await _wait_until(lambda: len(FakeOverlayBridge.instances) == 2)
 
     restarted_bridge = FakeOverlayBridge.instances[1]

@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
+from puripuly_heart.app.ports.desktop_overlay import (
+    DesktopOverlayPolicy,
+    DesktopWorkAreaPort,
+)
 from puripuly_heart.app.ports.manual_typing import SelfChatboxTypingPort
 from puripuly_heart.app.ports.microphone_test import (
     MicrophoneTestCapturePort,
@@ -503,3 +507,31 @@ def create_provider_verifier() -> ProviderVerifierPort:
     from puripuly_heart.app.adapters.provider_verifier import ProviderVerifierAdapter
 
     return ProviderVerifierAdapter()
+
+
+def create_desktop_overlay_policy() -> DesktopOverlayPolicy:
+    from puripuly_heart.config.settings import (
+        DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
+        DESKTOP_FLET_DEFAULT_SIZE_PRESET,
+        DESKTOP_FLET_DEFAULT_TEXT_SCALE,
+        DESKTOP_FLET_MIN_HEIGHT,
+        DESKTOP_FLET_MIN_WIDTH,
+        DESKTOP_FLET_SIZE_PRESETS,
+    )
+
+    return DesktopOverlayPolicy(
+        minimum_width=DESKTOP_FLET_MIN_WIDTH,
+        minimum_height=DESKTOP_FLET_MIN_HEIGHT,
+        default_text_scale=DESKTOP_FLET_DEFAULT_TEXT_SCALE,
+        default_background_alpha=DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
+        default_size_preset=DESKTOP_FLET_DEFAULT_SIZE_PRESET,
+        size_presets=DESKTOP_FLET_SIZE_PRESETS,
+    )
+
+
+def create_windows_desktop_work_area() -> DesktopWorkAreaPort:
+    from puripuly_heart.app.adapters.windows_desktop_work_area import (
+        WindowsDesktopWorkAreaAdapter,
+    )
+
+    return WindowsDesktopWorkAreaAdapter()

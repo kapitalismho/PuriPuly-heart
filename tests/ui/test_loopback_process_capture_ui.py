@@ -429,7 +429,7 @@ async def test_peer_starting_is_published_before_delayed_readiness_and_latest_in
     controller.settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.settings.ui.overlay_enabled = True
-    controller.overlay_state = "connected"
+    controller._get_overlay_application_owner().state = "connected"
     controller.hub = _runtime_hub_stub(
         self_available=False,
         peer_translation_enabled=False,

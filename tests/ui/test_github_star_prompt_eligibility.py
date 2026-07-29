@@ -9,6 +9,7 @@ import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -79,7 +80,7 @@ def _patch_stop_side_effects(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", _async_noop)
     monkeypatch.setattr(GuiController, "set_stt_enabled", _async_noop)
     monkeypatch.setattr(GuiController, "_configure_vrc_mic_receiver", _async_noop)
-    monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", _async_noop)
+    monkeypatch.setattr(OverlayApplicationOwner, "shutdown", _async_noop)
     monkeypatch.setattr(
         GuiController,
         "_replace_managed_openrouter_release_service",
