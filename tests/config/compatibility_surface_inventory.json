@@ -1010,7 +1010,10 @@
       "classification": "internal_adapter_implementation_contract",
       "modules": [
         "puripuly_heart.app.adapters.provider_verifier",
-        "puripuly_heart.app.adapters.gpu_worker_process"
+        "puripuly_heart.app.adapters.gpu_worker_process",
+        "puripuly_heart.app.adapters.local_asr_application",
+        "puripuly_heart.app.adapters.peer_application_state",
+        "puripuly_heart.app.adapters.peer_capture_inventory"
       ],
       "rationale": "ProviderVerifierAdapter is an app adapter implementation of the provider-verifier port; the adapter class is importable for wiring/tests but is not an external public compatibility facade."
     },
@@ -1122,7 +1125,16 @@
       "surface": "puripuly_heart.app provider runtime wiring modules",
       "classification": "internal_provider_runtime_wiring",
       "modules": [
-        "puripuly_heart.app.wiring_local_asr_provider_runtime"
+        "puripuly_heart.app.wiring_capture_runtime",
+        "puripuly_heart.app.wiring_local_asr_application",
+        "puripuly_heart.app.wiring_local_asr_provider_runtime",
+        "puripuly_heart.app.wiring_managed_account",
+        "puripuly_heart.app.wiring_microphone_test",
+        "puripuly_heart.app.wiring_peer_application",
+        "puripuly_heart.app.wiring_provider_runtime",
+        "puripuly_heart.app.wiring_provider_runtime_policy",
+        "puripuly_heart.app.wiring_runtime_pipeline",
+        "puripuly_heart.app.wiring_vrc_mic_sync"
       ],
       "rationale": "The provider runtime wiring module is the internal application composition adapter for the provider-runtime owner and is not an external public compatibility facade."
     },

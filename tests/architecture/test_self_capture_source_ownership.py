@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
 ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_source.py"
 VAD_ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_vad.py"
 AUDIO_LOOP_ADAPTER_PATH = (
@@ -13,27 +13,12 @@ AUDIO_LOOP_ADAPTER_PATH = (
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
 
 
-def _controller_method_source(method_name: str) -> str:
+def test_capture_wiring_composes_self_source_adapter_without_controller_algorithm() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    controller = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.ClassDef) and node.name == "GuiController"
-    )
-    method = next(
-        node
-        for node in controller.body
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == method_name
-    )
-    return ast.get_source_segment(source, method) or ""
-
-
-def test_controller_composes_self_capture_source_adapter_without_source_algorithm() -> None:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
-    composition = _controller_method_source("_get_self_capture_owner")
+    composition = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
 
     assert "source_factory=create_self_capture_source_adapter(" in composition
+    assert "source_factory=create_self_capture_source_adapter(" not in source
     assert "_create_self_capture_source" not in source
     assert "All microphone attempts failed" not in source
     assert "name_fallback" not in source
@@ -64,11 +49,12 @@ def test_self_capture_session_owner_remains_source_lifecycle_owner() -> None:
     assert "source_factory: SelfCaptureSourceFactory" in source
 
 
-def test_controller_composes_self_vad_adapter_without_vad_algorithm() -> None:
+def test_capture_wiring_composes_self_vad_adapter_without_controller_algorithm() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
-    composition = _controller_method_source("_get_self_capture_owner")
+    composition = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
 
     assert "vad_factory=create_self_capture_vad_adapter(" in composition
+    assert "vad_factory=create_self_capture_vad_adapter(" not in source
     assert "_create_self_capture_vad" not in source
     assert "ensure_silero_vad_onnx" not in source
     assert "SileroVadOnnx" not in source
@@ -98,12 +84,13 @@ def test_self_capture_session_owner_remains_vad_and_loop_lifecycle_owner() -> No
     assert '"_loop_task"' in source
 
 
-def test_controller_composes_self_audio_loop_adapter_without_loop_method() -> None:
+def test_capture_wiring_composes_self_audio_loop_without_controller_algorithm() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
-    composition = _controller_method_source("_get_self_capture_owner")
+    composition = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
 
     assert "run_audio_loop=create_self_capture_audio_loop_adapter(" in composition
-    assert "audio_gate_provider=lambda: self.vrc_mic_audio_gate" in composition
+    assert "audio_gate_provider=lambda: audio_gate" in composition
+    assert "run_audio_loop=create_self_capture_audio_loop_adapter(" not in source
     assert "_run_self_capture_audio_loop" not in source
 
 

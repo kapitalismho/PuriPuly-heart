@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+PROVIDER_RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_provider_runtime.py"
 
 
 def _controller_method_source(method_name: str) -> str:
@@ -23,15 +24,14 @@ def _controller_method_source(method_name: str) -> str:
     return ast.get_source_segment(source, method) or ""
 
 
-def test_controller_delegates_manual_and_settings_gpu_recovery_to_owner() -> None:
+def test_provider_runtime_owns_gpu_recovery_and_controller_has_no_algorithm() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
     manual = _controller_method_source("retry_gpu_activation")
-    settings = _controller_method_source("_apply_gpu_runtime_owner_recovery")
+    provider_runtime = PROVIDER_RUNTIME_PATH.read_text(encoding="utf-8")
 
     assert "_get_gpu_provider_recovery_owner().recover(" in manual
-    assert "_get_gpu_provider_recovery_owner().recover(" in settings
     assert "_gpu_provider_recovery_request(" in manual
-    assert "_gpu_provider_recovery_request(" in settings
+    assert "recover_gpu=effects.gpu_recovery" in provider_runtime
     for retired_name in (
         "_gpu_provider_recovery_lock",
         "_get_gpu_provider_recovery_lock",

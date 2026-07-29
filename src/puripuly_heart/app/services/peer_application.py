@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from puripuly_heart.app.services.local_asr_selection import LOCAL_CPU_PROVIDERS
-from puripuly_heart.app.services.peer_capture_target import PeerCaptureTargetResolutionService
-from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.core.peer_capture import (
     PeerCaptureDiagnostic,
     PeerCaptureFailureReason,
@@ -85,11 +83,6 @@ class PeerApplicationOwner:
     _rebuild: ProviderRuntimeRebuildService = field(
         init=False,
         default_factory=ProviderRuntimeRebuildService,
-        repr=False,
-    )
-    _target_resolution: PeerCaptureTargetResolutionService = field(
-        init=False,
-        default_factory=PeerCaptureTargetResolutionService,
         repr=False,
     )
     _last_runtime_signature: tuple[object, ...] | None = field(
@@ -478,22 +471,6 @@ class PeerApplicationOwner:
             and self._runtime is runtime
             and state.settings_available
             and self.desired_active(state)
-        )
-
-    def resolve_capture_target(
-        self,
-        *,
-        legacy_output_device: str,
-        persisted_capture_target: object | None,
-    ) -> ResolvedDesktopAudioCaptureTarget:
-        persisted = (
-            persisted_capture_target
-            if isinstance(persisted_capture_target, ResolvedDesktopAudioCaptureTarget)
-            else None
-        )
-        return self._target_resolution.resolve(
-            legacy_output_device=legacy_output_device,
-            persisted_capture_target=persisted,
         )
 
     def local_stt_requested(self, state: PeerApplicationState | None = None) -> bool:

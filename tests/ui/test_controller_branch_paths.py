@@ -11,13 +11,13 @@ from types import SimpleNamespace
 from typing import Awaitable, Callable, Literal
 from uuid import uuid4
 
-import flet as ft
 import numpy as np
 import pytest
 
 pytest.importorskip("flet")
 
-from puripuly_heart.app import wiring_managed_auth_factory as managed_auth_runtime_module
+from puripuly_heart.app import wiring_microphone_test as microphone_test_wiring_module
+from puripuly_heart.app import wiring_provider_runtime as provider_runtime_wiring_module
 from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as canonical_persistence_adapter_module,
 )
@@ -48,14 +48,19 @@ from puripuly_heart.app.services import provider_settings as provider_settings_m
 from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.app.services.canonical_settings_persistence import (
     SettingsOwner,
-    legacy_settings_snapshot_values,
 )
 from puripuly_heart.app.services.desktop_overlay_application import (
     DesktopOverlayApplicationOwner,
 )
-from puripuly_heart.app.services.managed_connection_auth import ManagedConnectionAuthService
-from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
+from puripuly_heart.app.services.local_asr_cpu_repair import (
+    LocalASRCpuRepairOwner,
+    LocalASRCpuRepairRequest,
+)
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
+from puripuly_heart.app.services.peer_application import PeerApplicationOwner
+from puripuly_heart.app.services.self_capture_application import (
+    SelfCaptureApplicationOwner,
+)
 from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
 from puripuly_heart.app.wiring import (
     build_peer_capture_session_config,
@@ -68,6 +73,11 @@ from puripuly_heart.app.wiring import (
     resolve_overlay_config,
 )
 from puripuly_heart.app.wiring_composition import create_desktop_overlay_policy
+from puripuly_heart.app.wiring_local_asr_application import LocalASRApplicationRuntime
+from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
+from puripuly_heart.app.wiring_provider_runtime_policy import (
+    build_llm_provider_signature,
+)
 from puripuly_heart.config.audio_host_api import (
     WINDOWS_MME_HOST_API,
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,
@@ -82,11 +92,9 @@ from puripuly_heart.config.settings import (
     LocalLLMBackend,
     LocalLLMSettings,
     OpenRouterCredentialSource,
-    OpenRouterLLMModel,
     OpenRouterProviderRouting,
     OpenRouterRoutingMode,
     OpenRouterSelectionAlias,
-    ProviderSettings,
     QwenLLMModel,
     QwenRegion,
     SecretsBackend,
@@ -102,7 +110,6 @@ from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core import messages
 from puripuly_heart.core.audio import source as audio_source_module
 from puripuly_heart.core.audio.format import AudioFrameF32
-from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.audio.source import (
     MicrophoneTestRouteObservation,
     SelfMicCaptureChannelDecision,
@@ -121,23 +128,11 @@ from puripuly_heart.core.local_stt_assets import (
     PARAKEET_V3_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
-from puripuly_heart.core.managed_openrouter_broker_client import (
-    HttpManagedOpenRouterBrokerClient,
-)
 from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterReleaseBehavior,
-    ManagedOpenRouterReleaseDiagnostics,
-    ManagedOpenRouterReleaseResult,
-    ManagedOpenRouterReleaseService,
     ManagedOpenRouterStatusRefreshResult,
-    TalkTogetherPassStatus,
-    UnavailableManagedOpenRouterReleaseClient,
 )
-from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
-from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
-from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import (
     OverlayEventAdapter,
@@ -155,7 +150,6 @@ from puripuly_heart.core.runtime_logging import (
 )
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmissionStatus,
-    SelfCaptureFailureReason,
     SelfCaptureProviderStatus,
     SelfCaptureSessionConfig,
     SelfCaptureSessionSnapshot,
@@ -170,12 +164,15 @@ from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 from puripuly_heart.ui import controller as controller_module
 from puripuly_heart.ui import presentation_adapter as presentation_adapter_module
-from puripuly_heart.ui.app import TranslatorApp
 from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.i18n import set_locale, t
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
-from tests.helpers.fakes import FakeSender
+from tests.helpers.fakes import (
+    FakeSender,
+    SelfCaptureStateStub,
+    self_capture_snapshot,
+)
 
 PEER_DISCLOSURE_KEY = "peer_translation.disclosure"
 
@@ -593,26 +590,6 @@ class DummyGate:
         self.reset_calls += 1
 
 
-class DummyManagedReleaseService:
-    def __init__(self, result: ManagedOpenRouterReleaseResult) -> None:
-        self.result = result
-        self.prepare_calls = 0
-        self.prepare_referral_ids: list[str | None] = []
-        self.close_calls = 0
-
-    async def prepare_for_translation(
-        self,
-        *,
-        referral_id: str | None = None,
-    ) -> ManagedOpenRouterReleaseResult:
-        self.prepare_calls += 1
-        self.prepare_referral_ids.append(referral_id)
-        return self.result
-
-    async def close(self) -> None:
-        self.close_calls += 1
-
-
 class RecordingSettingsMutationService:
     def __init__(self, result: messages.TransactionResult | None = None) -> None:
         self.requests: list[settings_mutation.SettingsMutationRequest] = []
@@ -628,50 +605,6 @@ class RecordingSettingsMutationService:
     ) -> messages.TransactionResult:
         self.requests.append(request)
         return self.result
-
-
-class InspectingManagedReleaseService(DummyManagedReleaseService):
-    def __init__(
-        self,
-        result: ManagedOpenRouterReleaseResult,
-        *,
-        on_prepare: Callable[[], object] | None = None,
-    ) -> None:
-        super().__init__(result)
-        self.on_prepare = on_prepare
-
-    async def prepare_for_translation(
-        self,
-        *,
-        referral_id: str | None = None,
-    ) -> ManagedOpenRouterReleaseResult:
-        self.prepare_calls += 1
-        self.prepare_referral_ids.append(referral_id)
-        if self.on_prepare is not None:
-            prepare_result = self.on_prepare()
-            if asyncio.iscoroutine(prepare_result):
-                await prepare_result
-        return self.result
-
-
-class FailingManagedReleaseService(DummyManagedReleaseService):
-    def __init__(self, exc: Exception) -> None:
-        super().__init__(
-            ManagedOpenRouterReleaseResult(
-                behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-                message_key="managed_release.retry",
-            )
-        )
-        self.exc = exc
-
-    async def prepare_for_translation(
-        self,
-        *,
-        referral_id: str | None = None,
-    ) -> ManagedOpenRouterReleaseResult:
-        self.prepare_calls += 1
-        self.prepare_referral_ids.append(referral_id)
-        raise self.exc
 
 
 class FakeOverlayBridge:
@@ -877,17 +810,9 @@ async def test_self_capture_admission_rejects_unsupported_language_before_status
     controller.hub = SimpleNamespace()
     messages: list[str] = []
 
-    def unexpected_status(_self: GuiController) -> str:
-        raise RuntimeError("status probe must not run")
-
     def show_message(_self: GuiController, message_key: str) -> None:
         messages.append(message_key)
 
-    monkeypatch.setattr(
-        GuiController,
-        "_current_local_stt_runtime_status",
-        unexpected_status,
-    )
     monkeypatch.setattr(GuiController, "_show_short_stt_message", show_message)
     admission = controller._get_self_capture_owner()._admission
 
@@ -922,43 +847,45 @@ def test_self_capture_admission_effects_preserve_controller_compatibility(
         messages.append(message_key)
 
     def request_repair(
-        _self: GuiController,
-        status: str,
-        *,
-        channel: str,
-        model_ids: tuple[str, ...] | None = None,
-        activation_generation: int | None = None,
+        _self: LocalASRCpuRepairOwner,
+        request: LocalASRCpuRepairRequest,
     ) -> bool:
-        assert model_ids is None
-        repairs.append((status, channel, activation_generation))
+        assert request.model_ids is None
+        repairs.append(
+            (
+                request.status,
+                request.channel,
+                request.activation_generation,
+            )
+        )
         return False
 
     monkeypatch.setattr(GuiController, "_show_short_stt_message", show_message)
     monkeypatch.setattr(
-        GuiController,
-        "_request_unavailable_local_asr_repair",
+        LocalASRCpuRepairOwner,
+        "request_repair",
         request_repair,
     )
 
-    controller._apply_self_capture_admission_effect(
+    controller._get_local_asr_application_runtime().adapters.effects.apply_self_admission(
         SelfCaptureAdmissionEffect(
             SelfCaptureAdmissionEffectType.RETAIN_GPU_PENDING_INTENT,
             status="installing",
         )
     )
-    controller._apply_self_capture_admission_effect(
+    controller._get_local_asr_application_runtime().adapters.effects.apply_self_admission(
         SelfCaptureAdmissionEffect(
             SelfCaptureAdmissionEffectType.REJECT_UNSUPPORTED_LANGUAGE,
         )
     )
-    controller._apply_self_capture_admission_effect(
+    controller._get_local_asr_application_runtime().adapters.effects.apply_self_admission(
         SelfCaptureAdmissionEffect(
             SelfCaptureAdmissionEffectType.RETAIN_DOWNLOAD_PENDING_INTENT,
             status="downloading",
             activation_generation=21,
         )
     )
-    controller._apply_self_capture_admission_effect(
+    controller._get_local_asr_application_runtime().adapters.effects.apply_self_admission(
         SelfCaptureAdmissionEffect(
             SelfCaptureAdmissionEffectType.REQUEST_LOCAL_REPAIR,
             status="invalid",
@@ -969,8 +896,11 @@ def test_self_capture_admission_effects_preserve_controller_compatibility(
     assert controller._get_gpu_runtime_interaction_owner().snapshot.pending_channels == frozenset(
         {"peer", "self"}
     )
-    assert controller._local_stt_pending_enable_after_install is True
-    assert controller._get_local_asr_cpu_repair_owner().snapshot.self_activation_generation == 21
+    assert controller._get_local_asr_application_runtime().self_pending is True
+    assert (
+        controller._get_local_asr_application_runtime().cpu_repair.snapshot.self_activation_generation
+        == 21
+    )
     assert dashboard.stt_enabled is False
     assert dashboard.stt_needs_key is False
     assert messages == [
@@ -1029,14 +959,6 @@ def _language_selection_change(
     )
 
 
-def _managed_china_settings() -> AppSettings:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.translation.connection = TranslationConnection.MANAGED_CHINA
-    return settings
-
-
 def _local_qwen_suppressed_notification(
     *,
     channel: Literal["self", "peer"] = "self",
@@ -1046,54 +968,6 @@ def _local_qwen_suppressed_notification(
         channel=channel,
         stt_provider_name=STTProviderName.LOCAL_QWEN,
     )
-
-
-@pytest.mark.asyncio
-async def test_managed_china_required_prepare_opens_qq_dialog_instead_of_snackbar(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    qq_dialog_calls: list[str] = []
-    snackbars: list[tuple[str, object]] = []
-    dashboard_enabled: list[bool] = []
-    app = SimpleNamespace(
-        view_dashboard=SimpleNamespace(
-            set_translation_enabled=lambda enabled: dashboard_enabled.append(enabled)
-        ),
-        show_qq_managed_auth_dialog=lambda: qq_dialog_calls.append("show"),
-        _show_snackbar=lambda *args: snackbars.append(args),
-    )
-    controller = _make_controller(app=app)
-    controller.settings = _managed_china_settings()
-    controller.hub = SimpleNamespace(llm=None, translation_enabled=False)
-
-    async def prepare_required() -> ManagedOpenRouterReleaseResult:
-        return ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-            message_key="qq_managed_auth.required",
-            local_key_available=False,
-        )
-
-    controller._managed_openrouter_release_service = SimpleNamespace(
-        prepare_for_translation=prepare_required
-    )
-
-    async def no_founder_letter(_self) -> bool:
-        return False
-
-    async def refresh_noop(_self, **_kwargs) -> None:
-        return None
-
-    monkeypatch.setattr(ManagedUsageOwner, "should_route_to_founder_letter", no_founder_letter)
-    monkeypatch.setattr(ManagedUsageOwner, "refresh", refresh_noop)
-    monkeypatch.setattr(GuiController, "log_detailed", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(GuiController, "log_basic", lambda *_args, **_kwargs: None)
-
-    result = await controller.set_translation_enabled(True)
-
-    assert result is False
-    assert qq_dialog_calls == ["show"]
-    assert snackbars == []
-    assert dashboard_enabled == [False]
 
 
 def test_local_qwen_suppression_first_gui_detection_counts_without_modal() -> None:
@@ -1238,6 +1112,10 @@ def _overlay_owner(controller: GuiController) -> OverlayApplicationOwner:
     return controller._get_overlay_application_owner()
 
 
+def _peer_owner(controller: GuiController) -> PeerApplicationOwner:
+    return controller._get_peer_application_runtime().owner
+
+
 def _peer_runtime_config(
     controller: GuiController,
     settings: AppSettings,
@@ -1310,7 +1188,7 @@ def _attach_desktop_renderer_events(
 
 
 def _microphone_test_task(controller: GuiController) -> asyncio.Task[None] | None:
-    runtime = controller._get_microphone_test_owner().runtime_if_created
+    runtime = controller._get_microphone_test_runtime().owner().runtime_if_created
     return runtime.session_task if runtime is not None else None
 
 
@@ -1435,163 +1313,6 @@ def test_desktop_gui_overlay_failure_i18n_reasons_survive_controller_normalizati
     assert reported == [("failed", failure_reason)]
 
 
-def _patch_init_pipeline_dependencies(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
-    created: dict[str, object] = {}
-
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: "llm")
-
-    class FakeSender:
-        def close(self) -> None:
-            return None
-
-    def fake_sender(*_args, **_kwargs):
-        sender = FakeSender()
-        created["sender"] = sender
-        return sender
-
-    def fake_osc(*_args, **_kwargs):
-        created["osc_kwargs"] = dict(_kwargs)
-        osc = object()
-        created["osc"] = osc
-        return osc
-
-    def fake_hub(*_args, **kwargs):
-        hub = SimpleNamespace(
-            llm=kwargs.get("llm"),
-            stt=kwargs.get("stt"),
-            peer_stt=kwargs.get("peer_stt"),
-            local_asr_provider_runtime=None,
-            peer_translation_enabled=kwargs.get("peer_translation_enabled", False),
-            integrated_context_enabled=kwargs.get("integrated_context_enabled", False),
-        )
-
-        def has_stt_provider(channel: str) -> bool:
-            return hub.stt is not None if channel == "self" else hub.peer_stt is not None
-
-        async def replace_stt_provider_request(
-            request,
-            *,
-            start,
-            on_terminal_failure,
-        ):
-            _ = start, on_terminal_failure
-            created["stt_request"] = request
-            hub.stt = "owned-stt"
-            return SimpleNamespace(status="applied", failure_type=None)
-
-        hub.has_stt_provider = has_stt_provider
-        hub.replace_stt_provider_request = replace_stt_provider_request
-        created["hub"] = hub
-        return hub
-
-    monkeypatch.setattr(controller_module, "VrchatOscUdpSender", fake_sender)
-    monkeypatch.setattr(controller_module, "ChatboxPaginator", fake_osc)
-    monkeypatch.setattr(controller_module, "ClientHub", fake_hub)
-
-    return created
-
-
-@pytest.mark.asyncio
-async def test_init_pipeline_wires_self_stt_fault_provider_with_debug_gate(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    stt_calls: list[dict[str, object]] = []
-    created = _patch_init_pipeline_dependencies(monkeypatch)
-
-    def fake_stt_provider_factory(*_args, **kwargs):
-        stt_calls.append(dict(kwargs))
-        return SimpleNamespace()
-
-    app = SimpleNamespace(debug_ui_preview=True)
-    controller = _make_controller(app=app)
-    controller.settings = AppSettings()
-    prior_owner_closed: list[str] = []
-
-    class PriorOwner:
-        async def close(self) -> None:
-            prior_owner_closed.append("closed")
-
-    prior_owner = PriorOwner()
-    controller._self_capture_owner = prior_owner
-    monkeypatch.setattr(
-        controller_module,
-        "ManagedSTTProviderFactory",
-        fake_stt_provider_factory,
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, *, enabled: asyncio.sleep(0),
-    )
-
-    assert controller.cycle_debug_stt_fault_profile() == "stt_input_low_snr_vad_pass"
-    await controller._init_pipeline()
-
-    provider = stt_calls[0]["fault_profile_provider"]
-    assert prior_owner_closed == ["closed"]
-    assert controller._self_capture_owner is not prior_owner
-    assert created["stt_request"].provider_id == controller.settings.provider.stt.value
-    assert controller._hub_has_stt_provider("self")
-    assert callable(stt_calls[0]["on_final_transcript_suppressed"])
-    assert callable(provider)
-    assert provider() == "stt_input_low_snr_vad_pass"
-
-    app.debug_ui_preview = False
-    assert provider() == "none"
-    assert controller.debug_stt_fault_profile == "stt_input_low_snr_vad_pass"
-
-
-@pytest.mark.asyncio
-async def test_rebuild_stt_provider_delegates_immutable_owner_request() -> None:
-    app = SimpleNamespace(debug_ui_preview=False)
-    controller = _make_controller(app=app)
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller.settings = AppSettings()
-    configs: list[object] = []
-
-    class FakeOwner:
-        loop_task = None
-        source = None
-        cleanup_source = None
-        vad = None
-        last_cleanup_exception = None
-
-        async def prepare_provider(self, config):
-            configs.append(config)
-            return SelfCaptureSessionSnapshot(
-                state=SelfCaptureSessionState.STOPPED,
-                provider_status=SelfCaptureProviderStatus.READY,
-                desired_active=False,
-                effective_active=False,
-                generation=1,
-                provider_id=config.provider_id,
-                runtime_signature=config.runtime_signature,
-                failure_reason=None,
-                admission_reason=None,
-                has_source=False,
-                has_vad=False,
-                has_loop_task=False,
-                cleanup_debt=0,
-                closed=False,
-            )
-
-    controller.hub = SimpleNamespace()
-    controller._self_capture_owner = FakeOwner()
-    controller._debug_stt_fault_profile = "stt_input_low_snr_vad_pass"
-
-    await controller._rebuild_stt_provider()
-
-    config = configs[0]
-    request = controller._self_capture_provider_request(config, False)
-    assert request.provider_id == controller.settings.provider.stt.value
-    assert request.config.source_language == controller.settings.languages.source_language
-    assert (
-        config.provider_signature
-        == build_self_capture_session_config(controller.settings).provider_signature
-    )
-
-
 def test_peer_stt_provider_request_preserves_resolved_runtime_config() -> None:
     app = SimpleNamespace(debug_ui_preview=True)
     controller = _make_controller(app=app)
@@ -1636,7 +1357,7 @@ def test_wrap_diagnostic_audio_source_wires_capture_fault_provider_with_debug_ga
     controller._runtime_logging = RuntimeLoggingSpy()
     controller._debug_capture_fault_profile = "capture_attenuate_40db"
 
-    wrapped = controller._wrap_diagnostic_audio_source(
+    wrapped = controller._get_capture_diagnostics_adapter().wrap_source(
         FakeAudioSource(),
         channel_label=channel_label,
     )
@@ -1867,19 +1588,20 @@ async def test_start_local_llm_without_runtime_does_not_show_api_key_warning(
         async def run(self) -> None:
             await asyncio.sleep(0)
 
-    async def fake_init_pipeline(self: GuiController) -> None:
-        self.hub = hub
-
     monkeypatch.delenv("LOCAL_LLM_API_KEY", raising=False)
     monkeypatch.setattr(GuiController, "_load_or_init_settings", lambda self, path: settings)
     monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
     monkeypatch.setattr(presentation_adapter_module, "set_ui_locale", lambda _locale: None)
     monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
     monkeypatch.setattr(
         controller_module, "create_secret_store", lambda *_a, **_k: DummySecrets({})
     )
     controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
+
+    async def fake_launch(*_args, **_kwargs) -> None:
+        controller.hub = hub
+
+    controller._runtime_pipeline_launcher = SimpleNamespace(launch=fake_launch)
     await controller.start()
     await asyncio.sleep(0)
 
@@ -2044,362 +1766,6 @@ async def test_set_translation_enabled_warms_supported_provider(
     assert called == [("secret", "https://dashscope.aliyuncs.com/api/v1", "qwen3.5-plus")]
 
 
-@pytest.mark.asyncio
-async def test_set_translation_enabled_keeps_managed_translation_disabled_until_local_key_available(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    observed_pending: list[bool | None] = []
-    controller._managed_openrouter_release_service = InspectingManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            pending_issue=True,
-            local_key_available=False,
-        ),
-        on_prepare=lambda: observed_pending.append(dash.managed_auth_pending),
-    )
-
-    async def fail_fetch_key_metadata(_api_key: str):
-        raise AssertionError("fetch_key_metadata should not run without a managed key")
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fail_fetch_key_metadata),
-    )
-
-    await controller.set_translation_enabled(True)
-
-    assert controller._managed_openrouter_release_service.prepare_calls == 1
-    assert controller.hub.translation_enabled is False
-    assert controller.hub.clear_context_calls == 0
-    assert observed_pending == [True]
-    assert dash.managed_auth_pending is False
-    assert dash.managed_auth_pending_calls == [True, False]
-    assert settings_view.managed_trial_usage_state == {
-        "visible": True,
-        "remaining_percent": None,
-    }
-    assert dash.managed_trial_calls == []
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_transitions_pending_true_to_false_after_managed_preissue_success(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    observed_pending: list[bool | None] = []
-    scheduled_refreshes: list[str] = []
-    controller._managed_openrouter_release_service = InspectingManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-            pending_issue=False,
-        ),
-        on_prepare=lambda: observed_pending.append(dash.managed_auth_pending),
-    )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    monkeypatch.setattr(
-        ManagedUsageOwner,
-        "schedule_usage_refresh",
-        lambda self: scheduled_refreshes.append("scheduled"),
-    )
-
-    await controller.set_translation_enabled(True)
-
-    assert controller._managed_openrouter_release_service.prepare_calls == 1
-    assert controller.hub.translation_enabled is True
-    assert controller.hub.clear_context_calls == 1
-    assert observed_pending == [True]
-    assert dash.managed_auth_pending is False
-    assert dash.managed_auth_pending_calls == [True, False]
-    assert scheduled_refreshes == ["scheduled"]
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_rebuild_path_keeps_success_when_managed_usage_refresh_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=None)
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-            pending_issue=False,
-        )
-    )
-
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        GuiController,
-        "_create_managed_openrouter_release_service",
-        lambda self, *, secrets: None,
-    )
-    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: object())
-
-    async def fail_usage_refresh(self):
-        raise RuntimeError("usage refresh boom")
-
-    monkeypatch.setattr(
-        GuiController,
-        "_fetch_managed_usage_metadata",
-        fail_usage_refresh,
-    )
-
-    await controller.set_translation_enabled(True)
-
-    assert controller.hub.llm is not None
-    assert controller.hub.translation_enabled is True
-    assert controller.hub.clear_context_calls == 1
-    assert dash.managed_auth_pending_calls == [True, False]
-    assert (
-        logging.WARNING,
-        "[ManagedAuth] Usage refresh failed: usage refresh boom",
-    ) in controller._runtime_logging.basic_messages
-    assert (
-        logging.INFO,
-        "[Settings] LLM provider rebuilt successfully",
-    ) in controller._runtime_logging.basic_messages
-    assert (
-        logging.INFO,
-        "[Translation] Enabled with provider: openrouter",
-    ) in controller._runtime_logging.basic_messages
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_rebuild_path_turns_translation_back_off_when_refresh_discovers_exhaustion(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    shown: list[str] = []
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=dash,
-            view_settings=settings_view,
-            show_founder_letter_dialog=lambda: shown.append("shown"),
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.managed_identity.active_managed_credential_ref = "hash_123"
-    controller.hub = DummyHub(llm=None)
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-            pending_issue=False,
-        )
-    )
-
-    metadata_responses = [
-        OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.05,
-            usage_usd=0.02,
-        ),
-        OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.0007,
-            usage_usd=0.0693,
-        ),
-    ]
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return metadata_responses.pop(0)
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_a, **_k: DummySecrets({"openrouter_managed_api_key": "managed-key"}),
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_create_managed_openrouter_release_service",
-        lambda self, *, secrets: None,
-    )
-    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller.set_translation_enabled(True)
-
-    assert shown == ["shown"]
-    assert controller.hub.llm is not None
-    assert controller.hub.translation_enabled is False
-    assert controller.hub.clear_context_calls == 0
-    assert dash.translation_enabled is False
-    assert settings_view.managed_trial_usage_state == {
-        "visible": True,
-        "remaining_percent": 1,
-    }
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_keeps_managed_translation_disabled_on_retry_result(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    snackbar_calls: list[tuple[str, str]] = []
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(
-            _show_snackbar=lambda message, color: snackbar_calls.append((message, color)),
-            view_dashboard=dash,
-            view_settings=settings_view,
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-            message_key="managed_release.retry_after_ms",
-            message_kwargs={"retry_after_ms": 5000},
-            diagnostics=ManagedOpenRouterReleaseDiagnostics(
-                operation="issue",
-                code="trial_unavailable",
-                error_class="retryable",
-                subcode="broker_backoff",
-                retry_after_ms=5000,
-                message="broker is temporarily unavailable",
-            ),
-            retry_after_ms=5000,
-        )
-    )
-
-    async def fail_fetch_key_metadata(_api_key: str):
-        raise AssertionError("fetch_key_metadata should not run without a managed key")
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fail_fetch_key_metadata),
-    )
-
-    await controller.set_translation_enabled(True)
-
-    assert controller._managed_openrouter_release_service.prepare_calls == 1
-    assert controller.hub.translation_enabled is False
-    assert controller.hub.clear_context_calls == 0
-    assert dash.managed_auth_pending is False
-    assert dash.managed_auth_pending_calls == [True, False]
-    assert snackbar_calls == [
-        (t("managed_release.retry_after_ms", retry_after_ms=5000), ft.Colors.ORANGE_700)
-    ]
-    assert (
-        logging.ERROR,
-        "[ManagedAuth] operation=issue code=trial_unavailable class=retryable subcode=broker_backoff retry_after_ms=5000 message=<redacted>",
-    ) in controller._runtime_logging.basic_messages
-    assert settings_view.managed_trial_usage_state == {
-        "visible": True,
-        "remaining_percent": None,
-    }
-    assert dash.managed_trial_calls == []
-
-
-def test_on_managed_trial_delegate_ready_clears_dashboard_pending_notice() -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-
-    controller._get_managed_auth_owner().set_pending(True)
-
-    controller._on_managed_trial_delegate_ready()
-
-    assert controller.managed_auth_pending is False
-    assert dash.managed_auth_pending is False
-    assert dash.managed_auth_pending_calls == [True, False]
-
-
-@pytest.mark.asyncio
-async def test_managed_trial_delegate_refresh_is_cancelled_by_managed_status_owner(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    entered = asyncio.Event()
-    cancelled = asyncio.Event()
-
-    async def blocked_refresh(self) -> None:
-        _ = self
-        entered.set()
-        try:
-            await asyncio.Event().wait()
-        except asyncio.CancelledError:
-            cancelled.set()
-            raise
-
-    monkeypatch.setattr(
-        ManagedUsageOwner,
-        "refresh_best_effort",
-        blocked_refresh,
-    )
-
-    controller._on_managed_trial_delegate_ready()
-    await entered.wait()
-
-    managed_usage_owner = controller._managed_usage_owner
-    assert managed_usage_owner is not None
-    owner = managed_usage_owner.refresh_owner
-    assert owner.active_task_names
-    controller._freeze_application_ingress()
-    await owner.close()
-
-    assert cancelled.is_set()
-    assert owner.active_task_names == ()
-
-    controller._on_managed_trial_delegate_ready()
-    assert owner.active_task_names == ()
-
-
 def test_application_ingress_freeze_is_terminal_for_late_work_owners() -> None:
     app = SimpleNamespace(
         set_dashboard_overlay_session_fallback_notice=lambda _active: None,
@@ -2415,907 +1781,6 @@ def test_application_ingress_freeze_is_terminal_for_late_work_owners() -> None:
     assert overlay_owner.accepting_ingress is False
     assert osc_owner.accepting_ingress is False
     assert mic_owner.accepting_ingress is False
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_off_wins_against_inflight_managed_enable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    prepare_started = asyncio.Event()
-    release_prepare = asyncio.Event()
-
-    async def block_prepare() -> None:
-        prepare_started.set()
-        await release_prepare.wait()
-
-    controller._managed_openrouter_release_service = InspectingManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-            pending_issue=False,
-        ),
-        on_prepare=block_prepare,
-    )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-    monkeypatch.setattr(
-        ManagedUsageOwner,
-        "schedule_usage_refresh",
-        lambda self: None,
-    )
-
-    enable_task = asyncio.create_task(controller.set_translation_enabled(True))
-    await prepare_started.wait()
-
-    await controller.set_translation_enabled(False)
-
-    assert controller.hub.translation_enabled is False
-    assert controller.managed_auth_pending is False
-    assert dash.managed_auth_pending is False
-
-    release_prepare.set()
-    await enable_task
-
-    assert controller._managed_openrouter_release_service.prepare_calls == 1
-    assert controller.hub.translation_enabled is False
-    assert controller.hub.clear_context_calls == 1
-    assert controller.managed_auth_pending is False
-    assert dash.managed_auth_pending is False
-    assert dash.managed_auth_pending_calls[:2] == [True, False]
-    assert dash.managed_auth_pending_calls[-1] is False
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_clears_dashboard_pending_notice_when_switching_away_from_managed(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-
-    controller._get_managed_auth_owner().set_pending(True)
-
-    next_settings = AppSettings()
-    next_settings.provider.llm = LLMProviderName.GEMINI
-
-    monkeypatch.setattr(
-        SettingsOwner,
-        "save_current",
-        lambda self, **_kwargs: True,
-    )
-    monkeypatch.setattr(
-        provider_runtime_apply_module.LlmProviderRebuildOwner,
-        "rebuild",
-        lambda self: asyncio.sleep(0),
-    )
-
-    await controller.apply_providers(next_settings)
-
-    assert controller.managed_auth_pending is False
-    assert dash.managed_auth_pending is False
-    assert dash.managed_auth_pending_calls == [True, False]
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_force_rebuild_local_llm_reads_updated_secret(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class ClosableLLM:
-        def __init__(self) -> None:
-            self.closed = False
-
-        async def close(self) -> None:
-            self.closed = True
-
-    async def noop_replace_managed_service(self, service) -> None:
-        _ = (self, service)
-
-    async def noop_refresh_managed_usage(self) -> None:
-        _ = self
-
-    settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=DummySettingsView())
-    )
-    controller.settings = settings
-    previous_llm = ClosableLLM()
-    controller.hub = DummyHub(llm=previous_llm)
-
-    monkeypatch.setattr(
-        SettingsOwner,
-        "save_current",
-        lambda self, **_kwargs: True,
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_create_managed_openrouter_release_service",
-        lambda self, *, secrets: object(),
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_replace_managed_openrouter_release_service",
-        noop_replace_managed_service,
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_refresh_managed_trial_usage_state_best_effort",
-        noop_refresh_managed_usage,
-    )
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_a, **_k: DummySecrets({"local_llm_api_key": "new-secret"}),
-    )
-
-    await controller.apply_providers(force_rebuild_llm=True)
-
-    assert previous_llm.closed is True
-    assert isinstance(controller.hub.llm, SemaphoreLLMProvider)
-    assert controller.hub.llm.inner.api_key == "new-secret"
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_clears_dashboard_pending_notice_when_prepare_raises(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = FailingManagedReleaseService(
-        RuntimeError("boom")
-    )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-
-    with pytest.raises(RuntimeError, match="boom"):
-        await controller.set_translation_enabled(True)
-
-    assert controller.managed_auth_pending is False
-    assert dash.managed_auth_pending is False
-    assert dash.managed_auth_pending_calls == [True, False]
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_resyncs_dashboard_pending_notice_when_staying_on_managed(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-
-    controller._get_managed_auth_owner().set_pending(True)
-
-    next_settings = AppSettings()
-    next_settings.provider.llm = LLMProviderName.OPENROUTER
-    next_settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-
-    monkeypatch.setattr(
-        SettingsOwner,
-        "save_current",
-        lambda self, **_kwargs: True,
-    )
-    monkeypatch.setattr(
-        provider_runtime_apply_module.LlmProviderRebuildOwner,
-        "rebuild",
-        lambda self: asyncio.sleep(0),
-    )
-
-    await controller.apply_providers(next_settings)
-
-    assert controller.managed_auth_pending is True
-    assert dash.managed_auth_pending is True
-    assert dash.managed_auth_pending_calls == [True, True]
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_staying_on_managed_does_not_prepare_managed_translation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-
-    class TrackingManagedReleaseService:
-        def __init__(self) -> None:
-            self.prepare_calls = 0
-            self.close_calls = 0
-
-        async def prepare_for_translation(self):
-            self.prepare_calls += 1
-            raise AssertionError("apply_providers must not prepare managed translation")
-
-        async def close(self) -> None:
-            self.close_calls += 1
-
-    initial_service = TrackingManagedReleaseService()
-    created_services: list[TrackingManagedReleaseService] = []
-    controller._managed_openrouter_release_service = initial_service
-
-    updated = copy.deepcopy(controller.settings)
-    updated.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
-
-    async def fake_refresh_managed_usage(self) -> None:
-        return None
-
-    def fake_create_managed_release_service(self, *, secrets):
-        _ = (self, secrets)
-        service = TrackingManagedReleaseService()
-        created_services.append(service)
-        return service
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: object())
-    monkeypatch.setattr(
-        GuiController,
-        "_create_managed_openrouter_release_service",
-        fake_create_managed_release_service,
-    )
-    monkeypatch.setattr(
-        GuiController,
-        "_refresh_managed_trial_usage_state_best_effort",
-        fake_refresh_managed_usage,
-    )
-
-    await controller.apply_providers(updated)
-
-    assert initial_service.close_calls == 1
-    assert len(created_services) == 1
-    assert created_services[0].prepare_calls == 0
-    assert controller.settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-
-
-def test_dashboard_trans_missing_managed_key_opens_discord_auth_dialog_without_prepare(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = SimpleNamespace(tasks=[], run_task=lambda task: app.page.tasks.append(task))
-    dash = DummyDashboard()
-    app.view_dashboard = dash
-    dialog_calls: list[bool] = []
-    app.show_discord_managed_auth_dialog = lambda *, preview=False: dialog_calls.append(preview)
-
-    controller = _make_controller(app=app)
-    app.controller = controller
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-        )
-    )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-
-    handled = app._on_translation_toggle(True)
-
-    assert handled is False
-    assert dialog_calls == [False]
-    assert dash.translation_enabled is False
-    assert app.page.tasks == []
-    assert controller._managed_openrouter_release_service.prepare_calls == 0
-
-
-def test_dashboard_trans_in_progress_managed_oauth_prevents_second_dialog(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = SimpleNamespace(tasks=[], run_task=lambda task: app.page.tasks.append(task))
-    dash = DummyDashboard()
-    app.view_dashboard = dash
-    dialog_calls: list[bool] = []
-    app.show_discord_managed_auth_dialog = lambda *, preview=False: dialog_calls.append(preview)
-
-    controller = _make_controller(app=app)
-    app.controller = controller
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._get_managed_auth_owner().set_pending(True)
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-        )
-    )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-
-    handled = app._on_translation_toggle(True)
-
-    assert handled is False
-    assert dialog_calls == []
-    assert dash.translation_enabled is False
-    assert app.page.tasks == []
-    assert controller._managed_openrouter_release_service.prepare_calls == 0
-
-
-def test_managed_connection_auth_settings_values_are_service_safe() -> None:
-    from puripuly_heart.app.services import managed_connection_auth
-
-    settings = AppSettings()
-    settings.secrets.backend = SecretsBackend.ENCRYPTED_FILE
-
-    values = managed_auth_runtime_module._managed_connection_auth_settings_values(settings)
-
-    assert managed_connection_auth._caller_settings_values_are_unsafe(
-        legacy_settings_snapshot_values(settings)
-    )
-    assert not managed_connection_auth._caller_settings_values_are_unsafe(values)
-
-
-@pytest.mark.asyncio
-async def test_discord_managed_auth_transaction_rebuilds_existing_provider(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = SimpleNamespace(
-        app_version="test",
-        client=object(),
-        raw_hardware_fingerprint_provider=None,
-        _legacy_hardware_hash_provider=None,
-        oauth_runtime=object(),
-        discord_oauth_listener_factory=object(),
-        discord_oauth_callback_runner=object(),
-        openrouter_config=controller_module.build_openrouter_release_runtime_config(
-            controller.settings
-        ),
-        signed_at_provider=lambda: "2026-01-01T00:00:00Z",
-    )
-    rebuild_calls: list[str] = []
-
-    async def fake_authorize(_self, _request):
-        return messages.TransactionResult(
-            status=messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
-            message=None,
-            diagnostics=None,
-        )
-
-    async def fake_rebuild_llm_provider(_owner) -> None:
-        rebuild_calls.append("rebuild")
-        assert controller.hub is not None
-        controller.hub.llm = object()
-
-    monkeypatch.setattr(
-        controller_module, "create_secret_store", lambda *_args, **_kwargs: DummySecrets({})
-    )
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(ManagedConnectionAuthService, "authorize", fake_authorize)
-    monkeypatch.setattr(
-        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
-    )
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is True
-    assert rebuild_calls == ["rebuild"]
-
-
-@pytest.mark.asyncio
-async def test_discord_managed_auth_pending_ack_installs_runtime_settings_without_success(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = SimpleNamespace(
-        app_version="test",
-        client=object(),
-        raw_hardware_fingerprint_provider=None,
-        _legacy_hardware_hash_provider=None,
-        oauth_runtime=object(),
-        discord_oauth_listener_factory=object(),
-        discord_oauth_callback_runner=object(),
-        openrouter_config=controller_module.build_openrouter_release_runtime_config(
-            controller.settings
-        ),
-        signed_at_provider=lambda: "2026-01-01T00:00:00Z",
-    )
-    rebuild_calls: list[str] = []
-
-    async def fake_authorize(service, _request):
-        service.settings_repository.committed_settings.managed_identity.pending_delivery_ack_source = (
-            "discord"
-        )
-        service.settings_repository.committed_settings.managed_identity.pending_delivery_ack_delivery_id = (
-            "delivery-discord"
-        )
-        service.settings_repository.committed_settings.managed_identity.pending_delivery_ack_managed_credential_ref = (
-            "managed-ref-discord"
-        )
-        return messages.TransactionResult(
-            status=messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
-            message=None,
-            diagnostics=None,
-        )
-
-    async def fake_rebuild_llm_provider(self: GuiController) -> None:
-        rebuild_calls.append("rebuild")
-
-    monkeypatch.setattr(
-        controller_module, "create_secret_store", lambda *_args, **_kwargs: DummySecrets({})
-    )
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(ManagedConnectionAuthService, "authorize", fake_authorize)
-    monkeypatch.setattr(
-        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
-    )
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is False
-    assert rebuild_calls == []
-    assert controller.settings.managed_identity.pending_delivery_ack_source == "discord"
-    assert (
-        controller.settings.managed_identity.pending_delivery_ack_delivery_id == "delivery-discord"
-    )
-
-
-@pytest.mark.asyncio
-async def test_start_discord_managed_auth_from_dialog_success_rebuilds_missing_provider(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=None)
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-        )
-    )
-    rebuild_calls: list[str] = []
-
-    async def fake_rebuild_llm_provider(_owner) -> None:
-        rebuild_calls.append("rebuild")
-        controller.hub.llm = object()
-
-    monkeypatch.setattr(
-        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
-    )
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is True
-    assert controller._managed_openrouter_release_service.prepare_calls == 1
-    assert rebuild_calls == ["rebuild"]
-    assert controller.hub.llm is not None
-    assert controller.managed_auth_pending is False
-    assert dash.managed_auth_pending_calls == [True, False]
-
-
-@pytest.mark.asyncio
-async def test_start_discord_managed_auth_from_dialog_passes_referral_id_without_persisting_friend_id() -> (
-    None
-):
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-        )
-    )
-    controller._managed_openrouter_release_service = service
-
-    ok = await controller.start_discord_managed_auth_from_dialog(referral_id=" 7kq9m2 ")
-
-    assert ok is True
-    assert service.prepare_referral_ids == [" 7kq9m2 "]
-    assert controller.settings.managed_identity.referral_id is None
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("referral_bonus_applied", "expected"),
-    [(True, True), (False, False), (None, False), ("true", False), (1, False)],
-)
-async def test_start_discord_managed_auth_from_dialog_exposes_only_boolean_true_referral_bonus(
-    referral_bonus_applied: object,
-    expected: bool,
-) -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-            referral_bonus_applied=referral_bonus_applied,  # type: ignore[arg-type]
-        )
-    )
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is True
-    assert controller.last_discord_managed_auth_referral_bonus_applied is expected
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("result_referral_id", "persisted_referral_id", "expected_referral_id"),
-    [
-        ("7kq9m2", None, "7KQ9M2"),
-        (None, "7KQ9M2", "7KQ9M2"),
-    ],
-)
-async def test_start_discord_managed_auth_from_dialog_updates_managed_key_referral_row_immediately(
-    monkeypatch: pytest.MonkeyPatch,
-    result_referral_id: str | None,
-    persisted_referral_id: str | None,
-    expected_referral_id: str,
-) -> None:
-    dash = DummyDashboard()
-
-    class ManagedKeySettingsView(DummySettingsView):
-        def __init__(self) -> None:
-            super().__init__()
-            self.managed_key_state_calls: list[dict[str, object]] = []
-
-        def set_managed_key_state(
-            self,
-            *,
-            visible: bool,
-            remaining_percent: int | None = None,
-            referral_id: str | None = None,
-            pass_status: object | None = None,
-        ) -> None:
-            self.managed_key_state_calls.append(
-                {
-                    "visible": visible,
-                    "remaining_percent": remaining_percent,
-                    "referral_id": referral_id,
-                    "pass_status": pass_status,
-                }
-            )
-
-    settings_view = ManagedKeySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.managed_identity.referral_id = persisted_referral_id
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-            referral_id=result_referral_id,
-        )
-    )
-    scheduled_refreshes: list[str] = []
-    monkeypatch.setattr(
-        ManagedUsageOwner,
-        "schedule_usage_refresh",
-        lambda self: scheduled_refreshes.append("usage"),
-    )
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is True
-    assert settings_view.managed_key_state_calls == [
-        {
-            "visible": True,
-            "remaining_percent": None,
-            "referral_id": expected_referral_id,
-            "pass_status": None,
-        }
-    ]
-    assert scheduled_refreshes == ["usage"]
-
-
-@pytest.mark.asyncio
-async def test_start_discord_managed_auth_from_dialog_repaints_pass_status_immediately(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    pass_status = TalkTogetherPassStatus(
-        pass_id="7KQ9M2",
-        invite_count=1,
-        invite_limit=5,
-        bonus_translations_per_friend=200,
-    )
-    dash = DummyDashboard()
-    settings_view = CapturingManagedKeySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-            referral_id="7KQ9M2",
-            pass_status=pass_status,
-        )
-    )
-    scheduled_refreshes: list[str] = []
-    monkeypatch.setattr(
-        ManagedUsageOwner,
-        "schedule_usage_refresh",
-        lambda self: scheduled_refreshes.append("usage"),
-    )
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is True
-    assert settings_view.managed_key_state_calls == [
-        {
-            "visible": True,
-            "remaining_percent": None,
-            "referral_id": "7KQ9M2",
-            "pass_status": pass_status,
-        }
-    ]
-    assert scheduled_refreshes == ["usage"]
-
-
-@pytest.mark.asyncio
-async def test_start_discord_managed_auth_from_dialog_issue_success_does_not_repaint_stale_usage_percent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-
-    class ManagedKeySettingsView(DummySettingsView):
-        def __init__(self) -> None:
-            super().__init__()
-            self.managed_key_state_calls: list[dict[str, object]] = []
-
-        def set_managed_key_state(
-            self,
-            *,
-            visible: bool,
-            remaining_percent: int | None = None,
-            referral_id: str | None = None,
-            pass_status: object | None = None,
-        ) -> None:
-            self.managed_key_state_calls.append(
-                {
-                    "visible": visible,
-                    "remaining_percent": remaining_percent,
-                    "referral_id": referral_id,
-                    "pass_status": pass_status,
-                }
-            )
-
-    settings_view = ManagedKeySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.managed_identity.active_managed_credential_ref = "new-ref"
-    controller.hub = DummyHub(llm=object())
-    controller._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
-        limit_usd=0.10,
-        remaining_usd=0.02,
-        usage_usd=0.08,
-    )
-    controller._get_managed_usage_owner().usage_metadata_entitlement_ref = "old-ref"
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(  # noqa: SLF001
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-            referral_id="7KQ9M2",
-        )
-    )
-    scheduled_refreshes: list[str] = []
-    monkeypatch.setattr(
-        ManagedUsageOwner,
-        "schedule_usage_refresh",
-        lambda self: scheduled_refreshes.append("usage"),
-    )
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is True
-    assert settings_view.managed_key_state_calls == [
-        {
-            "visible": True,
-            "remaining_percent": None,
-            "referral_id": "7KQ9M2",
-            "pass_status": None,
-        }
-    ]
-    assert scheduled_refreshes == ["usage"]
-
-
-def test_discord_managed_auth_callback_received_runs_active_hook_only() -> None:
-    calls: list[str] = []
-    controller = _make_controller(app=SimpleNamespace())
-    controller._get_managed_auth_owner().callback_received_hook = lambda: calls.append("received")
-
-    controller._on_discord_managed_auth_callback_received()
-
-    assert calls == ["received"]
-
-
-@pytest.mark.asyncio
-async def test_start_discord_managed_auth_from_dialog_rebuild_failure_returns_false(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    snackbar_calls: list[tuple[str, str]] = []
-    controller = _make_controller(
-        app=SimpleNamespace(
-            _show_snackbar=lambda message, color: snackbar_calls.append((message, color))
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=None)
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-            api_key="managed-key",
-            local_key_available=True,
-        )
-    )
-    rebuild_calls: list[str] = []
-
-    async def fake_rebuild_llm_provider(_owner) -> None:
-        rebuild_calls.append("rebuild")
-        controller.hub.llm = None
-
-    monkeypatch.setattr(
-        provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
-    )
-    monkeypatch.setattr(presentation_adapter_module, "t", lambda key, **_kwargs: key)
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is False
-    assert rebuild_calls == ["rebuild"]
-    assert controller.hub.llm is None
-    assert snackbar_calls == [("discord_auth.error.retry", ft.Colors.ORANGE_700)]
-
-
-@pytest.mark.asyncio
-async def test_start_discord_managed_auth_from_dialog_does_not_log_raw_broker_diagnostics(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    snackbar_calls: list[tuple[str, str]] = []
-    controller = _make_controller(
-        app=SimpleNamespace(
-            _show_snackbar=lambda message, color: snackbar_calls.append((message, color))
-        )
-    )
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    raw_subcode = "discord_email_unverified"
-    raw_message = "raw broker eligibility message"
-    controller._managed_openrouter_release_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.STOP,
-            message_key="managed_release.not_eligible",
-            diagnostics=ManagedOpenRouterReleaseDiagnostics(
-                operation="discord_issue",
-                code="trial_not_eligible",
-                error_class="terminal",
-                subcode=raw_subcode,
-                message=raw_message,
-            ),
-        )
-    )
-    monkeypatch.setattr(presentation_adapter_module, "t", lambda key, **_kwargs: key)
-
-    ok = await controller.start_discord_managed_auth_from_dialog()
-
-    assert ok is False
-    assert snackbar_calls == [("discord_auth.error.email_unverified", ft.Colors.ORANGE_700)]
-    logged_messages = [message for _level, message in controller._runtime_logging.basic_messages]
-    assert not any(raw_subcode in message for message in logged_messages)
-    assert not any(raw_message in message for message in logged_messages)
-
-
-def test_discord_auth_message_key_falls_back_to_result_message_key() -> None:
-    result = ManagedOpenRouterReleaseResult(
-        behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-        message_key="managed_release.retry_after_ms",
-        message_kwargs={"retry_after_ms": 5000},
-    )
-
-    assert (
-        managed_auth_runtime_module._discord_auth_message_key(result)
-        == "managed_release.retry_after_ms"
-    )
-
-
-def test_discord_auth_message_key_maps_loopback_bind_failure_diagnostic() -> None:
-    result = ManagedOpenRouterReleaseResult(
-        behavior=ManagedOpenRouterReleaseBehavior.RETRY,
-        message_key="managed_release.retry",
-        diagnostics=ManagedOpenRouterReleaseDiagnostics(
-            operation="discord_start",
-            code="discord_loopback_unavailable",
-            error_class="retryable",
-            message="bind failed",
-        ),
-    )
-
-    assert managed_auth_runtime_module._discord_auth_message_key(result) == (
-        "discord_auth.error.loopback_unavailable"
-    )
 
 
 def test_verified_key_and_runtime_signature_depend_on_region_and_settings() -> None:
@@ -3335,94 +1800,6 @@ def test_verified_key_and_runtime_signature_depend_on_region_and_settings() -> N
     assert key_beijing == "alibaba_beijing"
     assert key_singapore == "alibaba_singapore"
     assert baseline != changed
-
-
-def test_build_llm_provider_signature_tracks_openrouter_selection_and_fallback_branch() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    base = AppSettings()
-    base.provider.llm = LLMProviderName.OPENROUTER
-    base.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    base.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
-    base.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.OPENROUTER,
-    )
-
-    different_selection = copy.deepcopy(base)
-    different_selection.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
-
-    different_fallback = copy.deepcopy(base)
-    different_fallback.translation.fallback = TranslationFallbackSettings(enabled=False)
-
-    assert controller._build_llm_provider_signature(
-        base
-    ) != controller._build_llm_provider_signature(different_selection)
-    assert controller._build_llm_provider_signature(
-        base
-    ) != controller._build_llm_provider_signature(different_fallback)
-
-
-def test_build_llm_provider_signature_tracks_managed_fallback_identity() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    base = AppSettings()
-    base.provider.llm = LLMProviderName.GEMINI
-    base.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.MANAGED_CHINA,
-    )
-
-    different_identity = copy.deepcopy(base)
-    different_identity.managed_identity.verified_hardware_hash = "fallback-managed-hash"
-
-    assert controller._build_llm_provider_signature(
-        base
-    ) != controller._build_llm_provider_signature(different_identity)
-
-
-def test_build_llm_provider_signature_tracks_openrouter_provider_routing() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    base = AppSettings()
-    base.provider.llm = LLMProviderName.OPENROUTER
-    base.openrouter.selection_alias = OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-    base.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
-
-    deepseek_only = copy.deepcopy(base)
-    deepseek_only.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
-
-    assert controller._build_llm_provider_signature(
-        base
-    ) != controller._build_llm_provider_signature(deepseek_only)
-
-
-def test_build_llm_provider_signature_tracks_local_llm_runtime_fields() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    base = AppSettings()
-    base.provider.llm = LLMProviderName.LOCAL_LLM
-    base.local_llm = LocalLLMSettings(
-        backend=LocalLLMBackend.OLLAMA,
-        base_url="http://127.0.0.1:11434/v1",
-        model="llama3.1:8b",
-        extra_body={"thinking": {"type": "disabled", "budget": 0}},
-    )
-
-    same_json_different_order = copy.deepcopy(base)
-    same_json_different_order.local_llm.extra_body = {"thinking": {"budget": 0, "type": "disabled"}}
-    changed_model = copy.deepcopy(base)
-    changed_model.local_llm.model = "qwen2.5:7b"
-    changed_body = copy.deepcopy(base)
-    changed_body.local_llm.extra_body = {"enable_thinking": False}
-
-    assert controller._build_llm_provider_signature(
-        base
-    ) == controller._build_llm_provider_signature(same_json_different_order)
-    assert controller._build_llm_provider_signature(
-        base
-    ) != controller._build_llm_provider_signature(changed_model)
-    assert controller._build_llm_provider_signature(
-        base
-    ) != controller._build_llm_provider_signature(changed_body)
 
 
 def test_merge_settings_tab_apply_copies_translation_selection_for_provider_apply() -> None:
@@ -3763,100 +2140,6 @@ def test_failed_canonical_persistence_rolls_back_peer_auto_intent(
     assert runtime.backend.provider_options["language_hints"] == ("ja",)
 
 
-def test_stale_managed_adapter_persists_only_managed_delta_on_current_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    stale_settings = AppSettings()
-    state = controller_module.build_managed_identity_state_port(
-        stale_settings,
-        controller._get_settings_owner().managed_identity_persistence_callback(stale_settings),
-    )
-    active_settings = copy.deepcopy(stale_settings)
-    active_settings.ui.locale = "ja"
-    controller.settings = active_settings
-    vnext_settings = AppSettingsVNext()
-    controller.vnext_settings = replace(
-        vnext_settings,
-        intent=replace(
-            vnext_settings.intent,
-            ui=replace(vnext_settings.intent.ui, locale="ja"),
-            peer_stt=replace(vnext_settings.intent.peer_stt, provider="soniox"),
-            languages=replace(
-                vnext_settings.intent.languages,
-                peer_source_mode="auto",
-                peer_expected_languages=["ja"],
-            ),
-        ),
-    )
-    controller._get_settings_owner().authoritative = True
-    controller._get_settings_owner().remember_projection(active_settings)
-    saved: list[AppSettingsVNext] = []
-    monkeypatch.setattr(
-        canonical_persistence_adapter_module,
-        "save_vnext_settings",
-        lambda _path, settings: saved.append(settings) or SimpleNamespace(ok=True),
-    )
-
-    state.referral_id = "234567"
-    state.persist()
-
-    assert controller.settings.ui.locale == "ja"
-    assert controller.settings.managed_identity.referral_id == "234567"
-    assert len(saved) == 1
-    assert saved[0].intent.ui.locale == "ja"
-    assert saved[0].state.managed_connection.referral_id == "234567"
-    assert saved[0].intent.peer_stt.provider == "soniox"
-    assert saved[0].intent.languages.peer_source_mode == "auto"
-    assert saved[0].intent.languages.peer_expected_languages == ["ja"]
-
-
-def test_failed_stale_managed_adapter_persistence_restores_active_and_bound_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    stale_settings = AppSettings()
-    state = controller_module.build_managed_identity_state_port(
-        stale_settings,
-        controller._get_settings_owner().managed_identity_persistence_callback(stale_settings),
-    )
-    active_settings = copy.deepcopy(stale_settings)
-    active_settings.ui.locale = "ja"
-    active_before_mutation = copy.deepcopy(active_settings)
-    stale_before_mutation = copy.deepcopy(stale_settings)
-    controller.settings = active_settings
-    vnext_settings = AppSettingsVNext()
-    canonical = replace(
-        vnext_settings,
-        intent=replace(
-            vnext_settings.intent,
-            ui=replace(vnext_settings.intent.ui, locale="ja"),
-            peer_stt=replace(vnext_settings.intent.peer_stt, provider="soniox"),
-            languages=replace(
-                vnext_settings.intent.languages,
-                peer_source_mode="auto",
-                peer_expected_languages=["ja"],
-            ),
-        ),
-    )
-    controller.vnext_settings = canonical
-    controller._get_settings_owner().authoritative = True
-    controller._get_settings_owner().remember_projection(active_settings)
-    monkeypatch.setattr(
-        canonical_persistence_adapter_module,
-        "save_vnext_settings",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("save failed")),
-    )
-
-    state.referral_id = "234567"
-    with pytest.raises(OSError, match="save failed"):
-        state.persist()
-
-    assert controller.settings == active_before_mutation
-    assert stale_settings == stale_before_mutation
-    assert controller.vnext_settings == canonical
-
-
 def test_nested_canonical_completion_keeps_outer_rollback_snapshot() -> None:
     controller = _make_controller(app=SimpleNamespace())
     legacy = AppSettings()
@@ -3969,9 +2252,9 @@ async def test_failed_scoped_persistence_restores_canonical_and_legacy_before_ru
         lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("save failed")),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_refresh_peer_stt_runtime",
-        lambda self: runtime_calls.append("peer") or asyncio.sleep(0),
+        PeerApplicationOwner,
+        "refresh_runtime",
+        lambda self, **_kwargs: runtime_calls.append("peer") or asyncio.sleep(0),
     )
 
     updated = copy.deepcopy(legacy)
@@ -4038,7 +2321,7 @@ async def test_apply_settings_updates_peer_translation_flags_on_hub(
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
     monkeypatch.setattr(
@@ -4047,9 +2330,15 @@ async def test_apply_settings_updates_peer_translation_flags_on_hub(
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
+        SelfCaptureApplicationOwner,
+        "replace_provider",
+        lambda self, **_kwargs: asyncio.sleep(0),
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        PeerApplicationOwner,
+        "refresh_runtime",
+        lambda self, **_kwargs: asyncio.sleep(0),
+    )
 
     updated = AppSettings()
     updated.ui.peer_translation_enabled = True
@@ -4074,16 +2363,22 @@ async def test_apply_settings_copies_self_and_peer_vad_hangovers_to_hub(
     controller.settings = settings
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(controller, settings)
     monkeypatch.setattr(
         SettingsOwner,
         "save_current",
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
+        SelfCaptureApplicationOwner,
+        "replace_provider",
+        lambda self, **_kwargs: asyncio.sleep(0),
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        PeerApplicationOwner,
+        "refresh_runtime",
+        lambda self, **_kwargs: asyncio.sleep(0),
+    )
 
     await controller.apply_settings(settings)
 
@@ -4189,266 +2484,6 @@ async def test_overlay_composition_replacement_cancels_old_owner_delivery() -> N
 
 
 @pytest.mark.asyncio
-async def test_init_pipeline_keeps_peer_original_runtime_available_without_peer_translation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    created = _patch_init_pipeline_dependencies(monkeypatch)
-    monkeypatch.setattr(
-        GuiController, "_configure_vrc_mic_receiver", lambda self, enabled: asyncio.sleep(0)
-    )
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.ui.overlay_enabled = True
-    _overlay_owner(controller).state = "connected"
-
-    await controller._init_pipeline()
-
-    hub = created["hub"]
-    assert hub.peer_stt is None
-    assert hub.peer_translation_enabled is False
-    assert controller._peer_runtime is not None
-
-
-@pytest.mark.asyncio
-async def test_init_pipeline_passes_chatbox_and_peer_language_settings_to_hub(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured: dict[str, object] = {}
-    llm_create_kwargs: dict[str, object] = {}
-
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-
-    def fake_create_llm_provider(*_args, **kwargs):
-        llm_create_kwargs.update(kwargs)
-        return "llm"
-
-    monkeypatch.setattr(controller_module, "create_llm_provider", fake_create_llm_provider)
-    monkeypatch.setattr(controller_module, "VrchatOscUdpSender", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "ChatboxPaginator", lambda *a, **k: object())
-
-    def fake_hub(*_args, **kwargs):
-        captured.update(kwargs)
-        hub = SimpleNamespace(
-            llm=kwargs.get("llm"),
-            stt=kwargs.get("stt"),
-            peer_stt=kwargs.get("peer_stt"),
-            local_asr_provider_runtime=None,
-        )
-
-        async def replace_stt_provider_request(request, *, start):
-            _ = request, start
-            hub.stt = "owned-stt"
-            return SimpleNamespace(status="applied")
-
-        hub.has_stt_provider = lambda channel: (
-            hub.stt is not None if channel == "self" else hub.peer_stt is not None
-        )
-        hub.replace_stt_provider_request = replace_stt_provider_request
-        return hub
-
-    monkeypatch.setattr(controller_module, "ClientHub", fake_hub)
-    monkeypatch.setattr(
-        GuiController, "_configure_vrc_mic_receiver", lambda self, enabled: asyncio.sleep(0)
-    )
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.osc.chatbox_include_source = False
-    controller.settings.languages.peer_source_language = "ja"
-    controller.settings.languages.peer_target_language = "en"
-
-    await controller._init_pipeline()
-
-    assert captured["chatbox_include_source"] is False
-    assert captured["peer_source_language"] == "ja"
-    assert captured["peer_target_language"] == "en"
-    assert llm_create_kwargs["runtime_logging"] is controller.runtime_logging
-
-
-@pytest.mark.asyncio
-async def test_init_pipeline_constructs_production_output_owner(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    requests: list[object] = []
-
-    class ProviderFactory:
-        async def create(
-            self,
-            request,
-            *,
-            gpu_runtime,
-            on_terminal_failure=None,
-        ):
-            _ = gpu_runtime, on_terminal_failure
-            requests.append(request)
-            return object()
-
-    class Chatbox:
-        def enqueue(self, message) -> None:
-            _ = message
-
-        def send_typing(self, is_typing: bool) -> None:
-            _ = is_typing
-
-        def set_typing_reason(self, reason: str, active: bool) -> None:
-            _ = (reason, active)
-
-        def clear_typing_reasons(self) -> None:
-            return
-
-        def process_due(self) -> None:
-            return
-
-        def send_immediate(self, text: str) -> bool:
-            _ = text
-            return True
-
-    chatbox = Chatbox()
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: None)
-    monkeypatch.setattr(
-        controller_module,
-        "ManagedSTTProviderFactory",
-        lambda **_kwargs: ProviderFactory(),
-    )
-    monkeypatch.setattr(controller_module, "VrchatOscUdpSender", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "ChatboxPaginator", lambda *a, **k: chatbox)
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-
-    await controller._init_pipeline()
-
-    assert type(controller.hub) is controller_module.ClientHub
-    assert controller.hub.output_runtime.chatbox is chatbox
-    assert controller.hub.output_runtime.overlay_sink is None
-    assert controller.hub.output_runtime.state == "open"
-    assert controller.hub.local_asr_provider_runtime is not None
-    assert (
-        controller.hub.local_asr_provider_runtime.snapshot.channel_for("self").provider_id
-        == controller.settings.provider.stt.value
-    )
-    assert set(controller.hub.provider_runtime_handles) == {"llm"}
-    assert [request.provider_id for request in requests] == [controller.settings.provider.stt.value]
-    assert controller.local_asr_provisioning is not None
-    assert controller.local_asr_provisioning.lifecycle_owner_snapshot()["owner"] == (
-        "LocalASRProvisioningOwner"
-    )
-
-
-@pytest.mark.asyncio
-async def test_real_controller_composition_routes_all_output_channels_once(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class RecordingChatbox:
-        def __init__(self) -> None:
-            self.messages: list[object] = []
-            self.typing_reasons: set[str] = set()
-
-        def enqueue(self, message: object) -> None:
-            self.messages.append(message)
-
-        def send_typing(self, is_typing: bool) -> None:
-            _ = is_typing
-
-        def set_typing_reason(self, reason: str, active: bool) -> None:
-            if active:
-                self.typing_reasons.add(reason)
-            else:
-                self.typing_reasons.discard(reason)
-
-        def clear_typing_reasons(self) -> None:
-            self.typing_reasons.clear()
-
-        def process_due(self) -> None:
-            return
-
-        def send_immediate(self, text: str) -> bool:
-            _ = text
-            return True
-
-    class RecordingOverlay:
-        def __init__(self) -> None:
-            self.events: list[object] = []
-
-        async def emit(self, event: object) -> None:
-            self.events.append(event)
-
-        def active_self_overlay_metadata(self) -> None:
-            return None
-
-    chatbox = RecordingChatbox()
-    overlay = RecordingOverlay()
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: None)
-    monkeypatch.setattr(controller_module, "VrchatOscUdpSender", lambda *a, **k: object())
-    monkeypatch.setattr(controller_module, "ChatboxPaginator", lambda *a, **k: chatbox)
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        lambda self, enabled: asyncio.sleep(0),
-    )
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-
-    await controller._init_pipeline()
-    hub = controller.hub
-    assert type(hub) is controller_module.ClientHub
-    await _overlay_owner(controller).replace_hub_sink(overlay)
-    await controller.submit_text("manual self text")
-    manual_id = getattr(chatbox.messages[0], "utterance_id")
-    peer_id = await hub.handle_peer_transcript_final_for_test("peer presentation text")
-    hub.enqueue_peer_translation_disclosure("system disclosure")
-
-    chatbox_ids = [getattr(message, "utterance_id") for message in chatbox.messages]
-    assert len(chatbox_ids) == 2
-    assert chatbox_ids[0] == manual_id
-    assert chatbox_ids[1] not in {manual_id, peer_id}
-    assert [getattr(message, "text") for message in chatbox.messages] == [
-        "manual self text",
-        "system disclosure",
-    ]
-    assert [getattr(event, "channel") for event in overlay.events] == [
-        "self",
-        "self",
-        "peer",
-        "peer",
-    ]
-    assert [getattr(event, "utterance_id") for event in overlay.events] == [
-        manual_id,
-        manual_id,
-        peer_id,
-        peer_id,
-    ]
-    assert [getattr(event, "type") for event in overlay.events] == [
-        "self_transcript_final",
-        "utterance_closed",
-        "peer_transcript_final",
-        "utterance_closed",
-    ]
-    peer_denials = [
-        decision
-        for decision in hub.output_runtime.routing_decisions
-        if decision.publication_kind == "peer_subtitle" and decision.route == "self_chatbox"
-    ]
-    assert len(peer_denials) == 1
-    assert peer_denials[0].reason == "peer_chatbox_denied"
-    assert all(
-        "peer presentation text" not in getattr(message, "text") for message in chatbox.messages
-    )
-
-    await hub.stop()
-    assert hub.output_runtime.state == "closed"
-    assert not hub.output_runtime.has_resources
-
-
-@pytest.mark.asyncio
 async def test_initial_peer_local_activation_publishes_starting_until_provider_attaches(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -4479,22 +2514,22 @@ async def test_initial_peer_local_activation_publishes_starting_until_provider_a
             await finish_activation.wait()
             controller.hub.peer_stt = object()
 
-    async def ready(_self: GuiController, **_kwargs) -> bool:
+    async def ready(_self: LocalASRApplicationRuntime, **_kwargs) -> bool:
         return True
 
-    controller._peer_runtime = DelayedPeerRuntime()
-    monkeypatch.setattr(GuiController, "_ensure_peer_local_stt_ready", ready)
+    _peer_owner(controller).bind_runtime(DelayedPeerRuntime())
+    monkeypatch.setattr(LocalASRApplicationRuntime, "ensure_peer_ready", ready)
 
-    task = asyncio.create_task(controller._refresh_peer_stt_runtime())
+    task = asyncio.create_task(controller._get_peer_application_runtime().owner.refresh_runtime())
     await activation_started.wait()
 
-    assert controller._peer_asr_model_loading is True
+    assert _peer_owner(controller).model_loading is True
     assert contracts[-1].peer.state == "starting"
 
     finish_activation.set()
     await task
 
-    assert controller._peer_asr_model_loading is False
+    assert _peer_owner(controller).model_loading is False
     assert contracts[-1].peer.state == "on"
 
 
@@ -4510,7 +2545,7 @@ async def test_refresh_overlay_runtime_dependencies_applies_peer_runtime_policy(
     _attach_overlay_bridge(controller, object())
 
     peer_runtime = DummyPeerRuntime()
-    controller._peer_runtime = peer_runtime
+    _peer_owner(controller).bind_runtime(peer_runtime)
 
     await controller._refresh_overlay_runtime_dependencies()
 
@@ -4531,7 +2566,7 @@ async def test_refresh_overlay_runtime_dependencies_disables_peer_runtime_when_o
     _attach_overlay_bridge(controller, None)
 
     peer_runtime = DummyPeerRuntime()
-    controller._peer_runtime = peer_runtime
+    _peer_owner(controller).bind_runtime(peer_runtime)
 
     await controller._refresh_overlay_runtime_dependencies()
 
@@ -7121,10 +5156,11 @@ async def test_successful_overlay_start_refreshes_consumers_after_peer_runtime_b
     controller.settings.ui.peer_translation_eula_accepted = True
     controller.hub = DummyHub(peer_stt=None)
 
-    async def fake_refresh_peer_stt_runtime(self: GuiController) -> None:
-        self.hub.peer_stt = object()
+    async def fake_refresh_peer_stt_runtime(self: PeerApplicationOwner, **_kwargs) -> None:
+        _ = self
+        controller.hub.peer_stt = object()
 
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
 
     await controller.set_overlay_enabled(True)
     await _wait_until(lambda: len(FakeOverlayProcessManager.instances) == 1)
@@ -7606,7 +5642,7 @@ async def test_refresh_overlay_runtime_dependencies_does_not_clear_overlay_scene
         )
     )
     saved_snapshot = bridge.snapshots[-1]
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
 
@@ -7666,7 +5702,9 @@ async def test_overlay_start_failure_keeps_saved_preferences_but_effective_state
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
+        SelfCaptureApplicationOwner,
+        "replace_provider",
+        lambda self, **_kwargs: asyncio.sleep(0),
     )
 
     controller = _make_controller(app=SimpleNamespace())
@@ -7737,7 +5775,9 @@ async def test_overlay_runtime_disconnect_keeps_saved_preferences_without_auto_r
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
+        SelfCaptureApplicationOwner,
+        "replace_provider",
+        lambda self, **_kwargs: asyncio.sleep(0),
     )
 
     controller = _make_controller(app=SimpleNamespace())
@@ -7777,7 +5817,9 @@ async def test_overlay_runtime_crash_keeps_saved_preferences_without_auto_restar
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
+        SelfCaptureApplicationOwner,
+        "replace_provider",
+        lambda self, **_kwargs: asyncio.sleep(0),
     )
 
     controller = _make_controller(app=SimpleNamespace())
@@ -7839,7 +5881,9 @@ async def test_overlay_successful_recovery_clears_previous_failure_reason(
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
+        SelfCaptureApplicationOwner,
+        "replace_provider",
+        lambda self, **_kwargs: asyncio.sleep(0),
     )
 
     controller = _make_controller(app=SimpleNamespace())
@@ -7967,7 +6011,7 @@ async def test_stop_closes_peer_runtime_without_replacing_self_stt(
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller.hub = DummyHub(llm=object(), stt=object(), peer_stt=object())
-    controller._peer_runtime = DummyPeerRuntime()
+    _peer_owner(controller).bind_runtime(DummyPeerRuntime())
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
     monkeypatch.setattr(
@@ -7983,7 +6027,7 @@ async def test_stop_closes_peer_runtime_without_replacing_self_stt(
 
     await controller.stop()
 
-    assert controller._peer_runtime is None
+    assert _peer_owner(controller).runtime is None
     assert controller.hub is None
 
 
@@ -8001,7 +6045,7 @@ async def test_stop_preserves_peer_runtime_when_close_fails_and_stops_hub(
 
     peer_runtime = FailingPeerRuntime()
     controller.hub = hub
-    controller._peer_runtime = peer_runtime
+    _peer_owner(controller).bind_runtime(peer_runtime)
 
     monkeypatch.setattr(GuiController, "set_stt_enabled", lambda self, value: asyncio.sleep(0))
     monkeypatch.setattr(
@@ -8018,7 +6062,7 @@ async def test_stop_preserves_peer_runtime_when_close_fails_and_stops_hub(
     with pytest.raises(RuntimeError, match="peer runtime close failed"):
         await controller.stop()
 
-    assert controller._peer_runtime is peer_runtime
+    assert _peer_owner(controller).runtime is peer_runtime
     assert hub.stop_calls == 1
     assert controller.hub is None
 
@@ -8408,119 +6452,6 @@ async def test_apply_settings_updates_vrc_gate_and_reconfigures_receiver(
     assert configure_calls == [True, False]
 
 
-@pytest.mark.asyncio
-async def test_init_pipeline_initializes_vrc_state_and_gate(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.osc.vrc_mic_intercept = True
-    controller.receiver = object()
-    configure_calls: list[bool] = []
-
-    _patch_init_pipeline_dependencies(monkeypatch)
-
-    async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
-        _ = self
-        configure_calls.append(enabled)
-
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        fake_configure_vrc_mic_receiver,
-    )
-
-    await controller._init_pipeline()
-
-    assert isinstance(controller.vrc_mic_state, VrcMicState)
-    assert isinstance(controller.vrc_mic_audio_gate, VrcMicAudioGate)
-    assert controller.vrc_mic_audio_gate.state is controller.vrc_mic_state
-    assert controller.vrc_mic_audio_gate.enabled is True
-    assert controller.vrc_mic_audio_gate.receiver_active is True
-    assert controller.vrc_mic_audio_gate._sync_deadline is not None
-    assert configure_calls == [True]
-
-
-@pytest.mark.asyncio
-async def test_init_pipeline_reuses_existing_gate_and_updates_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.osc.vrc_mic_intercept = True
-    controller.receiver = object()
-    original_state = VrcMicState(muted=False)
-    gate = VrcMicAudioGate(state=original_state, enabled=False)
-
-    _patch_init_pipeline_dependencies(monkeypatch)
-
-    async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
-        _ = self
-        _ = enabled
-
-    controller.vrc_mic_audio_gate = gate
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        fake_configure_vrc_mic_receiver,
-    )
-
-    await controller._init_pipeline()
-
-    assert controller.vrc_mic_audio_gate is gate
-    assert controller.vrc_mic_state is not None
-    assert gate.state is controller.vrc_mic_state
-    assert gate.state is not original_state
-    assert gate.enabled is True
-    assert gate.receiver_active is True
-    assert gate._sync_deadline is not None
-
-
-@pytest.mark.asyncio
-async def test_init_pipeline_configures_receiver_after_pipeline_init(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.osc.vrc_mic_intercept = True
-    created = _patch_init_pipeline_dependencies(monkeypatch)
-    snapshots: list[tuple[bool, bool, bool, bool]] = []
-
-    async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
-        _ = self
-        snapshots.append(
-            (
-                controller.sender is created["sender"],
-                controller.osc is created["osc"],
-                controller.hub is created["hub"],
-                enabled,
-            )
-        )
-
-    monkeypatch.setattr(
-        GuiController,
-        "_configure_vrc_mic_receiver",
-        fake_configure_vrc_mic_receiver,
-    )
-
-    await controller._init_pipeline()
-
-    assert snapshots == [(True, True, True, True)]
-
-
-@pytest.mark.asyncio
-async def test_init_pipeline_passes_runtime_logging_to_smart_osc_queue(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    created = _patch_init_pipeline_dependencies(monkeypatch)
-
-    await controller._init_pipeline()
-
-    assert created["osc_kwargs"]["runtime_logging"] is controller.runtime_logging
-
-
 def _self_mic_decision(
     *,
     device_idx: int | None,
@@ -8547,73 +6478,19 @@ def _create_self_capture_source_via_adapter_for_test(controller: GuiController) 
     source = SelfCaptureSourceAdapter(
         normalize_host_api=normalize_input_host_api,
         resolve_device=audio_source_module.resolve_sounddevice_input_device,
-        channel_decision=controller_module.determine_self_mic_capture_channels,
-        source_factory=controller_module.SoundDeviceAudioSource,
+        channel_decision=audio_source_module.determine_self_mic_capture_channels,
+        source_factory=audio_source_module.SoundDeviceAudioSource,
         log_detailed=controller.log_detailed,
-        wrap_source=lambda raw_source: controller._wrap_diagnostic_audio_source(
-            raw_source,
-            channel_label="self",
+        wrap_source=lambda raw_source: (
+            controller._get_capture_diagnostics_adapter().wrap_source(
+                raw_source,
+                channel_label="self",
+            )
         ),
     )(
         build_self_capture_session_config(controller.settings),
     )
-    controller._audio_source = source
     return source
-
-
-class MicTestSelfCaptureOwner:
-    def __init__(self, *, source: object, task: asyncio.Task[None]) -> None:
-        self.source = source
-        self.cleanup_source = None
-        self.loop_task = task
-        self.vad = object()
-        self.last_cleanup_exception = None
-        self.generation = 0
-
-    async def apply_intent(self, config, *, enabled: bool, **kwargs):
-        _ = config, kwargs
-        assert enabled is False
-        self.generation += 1
-        if self.loop_task is not None:
-            self.loop_task.cancel()
-            await asyncio.gather(self.loop_task, return_exceptions=True)
-            self.loop_task = None
-        source = self.source if self.source is not None else self.cleanup_source
-        self.source = None
-        self.vad = None
-        failure = None
-        if source is not None:
-            try:
-                await getattr(source, "close")()
-            except Exception as exc:
-                failure = exc
-                self.cleanup_source = source
-                self.last_cleanup_exception = exc
-            else:
-                self.cleanup_source = None
-                self.last_cleanup_exception = None
-        return SelfCaptureSessionSnapshot(
-            state=(
-                SelfCaptureSessionState.FAULTED
-                if failure is not None
-                else SelfCaptureSessionState.STOPPED
-            ),
-            provider_status=SelfCaptureProviderStatus.DETACHED,
-            desired_active=False,
-            effective_active=False,
-            generation=self.generation,
-            provider_id=None,
-            runtime_signature=None,
-            failure_reason=(
-                SelfCaptureFailureReason.CLEANUP_FAILED if failure is not None else None
-            ),
-            admission_reason=None,
-            has_source=False,
-            has_vad=False,
-            has_loop_task=False,
-            cleanup_debt=1 if failure is not None else 0,
-            closed=False,
-        )
 
 
 def _mic_test_route_observation(
@@ -8681,13 +6558,14 @@ def _patch_microphone_test_capture(
     callback: Callable[..., Awaitable[None]],
 ) -> None:
     capture_port = _CallbackMicrophoneTestCapturePort(controller, callback)
-    owner = controller._microphone_test_owner
+    runtime = controller._microphone_test_runtime
+    owner = runtime.owner_if_created if runtime is not None else None
     if owner is not None:
         owner.capture_port = capture_port
     monkeypatch.setattr(
-        GuiController,
-        "_build_microphone_test_capture_adapter",
-        lambda _controller: capture_port,
+        MicrophoneTestRuntime,
+        "capture_port",
+        lambda _runtime: capture_port,
     )
 
 
@@ -8698,15 +6576,16 @@ async def _capture_via_microphone_test_port(
     meter_callback: Callable[[float], object] | None = None,
     level_log_interval_s: float = 1.0,
 ) -> None:
-    capture_port = controller._build_microphone_test_capture_adapter()
-    request = controller._microphone_test_capture_request(
+    microphone = controller._get_microphone_test_runtime()
+    capture_port = microphone.capture_port()
+    request = microphone.capture_request(
         generation,
         meter_callback,
         level_log_interval_s,
     )
     await capture_port.capture(
         request,
-        runtime=controller._get_microphone_test_owner().runtime,
+        runtime=microphone.owner().runtime,
     )
 
 
@@ -8738,12 +6617,12 @@ async def test_microphone_test_capture_port_stream_open_exception_logs_raw_messa
         raise RuntimeError(raw_message)
 
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "observe_microphone_test_route",
         lambda **kwargs: _mic_test_route_observation(),
     )
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
@@ -8751,7 +6630,7 @@ async def test_microphone_test_capture_port_stream_open_exception_logs_raw_messa
             name="마이크",
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
+    monkeypatch.setattr(microphone_test_wiring_module, "SoundDeviceAudioSource", fake_source)
 
     await _capture_via_microphone_test_port(
         controller,
@@ -8759,7 +6638,7 @@ async def test_microphone_test_capture_port_stream_open_exception_logs_raw_messa
     )
 
     messages = _mic_test_basic_messages(controller)
-    assert controller._get_microphone_test_owner().meter_level == 0.0
+    assert controller._get_microphone_test_runtime().owner().meter_level == 0.0
     assert meter_values == [0.0, 0.0]
     assert any(
         message.startswith("[MicTest] open ")
@@ -8810,12 +6689,12 @@ async def test_microphone_test_capture_port_silent_frames_and_throttles_periodic
             return None
 
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "observe_microphone_test_route",
         lambda **kwargs: _mic_test_route_observation(),
     )
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
@@ -8823,7 +6702,11 @@ async def test_microphone_test_capture_port_silent_frames_and_throttles_periodic
             name="마이크",
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", lambda *a, **k: FakeSource())
+    monkeypatch.setattr(
+        microphone_test_wiring_module,
+        "SoundDeviceAudioSource",
+        lambda *a, **k: FakeSource(),
+    )
 
     await _capture_via_microphone_test_port(
         controller,
@@ -8837,7 +6720,7 @@ async def test_microphone_test_capture_port_silent_frames_and_throttles_periodic
     assert "peak_db=-120.0" in level_messages[0]
     assert "zero_ratio=1.000" in level_messages[0]
     assert "frames=3" in level_messages[0]
-    assert controller._get_microphone_test_owner().meter_level == 0.0
+    assert controller._get_microphone_test_runtime().owner().meter_level == 0.0
     assert meter_values == [0.0, 0.0, 0.0, 0.0, 0.0]
     _assert_mic_test_event_and_field_names_have_no_verdict_labels(messages)
 
@@ -8873,12 +6756,12 @@ async def test_microphone_test_capture_port_cancellation_closes_source_and_logs_
             close_calls.append("closed")
 
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "observe_microphone_test_route",
         lambda **kwargs: _mic_test_route_observation(),
     )
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
@@ -8886,7 +6769,11 @@ async def test_microphone_test_capture_port_cancellation_closes_source_and_logs_
             name="마이크",
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", lambda *a, **k: FakeSource())
+    monkeypatch.setattr(
+        microphone_test_wiring_module,
+        "SoundDeviceAudioSource",
+        lambda *a, **k: FakeSource(),
+    )
 
     task = asyncio.create_task(
         _capture_via_microphone_test_port(
@@ -8916,7 +6803,7 @@ async def test_microphone_test_capture_port_cancellation_closes_source_and_logs_
         and "exception_class='CancelledError'" in message
         for message in messages
     )
-    assert controller._get_microphone_test_owner().meter_level == 0.0
+    assert controller._get_microphone_test_runtime().owner().meter_level == 0.0
     _assert_mic_test_event_and_field_names_have_no_verdict_labels(messages)
 
 
@@ -8967,12 +6854,12 @@ async def test_microphone_test_capture_port_cancellation_after_nonzero_frame_cle
         meter_values.append(value)
 
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "observe_microphone_test_route",
         lambda **kwargs: _mic_test_route_observation(),
     )
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
@@ -8980,7 +6867,11 @@ async def test_microphone_test_capture_port_cancellation_after_nonzero_frame_cle
             name="마이크",
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", lambda *a, **k: FakeSource())
+    monkeypatch.setattr(
+        microphone_test_wiring_module,
+        "SoundDeviceAudioSource",
+        lambda *a, **k: FakeSource(),
+    )
 
     task = asyncio.create_task(
         _capture_via_microphone_test_port(
@@ -9000,7 +6891,7 @@ async def test_microphone_test_capture_port_cancellation_after_nonzero_frame_cle
     assert meter_values[0] == 0.0
     assert any(value > 0.0 for value in meter_values)
     assert meter_values[-1] == 0.0
-    assert controller._get_microphone_test_owner().meter_level == 0.0
+    assert controller._get_microphone_test_runtime().owner().meter_level == 0.0
     assert final_clear_after_end == [True]
     assert any(
         message.startswith("[MicTest] end ")
@@ -9019,11 +6910,11 @@ async def test_start_microphone_test_clears_pending_self_stt_desire_before_captu
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller._runtime_logging = RuntimeLoggingSpy()
-    controller._local_stt_pending_enable_after_install = True
+    controller._get_local_asr_application_runtime().cpu_repair.set_self_pending(True)
     capture_pending_state: list[bool] = []
 
     async def fake_capture(self, **_kwargs) -> None:
-        capture_pending_state.append(self._local_stt_pending_enable_after_install)
+        capture_pending_state.append(self._get_local_asr_application_runtime().self_pending)
 
     _patch_microphone_test_capture(monkeypatch, controller, fake_capture)
 
@@ -9048,7 +6939,7 @@ async def test_controller_stop_closes_mic_test_runtime_and_continues_after_close
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller._runtime_logging = RuntimeLoggingSpy()
-    runtime = controller._get_microphone_test_owner().runtime
+    runtime = controller._get_microphone_test_runtime().owner().runtime
     generation = runtime.begin_direct_capture()
     events: list[str] = []
 
@@ -9103,7 +6994,7 @@ async def test_direct_microphone_capture_rejects_overlap_without_invalidating_ac
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller._runtime_logging = RuntimeLoggingSpy()
-    runtime = controller._get_microphone_test_owner().runtime
+    runtime = controller._get_microphone_test_runtime().owner().runtime
     session_started = asyncio.Event()
 
     async def active_session(generation: int) -> None:
@@ -9116,7 +7007,7 @@ async def test_direct_microphone_capture_rejects_overlap_without_invalidating_ac
     active_generation = runtime.generation
 
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "observe_microphone_test_route",
         lambda **kwargs: _mic_test_route_observation(should_attempt_open=False),
     )
@@ -9138,7 +7029,7 @@ async def test_direct_microphone_capture_releases_direct_generation_when_initial
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller._runtime_logging = RuntimeLoggingSpy()
-    runtime = controller._get_microphone_test_owner().runtime
+    runtime = controller._get_microphone_test_runtime().owner().runtime
     route_observed = False
 
     async def cancelled_meter_callback(_level: float) -> None:
@@ -9149,7 +7040,11 @@ async def test_direct_microphone_capture_releases_direct_generation_when_initial
         route_observed = True
         return _mic_test_route_observation(should_attempt_open=False)
 
-    monkeypatch.setattr(controller_module, "observe_microphone_test_route", observe_route)
+    monkeypatch.setattr(
+        microphone_test_wiring_module,
+        "observe_microphone_test_route",
+        observe_route,
+    )
 
     with pytest.raises(asyncio.CancelledError):
         await _capture_via_microphone_test_port(
@@ -9177,12 +7072,16 @@ async def test_direct_microphone_capture_releases_direct_generation_when_route_o
     controller = _make_controller(app=SimpleNamespace())
     controller.settings = AppSettings()
     controller._runtime_logging = RuntimeLoggingSpy()
-    runtime = controller._get_microphone_test_owner().runtime
+    runtime = controller._get_microphone_test_runtime().owner().runtime
 
     def observe_route(**_kwargs):
         raise RuntimeError("route observation failed")
 
-    monkeypatch.setattr(controller_module, "observe_microphone_test_route", observe_route)
+    monkeypatch.setattr(
+        microphone_test_wiring_module,
+        "observe_microphone_test_route",
+        observe_route,
+    )
 
     with pytest.raises(RuntimeError, match="route observation failed"):
         await _capture_via_microphone_test_port(controller)
@@ -9234,28 +7133,32 @@ async def test_direct_microphone_capture_source_close_failure_is_observable_and_
     source = FailsOnceSource()
 
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "observe_microphone_test_route",
         lambda **kwargs: _mic_test_route_observation(),
     )
     monkeypatch.setattr(
-        controller_module,
+        microphone_test_wiring_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
             preferred_channels=1,
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", lambda *a, **k: source)
+    monkeypatch.setattr(
+        microphone_test_wiring_module,
+        "SoundDeviceAudioSource",
+        lambda *a, **k: source,
+    )
 
     with pytest.raises(RuntimeError, match="mic source close failed"):
         await _capture_via_microphone_test_port(controller)
 
-    runtime = controller._get_microphone_test_owner().runtime_if_created
+    runtime = controller._get_microphone_test_runtime().owner().runtime_if_created
     assert runtime is not None
     assert runtime.source is source
     assert source.close_calls == 1
-    assert controller._get_microphone_test_owner().meter_level == 0.0
+    assert controller._get_microphone_test_runtime().owner().meter_level == 0.0
 
     await runtime.stop()
     assert runtime.source is None
@@ -9401,14 +7304,14 @@ def test_self_capture_source_adapter_normalizes_wasapi_compatibility_mode(
 
     monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
-        controller_module,
+        audio_source_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
             preferred_channels=1,
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
+    monkeypatch.setattr(audio_source_module, "SoundDeviceAudioSource", fake_source)
 
     _create_self_capture_source_via_adapter_for_test(controller)
 
@@ -9439,7 +7342,7 @@ def test_self_capture_vad_adapter_wires_self_diagnostics() -> None:
         log_detailed=controller.log_detailed,
         diagnostics_enabled=controller._detailed_audio_diag_enabled,
     )
-    controller._vad = adapter(build_self_capture_session_config(controller.settings))
+    adapter(build_self_capture_session_config(controller.settings))
 
     assert vad_calls[0].get("max_segment_ms") is None
     assert vad_calls[0]["diagnostic_label"] == "self"
@@ -9489,7 +7392,7 @@ def test_self_capture_source_adapter_requests_two_channel_capture_from_metadata(
         lambda **kwargs: 7,
     )
     monkeypatch.setattr(
-        controller_module,
+        audio_source_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
@@ -9497,7 +7400,7 @@ def test_self_capture_source_adapter_requests_two_channel_capture_from_metadata(
             name="마이크",
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
+    monkeypatch.setattr(audio_source_module, "SoundDeviceAudioSource", fake_source)
 
     _create_self_capture_source_via_adapter_for_test(controller)
 
@@ -9550,14 +7453,14 @@ def test_self_capture_source_adapter_retries_same_device_with_mono_after_two_cha
 
     monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
-        controller_module,
+        audio_source_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
             preferred_channels=2,
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
+    monkeypatch.setattr(audio_source_module, "SoundDeviceAudioSource", fake_source)
 
     _create_self_capture_source_via_adapter_for_test(controller)
 
@@ -9615,11 +7518,11 @@ def test_self_capture_source_adapter_recomputes_channels_for_name_fallback(
 
     monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
-        controller_module,
+        audio_source_module,
         "determine_self_mic_capture_channels",
         fake_decision,
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
+    monkeypatch.setattr(audio_source_module, "SoundDeviceAudioSource", fake_source)
 
     _create_self_capture_source_via_adapter_for_test(controller)
 
@@ -9672,11 +7575,11 @@ def test_self_capture_source_adapter_uses_default_metadata_for_system_default_fa
         lambda **kwargs: 7,
     )
     monkeypatch.setattr(
-        controller_module,
+        audio_source_module,
         "determine_self_mic_capture_channels",
         fake_decision,
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
+    monkeypatch.setattr(audio_source_module, "SoundDeviceAudioSource", fake_source)
 
     _create_self_capture_source_via_adapter_for_test(controller)
 
@@ -9715,7 +7618,7 @@ def test_self_capture_source_adapter_suppresses_format_diagnostics_in_basic_mode
         lambda **kwargs: 7,
     )
     monkeypatch.setattr(
-        controller_module,
+        audio_source_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
@@ -9723,7 +7626,7 @@ def test_self_capture_source_adapter_suppresses_format_diagnostics_in_basic_mode
             name="마이크",
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
+    monkeypatch.setattr(audio_source_module, "SoundDeviceAudioSource", fake_source)
 
     _create_self_capture_source_via_adapter_for_test(controller)
 
@@ -9865,14 +7768,14 @@ def test_self_capture_source_adapter_omits_wasapi_flags_from_name_fallback(
 
     monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
-        controller_module,
+        audio_source_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
             preferred_channels=1,
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
+    monkeypatch.setattr(audio_source_module, "SoundDeviceAudioSource", fake_source)
 
     _create_self_capture_source_via_adapter_for_test(controller)
 
@@ -9915,14 +7818,14 @@ def test_self_capture_source_adapter_retries_same_device_without_wasapi_flags(
 
     monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
-        controller_module,
+        audio_source_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
             preferred_channels=1,
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
+    monkeypatch.setattr(audio_source_module, "SoundDeviceAudioSource", fake_source)
 
     _create_self_capture_source_via_adapter_for_test(controller)
 
@@ -9970,14 +7873,14 @@ def test_self_capture_source_adapter_omits_wasapi_flags_from_system_default(
 
     monkeypatch.setattr(audio_source_module, "resolve_sounddevice_input_device", fake_resolve)
     monkeypatch.setattr(
-        controller_module,
+        audio_source_module,
         "determine_self_mic_capture_channels",
         lambda *, device_idx, internal_channels: _self_mic_decision(
             device_idx=device_idx,
             preferred_channels=1,
         ),
     )
-    monkeypatch.setattr(controller_module, "SoundDeviceAudioSource", fake_source)
+    monkeypatch.setattr(audio_source_module, "SoundDeviceAudioSource", fake_source)
 
     _create_self_capture_source_via_adapter_for_test(controller)
 
@@ -10033,7 +7936,7 @@ async def test_controller_stop_closes_vrc_mic_receiver_before_hub_shutdown(
     monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay)
     monkeypatch.setattr(GuiController, "_close_peer_runtime_for_release", fake_noop)
     monkeypatch.setattr(GuiController, "_stop_hub_for_release", fake_stop_hub_for_release)
-    monkeypatch.setattr(GuiController, "_replace_managed_openrouter_release_service", fake_noop)
+    monkeypatch.setattr(GuiController, "_close_managed_openrouter_release_service", fake_noop)
     monkeypatch.setattr(
         GuiController, "_close_app_github_star_prompt_runtime_for_release", fake_noop
     )
@@ -10091,7 +7994,7 @@ async def test_controller_stop_uses_bounded_prompt_runtime_close_and_still_stops
     monkeypatch.setattr(GuiController, "_close_microphone_test_runtime_for_release", fake_noop)
     monkeypatch.setattr(OverlayApplicationOwner, "shutdown", fake_shutdown_overlay)
     monkeypatch.setattr(GuiController, "_close_peer_runtime_for_release", fake_noop)
-    monkeypatch.setattr(GuiController, "_replace_managed_openrouter_release_service", fake_noop)
+    monkeypatch.setattr(GuiController, "_close_managed_openrouter_release_service", fake_noop)
 
     stop_task = asyncio.create_task(controller.stop())
     try:
@@ -10202,16 +8105,12 @@ async def test_start_initializes_dashboard_and_bridge(
         def close(self) -> None:
             self.closed.set()
 
-    async def fake_init_pipeline(self) -> None:
-        self.hub = hub
-
     monkeypatch.setattr(GuiController, "_load_or_init_settings", lambda self, path: settings)
     monkeypatch.setattr(
         GuiController,
         "_sync_ui_from_settings",
         lambda self: sync_calls.append("synced"),
     )
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
     monkeypatch.setattr(
         presentation_adapter_module,
         "set_ui_locale",
@@ -10225,6 +8124,11 @@ async def test_start_initializes_dashboard_and_bridge(
         _on_gpu_discovery_requested=lambda: gpu_discovery_requests.append("discover"),
     )
     controller = _make_controller(app=app)
+
+    async def fake_launch(*_args, **_kwargs) -> None:
+        controller.hub = hub
+
+    controller._runtime_pipeline_launcher = SimpleNamespace(launch=fake_launch)
 
     assert callable(getattr(controller, "set_runtime_logging_mode", None))
     controller.set_runtime_logging_mode("detailed")
@@ -10289,9 +8193,6 @@ async def test_start_does_not_auto_restore_transient_overlay_or_peer_toggles(
     overlay_calls: list[bool] = []
     gpu_discovery_requests: list[str] = []
 
-    async def fake_init_pipeline(self) -> None:
-        self.hub = hub
-
     async def fake_set_overlay_enabled(self: GuiController, enabled: bool) -> None:
         _ = self
         overlay_calls.append(enabled)
@@ -10305,7 +8206,6 @@ async def test_start_does_not_auto_restore_transient_overlay_or_peer_toggles(
 
     monkeypatch.setattr(GuiController, "_load_or_init_settings", lambda self, path: settings)
     monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
     monkeypatch.setattr(GuiController, "set_overlay_enabled", fake_set_overlay_enabled)
     monkeypatch.setattr(presentation_adapter_module, "set_ui_locale", lambda _locale: None)
     monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
@@ -10317,6 +8217,11 @@ async def test_start_does_not_auto_restore_transient_overlay_or_peer_toggles(
             _on_gpu_discovery_requested=lambda: gpu_discovery_requests.append("discover"),
         )
     )
+
+    async def fake_launch(*_args, **_kwargs) -> None:
+        controller.hub = hub
+
+    controller._runtime_pipeline_launcher = SimpleNamespace(launch=fake_launch)
 
     await controller.start()
     await asyncio.sleep(0)
@@ -10449,144 +8354,6 @@ async def test_set_runtime_logging_mode_updates_overlay_runtime_contract() -> No
     assert _overlay_runtime(controller).bridge.runtime_control_messages == ["detailed"]
 
 
-@pytest.mark.asyncio
-async def test_start_keeps_managed_openrouter_dashboard_toggle_available_without_local_key(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.ui.overlay_enabled = False
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.api_key_verified.openrouter = False
-
-    dash = DummyDashboard()
-    logs = DummyLogsView()
-    settings_view = DummySettingsView()
-    hub = DummyHub(llm=object(), stt=object())
-
-    async def fake_init_pipeline(self) -> None:
-        self.hub = hub
-
-    monkeypatch.setattr(GuiController, "_load_or_init_settings", lambda self, path: settings)
-    monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(presentation_adapter_module, "set_ui_locale", lambda _locale: None)
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({}),
-    )
-
-    async def fail_fetch_key_metadata(_api_key: str):
-        raise AssertionError("fetch_key_metadata should not run without a managed key")
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fail_fetch_key_metadata),
-    )
-
-    class FakeBridge:
-        def __init__(self, **kwargs) -> None:
-            _ = kwargs
-
-        async def run(self) -> None:
-            return None
-
-    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
-
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_logs=logs, view_settings=settings_view)
-    )
-
-    await controller.start()
-    await asyncio.sleep(0)
-
-    assert dash.translation_needs_key is False
-    assert dash.translation_enabled is False
-    assert settings_view.managed_trial_usage_state is None
-
-    assert await controller.refresh_openrouter_usage_after_launch() is False
-    assert settings_view.managed_trial_usage_state == {
-        "visible": True,
-        "remaining_percent": None,
-    }
-    assert dash.managed_trial_calls == []
-
-
-@pytest.mark.asyncio
-async def test_exhausted_managed_start_does_not_auto_show_founder_letter(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.ui.overlay_enabled = False
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.managed_identity.active_managed_credential_ref = "hash_123"
-
-    shown: list[str] = []
-    dash = DummyDashboard()
-    logs = DummyLogsView()
-    settings_view = DummySettingsView()
-    hub = DummyHub(llm=object(), stt=object())
-
-    async def fake_init_pipeline(self) -> None:
-        self.hub = hub
-
-    monkeypatch.setattr(GuiController, "_load_or_init_settings", lambda self, path: settings)
-    monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
-    monkeypatch.setattr(GuiController, "_init_pipeline", fake_init_pipeline)
-    monkeypatch.setattr(presentation_adapter_module, "set_ui_locale", lambda _locale: None)
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({"openrouter_managed_api_key": "managed-key"}),
-    )
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.0007,
-            usage_usd=0.0693,
-        )
-
-    async def fake_verify_api_key(_api_key: str) -> bool:
-        return True
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "verify_api_key",
-        staticmethod(fake_verify_api_key),
-    )
-
-    class FakeBridge:
-        def __init__(self, **kwargs) -> None:
-            _ = kwargs
-
-        async def run(self) -> None:
-            return None
-
-    monkeypatch.setattr(presentation_adapter_module, "UIEventBridge", FakeBridge)
-
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=dash,
-            view_logs=logs,
-            view_settings=settings_view,
-            show_founder_letter_dialog=lambda: shown.append("shown"),
-        )
-    )
-
-    await controller.start()
-    await asyncio.sleep(0)
-    assert shown == []
-
-
 class CapturingManagedKeySettingsView(DummySettingsView):
     def __init__(self) -> None:
         super().__init__()
@@ -10620,736 +8387,6 @@ class ManagedStatusRefreshService:
         return self.result
 
 
-def _install_managed_usage_metadata_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
-    class DummySecretsForTrial:
-        def get(self, key: str) -> str | None:
-            if key == "openrouter_managed_api_key":
-                return "managed-key"
-            return None
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.05,
-            usage_usd=0.02,
-        )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecretsForTrial(),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-
-def _make_managed_usage_controller(
-    monkeypatch: pytest.MonkeyPatch,
-    *,
-    settings_view: CapturingManagedKeySettingsView,
-    status_service: ManagedStatusRefreshService,
-) -> GuiController:
-    _install_managed_usage_metadata_stubs(monkeypatch)
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.managed_identity.referral_id = "7KQ9M2"
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = status_service  # noqa: SLF001
-    return controller
-
-
-def test_status_refresh_managed_key_setter_type_error_is_not_masked() -> None:
-    class RaisingManagedKeySettingsView(DummySettingsView):
-        def __init__(self) -> None:
-            super().__init__()
-            self.calls = 0
-
-        def set_managed_key_state(
-            self,
-            *,
-            visible: bool,
-            remaining_percent: int | None = None,
-            referral_id: str | None = None,
-            pass_status: object | None = None,
-        ) -> None:
-            _ = visible, remaining_percent, referral_id, pass_status
-            self.calls += 1
-            raise TypeError("pass_status setter internals failed")
-
-    settings_view = RaisingManagedKeySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.managed_identity.referral_id = "7KQ9M2"
-
-    with pytest.raises(TypeError, match="pass_status setter internals failed"):
-        controller._get_managed_usage_owner().set_view_state(
-            visible=True,
-            remaining_percent=71,
-            referral_id="7KQ9M2",
-        )
-
-    assert settings_view.calls == 1
-
-
-@pytest.mark.asyncio
-async def test_refresh_managed_trial_usage_state_uses_settings_view_live_openrouter_usage(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-
-    class DummySecretsForTrial:
-        def get(self, key: str) -> str | None:
-            if key == "openrouter_managed_api_key":
-                return "managed-key"
-            return None
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.05,
-            usage_usd=0.02,
-        )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecretsForTrial(),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
-
-    assert settings_view.managed_trial_usage_state == {
-        "visible": True,
-        "remaining_percent": 71,
-    }
-    assert dash.managed_trial_calls == []
-
-
-@pytest.mark.asyncio
-async def test_refresh_managed_trial_usage_state_exposes_refreshed_referral_id_to_managed_key_view(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-
-    class ManagedKeySettingsView(DummySettingsView):
-        def __init__(self) -> None:
-            super().__init__()
-            self.managed_key_state_calls: list[dict[str, object]] = []
-
-        def set_managed_key_state(
-            self,
-            *,
-            visible: bool,
-            remaining_percent: int | None = None,
-            referral_id: str | None = None,
-            pass_status: object | None = None,
-        ) -> None:
-            self.managed_key_state_calls.append(
-                {
-                    "visible": visible,
-                    "remaining_percent": remaining_percent,
-                    "referral_id": referral_id,
-                    "pass_status": pass_status,
-                }
-            )
-
-    class FakeStatusRefreshService:
-        def __init__(self) -> None:
-            self.calls = 0
-
-        async def refresh_owned_referral_id_from_status(self) -> str | None:
-            self.calls += 1
-            return "7KQ9M2"
-
-    settings_view = ManagedKeySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    status_service = FakeStatusRefreshService()
-    controller._managed_openrouter_release_service = status_service  # noqa: SLF001
-
-    class DummySecretsForTrial:
-        def get(self, key: str) -> str | None:
-            if key == "openrouter_managed_api_key":
-                return "managed-key"
-            return None
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.05,
-            usage_usd=0.02,
-        )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecretsForTrial(),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
-
-    await _wait_until(lambda: status_service.calls == 1)
-    assert status_service.calls == 1
-    await _wait_until(
-        lambda: bool(settings_view.managed_key_state_calls)
-        and settings_view.managed_key_state_calls[-1]["referral_id"] == "7KQ9M2"
-    )
-    assert settings_view.managed_key_state_calls[-1] == {
-        "visible": True,
-        "remaining_percent": 71,
-        "referral_id": "7KQ9M2",
-        "pass_status": None,
-    }
-
-
-@pytest.mark.asyncio
-async def test_refresh_managed_trial_usage_state_preserves_known_referral_id_when_status_omits_it(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-
-    class ManagedKeySettingsView(DummySettingsView):
-        def __init__(self) -> None:
-            super().__init__()
-            self.managed_key_state_calls: list[dict[str, object]] = []
-
-        def set_managed_key_state(
-            self,
-            *,
-            visible: bool,
-            remaining_percent: int | None = None,
-            referral_id: str | None = None,
-            pass_status: object | None = None,
-        ) -> None:
-            self.managed_key_state_calls.append(
-                {
-                    "visible": visible,
-                    "remaining_percent": remaining_percent,
-                    "referral_id": referral_id,
-                    "pass_status": pass_status,
-                }
-            )
-
-    class OldBrokerStatusRefreshService:
-        def __init__(self) -> None:
-            self.calls = 0
-
-        async def refresh_owned_referral_id_from_status(self) -> str | None:
-            self.calls += 1
-            return None
-
-    settings_view = ManagedKeySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.managed_identity.referral_id = "7KQ9M2"
-    controller.hub = DummyHub(llm=object())
-    status_service = OldBrokerStatusRefreshService()
-    controller._managed_openrouter_release_service = status_service  # noqa: SLF001
-
-    class DummySecretsForTrial:
-        def get(self, key: str) -> str | None:
-            if key == "openrouter_managed_api_key":
-                return "managed-key"
-            return None
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.05,
-            usage_usd=0.02,
-        )
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecretsForTrial(),
-    )
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
-
-    await _wait_until(lambda: status_service.calls == 1)
-    assert status_service.calls == 1
-    assert settings_view.managed_key_state_calls
-    assert all(call["referral_id"] == "7KQ9M2" for call in settings_view.managed_key_state_calls)
-    assert settings_view.managed_key_state_calls[-1] == {
-        "visible": True,
-        "remaining_percent": 71,
-        "referral_id": "7KQ9M2",
-        "pass_status": None,
-    }
-
-
-@pytest.mark.asyncio
-async def test_refresh_managed_trial_usage_state_hides_referral_card_when_openrouter_byok_selected(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-
-    class ManagedKeySettingsView(DummySettingsView):
-        def __init__(self) -> None:
-            super().__init__()
-            self.managed_key_state_calls: list[dict[str, object]] = []
-
-        def set_managed_key_state(
-            self,
-            *,
-            visible: bool,
-            remaining_percent: int | None = None,
-            referral_id: str | None = None,
-            pass_status: object | None = None,
-        ) -> None:
-            self.managed_key_state_calls.append(
-                {
-                    "visible": visible,
-                    "remaining_percent": remaining_percent,
-                    "referral_id": referral_id,
-                    "pass_status": pass_status,
-                }
-            )
-
-    settings_view = ManagedKeySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.translation.connection = TranslationConnection.OPENROUTER
-    controller.settings.translation.connection_history[TranslationModel.GEMMA4.value] = (
-        TranslationConnection.OPENROUTER
-    )
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    controller.settings.managed_identity.referral_id = "7KQ9M2"
-    controller.hub = DummyHub(llm=object())
-
-    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
-
-    assert settings_view.managed_key_state_calls == [
-        {
-            "visible": False,
-            "remaining_percent": None,
-            "referral_id": "7KQ9M2",
-            "pass_status": None,
-        }
-    ]
-
-
-@pytest.mark.asyncio
-async def test_refresh_managed_trial_usage_state_hides_card_when_connection_is_openrouter_even_if_source_is_managed(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-
-    class ManagedKeySettingsView(DummySettingsView):
-        def __init__(self) -> None:
-            super().__init__()
-            self.managed_key_state_calls: list[dict[str, object]] = []
-
-        def set_managed_key_state(
-            self,
-            *,
-            visible: bool,
-            remaining_percent: int | None = None,
-            referral_id: str | None = None,
-            pass_status: object | None = None,
-        ) -> None:
-            self.managed_key_state_calls.append(
-                {
-                    "visible": visible,
-                    "remaining_percent": remaining_percent,
-                    "referral_id": referral_id,
-                    "pass_status": pass_status,
-                }
-            )
-
-    class EmptySecrets:
-        def get(self, _key: str) -> str | None:
-            return None
-
-    settings_view = ManagedKeySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.translation.connection = TranslationConnection.OPENROUTER
-    controller.settings.translation.connection_history[TranslationModel.GEMMA4.value] = (
-        TranslationConnection.OPENROUTER
-    )
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.managed_identity.referral_id = "7KQ9M2"
-    controller.hub = DummyHub(llm=object())
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: EmptySecrets(),
-    )
-
-    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
-
-    assert settings_view.managed_key_state_calls == [
-        {
-            "visible": False,
-            "remaining_percent": None,
-            "referral_id": "7KQ9M2",
-            "pass_status": None,
-        }
-    ]
-
-
-@pytest.mark.asyncio
-async def test_status_refresh_background_view_update_error_is_logged_not_left_on_task(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dash = DummyDashboard()
-    log_messages: list[tuple[str, int]] = []
-
-    class FailingManagedKeySettingsView(DummySettingsView):
-        def set_managed_key_state(
-            self,
-            *,
-            visible: bool,
-            remaining_percent: int | None = None,
-            referral_id: str | None = None,
-            pass_status: object | None = None,
-        ) -> None:
-            _ = pass_status
-            if referral_id == "7KQ9M2":
-                raise RuntimeError("managed key repaint failed")
-            super().set_managed_trial_usage_state(
-                visible=visible,
-                remaining_percent=remaining_percent,
-            )
-
-    class FakeStatusRefreshService:
-        async def refresh_owned_referral_id_from_status(self) -> str | None:
-            return "7KQ9M2"
-
-    def fake_log_basic(
-        _self: GuiController,
-        message: str,
-        *,
-        level: int = logging.INFO,
-    ) -> None:
-        log_messages.append((message, level))
-
-    settings_view = FailingManagedKeySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dash, view_settings=settings_view)
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller._managed_openrouter_release_service = FakeStatusRefreshService()  # noqa: SLF001
-
-    monkeypatch.setattr(GuiController, "log_basic", fake_log_basic)
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: DummySecrets({"openrouter_managed_api_key": "managed-key"}),
-    )
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.05,
-            usage_usd=0.02,
-        )
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
-    await _wait_until(lambda: bool(log_messages))
-    managed_usage_owner = controller._managed_usage_owner
-    assert managed_usage_owner is not None
-    owner = managed_usage_owner.refresh_owner
-    await _wait_until(lambda: not owner.active_task_names)
-
-    assert owner.active_task_names == ()
-    assert any(
-        "Referral ID status refresh failed" in message
-        and "managed key repaint failed" in message
-        and level == logging.WARNING
-        for message, level in log_messages
-    )
-
-
-@pytest.mark.asyncio
-async def test_managed_usage_owner_founder_route_does_not_wait_for_slow_status(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    shown: list[str] = []
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=dash,
-            view_settings=settings_view,
-            show_founder_letter_dialog=lambda: shown.append("shown"),
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.managed_identity.active_managed_credential_ref = "hash_123"
-    controller.hub = DummyHub(llm=object())
-
-    class SlowStatusRefreshService:
-        def __init__(self) -> None:
-            self.started = asyncio.Event()
-            self.release = asyncio.Event()
-            self.finished = asyncio.Event()
-
-        async def refresh_owned_referral_id_from_status(self) -> str | None:
-            self.started.set()
-            await self.release.wait()
-            self.finished.set()
-            return None
-
-    status_service = SlowStatusRefreshService()
-    controller._managed_openrouter_release_service = status_service  # noqa: SLF001
-
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_a, **_k: DummySecrets({"openrouter_managed_api_key": "managed-key"}),
-    )
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.0007,
-            usage_usd=0.0693,
-        )
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    route_task = asyncio.create_task(
-        controller._get_managed_usage_owner().should_route_to_founder_letter()
-    )
-    try:
-        await asyncio.wait_for(status_service.started.wait(), timeout=1.0)
-
-        assert route_task.done()
-        assert route_task.result() is True
-        assert shown == ["shown"]
-    finally:
-        status_service.release.set()
-        await asyncio.wait_for(status_service.finished.wait(), timeout=1.0)
-        if not route_task.done():
-            route_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await route_task
-
-
-@pytest.mark.asyncio
-async def test_refresh_managed_trial_usage_state_auto_shows_founder_letter_once(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    shown: list[str] = []
-    dash = DummyDashboard()
-    settings_view = DummySettingsView()
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=dash,
-            view_settings=settings_view,
-            show_founder_letter_dialog=lambda: shown.append("shown"),
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller.settings.managed_identity.active_managed_credential_ref = "hash_123"
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_a, **_k: DummySecrets({"openrouter_managed_api_key": "managed-key"}),
-    )
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.0007,
-            usage_usd=0.0693,
-        )
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
-    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
-
-    assert shown == ["shown"]
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_reopens_founder_letter_on_exhausted_managed_trans(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    shown: list[str] = []
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=DummyDashboard(),
-            view_settings=DummySettingsView(),
-            show_founder_letter_dialog=lambda: shown.append("shown"),
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_a, **_k: DummySecrets({"openrouter_managed_api_key": "managed-key"}),
-    )
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        return OpenRouterKeyMetadata(
-            limit_usd=0.07,
-            remaining_usd=0.0007,
-            usage_usd=0.0693,
-        )
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller.set_translation_enabled(True)
-
-    assert shown == ["shown"]
-    assert controller.hub.translation_enabled is False
-
-
-@pytest.mark.asyncio
-async def test_set_translation_enabled_does_not_route_stale_exhausted_metadata_across_entitlements(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    shown: list[str] = []
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=DummyDashboard(),
-            view_settings=DummySettingsView(),
-            show_founder_letter_dialog=lambda: shown.append("shown"),
-        )
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.hub = DummyHub(llm=object())
-    controller.settings.managed_identity.active_managed_credential_ref = "hash_old"
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_a, **_k: DummySecrets({"openrouter_managed_api_key": "managed-key"}),
-    )
-
-    metadata_calls = 0
-
-    async def fake_fetch_key_metadata(_api_key: str):
-        nonlocal metadata_calls
-        metadata_calls += 1
-        if metadata_calls == 1:
-            return OpenRouterKeyMetadata(
-                limit_usd=0.07,
-                remaining_usd=0.0007,
-                usage_usd=0.0693,
-            )
-        raise RuntimeError("metadata boom")
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "fetch_key_metadata",
-        staticmethod(fake_fetch_key_metadata),
-    )
-
-    await controller._get_managed_usage_owner().refresh(auto_show_founder_letter=True)
-    assert shown == ["shown"]
-
-    shown.clear()
-    controller.settings.managed_identity.active_managed_credential_ref = "hash_new"
-
-    class DummyService:
-        def __init__(self) -> None:
-            self.calls = 0
-
-        async def prepare_for_translation(self):
-            self.calls += 1
-            return ManagedOpenRouterReleaseResult(
-                behavior=ManagedOpenRouterReleaseBehavior.READY,
-                message_key="managed_release.ready",
-                api_key="managed-key",
-                local_key_available=True,
-            )
-
-    service = DummyService()
-    controller._managed_openrouter_release_service = service
-    monkeypatch.setattr(ManagedUsageOwner, "schedule_usage_refresh", lambda self: None)
-
-    await controller.set_translation_enabled(True)
-
-    assert shown == []
-    assert service.calls == 1
-    assert controller.hub.translation_enabled is True
-
-
 @pytest.mark.asyncio
 async def test_set_stt_enabled_marks_promo_and_runs_switch(
     monkeypatch: pytest.MonkeyPatch,
@@ -11361,14 +8398,20 @@ async def test_set_stt_enabled_marks_promo_and_runs_switch(
     controller.hub = DummyHub()
     switch_calls: list[bool] = []
 
-    async def fake_ensure_stt_switch(self) -> None:
-        switch_calls.append(self._stt_desired)
+    async def fake_run_stt_switch(
+        self,
+        *,
+        desired: bool | None = None,
+    ) -> SelfCaptureSessionSnapshot:
+        _ = self
+        assert desired is not None
+        switch_calls.append(desired)
+        return self_capture_snapshot(desired)
 
-    monkeypatch.setattr(GuiController, "_ensure_stt_switch", fake_ensure_stt_switch)
+    monkeypatch.setattr(SelfCaptureApplicationOwner, "run_switch", fake_run_stt_switch)
 
     await controller.set_stt_enabled(True)
 
-    assert controller._stt_desired is True
     assert controller.hub.promo_calls == 1
     assert switch_calls == [True]
     assert controller._runtime_logging.basic_messages == [
@@ -11403,13 +8446,47 @@ async def test_local_stt_button_stays_starting_until_activation_completes(
     async def validate_gpu(_self: GuiController) -> bool:
         return True
 
-    async def activate(_self: GuiController) -> None:
+    async def activate(
+        _self: SelfCaptureApplicationOwner,
+        *,
+        desired: bool | None = None,
+    ) -> SelfCaptureSessionSnapshot:
+        assert desired is True
+        controller._self_capture_owner = SimpleNamespace(
+            snapshot=self_capture_snapshot(
+                True,
+                state=SelfCaptureSessionState.STARTING,
+            ),
+            loop_task=None,
+            source=None,
+            cleanup_source=None,
+            vad=None,
+            last_cleanup_exception=None,
+        )
+        controller._get_local_asr_application_runtime().adapters.notice.sync()
         activation_started.set()
         await finish_activation.wait()
-        controller._mic_task = SimpleNamespace()
+        snapshot = SelfCaptureSessionSnapshot(
+            state=SelfCaptureSessionState.RUNNING,
+            provider_status=SelfCaptureProviderStatus.READY,
+            desired_active=True,
+            effective_active=True,
+            generation=1,
+            provider_id=provider.value,
+            runtime_signature=("runtime",),
+            failure_reason=None,
+            admission_reason=None,
+            has_source=True,
+            has_vad=True,
+            has_loop_task=True,
+            cleanup_debt=0,
+            closed=False,
+        )
+        controller._self_capture_owner.snapshot = snapshot
+        return snapshot
 
     monkeypatch.setattr(GuiController, "_validate_gpu_activation", validate_gpu)
-    monkeypatch.setattr(GuiController, "_ensure_stt_switch", activate)
+    monkeypatch.setattr(SelfCaptureApplicationOwner, "run_switch", activate)
 
     task = asyncio.create_task(controller.set_stt_enabled(True))
     await activation_started.wait()
@@ -11422,155 +8499,6 @@ async def test_local_stt_button_stays_starting_until_activation_completes(
 
     assert dashboard.stt_starting is False
     assert dashboard.stt_enabled is True
-
-
-@pytest.mark.asyncio
-async def test_ensure_stt_switch_delegates_to_owner_path(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    run_calls: list[str] = []
-
-    async def fake_run_stt_switch(self) -> None:
-        _ = self
-        run_calls.append("run")
-
-    monkeypatch.setattr(GuiController, "_run_stt_switch", fake_run_stt_switch)
-
-    await controller._ensure_stt_switch()
-
-    assert run_calls == ["run"]
-
-
-@pytest.mark.asyncio
-async def test_run_stt_switch_stop_path_drains_self_ingress_without_touching_peer() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller._stt_desired = False
-    apply_calls: list[dict[str, object]] = []
-    peer_calls: list[str] = []
-
-    class FakePeerStt:
-        async def close(self) -> None:
-            peer_calls.append("close")
-
-    class FakeOwner:
-        loop_task = None
-        source = None
-        cleanup_source = None
-        vad = None
-        last_cleanup_exception = None
-
-        async def apply_intent(self, config, **kwargs):
-            _ = config
-            apply_calls.append(kwargs)
-            return SelfCaptureSessionSnapshot(
-                state=SelfCaptureSessionState.STOPPED,
-                provider_status=SelfCaptureProviderStatus.DETACHED,
-                desired_active=False,
-                effective_active=False,
-                generation=1,
-                provider_id=None,
-                runtime_signature=None,
-                failure_reason=None,
-                admission_reason=None,
-                has_source=False,
-                has_vad=False,
-                has_loop_task=False,
-                cleanup_debt=0,
-                closed=False,
-            )
-
-    controller.hub = DummyHub(peer_stt=FakePeerStt())
-    controller._self_capture_owner = FakeOwner()
-
-    await controller._run_stt_switch()
-
-    assert apply_calls == [
-        {
-            "enabled": False,
-            "restart": False,
-            "force_immediate": False,
-            "explicit_toggle_off": True,
-        }
-    ]
-    assert controller.hub.drain_self_stt_calls == []
-    assert peer_calls == []
-
-
-@pytest.mark.asyncio
-async def test_run_stt_switch_warns_when_hub_missing() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller._stt_desired = True
-    controller.hub = None
-
-    await controller._run_stt_switch()
-
-    assert controller._runtime_logging.detailed_messages == [
-        (logging.WARNING, "[STT] Enable requested before hub is ready")
-    ]
-
-
-@pytest.mark.asyncio
-async def test_run_stt_switch_restart_path_drains_and_warms_through_hub_owner() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller._stt_desired = True
-    controller._stt_restart_requested = True
-    apply_calls: list[dict[str, object]] = []
-    peer_calls: list[str] = []
-
-    class FakePeerStt:
-        async def close(self) -> None:
-            peer_calls.append("close")
-
-        async def warmup(self) -> None:
-            peer_calls.append("warmup")
-
-    class FakeOwner:
-        loop_task = None
-        source = None
-        cleanup_source = None
-        vad = None
-        last_cleanup_exception = None
-
-        async def apply_intent(self, config, **kwargs):
-            _ = config
-            apply_calls.append(kwargs)
-            return SelfCaptureSessionSnapshot(
-                state=SelfCaptureSessionState.RUNNING,
-                provider_status=SelfCaptureProviderStatus.READY,
-                desired_active=True,
-                effective_active=True,
-                generation=1,
-                provider_id="deepgram",
-                runtime_signature=("runtime",),
-                failure_reason=None,
-                admission_reason=None,
-                has_source=True,
-                has_vad=True,
-                has_loop_task=True,
-                cleanup_debt=0,
-                closed=False,
-            )
-
-    controller.hub = DummyHub(peer_stt=FakePeerStt())
-    controller._self_capture_owner = FakeOwner()
-
-    await controller._run_stt_switch()
-
-    assert apply_calls == [
-        {
-            "enabled": True,
-            "restart": True,
-            "force_immediate": False,
-            "explicit_toggle_off": False,
-        }
-    ]
-    assert controller.hub.drain_self_stt_calls == []
-    assert controller.hub.warmup_stt_calls == []
-    assert peer_calls == []
 
 
 @pytest.mark.asyncio
@@ -11610,7 +8538,7 @@ async def test_apply_settings_replaces_stt_provider_when_source_language_changes
     replace_calls: list[str] = []
     locale_calls: list[str] = []
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         _ = self
         replace_calls.append("replace")
 
@@ -11626,7 +8554,7 @@ async def test_apply_settings_replaces_stt_provider_when_source_language_changes
         lambda self, **_kwargs: saved.append("saved") or True,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
     controller._last_stt_runtime_signature = ("old",)
 
@@ -11656,7 +8584,7 @@ async def test_apply_settings_source_language_change_reloads_settings_view(
     controller.hub.source_language = "en"
     replace_calls: list[str] = []
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         _ = self
         replace_calls.append("replace")
 
@@ -11666,7 +8594,7 @@ async def test_apply_settings_source_language_change_reloads_settings_view(
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
     controller._last_stt_runtime_signature = ("old",)
 
@@ -11695,7 +8623,7 @@ async def test_apply_settings_reloads_settings_view_for_target_only_change(
     controller.hub.source_language = "en"
     controller.hub.target_language = "ko"
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         _ = self
 
     monkeypatch.setattr(
@@ -11703,9 +8631,9 @@ async def test_apply_settings_reloads_settings_view_for_target_only_change(
         "save_current",
         lambda self, **_kwargs: True,
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(controller, settings)
 
     await controller.apply_settings(settings)
 
@@ -11723,8 +8651,8 @@ async def test_apply_settings_target_only_change_clears_self_language_runtime_st
     controller.hub.source_language = settings.languages.source_language
     controller.hub.target_language = settings.languages.target_language
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
-    controller._last_peer_translation_enabled = settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(controller, settings)
+    _peer_owner(controller).last_intent_enabled = settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = settings.osc.vrc_mic_intercept
 
     replace_calls: list[str] = []
@@ -11733,11 +8661,11 @@ async def test_apply_settings_target_only_change_clears_self_language_runtime_st
     updated = copy.deepcopy(settings)
     updated.languages.target_language = "ja"
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         _ = self
         replace_calls.append("replace")
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         _ = self
         refresh_peer_calls.append("peer")
 
@@ -11747,14 +8675,14 @@ async def test_apply_settings_target_only_change_clears_self_language_runtime_st
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
 
     await controller.apply_settings(updated)
 
@@ -11778,8 +8706,8 @@ async def test_apply_settings_self_target_change_clears_peer_runtime_when_peer_t
     controller.hub.peer_source_language = settings.languages.peer_source_language
     controller.hub.peer_target_language = settings.languages.peer_target_language
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
-    controller._last_peer_translation_enabled = settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(controller, settings)
+    _peer_owner(controller).last_intent_enabled = settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = settings.osc.vrc_mic_intercept
 
     refresh_peer_calls: list[str] = []
@@ -11787,10 +8715,10 @@ async def test_apply_settings_self_target_change_clears_peer_runtime_when_peer_t
     updated = copy.deepcopy(settings)
     updated.languages.target_language = "ja"
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         raise AssertionError("self STT runtime should not restart for target-only change")
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         _ = self
         refresh_peer_calls.append("peer")
 
@@ -11800,14 +8728,14 @@ async def test_apply_settings_self_target_change_clears_peer_runtime_when_peer_t
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
 
     await controller.apply_settings(updated)
 
@@ -11829,8 +8757,8 @@ async def test_apply_settings_self_source_change_clears_peer_runtime_when_peer_s
     controller.hub.peer_source_language = settings.languages.peer_source_language
     controller.hub.peer_target_language = settings.languages.peer_target_language
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
-    controller._last_peer_translation_enabled = settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(controller, settings)
+    _peer_owner(controller).last_intent_enabled = settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = settings.osc.vrc_mic_intercept
 
     replace_calls: list[str] = []
@@ -11839,11 +8767,11 @@ async def test_apply_settings_self_source_change_clears_peer_runtime_when_peer_s
     updated = copy.deepcopy(settings)
     updated.languages.source_language = "ja"
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         _ = self
         replace_calls.append("replace")
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         _ = self
         refresh_peer_calls.append("peer")
 
@@ -11853,14 +8781,14 @@ async def test_apply_settings_self_source_change_clears_peer_runtime_when_peer_s
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
 
     await controller.apply_settings(updated)
 
@@ -11884,8 +8812,8 @@ async def test_apply_settings_logs_and_continues_when_language_cleanup_fails(
     controller.hub.peer_target_language = settings.languages.peer_target_language
     controller.hub.clear_language_runtime_state_errors["self"] = RuntimeError("cleanup boom")
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(controller, settings)
-    controller._last_peer_translation_enabled = settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(controller, settings)
+    _peer_owner(controller).last_intent_enabled = settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = settings.osc.vrc_mic_intercept
 
     errors: list[str] = []
@@ -11893,10 +8821,10 @@ async def test_apply_settings_logs_and_continues_when_language_cleanup_fails(
     updated = copy.deepcopy(settings)
     updated.languages.target_language = "ja"
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         raise AssertionError("self STT runtime should not restart for target-only change")
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         raise AssertionError("peer runtime should not refresh for explicit peer target")
 
     monkeypatch.setattr(
@@ -11905,14 +8833,14 @@ async def test_apply_settings_logs_and_continues_when_language_cleanup_fails(
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(GuiController, "_log_error", lambda self, message: errors.append(message))
 
     await controller.apply_settings(updated)
@@ -11940,10 +8868,10 @@ async def test_order22_language_runtime_clear_failure_degrades_without_raw_log_t
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     raw_failure_text = "language cleanup failed secret-token-must-not-leak"
     controller.hub.clear_language_runtime_state_errors["self"] = RuntimeError(raw_failure_text)
@@ -11953,8 +8881,8 @@ async def test_order22_language_runtime_clear_failure_degrades_without_raw_log_t
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
 
@@ -12354,10 +9282,10 @@ async def test_apply_settings_reload_updates_overlay_calibration_baseline_withou
     controller.hub.source_language = settings.languages.source_language
     controller.hub.target_language = settings.languages.target_language
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         _ = self
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         _ = self
 
     monkeypatch.setattr(
@@ -12366,9 +9294,9 @@ async def test_apply_settings_reload_updates_overlay_calibration_baseline_withou
         lambda self, **_kwargs: True,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
 
     controller.begin_overlay_calibration()
     controller.set_overlay_calibration_field("distance", 1.2)
@@ -12419,8 +9347,7 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
     controller._last_stt_runtime_signature = ("old",)
-    controller._mic_task = object()
-    controller._stt_desired = True
+    controller._self_capture_owner = SelfCaptureStateStub(True)
 
     async def fake_rebuild_llm_provider(self) -> None:
         rebuild_llm_calls.append("rebuild_llm")
@@ -12463,11 +9390,19 @@ async def test_apply_settings_restarts_stt_and_reports_locale_failure(
         "_configure_vrc_mic_receiver",
         fake_configure_vrc_mic_receiver,
     )
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
-    monkeypatch.setattr(GuiController, "_ensure_stt_switch", fake_ensure_stt_switch)
     monkeypatch.setattr(
-        GuiController,
-        "_replace_runtime_stt_provider",
+        provider_runtime_wiring_module.ProviderRuntimeEffects,
+        "rebuild_self_stt",
+        fake_rebuild_stt_provider,
+    )
+    monkeypatch.setattr(
+        SelfCaptureApplicationOwner,
+        "run_switch",
+        fake_ensure_stt_switch,
+    )
+    monkeypatch.setattr(
+        SelfCaptureApplicationOwner,
+        "replace_provider",
         fake_replace_runtime_stt_provider,
     )
     monkeypatch.setattr(GuiController, "_log_error", lambda self, message: errors.append(message))
@@ -12498,6 +9433,7 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     prepared_configs: list[object] = []
 
     class FakeOwner:
+        snapshot = self_capture_snapshot(False)
         loop_task = None
         source = None
         cleanup_source = None
@@ -12532,8 +9468,6 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
     controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._stt_desired = False
-    controller._mic_task = None
     controller._self_capture_owner = FakeOwner()
 
     settings.stt.custom_vocabulary_enabled = True
@@ -12554,7 +9488,10 @@ async def test_apply_settings_rebuilds_stt_provider_when_runtime_changes_while_s
     )
     await controller.apply_settings(settings)
 
-    request = controller._self_capture_provider_request(prepared_configs[-1], False)
+    request = controller._get_capture_owner_factory().self_provider_request(
+        prepared_configs[-1],
+        False,
+    )
     assert request.config.source_language == "ko"
     assert request.config.custom_vocabulary_enabled is True
     assert request.config.custom_terms == {"ko": ("Puripuly",)}
@@ -12580,7 +9517,7 @@ async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabular
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
     controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._stt_desired = True
+    controller._self_capture_owner = SelfCaptureStateStub(True)
 
     settings.stt.custom_vocabulary_enabled = True
     settings.stt.custom_terms = {"ko": ["Puripuly", "VRChat"]}
@@ -12588,6 +9525,7 @@ async def test_apply_settings_replaces_running_stt_provider_for_custom_vocabular
     apply_calls: list[dict[str, object]] = []
 
     class FakeOwner:
+        snapshot = self_capture_snapshot(True)
         loop_task = object()
         source = object()
         cleanup_source = None
@@ -12660,8 +9598,7 @@ async def test_apply_settings_does_not_restart_stt_for_qwen_custom_vocabulary_ch
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
     controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._stt_desired = True
-    controller._mic_task = object()
+    controller._self_capture_owner = SelfCaptureStateStub(True)
 
     settings.stt.custom_vocabulary_enabled = True
     settings.stt.custom_terms = {"ko": ["Puripuly", "VRChat"]}
@@ -12669,7 +9606,7 @@ async def test_apply_settings_does_not_restart_stt_for_qwen_custom_vocabulary_ch
     async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
         _ = (self, enabled)
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         _ = self
         replace_calls.append("replace")
 
@@ -12684,7 +9621,7 @@ async def test_apply_settings_does_not_restart_stt_for_qwen_custom_vocabulary_ch
         fake_configure_vrc_mic_receiver,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
 
     await controller.apply_settings(settings)
@@ -12713,8 +9650,7 @@ async def test_apply_settings_restarts_stt_for_local_qwen_custom_vocabulary_chan
     controller.hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
     controller.hub.hangover_s = 1.1
     controller._last_stt_runtime_signature = build_self_stt_runtime_signature(settings)
-    controller._stt_desired = True
-    controller._mic_task = object()
+    controller._self_capture_owner = SelfCaptureStateStub(True)
 
     settings.stt.custom_vocabulary_enabled = True
     settings.stt.custom_terms = {"ko": ["Puripuly", "VRChat"]}
@@ -12722,7 +9658,7 @@ async def test_apply_settings_restarts_stt_for_local_qwen_custom_vocabulary_chan
     async def fake_configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
         _ = (self, enabled)
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         _ = self
         replace_calls.append("replace")
 
@@ -12737,7 +9673,7 @@ async def test_apply_settings_restarts_stt_for_local_qwen_custom_vocabulary_chan
         fake_configure_vrc_mic_receiver,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
 
     await controller.apply_settings(settings)
@@ -12858,385 +9794,6 @@ async def test_verify_api_key_routes_alibaba_singapore_to_qwen_owner() -> None:
             True,
         )
     ]
-
-
-@pytest.mark.asyncio
-async def test_create_openrouter_pkce_client_uses_openrouter_documented_localhost_port() -> None:
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=DummySettingsView())
-    )
-
-    client = controller._create_openrouter_pkce_client()
-    session = client.build_session()
-
-    assert client.callback_origin == "http://localhost:3000"
-    assert "callback_url=http%3A%2F%2Flocalhost%3A3000%2Fcallback" in session.authorization_url
-
-
-@pytest.mark.asyncio
-async def test_connect_openrouter_via_pkce_rejects_unverified_exchanged_key(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=DummySettingsView())
-    )
-    controller.settings = AppSettings()
-    previous_settings = copy.deepcopy(controller.settings)
-    target_settings = copy.deepcopy(controller.settings)
-    target_settings.provider.llm = LLMProviderName.OPENROUTER
-    target_settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    target_settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    target_settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    store = DummySecrets({"openrouter_api_key": "legacy-key"})
-
-    class DummyPKCEClient:
-        async def run_desktop_flow(self) -> OpenRouterPKCEExchangeResult:
-            return OpenRouterPKCEExchangeResult(api_key="sk-or-v1-user", user_id="user_123")
-
-    monkeypatch.setattr(
-        GuiController,
-        "_create_openrouter_pkce_client",
-        lambda self: DummyPKCEClient(),
-    )
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: store)
-    verify_calls: list[str] = []
-
-    async def fake_verify_openrouter_api_key(api_key: str) -> bool:
-        verify_calls.append(api_key)
-        return False
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "verify_api_key",
-        fake_verify_openrouter_api_key,
-    )
-    applied: list[AppSettings] = []
-
-    async def fake_apply_providers(
-        self,
-        settings: AppSettings | None = None,
-        *,
-        force_rebuild_llm: bool = False,
-    ) -> None:
-        _ = self
-        _ = force_rebuild_llm
-        assert settings is not None
-        applied.append(copy.deepcopy(settings))
-
-    monkeypatch.setattr(GuiController, "apply_providers", fake_apply_providers)
-
-    ok = await controller.connect_openrouter_via_pkce(
-        target_settings=target_settings,
-        launch_source="settings",
-    )
-
-    assert ok is False
-    assert verify_calls == ["sk-or-v1-user"]
-    assert applied == []
-    assert controller.settings == previous_settings
-    assert store.get("openrouter_api_key") == "legacy-key"
-    assert store.set_calls == []
-    assert store.delete_calls == []
-
-
-@pytest.mark.asyncio
-async def test_connect_openrouter_via_pkce_rebuilds_llm_when_signature_is_unchanged(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dashboard = DummyDashboard()
-    dashboard.translation_needs_key = True
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=dashboard, view_settings=DummySettingsView())
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    controller.settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    controller.hub = DummyHub(llm=None)
-    controller._sync_signature_caches(controller.settings)
-    target_settings = copy.deepcopy(controller.settings)
-    store = DummySecrets({})
-
-    class DummyPKCEClient:
-        async def run_desktop_flow(self) -> OpenRouterPKCEExchangeResult:
-            return OpenRouterPKCEExchangeResult(api_key="sk-or-v1-user", user_id="user_123")
-
-    monkeypatch.setattr(
-        GuiController,
-        "_create_openrouter_pkce_client",
-        lambda self: DummyPKCEClient(),
-    )
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: store)
-
-    class DummyManagedReleaseService:
-        async def close(self) -> None:
-            return None
-
-    def fake_create_managed_release_service(self, *, secrets):
-        _ = (self, secrets)
-        return DummyManagedReleaseService()
-
-    monkeypatch.setattr(
-        GuiController,
-        "_create_managed_openrouter_release_service",
-        fake_create_managed_release_service,
-    )
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-
-    async def fake_verify_openrouter_api_key(_api_key: str) -> bool:
-        return True
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "verify_api_key",
-        fake_verify_openrouter_api_key,
-    )
-    created_llm: list[str] = []
-
-    def fake_create_llm_provider(*_args, **_kwargs):
-        created_llm.append(store.get("openrouter_api_key") or "")
-        return "rebuilt-llm"
-
-    monkeypatch.setattr(controller_module, "create_llm_provider", fake_create_llm_provider)
-
-    async def fake_refresh_managed_trial_usage_state_best_effort(self) -> None:
-        _ = self
-
-    monkeypatch.setattr(
-        GuiController,
-        "_refresh_managed_trial_usage_state_best_effort",
-        fake_refresh_managed_trial_usage_state_best_effort,
-    )
-
-    ok = await controller.connect_openrouter_via_pkce(
-        target_settings=target_settings,
-        launch_source="settings",
-    )
-
-    assert ok is True
-    assert created_llm == ["sk-or-v1-user"]
-    assert controller.hub.llm == "rebuilt-llm"
-    assert controller.settings.api_key_verified.openrouter is True
-    assert dashboard.translation_needs_key is False
-
-
-def test_reopen_openrouter_pkce_authorization_url_delegates_to_active_client() -> None:
-    reopen_calls: list[str] = []
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=DummySettingsView())
-    )
-    controller._get_openrouter_pkce_flow_owner().active_client = SimpleNamespace(
-        reopen_authorization_url=lambda: reopen_calls.append("reopen") or True
-    )
-
-    assert controller.reopen_openrouter_pkce_authorization_url() is True
-    assert reopen_calls == ["reopen"]
-
-
-@pytest.mark.asyncio
-async def test_connect_openrouter_via_pkce_leaves_settings_unchanged_on_failure(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=DummySettingsView())
-    )
-    controller.settings = AppSettings()
-    controller.settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
-    target_settings = copy.deepcopy(controller.settings)
-    target_settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    target_settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    target_settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    store = DummySecrets({})
-
-    class DummyPKCEClient:
-        async def run_desktop_flow(self) -> OpenRouterPKCEExchangeResult:
-            raise RuntimeError("browser failed")
-
-    monkeypatch.setattr(
-        GuiController,
-        "_create_openrouter_pkce_client",
-        lambda self: DummyPKCEClient(),
-    )
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: store)
-
-    ok = await controller.connect_openrouter_via_pkce(
-        target_settings=target_settings,
-        launch_source="settings",
-    )
-
-    assert ok is False
-    assert controller.settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
-    assert store.set_calls == []
-
-
-@pytest.mark.asyncio
-async def test_connect_openrouter_via_pkce_reopens_letter_context_on_letter_failure(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    shown: list[str] = []
-    controller = _make_controller(
-        app=SimpleNamespace(
-            view_dashboard=DummyDashboard(),
-            view_settings=DummySettingsView(),
-            show_founder_letter_dialog=lambda: shown.append("shown"),
-        )
-    )
-    controller.settings = AppSettings()
-    target_settings = copy.deepcopy(controller.settings)
-    target_settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    target_settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    target_settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-
-    class DummyPKCEClient:
-        async def run_desktop_flow(self) -> OpenRouterPKCEExchangeResult:
-            raise RuntimeError("browser failed")
-
-    monkeypatch.setattr(
-        GuiController,
-        "_create_openrouter_pkce_client",
-        lambda self: DummyPKCEClient(),
-    )
-
-    ok = await controller.connect_openrouter_via_pkce(
-        target_settings=target_settings,
-        launch_source="letter",
-    )
-
-    assert ok is False
-    assert shown == ["shown"]
-
-
-@pytest.mark.asyncio
-async def test_connect_openrouter_via_pkce_returns_degraded_on_runtime_apply_failure(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=DummySettingsView())
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    target_settings = copy.deepcopy(controller.settings)
-    target_settings.provider.llm = LLMProviderName.OPENROUTER
-    target_settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    target_settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    target_settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    store = DummySecrets({"openrouter_api_key": "legacy-key"})
-
-    class DummyPKCEClient:
-        async def run_desktop_flow(self) -> OpenRouterPKCEExchangeResult:
-            return OpenRouterPKCEExchangeResult(api_key="sk-or-v1-user", user_id="user_123")
-
-    monkeypatch.setattr(
-        GuiController,
-        "_create_openrouter_pkce_client",
-        lambda self: DummyPKCEClient(),
-    )
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: store)
-    _patch_settings_save(monkeypatch, lambda *_a, **_k: None)
-
-    async def fake_verify_openrouter_api_key(_api_key: str) -> bool:
-        return True
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "verify_api_key",
-        fake_verify_openrouter_api_key,
-    )
-
-    async def fake_apply_provider_runtime_plan(
-        _owner,
-        settings: AppSettings,
-        plan: object,
-    ) -> None:
-        _ = plan
-        controller.settings = copy.deepcopy(settings)
-        raise RuntimeError("apply failed after mutation")
-
-    monkeypatch.setattr(
-        provider_runtime_apply_module.ProviderRuntimeOwner,
-        "apply",
-        fake_apply_provider_runtime_plan,
-    )
-
-    ok = await controller.connect_openrouter_via_pkce(
-        target_settings=target_settings,
-        launch_source="settings",
-    )
-
-    assert ok is True
-    assert store.get("openrouter_api_key") == "sk-or-v1-user"
-    assert store.set_calls == [("openrouter_api_key", "sk-or-v1-user")]
-    assert store.delete_calls == []
-    assert controller.settings.api_key_verified.openrouter is True
-    assert (
-        _settings_result(controller) is not None
-        and _settings_result(controller).status
-        == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
-    )
-
-
-@pytest.mark.asyncio
-async def test_connect_openrouter_via_pkce_restores_secret_on_settings_commit_failure(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(
-        app=SimpleNamespace(view_dashboard=DummyDashboard(), view_settings=DummySettingsView())
-    )
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    target_settings = copy.deepcopy(controller.settings)
-    target_settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    target_settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    target_settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-    store = DummySecrets({"openrouter_api_key": "legacy-key"})
-
-    class DummyPKCEClient:
-        async def run_desktop_flow(self) -> OpenRouterPKCEExchangeResult:
-            return OpenRouterPKCEExchangeResult(api_key="sk-or-v1-user", user_id="user_123")
-
-    monkeypatch.setattr(
-        GuiController,
-        "_create_openrouter_pkce_client",
-        lambda self: DummyPKCEClient(),
-    )
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: store)
-
-    def raise_on_save(*_a, **_k):
-        raise RuntimeError("disk write failed")
-
-    _patch_settings_save(monkeypatch, raise_on_save)
-
-    async def fake_verify_openrouter_api_key(_api_key: str) -> bool:
-        return True
-
-    monkeypatch.setattr(
-        OpenRouterLLMProvider,
-        "verify_api_key",
-        fake_verify_openrouter_api_key,
-    )
-
-    ok = await controller.connect_openrouter_via_pkce(
-        target_settings=target_settings,
-        launch_source="settings",
-    )
-
-    assert ok is False
-    assert store.get("openrouter_api_key") == "legacy-key"
-    assert store.set_calls == [
-        ("openrouter_api_key", "sk-or-v1-user"),
-        ("openrouter_api_key", "legacy-key"),
-    ]
-    assert store.delete_calls == []
-    assert (
-        _settings_result(controller) is not None
-        and _settings_result(controller).status
-        == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORED
-    )
 
 
 def test_merge_settings_tab_apply_with_current_languages_preserves_all_language_fields() -> None:
@@ -13431,48 +9988,6 @@ async def test_order21_plan_failure_does_not_leak_rejected_canonical_state(
 
 
 @pytest.mark.asyncio
-async def test_managed_auth_repository_persists_pending_delivery_ack_patch(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    committed = AppSettings()
-    saved: list[AppSettings] = []
-
-    def record_saved(_path: Path, settings: AppSettings) -> None:
-        saved.append(copy.deepcopy(settings))
-
-    _patch_settings_save(monkeypatch, record_saved)
-    repository = controller._get_settings_owner().create_legacy_patch_repository(
-        committed_settings=committed,
-        surface="managed_connection_auth",
-        save_failure_sink=controller._log_error,
-    )
-
-    result = await repository.save(
-        SettingsCommitRequest(
-            values={
-                "state": {
-                    "managed_connection": {
-                        "pending_delivery_ack_source": "discord",
-                        "pending_delivery_ack_delivery_id": "delivery-1",
-                        "pending_delivery_ack_managed_credential_ref": "managed-ref-1",
-                        "pending_delivery_ack_expires_at": "2026-07-07T00:15:00.000Z",
-                    }
-                }
-            },
-            expected_revision=None,
-            reason="managed_connection_auth",
-        )
-    )
-
-    assert result.succeeded is True
-    assert saved[0].managed_identity.pending_delivery_ack_source == "discord"
-    assert saved[0].managed_identity.pending_delivery_ack_delivery_id == "delivery-1"
-    assert saved[0].managed_identity.pending_delivery_ack_managed_credential_ref == "managed-ref-1"
-    assert "delivery_ack_token" not in repr(result.snapshot.values if result.snapshot else {})
-
-
-@pytest.mark.asyncio
 async def test_apply_providers_failed_signature_retries_same_settings_without_raw_exception_log(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -13484,17 +9999,15 @@ async def test_apply_providers_failed_signature_retries_same_settings_without_ra
     controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
-    controller._last_peer_stt_provider_signature = _peer_provider_signature(
+    _peer_owner(controller).last_provider_signature = _peer_provider_signature(
         controller, controller.settings
     )
-    controller._last_llm_provider_signature = controller._build_llm_provider_signature(
-        controller.settings
-    )
+    controller._last_llm_provider_signature = build_llm_provider_signature(controller.settings)
     pending = copy.deepcopy(controller.settings)
     pending.provider.llm = LLMProviderName.OPENROUTER
     pending.openrouter.selected_source = OpenRouterCredentialSource.BYOK
     pending.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    pending_signature = controller._build_llm_provider_signature(pending)
+    pending_signature = build_llm_provider_signature(pending)
     recovered_llm = object()
     create_attempts: list[LLMProviderName] = []
     saved_settings: list[AppSettings] = []
@@ -13511,9 +10024,15 @@ async def test_apply_providers_failed_signature_retries_same_settings_without_ra
 
     _patch_settings_save(monkeypatch, record_saved_settings)
     monkeypatch.setattr(
-        controller_module, "create_secret_store", lambda *_args, **_kwargs: DummySecrets({})
+        provider_runtime_wiring_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets({}),
     )
-    monkeypatch.setattr(controller_module, "create_llm_provider", fail_then_recover_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_wiring_module,
+        "create_llm_provider",
+        fail_then_recover_llm_provider,
+    )
 
     await controller.apply_providers(pending)
 
@@ -13550,10 +10069,10 @@ async def test_apply_providers_force_rebuild_failed_signature_uses_miss_sentinel
     controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
-    controller._last_peer_stt_provider_signature = _peer_provider_signature(
+    _peer_owner(controller).last_provider_signature = _peer_provider_signature(
         controller, controller.settings
     )
-    target_signature = controller._build_llm_provider_signature(controller.settings)
+    target_signature = build_llm_provider_signature(controller.settings)
     controller._last_llm_provider_signature = target_signature
     recovered_llm = object()
     create_attempts: list[LLMProviderName] = []
@@ -13566,9 +10085,15 @@ async def test_apply_providers_force_rebuild_failed_signature_uses_miss_sentinel
 
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
-        controller_module, "create_secret_store", lambda *_args, **_kwargs: DummySecrets({})
+        provider_runtime_wiring_module,
+        "create_secret_store",
+        lambda *_args, **_kwargs: DummySecrets({}),
     )
-    monkeypatch.setattr(controller_module, "create_llm_provider", fail_then_recover_llm_provider)
+    monkeypatch.setattr(
+        provider_runtime_wiring_module,
+        "create_llm_provider",
+        fail_then_recover_llm_provider,
+    )
 
     await controller.apply_providers(force_rebuild_llm=True)
 
@@ -13584,120 +10109,6 @@ async def test_apply_providers_force_rebuild_failed_signature_uses_miss_sentinel
 
 
 @pytest.mark.asyncio
-async def test_apply_providers_broker_base_url_rebuilds_managed_broker_service(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
-    controller.settings.openrouter.broker_base_url = "https://old-broker.example.test/"
-    controller.hub = DummyHub()
-    old_service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-        )
-    )
-    controller._managed_openrouter_release_service = old_service
-    controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
-        controller.settings
-    )
-    controller._last_peer_stt_provider_signature = _peer_provider_signature(
-        controller, controller.settings
-    )
-    controller._last_llm_provider_signature = controller._build_llm_provider_signature(
-        controller.settings
-    )
-    pending = copy.deepcopy(controller.settings)
-    pending.openrouter.broker_base_url = "https://new-broker.example.test/"
-    captured_services: list[object | None] = []
-
-    def capture_llm_provider(*_args, managed_release_service=None, **_kwargs) -> object:
-        captured_services.append(managed_release_service)
-        return object()
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        controller_module, "create_secret_store", lambda *_args, **_kwargs: DummySecrets({})
-    )
-    monkeypatch.setattr(controller_module, "create_llm_provider", capture_llm_provider)
-
-    await controller.apply_providers(pending)
-
-    assert old_service.close_calls == 1
-    assert len(captured_services) == 1
-    service = captured_services[0]
-    assert isinstance(service, ManagedOpenRouterReleaseService)
-    assert isinstance(service.client, HttpManagedOpenRouterBrokerClient)
-    assert service.client.base_url == "https://new-broker.example.test"
-
-
-def test_create_managed_openrouter_release_service_skips_managed_fallback_branch() -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.GEMINI
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
-    controller.settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
-    controller.settings.translation.fallback = TranslationFallbackSettings(
-        enabled=True,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.MANAGED_CHINA,
-    )
-
-    service = controller._create_managed_openrouter_release_service(secrets=DummySecrets({}))
-
-    assert service is None
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_managed_identity_rebuilds_service_with_pending_identity(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_MANAGED
-    controller.settings.managed_identity.verified_hardware_hash = "old-hardware-hash"
-    controller.settings.managed_identity.verified_hardware_hash_salt_version = 1
-    controller.hub = DummyHub()
-    controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
-        controller.settings
-    )
-    controller._last_peer_stt_provider_signature = _peer_provider_signature(
-        controller, controller.settings
-    )
-    controller._last_llm_provider_signature = controller._build_llm_provider_signature(
-        controller.settings
-    )
-    pending = copy.deepcopy(controller.settings)
-    pending.managed_identity.verified_hardware_hash = "pending-hardware-hash"
-    pending.managed_identity.verified_hardware_hash_salt_version = 9
-    captured_services: list[object | None] = []
-
-    def capture_llm_provider(*_args, managed_release_service=None, **_kwargs) -> object:
-        captured_services.append(managed_release_service)
-        return object()
-
-    _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        controller_module, "create_secret_store", lambda *_args, **_kwargs: DummySecrets({})
-    )
-    monkeypatch.setattr(controller_module, "create_llm_provider", capture_llm_provider)
-
-    await controller.apply_providers(pending)
-
-    assert len(captured_services) == 1
-    service = captured_services[0]
-    assert isinstance(service, ManagedOpenRouterReleaseService)
-    assert service.managed_state.verified_hardware_hash == "pending-hardware-hash"
-    assert service.managed_state.verified_hardware_hash_salt_version == 9
-    assert controller.settings.managed_identity.verified_hardware_hash == "pending-hardware-hash"
-
-
-@pytest.mark.asyncio
 async def test_apply_providers_mixed_degraded_default_service_persists_full_provider_draft(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -13710,12 +10121,10 @@ async def test_apply_providers_mixed_degraded_default_service_persists_full_prov
     controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
-    controller._last_peer_stt_provider_signature = _peer_provider_signature(
+    _peer_owner(controller).last_provider_signature = _peer_provider_signature(
         controller, controller.settings
     )
-    controller._last_llm_provider_signature = controller._build_llm_provider_signature(
-        controller.settings
-    )
+    controller._last_llm_provider_signature = build_llm_provider_signature(controller.settings)
     pending = copy.deepcopy(controller.settings)
     pending.translation.fallback = TranslationFallbackSettings(
         enabled=True,
@@ -13774,17 +10183,17 @@ async def test_order22_apply_settings_routes_stt_language_audio_patch_through_de
     controller.hub.peer_source_language = controller.settings.languages.peer_source_language
     controller.hub.peer_target_language = controller.settings.languages.peer_target_language
     controller.hub.low_latency_mode = controller.settings.stt.low_latency_mode
-    controller._peer_runtime = DummyPeerRuntime()
+    _peer_owner(controller).bind_runtime(DummyPeerRuntime())
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
     controller._last_microphone_test_audio_settings_signature = (
         controller._microphone_test_audio_settings_signature(controller.settings)
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
 
     pending = copy.deepcopy(controller.settings)
@@ -13814,18 +10223,18 @@ async def test_order22_apply_settings_routes_stt_language_audio_patch_through_de
     async def fake_rebuild_llm_provider(self) -> None:
         calls.append("llm")
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         calls.append("peer")
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         calls.append("replace")
 
     monkeypatch.setattr(settings_mutation.SettingsMutationService, "mutate", capture_mutate)
     _patch_settings_save(monkeypatch, record_saved_settings)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
     monkeypatch.setattr(
@@ -13836,9 +10245,9 @@ async def test_order22_apply_settings_routes_stt_language_audio_patch_through_de
     monkeypatch.setattr(
         provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
 
     await controller.apply_settings(pending)
@@ -13878,10 +10287,10 @@ async def test_order22_apply_settings_runtime_failure_degrades_without_rollback_
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     pending = copy.deepcopy(controller.settings)
     pending.provider.stt = STTProviderName.SONIOX
@@ -13892,18 +10301,18 @@ async def test_order22_apply_settings_runtime_failure_degrades_without_rollback_
     def record_saved_settings(_path, settings) -> None:
         saved_settings.append(copy.deepcopy(settings))
 
-    async def fail_replace_runtime_stt_provider(self) -> None:
+    async def fail_replace_runtime_stt_provider(self, **_kwargs) -> None:
         raise RuntimeError(raw_failure_text)
 
     _patch_settings_save(monkeypatch, record_saved_settings)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fail_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fail_replace_runtime_stt_provider
     )
 
     await controller.apply_settings(pending)
@@ -14074,10 +10483,10 @@ async def test_order22_apply_settings_self_stt_provider_specific_change_restarts
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     pending = copy.deepcopy(controller.settings)
     pending.deepgram_stt.model = "nova-2"
@@ -14090,19 +10499,19 @@ async def test_order22_apply_settings_self_stt_provider_specific_change_restarts
         requests.append(request)
         return await original_mutate(self, request)
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         replace_calls.append("replace")
 
     monkeypatch.setattr(settings_mutation.SettingsMutationService, "mutate", capture_mutate)
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
 
     await controller.apply_settings(pending)
@@ -14128,10 +10537,10 @@ async def test_order22_apply_settings_mixed_draft_applies_audio_runtime_and_pres
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     pending = copy.deepcopy(controller.settings)
     pending.audio.input_device = "Desk Mic"
@@ -14158,13 +10567,19 @@ async def test_order22_apply_settings_mixed_draft_applies_audio_runtime_and_pres
     _patch_settings_save(monkeypatch, record_saved_settings)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
+        PeerApplicationOwner,
+        "refresh_runtime",
+        lambda self, **_kwargs: asyncio.sleep(0),
+    )
+    monkeypatch.setattr(
+        SelfCaptureApplicationOwner,
+        "replace_provider",
+        lambda self, **_kwargs: asyncio.sleep(0),
     )
     monkeypatch.setattr(
         GuiController,
@@ -14227,10 +10642,10 @@ async def test_mixed_order22_order23_order24_fallback_save_failure_restores_comm
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     pending = copy.deepcopy(controller.settings)
     pending.languages.source_language = "ja"
@@ -14249,13 +10664,19 @@ async def test_mixed_order22_order23_order24_fallback_save_failure_restores_comm
     _patch_settings_save(monkeypatch, fail_uncommitted_full_draft_save)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
+        PeerApplicationOwner,
+        "refresh_runtime",
+        lambda self, **_kwargs: asyncio.sleep(0),
+    )
+    monkeypatch.setattr(
+        SelfCaptureApplicationOwner,
+        "replace_provider",
+        lambda self, **_kwargs: asyncio.sleep(0),
     )
 
     await controller.apply_settings(pending)
@@ -14316,10 +10737,10 @@ async def test_order22_apply_settings_mixed_full_draft_save_failure_degrades_and
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     pending = copy.deepcopy(controller.settings)
     pending.audio.input_device = "Desk Mic"
@@ -14338,13 +10759,19 @@ async def test_order22_apply_settings_mixed_full_draft_save_failure_degrades_and
     _patch_settings_save(monkeypatch, fail_third_save)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", lambda self: asyncio.sleep(0)
+        PeerApplicationOwner,
+        "refresh_runtime",
+        lambda self, **_kwargs: asyncio.sleep(0),
+    )
+    monkeypatch.setattr(
+        SelfCaptureApplicationOwner,
+        "replace_provider",
+        lambda self, **_kwargs: asyncio.sleep(0),
     )
 
     await controller.apply_settings(pending)
@@ -14406,7 +10833,6 @@ async def test_order22_mixed_provider_draft_rebuilds_self_stt_from_pre_mutation_
     controller.settings.system_prompt = "base prompt"
     controller.hub = DummyHub()
     controller.hub.system_prompt = controller.settings.system_prompt
-    controller._stt_desired = False
     pending = copy.deepcopy(controller.settings)
     pending.provider.stt = STTProviderName.SONIOX
     pending.system_prompt = "draft prompt"
@@ -14426,10 +10852,10 @@ async def test_order22_mixed_provider_draft_rebuilds_self_stt_from_pre_mutation_
     async def fake_rebuild_stt_provider(self) -> None:
         calls.append("rebuild_stt")
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         calls.append("replace")
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         calls.append("peer")
 
     async def fake_rebuild_llm_provider(self) -> None:
@@ -14437,11 +10863,15 @@ async def test_order22_mixed_provider_draft_rebuilds_self_stt_from_pre_mutation_
 
     monkeypatch.setattr(settings_mutation.SettingsMutationService, "mutate", capture_mutate)
     _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        provider_runtime_wiring_module.ProviderRuntimeEffects,
+        "rebuild_self_stt",
+        fake_rebuild_stt_provider,
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
+    )
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
         provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
     )
@@ -14541,8 +10971,8 @@ async def test_order21_provider_only_mixed_full_draft_save_failure_restores_comm
     assert controller.settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
     assert controller.settings.managed_identity.verified_hardware_hash is None
     assert controller.settings.managed_identity.verified_hardware_hash_salt_version is None
-    committed_signature = controller._build_llm_provider_signature(controller.settings)
-    pending_signature = controller._build_llm_provider_signature(pending)
+    committed_signature = build_llm_provider_signature(controller.settings)
+    pending_signature = build_llm_provider_signature(pending)
     assert controller._last_llm_provider_signature == committed_signature
     assert controller._last_llm_provider_signature != pending_signature
     logged_text = "\n".join(
@@ -14631,8 +11061,8 @@ async def test_order21_provider_only_mixed_full_draft_save_failure_preserves_ret
     assert controller.settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
     assert controller.settings.managed_identity.verified_hardware_hash is None
     assert controller.settings.managed_identity.verified_hardware_hash_salt_version is None
-    committed_signature = controller._build_llm_provider_signature(controller.settings)
-    pending_signature = controller._build_llm_provider_signature(pending)
+    committed_signature = build_llm_provider_signature(controller.settings)
+    pending_signature = build_llm_provider_signature(pending)
     assert controller._last_llm_provider_signature == ()
     assert controller._last_llm_provider_signature != committed_signature
     assert controller._last_llm_provider_signature != pending_signature
@@ -14723,7 +11153,6 @@ async def test_provider_order21_order24_fallback_save_failure_restores_committed
     controller.settings.system_prompt = "base prompt"
     controller.hub = DummyHub(stt=object(), llm=object())
     controller.hub.system_prompt = controller.settings.system_prompt
-    controller._stt_desired = False
     pending = copy.deepcopy(controller.settings)
     pending.llm.concurrency_limit = 3
     pending.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
@@ -14799,7 +11228,6 @@ async def test_order22_provider_mixed_fallback_failure_degrades_without_raw_valu
     controller.settings.provider.stt = STTProviderName.DEEPGRAM
     controller.settings.system_prompt = "base prompt"
     controller.hub = DummyHub(stt=object())
-    controller._stt_desired = False
     pending = copy.deepcopy(controller.settings)
     pending.provider.stt = STTProviderName.SONIOX
     pending.system_prompt = "draft prompt"
@@ -14813,7 +11241,11 @@ async def test_order22_provider_mixed_fallback_failure_degrades_without_raw_valu
         raise RuntimeError(raw_failure_text)
 
     _patch_settings_save(monkeypatch, record_saved_settings)
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fail_rebuild_stt_provider)
+    monkeypatch.setattr(
+        provider_runtime_wiring_module.ProviderRuntimeEffects,
+        "rebuild_self_stt",
+        fail_rebuild_stt_provider,
+    )
 
     await controller.apply_providers(pending)
 
@@ -14856,7 +11288,6 @@ async def test_order22_provider_mixed_full_draft_save_failure_degrades_and_resto
     controller.settings.system_prompt = "base prompt"
     controller.hub = DummyHub(stt=object())
     controller.hub.system_prompt = controller.settings.system_prompt
-    controller._stt_desired = False
     pending = copy.deepcopy(controller.settings)
     pending.provider.stt = STTProviderName.SONIOX
     pending.system_prompt = "draft prompt"
@@ -14874,7 +11305,11 @@ async def test_order22_provider_mixed_full_draft_save_failure_degrades_and_resto
         runtime_calls.append("rebuild_stt")
 
     _patch_settings_save(monkeypatch, fail_second_save)
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", record_rebuild_stt_provider)
+    monkeypatch.setattr(
+        provider_runtime_wiring_module.ProviderRuntimeEffects,
+        "rebuild_self_stt",
+        record_rebuild_stt_provider,
+    )
 
     applied = await controller.apply_providers(pending)
 
@@ -14918,32 +11353,35 @@ async def test_order22_mixed_settings_direct_fallback_degrades_when_stt_unavaila
     controller.hub = DummyHub(stt=object())
     controller.hub.source_language = controller.settings.languages.source_language
     controller.hub.target_language = controller.settings.languages.target_language
-    controller._stt_desired = True
+    controller._self_capture_owner = SelfCaptureStateStub(True)
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     pending = copy.deepcopy(controller.settings)
     pending.provider.stt = STTProviderName.SONIOX
     pending.overlay.show_translation = False
 
-    async def unavailable_replace_runtime_stt_provider(self) -> None:
-        assert self.hub is not None
-        self.hub.stt = None
+    async def unavailable_replace_runtime_stt_provider(self, **_kwargs) -> None:
+        _ = self
+        assert controller.hub is not None
+        controller.hub.stt = None
 
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", unavailable_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner,
+        "replace_provider",
+        unavailable_replace_runtime_stt_provider,
     )
 
     await controller.apply_settings(pending)
@@ -14980,10 +11418,10 @@ async def test_order22_qwen_historical_low_latency_change_does_not_rebuild_llm(
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     pending = copy.deepcopy(controller.settings)
     pending.stt.low_latency_mode = True
@@ -14997,8 +11435,8 @@ async def test_order22_qwen_historical_low_latency_change_does_not_rebuild_llm(
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
     monkeypatch.setattr(
@@ -15030,10 +11468,10 @@ async def test_order22_qwen_historical_false_cannot_restore_non_fast_runtime(
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     controller._last_vrc_mic_sync_enabled = controller.settings.osc.vrc_mic_intercept
     pending = copy.deepcopy(controller.settings)
     pending.stt.low_latency_mode = False
@@ -15047,8 +11485,8 @@ async def test_order22_qwen_historical_false_cannot_restore_non_fast_runtime(
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", lambda self: asyncio.sleep(0))
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
     monkeypatch.setattr(
@@ -15348,16 +11786,13 @@ async def test_apply_providers_preserves_current_languages_while_applying_provid
     controller.hub.target_language = "pt"
     controller.hub.peer_source_language = "zh-CN"
     controller.hub.peer_target_language = "nl"
-    controller._stt_desired = False
     controller._last_self_stt_provider_signature = build_self_stt_provider_signature(
         controller.settings
     )
-    controller._last_peer_stt_provider_signature = _peer_provider_signature(
+    _peer_owner(controller).last_provider_signature = _peer_provider_signature(
         controller, controller.settings
     )
-    controller._last_llm_provider_signature = controller._build_llm_provider_signature(
-        controller.settings
-    )
+    controller._last_llm_provider_signature = build_llm_provider_signature(controller.settings)
     calls: list[str] = []
 
     pending = AppSettings()
@@ -15384,14 +11819,18 @@ async def test_apply_providers_preserves_current_languages_while_applying_provid
     async def fake_rebuild_stt_provider(self) -> None:
         calls.append("rebuild_stt")
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         calls.append("peer")
 
     async def fake_rebuild_llm_provider(self) -> None:
         calls.append("llm")
 
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", fake_rebuild_stt_provider)
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(
+        provider_runtime_wiring_module.ProviderRuntimeEffects,
+        "rebuild_self_stt",
+        fake_rebuild_stt_provider,
+    )
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
         provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
     )
@@ -15588,28 +12027,28 @@ async def test_dashboard_peer_language_change_refreshes_peer_translation_pipelin
     controller._last_self_stt_runtime_signature = build_self_stt_runtime_signature(
         controller.settings
     )
-    controller._last_peer_stt_runtime_signature = _peer_runtime_signature(
+    _peer_owner(controller).last_runtime_signature = _peer_runtime_signature(
         controller, controller.settings
     )
-    controller._last_peer_translation_enabled = controller.settings.ui.peer_translation_enabled
+    _peer_owner(controller).last_intent_enabled = controller.settings.ui.peer_translation_enabled
     refreshed: list[str] = []
 
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
-        GuiController,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
+        LocalASRCpuRepairOwner,
+        "clear_if_provider_switched_away",
         lambda self: None,
     )
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         refreshed.append("peer")
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         raise AssertionError("self STT runtime should not restart for peer-only change")
 
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
 
     await controller.on_dashboard_language_change(
@@ -15656,11 +12095,12 @@ async def test_apply_providers_republishes_overlay_peer_contract_after_peer_refr
 
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
-        assert self.hub is not None
-        self.hub.peer_stt = object()
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
+        _ = self
+        assert controller.hub is not None
+        controller.hub.peer_stt = object()
 
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
 
     await controller.apply_providers(updated)
 
@@ -15677,7 +12117,7 @@ async def test_apply_providers_clears_local_qwen_pending_enable_after_switch_awa
     controller.settings = AppSettings()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN
     controller.hub = DummyHub()
-    controller._local_stt_pending_enable_after_install = True
+    controller._get_local_asr_application_runtime().cpu_repair.set_self_pending(True)
 
     updated = AppSettings()
     updated.provider.stt = STTProviderName.DEEPGRAM
@@ -15688,12 +12128,20 @@ async def test_apply_providers_clears_local_qwen_pending_enable_after_switch_awa
         "rebuild",
         lambda self: asyncio.sleep(0),
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", lambda self: asyncio.sleep(0))
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", lambda self: asyncio.sleep(0))
+    monkeypatch.setattr(
+        PeerApplicationOwner,
+        "refresh_runtime",
+        lambda self, **_kwargs: asyncio.sleep(0),
+    )
+    monkeypatch.setattr(
+        provider_runtime_wiring_module.ProviderRuntimeEffects,
+        "rebuild_self_stt",
+        lambda self: asyncio.sleep(0),
+    )
 
     await controller.apply_providers(updated)
 
-    assert controller._local_stt_pending_enable_after_install is False
+    assert controller._get_local_asr_application_runtime().self_pending is False
 
 
 @pytest.mark.asyncio
@@ -15721,8 +12169,16 @@ async def test_apply_providers_switch_to_managed_blocks_concurrent_toggle_from_u
     updated.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 
     _patch_settings_save(monkeypatch, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(controller_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(controller_module, "create_llm_provider", lambda *_a, **_k: object())
+    monkeypatch.setattr(
+        provider_runtime_wiring_module,
+        "create_secret_store",
+        lambda *_a, **_k: object(),
+    )
+    monkeypatch.setattr(
+        provider_runtime_wiring_module,
+        "create_llm_provider",
+        lambda *_a, **_k: object(),
+    )
 
     apply_task = asyncio.create_task(controller.apply_providers(updated))
     await close_started.wait()
@@ -15747,7 +12203,7 @@ async def test_apply_providers_splits_qwen_region_refresh_by_active_consumers(
     controller.settings.provider.stt = STTProviderName.QWEN_ASR
     controller.settings.provider.peer_stt = STTProviderName.QWEN_ASR
     controller.hub = DummyHub()
-    controller._stt_desired = True
+    controller._self_capture_owner = SelfCaptureStateStub(True)
     calls: list[str] = []
 
     updated = AppSettings()
@@ -15761,18 +12217,18 @@ async def test_apply_providers_splits_qwen_region_refresh_by_active_consumers(
     async def fake_rebuild_llm_provider(self) -> None:
         calls.append("llm")
 
-    async def fake_refresh_peer_stt_runtime(self) -> None:
+    async def fake_refresh_peer_stt_runtime(self, **_kwargs) -> None:
         calls.append("peer")
 
-    async def fake_replace_runtime_stt_provider(self) -> None:
+    async def fake_replace_runtime_stt_provider(self, **_kwargs) -> None:
         calls.append("replace")
 
     monkeypatch.setattr(
         provider_runtime_apply_module.LlmProviderRebuildOwner, "rebuild", fake_rebuild_llm_provider
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", fake_refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", fake_refresh_peer_stt_runtime)
     monkeypatch.setattr(
-        GuiController, "_replace_runtime_stt_provider", fake_replace_runtime_stt_provider
+        SelfCaptureApplicationOwner, "replace_provider", fake_replace_runtime_stt_provider
     )
     await controller.apply_providers(updated)
 
@@ -15815,83 +12271,6 @@ def test_load_or_init_settings_creates_default_file(
     assert reloaded.compatibility_settings.ui.overlay_enabled is False
     assert reloaded.compatibility_settings.system_prompt == shared_prompt
     assert reloaded.compatibility_settings.system_prompts == {}
-
-
-def test_create_managed_openrouter_release_service_uses_http_broker_client_and_raw_fingerprint_provider() -> (
-    None
-):
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.openrouter.broker_base_url = "https://broker.example.test/"
-
-    service = controller._create_managed_openrouter_release_service(secrets=DummySecrets({}))
-
-    assert isinstance(service, ManagedOpenRouterReleaseService)
-    assert isinstance(service.client, HttpManagedOpenRouterBrokerClient)
-    assert service.client.base_url == "https://broker.example.test"
-    assert (
-        service.raw_hardware_fingerprint_provider is controller_module.get_raw_hardware_fingerprint
-    )
-
-
-def test_create_managed_openrouter_release_service_degrades_to_unavailable_client_for_invalid_broker_base_url() -> (
-    None
-):
-    controller = _make_controller(app=SimpleNamespace())
-    controller.settings = AppSettings()
-    controller.settings.provider.llm = LLMProviderName.OPENROUTER
-    controller.settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    controller.settings.openrouter.broker_base_url = "https://broker.example.test/prefix"
-
-    service = controller._create_managed_openrouter_release_service(secrets=DummySecrets({}))
-
-    assert isinstance(service, ManagedOpenRouterReleaseService)
-    assert isinstance(service.client, UnavailableManagedOpenRouterReleaseClient)
-
-
-@pytest.mark.asyncio
-async def test_rebuild_stt_provider_logs_only_failure_when_owned_replacement_fails() -> None:
-    dash = DummyDashboard()
-    controller = _make_controller(app=SimpleNamespace(view_dashboard=dash))
-    controller._runtime_logging = RuntimeLoggingSpy()
-    controller.settings = AppSettings()
-    controller.settings.provider.stt = STTProviderName.DEEPGRAM
-    previous_stt = object()
-    controller.hub = DummyHub(stt=previous_stt)
-
-    async def failed_replacement(request: object, *, start: bool):
-        _ = request, start
-        return SimpleNamespace(status="failed")
-
-    controller.hub.replace_stt_provider_request = failed_replacement
-
-    await controller._rebuild_stt_provider()
-
-    assert controller.hub.stt is previous_stt
-    assert dash.stt_needs_key is True
-    assert dash.stt_enabled is False
-    assert controller._runtime_logging.basic_messages == [
-        (logging.ERROR, "STT backend not available")
-    ]
-
-
-@pytest.mark.asyncio
-async def test_stop_closes_managed_openrouter_release_service() -> None:
-    controller = _make_controller(app=SimpleNamespace())
-    service = DummyManagedReleaseService(
-        ManagedOpenRouterReleaseResult(
-            behavior=ManagedOpenRouterReleaseBehavior.READY,
-            message_key="managed_release.ready",
-        )
-    )
-    controller._managed_openrouter_release_service = service
-
-    await controller.stop()
-
-    assert service.close_calls == 1
-    assert controller._managed_openrouter_release_service is None
 
 
 def test_overlay_calibration_controls_follow_apply_cancel_contract() -> None:
@@ -16208,10 +12587,13 @@ async def test_self_local_qwen_rebuilds_after_idle_release(
         nonlocal available
         available = True
 
-    monkeypatch.setattr(GuiController, "_current_local_stt_runtime_status", lambda _self: "ready")
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", rebuild)
+    monkeypatch.setattr(
+        provider_runtime_wiring_module.ProviderRuntimeEffects,
+        "rebuild_self_stt",
+        rebuild,
+    )
 
-    assert await controller._ensure_local_stt_ready() is True
+    assert await controller._get_local_asr_application_runtime().ensure_self_ready() is True
     assert warmup_calls == 1
 
 

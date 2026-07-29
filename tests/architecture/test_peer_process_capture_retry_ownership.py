@@ -26,7 +26,7 @@ def _method_source(path: Path, class_name: str, method_name: str) -> str:
 def test_controller_retry_is_only_an_owner_delegate() -> None:
     method = _method_source(CONTROLLER_PATH, "GuiController", "retry_peer_process_capture")
 
-    assert "_get_peer_application_owner().retry_process_capture()" in method
+    assert "_get_peer_application_runtime().owner.retry_process_capture()" in method
     assert "_peer_process_warning_reason" not in method
     assert "_build_peer_runtime_config" not in method
 

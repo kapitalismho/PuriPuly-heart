@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -30,13 +31,25 @@ async def test_composition_is_page_free_and_delegates_the_complete_evidence_cont
             self.config_path = kwargs["config_path"]
             self.settings = None
             self.hub = FakeHub(owner)
+            self.vrc_mic_state = None
+            self.vrc_mic_audio_gate = None
+            self.receiver = None
 
         def _load_or_init_settings(self, path: Path) -> object:
             events.append(("load", path))
             return settings
 
-        async def _init_pipeline(self) -> None:
-            events.append(("initialize", self.settings))
+        def _get_local_asr_provisioning_owner(self) -> object:
+            return object()
+
+        def _sync_signature_caches(self, settings: object) -> None:
+            _ = settings
+
+        def _get_runtime_pipeline_launcher(self) -> object:
+            async def launch(settings: object, **_kwargs) -> None:
+                events.append(("initialize", settings))
+
+            return SimpleNamespace(launch=launch)
 
         async def retry_gpu_activation(self) -> None:
             events.append("retry")
@@ -118,9 +131,21 @@ async def test_initialize_preserves_canonical_owner_failure_contract(monkeypatch
             self.config_path = kwargs["config_path"]
             self.settings = None
             self.hub = FakeHub(object())
+            self.vrc_mic_state = None
+            self.vrc_mic_audio_gate = None
+            self.receiver = None
 
-        async def _init_pipeline(self) -> None:
-            return None
+        def _get_local_asr_provisioning_owner(self) -> object:
+            return object()
+
+        def _sync_signature_caches(self, settings: object) -> None:
+            _ = settings
+
+        def _get_runtime_pipeline_launcher(self) -> object:
+            async def launch(_settings: object, **_kwargs) -> None:
+                return None
+
+            return SimpleNamespace(launch=launch)
 
     monkeypatch.setattr(composition_module, "GuiController", FakeController)
     application = composition_module.compose_local_asr_production_evidence(

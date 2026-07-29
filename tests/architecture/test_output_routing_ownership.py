@@ -76,6 +76,9 @@ def test_hub_delegates_output_side_effects_to_output_runtime() -> None:
 
 def test_flet_composition_uses_owner_without_importing_output_implementation() -> None:
     controller_source = (SOURCE_ROOT / "ui" / "controller.py").read_text(encoding="utf-8")
+    pipeline_source = (SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py").read_text(
+        encoding="utf-8"
+    )
     imported_modules: set[str] = set()
     for source_file in sorted((SOURCE_ROOT / "ui").rglob("*.py")):
         tree = ast.parse(source_file.read_text(encoding="utf-8"))
@@ -85,7 +88,9 @@ def test_flet_composition_uses_owner_without_importing_output_implementation() -
             elif isinstance(node, ast.ImportFrom) and node.module is not None:
                 imported_modules.add(node.module)
 
-    assert "ClientHub(" in controller_source
+    assert "_init_pipeline" not in controller_source
+    assert "compose_runtime_pipeline(" in pipeline_source
+    assert "ClientHub(" in pipeline_source
     assert "hub.output_runtime.start_ui_event_bridge(" in controller_source
     assert "puripuly_heart.core.runtime.output" not in imported_modules
     assert "puripuly_heart.core.output.router" not in imported_modules

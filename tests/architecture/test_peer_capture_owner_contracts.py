@@ -16,6 +16,7 @@ from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "peer_channel.py"
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
 SOURCE_ADAPTER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_source.py"
 )
@@ -59,7 +60,7 @@ def test_peer_capture_owner_has_no_ui_hub_or_settings_dependency() -> None:
 
 
 def test_production_controller_composes_one_peer_owner_through_ports() -> None:
-    tree = ast.parse(CONTROLLER_PATH.read_text(encoding="utf-8"))
+    tree = ast.parse(CAPTURE_WIRING_PATH.read_text(encoding="utf-8"))
     calls = [
         node
         for node in ast.walk(tree)
@@ -80,14 +81,15 @@ def test_production_controller_composes_one_peer_owner_through_ports() -> None:
         "state_changed",
         "diagnostic_sink",
     }.issubset(keywords)
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    source = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
+    controller_source = CONTROLLER_PATH.read_text(encoding="utf-8")
     assert "admission=create_peer_capture_admission_adapter(" in source
     assert "target_resolver=create_peer_capture_target_resolver_adapter()" in source
     assert "vad_factory=create_peer_capture_vad_adapter(" in source
     assert "run_audio_loop=create_peer_capture_audio_loop_adapter(" in source
     assert "vad_sink=create_peer_capture_vad_sink_adapter(" in source
-    assert "PeerChannelRuntime" not in source
-    assert "PeerRuntimeConfig" not in source
+    assert "PeerChannelRuntime" not in controller_source
+    assert "PeerRuntimeConfig" not in controller_source
 
 
 def test_controller_does_not_construct_peer_owner_resources_outside_adapters() -> None:
@@ -110,14 +112,15 @@ def test_controller_does_not_construct_peer_owner_resources_outside_adapters() -
 
 
 def test_controller_composes_peer_capture_source_adapter_without_source_algorithm() -> None:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    source = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
+    controller_source = CONTROLLER_PATH.read_text(encoding="utf-8")
 
     assert "source_factory=create_peer_capture_source_adapter(" in source
-    assert "_create_peer_audio_source_from_runtime_config" not in source
-    assert "_create_process_peer_audio_source" not in source
-    assert "DesktopLoopbackAudioSource" not in source
-    assert "ProcessAudioCaptureSource" not in source
-    assert "DesktopPeerPipeline" not in source
+    assert "_create_peer_audio_source_from_runtime_config" not in controller_source
+    assert "_create_process_peer_audio_source" not in controller_source
+    assert "DesktopLoopbackAudioSource" not in controller_source
+    assert "ProcessAudioCaptureSource" not in controller_source
+    assert "DesktopPeerPipeline" not in controller_source
 
 
 def test_peer_capture_source_adapter_has_no_ui_resolution_or_lifecycle_ownership() -> None:
@@ -143,12 +146,13 @@ def test_peer_capture_session_owner_remains_source_lifecycle_owner() -> None:
 
 
 def test_controller_composes_peer_target_resolver_without_resolution_algorithm() -> None:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    source = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
+    controller_source = CONTROLLER_PATH.read_text(encoding="utf-8")
 
     assert "target_resolver=create_peer_capture_target_resolver_adapter()" in source
-    assert "_PeerCaptureTargetResolverAdapter" not in source
-    assert "_resolve_peer_capture_target_for_owner" not in source
-    assert "_process_target_from_capture_target" not in source
+    assert "_PeerCaptureTargetResolverAdapter" not in controller_source
+    assert "_resolve_peer_capture_target_for_owner" not in controller_source
+    assert "_process_target_from_capture_target" not in controller_source
 
 
 def test_peer_target_resolver_has_no_ui_source_or_session_lifecycle_ownership() -> None:
@@ -174,12 +178,13 @@ def test_peer_capture_session_owner_remains_target_resolution_lifecycle_caller()
 
 
 def test_controller_composes_peer_vad_adapter_without_vad_algorithm() -> None:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    source = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
+    controller_source = CONTROLLER_PATH.read_text(encoding="utf-8")
 
     assert "vad_factory=create_peer_capture_vad_adapter(" in source
-    assert "_create_peer_vad_from_runtime_config" not in source
-    assert "_peer_capture_sample_rate" not in source
-    assert "create_peer_vad_gating" not in source
+    assert "_create_peer_vad_from_runtime_config" not in controller_source
+    assert "_peer_capture_sample_rate" not in controller_source
+    assert "create_peer_vad_gating" not in controller_source
 
 
 def test_peer_vad_adapter_has_no_ui_self_vad_or_session_lifecycle_ownership() -> None:
@@ -205,10 +210,11 @@ def test_peer_capture_session_owner_remains_vad_and_loop_lifecycle_owner() -> No
 
 
 def test_controller_composes_peer_audio_loop_adapter_without_loop_method() -> None:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    source = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
+    controller_source = CONTROLLER_PATH.read_text(encoding="utf-8")
 
     assert "run_audio_loop=create_peer_capture_audio_loop_adapter(" in source
-    assert "_run_peer_audio_vad_loop" not in source
+    assert "_run_peer_audio_vad_loop" not in controller_source
 
 
 def test_peer_audio_loop_adapter_has_no_ui_task_or_session_lifecycle_ownership() -> None:
@@ -233,11 +239,37 @@ def test_peer_capture_session_owner_remains_loop_task_and_cancellation_owner() -
 
 
 def test_controller_composes_peer_admission_adapter_without_admission_algorithm() -> None:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    source = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
+    controller_source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    tree = ast.parse(controller_source)
+    owned_names = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)} | {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
 
     assert "admission=create_peer_capture_admission_adapter(" in source
     assert "_PeerCaptureAdmissionAdapter" not in source
-    assert "_admit_peer_capture" not in source
+    for removed_name in (
+        "_admit_peer_capture",
+        "_peer_runtime",
+        "_last_peer_stt_runtime_signature",
+        "_last_peer_stt_provider_signature",
+        "_last_peer_translation_enabled",
+        "_last_peer_translation_activation_requested",
+        "_peer_activation_generation",
+        "_peer_activation_starting",
+        "_peer_asr_model_loading",
+        "_peer_process_warning_reason",
+        "_encode_process_capture_option",
+        "_decode_capture_option",
+        "_process_target_from_resolved",
+        "_process_capture_display_name",
+        "_process_option_label",
+        "_enumerate_loopback_device_names",
+        "_resolve_peer_capture_target",
+    ):
+        assert removed_name not in owned_names
 
 
 def test_peer_admission_adapter_has_no_ui_resource_or_lifecycle_ownership() -> None:
@@ -264,10 +296,11 @@ def test_peer_capture_session_owner_remains_admission_and_retry_lifecycle_owner(
 
 
 def test_controller_composes_peer_vad_sink_adapter_without_channel_wrapper() -> None:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    source = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
+    controller_source = CONTROLLER_PATH.read_text(encoding="utf-8")
 
     assert "vad_sink=create_peer_capture_vad_sink_adapter(" in source
-    assert "_PeerCaptureVadSink" not in source
+    assert "_PeerCaptureVadSink" not in controller_source
 
 
 def test_peer_vad_sink_adapter_routes_only_peer_events_without_lifecycle_ownership() -> None:

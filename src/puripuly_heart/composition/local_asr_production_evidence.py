@@ -36,7 +36,14 @@ class _ControllerBackedLocalASRProductionEvidence:
 
     async def initialize(self, settings: object) -> None:
         self.backend.settings = settings
-        await self.backend._init_pipeline()
+        self.backend._get_local_asr_provisioning_owner()
+        self.backend._sync_signature_caches(settings)
+        await self.backend._get_runtime_pipeline_launcher().launch(
+            settings,
+            vrc_mic_state=self.backend.vrc_mic_state,
+            vrc_mic_audio_gate=self.backend.vrc_mic_audio_gate,
+            receiver_active=self.backend.receiver is not None,
+        )
         self._validated_hub_and_owner()
 
     def _validated_hub_and_owner(

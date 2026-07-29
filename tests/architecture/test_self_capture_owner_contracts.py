@@ -14,6 +14,7 @@ from puripuly_heart.core.self_capture import (
 ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
 LEGACY_OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_audio.py"
 VAD_SINK_ADAPTER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_vad_sink.py"
@@ -67,9 +68,18 @@ def test_controller_has_no_legacy_self_capture_lifecycle() -> None:
         for node in controller.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
+    owned_names = (
+        methods
+        | {
+            node.target.id
+            for node in controller.body
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+        }
+        | {node.attr for node in ast.walk(controller) if isinstance(node, ast.Attribute)}
+    )
 
     assert not LEGACY_OWNER_PATH.exists()
-    assert methods.isdisjoint(
+    assert owned_names.isdisjoint(
         {
             "_get_self_audio_runtime",
             "_sync_self_audio_runtime_aliases",
@@ -78,24 +88,37 @@ def test_controller_has_no_legacy_self_capture_lifecycle() -> None:
             "_stop_mic_loop",
             "_run_mic_loop",
             "_drain_self_stt_for_toggle_off",
+            "_mic_task",
+            "_audio_source",
+            "_vad",
+            "_last_mic_loop_close_exception",
+            "_stt_desired",
+            "_stt_activation_generation",
+            "_stt_activation_starting",
+            "_stt_activation_failed",
         }
     )
 
 
 def test_controller_composes_self_vad_sink_adapter_without_channel_wrapper() -> None:
-    source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    source = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
+    controller_source = CONTROLLER_PATH.read_text(encoding="utf-8")
 
     assert "vad_sink=create_self_capture_vad_sink_adapter(" in source
-    assert "_SelfCaptureVadSink" not in source
+    assert "_SelfCaptureVadSink" not in controller_source
 
 
 def test_controller_composes_self_admission_adapter_without_admission_algorithm() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    local_asr_adapter = (
+        ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "local_asr_application.py"
+    ).read_text(encoding="utf-8")
 
     assert "admission=create_self_capture_admission_adapter(" in source
     assert "_SelfCaptureAdmissionAdapter" not in source
     assert "_admit_self_capture" not in source
     assert "SelfCaptureAdmissionStatus" not in source
+    assert "def self_admission(" in local_asr_adapter
 
 
 def test_self_admission_adapter_has_explicit_effects_without_cross_layer_ownership() -> None:

@@ -14,7 +14,12 @@ import pytest
 from puripuly_heart.app.adapters.peer_capture_target_resolver import (
     PeerCaptureTargetResolverAdapter,
 )
+from puripuly_heart.app.services.peer_application import PeerApplicationOwner
+from puripuly_heart.app.services.peer_capture_target_application import (
+    PeerCaptureTargetApplicationOwner,
+)
 from puripuly_heart.app.wiring import build_peer_capture_session_config
+from puripuly_heart.app.wiring_local_asr_application import LocalASRApplicationRuntime
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.config.settings_vnext.facade import load_settings, save_settings_with_result
@@ -71,6 +76,23 @@ def _presentation(
     return FletUiPresentationAdapter(app)
 
 
+def _capture_target_owner(
+    *,
+    settings: AppSettings | None = None,
+    candidates: tuple[object, ...] = (),
+    devices: tuple[str, ...] = (),
+) -> PeerCaptureTargetApplicationOwner:
+    return PeerCaptureTargetApplicationOwner(
+        settings=SimpleNamespace(current=settings),
+        localize=t,
+        processes=SimpleNamespace(candidates=lambda: candidates),
+        devices=SimpleNamespace(names=lambda: devices),
+        runtime_effects=SimpleNamespace(),
+        settings_presentation_sink=lambda _settings: None,
+        warning_reset=lambda: None,
+    )
+
+
 class ReadyProvisioningPort:
     def __init__(self) -> None:
         self.snapshot = LocalASRProvisioningSnapshot(
@@ -122,6 +144,26 @@ class RecordingControllerSelfOwner:
         self.cleanup_source = None
         self.vad = None
         self.last_cleanup_exception = None
+        self._snapshot = SelfCaptureSessionSnapshot(
+            state=SelfCaptureSessionState.STOPPED,
+            provider_status=SelfCaptureProviderStatus.DETACHED,
+            desired_active=False,
+            effective_active=False,
+            generation=0,
+            provider_id=None,
+            runtime_signature=None,
+            failure_reason=None,
+            admission_reason=None,
+            has_source=False,
+            has_vad=False,
+            has_loop_task=False,
+            cleanup_debt=0,
+            closed=False,
+        )
+
+    @property
+    def snapshot(self) -> SelfCaptureSessionSnapshot:
+        return self._snapshot
 
     async def apply_intent(
         self,
@@ -138,7 +180,7 @@ class RecordingControllerSelfOwner:
         self.loop_task = object() if active else None
         self.source = object() if active else None
         self.vad = object() if active else None
-        return SelfCaptureSessionSnapshot(
+        self._snapshot = SelfCaptureSessionSnapshot(
             state=(
                 SelfCaptureSessionState.FAULTED
                 if failed
@@ -166,6 +208,7 @@ class RecordingControllerSelfOwner:
             cleanup_debt=0,
             closed=False,
         )
+        return self._snapshot
 
 
 def _runtime_hub_stub(
@@ -446,7 +489,7 @@ async def test_peer_starting_is_published_before_delayed_readiness_and_latest_in
     async def no_refresh(_self) -> None:  # noqa: ANN001
         return None
 
-    monkeypatch.setattr(GuiController, "_ensure_peer_local_stt_ready", delayed_ready)
+    monkeypatch.setattr(LocalASRApplicationRuntime, "ensure_peer_ready", delayed_ready)
     monkeypatch.setattr(GuiController, "_refresh_overlay_runtime_dependencies", no_refresh)
     enabling = asyncio.create_task(controller.set_peer_translation_enabled(True))
     await entered.wait()
@@ -460,7 +503,7 @@ async def test_peer_starting_is_published_before_delayed_readiness_and_latest_in
     release.set()
     await asyncio.gather(enabling, *([latest] if latest is not None else []))
     assert controller.settings.ui.peer_translation_enabled is final_enabled
-    assert controller._peer_activation_starting is False
+    assert controller._get_peer_application_runtime().owner.activation_starting is False
 
 
 @pytest.mark.asyncio
@@ -480,8 +523,8 @@ async def test_self_toggle_path_delegates_only_to_composed_capture_owner() -> No
     await controller.set_stt_enabled(True)
 
     assert owner.apply_calls == [True, False, True]
-    assert controller._stt_desired is True
-    assert controller._mic_task is owner.loop_task
+    assert owner.snapshot.desired_active is True
+    assert owner.loop_task is not None
 
 
 @pytest.mark.asyncio
@@ -504,8 +547,8 @@ async def test_self_microphone_start_failure_becomes_effective_off_failure_notic
     owner.fail_start = True
     controller._self_capture_owner = owner
     await controller.set_stt_enabled(True)
-    assert controller._stt_desired is False
-    assert controller._stt_activation_failed is True
+    assert owner.snapshot.desired_active is False
+    assert owner.snapshot.state is SelfCaptureSessionState.FAULTED
     assert dash.enabled[-1] is False
     assert dash.notices[-1][0] == "start_failed"
 
@@ -698,56 +741,39 @@ def test_dashboard_normal_peer_toggle_still_inverts_intent() -> None:
     assert toggles == [False]
 
 
-def test_controller_encodes_and_decodes_loopback_capture_options() -> None:
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=_presentation(SimpleNamespace()),
-        config_path=Path("settings.json"),
-    )
+def test_capture_target_owner_encodes_and_decodes_loopback_capture_options() -> None:
     process = ProcessCaptureTargetIntent.generic_executable(r"C:\Apps\Game\Game.exe")
-    encoded = controller._encode_process_capture_option(process)
-    decoded = controller._decode_capture_option(encoded)
+    encoded = PeerCaptureTargetApplicationOwner.encode_process_option(process)
+    decoded = PeerCaptureTargetApplicationOwner.decode_option(encoded)
     assert decoded.kind == "process"
     assert decoded.process is not None
     assert decoded.process.kind == "generic_executable"
-    assert controller._decode_capture_option("device:Speakers").kind == "named_output_device"
-    assert controller._decode_capture_option("device:").kind == "default_output_device"
-
-
-def test_controller_list_loopback_options_puts_process_before_device(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=_presentation(SimpleNamespace()),
-        config_path=Path("settings.json"),
+    assert (
+        PeerCaptureTargetApplicationOwner.decode_option("device:Speakers").kind
+        == "named_output_device"
+    )
+    assert (
+        PeerCaptureTargetApplicationOwner.decode_option("device:").kind == "default_output_device"
     )
 
-    class FakeResolver:
-        def __init__(self, *, snapshots):  # noqa: ANN001
-            _ = snapshots
 
-        def enumerate_candidates(self):
-            return (
-                SimpleNamespace(
-                    name="VRChat",
-                    target=ProcessCaptureTargetIntent.vrchat(r"C:\VRChat\VRChat.exe"),
-                    enabled=True,
-                ),
-                SimpleNamespace(
-                    name="Game (2)",
-                    target=ProcessCaptureTargetIntent.generic_executable(r"C:\Apps\Game\Game.exe"),
-                    enabled=False,
-                ),
-            )
-
-    monkeypatch.setattr(controller_module, "ProcessCaptureResolver", FakeResolver)
-    monkeypatch.setattr(
-        GuiController,
-        "_enumerate_loopback_device_names",
-        staticmethod(lambda: ["Speakers (Loopback)"]),
+def test_capture_target_owner_lists_enabled_processes_before_disabled_and_devices() -> None:
+    owner = _capture_target_owner(
+        candidates=(
+            SimpleNamespace(
+                name="Game (2)",
+                target=ProcessCaptureTargetIntent.generic_executable(r"C:\Apps\Game\Game.exe"),
+                enabled=False,
+            ),
+            SimpleNamespace(
+                name="VRChat",
+                target=ProcessCaptureTargetIntent.vrchat(r"C:\VRChat\VRChat.exe"),
+                enabled=True,
+            ),
+        ),
+        devices=("Speakers (Loopback)",),
     )
-    options = controller.list_loopback_capture_options()
+    options = owner.options()
     assert options[0].section == t("settings.desktop_audio.section.process")
     assert options[0].label == "VRChat"
     assert options[0].description == ""
@@ -758,46 +784,6 @@ def test_controller_list_loopback_options_puts_process_before_device(
     assert options[device_index].section == t("settings.desktop_audio.section.device")
 
 
-def test_controller_process_options_sorts_disabled_after_enabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=_presentation(SimpleNamespace()),
-        config_path=Path("settings.json"),
-    )
-
-    class FakeResolver:
-        def __init__(self, *, snapshots):  # noqa: ANN001
-            _ = snapshots
-
-        def enumerate_candidates(self):
-            return (
-                SimpleNamespace(
-                    name="Game (2)",
-                    target=ProcessCaptureTargetIntent.generic_executable(r"C:\Apps\Game\Game.exe"),
-                    enabled=False,
-                ),
-                SimpleNamespace(
-                    name="VRChat",
-                    target=ProcessCaptureTargetIntent.vrchat(r"C:\VRChat\VRChat.exe"),
-                    enabled=True,
-                ),
-            )
-
-    monkeypatch.setattr(controller_module, "ProcessCaptureResolver", FakeResolver)
-    monkeypatch.setattr(
-        GuiController,
-        "_enumerate_loopback_device_names",
-        staticmethod(lambda: []),
-    )
-    options = controller.list_loopback_process_options()
-    assert options[0].label == "VRChat"
-    assert options[0].disabled is False
-    assert options[1].label == "Game (2)"
-    assert options[1].disabled is True
-
-
 def test_controller_process_diagnostic_sets_peer_warning_reason() -> None:
     controller = GuiController(
         page=SimpleNamespace(),
@@ -806,14 +792,17 @@ def test_controller_process_diagnostic_sets_peer_warning_reason() -> None:
     )
     controller.settings = AppSettings()
     controller.settings.ui.peer_translation_enabled = True
-    controller._on_peer_runtime_diagnostic(
+    controller._get_peer_application_runtime().owner.on_runtime_diagnostic(
         PeerRuntimeDiagnostic(
             reason=PeerRuntimeFailureReason.PROCESS_TARGET_UNAVAILABLE,
             capture_kind="process",
             process_unavailable_reason="no_process",
         )
     )
-    assert controller._peer_process_warning_reason == "process_unavailable_no_process"
+    assert (
+        controller._get_peer_application_runtime().owner.process_warning_reason
+        == "process_unavailable_no_process"
+    )
     state = controller.overlay_peer_presentation_state()
     assert state is not None
     contract = build_overlay_peer_consumer_contract_from_state(state)
@@ -857,37 +846,16 @@ def test_loopback_summary_prefers_localized_process_name() -> None:
     assert controller.loopback_capture_summary(settings) == "game"
 
 
-def test_list_options_preserves_saved_process_when_stopped(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=_presentation(SimpleNamespace()),
-        config_path=Path("settings.json"),
-    )
-    controller.settings = AppSettings()
-    saved = ProcessCaptureTargetIntent.vrchat(r"C:\VRChat\VRChat.exe")
-    controller.settings.desktop_audio.runtime_capture_target = ResolvedDesktopAudioCaptureTarget(
+def test_list_options_preserves_saved_process_when_stopped() -> None:
+    settings = AppSettings()
+    settings.desktop_audio.runtime_capture_target = ResolvedDesktopAudioCaptureTarget(
         kind="process",
         process_kind="vrchat",
         executable_identity=r"c:\vrchat\vrchat.exe",
     )
-
-    class EmptyResolver:
-        def __init__(self, *, snapshots):  # noqa: ANN001
-            _ = snapshots
-
-        def enumerate_candidates(self):
-            return ()
-
-    monkeypatch.setattr(controller_module, "ProcessCaptureResolver", EmptyResolver)
-    monkeypatch.setattr(
-        GuiController,
-        "_enumerate_loopback_device_names",
-        staticmethod(lambda: ["Speakers"]),
-    )
-    options = controller.list_loopback_capture_options()
-    current = controller.current_loopback_capture_option_value()
+    owner = _capture_target_owner(settings=settings, devices=("Speakers",))
+    options = owner.options()
+    current = owner.current_value()
     process_options = [option for option in options if option.value.startswith("process:")]
     assert len(process_options) == 1
     assert process_options[0].value == current
@@ -896,12 +864,10 @@ def test_list_options_preserves_saved_process_when_stopped(
     assert process_options[0].disabled is False
     assert "\\" not in process_options[0].label
     assert "pid" not in process_options[0].label.lower()
-    assert controller.settings.desktop_audio.runtime_capture_target.kind == "process"
-    assert (
-        controller.settings.desktop_audio.runtime_capture_target.executable_identity
-        == r"c:\vrchat\vrchat.exe"
+    assert settings.desktop_audio.runtime_capture_target.kind == "process"
+    assert settings.desktop_audio.runtime_capture_target.executable_identity == (
+        r"c:\vrchat\vrchat.exe"
     )
-    _ = saved
 
 
 def test_settings_capture_target_refresh_preserves_unrelated_drafts() -> None:
@@ -1040,18 +1006,18 @@ async def test_failed_process_warning_survives_unrelated_draft_apply_without_dev
     async def refresh_peer_stt_runtime(_self) -> None:
         return None
 
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", refresh_peer_stt_runtime)
     monkeypatch.setattr(GuiController, "_sync_effective_hub_flags", lambda *_args: None)
     monkeypatch.setattr(GuiController, "_refresh_overlay_peer_consumers", lambda *_args: None)
     await controller.apply_loopback_capture_option("process:vrchat:c:\\vrchat\\vrchat.exe")
-    controller._on_peer_runtime_diagnostic(
+    controller._get_peer_application_runtime().owner.on_runtime_diagnostic(
         PeerRuntimeDiagnostic(
             reason=PeerRuntimeFailureReason.PROCESS_TARGET_UNAVAILABLE,
             capture_kind="process",
             process_unavailable_reason="no_process",
         )
     )
-    warning_reason = controller._peer_process_warning_reason
+    warning_reason = controller._get_peer_application_runtime().owner.process_warning_reason
     pending = view.build_provider_apply_settings()
     assert pending is not None
     assert pending.desktop_audio.runtime_capture_target is not None
@@ -1071,7 +1037,7 @@ async def test_failed_process_warning_survives_unrelated_draft_apply_without_dev
     )
     assert persisted.desktop_audio.runtime_capture_target.kind == "process"
     assert config.capture_target.kind == "process"
-    assert controller._peer_process_warning_reason == warning_reason
+    assert controller._get_peer_application_runtime().owner.process_warning_reason == warning_reason
 
     class UnavailableResolver:
         def __init__(self, *, snapshots):
@@ -1127,7 +1093,7 @@ async def test_controller_capture_target_apply_uses_narrow_settings_refresh(
         "update_capture_target",
         lambda *_args: saved,
     )
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", refresh_peer_stt_runtime)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", refresh_peer_stt_runtime)
     monkeypatch.setattr(GuiController, "_sync_effective_hub_flags", sync_effective_hub_flags)
     monkeypatch.setattr(
         GuiController,

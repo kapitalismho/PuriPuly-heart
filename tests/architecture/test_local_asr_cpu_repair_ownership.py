@@ -7,15 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = ROOT / "src" / "puripuly_heart"
 CONTROLLER_PATH = SOURCE_ROOT / "ui" / "controller.py"
 OWNER_PATH = SOURCE_ROOT / "app" / "services" / "local_asr_cpu_repair.py"
-
-
-def _method_source(path: Path, method_name: str) -> str:
-    source = path.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == method_name:
-            return ast.get_source_segment(source, node) or ""
-    raise AssertionError(f"method not found: {method_name}")
+WIRING_PATH = SOURCE_ROOT / "app" / "wiring_local_asr_application.py"
 
 
 def test_cpu_repair_owner_is_constructed_only_by_application_composition() -> None:
@@ -34,20 +26,16 @@ def test_cpu_repair_owner_is_constructed_only_by_application_composition() -> No
     assert constructions == ["src/puripuly_heart/app/wiring_composition.py"]
 
 
-def test_controller_cpu_repair_commands_are_compatibility_delegates() -> None:
-    request = _method_source(CONTROLLER_PATH, "_request_unavailable_local_asr_repair")
-    clear = _method_source(
-        CONTROLLER_PATH,
-        "_clear_local_stt_pending_enable_if_provider_switched_away",
-    )
-    getter = _method_source(CONTROLLER_PATH, "_get_local_asr_cpu_repair_owner")
+def test_local_asr_application_wiring_owns_cpu_repair_composition() -> None:
+    controller_source = CONTROLLER_PATH.read_text(encoding="utf-8")
+    wiring_source = WIRING_PATH.read_text(encoding="utf-8")
 
-    assert ".request_repair(" in request
-    assert "LocalASRCpuRepairRequest(" in request
-    assert "LocalASRInstallRequest" not in request
-    assert ".clear_if_provider_switched_away()" in clear
-    assert "create_local_asr_cpu_repair_owner(" in getter
-    assert "LocalASRCpuRepairOwner(" not in getter
+    assert "_request_unavailable_local_asr_repair" not in controller_source
+    assert "_clear_local_stt_pending_enable_if_provider_switched_away" not in controller_source
+    assert "_get_local_asr_cpu_repair_owner" not in controller_source
+    assert "create_local_asr_cpu_repair_owner(" in wiring_source
+    assert "LocalASRCpuRepairRequest(" in wiring_source
+    assert "LocalASRInstallRequest" not in wiring_source
 
 
 def test_controller_has_no_cpu_repair_state_fields_or_result_algorithm() -> None:

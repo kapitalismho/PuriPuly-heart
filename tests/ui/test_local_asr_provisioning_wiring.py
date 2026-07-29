@@ -306,7 +306,7 @@ async def test_missing_direct_cpu_enable_requests_exact_model_through_owner() ->
             origin="manual",
         )
     ]
-    assert controller._local_stt_pending_enable_after_install is True
+    assert controller._get_local_asr_application_runtime().self_pending is True
     assert dashboard.enabled[-1] is False
 
     await port.close()
@@ -323,21 +323,21 @@ async def test_cpu_repair_composition_routes_peer_resume_to_runtime_refresh(
     controller.settings.ui.peer_translation_enabled = True
     controller.settings.ui.peer_translation_eula_accepted = True
     refreshes: list[str] = []
-    controller._get_local_asr_cpu_repair_owner()
+    controller._get_local_asr_application_runtime()
     monkeypatch.setattr(
         GuiController,
         "_refresh_overlay_runtime_dependencies",
         lambda self: asyncio.sleep(0, result=refreshes.append("refresh")),
     )
 
-    assert await controller._ensure_peer_local_stt_ready() is False
+    assert await controller._get_local_asr_application_runtime().ensure_peer_ready() is False
     assert port.requests[0].model_ids == (LOCAL_STT_MODEL_ID,)
     release.set()
     await asyncio.gather(*port.tasks)
     await _wait_until(lambda: bool(refreshes))
 
     assert refreshes == ["refresh"]
-    assert controller._get_local_asr_cpu_repair_owner().snapshot.peer_pending is False
+    assert controller._get_local_asr_application_runtime().cpu_repair.snapshot.peer_pending is False
 
 
 def test_provisioning_snapshot_is_localized_only_at_ui_projection() -> None:

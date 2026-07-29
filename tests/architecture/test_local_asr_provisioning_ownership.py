@@ -43,6 +43,9 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
     selection = (SOURCE_ROOT / "app" / "services" / "local_asr_selection.py").read_text(
         encoding="utf-8"
     )
+    application_wiring = (SOURCE_ROOT / "app" / "wiring_local_asr_application.py").read_text(
+        encoding="utf-8"
+    )
     tree = ast.parse(source)
     imports: set[str] = set()
     for node in ast.walk(tree):
@@ -52,9 +55,11 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
             imports.add(node.module)
 
     assert "create_local_asr_provisioning_owner(" in source
-    assert "create_local_asr_cpu_repair_owner(" in source
+    assert "create_local_asr_cpu_repair_owner(" not in source
+    assert "create_local_asr_cpu_repair_owner(" in application_wiring
     assert "create_gpu_runtime_interaction_owner(" in source
-    assert "create_local_asr_readiness_owner(" in source
+    assert "create_local_asr_readiness_owner(" not in source
+    assert "create_local_asr_readiness_owner(" in application_wiring
     assert ".inspect_cpu(" in source
     assert ".inspect_gpu(" in source
     assert ".inspect_gpu(" in gpu_provisioning
@@ -65,8 +70,10 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
     assert "result_handler=" in cpu_repair
     assert ".report_model_validation_failure(" not in source
     assert ".report_model_validation_failure(" in readiness
-    assert ".ensure_self_ready(" in source
+    assert ".ensure_self_ready(" not in source
+    assert ".ensure_self_ready(" in application_wiring
     assert ".ensure_peer_ready(" in source
+    assert ".ensure_peer_ready(" in application_wiring
     assert "_probe_self_local_stt_runtime_load" not in source
     assert "LocalCPUAutoUnavailableError" not in source
     assert "LocalSTTModelMissingError" not in source

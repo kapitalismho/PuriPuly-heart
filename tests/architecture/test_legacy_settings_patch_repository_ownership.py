@@ -13,6 +13,7 @@ SETTINGS_APPLICATION_PATH = (
 OPENROUTER_PKCE_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "services" / "openrouter_pkce_flow.py"
 )
+MANAGED_ACCOUNT_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_managed_account.py"
 
 
 def test_controller_composes_application_settings_patch_repository() -> None:
@@ -20,11 +21,13 @@ def test_controller_composes_application_settings_patch_repository() -> None:
     provider_settings_source = PROVIDER_SETTINGS_PATH.read_text(encoding="utf-8")
     settings_application_source = SETTINGS_APPLICATION_PATH.read_text(encoding="utf-8")
     openrouter_pkce_source = OPENROUTER_PKCE_PATH.read_text(encoding="utf-8")
+    managed_account_source = MANAGED_ACCOUNT_WIRING_PATH.read_text(encoding="utf-8")
 
     assert "_ControllerSettingsPatchRepository" not in source
     assert "def _settings_snapshot_values" not in source
     assert "_legacy_settings_patch_repository" not in source
-    assert source.count("self._get_settings_owner().create_legacy_patch_repository(") == 1
+    assert "create_legacy_patch_repository(" not in source
+    assert managed_account_source.count("settings.create_legacy_patch_repository(") == 1
     assert provider_settings_source.count("self.settings.create_legacy_patch_repository(") == 3
     assert settings_application_source.count("self.settings.create_legacy_patch_repository(") == 1
     assert openrouter_pkce_source.count("self.settings.create_legacy_patch_repository(") == 1

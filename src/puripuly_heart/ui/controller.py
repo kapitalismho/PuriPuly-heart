@@ -3,9 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import copy
-import hashlib
 import inspect
-import json
 import logging
 import sys
 from collections.abc import Callable, Mapping
@@ -16,16 +14,7 @@ from typing import Any, Literal, cast
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.gpu_worker import GpuWorkerDevice
-from puripuly_heart.app.ports.microphone_test import (
-    MicrophoneTestCapturePort,
-    MicrophoneTestCaptureRequest,
-)
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
-from puripuly_heart.app.ports.self_capture_admission import (
-    SelfCaptureAdmissionEffect,
-    SelfCaptureAdmissionEffectType,
-    SelfCaptureAdmissionState,
-)
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
     OptionItem,
@@ -71,45 +60,23 @@ from puripuly_heart.app.services.gpu_runtime_interaction import (
     GpuRuntimeInteractionOwner,
     GpuRuntimeInteractionState,
 )
-from puripuly_heart.app.services.local_asr_cpu_repair import (
-    LocalASRCpuRepairEffect,
-    LocalASRCpuRepairEffectType,
-    LocalASRCpuRepairOwner,
-    LocalASRCpuRepairRequest,
-    LocalASRCpuRepairRuntimeState,
-)
 from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningDiagnostic,
 )
-from puripuly_heart.app.services.local_asr_readiness import (
-    LocalASRReadinessEffect,
-    LocalASRReadinessEffectType,
-    LocalASRReadinessOwner,
-    LocalASRReadinessState,
-)
 from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
-    local_asr_status_for_provider,
-    required_local_asr_model_ids,
     resolve_local_asr_selection,
 )
 from puripuly_heart.app.services.managed_auth import ManagedAuthOwner
 from puripuly_heart.app.services.managed_usage import (
-    ManagedUsageMetadataResult,
     ManagedUsageOwner,
-    ManagedUsageState,
     ManagedUsageViewState,
 )
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
-from puripuly_heart.app.services.microphone_test import (
-    MicrophoneTestSelfCaptureState,
-    MicrophoneTestSessionOwner,
-    MicrophoneTestSessionRequest,
-)
 from puripuly_heart.app.services.openrouter_pkce_flow import (
     OpenRouterPkceApplicationOwner,
     OpenRouterPkceFlowOwner,
@@ -121,19 +88,11 @@ from puripuly_heart.app.services.overlay_application import (
 from puripuly_heart.app.services.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
-from puripuly_heart.app.services.peer_application import (
-    PeerApplicationOwner,
-    PeerApplicationState,
-)
 from puripuly_heart.app.services.provider_credential_verification import (
     ProviderCredentialVerificationInteractionOwner,
 )
 from puripuly_heart.app.services.provider_runtime_apply import (
-    LlmProviderRebuildContext,
-    LlmProviderRebuildOwner,
     ProviderRuntimeApplyPlan,
-    ProviderRuntimeOwner,
-    ProviderRuntimeState,
 )
 from puripuly_heart.app.services.provider_settings import (
     ProviderApplicationOwner,
@@ -142,6 +101,10 @@ from puripuly_heart.app.services.provider_settings import (
 )
 from puripuly_heart.app.services.provider_verification_binding import (
     ProviderVerificationBindingOwner,
+)
+from puripuly_heart.app.services.self_capture_application import (
+    SelfCaptureApplicationOwner,
+    SelfCaptureApplicationSettings,
 )
 from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
 from puripuly_heart.app.services.settings_mutation import SettingsMutationService
@@ -157,91 +120,75 @@ from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.app.wiring import (
     LocalASRProviderRuntimeFactory,
     ManagedSTTProviderFactory,
-    build_managed_identity_state_port,
-    build_openrouter_credential_runtime_config,
-    build_openrouter_release_runtime_config,
     build_peer_capture_session_config,
     build_peer_stt_provider_request,
-    build_peer_stt_provider_signature_from_vnext,
     build_peer_stt_runtime_signature,
     build_self_capture_session_config,
     build_self_stt_provider_request,
-    build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
-    compose_peer_capture_session_owner,
-    compose_self_capture_session_owner,
     copy_stable_secrets_to_vnext_namespace,
-    create_llm_provider,
     create_local_asr_provisioning_owner,
-    create_microphone_test_capture_adapter,
-    create_peer_capture_admission_adapter,
-    create_peer_capture_audio_loop_adapter,
-    create_peer_capture_source_adapter,
-    create_peer_capture_target_resolver_adapter,
-    create_peer_capture_vad_adapter,
-    create_peer_capture_vad_sink_adapter,
     create_provider_verifier,
     create_secret_store,
     create_self_capture_admission_adapter,
-    create_self_capture_audio_loop_adapter,
-    create_self_capture_source_adapter,
-    create_self_capture_vad_adapter,
-    create_self_capture_vad_sink_adapter,
     create_sync_secret_store_adapter,
     resolve_overlay_config,
+)
+from puripuly_heart.app.wiring_capture_runtime import (
+    CaptureDiagnosticsAdapter,
+    CaptureOwnerFactory,
 )
 from puripuly_heart.app.wiring_composition import (
     create_desktop_overlay_policy,
     create_gpu_provider_recovery_application_owner,
     create_gpu_runtime_interaction_owner,
-    create_local_asr_cpu_repair_owner,
     create_local_asr_diagnostics_owner,
-    create_local_asr_readiness_owner,
     create_manual_typing_owner,
     create_provider_credential_verification_interaction_owner,
     create_vrchat_osc_presence_probe_owner,
     create_windows_desktop_work_area,
 )
-from puripuly_heart.app.wiring_managed_auth_factory import (
-    ManagedAuthRuntimeAdapter,
-    ManagedTranslationRuntimeAdapter,
+from puripuly_heart.app.wiring_local_asr_application import (
+    LocalASRApplicationRuntime,
+    compose_local_asr_application,
 )
+from puripuly_heart.app.wiring_managed_account import (
+    ManagedAccountComponents,
+    ManagedTranslationRuntimeAccess,
+    compose_managed_account,
+)
+from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
+from puripuly_heart.app.wiring_peer_application import (
+    PeerApplicationRuntime,
+    compose_peer_application,
+)
+from puripuly_heart.app.wiring_provider_runtime import (
+    ProviderRuntimeComponents,
+    ProviderRuntimeSignatures,
+    compose_provider_runtime,
+)
+from puripuly_heart.app.wiring_runtime_pipeline import (
+    RuntimePipelineComponents,
+    RuntimePipelineLauncher,
+)
+from puripuly_heart.app.wiring_vrc_mic_sync import compose_vrc_mic_sync
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.paths import user_config_dir
-from puripuly_heart.config.process_capture_resolution import (
-    ProcessCaptureResolver,
-)
-from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import (
     OVERLAY_TARGET_STEAMVR,
     AppSettings,
     LLMProviderName,
     OpenRouterCredentialSource,
-    OpenRouterProviderRouting,
     QwenLLMModel,
     STTProviderName,
-    TranslationConnection,
     build_managed_openrouter_byok_target_settings,
-    normalize_owned_referral_id,
     with_telemetry_consent,
 )
-from puripuly_heart.config.settings_vnext.schema import (
-    AppSettingsVNext,
-    CaptureTargetIntent,
-    ProcessCaptureTargetIntent,
-)
-from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.audio.process_identity import PsutilCurrentUserProcessSnapshots
-from puripuly_heart.core.audio.source import (
-    AudioSource,
-    SoundDeviceAudioSource,
-    determine_self_mic_capture_channels,
-    observe_microphone_test_route,
-)
 from puripuly_heart.core.clipboard.watcher import create_clipboard_watcher
 from puripuly_heart.core.clock import SystemClock
-from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
     SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
@@ -253,8 +200,6 @@ from puripuly_heart.core.lifecycle import (
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     LocalASRProviderRuntimeSnapshot,
-    ProviderRuntimeBuildRequest,
-    ProviderRuntimeChannelSnapshot,
 )
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningDiagnostic,
@@ -262,39 +207,22 @@ from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningSnapshot,
 )
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
-from puripuly_heart.core.managed_openrouter_broker_client import (
-    HttpManagedOpenRouterBrokerClient,
-)
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterReleaseService,
-    UnavailableManagedOpenRouterReleaseClient,
-)
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
     TransactionResult,
 )
-from puripuly_heart.core.openrouter_credentials import resolve_openrouter_credentials
-from puripuly_heart.core.openrouter_handoff import should_auto_show_founder_letter
-from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEClient
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.osc.receiver import (
-    VRC_OSC_RECEIVER_HOST,
-    VRC_OSC_RECEIVER_PORT,
     VrcMicState,
-    VrcOscReceiver,
 )
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
 from puripuly_heart.core.peer_capture import (
-    PeerCaptureDiagnostic,
     PeerCaptureSessionSnapshot,
 )
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
-from puripuly_heart.core.runtime.peer_channel import (
-    PeerCaptureSessionOwner,
-)
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.vrchat_osc_presence import (
     VrchatOscPresenceProbeOwner,
@@ -306,15 +234,11 @@ from puripuly_heart.core.runtime_logging import (
     SessionRuntimeLoggingService,
 )
 from puripuly_heart.core.self_capture import (
-    SelfCaptureDiagnostic,
-    SelfCaptureProviderStatus,
-    SelfCaptureSessionConfig,
     SelfCaptureSessionSnapshot,
     SelfCaptureSessionState,
 )
 from puripuly_heart.core.stt.controller import FinalTranscriptSuppressedNotification
 from puripuly_heart.core.telemetry import (
-    TranslationSuccessTelemetryClientPort,
     TranslationSuccessTelemetryResult,
     TranslationSuccessTelemetryService,
 )
@@ -352,18 +276,8 @@ _OVERLAY_FAILURE_REASONS = frozenset(
         "unknown",
     }
 )
-_MANAGED_OPENROUTER_CONNECTIONS = frozenset(
-    {
-        TranslationConnection.MANAGED,
-        TranslationConnection.MANAGED_CHINA,
-    }
-)
 _MICROPHONE_TEST_LEVEL_INTERVAL_S = 1.0
 LOCAL_QWEN_HALLUCINATION_GUIDANCE_TRIGGER_COUNT = 2
-
-
-def _canonical_json_signature(value: object) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def _callable_accepts_positional_arguments(callable_obj: object, count: int) -> bool:
@@ -391,30 +305,6 @@ def _settings_mutation_committed(result: TransactionResult) -> bool:
     }
 
 
-def _sensitive_optional_text_signature(value: str | None) -> tuple[int, str] | None:
-    if value is None:
-        return None
-    normalized = value.strip()
-    if not normalized:
-        return None
-    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-    return (len(normalized), digest)
-
-
-def _managed_openrouter_identity_signature(settings: AppSettings) -> tuple[object, ...]:
-    identity = settings.managed_identity
-    return (
-        identity.installation_id,
-        _sensitive_optional_text_signature(identity.release_token),
-        identity.release_token_expires_at,
-        identity.verified_hardware_hash,
-        identity.verified_hardware_hash_salt_version,
-        identity.active_managed_credential_ref,
-        identity.active_managed_expires_at,
-        identity.referral_id,
-    )
-
-
 @dataclass(slots=True)
 class GuiController:
     page: object
@@ -424,7 +314,6 @@ class GuiController:
     runtime_logging_sinks: RuntimeLoggingSinks | None = field(default=None, repr=False)
     settings_mutation_service: SettingsMutationService | None = None
     provider_verifier: ProviderVerifierPort | None = None
-    telemetry_client: TranslationSuccessTelemetryClientPort | None = None
     vrchat_osc_presence: VrchatOscPresencePort | None = field(default=None, repr=False)
     local_asr_provisioning: LocalASRProvisioningPort | None = field(
         default=None,
@@ -438,13 +327,7 @@ class GuiController:
     )
 
     clock: SystemClock = SystemClock()
-    _managed_openrouter_release_service: ManagedOpenRouterReleaseService | None = None
-    _openrouter_pkce_flow_owner: OpenRouterPkceFlowOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _openrouter_pkce_application_owner: OpenRouterPkceApplicationOwner | None = field(
+    _managed_account_components: ManagedAccountComponents | None = field(
         init=False,
         default=None,
         repr=False,
@@ -454,9 +337,29 @@ class GuiController:
     osc: ChatboxPaginator | None = None
     hub: ClientHub | None = None
     _self_capture_owner: SelfCaptureSessionOwner | None = field(init=False, default=None)
-    _provider_runtime_owner: ProviderRuntimeOwner | None = field(
+    _capture_owner_factory: CaptureOwnerFactory | None = field(
         init=False,
         default=None,
+        repr=False,
+    )
+    _runtime_pipeline_launcher: RuntimePipelineLauncher | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _capture_diagnostics_adapter: CaptureDiagnosticsAdapter | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _provider_runtime_components: ProviderRuntimeComponents | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _provider_runtime_signatures: ProviderRuntimeSignatures = field(
+        init=False,
+        default_factory=ProviderRuntimeSignatures,
         repr=False,
     )
     _provider_application_owner: ProviderApplicationOwner | None = field(
@@ -469,12 +372,7 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _llm_provider_rebuild_owner: LlmProviderRebuildOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _peer_application_owner: PeerApplicationOwner | None = field(
+    _peer_application_runtime: PeerApplicationRuntime | None = field(
         init=False,
         default=None,
         repr=False,
@@ -488,39 +386,21 @@ class GuiController:
     vrc_mic_audio_gate: VrcMicAudioGate | None = None
 
     _bridge_task: asyncio.Task[None] | None = None
-    _mic_task: asyncio.Task[None] | None = None
     _manual_typing_owner: ManualTypingOwner | None = field(
         init=False,
         default=None,
         repr=False,
     )
-    _audio_source: AudioSource | None = None
-    _last_mic_loop_close_exception: BaseException | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _microphone_test_owner: MicrophoneTestSessionOwner | None = field(
+    _microphone_test_runtime: MicrophoneTestRuntime | None = field(
         init=False,
         default=None,
         repr=False,
     )
     _debug_capture_fault_profile: str = field(init=False, default="none")
     _debug_stt_fault_profile: str = field(init=False, default="none")
-    _vad: object | None = None
-    _stt_desired: bool = False
-    _stt_restart_requested: bool = False
-    _stt_force_immediate: bool = False
-    _stt_activation_generation: int = field(init=False, default=0)
-    _stt_activation_starting: bool = field(init=False, default=False)
-    _stt_activation_failed: bool = field(init=False, default=False)
-    _last_stt_runtime_signature: tuple[object, ...] | None = None
-    _last_self_stt_runtime_signature: tuple[object, ...] | None = None
-    _last_self_stt_provider_signature: tuple[object, ...] | None = None
-    _last_llm_provider_signature: tuple[object, ...] | None = None
-    _superseded_local_asr_settings_ids: set[int] = field(
+    _self_capture_application_owner: SelfCaptureApplicationOwner | None = field(
         init=False,
-        default_factory=set,
+        default=None,
         repr=False,
     )
     _process_idle_preparation_scheduled: bool = field(init=False, default=False)
@@ -535,12 +415,7 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _local_asr_cpu_repair_owner: LocalASRCpuRepairOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _local_asr_readiness_owner: LocalASRReadinessOwner | None = field(
+    _local_asr_application_runtime: LocalASRApplicationRuntime | None = field(
         init=False,
         default=None,
         repr=False,
@@ -576,34 +451,9 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _managed_usage_owner: ManagedUsageOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
     _provider_credential_verification_owner: (
         ProviderCredentialVerificationInteractionOwner | None
     ) = field(init=False, default=None, repr=False)
-    _managed_auth_runtime_adapter: ManagedAuthRuntimeAdapter | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _managed_auth_owner: ManagedAuthOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _managed_translation_runtime_adapter: ManagedTranslationRuntimeAdapter | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _translation_enable_owner: TranslationEnableOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
     _github_star_prompt_owner: GithubStarPromptOwner | None = field(
         init=False,
         default=None,
@@ -649,6 +499,47 @@ class GuiController:
         self._get_settings_owner().current = settings
 
     @property
+    def _last_stt_runtime_signature(self) -> tuple[object, ...] | None:
+        return self._provider_runtime_signatures.last_self_runtime
+
+    @_last_stt_runtime_signature.setter
+    def _last_stt_runtime_signature(self, signature: tuple[object, ...] | None) -> None:
+        self._provider_runtime_signatures.last_self_runtime = signature
+
+    @property
+    def _last_self_stt_runtime_signature(self) -> tuple[object, ...] | None:
+        return self._provider_runtime_signatures.last_self_runtime
+
+    @_last_self_stt_runtime_signature.setter
+    def _last_self_stt_runtime_signature(
+        self,
+        signature: tuple[object, ...] | None,
+    ) -> None:
+        self._provider_runtime_signatures.last_self_runtime = signature
+
+    @property
+    def _last_self_stt_provider_signature(self) -> tuple[object, ...] | None:
+        return self._provider_runtime_signatures.last_self_provider
+
+    @_last_self_stt_provider_signature.setter
+    def _last_self_stt_provider_signature(
+        self,
+        signature: tuple[object, ...] | None,
+    ) -> None:
+        self._provider_runtime_signatures.last_self_provider = signature
+
+    @property
+    def _last_llm_provider_signature(self) -> tuple[object, ...] | None:
+        return self._provider_runtime_signatures.last_llm_provider
+
+    @_last_llm_provider_signature.setter
+    def _last_llm_provider_signature(
+        self,
+        signature: tuple[object, ...] | None,
+    ) -> None:
+        self._provider_runtime_signatures.last_llm_provider = signature
+
+    @property
     def vnext_settings(self) -> AppSettingsVNext | None:
         return self._get_settings_owner().canonical
 
@@ -658,13 +549,13 @@ class GuiController:
 
     @property
     def managed_auth_pending(self) -> bool:
-        owner = self._managed_auth_owner
-        return owner.pending if owner is not None else False
+        components = self._managed_account_components
+        return components.auth.pending if components is not None else False
 
     @property
     def last_discord_managed_auth_referral_bonus_applied(self) -> bool:
-        owner = self._managed_auth_owner
-        return owner.last_referral_bonus_applied if owner is not None else False
+        components = self._managed_account_components
+        return components.auth.last_referral_bonus_applied if components is not None else False
 
     def _report_overlay_application_state(
         self,
@@ -703,9 +594,15 @@ class GuiController:
                     enabled,
                 ),
                 hub_provider=lambda: self.hub,
-                peer_snapshot_provider=lambda: self._get_peer_application_owner().snapshot(),
-                disable_peer_intent=lambda: self._get_peer_application_owner().disable_for_overlay(),
-                sync_peer_effective=lambda: self._get_peer_application_owner().sync_effective_flags(),
+                peer_snapshot_provider=lambda: (
+                    self._get_peer_application_runtime().owner.snapshot()
+                ),
+                disable_peer_intent=lambda: (
+                    self._get_peer_application_runtime().owner.disable_for_overlay()
+                ),
+                sync_peer_effective=lambda: (
+                    self._get_peer_application_runtime().owner.sync_effective_flags()
+                ),
                 refresh_peer_dependencies=self._refresh_overlay_runtime_dependencies,
                 presentation_sink=self.app.refresh_overlay_peer_contract,
                 state_sink=self._report_overlay_application_state,
@@ -778,188 +675,58 @@ class GuiController:
             self._overlay_calibration_application_owner = owner
         return owner
 
-    @property
-    def _peer_runtime(self) -> PeerCaptureSessionOwner | None:
-        owner = self._peer_application_owner
-        return owner.runtime if owner is not None else None
-
-    @_peer_runtime.setter
-    def _peer_runtime(self, runtime: PeerCaptureSessionOwner | None) -> None:
-        self._get_peer_application_owner().bind_runtime(runtime)
-
-    @property
-    def _last_peer_stt_runtime_signature(self) -> tuple[object, ...] | None:
-        return self._get_peer_application_owner().last_runtime_signature
-
-    @_last_peer_stt_runtime_signature.setter
-    def _last_peer_stt_runtime_signature(self, value: tuple[object, ...] | None) -> None:
-        self._get_peer_application_owner().last_runtime_signature = value
-
-    @property
-    def _last_peer_stt_provider_signature(self) -> tuple[object, ...] | None:
-        return self._get_peer_application_owner().last_provider_signature
-
-    @_last_peer_stt_provider_signature.setter
-    def _last_peer_stt_provider_signature(self, value: tuple[object, ...] | None) -> None:
-        self._get_peer_application_owner().last_provider_signature = value
-
-    @property
-    def _last_peer_translation_enabled(self) -> bool | None:
-        return self._get_peer_application_owner().last_intent_enabled
-
-    @_last_peer_translation_enabled.setter
-    def _last_peer_translation_enabled(self, value: bool | None) -> None:
-        self._get_peer_application_owner().last_intent_enabled = value
-
-    @property
-    def _last_peer_translation_activation_requested(self) -> bool | None:
-        return self._get_peer_application_owner().last_activation_requested
-
-    @_last_peer_translation_activation_requested.setter
-    def _last_peer_translation_activation_requested(self, value: bool | None) -> None:
-        self._get_peer_application_owner().last_activation_requested = value
-
-    @property
-    def _peer_activation_generation(self) -> int:
-        return self._get_peer_application_owner().activation_generation
-
-    @_peer_activation_generation.setter
-    def _peer_activation_generation(self, value: int) -> None:
-        self._get_peer_application_owner().activation_generation = value
-
-    @property
-    def _peer_activation_starting(self) -> bool:
-        return self._get_peer_application_owner().activation_starting
-
-    @_peer_activation_starting.setter
-    def _peer_activation_starting(self, value: bool) -> None:
-        self._get_peer_application_owner().activation_starting = value
-
-    @property
-    def _peer_asr_model_loading(self) -> bool:
-        return self._get_peer_application_owner().model_loading
-
-    @_peer_asr_model_loading.setter
-    def _peer_asr_model_loading(self, value: bool) -> None:
-        self._get_peer_application_owner().model_loading = value
-
-    @property
-    def _peer_process_warning_reason(self) -> str | None:
-        return self._get_peer_application_owner().process_warning_reason
-
-    @_peer_process_warning_reason.setter
-    def _peer_process_warning_reason(self, value: str | None) -> None:
-        self._get_peer_application_owner().process_warning_reason = value
-
-    def _peer_application_state(
-        self,
-        settings: AppSettings | None = None,
-    ) -> PeerApplicationState:
-        resolved_settings = settings or self.settings
-        hub = self.hub
-        activation_requested = bool(
-            resolved_settings is not None
-            and PeerApplicationOwner.activation_requested(
-                intent_enabled=resolved_settings.ui.peer_translation_enabled,
-                eula_accepted=resolved_settings.ui.peer_translation_eula_accepted,
-            )
-        )
-        return PeerApplicationState(
-            settings_available=resolved_settings is not None,
-            peer_intent_enabled=bool(
-                resolved_settings is not None and resolved_settings.ui.peer_translation_enabled
-            ),
-            eula_accepted=bool(
-                resolved_settings is not None
-                and resolved_settings.ui.peer_translation_eula_accepted
-            ),
-            overlay_intent_enabled=bool(
-                resolved_settings is not None and resolved_settings.ui.overlay_enabled
-            ),
-            peer_provider_id=(
-                resolved_settings.provider.peer_stt.value if resolved_settings is not None else None
-            ),
-            runtime_available=hub is not None,
-            peer_provider_available=bool(
-                activation_requested and hub is not None and self._hub_has_stt_provider("peer")
-            ),
-            overlay_state=self._get_overlay_application_owner().snapshot.state,
-            overlay_command_available=(
-                self._get_overlay_application_owner().current_bridge() is not None
-            ),
-            ingress_frozen=self._shutdown_ingress_frozen,
-        )
-
-    def _apply_peer_effective_flags(
-        self,
-        peer_translation_enabled: bool,
-        integrated_context_enabled: bool,
-    ) -> None:
-        if self.hub is None:
-            return
-        self.hub.peer_translation_enabled = peer_translation_enabled
-        self.hub.integrated_context_enabled = integrated_context_enabled
-
-    def _get_peer_application_owner(self) -> PeerApplicationOwner:
-        owner = self._peer_application_owner
-        if owner is None:
-            owner = PeerApplicationOwner(
-                state_provider=self._peer_application_state,
-                config_factory=lambda: build_peer_capture_session_config(
-                    cast(AppSettings, self.settings),
-                    canonical_settings=self._canonical_vnext_settings_for(
-                        cast(AppSettings, self.settings)
-                    ),
-                ),
-                peer_intent_sink=lambda enabled: setattr(
-                    cast(AppSettings, self.settings).ui,
-                    "peer_translation_enabled",
-                    enabled,
-                ),
-                overlay_intent_sink=lambda enabled: setattr(
-                    cast(AppSettings, self.settings).ui,
-                    "overlay_enabled",
-                    enabled,
-                ),
+    def _get_peer_application_runtime(self) -> PeerApplicationRuntime:
+        runtime = self._peer_application_runtime
+        if runtime is None:
+            runtime = compose_peer_application(
+                settings_provider=lambda: self.settings,
+                settings_owner=self._get_settings_owner(),
+                canonical_settings=self._canonical_vnext_settings_for,
+                hub_provider=lambda: self.hub,
+                overlay_provider=self._get_overlay_application_owner,
+                ingress_frozen=lambda: self._shutdown_ingress_frozen,
                 persist_manual_fallback=lambda: (
                     self._get_settings_application_owner().persist_manual_fallback(channel="peer")
                 ),
-                ensure_local_ready=lambda generation: self._ensure_peer_local_stt_ready(
-                    activation_generation=generation
+                ensure_local_ready=lambda generation: (
+                    self._get_local_asr_application_runtime().ensure_peer_ready(
+                        activation_generation=generation
+                    )
                 ),
-                clear_cpu_pending=self._reset_local_stt_pending_peer_enable_after_install,
+                clear_cpu_pending=lambda: (
+                    self._get_local_asr_application_runtime().cpu_repair.reset_peer()
+                ),
                 clear_gpu_pending=lambda: self._get_gpu_runtime_interaction_owner().clear_pending(
                     "peer"
                 ),
-                clear_switched_pending=self._clear_local_stt_pending_enable_if_provider_switched_away,
-                sync_local_notice=self._sync_local_stt_notice,
-                presentation_changed=self._refresh_overlay_peer_consumers,
-                begin_overlay_start=self._get_overlay_application_owner().begin_start,
-                effective_sink=self._apply_peer_effective_flags,
-                disclosure_sink=self._enqueue_peer_translation_disclosure,
-                superseded_sink=lambda: self._superseded_local_asr_settings_ids.add(
-                    id(self.settings)
+                clear_switched_pending=lambda: (
+                    self._get_local_asr_application_runtime().cpu_repair.clear_if_provider_switched_away()
                 ),
+                sync_local_notice=lambda: (
+                    self._get_local_asr_application_runtime().adapters.notice.sync()
+                ),
+                presentation_changed=self._refresh_overlay_peer_consumers,
+                disclosure_sink=self._enqueue_peer_translation_disclosure,
+                superseded_sink=lambda: self._provider_runtime_signatures.mark_superseded(
+                    cast(AppSettings, self.settings)
+                ),
+                localize=self.app.localize,
+                settings_presentation_sink=self.app.refresh_settings_loopback_capture_target,
                 log_basic=self.log_basic,
                 log_detailed=self.log_detailed,
-                log_failure=lambda message: self.log_basic(
-                    message,
-                    level=logging.ERROR,
-                ),
             )
-            self._peer_application_owner = owner
-        return owner
+            self._peer_application_runtime = runtime
+        return runtime
 
     def _effective_peer_translation_enabled_for(self, settings: AppSettings) -> bool:
-        return self._get_peer_application_owner().effective_enabled(
-            self._peer_application_state(settings)
-        )
+        runtime = self._get_peer_application_runtime()
+        return runtime.owner.effective_enabled(runtime.state_for(settings))
 
     def _peer_translation_eula_accepted_for(self, settings: AppSettings) -> bool:
         return bool(settings.ui.peer_translation_eula_accepted)
 
     def _peer_translation_activation_requested_for(self, settings: AppSettings) -> bool:
-        return self._get_peer_application_owner().activation_requested(
+        return self._get_peer_application_runtime().owner.activation_requested(
             intent_enabled=settings.ui.peer_translation_enabled,
             eula_accepted=settings.ui.peer_translation_eula_accepted,
         )
@@ -975,8 +742,8 @@ class GuiController:
         resolved_settings = settings or self.settings
         if resolved_settings is None:
             return
-        state = self._peer_application_state(resolved_settings)
-        self._get_peer_application_owner().sync_effective_flags(state)
+        runtime = self._get_peer_application_runtime()
+        runtime.owner.sync_effective_flags(runtime.state_for(resolved_settings))
 
     def get_event_language_codes(self) -> tuple[str | None, str | None]:
         if self.settings is None:
@@ -994,10 +761,9 @@ class GuiController:
         *,
         peer_stop_mode: str = "retain",
     ) -> None:
-        if peer_stop_mode == "release":
-            await self._refresh_peer_stt_runtime(stop_mode="release")
-        else:
-            await self._refresh_peer_stt_runtime()
+        await self._get_peer_application_runtime().owner.refresh_runtime(
+            stop_mode="release" if peer_stop_mode == "release" else "retain"
+        )
         self._sync_effective_hub_flags()
         self._refresh_overlay_peer_consumers()
 
@@ -1062,8 +828,15 @@ class GuiController:
 
         self.app.attach_runtime_log_sink(runtime_logging)
 
-        await self._init_pipeline()
-        self._sync_local_stt_notice()
+        self._get_local_asr_provisioning_owner()
+        self._sync_signature_caches(self.settings)
+        await self._get_runtime_pipeline_launcher().launch(
+            self.settings,
+            vrc_mic_state=self.vrc_mic_state,
+            vrc_mic_audio_gate=self.vrc_mic_audio_gate,
+            receiver_active=self.receiver is not None,
+        )
+        self._get_local_asr_application_runtime().adapters.notice.sync()
 
         assert self.hub is not None
 
@@ -1167,7 +940,7 @@ class GuiController:
     ) -> None:
         self._sync_local_cpu_auto_availability(snapshot.cpu_auto_available)
         self._get_gpu_runtime_interaction_owner().observe_provisioning(snapshot)
-        self._sync_local_stt_notice()
+        self._get_local_asr_application_runtime().adapters.notice.sync()
 
     def _on_local_asr_provisioning_diagnostic(
         self,
@@ -1340,128 +1113,24 @@ class GuiController:
             and self.hub.llm is not None
         )
 
-    def _get_managed_auth_runtime_adapter(self) -> ManagedAuthRuntimeAdapter:
-        adapter = self._managed_auth_runtime_adapter
-        if adapter is None:
-            adapter = ManagedAuthRuntimeAdapter(
+    def _get_managed_account_components(self) -> ManagedAccountComponents:
+        components = self._managed_account_components
+        if components is None:
+            components = compose_managed_account(
                 config_path=self.config_path,
-                secret_store_factory=create_secret_store,
-                settings_provider=lambda: self.settings,
-                settings_sink=lambda settings: setattr(self, "settings", settings),
-                release_service_provider=lambda: self._managed_openrouter_release_service,
-                persistence_callback_factory=(
-                    self._get_settings_owner().managed_identity_persistence_callback
-                ),
-                settings_repository_factory=lambda base, committed, surface: (
-                    self._get_settings_owner().create_legacy_patch_repository(
-                        base_settings=base,
-                        committed_settings=committed,
-                        surface=surface,
-                        save_failure_sink=self._log_error,
-                    )
-                ),
-                settings_owner_complete=self._get_settings_owner().complete,
-                runtime_presence_provider=lambda: (
-                    self.hub is not None,
-                    self.hub is not None and self.hub.llm is not None,
+                settings=self._get_settings_owner(),
+                provider_settings=self._get_provider_settings_owner(),
+                provider_runtime=self._get_provider_runtime_components().runtime,
+                verifier=self._get_provider_verifier(),
+                results=self._get_settings_application_owner().results,
+                runtime=ManagedTranslationRuntimeAccess(
+                    runtime_provider=lambda: self.hub,
+                    rebuild_llm=self._get_provider_runtime_components().llm_rebuild.rebuild,
                 ),
                 ingress_provider=lambda: self._shutdown_ingress_frozen,
-            )
-            self._managed_auth_runtime_adapter = adapter
-        return adapter
-
-    def _get_managed_auth_owner(self) -> ManagedAuthOwner:
-        owner = self._managed_auth_owner
-        if owner is None:
-            adapter = self._get_managed_auth_runtime_adapter()
-            owner = ManagedAuthOwner(
-                state_provider=adapter.state,
                 pending_sink=self.app.set_dashboard_managed_auth_pending,
-                qq_executor=adapter.execute_qq,
-                discord_executor=adapter.execute_discord,
-                runtime_ensurer=self._ensure_managed_auth_runtime,
-                usage_view_sink=self._apply_managed_auth_usage_view,
-                usage_refresh_sink=self._get_managed_usage_owner().schedule_usage_refresh,
-                message_sink=lambda key, values: self._show_short_message(
-                    key,
-                    **dict(values),
-                ),
-                result_sink=self._get_settings_application_owner().results.set,
-                log_sink=lambda message: self.log_basic(
-                    message,
-                    level=logging.ERROR,
-                ),
-            )
-            self._managed_auth_owner = owner
-        return owner
-
-    async def _ensure_managed_auth_runtime(self, mode: str) -> bool:
-        if self.hub is None:
-            return False
-        if mode == "always" or (mode == "if_missing" and self.hub.llm is None):
-            await self._get_llm_provider_rebuild_owner().rebuild()
-        return self.hub.llm is not None
-
-    def _apply_managed_auth_usage_view(
-        self,
-        referral_id: str | None,
-        pass_status,
-    ) -> None:
-        owner = self._get_managed_usage_owner()
-        owner.set_view_state(
-            visible=True,
-            remaining_percent=None,
-            referral_id=referral_id or owner.current_referral_id,
-            pass_status=pass_status,
-        )
-
-    def _set_managed_trial_pending_auth(self, pending: bool) -> None:
-        self._get_managed_auth_owner().set_pending(pending)
-
-    def clear_managed_auth_pending_state(self) -> None:
-        self._get_managed_auth_owner().clear_pending()
-
-    def _get_managed_translation_runtime_adapter(
-        self,
-    ) -> ManagedTranslationRuntimeAdapter:
-        adapter = self._managed_translation_runtime_adapter
-        if adapter is None:
-            adapter = ManagedTranslationRuntimeAdapter(
-                auth=self._get_managed_auth_runtime_adapter(),
-                settings_provider=lambda: self.settings,
-                release_service_provider=lambda: self._managed_openrouter_release_service,
-                runtime_snapshot_provider=lambda: (
-                    self.hub is not None,
-                    self.hub.translation_enabled if self.hub is not None else False,
-                    self.hub.llm if self.hub is not None else None,
-                ),
-                ingress_provider=lambda: self._shutdown_ingress_frozen,
-                founder_dialog=self.app.show_founder_letter_dialog,
-                persist_settings=lambda: self._get_settings_owner().save_current(
-                    failure_sink=lambda exc: self._log_error(f"Failed to save settings: {exc}")
-                ),
-            )
-            self._managed_translation_runtime_adapter = adapter
-        return adapter
-
-    def _get_translation_enable_owner(self) -> TranslationEnableOwner:
-        owner = self._translation_enable_owner
-        if owner is None:
-            adapter = self._get_managed_translation_runtime_adapter()
-            owner = TranslationEnableOwner(
-                state_provider=adapter.state,
-                managed_prepare=adapter.prepare,
-                founder_route=self._get_managed_usage_owner().should_route_to_founder_letter,
-                pending_sink=self._set_managed_trial_pending_auth,
-                runtime_ensurer=self._ensure_managed_auth_runtime,
-                usage_refresh_sink=self._get_managed_usage_owner().schedule_usage_refresh,
-                usage_refresh_now=lambda: self._get_managed_usage_owner().refresh(
-                    auto_show_founder_letter=False
-                ),
-                runtime_sink=self._set_translation_runtime_state,
+                usage_view_sink=self._apply_managed_usage_view_state,
                 dashboard_sink=self.app.set_dashboard_translation_enabled,
-                clear_context=lambda: self.hub.clear_context() if self.hub is not None else None,
-                warmup=adapter.warmup,
                 message_sink=lambda key, values: self._show_short_message(
                     key,
                     **dict(values),
@@ -1471,33 +1140,38 @@ class GuiController:
                     if callable(getattr(self.app, "show_qq_managed_auth_dialog", None))
                     else None
                 ),
-                result_sink=self._get_settings_application_owner().results.set,
+                founder_dialog=self.app.show_founder_letter_dialog,
+                failure_route=self._maybe_show_founder_letter_after_pkce_failure,
                 log_basic=self.log_basic,
                 log_detailed=self.log_detailed,
                 log_error=self._log_error,
-                founder_letter_sink=adapter.show_founder_letter,
+                basic_warning_sink=lambda message: self.log_basic(
+                    message,
+                    level=logging.WARNING,
+                ),
+                detailed_warning_sink=lambda message, exception: self.log_detailed(
+                    message,
+                    level=logging.WARNING,
+                    exception=exception,
+                ),
             )
-            self._translation_enable_owner = owner
-        return owner
+            self._managed_account_components = components
+        return components
 
-    def _set_translation_runtime_state(self, enabled: bool) -> None:
-        if self.hub is not None:
-            self.hub.translation_enabled = bool(enabled)
+    def _get_managed_auth_owner(self) -> ManagedAuthOwner:
+        return self._get_managed_account_components().auth
 
-    def _managed_openrouter_release_settings(self) -> AppSettings | None:
-        if self.settings is None:
-            return None
-        if not self._managed_openrouter_selected():
-            return None
-        return self.settings
+    def _set_managed_trial_pending_auth(self, pending: bool) -> None:
+        self._get_managed_auth_owner().set_pending(pending)
+
+    def clear_managed_auth_pending_state(self) -> None:
+        self._get_managed_auth_owner().clear_pending()
+
+    def _get_translation_enable_owner(self) -> TranslationEnableOwner:
+        return self._get_managed_account_components().translation
 
     def _managed_openrouter_selected(self) -> bool:
-        return bool(
-            self.settings is not None
-            and self.settings.provider.llm == LLMProviderName.OPENROUTER
-            and self.settings.translation.connection in _MANAGED_OPENROUTER_CONNECTIONS
-            and self.settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-        )
+        return self._get_managed_account_components().release.selected()
 
     def dashboard_managed_auth_action(self) -> str:
         return self._get_managed_auth_owner().dashboard_action()
@@ -1621,7 +1295,7 @@ class GuiController:
 
     def _get_telemetry_service(self) -> TranslationSuccessTelemetryService:
         return TranslationSuccessTelemetryService(
-            self.telemetry_client,
+            self._get_managed_account_components().release.telemetry_client,
             diagnostics_sink=self._telemetry_diagnostics_sink,
         )
 
@@ -1658,49 +1332,6 @@ class GuiController:
             replacement_settings
         )
 
-    def _managed_usage_state(self) -> ManagedUsageState:
-        settings = self.settings
-        if settings is None:
-            return ManagedUsageState(
-                settings_available=False,
-                managed_key_visible=False,
-                release_settings_available=False,
-                installation_id=None,
-                entitlement_ref=None,
-                referral_id=None,
-                ingress_frozen=self._shutdown_ingress_frozen,
-            )
-        active_ref = settings.managed_identity.active_managed_credential_ref
-        entitlement_ref = active_ref.strip() if isinstance(active_ref, str) else None
-        return ManagedUsageState(
-            settings_available=True,
-            managed_key_visible=self._managed_openrouter_selected(),
-            release_settings_available=self._managed_openrouter_release_settings() is not None,
-            installation_id=settings.managed_identity.installation_id.strip() or None,
-            entitlement_ref=entitlement_ref or None,
-            referral_id=normalize_owned_referral_id(settings.managed_identity.referral_id),
-            ingress_frozen=self._shutdown_ingress_frozen,
-        )
-
-    async def _fetch_managed_usage_metadata(self) -> ManagedUsageMetadataResult:
-        settings = self.settings
-        release_settings = self._managed_openrouter_release_settings()
-        if settings is None or release_settings is None:
-            return ManagedUsageMetadataResult(key_available=False, metadata=None)
-        try:
-            secrets = create_secret_store(settings.secrets, config_path=self.config_path)
-            resolution = resolve_openrouter_credentials(
-                build_openrouter_credential_runtime_config(release_settings),
-                secrets=secrets,
-            )
-        except Exception:
-            return ManagedUsageMetadataResult(key_available=False, metadata=None)
-        api_key = resolution.api_key
-        if not api_key:
-            return ManagedUsageMetadataResult(key_available=False, metadata=None)
-        metadata = await self._get_provider_verifier().fetch_openrouter_key_metadata(api_key)
-        return ManagedUsageMetadataResult(key_available=True, metadata=metadata)
-
     def _apply_managed_usage_view_state(self, state: ManagedUsageViewState) -> None:
         self.app.set_settings_managed_key_state(
             visible=state.visible,
@@ -1709,51 +1340,8 @@ class GuiController:
             pass_status=state.pass_status,
         )
 
-    def _managed_usage_auto_show_founder_letter(self, metadata) -> bool:
-        if self.settings is None:
-            return False
-        return should_auto_show_founder_letter(
-            build_managed_identity_state_port(
-                self.settings,
-                lambda _settings: None,
-            ),
-            metadata,
-        )
-
-    def _managed_usage_warning_sink(
-        self,
-        message: str,
-        exception: BaseException | None,
-    ) -> None:
-        if message.startswith("[ManagedAuth] Background refresh failed"):
-            self.log_detailed(
-                message,
-                level=logging.WARNING,
-                exception=exception,
-            )
-            return
-        self.log_basic(message, level=logging.WARNING)
-
     def _get_managed_usage_owner(self) -> ManagedUsageOwner:
-        owner = self._managed_usage_owner
-        if owner is None:
-            owner = ManagedUsageOwner(
-                state_provider=self._managed_usage_state,
-                release_service_provider=lambda: self._managed_openrouter_release_service,
-                metadata_fetcher=self._fetch_managed_usage_metadata,
-                pending_sink=self._set_managed_trial_pending_auth,
-                view_sink=self._apply_managed_usage_view_state,
-                disable_translation_sink=lambda reopen: (
-                    self._get_translation_enable_owner().disable_for_managed_exhaustion(
-                        reopen_founder_letter=reopen
-                    )
-                ),
-                auto_show_founder_letter_provider=self._managed_usage_auto_show_founder_letter,
-                normalize_referral_id=normalize_owned_referral_id,
-                warning_sink=self._managed_usage_warning_sink,
-            )
-            self._managed_usage_owner = owner
-        return owner
+        return self._get_managed_account_components().usage
 
     def _on_managed_trial_delegate_ready(self) -> None:
         self._get_managed_usage_owner().delegate_ready()
@@ -1761,87 +1349,17 @@ class GuiController:
     async def _refresh_managed_trial_usage_state_best_effort(self) -> None:
         await self._get_managed_usage_owner().refresh_best_effort()
 
-    def _build_llm_provider_signature(self, settings: AppSettings) -> tuple[object, ...]:
-        primary_uses_openrouter = settings.provider.llm == LLMProviderName.OPENROUTER
-        fallback_uses_openrouter = bool(
-            settings.translation.fallback.enabled
-            and settings.translation.fallback.connection
-            in (
-                TranslationConnection.OPENROUTER,
-                TranslationConnection.MANAGED,
-                TranslationConnection.MANAGED_CHINA,
-            )
-        )
-        uses_openrouter = primary_uses_openrouter or fallback_uses_openrouter
-        uses_managed_openrouter = bool(
-            (
-                primary_uses_openrouter
-                and settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-            )
-            or (
-                settings.translation.fallback.enabled
-                and settings.translation.fallback.connection
-                in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
-            )
-        )
-        return (
-            settings.provider.llm,
-            settings.llm.concurrency_limit,
-            settings.gemini.llm_model if settings.provider.llm == LLMProviderName.GEMINI else None,
-            (settings.openrouter.llm_model if primary_uses_openrouter else None),
-            (settings.openrouter.routing_mode if uses_openrouter else None),
-            (
-                settings.openrouter.provider_routing
-                if uses_openrouter
-                else OpenRouterProviderRouting.DEFAULT
-            ),
-            (settings.openrouter.selected_source if primary_uses_openrouter else None),
-            (settings.openrouter.selection_alias if primary_uses_openrouter else None),
-            (
-                settings.translation.fallback.enabled,
-                settings.translation.fallback.model,
-                settings.translation.fallback.connection,
-            ),
-            (settings.openrouter.broker_base_url if uses_openrouter else None),
-            (_managed_openrouter_identity_signature(settings) if uses_managed_openrouter else None),
-            settings.qwen.llm_model if settings.provider.llm == LLMProviderName.QWEN else None,
-            settings.qwen.region if settings.provider.llm == LLMProviderName.QWEN else None,
-            (
-                settings.deepseek.llm_model
-                if settings.provider.llm == LLMProviderName.DEEPSEEK
-                else None
-            ),
-            (
-                (
-                    settings.local_llm.backend,
-                    settings.local_llm.base_url,
-                    settings.local_llm.model,
-                    _canonical_json_signature(settings.local_llm.extra_body),
-                )
-                if settings.provider.llm == LLMProviderName.LOCAL_LLM
-                else None
-            ),
-        )
-
     def _sync_signature_caches(self, settings: AppSettings) -> None:
-        current_self_signature = build_self_stt_runtime_signature(settings)
-        self._last_stt_runtime_signature = current_self_signature
-        self._last_self_stt_runtime_signature = current_self_signature
-        self._last_peer_stt_runtime_signature = build_peer_stt_runtime_signature(
+        self._provider_runtime_signatures.sync(
             settings,
-            canonical_settings=self._canonical_vnext_settings_for(settings),
+            canonical=self._canonical_vnext_settings_for(settings),
+            peer=self._get_peer_application_runtime().owner,
         )
-        self._last_self_stt_provider_signature = build_self_stt_provider_signature(settings)
-        self._last_peer_stt_provider_signature = build_peer_stt_provider_signature_from_vnext(
-            self._canonical_vnext_settings_for(settings)
-        )
-        self._last_llm_provider_signature = self._build_llm_provider_signature(settings)
+        self._sync_non_provider_runtime_signatures(settings)
+
+    def _sync_non_provider_runtime_signatures(self, settings: AppSettings) -> None:
         self._last_microphone_test_audio_settings_signature = (
             self._microphone_test_audio_settings_signature(settings)
-        )
-        self._last_peer_translation_enabled = settings.ui.peer_translation_enabled
-        self._last_peer_translation_activation_requested = (
-            self._peer_translation_activation_requested_for(settings)
         )
 
     def _copy_provider_prompt_apply_fields(self, source: AppSettings, target: AppSettings) -> None:
@@ -1905,9 +1423,8 @@ class GuiController:
         return merged
 
     def _peer_runtime_should_be_active(self, settings: AppSettings) -> bool:
-        return self._get_peer_application_owner().desired_active(
-            self._peer_application_state(settings)
-        )
+        runtime = self._get_peer_application_runtime()
+        return runtime.owner.desired_active(runtime.state_for(settings))
 
     def _active_local_asr_change(
         self,
@@ -1915,8 +1432,10 @@ class GuiController:
         next_settings: AppSettings,
     ) -> bool:
         local_providers = {*LOCAL_CPU_PROVIDERS, STTProviderName.LOCAL_QWEN_GPU.value}
+        self_owner = self._self_capture_owner
         self_changed = (
-            self._stt_desired
+            self_owner is not None
+            and self_owner.snapshot.desired_active
             and (
                 base_settings.provider.stt.value in local_providers
                 or next_settings.provider.stt.value in local_providers
@@ -1965,27 +1484,14 @@ class GuiController:
         self,
         snapshot: PeerCaptureSessionSnapshot,
     ) -> None:
-        self._get_peer_application_owner().on_runtime_state_changed(snapshot)
-
-    def _resolve_peer_capture_target(
-        self,
-        settings: AppSettings,
-    ) -> ResolvedDesktopAudioCaptureTarget:
-        return self._get_peer_application_owner().resolve_capture_target(
-            legacy_output_device=settings.desktop_audio.output_device,
-            persisted_capture_target=getattr(
-                settings.desktop_audio,
-                "runtime_capture_target",
-                None,
-            ),
-        )
+        self._get_peer_application_runtime().owner.on_runtime_state_changed(snapshot)
 
     async def _close_peer_runtime_for_release(self, failures: list[Exception]) -> None:
-        owner = self._peer_application_owner
-        if owner is None:
+        runtime = self._peer_application_runtime
+        if runtime is None:
             return
         try:
-            await owner.close()
+            await runtime.owner.close()
         except Exception as exc:
             failures.append(exc)
 
@@ -2024,10 +1530,6 @@ class GuiController:
             return
         if self._self_capture_owner is owner:
             self._self_capture_owner = None
-        self._mic_task = None
-        self._audio_source = None
-        self._vad = None
-        self._last_mic_loop_close_exception = None
 
     def bind_application_lifecycle(
         self,
@@ -2149,6 +1651,12 @@ class GuiController:
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+                owner_name="RuntimePipelineLauncher",
+                callback_name="close_failed_resources",
+                callback=self._close_runtime_pipeline_launcher,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
                 owner_name="ClientHub",
                 callback_name="stop_owned_runtimes",
                 callback=self._stop_hub,
@@ -2216,11 +1724,12 @@ class GuiController:
 
     def _freeze_application_ingress(self) -> None:
         self._shutdown_ingress_frozen = True
-        self._stt_desired = False
-        self._stt_activation_generation += 1
-        peer_owner = self._peer_application_owner
-        if peer_owner is not None:
-            peer_owner.stop_ingress()
+        self_owner = self._self_capture_owner
+        if self_owner is not None:
+            self_owner.invalidate_intent()
+        peer_runtime = self._peer_application_runtime
+        if peer_runtime is not None:
+            peer_runtime.owner.stop_ingress()
         owner = self._vrchat_osc_presence_owner
         if owner is not None:
             owner.stop_ingress()
@@ -2233,15 +1742,11 @@ class GuiController:
         logging_owner = self._runtime_logging_owner
         if logging_owner is not None:
             logging_owner.stop_ingress()
-        managed_usage_owner = self._managed_usage_owner
-        if managed_usage_owner is not None:
-            managed_usage_owner.stop_ingress()
-        managed_auth_owner = self._managed_auth_owner
-        if managed_auth_owner is not None:
-            managed_auth_owner.stop_ingress()
-        translation_enable_owner = self._translation_enable_owner
-        if translation_enable_owner is not None:
-            translation_enable_owner.stop_ingress()
+        managed = self._managed_account_components
+        if managed is not None:
+            managed.usage.stop_ingress()
+            managed.auth.stop_ingress()
+            managed.translation.stop_ingress()
 
     def _stop_github_star_prompt_ingress(self) -> None:
         owner = self._github_star_prompt_owner
@@ -2269,19 +1774,19 @@ class GuiController:
             await owner.close_background_tasks()
 
     async def _close_managed_usage_owner(self) -> None:
-        owner = self._managed_usage_owner
-        if owner is not None:
-            await owner.close()
+        managed = self._managed_account_components
+        if managed is not None:
+            await managed.usage.close()
 
     async def _close_managed_auth_owner(self) -> None:
-        owner = self._managed_auth_owner
-        if owner is not None:
-            await owner.close()
+        managed = self._managed_account_components
+        if managed is not None:
+            await managed.auth.close()
 
     async def _close_translation_enable_owner(self) -> None:
-        owner = self._translation_enable_owner
-        if owner is not None:
-            await owner.close()
+        managed = self._managed_account_components
+        if managed is not None:
+            await managed.translation.close()
 
     async def _close_microphone_test_runtime(self) -> None:
         failures: list[Exception] = []
@@ -2326,6 +1831,14 @@ class GuiController:
             self._ui_event_bridge = None
         _raise_lifecycle_cleanup_failures("Hub owner shutdown failed", failures)
 
+    async def _close_runtime_pipeline_launcher(self) -> None:
+        launcher = self._runtime_pipeline_launcher
+        if launcher is None:
+            return
+        await launcher.close()
+        if self._runtime_pipeline_launcher is launcher:
+            self._runtime_pipeline_launcher = None
+
     def _close_sender(self) -> None:
         sender = self.sender
         if sender is None:
@@ -2336,10 +1849,9 @@ class GuiController:
         self.osc = None
 
     async def _close_managed_openrouter_release_service(self) -> None:
-        service = self._managed_openrouter_release_service
-        self._managed_openrouter_release_service = None
-        if service is not None:
-            await service.close()
+        managed = self._managed_account_components
+        if managed is not None:
+            await managed.release.close()
 
     def _emit_final_application_shutdown_diagnostics(
         self,
@@ -2367,10 +1879,10 @@ class GuiController:
         await self._get_overlay_application_owner().set_enabled(enabled)
 
     async def set_peer_translation_enabled(self, enabled: bool) -> None:
-        await self._get_peer_application_owner().set_enabled(enabled)
+        await self._get_peer_application_runtime().owner.set_enabled(enabled)
 
     async def retry_peer_process_capture(self) -> bool:
-        return await self._get_peer_application_owner().retry_process_capture()
+        return await self._get_peer_application_runtime().owner.retry_process_capture()
 
     def _enqueue_peer_translation_disclosure(self) -> None:
         hub = self.hub
@@ -2402,53 +1914,69 @@ class GuiController:
     async def set_translation_enabled(self, enabled: bool) -> bool:
         return await self._get_translation_enable_owner().set_enabled(enabled)
 
-    async def set_stt_enabled(self, enabled: bool, *, force_immediate: bool = False) -> None:
-        if enabled and not self._get_settings_application_owner().persist_manual_fallback(
-            channel="self"
-        ):
-            self.app.set_dashboard_stt_enabled(False)
-            return
-        self.log_basic(f"[STT] Toggle request: enabled={enabled}")
-        self.log_detailed(
-            "[STT] Toggle detail: "
-            "desired_before="
-            f"{self._stt_desired} "
-            f"overlay_state={self._get_overlay_application_owner().snapshot.state}"
-        )
-        self._stt_activation_starting = bool(enabled)
-        self._stt_activation_failed = False
-        self._sync_local_stt_notice()
-        self._stt_desired = bool(enabled)
-        self._stt_force_immediate = force_immediate
-        if not enabled:
-            self._reset_local_stt_pending_enable_after_install()
-            self._get_gpu_runtime_interaction_owner().clear_pending("self")
+    @property
+    def _stt_restart_requested(self) -> bool:
+        return self._get_self_capture_application_owner().restart_requested
 
-        # Log provider info when enabling
-        if enabled and self.settings is not None:
-            provider = self.settings.provider.stt.value
-            if provider == "qwen_asr":
-                region = self.settings.qwen.region.value
-                self.log_basic(f"[STT] Enabled with provider: {provider}")
-                self.log_detailed(f"[STT] Provider detail: provider={provider} region={region}")
-            else:
-                self.log_basic(f"[STT] Enabled with provider: {provider}")
+    @_stt_restart_requested.setter
+    def _stt_restart_requested(self, requested: bool) -> None:
+        self._get_self_capture_application_owner().restart_requested = requested
 
-        # Mark promo eligible when user explicitly enables STT via button
-        if enabled and self.hub is not None:
-            self.hub.mark_promo_eligible()
-
-        snapshot = await self._ensure_stt_switch()
-        self._stt_activation_starting = False
-        if snapshot is None or snapshot.state is not SelfCaptureSessionState.ADMISSION_PENDING:
-            self.app.set_dashboard_stt_enabled(
-                bool(
-                    self._stt_desired
-                    and not self._stt_activation_failed
-                    and self._mic_task is not None
-                )
+    def _get_self_capture_application_owner(self) -> SelfCaptureApplicationOwner:
+        owner = self._self_capture_application_owner
+        if owner is None:
+            owner = SelfCaptureApplicationOwner(
+                settings_provider=lambda: (
+                    SelfCaptureApplicationSettings(
+                        config=build_self_capture_session_config(self.settings),
+                        provider_id=self.settings.provider.stt.value,
+                        qwen_region=self.settings.qwen.region.value,
+                    )
+                    if self.settings is not None
+                    else None
+                ),
+                runtime_available=lambda: self.hub is not None,
+                capture_owner=self._get_self_capture_owner,
+                capture_owner_if_created=lambda: self._self_capture_owner,
+                persist_manual_fallback=lambda: (
+                    self._get_settings_application_owner().persist_manual_fallback(channel="self")
+                ),
+                reset_local_pending=lambda: (
+                    self._get_local_asr_application_runtime().cpu_repair.reset_self()
+                ),
+                clear_gpu_pending=lambda: self._get_gpu_runtime_interaction_owner().clear_pending(
+                    "self"
+                ),
+                overlay_state_provider=lambda: (
+                    self._get_overlay_application_owner().snapshot.state
+                ),
+                mark_promo_eligible=lambda: (
+                    self.hub.mark_promo_eligible() if self.hub is not None else None
+                ),
+                dashboard_enabled_sink=self.app.set_dashboard_stt_enabled,
+                dashboard_needs_key_sink=self.app.set_dashboard_stt_needs_key,
+                dashboard_needs_key=lambda available: self._dashboard_stt_needs_key(
+                    stt_available=available
+                ),
+                state_sink=self._on_self_capture_state_changed,
+                sync_effective_flags=self._sync_effective_hub_flags,
+                sync_local_notice=lambda: (
+                    self._get_local_asr_application_runtime().adapters.notice.sync()
+                ),
+                log_basic=self.log_basic,
+                log_detailed=lambda message, level: self.log_detailed(
+                    message,
+                    level=level,
+                ),
             )
-        self._sync_local_stt_notice()
+            self._self_capture_application_owner = owner
+        return owner
+
+    async def set_stt_enabled(self, enabled: bool, *, force_immediate: bool = False) -> None:
+        await self._get_self_capture_application_owner().set_enabled(
+            enabled,
+            force_immediate=force_immediate,
+        )
 
     def _show_short_stt_message(self, message_key: str) -> None:
         self._show_short_message(message_key)
@@ -2512,173 +2040,21 @@ class GuiController:
     def _sync_local_cpu_auto_availability(self, available: bool) -> None:
         self.app.set_settings_local_cpu_auto_available(available)
 
-    def _current_local_stt_runtime_status(self) -> str:
-        if self.settings is None:
-            return "ready"
-        return local_asr_status_for_provider(
-            self._get_local_asr_provisioning_owner().snapshot,
-            self.settings.provider.stt.value,
-        )
-
     def _peer_local_stt_requested(self, settings: AppSettings | None = None) -> bool:
-        return self._get_peer_application_owner().local_stt_requested(
-            self._peer_application_state(settings)
-        )
+        runtime = self._get_peer_application_runtime()
+        return runtime.owner.local_stt_requested(runtime.state_for(settings))
 
-    def _local_asr_cpu_repair_state(self) -> LocalASRCpuRepairRuntimeState:
-        settings = self.settings
-        self_provider = settings.provider.stt.value if settings is not None else None
-        peer_provider = settings.provider.peer_stt.value if settings is not None else None
-        return LocalASRCpuRepairRuntimeState(
-            settings_available=settings is not None,
-            locale=settings.ui.locale if settings is not None else None,
-            self_provider=self_provider,
-            peer_provider=peer_provider,
-            self_provider_local=bool(self_provider in LOCAL_CPU_PROVIDERS),
-            peer_requested=self._peer_local_stt_requested(settings),
-            self_activation_generation=self._stt_activation_generation,
-            peer_activation_generation=self._peer_activation_generation,
-            self_desired=self._stt_desired,
-        )
-
-    def _apply_local_asr_cpu_repair_effect(
-        self,
-        effect: LocalASRCpuRepairEffect,
-    ) -> None:
-        if effect.type is LocalASRCpuRepairEffectType.DISABLE_SELF_INTENT:
-            self._stt_desired = False
-            return
-        if effect.type is LocalASRCpuRepairEffectType.DISABLE_SELF_DASHBOARD:
-            self.app.set_dashboard_stt_enabled(False)
-            self.app.set_dashboard_stt_needs_key(False)
-            return
-        if effect.type is LocalASRCpuRepairEffectType.SYNC_NOTICE:
-            self._sync_local_stt_notice()
-            return
-        if effect.type is LocalASRCpuRepairEffectType.SHOW_DOWNLOAD_FAILED:
-            self._show_short_stt_message("local_stt.download_failed")
-            return
-        raise ValueError(f"Unsupported Local ASR CPU repair effect: {effect.type}")
-
-    async def _resume_self_after_local_asr_cpu_repair(self) -> bool:
-        self._stt_desired = True
-        self._stt_activation_starting = True
-        self._sync_local_stt_notice()
-        snapshot = await self._ensure_stt_switch()
-        if snapshot is not None and snapshot.generation != self._stt_activation_generation:
-            return False
-        self._stt_activation_starting = False
-        self.app.set_dashboard_stt_enabled(
-            bool(
-                self._stt_desired and not self._stt_activation_failed and self._mic_task is not None
-            )
-        )
-        self._sync_local_stt_notice()
-        return True
-
-    async def _resume_peer_after_local_asr_cpu_repair(self) -> None:
-        await self._refresh_overlay_runtime_dependencies()
-
-    def _get_local_asr_cpu_repair_owner(self) -> LocalASRCpuRepairOwner:
-        owner = self._local_asr_cpu_repair_owner
-        if owner is None:
-            owner = create_local_asr_cpu_repair_owner(
-                provisioning_provider=lambda: self._get_local_asr_provisioning_owner(),
-                state_provider=lambda: self._local_asr_cpu_repair_state(),
-                model_ids_for_provider=required_local_asr_model_ids,
-                status_for_provider=lambda provider: local_asr_status_for_provider(
-                    self._get_local_asr_provisioning_owner().snapshot,
-                    provider,
-                ),
-                effect_sink=lambda effect: self._apply_local_asr_cpu_repair_effect(effect),
-                rebuild_self_provider=lambda: self._rebuild_stt_provider(),
-                resume_self=lambda: self._resume_self_after_local_asr_cpu_repair(),
-                resume_peer=lambda: self._resume_peer_after_local_asr_cpu_repair(),
-            )
-            self._local_asr_cpu_repair_owner = owner
-        return owner
-
-    def _local_asr_readiness_state(self) -> LocalASRReadinessState:
-        settings = self.settings
-        return LocalASRReadinessState(
-            settings_available=settings is not None,
-            runtime_available=self.hub is not None,
-            self_provider=settings.provider.stt.value if settings is not None else None,
-            peer_provider=settings.provider.peer_stt.value if settings is not None else None,
-            self_source_language=(
-                settings.languages.source_language if settings is not None else ""
-            ),
-            peer_source_language=(
-                settings.languages.effective_peer_source if settings is not None else ""
-            ),
-            self_desired=self._stt_desired,
-            peer_requested=self._peer_local_stt_requested(settings),
-            self_activation_generation=self._stt_activation_generation,
-            peer_activation_generation=self._peer_activation_generation,
-        )
-
-    def _apply_local_asr_readiness_effect(
-        self,
-        effect: LocalASRReadinessEffect,
-    ) -> None:
-        if effect.type is LocalASRReadinessEffectType.DISABLE_SELF_UNSUPPORTED:
-            self._stt_desired = False
-            self.app.set_dashboard_stt_enabled(False)
-            self.app.set_dashboard_stt_needs_key(False)
-            self._show_short_stt_message("local_stt.language_unsupported")
-            return
-        if effect.type is LocalASRReadinessEffectType.DISABLE_SELF_INVALID:
-            self._stt_desired = False
-            self.app.set_dashboard_stt_enabled(False)
-            self.app.set_dashboard_stt_needs_key(False)
-            self._show_short_stt_message("error.local_stt_model_invalid")
-            return
-        if effect.type is LocalASRReadinessEffectType.SELF_DOWNLOAD_IN_PROGRESS:
-            self._stt_desired = False
-            self.app.set_dashboard_stt_enabled(False)
-            self._show_short_stt_message("local_stt.download_in_progress")
-            return
-        if effect.type is LocalASRReadinessEffectType.DISABLE_PEER_UNSUPPORTED:
-            owner = self._get_peer_application_owner()
-            owner.disable_intent()
-            owner.sync_effective_flags()
-            self._show_short_stt_message("local_stt.language_unsupported")
-            return
-        if effect.type is LocalASRReadinessEffectType.SYNC_NOTICE:
-            self._sync_local_stt_notice()
-            return
-        raise ValueError(f"Unsupported Local ASR readiness effect: {effect.type}")
-
-    def _get_local_asr_readiness_owner(self) -> LocalASRReadinessOwner:
-        owner = self._local_asr_readiness_owner
-        if owner is None:
-
-            async def probe_self_provider() -> None:
-                if self.hub is None or not self._hub_has_stt_provider("self"):
-                    raise RuntimeError("self STT provider is unavailable")
-                if self._hub_local_asr_provider_runtime() is None:
-                    raise RuntimeError("local ASR provider runtime is unavailable")
-                await self.hub.warmup_stt_channel("self")
-
-            def self_channel_provider() -> ProviderRuntimeChannelSnapshot | None:
-                runtime = self._hub_local_asr_provider_runtime()
-                return runtime.snapshot.channel_for("self") if runtime is not None else None
-
-            owner = create_local_asr_readiness_owner(
+    def _get_local_asr_application_runtime(self) -> LocalASRApplicationRuntime:
+        runtime = self._local_asr_application_runtime
+        if runtime is None:
+            runtime = compose_local_asr_application(
+                settings_provider=lambda: self.settings,
+                hub_provider=lambda: self.hub,
+                self_capture_provider=lambda: self._self_capture_owner,
+                peer_provider=lambda: self._get_peer_application_runtime().owner,
+                peer_requested=self._peer_local_stt_requested,
+                peer_activation_requested=self._peer_translation_activation_requested_for,
                 provisioning_provider=self._get_local_asr_provisioning_owner,
-                cpu_repair_owner=self._get_local_asr_cpu_repair_owner(),
-                state_provider=self._local_asr_readiness_state,
-                effect_sink=self._apply_local_asr_readiness_effect,
-                self_provider_available=lambda: (
-                    self.hub is not None and self._hub_has_stt_provider("self")
-                ),
-                self_channel_provider=self_channel_provider,
-                rebuild_self_provider=self._rebuild_stt_provider,
-                probe_self_provider=probe_self_provider,
-                persist_manual_fallback=lambda channel: (
-                    self._get_settings_application_owner().persist_manual_fallback(channel=channel)
-                ),
-                validate_gpu_activation=self._validate_gpu_activation,
                 gpu_state_provider=lambda: (
                     self._get_gpu_runtime_interaction_owner().snapshot.ui_state
                 ),
@@ -2687,193 +2063,48 @@ class GuiController:
                         cast(GpuASRChannel, channel)
                     )
                 ),
+                validate_gpu_activation=self._validate_gpu_activation,
+                dashboard_enabled_sink=self.app.set_dashboard_stt_enabled,
+                dashboard_needs_key_sink=self.app.set_dashboard_stt_needs_key,
+                message_sink=self._show_short_stt_message,
+                notice_sink=self.app.set_dashboard_local_stt_notice,
+                rebuild_self_provider=lambda: (
+                    self._get_provider_runtime_components().effects.rebuild_self_stt()
+                ),
+                resume_self=self._resume_self_after_local_asr_cpu_repair,
+                resume_peer=self._resume_peer_after_local_asr_cpu_repair,
+                persist_manual_fallback=lambda channel: (
+                    self._get_settings_application_owner().persist_manual_fallback(
+                        channel=cast(Literal["self", "peer"], channel)
+                    )
+                ),
                 load_log_sink=self._get_local_asr_diagnostics_owner().log_load_result,
             )
-            self._local_asr_readiness_owner = owner
-        return owner
+            self._local_asr_application_runtime = runtime
+        return runtime
 
-    @property
-    def _local_stt_pending_enable_after_install(self) -> bool:
-        return self._get_local_asr_cpu_repair_owner().snapshot.self_pending
-
-    @_local_stt_pending_enable_after_install.setter
-    def _local_stt_pending_enable_after_install(self, pending: bool) -> None:
-        self._get_local_asr_cpu_repair_owner().set_self_pending(pending)
-
-    def _reset_local_stt_pending_enable_after_install(self) -> None:
-        self._get_local_asr_cpu_repair_owner().reset_self()
-
-    def _reset_local_stt_pending_peer_enable_after_install(self) -> None:
-        self._get_local_asr_cpu_repair_owner().reset_peer()
-
-    def _clear_local_stt_pending_enable_if_provider_switched_away(self) -> None:
-        self._get_local_asr_cpu_repair_owner().clear_if_provider_switched_away()
-
-    def _sync_local_stt_notice(self) -> None:
-        if self.settings is None:
-            return
-        self_provider = self.settings.provider.stt.value
-        peer_provider = self.settings.provider.peer_stt.value
-        self_local = self_provider in LOCAL_CPU_PROVIDERS
-        peer_local = self._peer_local_stt_requested(self.settings)
-        self_local_asr = self_local or self_provider == STTProviderName.LOCAL_QWEN_GPU.value
-        peer_local_asr = peer_local or (
-            peer_provider == STTProviderName.LOCAL_QWEN_GPU.value
-            and self._peer_translation_activation_requested_for(self.settings)
-        )
-        provisioning_snapshot = self._get_local_asr_provisioning_owner().snapshot
-        status = (
-            local_asr_status_for_provider(provisioning_snapshot, self_provider)
-            if self_local
-            else local_asr_status_for_provider(provisioning_snapshot, peer_provider)
-        )
-        visible_model_ids = required_local_asr_model_ids(
-            self_provider if self_local else peer_provider
-        )
-        activity = provisioning_snapshot.activity_for("cpu")
-        notice_model_id = (
-            activity.model_id
-            if activity is not None and activity.model_id in visible_model_ids
-            else next(
-                (
-                    model_id
-                    for model_id in visible_model_ids
-                    if provisioning_snapshot.state_for(model_id).status != "ready"
-                ),
-                None,
+    async def _resume_self_after_local_asr_cpu_repair(self) -> bool:
+        snapshot = await self._get_self_capture_application_owner().run_switch(desired=True)
+        self.app.set_dashboard_stt_enabled(
+            bool(
+                snapshot is not None
+                and snapshot.desired_active
+                and snapshot.state is not SelfCaptureSessionState.FAULTED
+                and snapshot.has_loop_task
             )
         )
-        if self._stt_activation_starting and self_local_asr:
-            status = "self_loading"
-        elif (self._peer_activation_starting or self._peer_asr_model_loading) and peer_local_asr:
-            status = "peer_loading"
-        elif self._stt_activation_failed and self_local_asr:
-            status = "start_failed"
-        should_show = status in {"self_loading", "peer_loading", "downloading"} or (
-            (self_local_asr or peer_local_asr) and status != "ready"
-        )
-        with contextlib.suppress(Exception):
-            self.app.set_dashboard_local_stt_notice(
-                status=status if should_show else None,
-                model_id=notice_model_id if should_show else None,
-                percent=(
-                    activity.progress_percent
-                    if status == "downloading" and activity is not None
-                    else None
-                ),
-                starting=self._stt_activation_starting,
-            )
+        self._get_local_asr_application_runtime().adapters.notice.sync()
+        return True
 
-    def _request_unavailable_local_asr_repair(
-        self,
-        status: str,
-        *,
-        channel: Literal["self", "peer"],
-        model_ids: tuple[str, ...] | None = None,
-        activation_generation: int | None = None,
-    ) -> bool:
-        return self._get_local_asr_cpu_repair_owner().request_repair(
-            LocalASRCpuRepairRequest(
-                status=status,
-                channel=channel,
-                model_ids=model_ids,
-                activation_generation=activation_generation,
-            )
-        )
-
-    async def _ensure_local_stt_ready(
-        self,
-        *,
-        activation_generation: int | None = None,
-    ) -> bool:
-        return await self._get_local_asr_readiness_owner().ensure_self_ready(
-            activation_generation=activation_generation,
-        )
-
-    async def _ensure_peer_local_stt_ready(
-        self,
-        *,
-        activation_generation: int | None = None,
-    ) -> bool:
-        return await self._get_local_asr_readiness_owner().ensure_peer_ready(
-            activation_generation=activation_generation,
-            gpu_provider_id=STTProviderName.LOCAL_QWEN_GPU.value,
-        )
+    async def _resume_peer_after_local_asr_cpu_repair(self) -> None:
+        await self._refresh_overlay_runtime_dependencies()
 
     async def _close_local_asr_provisioning(self) -> None:
-        self._get_local_asr_cpu_repair_owner().reset_all()
-        if self.local_asr_provisioning is not None:
+        runtime = self._local_asr_application_runtime
+        if runtime is not None:
+            await runtime.close()
+        elif self.local_asr_provisioning is not None:
             await self.local_asr_provisioning.close()
-
-    async def _ensure_stt_switch(self) -> SelfCaptureSessionSnapshot | None:
-        return await self._run_stt_switch()
-
-    async def _replace_runtime_stt_provider(self, *, smooth_local: bool = False) -> None:
-        self.log_detailed(
-            "[STT] Replacing runtime provider detail: "
-            f"desired={self._stt_desired} mic_task_active={self._mic_task is not None}"
-        )
-        if self.settings is None or self.hub is None:
-            return
-        owner = self._get_self_capture_owner()
-        config = build_self_capture_session_config(self.settings)
-        if self._stt_desired:
-            snapshot = await owner.apply_intent(
-                config,
-                enabled=True,
-                restart=not smooth_local,
-                explicit_toggle_off=False,
-            )
-        else:
-            snapshot = await owner.prepare_provider(config)
-        self._on_self_capture_state_changed(snapshot)
-        self._project_self_provider_availability(snapshot)
-        self._stt_restart_requested = False
-
-    def _project_self_provider_availability(
-        self,
-        snapshot: SelfCaptureSessionSnapshot,
-    ) -> bool:
-        available = snapshot.provider_status is SelfCaptureProviderStatus.READY
-        self._sync_effective_hub_flags(self.settings)
-        self.app.set_dashboard_stt_needs_key(self._dashboard_stt_needs_key(stt_available=available))
-        if not available:
-            self.app.set_dashboard_stt_enabled(False)
-        return available
-
-    async def _apply_stt_runtime_replacement(self, *, smooth_local: bool) -> None:
-        replacement = self._replace_runtime_stt_provider
-        try:
-            inspect.signature(replacement).bind(smooth_local=smooth_local)
-        except (TypeError, ValueError):
-            await replacement()
-            return
-        await replacement(smooth_local=smooth_local)
-
-    async def _run_stt_switch(self) -> SelfCaptureSessionSnapshot | None:
-        if self.settings is None:
-            self.log_detailed(
-                "[STT] Enable requested before hub is ready",
-                level=logging.WARNING,
-            )
-            self._stt_desired = False
-            self._stt_activation_failed = True
-            return None
-        desired = self._stt_desired
-        restart = self._stt_restart_requested
-        force_immediate = self._stt_force_immediate
-        self._stt_restart_requested = False
-        self._stt_force_immediate = False
-        owner = self._get_self_capture_owner()
-        snapshot = await owner.apply_intent(
-            build_self_capture_session_config(self.settings),
-            enabled=desired,
-            restart=restart,
-            force_immediate=force_immediate,
-            explicit_toggle_off=not desired,
-        )
-        self._on_self_capture_state_changed(snapshot)
-        return snapshot
 
     def _get_clipboard_auto_translation_owner(self) -> ClipboardAutoTranslationOwner:
         owner = self._clipboard_auto_translation_owner
@@ -2976,6 +2207,16 @@ class GuiController:
                     calibration=self._get_overlay_calibration_application_owner(),
                     overlay=self._get_overlay_application_owner(),
                     overlay_state_provider=self._overlay_application_state,
+                    peer=lambda: self._get_peer_application_runtime().owner,
+                    self_capture=lambda: self._self_capture_owner,
+                    clear_local_pending=lambda: (
+                        self._get_local_asr_application_runtime().cpu_repair.clear_if_provider_switched_away()
+                    ),
+                    replace_self_stt=lambda smooth: (
+                        self._get_self_capture_application_owner().replace_provider(
+                            smooth_local=smooth
+                        )
+                    ),
                 ),
                 manual_fallback=self.manual_local_asr_fallback_owner,
                 cpu_auto_available=lambda: (
@@ -3062,7 +2303,7 @@ class GuiController:
         if owner is None:
             owner = ProviderApplicationOwner(
                 settings=self._get_settings_owner(),
-                runtime=self._get_provider_runtime_owner(),
+                runtime=self._get_provider_runtime_components().runtime,
                 merge_settings=self.merge_settings_tab_apply_with_current_languages,
                 preserve_before_replace=(
                     self._preserve_github_star_prompt_observation_before_settings_replace
@@ -3086,137 +2327,74 @@ class GuiController:
                 compensate_local_asr=(
                     self._get_settings_application_owner().compensate_failed_local_asr_settings_apply
                 ),
-                llm_retry_pending=lambda: self._last_llm_provider_signature == (),
-                mark_llm_retry=self._mark_llm_provider_retry,
+                llm_retry_pending=lambda: (
+                    self._provider_runtime_signatures.last_llm_provider == ()
+                ),
+                mark_llm_retry=self._provider_runtime_signatures.mark_llm_retry,
             )
             self._provider_application_owner = owner
         return owner
 
     def _consume_superseded_local_asr_settings(self, settings: AppSettings) -> bool:
-        settings_id = id(settings)
-        if settings_id not in self._superseded_local_asr_settings_ids:
-            return False
-        self._superseded_local_asr_settings_ids.discard(settings_id)
-        return True
+        return self._provider_runtime_signatures.consume_superseded(settings)
 
-    def _get_provider_runtime_owner(self) -> ProviderRuntimeOwner:
-        owner = self._provider_runtime_owner
-        if owner is None:
-            owner = ProviderRuntimeOwner(
-                state_provider=self._provider_runtime_state,
-                common_effect=self._apply_provider_runtime_common_effects,
-                rebuild_llm=self._get_llm_provider_rebuild_owner().rebuild,
-                recover_gpu=self._apply_gpu_runtime_owner_recovery,
-                refresh_peer=self._refresh_provider_runtime_peer_effect,
-                refresh_self_stt=self._refresh_provider_runtime_self_stt_effect,
-                signature_sink=self._sync_signature_caches,
-                llm_retry_sink=self._mark_llm_provider_retry,
-                current_settings_provider=lambda: self.settings,
-                signature_cache_provider=lambda: (
-                    self._last_self_stt_provider_signature,
-                    self._last_peer_stt_provider_signature,
-                    self._last_llm_provider_signature,
-                ),
-                self_signature_builder=build_self_stt_provider_signature,
-                peer_signature_builder=lambda settings, canonical: (
-                    build_peer_stt_provider_signature_from_vnext(
-                        canonical or self._canonical_vnext_settings_for(settings)
+    def _get_provider_runtime_components(self) -> ProviderRuntimeComponents:
+        components = self._provider_runtime_components
+        if components is None:
+
+            async def recover_gpu(
+                settings: AppSettings,
+                plan: ProviderRuntimeApplyPlan,
+            ) -> None:
+                await self._get_gpu_provider_recovery_owner().recover(
+                    lambda: self._gpu_provider_recovery_request(
+                        settings,
+                        reason="settings_restart",
+                        plan=plan,
                     )
+                )
+
+            components = compose_provider_runtime(
+                config_path=self.config_path,
+                settings=self._get_settings_owner(),
+                hub_provider=lambda: self.hub,
+                self_capture_provider=lambda: self._self_capture_owner,
+                self_capture_owner=self._get_self_capture_owner,
+                peer=lambda: self._get_peer_application_runtime().owner,
+                peer_desired=self._peer_runtime_should_be_active,
+                canonical_settings=self._canonical_vnext_settings_for,
+                clear_local_pending=lambda: (
+                    self._get_local_asr_application_runtime().cpu_repair.clear_if_provider_switched_away()
                 ),
-                llm_signature_builder=self._build_llm_provider_signature,
-                gpu_restart_decision=self._provider_runtime_requires_gpu_restart,
+                sync_local_notice=lambda: (
+                    self._get_local_asr_application_runtime().adapters.notice.sync()
+                ),
+                managed_pending_sink=self._set_managed_trial_pending_auth,
+                managed_pending_provider=lambda: self.managed_auth_pending,
+                dashboard_managed_pending_sink=(self.app.set_dashboard_managed_auth_pending),
+                sync_effective_flags=self._sync_effective_hub_flags,
+                refresh_overlay=self._refresh_overlay_peer_consumers,
+                refresh_peer_runtime=lambda: (
+                    self._get_peer_application_runtime().owner.refresh_runtime()
+                ),
+                replace_self_stt=lambda smooth: (
+                    self._get_self_capture_application_owner().replace_provider(smooth_local=smooth)
+                ),
+                self_state_sink=self._on_self_capture_state_changed,
+                self_availability=(self._get_self_capture_application_owner().project_availability),
+                gpu_recovery=recover_gpu,
+                managed_release=lambda: self._get_managed_account_components().release,
+                managed_delegate_ready=self._on_managed_trial_delegate_ready,
+                runtime_logging=self.runtime_logging,
+                translation_needs_key_sink=(self.app.set_dashboard_translation_needs_key),
+                usage_refresh=self._refresh_managed_trial_usage_state_best_effort,
+                failure_sink=self._log_error,
+                success_sink=self.log_basic,
+                additional_signature_sink=self._sync_non_provider_runtime_signatures,
+                signatures=self._provider_runtime_signatures,
             )
-            self._provider_runtime_owner = owner
-        return owner
-
-    def _provider_runtime_state(self, settings: object) -> ProviderRuntimeState:
-        hub = self.hub
-        return ProviderRuntimeState(
-            runtime_available=hub is not None,
-            llm_available=hub is not None and hub.llm is not None,
-            self_stt_available=hub is not None and hub.has_stt_provider("self"),
-            peer_stt_available=hub is not None and hub.has_stt_provider("peer"),
-            self_stt_desired=self._stt_desired,
-            peer_stt_desired=self._peer_runtime_should_be_active(settings),
-        )
-
-    def _apply_provider_runtime_common_effects(self, settings: object) -> None:
-        if not isinstance(settings, AppSettings):
-            raise TypeError("provider runtime settings must be AppSettings")
-        next_settings = settings
-        self.settings = next_settings
-        self._clear_local_stt_pending_enable_if_provider_switched_away()
-        self._sync_local_stt_notice()
-        if (
-            next_settings.provider.llm != LLMProviderName.OPENROUTER
-            or next_settings.openrouter.selected_source != OpenRouterCredentialSource.MANAGED
-        ):
-            self._set_managed_trial_pending_auth(False)
-        else:
-            self.app.set_dashboard_managed_auth_pending(self.managed_auth_pending)
-
-        if self.hub is not None:
-            self.hub.source_language = next_settings.languages.source_language
-            self.hub.target_language = next_settings.languages.target_language
-            self.hub.peer_source_language = next_settings.languages.peer_source_language
-            self.hub.peer_target_language = next_settings.languages.peer_target_language
-            self.hub.system_prompt = next_settings.system_prompt
-            self.hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            self.hub.low_latency_merge_gap_ms = next_settings.stt.low_latency_merge_gap_ms
-            self.hub.low_latency_spec_retry_max = next_settings.stt.low_latency_spec_retry_max
-            self.hub.hangover_s = (
-                next_settings.stt.low_latency_vad_hangover_ms / 1000.0
-                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-                else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
-            )
-            self.hub.peer_hangover_s = next_settings.desktop_audio.vad_hangover_ms / 1000.0
-            self.hub.chatbox_include_source = next_settings.osc.chatbox_include_source
-            self._sync_effective_hub_flags(next_settings)
-
-    async def _refresh_provider_runtime_peer_effect(self) -> None:
-        await self._refresh_peer_stt_runtime()
-        if self.settings is not None:
-            self._sync_effective_hub_flags(self.settings)
-        self._refresh_overlay_peer_consumers()
-
-    async def _refresh_provider_runtime_self_stt_effect(self) -> None:
-        if self._stt_desired:
-            await self._apply_stt_runtime_replacement(smooth_local=True)
-        else:
-            await self._rebuild_stt_provider()
-
-    def _mark_llm_provider_retry(self) -> None:
-        self._last_llm_provider_signature = ()
-
-    @staticmethod
-    def _provider_runtime_requires_gpu_restart(
-        current_settings: object,
-        next_settings: object,
-    ) -> bool:
-        if not isinstance(current_settings, AppSettings) or not isinstance(
-            next_settings,
-            AppSettings,
-        ):
-            return False
-        return current_settings.stt.gpu_device_id != next_settings.stt.gpu_device_id and (
-            current_settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-            or current_settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-            or next_settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU
-            or next_settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU
-        )
-
-    async def _apply_gpu_runtime_owner_recovery(
-        self,
-        next_settings: AppSettings,
-        plan: ProviderRuntimeApplyPlan,
-    ) -> None:
-        await self._get_gpu_provider_recovery_owner().recover(
-            lambda: self._gpu_provider_recovery_request(
-                next_settings,
-                reason="settings_restart",
-                plan=plan,
-            )
-        )
+            self._provider_runtime_components = components
+        return components
 
     def _get_gpu_provider_recovery_owner(self) -> GpuProviderRecoveryApplicationOwner:
         owner = self._gpu_provider_recovery_owner
@@ -3239,11 +2417,13 @@ class GuiController:
                 runtime_state_sink=self._on_local_asr_provider_runtime_state_changed,
                 quiesce=self._suspend_gpu_provider_consumers,
                 self_owner_factory=self._get_self_capture_owner,
-                peer_owner_provider=lambda: self._peer_runtime,
+                peer_owner_provider=lambda: (self._get_peer_application_runtime().owner.runtime),
                 self_state_sink=self._on_self_capture_state_changed,
-                ensure_self_switch=self._ensure_stt_switch,
-                refresh_self=self._refresh_provider_runtime_self_stt_effect,
-                refresh_peer=self._refresh_provider_runtime_peer_effect,
+                ensure_self_switch=lambda: (
+                    self._get_self_capture_application_owner().run_switch()
+                ),
+                refresh_self=(self._get_provider_runtime_components().effects.refresh_self_stt),
+                refresh_peer=self._get_provider_runtime_components().effects.refresh_peer,
                 diagnostic_sink=self._on_gpu_provider_recovery_diagnostic,
             )
             self._gpu_provider_recovery_owner = owner
@@ -3263,7 +2443,10 @@ class GuiController:
             reason=reason,
             self_gpu_selected=settings.provider.stt == STTProviderName.LOCAL_QWEN_GPU,
             peer_gpu_selected=settings.provider.peer_stt == STTProviderName.LOCAL_QWEN_GPU,
-            self_desired=self._stt_desired,
+            self_desired=bool(
+                self._self_capture_owner is not None
+                and self._self_capture_owner.snapshot.desired_active
+            ),
             peer_enabled=settings.ui.peer_translation_enabled,
             self_config_factory=lambda: build_self_capture_session_config(settings),
             peer_config_factory=lambda: build_peer_capture_session_config(
@@ -3290,8 +2473,9 @@ class GuiController:
         if "self" in channels and self._self_capture_owner is not None:
             snapshot = await self._self_capture_owner.suspend_provider_consumer()
             self._on_self_capture_state_changed(snapshot)
-        if "peer" in channels and self._peer_runtime is not None:
-            await self._peer_runtime.suspend_provider_consumer()
+        peer_runtime = self._get_peer_application_runtime().owner.runtime
+        if "peer" in channels and peer_runtime is not None:
+            await peer_runtime.suspend_provider_consumer()
 
     def _on_gpu_provider_recovery_diagnostic(
         self,
@@ -3358,15 +2542,11 @@ class GuiController:
     def _capture_runtime_signatures_before_canonical_mutation(self) -> None:
         if self.settings is None:
             return
-        if self._last_peer_stt_provider_signature is None:
-            self._last_peer_stt_provider_signature = build_peer_stt_provider_signature_from_vnext(
-                self._canonical_vnext_settings_for(self.settings)
-            )
-        if self._last_peer_stt_runtime_signature is None:
-            self._last_peer_stt_runtime_signature = build_peer_stt_runtime_signature(
-                self.settings,
-                canonical_settings=self._canonical_vnext_settings_for(self.settings),
-            )
+        self._provider_runtime_signatures.capture_peer_before_canonical_mutation(
+            self.settings,
+            canonical=self._canonical_vnext_settings_for(self.settings),
+            peer=self._get_peer_application_runtime().owner,
+        )
 
     def _get_provider_verifier(self) -> ProviderVerifierPort:
         if self.provider_verifier is None:
@@ -3427,45 +2607,6 @@ class GuiController:
             self.provider_settings_owner = owner
         return owner
 
-    def _get_llm_provider_rebuild_owner(self) -> LlmProviderRebuildOwner:
-        owner = self._llm_provider_rebuild_owner
-        if owner is None:
-            owner = LlmProviderRebuildOwner(
-                context_provider=self._llm_provider_rebuild_context,
-                provider_factory=self._create_llm_provider_for_rebuild,
-                availability_sink=self.app.set_dashboard_translation_needs_key,
-                usage_refresh=self._refresh_managed_trial_usage_state_best_effort,
-                failure_sink=self._log_error,
-                success_sink=self.log_basic,
-            )
-            self._llm_provider_rebuild_owner = owner
-        return owner
-
-    def _llm_provider_rebuild_context(self) -> LlmProviderRebuildContext | None:
-        if self.hub is None or self.settings is None:
-            return None
-        return LlmProviderRebuildContext(
-            settings=self.settings,
-            replace_provider=self.hub.replace_llm_provider,
-            requires_secret=self._llm_provider_requires_secret(self.settings.provider.llm),
-        )
-
-    async def _create_llm_provider_for_rebuild(self, settings: object) -> object | None:
-        if not isinstance(settings, AppSettings):
-            raise TypeError("LLM provider rebuild settings must be AppSettings")
-        secrets = create_secret_store(settings.secrets, config_path=self.config_path)
-        new_managed_release_service = self._create_managed_openrouter_release_service(
-            secrets=secrets
-        )
-        await self._replace_managed_openrouter_release_service(new_managed_release_service)
-        return create_llm_provider(
-            settings,
-            secrets=secrets,
-            managed_release_service=self._managed_openrouter_release_service,
-            managed_delegate_ready=self._on_managed_trial_delegate_ready,
-            runtime_logging=self.runtime_logging,
-        )
-
     def _build_local_asr_provider_runtime_factory(
         self,
         *,
@@ -3497,225 +2638,23 @@ class GuiController:
     ) -> None:
         self._get_gpu_runtime_interaction_owner().observe_runtime(snapshot)
 
-    async def _rebuild_stt_provider(self) -> None:
-        """Rebuild only the STT provider so later enable uses current settings."""
-        if self.hub is None or self.settings is None:
-            return
-
-        owner = self._get_self_capture_owner()
-        config = build_self_capture_session_config(self.settings)
-        if self._stt_desired:
-            snapshot = await owner.apply_intent(config, enabled=True)
-        else:
-            snapshot = await owner.prepare_provider(config)
-        self._on_self_capture_state_changed(snapshot)
-        available = self._project_self_provider_availability(snapshot)
-        if not available:
-            self._log_error("STT backend not available")
-            return
-        self.log_basic("[Settings] STT provider replacement completed successfully")
-
-    def _on_peer_runtime_diagnostic(self, diagnostic: PeerCaptureDiagnostic) -> None:
-        self._get_peer_application_owner().on_runtime_diagnostic(diagnostic)
-
     def loopback_capture_summary(self, settings: AppSettings | None = None) -> str:
-        resolved_settings = settings or self.settings
-        if resolved_settings is None:
-            return self.app.localize("settings.default_option")
-        target = self._resolve_peer_capture_target(resolved_settings)
-        if target.kind == "named_output_device":
-            return target.device_name or self.app.localize("settings.default_option")
-        if target.kind == "process":
-            return self._process_capture_display_name(target)
-        return self.app.localize("settings.default_option")
+        return self._get_peer_application_runtime().target.summary(settings)
 
     def list_loopback_capture_options(self) -> list[OptionItem]:
-        options = self.list_loopback_process_options()
-        options.extend(self.list_loopback_device_options())
-        return options
+        return self._get_peer_application_runtime().target.options()
 
     def list_loopback_process_options(self) -> list[OptionItem]:
-        process_section = self.app.localize("settings.desktop_audio.section.process")
-        options: list[OptionItem] = []
-        seen_process_values: set[str] = set()
-        for candidate in ProcessCaptureResolver(
-            snapshots=PsutilCurrentUserProcessSnapshots()
-        ).enumerate_candidates():
-            value = self._encode_process_capture_option(candidate.target)
-            seen_process_values.add(value)
-            options.append(
-                OptionItem(
-                    value=value,
-                    label=self._process_option_label(candidate.target, candidate.name),
-                    description="",
-                    disabled=not candidate.enabled,
-                    section=process_section,
-                )
-            )
-        current_value = self.current_loopback_capture_option_value()
-        if current_value.startswith("process:") and current_value not in seen_process_values:
-            process = self._decode_capture_option(current_value).process
-            if process is not None:
-                options.insert(
-                    0,
-                    OptionItem(
-                        value=current_value,
-                        label=self._process_option_label(process, ""),
-                        description="",
-                        disabled=False,
-                        section=process_section,
-                    ),
-                )
-        options.sort(key=lambda o: o.disabled)
-        return options
+        return self._get_peer_application_runtime().target.process_options()
 
     def list_loopback_device_options(self) -> list[OptionItem]:
-        device_section = self.app.localize("settings.desktop_audio.section.device")
-        options: list[OptionItem] = [
-            OptionItem(
-                value="device:",
-                label=self.app.localize("settings.default_option"),
-                description="",
-                disabled=False,
-                section=device_section,
-            )
-        ]
-        for device in self._enumerate_loopback_device_names():
-            options.append(
-                OptionItem(
-                    value=f"device:{device}",
-                    label=device,
-                    description="",
-                    disabled=False,
-                    section=device_section,
-                )
-            )
-        return options
+        return self._get_peer_application_runtime().target.device_options()
 
     def current_loopback_capture_option_value(self, settings: AppSettings | None = None) -> str:
-        resolved_settings = settings or self.settings
-        if resolved_settings is None:
-            return "device:"
-        target = self._resolve_peer_capture_target(resolved_settings)
-        if target.kind == "process":
-            process = self._process_target_from_resolved(target)
-            return self._encode_process_capture_option(process)
-        if target.kind == "named_output_device":
-            return f"device:{target.device_name or ''}"
-        return "device:"
+        return self._get_peer_application_runtime().target.current_value(settings)
 
     async def apply_loopback_capture_option(self, value: str) -> None:
-        if self.settings is None:
-            return
-        capture_target = self._decode_capture_option(value)
-        next_settings = self._get_settings_owner().update_capture_target(
-            self.settings,
-            capture_target,
-        )
-        # Keep non-capture runtime fields from the live session.
-        next_settings.ui.overlay_enabled = self.settings.ui.overlay_enabled
-        next_settings.ui.peer_translation_enabled = self.settings.ui.peer_translation_enabled
-        self.settings = next_settings
-        self._get_settings_owner().authoritative = True
-        self._get_settings_owner().remember_projection(next_settings)
-        self._peer_process_warning_reason = None
-        await self._refresh_peer_stt_runtime()
-        self._sync_effective_hub_flags(self.settings)
-        self._refresh_overlay_peer_consumers()
-        with contextlib.suppress(Exception):
-            self.app.refresh_settings_loopback_capture_target(self.settings)
-
-    @staticmethod
-    def _encode_process_capture_option(target: ProcessCaptureTargetIntent) -> str:
-        if target.kind == "discord":
-            return f"process:discord:{target.discord_channel}"
-        if target.kind == "vrchat":
-            return f"process:vrchat:{target.executable_identity}"
-        return f"process:generic:{target.executable_identity}"
-
-    def _decode_capture_option(self, value: str) -> CaptureTargetIntent:
-        if value.startswith("process:"):
-            payload = value[len("process:") :]
-            kind, _, rest = payload.partition(":")
-            if kind == "discord":
-                return CaptureTargetIntent.process_target(ProcessCaptureTargetIntent.discord(rest))
-            if kind == "vrchat":
-                return CaptureTargetIntent.process_target(ProcessCaptureTargetIntent.vrchat(rest))
-            return CaptureTargetIntent.process_target(
-                ProcessCaptureTargetIntent.generic_executable(rest)
-            )
-        device_name = value[len("device:") :] if value.startswith("device:") else value
-        if device_name:
-            return CaptureTargetIntent.named_output_device(device_name)
-        return CaptureTargetIntent.default_output_device()
-
-    def _process_target_from_resolved(
-        self,
-        target: ResolvedDesktopAudioCaptureTarget,
-    ) -> ProcessCaptureTargetIntent:
-        if target.process_kind == "discord":
-            return ProcessCaptureTargetIntent.discord(target.discord_channel or "")
-        if target.process_kind == "vrchat":
-            return ProcessCaptureTargetIntent.vrchat(target.executable_identity or "")
-        return ProcessCaptureTargetIntent.generic_executable(target.executable_identity or "")
-
-    def _process_capture_display_name(self, target: ResolvedDesktopAudioCaptureTarget) -> str:
-        process = self._process_target_from_resolved(target)
-        return self._process_option_label(process, "")
-
-    def _process_option_label(
-        self,
-        target: ProcessCaptureTargetIntent,
-        fallback_name: str,
-    ) -> str:
-        if target.kind == "vrchat":
-            base = self.app.localize("settings.desktop_audio.process.vrchat")
-        elif target.kind == "discord":
-            channel = target.discord_channel or "stable"
-            if channel == "ptb":
-                base = self.app.localize("settings.desktop_audio.process.discord_ptb")
-            elif channel == "canary":
-                base = self.app.localize("settings.desktop_audio.process.discord_canary")
-            else:
-                base = self.app.localize("settings.desktop_audio.process.discord_stable")
-        elif fallback_name:
-            return fallback_name
-        else:
-            path = target.executable_identity or ""
-            basename = path.rsplit("\\", 1)[-1]
-            if basename.lower().endswith(".exe"):
-                basename = basename[:-4]
-            base = basename or self.app.localize("settings.default_option")
-        if target.kind in {"vrchat", "discord"} and fallback_name:
-            count_suffix = fallback_name.rsplit(" (", 1)
-            if len(count_suffix) == 2 and count_suffix[1].endswith(")"):
-                count = count_suffix[1][:-1]
-                if count.isdigit():
-                    return f"{base} ({count})"
-        return base
-
-    @staticmethod
-    def _enumerate_loopback_device_names() -> list[str]:
-        names: list[str] = []
-        manager = None
-        try:
-            import pyaudiowpatch as pyaudio  # type: ignore
-
-            manager = pyaudio.PyAudio()
-            seen: set[str] = set()
-            for info in manager.get_loopback_device_info_generator():
-                name = str(info.get("name", "") or "").strip()
-                if not name or name in seen:
-                    continue
-                seen.add(name)
-                names.append(name)
-        except Exception:
-            return names
-        finally:
-            if manager is not None:
-                with contextlib.suppress(Exception):
-                    manager.terminate()
-        return names
+        await self._get_peer_application_runtime().target.apply(value)
 
     @property
     def debug_capture_fault_profile(self) -> str:
@@ -3823,267 +2762,63 @@ class GuiController:
         self._debug_stt_fault_profile = "none"
         self.log_detailed("[AudioDiag][DebugFault] capture_profile=none stt_profile=none")
 
-    def _wrap_diagnostic_audio_source(
-        self,
-        source: AudioSource,
-        *,
-        channel_label: str,
-    ) -> AudioSource:
-        from puripuly_heart.core.audio.diagnostics import AudioFaultProfile, DiagnosticAudioSource
+    def _get_capture_diagnostics_adapter(self) -> CaptureDiagnosticsAdapter:
+        adapter = self._capture_diagnostics_adapter
+        if adapter is None:
+            adapter = CaptureDiagnosticsAdapter(
+                detailed_enabled=self._detailed_audio_diag_enabled,
+                debug_allowed=self._debug_audio_fault_allowed,
+                capture_fault_profile=lambda: self._debug_capture_fault_profile,
+                log_detailed=lambda message: self.log_detailed(message),
+            )
+            self._capture_diagnostics_adapter = adapter
+        return adapter
 
-        def extra_fields() -> dict[str, object]:
-            return {
-                "queue_drops": getattr(source, "queue_drop_count", 0),
-                "callback_statuses": getattr(source, "callback_status_count", 0),
-                "last_callback_status": getattr(source, "last_callback_status", None),
-                "resolved_device_name": getattr(source, "resolved_device_name", None),
-                "resolved_device_index": getattr(source, "resolved_device_index", None),
-                "resolved_channels": getattr(source, "resolved_channels", None),
-                "actual_sample_rate_hz": getattr(source, "actual_sample_rate_hz", None),
-                "used_default_fallback": getattr(source, "used_default_fallback", None),
-            }
-
-        return DiagnosticAudioSource(
-            source=source,
-            channel_label=channel_label,
-            is_detailed_enabled=self._detailed_audio_diag_enabled,
-            log_detailed=lambda message: self.log_detailed(message),
-            fault_profile_provider=lambda: (
-                self._debug_capture_fault_profile
-                if self._debug_audio_fault_allowed()
-                else AudioFaultProfile.NONE.value
-            ),
-            extra_fields_provider=extra_fields,
-        )
-
-    async def _refresh_peer_stt_runtime(self, *, stop_mode: str = "retain") -> None:
-        await self._get_peer_application_owner().refresh_runtime(
-            stop_mode="release" if stop_mode == "release" else "retain"
-        )
-
-    async def _init_pipeline(self) -> None:
-        assert self.settings is not None
-        self._get_local_asr_provisioning_owner()
-        self._sync_signature_caches(self.settings)
-        secrets = create_secret_store(self.settings.secrets, config_path=self.config_path)
-        new_managed_release_service = self._create_managed_openrouter_release_service(
-            secrets=secrets
-        )
-        await self._replace_managed_openrouter_release_service(new_managed_release_service)
-
-        llm = None
-        with contextlib.suppress(Exception):
-            llm = create_llm_provider(
-                self.settings,
-                secrets=secrets,
-                managed_release_service=self._managed_openrouter_release_service,
-                managed_delegate_ready=self._on_managed_trial_delegate_ready,
+    def _get_runtime_pipeline_launcher(self) -> RuntimePipelineLauncher:
+        launcher = self._runtime_pipeline_launcher
+        if launcher is None:
+            launcher = RuntimePipelineLauncher(
+                config_path=self.config_path,
+                clock=self.clock,
                 runtime_logging=self.runtime_logging,
-            )
-
-        stt_request = None
-        if self.settings.provider.stt != STTProviderName.LOCAL_QWEN_GPU:
-            try:
-                stt_request = build_self_stt_provider_request(self.settings)
-            except Exception:
-                self._log_error("STT backend not available")
-
-        sender = VrchatOscUdpSender(
-            host=self.settings.osc.host,
-            port=self.settings.osc.port,
-            chatbox_address=self.settings.osc.chatbox_address,
-            chatbox_send=self.settings.osc.chatbox_send,
-            chatbox_clear=self.settings.osc.chatbox_clear,
-        )
-        osc = ChatboxPaginator(
-            sender=sender,
-            clock=self.clock,
-            max_chars=self.settings.osc.chatbox_max_chars,
-            runtime_logging=self.runtime_logging,
-        )
-
-        hub = ClientHub(
-            stt=None,
-            llm=llm,
-            osc=osc,
-            peer_stt=None,
-            clock=self.clock,
-            runtime_logging=self.runtime_logging,
-            local_asr_provider_runtime_factory=self._build_local_asr_provider_runtime_factory(
-                secrets=secrets
-            ),
-            source_language=self.settings.languages.source_language,
-            target_language=self.settings.languages.target_language,
-            peer_source_language=self.settings.languages.peer_source_language,
-            peer_target_language=self.settings.languages.peer_target_language,
-            system_prompt=self.settings.system_prompt,
-            chatbox_include_source=self.settings.osc.chatbox_include_source,
-            fallback_transcript_only=True,
-            translation_enabled=True,
-            peer_translation_enabled=False,
-            integrated_context_enabled=True,
-            low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
-            low_latency_merge_gap_ms=self.settings.stt.low_latency_merge_gap_ms,
-            low_latency_spec_retry_max=self.settings.stt.low_latency_spec_retry_max,
-            hangover_s=(
-                self.settings.stt.low_latency_vad_hangover_ms / 1000.0
-                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-                else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
-            ),
-            peer_hangover_s=self.settings.desktop_audio.vad_hangover_ms / 1000.0,
-        )
-
-        if self.vrc_mic_state is None:
-            self.vrc_mic_state = VrcMicState()
-        if self.vrc_mic_audio_gate is None:
-            self.vrc_mic_audio_gate = VrcMicAudioGate(
-                state=self.vrc_mic_state,
-                enabled=self.settings.osc.vrc_mic_intercept,
-            )
-        else:
-            self.vrc_mic_audio_gate.state = self.vrc_mic_state
-            self.vrc_mic_audio_gate.set_enabled(self.settings.osc.vrc_mic_intercept)
-        self.vrc_mic_audio_gate.set_receiver_active(self.receiver is not None)
-        self.vrc_mic_audio_gate.reset()
-
-        prior_self_capture_owner = self._self_capture_owner
-        if prior_self_capture_owner is not None:
-            await prior_self_capture_owner.close()
-        self.sender = sender
-        self.osc = osc
-        self.hub = hub
-        self._self_capture_owner = None
-        self_capture_owner = self._get_self_capture_owner()
-        if stt_request is not None:
-            snapshot = await self_capture_owner.prepare_provider(
-                build_self_capture_session_config(self.settings)
-            )
-            if snapshot.provider_status.value != "ready":
-                self._log_error("STT backend not available")
-
-        peer_runtime = compose_peer_capture_session_owner(
-            hub=hub,
-            admission=create_peer_capture_admission_adapter(
-                runtime_available=lambda: self.settings is not None and self.hub is not None,
-                ensure_local_ready=self._ensure_peer_local_stt_ready,
-            ),
-            target_resolver=create_peer_capture_target_resolver_adapter(),
-            clock=self.clock,
-            provider_request_factory=lambda config, warmup: build_peer_stt_provider_request(
-                config,
-                gpu_device_id=self.settings.stt.gpu_device_id,
-                warmup=warmup,
-            ),
-            source_factory=create_peer_capture_source_adapter(
-                log_detailed=self.log_detailed,
-                wrap_source=lambda source: self._wrap_diagnostic_audio_source(
-                    cast(AudioSource, source),
-                    channel_label="peer",
+                managed_release=self._get_managed_account_components().release,
+                managed_delegate_ready=self._on_managed_trial_delegate_ready,
+                local_asr_factory=lambda secrets: (
+                    self._build_local_asr_provider_runtime_factory(secrets=secrets)
                 ),
-                is_detailed_enabled=self._detailed_audio_diag_enabled,
-            ),
-            vad_factory=create_peer_capture_vad_adapter(
-                log_detailed=self.log_detailed,
-                diagnostics_enabled=self._detailed_audio_diag_enabled,
-            ),
-            run_audio_loop=create_peer_capture_audio_loop_adapter(
-                log_detailed=self.log_detailed,
-                is_detailed_enabled=self._detailed_audio_diag_enabled,
-            ),
-            vad_sink=create_peer_capture_vad_sink_adapter(runtime_provider=lambda: self.hub),
-            state_changed=self._on_peer_capture_state_changed,
-            diagnostic_sink=self._on_peer_runtime_diagnostic,
-            local_asr_diagnostic_sink=(
-                self._get_local_asr_diagnostics_owner().transition_diagnostic
-            ),
-        )
-        await self._get_peer_application_owner().replace_runtime(peer_runtime)
-        self._last_peer_translation_enabled = self.settings.ui.peer_translation_enabled
-        await self._configure_vrc_mic_receiver(enabled=self.settings.osc.vrc_mic_intercept)
+                self_capture_factory=self._get_capture_owner_factory().compose_self,
+                peer_capture_factory=self._get_capture_owner_factory().compose_peer,
+                previous_self_capture=lambda: self._self_capture_owner,
+                component_sink=self._apply_runtime_pipeline_components,
+                peer_application=lambda: self._get_peer_application_runtime().owner,
+                configure_vrc_mic=self._configure_vrc_mic_receiver,
+                stt_failure_sink=self._log_error,
+                cleanup_failure_sink=lambda message, exc: self._log_error(f"{message}: {exc}"),
+            )
+            self._runtime_pipeline_launcher = launcher
+        return launcher
 
-    async def _replace_managed_openrouter_release_service(
+    def _apply_runtime_pipeline_components(
         self,
-        service: ManagedOpenRouterReleaseService | None,
+        pipeline: RuntimePipelineComponents,
     ) -> None:
-        previous = self._managed_openrouter_release_service
-        self._managed_openrouter_release_service = service
-        if previous is not None and previous is not service:
-            with contextlib.suppress(Exception):
-                await previous.close()
-
-    def _create_managed_openrouter_release_service(
-        self, *, secrets
-    ) -> ManagedOpenRouterReleaseService | None:
-        if self.settings is None:
-            self.telemetry_client = None
-            return None
-        release_settings = self._managed_openrouter_release_settings()
-        if release_settings is None:
-            self.telemetry_client = None
-            return None
-
-        from puripuly_heart import __version__
-
-        try:
-            client = HttpManagedOpenRouterBrokerClient(
-                base_url=self.settings.openrouter.broker_base_url,
-            )
-            self.telemetry_client = client
-        except ValueError as exc:
-            logger.warning(
-                "[Managed OpenRouter] Invalid broker base URL %r; using unavailable fallback: %s",
-                self.settings.openrouter.broker_base_url,
-                exc,
-            )
-            client = UnavailableManagedOpenRouterReleaseClient()
-            self.telemetry_client = None
-
-        return ManagedOpenRouterReleaseService(
-            openrouter_config=build_openrouter_release_runtime_config(release_settings),
-            managed_state=build_managed_identity_state_port(
-                self.settings,
-                self._get_settings_owner().managed_identity_persistence_callback(self.settings),
-            ),
-            secrets=secrets,
-            client=client,
-            raw_hardware_fingerprint_provider=get_raw_hardware_fingerprint,
-            app_version=__version__,
-            on_discord_callback_received=self._on_discord_managed_auth_callback_received,
-        )
+        self.sender = pipeline.sender
+        self.osc = pipeline.osc
+        self.hub = pipeline.hub
+        self.vrc_mic_state = pipeline.vrc_mic_state
+        self.vrc_mic_audio_gate = pipeline.vrc_mic_audio_gate
+        self._self_capture_owner = pipeline.self_capture
 
     def _get_openrouter_pkce_flow_owner(self) -> OpenRouterPkceFlowOwner:
-        owner = self._openrouter_pkce_flow_owner
-        if owner is None:
-            owner = OpenRouterPkceFlowOwner(
-                client_factory=lambda: self._create_openrouter_pkce_client(),
-            )
-            self._openrouter_pkce_flow_owner = owner
-        return owner
+        return self._get_managed_account_components().pkce_flow
 
     def _get_openrouter_pkce_application_owner(self) -> OpenRouterPkceApplicationOwner:
-        owner = self._openrouter_pkce_application_owner
-        if owner is None:
-            owner = OpenRouterPkceApplicationOwner(
-                flow=self._get_openrouter_pkce_flow_owner(),
-                verifier=self._get_provider_verifier(),
-                settings=self._get_settings_owner(),
-                provider_settings=self._get_provider_settings_owner(),
-                provider_runtime=self._get_provider_runtime_owner(),
-                secret_store_factory=lambda settings: create_sync_secret_store_adapter(
-                    create_secret_store(settings.secrets, config_path=self.config_path)
-                ),
-                failure_message_sink=self._show_short_message,
-                failure_diagnostics_sink=self._log_error,
-                failure_route=self._maybe_show_founder_letter_after_pkce_failure,
-                results=self._get_settings_application_owner().results,
-            )
-            self._openrouter_pkce_application_owner = owner
-        return owner
+        return self._get_managed_account_components().pkce
 
     async def _close_oauth_runtime(self) -> None:
-        owner = self._openrouter_pkce_flow_owner
-        if owner is not None:
-            await owner.close()
+        managed = self._managed_account_components
+        if managed is not None:
+            await managed.pkce_flow.close()
 
     async def _close_app_oauth_runtime_for_release(self, failures: list[Exception]) -> None:
         close_oauth_runtime = getattr(self.app, "close_oauth_runtime", None)
@@ -4096,14 +2831,12 @@ class GuiController:
         except Exception as exc:
             failures.append(exc)
 
-    def _on_discord_managed_auth_callback_received(self) -> None:
-        self._get_managed_auth_owner().on_callback_received()
-
     @property
     def _last_microphone_test_audio_settings_signature(
         self,
     ) -> tuple[object, ...] | None:
-        owner = self._microphone_test_owner
+        runtime = self._microphone_test_runtime
+        owner = runtime.owner_if_created if runtime is not None else None
         return owner.audio_signature if owner is not None else None
 
     @_last_microphone_test_audio_settings_signature.setter
@@ -4111,75 +2844,40 @@ class GuiController:
         self,
         signature: tuple[object, ...] | None,
     ) -> None:
-        self._get_microphone_test_owner().audio_signature = signature
+        self._get_microphone_test_runtime().owner().audio_signature = signature
 
     @property
     def microphone_test_active(self) -> bool:
-        owner = self._microphone_test_owner
-        return owner.active if owner is not None else False
+        runtime = self._microphone_test_runtime
+        return runtime.active if runtime is not None else False
 
-    def _get_microphone_test_owner(self) -> MicrophoneTestSessionOwner:
-        owner = self._microphone_test_owner
-        if owner is None:
-            owner = MicrophoneTestSessionOwner(
-                capture_port=self._build_microphone_test_capture_adapter(),
-                capture_request_factory=self._microphone_test_capture_request,
-                self_capture_snapshot=self._microphone_test_self_capture_state,
+    def _get_microphone_test_runtime(self) -> MicrophoneTestRuntime:
+        runtime = self._microphone_test_runtime
+        if runtime is None:
+            runtime = MicrophoneTestRuntime(
+                settings_provider=lambda: self.settings,
+                self_capture_provider=lambda: self._self_capture_owner,
+                local_pending_provider=lambda: (
+                    self._get_local_asr_application_runtime().self_pending
+                ),
                 disable_self_capture=lambda: self.set_stt_enabled(False),
+                clock=self.clock,
                 log_sink=self.log_basic,
-                diagnostics_sink=self._on_microphone_test_session_diagnostic,
+                detailed_sink=lambda message, level, exception: self.log_detailed(
+                    message,
+                    level=level,
+                    exception=exception,
+                ),
+                error_sink=self._log_error,
             )
-            self._microphone_test_owner = owner
-        return owner
-
-    def _on_microphone_test_session_diagnostic(
-        self,
-        event: str,
-        metadata: Mapping[str, object],
-        exception: BaseException | None,
-    ) -> None:
-        if event == "session_failed":
-            self._log_error(f"Microphone test error: {exception}")
-            return
-        if event == "cleanup_retry_failed":
-            self._log_error(f"Microphone test cleanup retry failed: {exception}")
-            return
-        if event == "meter_callback_failed":
-            exc_info = (
-                (type(exception), exception, exception.__traceback__)
-                if exception is not None
-                else None
-            )
-            logger.debug("Microphone-test meter callback raised", exc_info=exc_info)
-            return
-        self.log_detailed(
-            f"[MicTest] owner event={event} error_type={metadata.get('error_type')}",
-            level=logging.WARNING,
-            exception=exception,
-        )
+            self._microphone_test_runtime = runtime
+        return runtime
 
     @staticmethod
     def _microphone_test_audio_settings_signature(
         settings: AppSettings | None,
     ) -> tuple[object, ...] | None:
-        if settings is None:
-            return None
-        return (
-            settings.audio.input_host_api,
-            settings.audio.input_device,
-            settings.audio.internal_sample_rate_hz,
-            settings.audio.internal_channels,
-        )
-
-    def _microphone_test_self_capture_state(self) -> MicrophoneTestSelfCaptureState:
-        source_open = self._mic_task is not None or self._audio_source is not None
-        return MicrophoneTestSelfCaptureState(
-            stop_required=bool(
-                self._stt_desired or self._local_stt_pending_enable_after_install or source_open
-            ),
-            source_open=source_open,
-            close_exception=self._last_mic_loop_close_exception,
-        )
+        return MicrophoneTestRuntime.audio_signature(settings)
 
     async def start_microphone_test(
         self,
@@ -4187,22 +2885,15 @@ class GuiController:
         meter_callback: Callable[[float], object] | None = None,
         level_log_interval_s: float = _MICROPHONE_TEST_LEVEL_INTERVAL_S,
     ) -> bool:
-        if self.settings is None:
-            return False
-        signature = self._microphone_test_audio_settings_signature(self.settings)
-        assert signature is not None
-        return await self._get_microphone_test_owner().start(
-            MicrophoneTestSessionRequest(
-                audio_signature=signature,
-                meter_callback=meter_callback,
-                level_log_interval_s=level_log_interval_s,
-            )
+        return await self._get_microphone_test_runtime().start(
+            meter_callback=meter_callback,
+            level_log_interval_s=level_log_interval_s,
         )
 
     async def stop_microphone_test(self) -> None:
-        owner = self._microphone_test_owner
-        if owner is not None:
-            await owner.stop()
+        runtime = self._microphone_test_runtime
+        if runtime is not None:
+            await runtime.stop()
 
     async def stop_microphone_test_for_audio_settings_change(self) -> None:
         await self.stop_microphone_test()
@@ -4211,198 +2902,70 @@ class GuiController:
         self,
         cleanup_failures: list[Exception],
     ) -> None:
-        owner = self._microphone_test_owner
-        if owner is None:
+        runtime = self._microphone_test_runtime
+        if runtime is None:
             return
         try:
-            await owner.close()
+            await runtime.close()
         except Exception as exc:
             cleanup_failures.append(exc)
-
-    async def _set_microphone_test_meter_level(
-        self,
-        value: float,
-        meter_callback: Callable[[float], object] | None,
-        *,
-        generation: int | None = None,
-    ) -> None:
-        await self._get_microphone_test_owner().set_meter_level(
-            value,
-            meter_callback,
-            generation=generation,
-        )
-
-    def _build_microphone_test_capture_adapter(self) -> MicrophoneTestCapturePort:
-        return create_microphone_test_capture_adapter(
-            clock=self.clock,
-            log_sink=self.log_basic,
-            meter_sink=lambda value, meter_callback, generation: (
-                self._set_microphone_test_meter_level(
-                    value,
-                    meter_callback,
-                    generation=generation,
-                )
-            ),
-            route_observer=observe_microphone_test_route,
-            channel_decision=determine_self_mic_capture_channels,
-            source_factory=SoundDeviceAudioSource,
-        )
-
-    def _microphone_test_capture_request(
-        self,
-        generation: int | None,
-        meter_callback: Callable[[float], object] | None,
-        level_log_interval_s: float,
-    ) -> MicrophoneTestCaptureRequest:
-        assert self.settings is not None
-        return MicrophoneTestCaptureRequest(
-            saved_host_api=self.settings.audio.input_host_api,
-            requested_device=self.settings.audio.input_device,
-            internal_channels=self.settings.audio.internal_channels,
-            generation=generation,
-            meter_callback=meter_callback,
-            level_log_interval_s=level_log_interval_s,
-        )
-
-    def _self_capture_admission_state(
-        self,
-        config: SelfCaptureSessionConfig,
-    ) -> SelfCaptureAdmissionState:
-        settings = self.settings
-        decision = (
-            resolve_local_asr_selection(
-                settings.provider.stt.value,
-                settings.languages.source_language,
-            )
-            if settings is not None and config.local_cpu
-            else None
-        )
-        return SelfCaptureAdmissionState(
-            settings_available=settings is not None,
-            runtime_available=self.hub is not None,
-            gpu_status=self._get_gpu_runtime_interaction_owner().snapshot.ui_state,
-            local_cpu_supported=bool(decision is None or decision.supported),
-            local_runtime_status=(
-                self._current_local_stt_runtime_status()
-                if decision is not None and decision.supported
-                else "ready"
-            ),
-            activation_generation=self._stt_activation_generation,
-        )
-
-    def _apply_self_capture_admission_effect(
-        self,
-        effect: SelfCaptureAdmissionEffect,
-    ) -> None:
-        if effect.type is SelfCaptureAdmissionEffectType.RETAIN_GPU_PENDING_INTENT:
-            self._get_gpu_runtime_interaction_owner().retain_pending("self")
-            return
-        if effect.type is SelfCaptureAdmissionEffectType.REJECT_UNSUPPORTED_LANGUAGE:
-            self.app.set_dashboard_stt_enabled(False)
-            self.app.set_dashboard_stt_needs_key(False)
-            self._show_short_stt_message("local_stt.language_unsupported")
-            return
-        if effect.type is SelfCaptureAdmissionEffectType.RETAIN_DOWNLOAD_PENDING_INTENT:
-            self._get_local_asr_cpu_repair_owner().retain_pending(
-                "self",
-                activation_generation=effect.activation_generation,
-            )
-            self.app.set_dashboard_stt_enabled(False)
-            self._show_short_stt_message("local_stt.download_in_progress")
-            return
-        if effect.type is SelfCaptureAdmissionEffectType.REQUEST_LOCAL_REPAIR:
-            assert effect.status is not None
-            self._request_unavailable_local_asr_repair(
-                effect.status,
-                channel="self",
-                activation_generation=effect.activation_generation,
-            )
-            return
-        raise ValueError(f"Unsupported Self capture admission effect: {effect.type}")
 
     def _get_self_capture_owner(self) -> SelfCaptureSessionOwner:
         if self._self_capture_owner is not None:
             return self._self_capture_owner
-        self._self_capture_owner = compose_self_capture_session_owner(
-            hub=self.hub,
-            admission=create_self_capture_admission_adapter(
-                state_provider=self._self_capture_admission_state,
-                validate_gpu_activation=self._validate_gpu_activation,
-                effect_sink=self._apply_self_capture_admission_effect,
-            ),
-            provider_request_factory=self._self_capture_provider_request,
-            source_factory=create_self_capture_source_adapter(
-                log_detailed=self.log_detailed,
-                wrap_source=lambda source: self._wrap_diagnostic_audio_source(
-                    cast(AudioSource, source),
-                    channel_label="self",
-                ),
-            ),
-            vad_factory=create_self_capture_vad_adapter(
-                log_detailed=self.log_detailed,
-                diagnostics_enabled=self._detailed_audio_diag_enabled,
-            ),
-            run_audio_loop=create_self_capture_audio_loop_adapter(
-                audio_gate_provider=lambda: self.vrc_mic_audio_gate,
-                log_detailed=self.log_detailed,
-                is_detailed_enabled=self._detailed_audio_diag_enabled,
-            ),
-            vad_sink=create_self_capture_vad_sink_adapter(runtime_provider=lambda: self.hub),
-            state_changed=self._on_self_capture_state_changed,
-            diagnostic_sink=self._on_self_capture_diagnostic,
-            audio_gate_reset=(
-                self.vrc_mic_audio_gate.reset if self.vrc_mic_audio_gate is not None else None
-            ),
+        self._self_capture_owner = self._get_capture_owner_factory().compose_self(
+            self.hub,
+            self.vrc_mic_audio_gate,
         )
         return self._self_capture_owner
 
-    def _self_capture_provider_request(
-        self,
-        config: SelfCaptureSessionConfig,
-        warmup: bool,
-    ) -> ProviderRuntimeBuildRequest:
-        _ = config
-        if self.settings is None:
-            raise RuntimeError("Self provider request requires settings")
-        return build_self_stt_provider_request(self.settings, warmup=warmup)
+    def _get_capture_owner_factory(self) -> CaptureOwnerFactory:
+        factory = self._capture_owner_factory
+        if factory is None:
+            factory = CaptureOwnerFactory(
+                settings_provider=lambda: self.settings,
+                self_admission=create_self_capture_admission_adapter(
+                    state_provider=(
+                        self._get_local_asr_application_runtime().adapters.state.self_admission
+                    ),
+                    validate_gpu_activation=self._validate_gpu_activation,
+                    effect_sink=(
+                        self._get_local_asr_application_runtime().adapters.effects.apply_self_admission
+                    ),
+                ),
+                ensure_peer_local_ready=lambda generation: (
+                    self._get_local_asr_application_runtime().ensure_peer_ready(
+                        activation_generation=generation,
+                    )
+                ),
+                clock=self.clock,
+                log_detailed=self.log_detailed,
+                detailed_enabled=self._detailed_audio_diag_enabled,
+                source_wrapper=lambda source, channel: (
+                    self._get_capture_diagnostics_adapter().wrap_source(
+                        source,
+                        channel_label=channel,
+                    )
+                ),
+                self_state_sink=self._on_self_capture_state_changed,
+                self_diagnostic_sink=(self._get_capture_diagnostics_adapter().self_capture),
+                peer_state_sink=self._on_peer_capture_state_changed,
+                peer_diagnostic_sink=(
+                    self._get_peer_application_runtime().owner.on_runtime_diagnostic
+                ),
+                local_asr_diagnostic_sink=(
+                    self._get_local_asr_diagnostics_owner().transition_diagnostic
+                ),
+            )
+            self._capture_owner_factory = factory
+        return factory
 
     def _on_self_capture_state_changed(
         self,
         snapshot: SelfCaptureSessionSnapshot,
     ) -> None:
-        owner = self._self_capture_owner
-        if owner is not None:
-            self._mic_task = owner.loop_task
-            self._audio_source = cast(
-                AudioSource | None,
-                owner.source if owner.source is not None else owner.cleanup_source,
-            )
-            self._vad = owner.vad
-            self._last_mic_loop_close_exception = owner.last_cleanup_exception
-        self._stt_desired = snapshot.desired_active
-        self._stt_activation_generation = snapshot.generation
-        self._stt_activation_starting = snapshot.state in {
-            SelfCaptureSessionState.STARTING,
-            SelfCaptureSessionState.ADMISSION_PENDING,
-        }
-        self._stt_activation_failed = snapshot.state is SelfCaptureSessionState.FAULTED
-
-    def _on_self_capture_diagnostic(self, diagnostic: SelfCaptureDiagnostic) -> None:
-        fields = [
-            f"event={diagnostic.event.value}",
-            f"generation={diagnostic.generation}",
-            f"state={diagnostic.state.value}",
-        ]
-        if diagnostic.provider_id is not None:
-            fields.append(f"provider={diagnostic.provider_id}")
-        if diagnostic.reason is not None:
-            fields.append(f"reason={diagnostic.reason.value}")
-        if diagnostic.detail is not None:
-            fields.append(f"detail={diagnostic.detail}")
-        self.log_detailed(f"[SelfCapture] {' '.join(fields)}")
-
-    def _create_vrc_osc_receiver_for_runtime(self, **kwargs: object) -> VrcOscReceiver:
-        return VrcOscReceiver(**kwargs)  # type: ignore[arg-type]
+        _ = snapshot
+        self._get_local_asr_application_runtime().adapters.notice.sync()
 
     @property
     def receiver(self) -> object | None:
@@ -4425,37 +2988,24 @@ class GuiController:
     def _get_vrc_mic_sync_owner(self) -> VrcMicSyncOwner:
         owner = self._vrc_mic_sync_owner
         if owner is None:
-            owner = VrcMicSyncOwner(
+            owner = compose_vrc_mic_sync(
                 state_provider=lambda: self.vrc_mic_state,
                 gate_provider=lambda: self.vrc_mic_audio_gate,
-                receiver_factory=self._create_vrc_osc_receiver_for_runtime,
-                diagnostics_sink=self._vrc_mic_receiver_runtime_diagnostics_sink,
+                log_detailed=lambda message, level: self.log_detailed(
+                    message,
+                    level=level,
+                ),
                 error_sink=self._log_error,
-                host=VRC_OSC_RECEIVER_HOST,
-                port=VRC_OSC_RECEIVER_PORT,
             )
             self._vrc_mic_sync_owner = owner
         return owner
 
-    def _vrc_mic_receiver_runtime_diagnostics_sink(
-        self,
-        event: str,
-        metadata: Mapping[str, object],
-    ) -> None:
-        self.log_detailed(
-            f"[Lifecycle][VrcMicReceiverRuntime] event={event} metadata={dict(metadata)}",
-            level=logging.WARNING,
-        )
-
     async def _configure_vrc_mic_receiver(self, *, enabled: bool) -> None:
         await self._get_vrc_mic_sync_owner().configure(enabled=enabled)
 
-    def _create_openrouter_pkce_client(self) -> OpenRouterPKCEClient:
-        return OpenRouterPKCEClient(callback_origin="http://localhost:3000")
-
     def reopen_openrouter_pkce_authorization_url(self) -> bool:
-        owner = self._openrouter_pkce_flow_owner
-        return owner.reopen_authorization_url() if owner is not None else False
+        managed = self._managed_account_components
+        return managed.pkce_flow.reopen_authorization_url() if managed is not None else False
 
     def build_managed_openrouter_byok_target_settings(self) -> AppSettings | None:
         return build_managed_openrouter_byok_target_settings(self.settings)

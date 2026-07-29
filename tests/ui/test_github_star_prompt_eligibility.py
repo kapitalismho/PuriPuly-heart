@@ -10,6 +10,12 @@ import pytest
 pytest.importorskip("flet")
 
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
+from puripuly_heart.app.services.peer_application import PeerApplicationOwner
+from puripuly_heart.app.services.provider_runtime_apply import LlmProviderRebuildOwner
+from puripuly_heart.app.services.self_capture_application import (
+    SelfCaptureApplicationOwner,
+)
+from puripuly_heart.app.wiring_provider_runtime import ProviderRuntimeEffects
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -83,7 +89,7 @@ def _patch_stop_side_effects(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(OverlayApplicationOwner, "shutdown", _async_noop)
     monkeypatch.setattr(
         GuiController,
-        "_replace_managed_openrouter_release_service",
+        "_close_managed_openrouter_release_service",
         _async_noop,
     )
 
@@ -344,10 +350,10 @@ async def test_apply_providers_drains_pending_observation_before_settings_replac
 
     _patch_settings_save(monkeypatch, fake_save_settings)
     monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_to_thread)
-    monkeypatch.setattr(controller_module.LlmProviderRebuildOwner, "rebuild", _async_noop)
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", _async_noop)
-    monkeypatch.setattr(GuiController, "_replace_runtime_stt_provider", _async_noop)
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", _async_noop)
+    monkeypatch.setattr(LlmProviderRebuildOwner, "rebuild", _async_noop)
+    monkeypatch.setattr(PeerApplicationOwner, "refresh_runtime", _async_noop)
+    monkeypatch.setattr(SelfCaptureApplicationOwner, "replace_provider", _async_noop)
+    monkeypatch.setattr(ProviderRuntimeEffects, "rebuild_self_stt", _async_noop)
 
     runtime = controller._get_github_star_prompt_owner().get_runtime()
     persist_task = runtime.start_translation_success_observation(

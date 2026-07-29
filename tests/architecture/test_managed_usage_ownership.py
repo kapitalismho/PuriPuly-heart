@@ -57,6 +57,10 @@ def test_controller_no_longer_owns_managed_usage_state_or_refresh_algorithms() -
         "_refresh_managed_trial_usage_state",
         "_refresh_managed_trial_usage_state_impl",
         "_set_managed_usage_view_state",
+        "_managed_usage_state",
+        "_fetch_managed_usage_metadata",
+        "_managed_usage_auto_show_founder_letter",
+        "_managed_usage_warning_sink",
     }.isdisjoint(methods)
     assert {
         "_managed_status_refresh_owner",

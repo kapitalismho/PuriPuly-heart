@@ -11,7 +11,11 @@ from puripuly_heart.app.ports.gpu_worker import GpuWorkerDevice
 from puripuly_heart.app.services.gpu_runtime_interaction import (
     GpuRuntimeInteractionOwner,
 )
+from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeApplyPlan
+from puripuly_heart.app.services.self_capture_application import (
+    SelfCaptureApplicationOwner,
+)
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeSnapshot,
@@ -131,11 +135,12 @@ class ReadyProvisioningPort:
 
 
 class RecordingSelfRecoveryOwner:
-    def __init__(self) -> None:
+    def __init__(self, *, desired_active: bool = False) -> None:
         self.prepared_handlers = []
         self.aborted_handlers = []
         self.adopted_handlers = []
         self.pending_handlers = set()
+        self.snapshot = SimpleNamespace(desired_active=desired_active)
 
     def prepare_provider_recovery(self, _config):
         async def on_terminal_failure(_exc: Exception) -> None:
@@ -245,7 +250,6 @@ async def test_gpu_settings_receive_hardware_name_separately_from_vulkan_slot() 
 async def test_public_self_gpu_toggle_surfaces_provider_teardown_failure() -> None:
     controller, _view = _controller()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
-    controller._stt_desired = True
     failure = RuntimeError("provider teardown failed")
     abort_calls = 0
 
@@ -261,7 +265,8 @@ async def test_public_self_gpu_toggle_surfaces_provider_teardown_failure() -> No
 
     assert exc_info.value is failure
     assert abort_calls == 1
-    assert controller._stt_desired is False
+    assert controller._self_capture_owner is not None
+    assert controller._self_capture_owner.snapshot.desired_active is False
 
 
 async def test_unavailable_saved_gpu_device_retains_gpu_without_runtime_start() -> None:
@@ -339,7 +344,8 @@ async def test_missing_gpu_model_preserves_self_enable_intent_without_downloadin
 
     await controller.set_stt_enabled(True)
 
-    assert controller._stt_desired is True
+    assert controller._self_capture_owner is not None
+    assert controller._self_capture_owner.snapshot.desired_active is True
     assert controller._get_gpu_runtime_interaction_owner().snapshot.pending_channels == frozenset(
         {"self"}
     )
@@ -390,7 +396,6 @@ async def test_gpu_discovery_keeps_startup_progress_off_dashboard() -> None:
 async def test_gpu_worker_failure_keeps_recovery_membership_out_of_controller_state() -> None:
     controller, view = _controller()
     controller.settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
-    controller._stt_desired = True
 
     controller._get_local_asr_diagnostics_owner().provider_runtime_diagnostic(
         ProviderRuntimeDiagnostic(
@@ -458,7 +463,7 @@ async def test_gpu_consumer_suspension_does_not_detach_unrelated_non_gpu_self_ch
             self.suspend_calls += 1
 
     peer_runtime = PeerRuntime()
-    controller._peer_runtime = peer_runtime
+    controller._get_peer_application_runtime().owner.bind_runtime(peer_runtime)
 
     await controller._suspend_gpu_provider_consumers(("peer",))
 
@@ -491,29 +496,28 @@ async def test_manual_retry_delegates_attached_gpu_channels_to_owner(
         STTProviderName.LOCAL_QWEN_GPU if "peer" in channels else STTProviderName.DEEPGRAM
     )
     controller.settings.ui.peer_translation_enabled = "peer" in channels
-    controller._stt_desired = "self" in channels
     controller._get_gpu_runtime_interaction_owner().observe_runtime(
         _owned_gpu_snapshot(device, phase="ready")
     )
-    self_owner = RecordingSelfRecoveryOwner()
+    self_owner = RecordingSelfRecoveryOwner(desired_active="self" in channels)
     peer_owner = RecordingSelfRecoveryOwner()
     controller._self_capture_owner = self_owner
     if "peer" in channels:
-        controller._peer_runtime = peer_owner
+        controller._get_peer_application_runtime().owner.bind_runtime(peer_owner)
     monkeypatch.setattr(
         GuiController,
         "_on_self_capture_state_changed",
         lambda _self, _snapshot: None,
     )
     monkeypatch.setattr(
-        GuiController,
-        "_ensure_stt_switch",
+        SelfCaptureApplicationOwner,
+        "run_switch",
         lambda _self: asyncio.sleep(0),
     )
     monkeypatch.setattr(
-        GuiController,
-        "_refresh_peer_stt_runtime",
-        lambda _self: asyncio.sleep(0),
+        PeerApplicationOwner,
+        "refresh_runtime",
+        lambda _self, **_kwargs: asyncio.sleep(0),
     )
     monkeypatch.setattr(
         GuiController,
