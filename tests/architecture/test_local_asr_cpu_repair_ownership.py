@@ -18,16 +18,6 @@ def _method_source(path: Path, method_name: str) -> str:
     raise AssertionError(f"method not found: {method_name}")
 
 
-def test_cpu_repair_owner_is_ui_and_settings_neutral() -> None:
-    source = OWNER_PATH.read_text(encoding="utf-8")
-
-    assert "puripuly_heart.ui" not in source
-    assert "puripuly_heart.config.settings" not in source
-    assert "AppSettings" not in source
-    assert "GuiController" not in source
-    assert "flet" not in source
-
-
 def test_cpu_repair_owner_is_constructed_only_by_application_composition() -> None:
     constructions: list[str] = []
     for source_file in sorted(SOURCE_ROOT.rglob("*.py")):

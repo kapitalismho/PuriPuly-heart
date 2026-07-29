@@ -5,7 +5,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
-OWNER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "services" / "github_star_prompt_settings.py"
 
 
 def _controller_method_source(method_name: str) -> str:
@@ -34,12 +33,3 @@ def test_controller_github_prompt_methods_delegate_to_settings_owner_composition
     assert "_github_star_prompt_translation_connection_for" not in source
     assert "_github_star_prompt_has_managed_connection" not in source
     assert "_github_star_prompt_has_user_owned_cloud_connection" not in source
-
-
-def test_github_prompt_settings_owner_has_no_ui_or_controller_dependency() -> None:
-    source = OWNER_PATH.read_text(encoding="utf-8")
-
-    assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
-    assert "SettingsOwner" in source
-    assert "UiPromptClipboardStateSettingsMutation" in source

@@ -42,15 +42,6 @@ def test_controller_interactive_verification_is_an_owner_delegate() -> None:
     assert "verifier.verify_qwen_llm_api_key(" not in method
 
 
-def test_provider_credential_owner_has_no_ui_dependency() -> None:
-    source = OWNER_PATH.read_text(encoding="utf-8")
-
-    assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
-    assert "ProviderVerifierPort" in source
-    assert "ProviderCredentialVerificationOutcome" in source
-
-
 def test_provider_verifier_port_declares_every_used_verification_operation() -> None:
     source = PORT_PATH.read_text(encoding="utf-8")
 

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import ast
 import importlib
 from collections.abc import Mapping
 from dataclasses import FrozenInstanceError, dataclass, fields, is_dataclass
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -34,19 +32,6 @@ RAW_MANAGED_CREDENTIAL = "mconn-order30-managed-credential-must-not-leak"
 RAW_EXCEPTION_TEXT = "mconn-order30-raw-exception-text-must-not-leak"
 RAW_BROKER_PAYLOAD = "mconn-order30-broker-payload-must-not-leak"
 
-FORBIDDEN_SERVICE_IMPORT_PREFIXES = (
-    "flet",
-    "keyring",
-    "puripuly_heart.app.adapters",
-    "puripuly_heart.app.wiring",
-    "puripuly_heart.config.settings",
-    "puripuly_heart.config.settings_vnext",
-    "puripuly_heart.core.managed_identity",
-    "puripuly_heart.core.managed_openrouter_broker_client",
-    "puripuly_heart.core.storage",
-    "puripuly_heart.providers",
-    "puripuly_heart.ui",
-)
 FORBIDDEN_RAW_VALUES = (
     RAW_MANAGED_CREDENTIAL,
     RAW_EXCEPTION_TEXT,
@@ -575,29 +560,6 @@ def _assert_remote_active_unsafe_settings_rejection(
     assert result.diagnostics.fields["settings_commit_succeeded"] is False
     assert result.diagnostics.fields["broker_connection_id"] == "broker-conn-1"
     assert result.diagnostics.fields["remote_key_revision"] == "remote-r1"
-
-
-def _imported_modules(module_file: str) -> set[str]:
-    tree = ast.parse(Path(module_file).read_text(encoding="utf-8"))
-    imported: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imported.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imported.add(node.module)
-    return imported
-
-
-def test_managed_connection_auth_service_has_no_ui_or_concrete_store_imports() -> None:
-    module = _service_module()
-    imports = _imported_modules(module.__file__ or "")
-
-    assert not {
-        imported
-        for imported in imports
-        for forbidden in FORBIDDEN_SERVICE_IMPORT_PREFIXES
-        if imported == forbidden or imported.startswith(f"{forbidden}.")
-    }
 
 
 def test_request_and_port_dtos_are_frozen_slotted_and_repr_safe() -> None:

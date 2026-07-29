@@ -5,8 +5,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
-OWNER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "services" / "microphone_test.py"
-ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "microphone_test_capture.py"
 
 
 def _method_source(path: Path, class_name: str, method_name: str) -> str:
@@ -51,21 +49,6 @@ def test_controller_microphone_test_state_is_backed_by_owner_properties() -> Non
     assert 'owner_name="MicrophoneTestSessionOwner"' in source
 
 
-def test_microphone_test_session_owner_has_no_ui_or_controller_dependency() -> None:
-    source = OWNER_PATH.read_text(encoding="utf-8")
-
-    assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
-    assert "MicTestRuntime" in source
-    assert "MicrophoneTestCapturePort" in source
-    assert "await self.capture_port.capture(" in source
-    assert "MicrophoneTestSessionRequest" in source
-    assert "MicrophoneTestSelfCaptureState" in source
-    assert "await self.disable_self_capture()" in source
-    assert "self microphone source still open after STT auto-off" in source
-    assert "drop meter updates from stale runtime generations" in source
-
-
 def test_production_microphone_test_session_does_not_reenter_controller_capture() -> None:
     factory = _method_source(
         CONTROLLER_PATH,
@@ -82,13 +65,3 @@ def test_controller_direct_microphone_test_capture_compatibility_method_is_remov
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
 
     assert "def run_microphone_test_capture(" not in source
-
-
-def test_microphone_test_capture_adapter_has_no_ui_or_controller_dependency() -> None:
-    source = ADAPTER_PATH.read_text(encoding="utf-8")
-
-    assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
-    assert "MicrophoneTestCaptureRequest" in source
-    assert "MicrophoneTestRuntimePort" in source
-    assert "source_factory" in source

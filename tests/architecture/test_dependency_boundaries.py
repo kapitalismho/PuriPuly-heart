@@ -333,6 +333,7 @@ LAYER_RULES = (
 
 EXTERNAL_MODULE_LAYERS = {
     "flet": UI_ADAPTERS_RENDERERS,
+    "keyring": ADAPTERS,
 }
 
 KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
@@ -1149,6 +1150,7 @@ def _legacy_settings_value_payload_text_symbol(
 def test_dependency_rule_vocabulary_distinguishes_required_layers() -> None:
     assert tuple(rule.layer for rule in LAYER_RULES) == REQUIRED_LAYER_VOCABULARY
     assert {rule.layer for rule in LAYER_RULES} == set(REQUIRED_LAYER_VOCABULARY)
+    assert _layer_for_module("keyring") == ADAPTERS
 
 
 def test_migration_serialization_forbids_runtime_owner_dependencies() -> None:

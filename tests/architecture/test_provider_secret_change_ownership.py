@@ -5,7 +5,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
-OWNER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_secret_change.py"
 
 
 def _controller_method_source(method_name: str) -> str:
@@ -37,15 +36,3 @@ def test_controller_delegates_complete_provider_secret_transaction_owner() -> No
     assert "LifecycleScope" not in source
     assert "start_lifecycle_task" not in source
     assert "asyncio.shield" not in source
-
-
-def test_provider_secret_change_owner_has_no_ui_or_controller_dependency() -> None:
-    source = OWNER_PATH.read_text(encoding="utf-8")
-
-    assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
-    assert "asyncio.Lock" in source
-    assert "LifecycleScope" in source
-    assert "start_lifecycle_task" in source
-    assert "await asyncio.shield(operation)" in source
-    assert "execution.result_handler(result, succeeded)" in source

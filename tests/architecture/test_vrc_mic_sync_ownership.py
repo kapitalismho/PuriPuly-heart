@@ -5,7 +5,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
-BRANCH_TEST_PATH = ROOT / "tests" / "ui" / "test_controller_branch_paths.py"
 
 
 def _method_source(path: Path, method_name: str) -> str:
@@ -27,13 +26,3 @@ def test_controller_vrc_mic_configure_remains_owner_delegate() -> None:
     method = _method_source(CONTROLLER_PATH, "_configure_vrc_mic_receiver")
 
     assert "_get_vrc_mic_sync_owner().configure(enabled=enabled)" in method
-
-
-def test_vrc_mic_stop_behavior_targets_composed_owner_boundary() -> None:
-    method = _method_source(
-        BRANCH_TEST_PATH,
-        "test_vrc_mic_sync_owner_stop_clears_receiver_and_marks_gate_inactive",
-    )
-
-    assert "_get_vrc_mic_sync_owner().stop()" in method
-    assert "_stop_vrc_mic_receiver()" not in method

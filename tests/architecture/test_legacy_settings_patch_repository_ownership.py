@@ -4,9 +4,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
-REPOSITORY_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "services" / "canonical_settings_persistence.py"
-)
 PROVIDER_SETTINGS_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_settings.py"
 )
@@ -31,12 +28,3 @@ def test_controller_composes_application_settings_patch_repository() -> None:
     assert "_begin_canonical_mutation" not in source
     assert "_rollback_canonical_mutation" not in source
     assert "_complete_canonical_mutation" not in source
-
-
-def test_settings_patch_repository_has_no_ui_or_controller_dependency() -> None:
-    source = REPOSITORY_PATH.read_text(encoding="utf-8")
-
-    assert "puripuly_heart.ui" not in source
-    assert "GuiController" not in source
-    assert "asyncio.to_thread(self.owner.persist)" in source
-    assert "self.owner.rollback()" in source

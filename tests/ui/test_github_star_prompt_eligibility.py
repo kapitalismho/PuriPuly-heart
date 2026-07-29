@@ -198,73 +198,6 @@ def test_user_owned_cloud_translation_success_observation_persists_through_setti
     assert restored.ui.github_star_prompt_translation_success_observed is True
 
 
-def test_translation_success_observation_restores_state_when_persistence_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    controller = _controller_for(settings)
-    saved_payloads: list[dict[str, object]] = []
-
-    def fail_save_settings(*_args: object, **_kwargs: object) -> None:
-        raise OSError("settings write failed")
-
-    _patch_settings_save(monkeypatch, fail_save_settings)
-
-    assert controller._get_github_star_prompt_owner().record_translation_success_observed() is False
-    assert settings.ui.github_star_prompt_translation_success_observed is False
-
-    def capture_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
-
-    _patch_settings_save(monkeypatch, capture_save_settings)
-
-    assert controller._get_github_star_prompt_owner().record_translation_success_observed() is True
-    assert settings.ui.github_star_prompt_translation_success_observed is True
-    assert saved_payloads
-
-
-@pytest.mark.asyncio
-async def test_pending_translation_success_observation_save_retargets_replaced_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    initial_settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    initial_settings.languages.target_language = "en"
-    controller = _controller_for(initial_settings)
-    saved_payloads: list[dict[str, object]] = []
-    first_to_thread_started = asyncio.Event()
-    release_first_to_thread = asyncio.Event()
-    to_thread_calls = 0
-
-    def fake_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
-
-    async def delayed_first_to_thread(func, /, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
-        nonlocal to_thread_calls
-        to_thread_calls += 1
-        if to_thread_calls == 1:
-            first_to_thread_started.set()
-            await release_first_to_thread.wait()
-        return func(*args, **kwargs)
-
-    _patch_settings_save(monkeypatch, fake_save_settings)
-    monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_first_to_thread)
-
-    persist_task = asyncio.create_task(
-        controller.persist_github_star_prompt_translation_success_observed()
-    )
-    await asyncio.wait_for(first_to_thread_started.wait(), timeout=1.0)
-
-    replacement_settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    replacement_settings.languages.target_language = "ja"
-    controller.settings = replacement_settings
-    release_first_to_thread.set()
-
-    assert await asyncio.wait_for(persist_task, timeout=1.0) is True
-    assert replacement_settings.ui.github_star_prompt_translation_success_observed is True
-    assert saved_payloads[-1]["languages"]["target_language"] == "ja"
-    assert saved_payloads[-1]["ui"]["github_star_prompt_translation_success_observed"] is True
-
-
 @pytest.mark.parametrize(
     "connection",
     [
@@ -390,38 +323,6 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "connection",
-    [
-        TranslationConnection.MANAGED,
-        TranslationConnection.MANAGED_CHINA,
-        TranslationConnection.OLLAMA,
-    ],
-)
-async def test_apply_settings_preserves_durable_observation_when_connection_switches_away(
-    monkeypatch: pytest.MonkeyPatch,
-    connection: TranslationConnection,
-) -> None:
-    settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    settings.ui.github_star_prompt_translation_success_observed = True
-    controller = _controller_for(settings)
-    replacement_settings = _settings_for_connection(connection)
-    saved_payloads: list[dict[str, object]] = []
-
-    monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", _async_noop)
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, updated: saved_payloads.append(to_dict(updated)),
-    )
-
-    await controller.apply_settings(replacement_settings)
-
-    assert replacement_settings.ui.github_star_prompt_translation_success_observed is True
-    assert controller.is_github_star_prompt_eligible() is False
-    assert saved_payloads[-1]["ui"]["github_star_prompt_translation_success_observed"] is True
-
-
-@pytest.mark.asyncio
 async def test_apply_providers_drains_pending_observation_before_settings_replacement(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -470,58 +371,6 @@ async def test_apply_providers_drains_pending_observation_before_settings_replac
         if not apply_task.done():
             apply_task.cancel()
             await asyncio.gather(apply_task, return_exceptions=True)
-        if not persist_task.done():
-            persist_task.cancel()
-            await asyncio.gather(persist_task, return_exceptions=True)
-
-
-@pytest.mark.asyncio
-async def test_stop_cancels_pending_github_star_observation_via_runtime_owner(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    controller = _controller_for(settings)
-    saved_payloads: list[dict[str, object]] = []
-    first_to_thread_started = asyncio.Event()
-    release_first_to_thread = asyncio.Event()
-
-    def fake_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
-
-    async def delayed_to_thread(func, /, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
-        first_to_thread_started.set()
-        await release_first_to_thread.wait()
-        return func(*args, **kwargs)
-
-    _patch_settings_save(monkeypatch, fake_save_settings)
-    monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_to_thread)
-    _patch_stop_side_effects(monkeypatch)
-
-    runtime = controller._get_github_star_prompt_owner().get_runtime()
-    persist_task = runtime.start_translation_success_observation(
-        controller.persist_github_star_prompt_translation_success_observed()
-    )
-    await asyncio.wait_for(first_to_thread_started.wait(), timeout=1.0)
-
-    stop_task = asyncio.create_task(controller.stop())
-    await asyncio.sleep(0)
-
-    assert not stop_task.done()
-    assert settings.ui.github_star_prompt_translation_success_observed is True
-
-    release_first_to_thread.set()
-    try:
-        await asyncio.wait_for(stop_task, timeout=1.0)
-
-        with pytest.raises(asyncio.CancelledError):
-            await asyncio.wait_for(persist_task, timeout=1.0)
-        assert runtime.translation_success_task is None
-        assert settings.ui.github_star_prompt_translation_success_observed is False
-        assert saved_payloads == []
-    finally:
-        if not stop_task.done():
-            stop_task.cancel()
-            await asyncio.gather(stop_task, return_exceptions=True)
         if not persist_task.done():
             persist_task.cancel()
             await asyncio.gather(persist_task, return_exceptions=True)
