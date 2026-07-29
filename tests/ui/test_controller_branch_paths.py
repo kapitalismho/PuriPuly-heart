@@ -1037,8 +1037,8 @@ def _controller_with_persisted_settings(
     controller = _make_controller(app=SimpleNamespace(view_dashboard=DummyDashboard()))
     controller.config_path = path
     controller.settings = controller._load_or_init_settings(path)
-    controller._vnext_settings_authoritative = True
-    controller._remember_canonical_legacy_projection(controller.settings)
+    controller._get_settings_owner().authoritative = True
+    controller._get_settings_owner().remember_projection(controller.settings)
     return controller, path
 
 
@@ -1954,6 +1954,41 @@ async def test_clipboard_watcher_not_started_on_non_windows(
 
     assert called is False
     assert controller._get_clipboard_auto_translation_owner().runtime is None
+
+
+def test_manual_local_asr_mismatches_persist_qwen_for_self_and_peer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    settings.provider.stt = STTProviderName.LOCAL_PARAKEET_V3
+    settings.provider.peer_stt = STTProviderName.LOCAL_PARAKEET_JAPANESE
+    settings.languages.source_language = "ko"
+    settings.languages.peer_source_language = "en"
+    saved: list[AppSettings] = []
+    messages: list[str] = []
+    controller = GuiController(
+        page=SimpleNamespace(),
+        app=FletUiPresentationAdapter(
+            SimpleNamespace(
+                show_snackbar=lambda message, _color: messages.append(message),
+            )
+        ),
+        config_path=Path("settings.json"),
+    )
+    controller.settings = settings
+
+    monkeypatch.setattr(GuiController, "_sync_ui_from_settings", lambda self: None)
+    monkeypatch.setattr(
+        GuiController,
+        "_save_settings",
+        lambda self: saved.append(self.settings) or True,
+    )
+
+    assert controller._persist_current_manual_local_asr_fallback() is True
+    assert controller.settings.provider.stt == STTProviderName.LOCAL_QWEN
+    assert controller.settings.provider.peer_stt == STTProviderName.LOCAL_QWEN
+    assert len(saved) == 1
+    assert messages == [t("local_stt.language_fallback_qwen")]
 
 
 @pytest.mark.asyncio
@@ -4200,7 +4235,7 @@ def test_peer_runtime_uses_canonical_vnext_intent_over_legacy_projection() -> No
             ),
         ),
     )
-    controller._vnext_settings_authoritative = True
+    controller._get_settings_owner().authoritative = True
 
     config = controller._build_peer_runtime_config(controller.settings)
 
@@ -4222,7 +4257,7 @@ def test_direct_peer_settings_mutation_refreshes_canonical_runtime_intent() -> N
             peer_stt=replace(vnext_settings.intent.peer_stt, provider="soniox"),
         ),
     )
-    controller._vnext_settings_authoritative = True
+    controller._get_settings_owner().authoritative = True
 
     pending = copy.deepcopy(settings)
     pending.languages.peer_source_mode = "auto"
@@ -4230,7 +4265,7 @@ def test_direct_peer_settings_mutation_refreshes_canonical_runtime_intent() -> N
     pending.desktop_audio.output_device = "Headphones (Loopback)"
     pending.desktop_audio.vad_speech_threshold = 0.72
 
-    controller._update_canonical_settings_from_legacy_delta(controller.settings, pending)
+    controller._get_settings_owner().apply_legacy_delta(controller.settings, pending)
     config = controller._build_peer_runtime_config(pending)
 
     assert controller.vnext_settings.intent.languages.peer_source_mode == "auto"
@@ -4263,13 +4298,13 @@ def test_unrelated_legacy_apply_preserves_canonical_peer_auto_intent_after_save_
             ),
         ),
     )
-    controller._vnext_settings_authoritative = True
+    controller._get_settings_owner().authoritative = True
     expected_signature = controller._build_peer_stt_provider_signature(legacy)
 
     pending = copy.deepcopy(legacy)
     pending.ui.locale = "ja"
-    controller._begin_canonical_mutation()
-    controller._update_canonical_settings_from_legacy_delta(controller.settings, pending)
+    controller._get_settings_owner().begin()
+    controller._get_settings_owner().apply_legacy_delta(controller.settings, pending)
     controller.settings = pending
     controller.persist_settings()
 
@@ -4305,11 +4340,11 @@ def test_failed_canonical_persistence_rolls_back_peer_auto_intent(
         ),
     )
     controller.vnext_settings = canonical
-    controller._vnext_settings_authoritative = True
+    controller._get_settings_owner().authoritative = True
     pending = copy.deepcopy(legacy)
     pending.ui.locale = "ja"
-    controller._begin_canonical_mutation()
-    controller._update_canonical_settings_from_legacy_delta(controller.settings, pending)
+    controller._get_settings_owner().begin()
+    controller._get_settings_owner().apply_legacy_delta(controller.settings, pending)
     controller.settings = pending
     monkeypatch.setattr(
         canonical_persistence_adapter_module,
@@ -4346,8 +4381,8 @@ def test_active_controller_persistence_preserves_canonical_peer_intent(
         ),
     )
     controller.vnext_settings = canonical
-    controller._vnext_settings_authoritative = True
-    controller._remember_canonical_legacy_projection(legacy)
+    controller._get_settings_owner().authoritative = True
+    controller._get_settings_owner().remember_projection(legacy)
     saved: list[AppSettingsVNext] = []
     monkeypatch.setattr(
         canonical_persistence_adapter_module,
@@ -4387,8 +4422,8 @@ def test_failed_active_in_place_managed_persistence_restores_legacy_and_canonica
         ),
     )
     controller.vnext_settings = canonical
-    controller._vnext_settings_authoritative = True
-    controller._remember_canonical_legacy_projection(legacy)
+    controller._get_settings_owner().authoritative = True
+    controller._get_settings_owner().remember_projection(legacy)
     monkeypatch.setattr(
         canonical_persistence_adapter_module,
         "save_vnext_settings",
@@ -4431,8 +4466,8 @@ def test_stale_managed_adapter_persists_only_managed_delta_on_current_settings(
             ),
         ),
     )
-    controller._vnext_settings_authoritative = True
-    controller._remember_canonical_legacy_projection(active_settings)
+    controller._get_settings_owner().authoritative = True
+    controller._get_settings_owner().remember_projection(active_settings)
     saved: list[AppSettingsVNext] = []
     monkeypatch.setattr(
         canonical_persistence_adapter_module,
@@ -4482,8 +4517,8 @@ def test_failed_stale_managed_adapter_persistence_restores_active_and_bound_sett
         ),
     )
     controller.vnext_settings = canonical
-    controller._vnext_settings_authoritative = True
-    controller._remember_canonical_legacy_projection(active_settings)
+    controller._get_settings_owner().authoritative = True
+    controller._get_settings_owner().remember_projection(active_settings)
     monkeypatch.setattr(
         canonical_persistence_adapter_module,
         "save_vnext_settings",
@@ -4518,8 +4553,8 @@ def test_direct_save_stages_legacy_delta_without_overwriting_canonical_peer_inte
             ),
         ),
     )
-    controller._vnext_settings_authoritative = True
-    controller._remember_canonical_legacy_projection(legacy)
+    controller._get_settings_owner().authoritative = True
+    controller._get_settings_owner().remember_projection(legacy)
     saved: list[AppSettingsVNext] = []
     monkeypatch.setattr(
         canonical_persistence_adapter_module,
@@ -4562,20 +4597,20 @@ def test_nested_canonical_completion_keeps_outer_rollback_snapshot() -> None:
         ),
     )
     controller.vnext_settings = canonical
-    controller._vnext_settings_authoritative = True
+    controller._get_settings_owner().authoritative = True
 
-    controller._begin_canonical_mutation()
+    controller._get_settings_owner().begin()
     controller.settings.ui.locale = "ja"
-    controller._begin_canonical_mutation()
-    controller._complete_canonical_mutation()
+    controller._get_settings_owner().begin()
+    controller._get_settings_owner().complete()
 
-    assert controller._canonical_mutation_rollback_pending is True
-    assert controller._canonical_mutation_depth == 1
-    controller._rollback_canonical_mutation()
+    assert controller._get_settings_owner().rollback_pending is True
+    assert controller._get_settings_owner().mutation_depth == 1
+    controller._get_settings_owner().rollback()
 
     assert controller.settings == legacy_before_mutation
     assert controller.vnext_settings == canonical
-    assert controller._canonical_mutation_depth == 0
+    assert controller._get_settings_owner().mutation_depth == 0
 
 
 @pytest.mark.asyncio
@@ -4598,7 +4633,7 @@ async def test_settings_repository_commits_only_scoped_delta_to_canonical_vnext(
             ),
         ),
     )
-    controller._vnext_settings_authoritative = True
+    controller._get_settings_owner().authoritative = True
     stale_full_draft = copy.deepcopy(legacy)
     stale_full_draft.provider.peer_stt = STTProviderName.DEEPGRAM
     saved: list[AppSettingsVNext] = []
@@ -4650,8 +4685,8 @@ async def test_failed_scoped_persistence_restores_canonical_and_legacy_before_ru
         ),
     )
     controller.vnext_settings = canonical
-    controller._vnext_settings_authoritative = True
-    controller._remember_canonical_legacy_projection(legacy)
+    controller._get_settings_owner().authoritative = True
+    controller._get_settings_owner().remember_projection(legacy)
     runtime_calls: list[str] = []
     monkeypatch.setattr(
         canonical_persistence_adapter_module,
@@ -12581,14 +12616,14 @@ async def test_schedule_github_star_prompt_translation_success_uses_runtime_owne
         observed.set()
         return True
 
+    owner = controller._get_github_star_prompt_owner()
     monkeypatch.setattr(
-        GuiController,
-        "persist_github_star_prompt_translation_success_observed",
-        lambda self: persist_success(),
+        type(owner),
+        "persist_translation_success_observed",
+        lambda _self: persist_success(),
     )
 
     assert controller.schedule_github_star_prompt_translation_success_observed() is True
-    owner = controller._get_github_star_prompt_owner()
     runtime = owner.runtime
     assert runtime is not None
     assert runtime.translation_success_task is not None

@@ -27,6 +27,9 @@ def test_composition_forwards_options_without_passing_a_flet_page(monkeypatch) -
 
     assert isinstance(application, UiApplicationBoundary)
     assert application.wraps(backend)
+    settings_owner = captured.pop("settings_owner")
+    provider_settings_owner = captured.pop("provider_settings_owner")
+    assert provider_settings_owner.settings is settings_owner
     assert captured == {
         "page": None,
         "app": presentation,

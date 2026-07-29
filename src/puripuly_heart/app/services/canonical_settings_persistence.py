@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, fields, replace
 from enum import Enum
 from pathlib import Path
 from typing import cast
@@ -108,29 +108,17 @@ def _apply_managed_pending_delivery_ack_patch(
             )
 
 
-@dataclass(frozen=True, slots=True)
-class LegacySettingsPatchCallbacks:
-    current_settings: Callable[[], AppSettings | None]
-    canonical_projection_snapshot: Callable[[], AppSettings | None]
-    begin_canonical_mutation: Callable[[], None]
-    update_canonical_from_legacy_delta: Callable[[AppSettings, AppSettings], None]
-    bind_provider_verification: Callable[[ProviderVerificationBinding], None]
-    persist_settings: Callable[[AppSettings], None]
-    rollback_canonical_mutation: Callable[[], None]
-    save_failure_sink: Callable[[str], None]
-    remember_canonical_projection: Callable[[AppSettings], None]
-
-
 @dataclass(slots=True)
 class LegacySettingsPatchRepository:
-    callbacks: LegacySettingsPatchCallbacks
+    owner: SettingsOwner
     committed_settings: AppSettings
     base_settings: AppSettings | None = None
     surface: str = "translation_provider"
     provider_verification_binding: ProviderVerificationBinding | None = None
+    save_failure_sink: Callable[[str], None] | None = None
 
     async def load(self) -> SettingsSnapshot:
-        settings = self.callbacks.current_settings() or self.committed_settings
+        settings = self.owner.current or self.committed_settings
         return SettingsSnapshot(
             values=legacy_settings_snapshot_values(settings),
             revision=None,
@@ -151,18 +139,22 @@ class LegacySettingsPatchRepository:
             _apply_managed_pending_delivery_ack_patch(next_settings, request.values)
         else:
             next_settings = copy.deepcopy(self.committed_settings)
-        self.callbacks.begin_canonical_mutation()
+        self.owner.begin()
         try:
-            self.callbacks.update_canonical_from_legacy_delta(
-                self.callbacks.canonical_projection_snapshot() or base_settings or next_settings,
+            self.owner.apply_legacy_delta(
+                self.owner.projection_snapshot or base_settings or next_settings,
                 next_settings,
             )
             if self.provider_verification_binding is not None:
-                self.callbacks.bind_provider_verification(self.provider_verification_binding)
-            await asyncio.to_thread(self.callbacks.persist_settings, next_settings)
+                self.owner.bind_provider_verification(self.provider_verification_binding)
+            await asyncio.to_thread(self.owner.persist)
+        except asyncio.CancelledError:
+            self.owner.rollback()
+            raise
         except Exception:
-            self.callbacks.rollback_canonical_mutation()
-            self.callbacks.save_failure_sink("Failed to save settings mutation")
+            self.owner.rollback()
+            if self.save_failure_sink is not None:
+                self.save_failure_sink("Failed to save settings mutation")
             return SettingsCommitResult(
                 succeeded=False,
                 snapshot=None,
@@ -175,7 +167,7 @@ class LegacySettingsPatchRepository:
                 ),
             )
         self.committed_settings = next_settings
-        self.callbacks.remember_canonical_projection(next_settings)
+        self.owner.remember_projection(next_settings)
         return SettingsCommitResult(
             succeeded=True,
             snapshot=SettingsSnapshot(
@@ -209,7 +201,14 @@ class SettingsOwner:
     persistence: CanonicalSettingsPersistencePort[AppSettings, AppSettingsVNext]
     policy: TranslationRuntimePolicy = FIXED_TRANSLATION_POLICY
     canonical: AppSettingsVNext | None = None
+    current: AppSettings | None = None
+    authoritative: bool = False
+    projection_snapshot: AppSettings | None = None
     _rollback_snapshot: AppSettingsVNext | None = None
+    _rollback_legacy_snapshot: AppSettings | None = None
+    _rollback_active_settings: AppSettings | None = None
+    _rollback_authoritative: bool = False
+    _rollback_pending: bool = False
     _mutation_depth: int = 0
 
     def start(self, *, allow_stable_settings_import: bool = False) -> SettingsOwnerStartResult:
@@ -235,15 +234,17 @@ class SettingsOwner:
                 authoritative=False,
             )
             self.persistence.persist(self.path, self.canonical)
+            self.current = self.persistence.compatibility_projection(self.canonical)
             return SettingsOwnerStartResult(
-                settings=self.persistence.compatibility_projection(self.canonical),
+                settings=self.current,
                 migrated=False,
                 backup_path=None,
             )
         loaded = self.persistence.load_active(self.path)
         self.canonical = loaded.canonical_settings
+        self.current = loaded.compatibility_settings
         return SettingsOwnerStartResult(
-            settings=loaded.compatibility_settings,
+            settings=self.current,
             migrated=loaded.migrated,
             backup_path=loaded.backup_path,
             stable_source_path=stable_source_path,
@@ -278,6 +279,7 @@ class SettingsOwner:
             base_settings=base_settings,
             next_settings=next_settings,
         )
+        self.authoritative = True
         return self.canonical
 
     def project_legacy_delta(
@@ -304,6 +306,38 @@ class SettingsOwner:
             raise RuntimeError("settings owner has no canonical settings")
         self.canonical = self.persistence.bind_provider_verification(self.canonical, binding)
 
+    def persist_provider_verification(
+        self,
+        *,
+        provider: str,
+        key: str,
+        success: bool,
+        binding: ProviderVerificationBinding | None,
+        active_secret: str | None,
+    ) -> None:
+        if self.current is None:
+            raise RuntimeError("settings owner has no compatibility settings")
+        baseline = copy.deepcopy(self.projection_snapshot or self.current)
+        active_settings = self.current
+        self.begin(legacy_snapshot=baseline)
+        setattr(active_settings.api_key_verified, provider, success)
+        try:
+            self.apply_legacy_delta(baseline, active_settings)
+            if success:
+                if binding is None:
+                    raise RuntimeError("verified provider requires evidence binding")
+                if active_secret != key:
+                    raise RuntimeError(
+                        "verified credential does not match the active SecretStore value"
+                    )
+                self.bind_provider_verification(binding)
+            self.persist()
+        except Exception:
+            self.rollback()
+            raise
+        self.remember_projection(active_settings)
+        self.complete()
+
     def compatibility_projection(self) -> AppSettings:
         if self.canonical is None:
             raise RuntimeError("settings owner has no canonical settings")
@@ -316,36 +350,19 @@ class SettingsOwner:
     def create_legacy_patch_repository(
         self,
         *,
-        current_settings: Callable[[], AppSettings | None],
-        canonical_projection_snapshot: Callable[[], AppSettings | None],
-        begin_canonical_mutation: Callable[[], None],
-        update_canonical_from_legacy_delta: Callable[[AppSettings, AppSettings], None],
-        bind_provider_verification: Callable[[ProviderVerificationBinding], None],
-        persist_settings: Callable[[AppSettings], None],
-        rollback_canonical_mutation: Callable[[], None],
-        save_failure_sink: Callable[[str], None],
-        remember_canonical_projection: Callable[[AppSettings], None],
         committed_settings: AppSettings,
         base_settings: AppSettings | None = None,
         surface: str = "translation_provider",
         provider_verification_binding: ProviderVerificationBinding | None = None,
+        save_failure_sink: Callable[[str], None] | None = None,
     ) -> LegacySettingsPatchRepository:
         return LegacySettingsPatchRepository(
-            callbacks=LegacySettingsPatchCallbacks(
-                current_settings=current_settings,
-                canonical_projection_snapshot=canonical_projection_snapshot,
-                begin_canonical_mutation=begin_canonical_mutation,
-                update_canonical_from_legacy_delta=update_canonical_from_legacy_delta,
-                bind_provider_verification=bind_provider_verification,
-                persist_settings=persist_settings,
-                rollback_canonical_mutation=rollback_canonical_mutation,
-                save_failure_sink=save_failure_sink,
-                remember_canonical_projection=remember_canonical_projection,
-            ),
+            owner=self,
             committed_settings=committed_settings,
             base_settings=base_settings,
             surface=surface,
             provider_verification_binding=provider_verification_binding,
+            save_failure_sink=save_failure_sink,
         )
 
     def update_capture_target(
@@ -386,15 +403,37 @@ class SettingsOwner:
             raise
         return projected
 
-    def begin(self) -> None:
+    def remember_projection(self, settings: AppSettings) -> None:
+        self.projection_snapshot = copy.deepcopy(settings)
+
+    def begin(self, *, legacy_snapshot: AppSettings | None = None) -> None:
         if self._mutation_depth == 0:
             self._rollback_snapshot = self.persistence.snapshot(self.canonical)
+            self._rollback_active_settings = self.current
+            self._rollback_legacy_snapshot = copy.deepcopy(
+                legacy_snapshot if legacy_snapshot is not None else self.current
+            )
+            self._rollback_authoritative = self.authoritative
+            self._rollback_pending = True
         self._mutation_depth += 1
 
     def rollback(self) -> None:
-        if self._mutation_depth == 0:
+        if not self._rollback_pending:
             return
         self.canonical = self.persistence.rollback(self._rollback_snapshot)
+        active_settings = self._rollback_active_settings
+        legacy_snapshot = self._rollback_legacy_snapshot
+        if active_settings is not None and legacy_snapshot is not None:
+            for settings_field in fields(AppSettings):
+                setattr(
+                    active_settings,
+                    settings_field.name,
+                    copy.deepcopy(getattr(legacy_snapshot, settings_field.name)),
+                )
+            self.current = active_settings
+        else:
+            self.current = legacy_snapshot
+        self.authoritative = self._rollback_authoritative
         self._mutation_depth = 1
         self.complete()
 
@@ -404,6 +443,18 @@ class SettingsOwner:
         self._mutation_depth -= 1
         if self._mutation_depth == 0:
             self._rollback_snapshot = None
+            self._rollback_legacy_snapshot = None
+            self._rollback_active_settings = None
+            self._rollback_authoritative = False
+            self._rollback_pending = False
+
+    @property
+    def mutation_depth(self) -> int:
+        return self._mutation_depth
+
+    @property
+    def rollback_pending(self) -> bool:
+        return self._rollback_pending
 
 
 def compose_settings_owner(path: Path) -> SettingsOwner:
@@ -411,7 +462,6 @@ def compose_settings_owner(path: Path) -> SettingsOwner:
 
 
 __all__ = [
-    "LegacySettingsPatchCallbacks",
     "LegacySettingsPatchRepository",
     "SettingsOwner",
     "SettingsOwnerStartResult",

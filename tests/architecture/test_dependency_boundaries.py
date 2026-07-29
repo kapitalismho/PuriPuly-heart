@@ -221,6 +221,8 @@ LAYER_RULES = (
         prefixes=(
             "puripuly_heart.app.services.canonical_settings_persistence",
             "puripuly_heart.app.services.capture_target_settings",
+            "puripuly_heart.app.services.github_star_prompt_settings",
+            "puripuly_heart.app.services.provider_settings",
         ),
         forbidden_layers=frozenset(
             {
@@ -542,6 +544,8 @@ SETTINGS_PERSISTENCE_COMPOSITION_PATHS = frozenset(
 SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
     {
         "src/puripuly_heart/app/services/settings_mutation_legacy.py",
+        "src/puripuly_heart/app/services/github_star_prompt_settings.py",
+        "src/puripuly_heart/app/services/provider_settings.py",
         "src/puripuly_heart/app/wiring_llm_factory.py",
         "src/puripuly_heart/app/wiring_managed_auth_factory.py",
         "src/puripuly_heart/app/wiring_overlay_factory.py",
@@ -1537,6 +1541,8 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "def _log_audio_environment_snapshot_async(",
             "def _refresh_owned_referral_id_from_managed_status_best_effort(",
             "def _request_local_asr_install(",
+            "def _show_local_stt_download_prompt(",
+            "def _on_local_stt_download_action(",
             "def _transition_active_self_local_asr(",
             "def _build_stt_runtime_signature(",
             "def _peer_stt_runtime_custom_vocabulary_signature(",

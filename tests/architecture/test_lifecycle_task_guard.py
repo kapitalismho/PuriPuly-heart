@@ -456,28 +456,39 @@ def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:
 
 def test_order44_local_asr_owner_retires_controller_background_scope() -> None:
     controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    cpu_repair_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "local_asr_cpu_repair.py"
+    )
     provisioning_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "local_asr_provisioning.py"
     )
     controller_source = controller_path.read_text(encoding="utf-8")
+    cpu_repair_source = cpu_repair_path.read_text(encoding="utf-8")
     provisioning_source = provisioning_path.read_text(encoding="utf-8")
 
     assert "_ui_background_scope" not in controller_source
     assert "GuiControllerBackgroundScope" not in controller_source
-    assert "result_handler=" in controller_source
+    assert "result_handler=" not in controller_source
+    assert "result_handler=lambda result: self.handle_install_result(" in cpu_repair_source
     assert "_result_delivery_tasks" in provisioning_source
     assert "LocalASRProvisioningOwner:install-result-" in provisioning_source
 
 
 def test_controller_does_not_retain_dead_shutdown_or_stt_switch_locks() -> None:
     controller_path = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+    provider_settings_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_settings.py"
+    )
     source = controller_path.read_text(encoding="utf-8")
+    provider_settings_source = provider_settings_path.read_text(encoding="utf-8")
 
     assert "_stop_lock" not in source
     assert "_stt_switch_lock" not in source
     assert "_provider_secret_change_lock" not in source
     assert "_provider_secret_change_serialization_owner" not in source
-    assert "_provider_secret_change_owner" in source
+    assert "_provider_secret_change_owner" not in source
+    assert "provider_settings_owner: ProviderSettingsOwner" in source
+    assert "secret_change: ProviderSecretChangeOwner" in provider_settings_source
     assert "_gpu_provider_recovery_lock" not in source
     assert "_gpu_provider_recovery_owner" in source
     assert "_overlay_lock" not in source

@@ -10,7 +10,7 @@ import logging
 import sys
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -64,6 +64,9 @@ from puripuly_heart.app.services.github_star_prompt import (
 from puripuly_heart.app.services.github_star_prompt import (
     github_star_prompt_utc_timestamp as _github_star_prompt_utc_timestamp,
 )
+from puripuly_heart.app.services.github_star_prompt_settings import (
+    compose_github_star_prompt_owner,
+)
 from puripuly_heart.app.services.gpu_provider_recovery import (
     GpuProviderRecoveryChannelPlan,
     GpuProviderRecoveryDiagnostic,
@@ -102,6 +105,11 @@ from puripuly_heart.app.services.managed_connection_auth import (
     ManagedConnectionAuthService,
 )
 from puripuly_heart.app.services.managed_status_refresh import ManagedStatusRefreshOwner
+from puripuly_heart.app.services.manual_local_asr_fallback import (
+    ManualLocalASRFallbackOwner,
+    ManualLocalASRFallbackPlan,
+    ManualLocalASRFallbackState,
+)
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.microphone_test import (
     MicrophoneTestSelfCaptureState,
@@ -127,13 +135,7 @@ from puripuly_heart.app.services.peer_process_capture_retry import (
     PeerProcessCaptureRetryOwner,
 )
 from puripuly_heart.app.services.provider_credential_verification import (
-    PROVIDER_CREDENTIAL_EMPTY,
-    PROVIDER_CREDENTIAL_ERROR,
-    PROVIDER_CREDENTIAL_MODEL_UNAVAILABLE,
-    PROVIDER_CREDENTIAL_UNKNOWN,
-    PROVIDER_CREDENTIAL_VERIFIED,
-    ProviderCredentialVerificationOwner,
-    ProviderCredentialVerificationRequest,
+    ProviderCredentialVerificationInteractionOwner,
 )
 from puripuly_heart.app.services.provider_runtime_apply import (
     _ControllerNoopRuntimeApply,
@@ -154,10 +156,12 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     _ui_prompt_clipboard_state_runtime_degraded_transaction_result,
     _ui_prompt_clipboard_state_save_failed_transaction_result,
 )
-from puripuly_heart.app.services.provider_secret_change import (
-    ProviderSecretChangeExecution,
-    ProviderSecretChangeOwner,
-    ProviderSecretChangeRequest,
+from puripuly_heart.app.services.provider_settings import (
+    ProviderSettingsOwner,
+    provider_verification_context,
+)
+from puripuly_heart.app.services.provider_verification_binding import (
+    ProviderVerificationBindingOwner,
 )
 from puripuly_heart.app.services.qq_managed_auth import QqManagedAuthRequest, QqManagedAuthService
 from puripuly_heart.app.services.secret_settings_transaction import (
@@ -176,7 +180,6 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
     build_overlay_osc_output_settings_path_patch,
     build_stt_language_audio_settings_path_patch,
     build_translation_provider_settings_path_patch,
-    build_ui_prompt_clipboard_state_settings_path_patch,
     settings_path_mutation_validator_for_command,
 )
 from puripuly_heart.app.services.settings_projection import (
@@ -224,6 +227,7 @@ from puripuly_heart.app.wiring_composition import (
     create_local_asr_diagnostics_owner,
     create_local_asr_gpu_provisioning_owner,
     create_manual_typing_owner,
+    create_provider_credential_verification_interaction_owner,
     create_vrchat_osc_presence_probe_owner,
 )
 from puripuly_heart.config.capture_target_resolution import resolve_desktop_audio_capture_target
@@ -463,23 +467,10 @@ _OVERLAY_FAILURE_REASONS = frozenset(
         "unknown",
     }
 )
-GITHUB_STAR_PROMPT_MANAGED_REMAINING_PERCENT_THRESHOLD = 60
-_GITHUB_STAR_PROMPT_MANAGED_CONNECTIONS = frozenset(
-    {
-        TranslationConnection.MANAGED,
-        TranslationConnection.MANAGED_CHINA,
-    }
-)
 _MANAGED_OPENROUTER_CONNECTIONS = frozenset(
     {
         TranslationConnection.MANAGED,
         TranslationConnection.MANAGED_CHINA,
-    }
-)
-_GITHUB_STAR_PROMPT_USER_OWNED_CLOUD_CONNECTIONS = frozenset(
-    {
-        TranslationConnection.OPENROUTER,
-        TranslationConnection.OFFICIAL_BYOK,
     }
 )
 DISCORD_AUTH_ERROR_KEY_BY_SUBCODE = {
@@ -591,26 +582,6 @@ def _settings_mutation_committed(result: TransactionResult) -> bool:
     }
 
 
-def _provider_verification_fingerprint(value: str) -> str:
-    return f"sha256:{hashlib.sha256(value.encode('utf-8')).hexdigest()}"
-
-
-_PROVIDER_VERIFICATION_SECRET_KEY_BY_PROVIDER = {
-    "deepgram": "deepgram_api_key",
-    "soniox": "soniox_api_key",
-    "google": "google_api_key",
-    "openrouter": OPENROUTER_BYOK_API_KEY_SECRET,
-    "deepseek": "deepseek_api_key",
-    "cerebras": "cerebras_api_key",
-    "alibaba_beijing": "alibaba_api_key_beijing",
-    "alibaba_singapore": "alibaba_api_key_singapore",
-}
-_PROVIDER_BY_VERIFICATION_SECRET_KEY = {
-    secret_key: provider
-    for provider, secret_key in _PROVIDER_VERIFICATION_SECRET_KEY_BY_PROVIDER.items()
-}
-
-
 def _sensitive_optional_text_signature(value: str | None) -> tuple[int, str] | None:
     if value is None:
         return None
@@ -651,40 +622,12 @@ class GuiController:
         repr=False,
     )
     settings_owner: SettingsOwner | None = field(default=None, repr=False)
+    provider_settings_owner: ProviderSettingsOwner | None = field(default=None, repr=False)
+    manual_local_asr_fallback_owner: ManualLocalASRFallbackOwner = field(
+        default_factory=ManualLocalASRFallbackOwner,
+        repr=False,
+    )
 
-    settings: AppSettings | None = None
-    _vnext_settings_authoritative: bool = field(init=False, default=False, repr=False)
-    _canonical_mutation_rollback_legacy_snapshot: AppSettings | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _canonical_mutation_rollback_active_settings: AppSettings | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _provider_secret_change_owner: ProviderSecretChangeOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
-    _canonical_mutation_rollback_authoritative: bool = field(
-        init=False,
-        default=False,
-        repr=False,
-    )
-    _canonical_mutation_rollback_pending: bool = field(
-        init=False,
-        default=False,
-        repr=False,
-    )
-    _canonical_mutation_depth: int = field(init=False, default=0, repr=False)
-    _canonical_legacy_projection_snapshot: AppSettings | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
     last_settings_mutation_result: TransactionResult | None = field(
         init=False,
         default=None,
@@ -851,11 +794,9 @@ class GuiController:
         default=None,
         repr=False,
     )
-    _provider_credential_verification_owner: ProviderCredentialVerificationOwner | None = field(
-        init=False,
-        default=None,
-        repr=False,
-    )
+    _provider_credential_verification_owner: (
+        ProviderCredentialVerificationInteractionOwner | None
+    ) = field(init=False, default=None, repr=False)
     _managed_trial_pending_auth: bool = field(init=False, default=False)
     _discord_managed_auth_in_progress: bool = field(init=False, default=False)
     _discord_managed_auth_callback_received_hook: Callable[[], None] | None = field(
@@ -940,6 +881,14 @@ class GuiController:
             self.settings_owner = compose_settings_owner(self.config_path)
         return self.settings_owner
 
+    @property
+    def settings(self) -> AppSettings | None:
+        return self._get_settings_owner().current
+
+    @settings.setter
+    def settings(self, settings: AppSettings | None) -> None:
+        self._get_settings_owner().current = settings
+
     def _legacy_settings_patch_repository(
         self,
         *,
@@ -949,19 +898,11 @@ class GuiController:
         provider_verification_binding: ProviderVerificationBinding | None = None,
     ) -> CommittedSettingsRepositoryPort[AppSettings]:
         return self._get_settings_owner().create_legacy_patch_repository(
-            current_settings=lambda: self.settings,
-            canonical_projection_snapshot=lambda: self._canonical_legacy_projection_snapshot,
-            begin_canonical_mutation=self._begin_canonical_mutation,
-            update_canonical_from_legacy_delta=(self._update_canonical_settings_from_legacy_delta),
-            bind_provider_verification=self._bind_provider_verification,
-            persist_settings=self._persist_settings_at_controller_boundary,
-            rollback_canonical_mutation=self._rollback_canonical_mutation,
-            save_failure_sink=self._log_error,
-            remember_canonical_projection=self._remember_canonical_legacy_projection,
             committed_settings=committed_settings,
             base_settings=base_settings,
             surface=surface,
             provider_verification_binding=provider_verification_binding,
+            save_failure_sink=self._log_error,
         )
 
     @property
@@ -1067,20 +1008,24 @@ class GuiController:
 
     async def _start_impl(self) -> None:
         self.settings = self._load_or_init_settings(self.config_path)
-        self._vnext_settings_authoritative = True
-        self._remember_canonical_legacy_projection(self.settings)
+        self._get_settings_owner().authoritative = True
+        self._get_settings_owner().remember_projection(self.settings)
         provisioning = self._get_local_asr_provisioning_owner()
         await provisioning.inspect_cpu()
         await provisioning.inspect_gpu(
             explicit_intent=self._selected_gpu_provider_requires_model(),
         )
         loaded_settings = self.settings
-        (
-            normalized_settings,
-            fallback_channels,
-            installation_fallback,
-        ) = self._normalize_manual_local_asr_fallbacks(loaded_settings)
-        if normalized_settings is not loaded_settings:
+        fallback_plan = self.manual_local_asr_fallback_owner.plan(
+            self._manual_local_asr_fallback_state(loaded_settings)
+        )
+        fallback_channels = fallback_plan.fallback_channels
+        installation_fallback = fallback_plan.installation_fallback
+        if fallback_plan.changed:
+            normalized_settings = self._settings_with_manual_local_asr_fallback_plan(
+                loaded_settings,
+                fallback_plan,
+            )
             self.settings = normalized_settings
             if not self._save_settings():
                 self.settings = loaded_settings
@@ -1941,7 +1886,7 @@ class GuiController:
                     broker_metadata={"flow": "managed_connection_auth"},
                 )
             )
-            self._complete_canonical_mutation()
+            self._get_settings_owner().complete()
             self.last_settings_mutation_result = result
             if result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING:
                 self.settings = updated
@@ -2089,57 +2034,8 @@ class GuiController:
             0, min(100, round((usage_metadata.remaining_usd / usage_metadata.limit_usd) * 100))
         )
 
-    def _github_star_prompt_translation_connection_for(
-        self,
-        settings: AppSettings | None,
-    ) -> TranslationConnection | None:
-        if settings is None:
-            return None
-        connection = settings.translation.connection
-        if isinstance(connection, TranslationConnection):
-            return connection
-        with contextlib.suppress(ValueError, TypeError):
-            return TranslationConnection(connection)
-        return None
-
-    def _github_star_prompt_current_translation_connection(self) -> TranslationConnection | None:
-        return self._github_star_prompt_translation_connection_for(self.settings)
-
-    def _github_star_prompt_settings_has_user_owned_cloud_connection(
-        self,
-        settings: AppSettings | None,
-    ) -> bool:
-        return (
-            self._github_star_prompt_translation_connection_for(settings)
-            in _GITHUB_STAR_PROMPT_USER_OWNED_CLOUD_CONNECTIONS
-        )
-
-    def _github_star_prompt_has_managed_connection(self) -> bool:
-        return (
-            self._github_star_prompt_current_translation_connection()
-            in _GITHUB_STAR_PROMPT_MANAGED_CONNECTIONS
-        )
-
-    def _github_star_prompt_has_user_owned_cloud_connection(self) -> bool:
-        return (
-            self._github_star_prompt_current_translation_connection()
-            in _GITHUB_STAR_PROMPT_USER_OWNED_CLOUD_CONNECTIONS
-        )
-
     def is_github_star_prompt_eligible(self) -> bool:
-        if self.settings is None:
-            return False
-        if self._github_star_prompt_has_managed_connection():
-            remaining_percent = self._managed_trial_remaining_percent(
-                self._managed_trial_usage_metadata
-            )
-            return (
-                remaining_percent is not None
-                and remaining_percent <= GITHUB_STAR_PROMPT_MANAGED_REMAINING_PERCENT_THRESHOLD
-            )
-        if self._github_star_prompt_has_user_owned_cloud_connection():
-            return bool(self.settings.ui.github_star_prompt_translation_success_observed)
-        return False
+        return self._get_github_star_prompt_owner().is_eligible()
 
     def should_show_github_star_prompt(self, *, now: datetime | None = None) -> bool:
         return self._get_github_star_prompt_owner().should_show(now=now)
@@ -2154,26 +2050,6 @@ class GuiController:
             f"{failure_context}: exception_class={type(exc).__name__}",
             level=logging.WARNING,
         )
-
-    async def _persist_order24_state_mutation(
-        self,
-        *,
-        base_settings: AppSettings,
-        committed_settings: AppSettings,
-    ) -> bool:
-        patch_values = build_ui_prompt_clipboard_state_settings_path_patch(
-            base_settings,
-            committed_settings,
-        )
-        if not patch_values:
-            return True
-        result = await self._mutate_order24_settings_patch(
-            patch_values=patch_values,
-            committed_settings=copy.deepcopy(committed_settings),
-            runtime_apply=_ControllerNoopRuntimeApply(),
-        )
-        self.last_settings_mutation_result = result
-        return _settings_mutation_committed(result)
 
     async def persist_github_star_prompt_opened(
         self,
@@ -2198,25 +2074,19 @@ class GuiController:
     def _get_github_star_prompt_owner(self) -> GithubStarPromptOwner:
         owner = self._github_star_prompt_owner
         if owner is None:
-            owner = GithubStarPromptOwner(
-                settings_provider=lambda: self.settings,
-                persist_settings_state=lambda base, committed: (
-                    self._persist_order24_state_mutation(
-                        base_settings=cast(AppSettings, base),
-                        committed_settings=cast(AppSettings, committed),
-                    )
+            owner = compose_github_star_prompt_owner(
+                settings=self._get_settings_owner(),
+                managed_remaining_percent=lambda: self._managed_trial_remaining_percent(
+                    self._managed_trial_usage_metadata
                 ),
-                is_eligible=self.is_github_star_prompt_eligible,
-                has_user_owned_cloud_connection=lambda settings: (
-                    self._github_star_prompt_settings_has_user_owned_cloud_connection(
-                        cast(AppSettings | None, settings)
-                    )
+                transaction_result_sink=lambda result: setattr(
+                    self,
+                    "last_settings_mutation_result",
+                    result,
                 ),
-                log_save_failure=self._log_github_star_prompt_save_failure,
+                save_failure_sink=self._log_github_star_prompt_save_failure,
                 runtime_diagnostics_sink=self._github_star_prompt_runtime_diagnostics_sink,
-                translation_success_observation=lambda: (
-                    self.persist_github_star_prompt_translation_success_observed()
-                ),
+                mutation_service_provider=lambda: self.settings_mutation_service,
             )
             self._github_star_prompt_owner = owner
         return owner
@@ -2855,15 +2725,12 @@ class GuiController:
         base_settings: AppSettings,
         committed_settings: AppSettings,
     ) -> None:
-        self._update_canonical_settings_from_legacy_delta(
+        self._get_settings_owner().apply_legacy_delta(
             committed_settings,
             base_settings,
         )
-        await asyncio.to_thread(
-            self._persist_settings_at_controller_boundary,
-            base_settings,
-        )
-        self._remember_canonical_legacy_projection(base_settings)
+        await asyncio.to_thread(self._get_settings_owner().persist)
+        self._get_settings_owner().remember_projection(base_settings)
         await self._apply_settings_direct(
             copy.deepcopy(base_settings),
             persist=False,
@@ -4978,10 +4845,10 @@ class GuiController:
         self._show_short_message(result.message_key, **dict(result.message_kwargs))
         return False
 
-    def _normalize_manual_local_asr_fallbacks(
+    def _manual_local_asr_fallback_state(
         self,
         settings: AppSettings,
-    ) -> tuple[AppSettings, tuple[str, ...], bool]:
+    ) -> ManualLocalASRFallbackState:
         cpu_auto_requested = (
             settings.provider.stt == STTProviderName.LOCAL_CPU_AUTO
             or settings.provider.peer_stt == STTProviderName.LOCAL_CPU_AUTO
@@ -4991,65 +4858,23 @@ class GuiController:
             cpu_auto_available = (
                 self._get_local_asr_provisioning_owner().snapshot.cpu_auto_available
             )
-        self_decision = resolve_local_asr_selection(
-            settings.provider.stt.value,
-            settings.languages.source_language,
+        return ManualLocalASRFallbackState(
+            self_provider=settings.provider.stt.value,
+            peer_provider=settings.provider.peer_stt.value,
+            self_source_language=settings.languages.source_language,
+            peer_source_language=settings.languages.effective_peer_source,
             cpu_auto_available=cpu_auto_available,
         )
-        peer_decision = resolve_local_asr_selection(
-            settings.provider.peer_stt.value,
-            settings.languages.effective_peer_source,
-            cpu_auto_available=cpu_auto_available,
-        )
-        fallback_channels: list[str] = []
-        normalized = settings
-        if self_decision.fallback_applied or peer_decision.fallback_applied:
-            normalized = copy.deepcopy(settings)
-        if self_decision.fallback_applied:
-            normalized.provider.stt = STTProviderName(self_decision.effective_provider)
-            fallback_channels.append("self")
-        if peer_decision.fallback_applied:
-            normalized.provider.peer_stt = STTProviderName(peer_decision.effective_provider)
-            fallback_channels.append("peer")
-        installation_fallback = not cpu_auto_available and (
-            (
-                self_decision.fallback_applied
-                and settings.provider.stt == STTProviderName.LOCAL_CPU_AUTO
-            )
-            or (
-                peer_decision.fallback_applied
-                and settings.provider.peer_stt == STTProviderName.LOCAL_CPU_AUTO
-            )
-        )
-        return normalized, tuple(fallback_channels), installation_fallback
 
-    def _manual_local_asr_fallback_normalization_channels(
-        self,
+    @staticmethod
+    def _settings_with_manual_local_asr_fallback_plan(
         settings: AppSettings,
-    ) -> frozenset[str]:
-        current = self.settings
-        if current is None:
-            return frozenset({"self", "peer"})
-        channels: set[str] = set()
-        if (
-            current.provider.stt != settings.provider.stt
-            and settings.provider.stt.value in LOCAL_CPU_PROVIDERS
-        ) or (
-            settings.provider.stt.value in LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER
-            and settings.provider.stt != STTProviderName.LOCAL_QWEN
-            and current.languages.source_language != settings.languages.source_language
-        ):
-            channels.add("self")
-        if (
-            current.provider.peer_stt != settings.provider.peer_stt
-            and settings.provider.peer_stt.value in LOCAL_CPU_PROVIDERS
-        ) or (
-            settings.provider.peer_stt.value in LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER
-            and settings.provider.peer_stt != STTProviderName.LOCAL_QWEN
-            and current.languages.effective_peer_source != settings.languages.effective_peer_source
-        ):
-            channels.add("peer")
-        return frozenset(channels)
+        plan: ManualLocalASRFallbackPlan,
+    ) -> AppSettings:
+        normalized = copy.deepcopy(settings)
+        normalized.provider.stt = STTProviderName(plan.self_provider)
+        normalized.provider.peer_stt = STTProviderName(plan.peer_provider)
+        return normalized
 
     def _notify_manual_local_asr_fallback(
         self,
@@ -5069,54 +4894,30 @@ class GuiController:
         if self.settings is None:
             return False
         previous = self.settings
-        if channel is None:
-            normalized, fallback_channels, installation_fallback = (
-                self._normalize_manual_local_asr_fallbacks(previous)
-            )
-            if normalized is previous:
-                return True
-            self.settings = normalized
-            if self._save_settings() is False:
-                self.settings = previous
-                return False
-            self._sync_ui_from_settings()
-            self._notify_manual_local_asr_fallback(
-                fallback_channels,
-                installation_fallback=installation_fallback,
-            )
-            self._log_manual_local_asr_fallbacks(previous, normalized, fallback_channels)
-            return True
-        scoped = copy.deepcopy(previous)
-        if channel == "self":
-            scoped.provider.peer_stt = STTProviderName.LOCAL_QWEN
-        elif channel == "peer":
-            scoped.provider.stt = STTProviderName.LOCAL_QWEN
-        else:
-            raise ValueError("channel must be 'self' or 'peer'")
-        normalized_scoped, fallback_channels, installation_fallback = (
-            self._normalize_manual_local_asr_fallbacks(scoped)
+        plan = self.manual_local_asr_fallback_owner.plan(
+            self._manual_local_asr_fallback_state(previous),
+            channel=channel,
         )
-        normalized = previous
-        if channel == "self" and normalized_scoped.provider.stt != previous.provider.stt:
-            normalized = copy.deepcopy(previous)
-            normalized.provider.stt = normalized_scoped.provider.stt
-        elif (
-            channel == "peer" and normalized_scoped.provider.peer_stt != previous.provider.peer_stt
-        ):
-            normalized = copy.deepcopy(previous)
-            normalized.provider.peer_stt = normalized_scoped.provider.peer_stt
-        if normalized is previous:
+        if not plan.changed:
             return True
+        normalized = self._settings_with_manual_local_asr_fallback_plan(
+            previous,
+            plan,
+        )
         self.settings = normalized
         if self._save_settings() is False:
             self.settings = previous
             return False
         self._sync_ui_from_settings()
         self._notify_manual_local_asr_fallback(
-            fallback_channels,
-            installation_fallback=installation_fallback,
+            plan.fallback_channels,
+            installation_fallback=plan.installation_fallback,
         )
-        self._log_manual_local_asr_fallbacks(previous, normalized, fallback_channels)
+        self._log_manual_local_asr_fallbacks(
+            previous,
+            normalized,
+            plan.fallback_channels,
+        )
         return True
 
     def _log_manual_local_asr_fallbacks(
@@ -5742,17 +5543,17 @@ class GuiController:
         updated.languages.peer_target_language = change.peer_target_code
         updated.languages.recent_source_languages = list(change.recent_source_codes)
         updated.languages.recent_target_languages = list(change.recent_target_codes)
-        self._begin_canonical_mutation(
-            legacy_snapshot=self._canonical_legacy_projection_snapshot or self.settings
+        self._get_settings_owner().begin(
+            legacy_snapshot=self._get_settings_owner().projection_snapshot or self.settings
         )
         self._capture_runtime_signatures_before_canonical_mutation()
-        self._update_canonical_settings_from_legacy_delta(self.settings, updated)
+        self._get_settings_owner().apply_legacy_delta(self.settings, updated)
         try:
             await self.apply_settings(updated)
             if self.settings is not None:
                 self.refresh_settings_projection(preserve_custom_vocab_draft=True)
         finally:
-            self._complete_canonical_mutation()
+            self._get_settings_owner().complete()
 
     def _settings_projection(self) -> SettingsProjectionOwner:
         owner = self._settings_projection_owner
@@ -5893,23 +5694,45 @@ class GuiController:
         owner.normalize_compatibility(settings)
         fallback_channels: tuple[str, ...] = ()
         installation_fallback = False
-        normalization_channels = self._manual_local_asr_fallback_normalization_channels(settings)
+        normalization_channels = self.manual_local_asr_fallback_owner.normalization_channels(
+            current=(
+                self._manual_local_asr_fallback_state(self.settings)
+                if self.settings is not None
+                else None
+            ),
+            pending=self._manual_local_asr_fallback_state(settings),
+        )
         if normalization_channels:
             await self._get_local_asr_provisioning_owner().inspect_cpu()
-            normalized_settings, normalized_channels, installation_fallback = (
-                self._normalize_manual_local_asr_fallbacks(settings)
+            fallback_plan = self.manual_local_asr_fallback_owner.plan(
+                self._manual_local_asr_fallback_state(settings)
             )
             fallback_channels = tuple(
-                channel for channel in normalized_channels if channel in normalization_channels
+                channel
+                for channel in fallback_plan.fallback_channels
+                if channel in normalization_channels
             )
             if fallback_channels:
-                scoped_settings = copy.deepcopy(settings)
-                if "self" in fallback_channels:
-                    scoped_settings.provider.stt = normalized_settings.provider.stt
-                if "peer" in fallback_channels:
-                    scoped_settings.provider.peer_stt = normalized_settings.provider.peer_stt
-                settings = scoped_settings
-            installation_fallback = bool(installation_fallback and fallback_channels)
+                settings = self._settings_with_manual_local_asr_fallback_plan(
+                    settings,
+                    ManualLocalASRFallbackPlan(
+                        self_provider=(
+                            fallback_plan.self_provider
+                            if "self" in fallback_channels
+                            else settings.provider.stt.value
+                        ),
+                        peer_provider=(
+                            fallback_plan.peer_provider
+                            if "peer" in fallback_channels
+                            else settings.provider.peer_stt.value
+                        ),
+                        fallback_channels=fallback_channels,
+                        installation_fallback=bool(
+                            fallback_plan.installation_fallback and fallback_channels
+                        ),
+                    ),
+                )
+            installation_fallback = bool(fallback_plan.installation_fallback and fallback_channels)
         if settings is not self.settings:
             routed = await self._apply_order22_order23_order24_settings_via_mutation_services(
                 settings
@@ -5966,12 +5789,12 @@ class GuiController:
     ) -> None:
         await self._preserve_github_star_prompt_observation_before_settings_replace(settings)
         if persist:
-            self._begin_canonical_mutation(
-                legacy_snapshot=self._canonical_legacy_projection_snapshot or self.settings
+            self._get_settings_owner().begin(
+                legacy_snapshot=self._get_settings_owner().projection_snapshot or self.settings
             )
             self._capture_runtime_signatures_before_canonical_mutation()
-            self._update_canonical_settings_from_legacy_delta(
-                self._canonical_legacy_projection_snapshot or self.settings,
+            self._get_settings_owner().apply_legacy_delta(
+                self._get_settings_owner().projection_snapshot or self.settings,
                 settings,
             )
 
@@ -6123,12 +5946,12 @@ class GuiController:
         if persist:
             if strict_persistence_errors:
                 try:
-                    self._persist_settings_at_controller_boundary(self.settings)
+                    self._get_settings_owner().persist()
                 except Exception:
-                    self._rollback_canonical_mutation()
+                    self._get_settings_owner().rollback()
                     raise _StrictSettingsSaveFailed from None
                 else:
-                    self._remember_canonical_legacy_projection(self.settings)
+                    self._get_settings_owner().remember_projection(self.settings)
             else:
                 if self._save_settings() is False:
                     return
@@ -6255,7 +6078,7 @@ class GuiController:
         self._refresh_overlay_peer_consumers()
         self._settings_projection().remember_all(self.settings)
         if persist:
-            self._complete_canonical_mutation()
+            self._get_settings_owner().complete()
 
     async def _apply_order22_order23_order24_settings_via_mutation_services(
         self,
@@ -6448,7 +6271,7 @@ class GuiController:
         )
 
         result = await service.mutate(request)
-        self._complete_canonical_mutation()
+        self._get_settings_owner().complete()
         self.last_settings_mutation_result = result
         if not _settings_mutation_committed(result):
             self.settings = copy.deepcopy(base_settings)
@@ -6561,7 +6384,7 @@ class GuiController:
         )
 
         result = await service.mutate(request)
-        self._complete_canonical_mutation()
+        self._get_settings_owner().complete()
         self.last_settings_mutation_result = result
         if not _settings_mutation_committed(result):
             self.settings = copy.deepcopy(base_settings)
@@ -6618,7 +6441,7 @@ class GuiController:
             correlation_id=None,
         )
         result = await service.mutate(request)
-        self._complete_canonical_mutation()
+        self._get_settings_owner().complete()
         return result
 
     async def _apply_ui_prompt_clipboard_state_settings_via_mutation_service(
@@ -6687,36 +6510,7 @@ class GuiController:
         return True
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
-        selected_model = None
-        if self.settings is not None:
-            if provider == "google":
-                selected_model = self.settings.gemini.llm_model.value
-            elif provider == "cerebras":
-                selected_model = self.settings.cerebras.llm_model.value
-            elif provider in {"alibaba_beijing", "alibaba_singapore"}:
-                selected_model = self.settings.qwen.llm_model.value
-        outcome = await self._get_provider_credential_verification_owner().verify(
-            ProviderCredentialVerificationRequest(
-                provider=provider,
-                api_key=key,
-                selected_model=selected_model,
-                fallback_models=tuple(model.value for model in QwenLLMModel),
-                low_latency=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
-            )
-        )
-        if outcome.status == PROVIDER_CREDENTIAL_VERIFIED:
-            return True, "Verification successful"
-        if outcome.status == PROVIDER_CREDENTIAL_EMPTY:
-            return False, "API Key is empty"
-        if outcome.status == PROVIDER_CREDENTIAL_UNKNOWN:
-            return False, f"Unknown provider: {provider}"
-        if outcome.status == PROVIDER_CREDENTIAL_MODEL_UNAVAILABLE:
-            return False, f"qwen_model_unavailable:{outcome.unavailable_model}"
-        if outcome.status == PROVIDER_CREDENTIAL_ERROR:
-            error_text = outcome.error_text or ""
-            self._log_error(f"Verification error for {provider}: {error_text}")
-            return False, error_text
-        return False, "Verification failed (check logs/console for details)"
+        return await self._get_provider_credential_verification_owner().verify(provider, key)
 
     async def apply_providers(
         self,
@@ -6990,7 +6784,7 @@ class GuiController:
         plan = self._build_provider_runtime_apply_plan(
             committed_settings,
             force_rebuild_llm=False,
-            canonical_settings=self._canonical_vnext_after_legacy_delta(
+            canonical_settings=self._get_settings_owner().project_legacy_delta(
                 base_settings,
                 committed_settings,
             ),
@@ -7016,7 +6810,7 @@ class GuiController:
         )
 
         result = await service.mutate(request)
-        self._complete_canonical_mutation()
+        self._get_settings_owner().complete()
         self.last_settings_mutation_result = result
         if not _settings_mutation_committed(result):
             return True
@@ -7026,7 +6820,7 @@ class GuiController:
             fallback_plan = self._build_provider_runtime_apply_plan(
                 next_settings,
                 force_rebuild_llm=False,
-                canonical_settings=self._canonical_vnext_after_legacy_delta(
+                canonical_settings=self._get_settings_owner().project_legacy_delta(
                     committed_settings,
                     next_settings,
                 ),
@@ -7097,7 +6891,7 @@ class GuiController:
         plan = self._build_provider_runtime_apply_plan(
             committed_settings,
             force_rebuild_llm=False,
-            canonical_settings=self._canonical_vnext_after_legacy_delta(
+            canonical_settings=self._get_settings_owner().project_legacy_delta(
                 base_settings,
                 committed_settings,
             ),
@@ -7130,7 +6924,7 @@ class GuiController:
         )
 
         result = await service.mutate(request)
-        self._complete_canonical_mutation()
+        self._get_settings_owner().complete()
         self.last_settings_mutation_result = result
         if not _settings_mutation_committed(result):
             self.settings = copy.deepcopy(base_settings)
@@ -7159,7 +6953,7 @@ class GuiController:
             fallback_plan = self._build_provider_runtime_apply_plan(
                 next_settings,
                 force_rebuild_llm=False,
-                canonical_settings=self._canonical_vnext_after_legacy_delta(
+                canonical_settings=self._get_settings_owner().project_legacy_delta(
                     committed_settings,
                     next_settings,
                 ),
@@ -7228,12 +7022,12 @@ class GuiController:
                     self.last_settings_mutation_result is not None
                     and _settings_mutation_committed(self.last_settings_mutation_result)
                 )
-        self._begin_canonical_mutation(
-            legacy_snapshot=self._canonical_legacy_projection_snapshot or self.settings
+        self._get_settings_owner().begin(
+            legacy_snapshot=self._get_settings_owner().projection_snapshot or self.settings
         )
         self._capture_runtime_signatures_before_canonical_mutation()
-        self._update_canonical_settings_from_legacy_delta(
-            self._canonical_legacy_projection_snapshot or self.settings,
+        self._get_settings_owner().apply_legacy_delta(
+            self._get_settings_owner().projection_snapshot or self.settings,
             next_settings,
         )
         if plan is None:
@@ -7244,18 +7038,18 @@ class GuiController:
         self.settings = next_settings
         if strict_persistence_errors:
             try:
-                self._persist_settings_at_controller_boundary(self.settings)
+                self._get_settings_owner().persist()
             except Exception:
-                self._rollback_canonical_mutation()
+                self._get_settings_owner().rollback()
                 raise _StrictSettingsSaveFailed from None
             else:
-                self._remember_canonical_legacy_projection(self.settings)
+                self._get_settings_owner().remember_projection(self.settings)
         else:
             if self._save_settings() is False:
                 return False
         await self._apply_provider_runtime_plan(next_settings, plan)
         self._settings_projection().remember_order22(self.settings)
-        self._complete_canonical_mutation()
+        self._get_settings_owner().complete()
         return True
 
     async def _apply_provider_runtime_plan(
@@ -7530,35 +7324,12 @@ class GuiController:
                 )
         return result.settings
 
-    def _persist_settings_at_controller_boundary(self, settings: AppSettings) -> None:
-        _ = settings
-        self._get_settings_owner().persist()
-
     def _canonical_vnext_settings_for(self, settings: AppSettings) -> AppSettingsVNext:
         projected = self._get_settings_owner().project(
             settings,
-            authoritative=self._vnext_settings_authoritative,
+            authoritative=self._get_settings_owner().authoritative,
         )
         return projected
-
-    def _update_canonical_settings_from_legacy_delta(
-        self,
-        base_settings: AppSettings | None,
-        next_settings: AppSettings,
-    ) -> AppSettingsVNext:
-        self.vnext_settings = self._canonical_vnext_after_legacy_delta(
-            base_settings,
-            next_settings,
-        )
-        self._vnext_settings_authoritative = True
-        return self.vnext_settings
-
-    def _canonical_vnext_after_legacy_delta(
-        self,
-        base_settings: AppSettings | None,
-        next_settings: AppSettings,
-    ) -> AppSettingsVNext:
-        return self._get_settings_owner().project_legacy_delta(base_settings, next_settings)
 
     def _provider_verification_binding(
         self,
@@ -7568,109 +7339,22 @@ class GuiController:
         flow: str,
         context_values: Mapping[str, object] | None = None,
     ) -> ProviderVerificationBinding:
-        secret_key = _PROVIDER_VERIFICATION_SECRET_KEY_BY_PROVIDER.get(provider)
-        if secret_key is None:
-            raise ValueError(f"unsupported provider verification binding: {provider}")
-        context: dict[str, object] = {"flow": flow}
-        settings = self.settings
-        if settings is not None:
-            if provider == "google":
-                context["model"] = settings.gemini.llm_model.value
-            elif provider == "cerebras":
-                context["model"] = settings.cerebras.llm_model.value
-            elif provider in {"alibaba_beijing", "alibaba_singapore"}:
-                context["base_url"] = (
-                    "https://dashscope.aliyuncs.com/api/v1"
-                    if provider == "alibaba_beijing"
-                    else "https://dashscope-intl.aliyuncs.com/api/v1"
-                )
-                context["model"] = settings.qwen.llm_model.value
-                context["low_latency"] = FIXED_TRANSLATION_POLICY.fast_translation_enabled
-        if context_values is not None:
-            context.update(context_values)
-        return ProviderVerificationBinding(
-            provider=provider,
-            secret_key=secret_key,
-            secret_revision=None,
-            secret_fingerprint=_provider_verification_fingerprint(key),
-            verifier_context=context,
-            verifier_evidence={"source": "provider_verifier"},
+        return self._get_provider_settings_owner().verification_binding(
+            provider,
+            key,
+            flow=flow,
+            context_values=context_values,
         )
-
-    def _bind_provider_verification(
-        self,
-        binding: ProviderVerificationBinding,
-    ) -> None:
-        self._get_settings_owner().bind_provider_verification(binding)
 
     async def persist_provider_secret_change(
         self,
         secret_key: str,
         value: str,
     ) -> bool:
-        return await self._get_provider_secret_change_owner().change(
-            lambda: self._provider_secret_change_execution(secret_key, value)
-        )
-
-    def _get_provider_secret_change_owner(
-        self,
-    ) -> ProviderSecretChangeOwner:
-        owner = self._provider_secret_change_owner
-        if owner is None:
-            owner = ProviderSecretChangeOwner()
-            self._provider_secret_change_owner = owner
-        return owner
-
-    def _provider_secret_change_execution(
-        self,
-        secret_key: str,
-        value: str,
-    ) -> ProviderSecretChangeExecution:
-        assert self.settings is not None
-        provider = _PROVIDER_BY_VERIFICATION_SECRET_KEY.get(secret_key)
-        if provider is None:
-            raise ValueError(f"unsupported provider secret key: {secret_key}")
-        updated = copy.deepcopy(self.settings)
-        setattr(updated.api_key_verified, provider, False)
-        secret_store = create_secret_store(
-            self.settings.secrets,
-            config_path=self.config_path,
-        )
-        repository = self._legacy_settings_patch_repository(
-            base_settings=self.settings,
-            committed_settings=updated,
-            surface="provider_secret_change",
-        )
-        transaction = SecretSettingsTransaction(
-            secret_store=create_sync_secret_store_adapter(secret_store),
-            settings_repository=repository,
-        )
-        return ProviderSecretChangeExecution(
-            transaction=transaction,
-            request=ProviderSecretChangeRequest(
-                provider=provider,
-                secret_key=secret_key,
-                secret_value=value,
-                settings_values=self._get_settings_owner().legacy_snapshot_values(updated),
-            ),
-            result_handler=lambda result, succeeded: self._apply_provider_secret_change_result(
-                repository,
-                result,
-                succeeded,
-            ),
-        )
-
-    def _apply_provider_secret_change_result(
-        self,
-        repository: CommittedSettingsRepositoryPort[AppSettings],
-        result: TransactionResult,
-        succeeded: bool,
-    ) -> None:
-        self.last_settings_mutation_result = result
-        if succeeded:
-            self.settings = repository.committed_settings
-            self._remember_canonical_legacy_projection(self.settings)
-            self._complete_canonical_mutation()
+        owner = self._get_provider_settings_owner()
+        succeeded = await owner.change_secret(secret_key, value)
+        self.last_settings_mutation_result = owner.last_result
+        return succeeded
 
     def persist_api_key_verification(
         self,
@@ -7678,42 +7362,10 @@ class GuiController:
         key: str,
         success: bool,
     ) -> None:
-        assert self.settings is not None
-        baseline = copy.deepcopy(self._canonical_legacy_projection_snapshot or self.settings)
-        self._begin_canonical_mutation(legacy_snapshot=baseline)
-        setattr(self.settings.api_key_verified, provider, success)
-        try:
-            self._update_canonical_settings_from_legacy_delta(
-                baseline,
-                self.settings,
-            )
-            if success:
-                binding = self._provider_verification_binding(
-                    provider,
-                    key,
-                    flow="settings_api_key_verification",
-                )
-                secret_store = create_secret_store(
-                    self.settings.secrets,
-                    config_path=self.config_path,
-                )
-                if secret_store.get(binding.secret_key) != key:
-                    raise RuntimeError(
-                        "verified credential does not match the active SecretStore value"
-                    )
-                self._bind_provider_verification(binding)
-            self._persist_settings_at_controller_boundary(self.settings)
-        except Exception:
-            self._rollback_canonical_mutation()
-            raise
-        self._remember_canonical_legacy_projection(self.settings)
-        self._complete_canonical_mutation()
+        self._get_provider_settings_owner().persist_verification(provider, key, success)
 
     def clear_provider_verification(self, provider: str) -> None:
         self.persist_api_key_verification(provider, "", False)
-
-    def _remember_canonical_legacy_projection(self, settings: AppSettings) -> None:
-        self._canonical_legacy_projection_snapshot = copy.deepcopy(settings)
 
     def _managed_identity_persistence_callback(
         self,
@@ -7738,7 +7390,7 @@ class GuiController:
         bound_managed_snapshot: object | None = None,
     ) -> None:
         active_settings = self.settings or settings
-        baseline = self._canonical_legacy_projection_snapshot or active_settings
+        baseline = self._get_settings_owner().projection_snapshot or active_settings
         managed_baseline = (
             bound_managed_snapshot
             if bound_managed_snapshot is not None
@@ -7747,64 +7399,17 @@ class GuiController:
         managed_delta = _managed_identity_delta(managed_baseline, settings.managed_identity)
         next_settings = copy.deepcopy(active_settings)
         _apply_managed_identity_delta(next_settings, managed_delta)
-        self._begin_canonical_mutation(legacy_snapshot=baseline)
-        self._update_canonical_settings_from_legacy_delta(baseline, next_settings)
+        self._get_settings_owner().begin(legacy_snapshot=baseline)
+        self._get_settings_owner().apply_legacy_delta(baseline, next_settings)
         try:
-            self._persist_settings_at_controller_boundary(next_settings)
+            self._get_settings_owner().persist()
         except Exception:
-            self._rollback_canonical_mutation()
+            self._get_settings_owner().rollback()
             _restore_managed_identity(settings, managed_baseline)
             raise
         self.settings = next_settings
-        self._remember_canonical_legacy_projection(next_settings)
-        self._complete_canonical_mutation()
-
-    def _begin_canonical_mutation(
-        self,
-        *,
-        legacy_snapshot: AppSettings | None = None,
-    ) -> None:
-        if self._canonical_mutation_depth == 0:
-            self._canonical_mutation_rollback_active_settings = self.settings
-            self._canonical_mutation_rollback_legacy_snapshot = copy.deepcopy(
-                legacy_snapshot if legacy_snapshot is not None else self.settings
-            )
-            self._canonical_mutation_rollback_authoritative = self._vnext_settings_authoritative
-            self._canonical_mutation_rollback_pending = True
-        self._get_settings_owner().begin()
-        self._canonical_mutation_depth += 1
-
-    def _rollback_canonical_mutation(self) -> None:
-        if not self._canonical_mutation_rollback_pending:
-            return
-        self._get_settings_owner().rollback()
-        active_settings = self._canonical_mutation_rollback_active_settings
-        legacy_snapshot = self._canonical_mutation_rollback_legacy_snapshot
-        if active_settings is not None and legacy_snapshot is not None:
-            for settings_field in fields(AppSettings):
-                setattr(
-                    active_settings,
-                    settings_field.name,
-                    copy.deepcopy(getattr(legacy_snapshot, settings_field.name)),
-                )
-            self.settings = active_settings
-        else:
-            self.settings = legacy_snapshot
-        self._vnext_settings_authoritative = self._canonical_mutation_rollback_authoritative
-        self._canonical_mutation_depth = 1
-        self._complete_canonical_mutation()
-
-    def _complete_canonical_mutation(self) -> None:
-        if self._canonical_mutation_depth == 0:
-            return
-        self._canonical_mutation_depth -= 1
+        self._get_settings_owner().remember_projection(next_settings)
         self._get_settings_owner().complete()
-        if self._canonical_mutation_depth:
-            return
-        self._canonical_mutation_rollback_legacy_snapshot = None
-        self._canonical_mutation_rollback_active_settings = None
-        self._canonical_mutation_rollback_authoritative = False
-        self._canonical_mutation_rollback_pending = False
 
     def _capture_runtime_signatures_before_canonical_mutation(self) -> None:
         if self.settings is None:
@@ -7825,11 +7430,14 @@ class GuiController:
 
     def _get_provider_credential_verification_owner(
         self,
-    ) -> ProviderCredentialVerificationOwner:
+    ) -> ProviderCredentialVerificationInteractionOwner:
         owner = self._provider_credential_verification_owner
         if owner is None:
-            owner = ProviderCredentialVerificationOwner(
+            owner = create_provider_credential_verification_interaction_owner(
                 verifier=self._get_provider_verifier(),
+                selected_model_provider=self._provider_credential_selected_model,
+                fallback_models=tuple(model.value for model in QwenLLMModel),
+                low_latency=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
                 diagnostics_sink=lambda event, metadata, exception: self.log_detailed(
                     "[ProviderVerification] Credential verification failed "
                     f"event={event} provider={metadata.get('provider')} "
@@ -7837,8 +7445,40 @@ class GuiController:
                     level=logging.WARNING,
                     exception=exception,
                 ),
+                error_sink=lambda provider, error_text: self._log_error(
+                    f"Verification error for {provider}: {error_text}"
+                ),
             )
             self._provider_credential_verification_owner = owner
+        return owner
+
+    def _provider_credential_selected_model(self, provider: str) -> str | None:
+        return self._get_provider_settings_owner().binding.selected_model(provider)
+
+    def _get_provider_settings_owner(
+        self,
+    ) -> ProviderSettingsOwner:
+        owner = self.provider_settings_owner
+        if owner is None:
+            owner = ProviderSettingsOwner(
+                settings=self._get_settings_owner(),
+                binding=ProviderVerificationBindingOwner(
+                    context_provider=lambda provider: provider_verification_context(
+                        self.settings,
+                        provider,
+                        low_latency=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
+                    ),
+                ),
+                secret_store_factory=lambda settings: create_sync_secret_store_adapter(
+                    create_secret_store(settings.secrets, config_path=self.config_path)
+                ),
+                active_secret_provider=lambda settings, secret_key: create_secret_store(
+                    settings.secrets,
+                    config_path=self.config_path,
+                ).get(secret_key),
+                save_failure_sink=self._log_error,
+            )
+            self.provider_settings_owner = owner
         return owner
 
     async def _rebuild_llm_provider(self) -> None:
@@ -8169,8 +7809,8 @@ class GuiController:
         next_settings.ui.overlay_enabled = self.settings.ui.overlay_enabled
         next_settings.ui.peer_translation_enabled = self.settings.ui.peer_translation_enabled
         self.settings = next_settings
-        self._vnext_settings_authoritative = True
-        self._remember_canonical_legacy_projection(next_settings)
+        self._get_settings_owner().authoritative = True
+        self._get_settings_owner().remember_projection(next_settings)
         self._peer_process_warning_reason = None
         await self._refresh_peer_stt_runtime()
         self._sync_effective_hub_flags(self.settings)
@@ -9159,7 +8799,7 @@ class GuiController:
             self._log_error("OpenRouter PKCE settings commit failed")
             self.last_settings_mutation_result = commit_result
             self._maybe_show_founder_letter_after_pkce_failure(launch_source)
-            self._complete_canonical_mutation()
+            self._get_settings_owner().complete()
             return False
 
         runtime_result = await runtime_apply_port.apply_runtime(
@@ -9175,13 +8815,13 @@ class GuiController:
                 message=runtime_result.message,
                 diagnostics=runtime_result.diagnostics,
             )
-            self._complete_canonical_mutation()
+            self._get_settings_owner().complete()
             return True
 
         self.last_settings_mutation_result = _runtime_apply_result_as_degraded_transaction(
             runtime_result
         )
-        self._complete_canonical_mutation()
+        self._get_settings_owner().complete()
         return True
 
     def _maybe_show_founder_letter_after_pkce_failure(self, launch_source: str) -> None:
@@ -9194,39 +8834,41 @@ class GuiController:
 
     def _save_settings(self) -> bool:
         assert self.settings is not None
-        owns_mutation = self._canonical_mutation_depth == 0
-        baseline = self._canonical_legacy_projection_snapshot or self.settings
+        owner = self._get_settings_owner()
+        owns_mutation = owner.mutation_depth == 0
+        baseline = owner.projection_snapshot or self.settings
         if owns_mutation:
-            self._begin_canonical_mutation(legacy_snapshot=baseline)
-        self._update_canonical_settings_from_legacy_delta(baseline, self.settings)
+            owner.begin(legacy_snapshot=baseline)
+        owner.apply_legacy_delta(baseline, self.settings)
         try:
-            self._persist_settings_at_controller_boundary(self.settings)
+            owner.persist()
         except Exception as exc:
-            self._rollback_canonical_mutation()
+            owner.rollback()
             self._log_error(f"Failed to save settings: {exc}")
             return False
         else:
-            self._remember_canonical_legacy_projection(self.settings)
+            owner.remember_projection(self.settings)
             if owns_mutation:
-                self._complete_canonical_mutation()
+                owner.complete()
             return True
 
     def persist_settings(self) -> None:
         """Persist current settings, propagating persistence errors to the caller."""
         assert self.settings is not None
-        owns_mutation = self._canonical_mutation_depth == 0
-        baseline = self._canonical_legacy_projection_snapshot or self.settings
+        owner = self._get_settings_owner()
+        owns_mutation = owner.mutation_depth == 0
+        baseline = owner.projection_snapshot or self.settings
         if owns_mutation:
-            self._begin_canonical_mutation(legacy_snapshot=baseline)
-        self._update_canonical_settings_from_legacy_delta(baseline, self.settings)
+            owner.begin(legacy_snapshot=baseline)
+        owner.apply_legacy_delta(baseline, self.settings)
         try:
-            self._persist_settings_at_controller_boundary(self.settings)
+            owner.persist()
         except Exception:
-            self._rollback_canonical_mutation()
+            owner.rollback()
             raise
-        self._remember_canonical_legacy_projection(self.settings)
+        owner.remember_projection(self.settings)
         if owns_mutation:
-            self._complete_canonical_mutation()
+            owner.complete()
 
     def _sync_ui_from_settings(self) -> None:
         settings = self.settings

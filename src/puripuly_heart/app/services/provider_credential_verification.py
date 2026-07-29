@@ -18,6 +18,8 @@ ProviderCredentialVerificationDiagnosticsSink = Callable[
     [str, Mapping[str, object], BaseException | None],
     None,
 ]
+ProviderCredentialSelectedModelProvider = Callable[[str], str | None]
+ProviderCredentialVerificationErrorSink = Callable[[str, str], None]
 
 PROVIDER_CREDENTIAL_VERIFIED: Final[ProviderCredentialVerificationStatus] = "verified"
 PROVIDER_CREDENTIAL_FAILED: Final[ProviderCredentialVerificationStatus] = "failed"
@@ -178,6 +180,44 @@ class ProviderCredentialVerificationOwner:
             return
 
 
+@dataclass(slots=True)
+class ProviderCredentialVerificationInteractionOwner:
+    verification_owner: ProviderCredentialVerificationOwner
+    selected_model_provider: ProviderCredentialSelectedModelProvider
+    fallback_models: tuple[str, ...] = ()
+    low_latency: bool = False
+    error_sink: ProviderCredentialVerificationErrorSink | None = None
+
+    @property
+    def owner_name(self) -> str:
+        return "ProviderCredentialVerificationInteractionOwner"
+
+    async def verify(self, provider: str, api_key: str) -> tuple[bool, str]:
+        outcome = await self.verification_owner.verify(
+            ProviderCredentialVerificationRequest(
+                provider=provider,
+                api_key=api_key,
+                selected_model=self.selected_model_provider(provider),
+                fallback_models=self.fallback_models,
+                low_latency=self.low_latency,
+            )
+        )
+        if outcome.status == PROVIDER_CREDENTIAL_VERIFIED:
+            return True, "Verification successful"
+        if outcome.status == PROVIDER_CREDENTIAL_EMPTY:
+            return False, "API Key is empty"
+        if outcome.status == PROVIDER_CREDENTIAL_UNKNOWN:
+            return False, f"Unknown provider: {provider}"
+        if outcome.status == PROVIDER_CREDENTIAL_MODEL_UNAVAILABLE:
+            return False, f"qwen_model_unavailable:{outcome.unavailable_model}"
+        if outcome.status == PROVIDER_CREDENTIAL_ERROR:
+            error_text = outcome.error_text or ""
+            if self.error_sink is not None:
+                self.error_sink(provider, error_text)
+            return False, error_text
+        return False, "Verification failed (check logs/console for details)"
+
+
 __all__ = [
     "PROVIDER_CREDENTIAL_EMPTY",
     "PROVIDER_CREDENTIAL_ERROR",
@@ -186,6 +226,7 @@ __all__ = [
     "PROVIDER_CREDENTIAL_UNKNOWN",
     "PROVIDER_CREDENTIAL_VERIFIED",
     "ProviderCredentialVerificationOutcome",
+    "ProviderCredentialVerificationInteractionOwner",
     "ProviderCredentialVerificationOwner",
     "ProviderCredentialVerificationRequest",
     "ProviderCredentialVerificationStatus",

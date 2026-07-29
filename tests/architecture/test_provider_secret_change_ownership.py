@@ -30,7 +30,10 @@ def test_controller_delegates_complete_provider_secret_transaction_owner() -> No
 
     assert "_provider_secret_change_serialization_owner" not in source
     assert "_persist_provider_secret_change_serialized" not in source
-    assert "_get_provider_secret_change_owner().change(" in method
+    assert "_get_provider_settings_owner()" in method
+    assert "owner.change_secret(secret_key, value)" in method
+    assert "_provider_secret_change_execution" not in source
+    assert "_apply_provider_secret_change_result" not in source
     assert "LifecycleScope" not in source
     assert "start_lifecycle_task" not in source
     assert "asyncio.shield" not in source

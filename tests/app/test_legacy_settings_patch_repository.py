@@ -2,95 +2,80 @@ from __future__ import annotations
 
 import copy
 import threading
-from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
 from puripuly_heart.app.ports.canonical_settings_persistence import (
     ProviderVerificationBinding,
 )
 from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
 from puripuly_heart.app.services.canonical_settings_persistence import (
-    LegacySettingsPatchCallbacks,
     LegacySettingsPatchRepository,
+    SettingsOwner,
     legacy_settings_snapshot_values,
 )
 from puripuly_heart.config.settings import AppSettings, LLMProviderName
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
-@dataclass
-class CallbackHarness:
-    current: AppSettings | None = None
-    canonical_snapshot: AppSettings | None = None
-    events: list[str] = field(default_factory=list)
-    persisted: list[AppSettings] = field(default_factory=list)
-    persist_thread_ids: list[int] = field(default_factory=list)
-    bindings: list[ProviderVerificationBinding] = field(default_factory=list)
-    updates: list[tuple[AppSettings, AppSettings]] = field(default_factory=list)
-    fail_persist: bool = False
+class RecordingPersistence(SettingsVNextCanonicalPersistenceAdapter):
+    def __init__(self) -> None:
+        self.events: list[str] = []
+        self.persist_thread_ids: list[int] = []
+        self.fail_persist = False
 
-    def begin(self) -> None:
-        self.events.append("begin")
-
-    def update(self, baseline: AppSettings, current: AppSettings) -> None:
+    def apply_legacy_delta(self, **kwargs):
         self.events.append("update")
-        self.updates.append((copy.deepcopy(baseline), copy.deepcopy(current)))
+        return super().apply_legacy_delta(**kwargs)
 
-    def bind(self, binding: ProviderVerificationBinding) -> None:
+    def bind_provider_verification(self, canonical, binding):
         self.events.append("bind")
-        self.bindings.append(binding)
+        return super().bind_provider_verification(canonical, binding)
 
-    def persist(self, settings: AppSettings) -> None:
+    def persist(self, path: Path, settings: AppSettingsVNext) -> None:
+        _ = path, settings
         self.events.append("persist")
         self.persist_thread_ids.append(threading.get_ident())
         if self.fail_persist:
             raise OSError("injected persistence failure")
-        self.persisted.append(copy.deepcopy(settings))
-
-    def rollback(self) -> None:
-        self.events.append("rollback")
-
-    def fail(self, message: str) -> None:
-        self.events.append(message)
-
-    def remember(self, settings: AppSettings) -> None:
-        self.events.append("remember")
-        self.current = copy.deepcopy(settings)
 
 
 def _repository(
-    harness: CallbackHarness,
     *,
     committed: AppSettings,
     base: AppSettings | None = None,
     surface: str = "translation_provider",
     binding: ProviderVerificationBinding | None = None,
-) -> LegacySettingsPatchRepository:
-    return LegacySettingsPatchRepository(
-        callbacks=LegacySettingsPatchCallbacks(
-            current_settings=lambda: harness.current,
-            canonical_projection_snapshot=lambda: harness.canonical_snapshot,
-            begin_canonical_mutation=harness.begin,
-            update_canonical_from_legacy_delta=harness.update,
-            bind_provider_verification=harness.bind,
-            persist_settings=harness.persist,
-            rollback_canonical_mutation=harness.rollback,
-            save_failure_sink=harness.fail,
-            remember_canonical_projection=harness.remember,
-        ),
+) -> tuple[LegacySettingsPatchRepository, SettingsOwner, RecordingPersistence]:
+    persistence = RecordingPersistence()
+    owner = SettingsOwner(
+        path=Path("settings.json"),
+        persistence=persistence,
+        canonical=AppSettingsVNext(),
+        current=copy.deepcopy(base or committed),
+        authoritative=True,
+        projection_snapshot=copy.deepcopy(base or committed),
+    )
+    repository = LegacySettingsPatchRepository(
+        owner=owner,
         committed_settings=committed,
         base_settings=base,
         surface=surface,
         provider_verification_binding=binding,
+        save_failure_sink=lambda message: persistence.events.append(message),
     )
+    return repository, owner, persistence
 
 
 @pytest.mark.asyncio
 async def test_repository_applies_path_patch_and_persists_off_event_loop() -> None:
     base = AppSettings()
     committed = copy.deepcopy(base)
-    harness = CallbackHarness(canonical_snapshot=copy.deepcopy(base))
-    repository = _repository(harness, committed=committed, base=base)
+    repository, owner, persistence = _repository(committed=committed, base=base)
     event_loop_thread_id = threading.get_ident()
 
     result = await repository.save(
@@ -103,17 +88,16 @@ async def test_repository_applies_path_patch_and_persists_off_event_loop() -> No
 
     assert result.succeeded is True
     assert repository.committed_settings.ui.locale == "ja"
-    assert harness.persisted[0].ui.locale == "ja"
-    assert harness.persist_thread_ids != [event_loop_thread_id]
-    assert harness.events == ["begin", "update", "persist", "remember"]
+    assert persistence.persist_thread_ids != [event_loop_thread_id]
+    assert persistence.events == ["update", "persist"]
+    assert owner.projection_snapshot is not None
+    assert owner.projection_snapshot.ui.locale == "ja"
 
 
 @pytest.mark.asyncio
 async def test_repository_applies_managed_delivery_ack_state_patch() -> None:
     committed = AppSettings()
-    harness = CallbackHarness()
-    repository = _repository(
-        harness,
+    repository, _owner, _persistence = _repository(
         committed=committed,
         surface="managed_connection_auth",
     )
@@ -155,8 +139,10 @@ async def test_repository_binds_provider_verification_before_persistence() -> No
     )
     committed = AppSettings()
     committed.provider.llm = LLMProviderName.OPENROUTER
-    harness = CallbackHarness()
-    repository = _repository(harness, committed=committed, binding=binding)
+    repository, owner, persistence = _repository(
+        committed=committed,
+        binding=binding,
+    )
 
     result = await repository.save(
         SettingsCommitRequest(
@@ -167,19 +153,19 @@ async def test_repository_binds_provider_verification_before_persistence() -> No
     )
 
     assert result.succeeded is True
-    assert harness.bindings == [binding]
-    assert harness.events.index("bind") < harness.events.index("persist")
+    assert persistence.events.index("bind") < persistence.events.index("persist")
+    assert owner.canonical is not None
+    assert owner.canonical.state.provider_verification.openrouter.status == "verified"
 
 
 @pytest.mark.asyncio
 async def test_repository_rolls_back_and_returns_safe_diagnostics_on_save_failure() -> None:
     committed = AppSettings()
-    harness = CallbackHarness(fail_persist=True)
-    repository = _repository(
-        harness,
+    repository, owner, persistence = _repository(
         committed=committed,
         surface="provider_secret_change",
     )
+    persistence.fail_persist = True
 
     result = await repository.save(
         SettingsCommitRequest(
@@ -195,11 +181,10 @@ async def test_repository_rolls_back_and_returns_safe_diagnostics_on_save_failur
     assert result.diagnostics.code == "settings_save_failed"
     assert result.diagnostics.fields["surface"] == "provider_secret_change"
     assert repository.committed_settings.ui.locale != "ko"
-    assert harness.events == [
-        "begin",
+    assert owner.mutation_depth == 0
+    assert persistence.events == [
         "update",
         "persist",
-        "rollback",
         "Failed to save settings mutation",
     ]
 

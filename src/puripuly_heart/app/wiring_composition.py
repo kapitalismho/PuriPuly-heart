@@ -41,6 +41,13 @@ from puripuly_heart.app.services.local_asr_gpu_provisioning import (
     LocalASRProvisioningProvider,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.provider_credential_verification import (
+    ProviderCredentialSelectedModelProvider,
+    ProviderCredentialVerificationDiagnosticsSink,
+    ProviderCredentialVerificationErrorSink,
+    ProviderCredentialVerificationInteractionOwner,
+    ProviderCredentialVerificationOwner,
+)
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
     PeerCaptureTargetResolverPort,
@@ -104,6 +111,27 @@ def create_manual_typing_owner(
         log_error=log_error,
         idle_timeout_seconds=idle_timeout_seconds,
         submit_timeout_seconds=submit_timeout_seconds,
+    )
+
+
+def create_provider_credential_verification_interaction_owner(
+    *,
+    verifier: ProviderVerifierPort,
+    selected_model_provider: ProviderCredentialSelectedModelProvider,
+    fallback_models: tuple[str, ...],
+    low_latency: bool,
+    diagnostics_sink: ProviderCredentialVerificationDiagnosticsSink | None = None,
+    error_sink: ProviderCredentialVerificationErrorSink | None = None,
+) -> ProviderCredentialVerificationInteractionOwner:
+    return ProviderCredentialVerificationInteractionOwner(
+        verification_owner=ProviderCredentialVerificationOwner(
+            verifier=verifier,
+            diagnostics_sink=diagnostics_sink,
+        ),
+        selected_model_provider=selected_model_provider,
+        fallback_models=fallback_models,
+        low_latency=low_latency,
+        error_sink=error_sink,
     )
 
 
