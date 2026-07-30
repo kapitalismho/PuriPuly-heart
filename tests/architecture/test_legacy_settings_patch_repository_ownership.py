@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 COMPOSITION_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 UI_RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "ui_runtime.py"
 PROVIDER_SETTINGS_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_settings.py"
+    ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider" / "provider_settings.py"
 )
 SETTINGS_APPLICATION_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "services" / "settings_application.py"

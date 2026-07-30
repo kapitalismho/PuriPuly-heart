@@ -1,36 +1,37 @@
-import sys as _sys
+from importlib import import_module as _import_module
 
-from puripuly_heart import core as _parent
-
-from . import discord_managed_oauth as discord_managed_oauth
-from . import discord_oauth_loopback as discord_oauth_loopback
-from . import oauth_callback_page as oauth_callback_page
-from .discord_managed_oauth import (
-    MAX_DISCORD_OAUTH_WAIT_SECONDS,
-    MIN_DISCORD_OAUTH_WAIT_SECONDS,
-    run_discord_oauth_callback_flow,
+_SUBMODULES = frozenset(
+    {
+        "discord_managed_oauth",
+        "discord_oauth_loopback",
+        "oauth_callback_page",
+    }
 )
-from .discord_oauth_loopback import (
-    DISCORD_OAUTH_LOOPBACK_HOST,
-    DISCORD_OAUTH_LOOPBACK_PATH,
-    DISCORD_OAUTH_LOOPBACK_PORTS,
-    DiscordOAuthCallbackError,
-    DiscordOAuthCallbackResult,
-    DiscordOAuthLoopbackClosedError,
-    DiscordOAuthLoopbackListener,
-    bind_first_available,
-    render_discord_oauth_callback_completion_page,
-)
-from .oauth_callback_page import (
-    OAUTH_CALLBACK_COMPLETION_FALLBACK_LINES,
-    OAUTH_CALLBACK_COMPLETION_LINE_KEYS,
-    OAUTH_CALLBACK_FONT_FAMILIES,
-    OAUTH_CALLBACK_TITLE_KEY,
-    render_oauth_callback_completion_page,
-    resolve_oauth_callback_locale,
-)
+_EXPORT_SOURCES = {
+    "bind_first_available": "discord_oauth_loopback",
+    "DISCORD_OAUTH_LOOPBACK_HOST": "discord_oauth_loopback",
+    "DISCORD_OAUTH_LOOPBACK_PATH": "discord_oauth_loopback",
+    "DISCORD_OAUTH_LOOPBACK_PORTS": "discord_oauth_loopback",
+    "DiscordOAuthCallbackError": "discord_oauth_loopback",
+    "DiscordOAuthCallbackResult": "discord_oauth_loopback",
+    "DiscordOAuthLoopbackClosedError": "discord_oauth_loopback",
+    "DiscordOAuthLoopbackListener": "discord_oauth_loopback",
+    "MAX_DISCORD_OAUTH_WAIT_SECONDS": "discord_managed_oauth",
+    "MIN_DISCORD_OAUTH_WAIT_SECONDS": "discord_managed_oauth",
+    "OAUTH_CALLBACK_COMPLETION_FALLBACK_LINES": "oauth_callback_page",
+    "OAUTH_CALLBACK_COMPLETION_LINE_KEYS": "oauth_callback_page",
+    "OAUTH_CALLBACK_FONT_FAMILIES": "oauth_callback_page",
+    "OAUTH_CALLBACK_TITLE_KEY": "oauth_callback_page",
+    "render_discord_oauth_callback_completion_page": "discord_oauth_loopback",
+    "render_oauth_callback_completion_page": "oauth_callback_page",
+    "resolve_oauth_callback_locale": "oauth_callback_page",
+    "run_discord_oauth_callback_flow": "discord_managed_oauth",
+}
 
 __all__ = [
+    "bind_first_available",
+    "discord_managed_oauth",
+    "discord_oauth_loopback",
     "DISCORD_OAUTH_LOOPBACK_HOST",
     "DISCORD_OAUTH_LOOPBACK_PATH",
     "DISCORD_OAUTH_LOOPBACK_PORTS",
@@ -43,23 +44,19 @@ __all__ = [
     "OAUTH_CALLBACK_COMPLETION_FALLBACK_LINES",
     "OAUTH_CALLBACK_COMPLETION_LINE_KEYS",
     "OAUTH_CALLBACK_FONT_FAMILIES",
-    "OAUTH_CALLBACK_TITLE_KEY",
-    "bind_first_available",
-    "discord_managed_oauth",
-    "discord_oauth_loopback",
     "oauth_callback_page",
+    "OAUTH_CALLBACK_TITLE_KEY",
     "render_discord_oauth_callback_completion_page",
     "render_oauth_callback_completion_page",
     "resolve_oauth_callback_locale",
     "run_discord_oauth_callback_flow",
 ]
 
-_COMPAT_MODULES = {
-    "discord_managed_oauth": discord_managed_oauth,
-    "discord_oauth_loopback": discord_oauth_loopback,
-    "oauth_callback_page": oauth_callback_page,
-}
-for _name, _module in _COMPAT_MODULES.items():
-    _sys.modules[f"puripuly_heart.core.{_name}"] = _module
-    setattr(_parent, _name, _module)
-del _COMPAT_MODULES, _module, _name
+
+def __getattr__(name: str) -> object:
+    if name in _SUBMODULES:
+        return _import_module(f".{name}", __name__)
+    source = _EXPORT_SOURCES.get(name)
+    if source is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(_import_module(f".{source}", __name__), name)

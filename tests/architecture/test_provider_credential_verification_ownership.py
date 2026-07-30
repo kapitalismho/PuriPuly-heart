@@ -6,7 +6,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 UI_RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "ui_runtime.py"
 OWNER_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_credential_verification.py"
+    ROOT
+    / "src"
+    / "puripuly_heart"
+    / "app"
+    / "services"
+    / "provider"
+    / "provider_credential_verification.py"
 )
 PORT_PATH = ROOT / "src" / "puripuly_heart" / "app" / "ports" / "provider_verifier.py"
 

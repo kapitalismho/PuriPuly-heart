@@ -33,5 +33,14 @@ _install_moved_module_aliases(
         "managed_key_delivery_ack": "puripuly_heart.app.services.managed.managed_key_delivery_ack",
         "managed_status_refresh": "puripuly_heart.app.services.managed.managed_status_refresh",
         "managed_usage": "puripuly_heart.app.services.managed.managed_usage",
+        "provider_credential_verification": (
+            "puripuly_heart.app.services.provider.provider_credential_verification"
+        ),
+        "provider_runtime_apply": "puripuly_heart.app.services.provider.provider_runtime_apply",
+        "provider_secret_change": "puripuly_heart.app.services.provider.provider_secret_change",
+        "provider_settings": "puripuly_heart.app.services.provider.provider_settings",
+        "provider_verification_binding": (
+            "puripuly_heart.app.services.provider.provider_verification_binding"
+        ),
     },
 )

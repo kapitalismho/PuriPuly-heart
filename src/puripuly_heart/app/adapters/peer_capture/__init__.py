@@ -1,9 +1,51 @@
-import sys as _sys
 from importlib import import_module as _import_module
 
-from puripuly_heart.app import adapters as _parent
+_SUBMODULES = frozenset(
+    {
+        "peer_capture_admission",
+        "peer_capture_audio_loop",
+        "peer_capture_inventory",
+        "peer_capture_provider",
+        "peer_capture_source",
+        "peer_capture_target_resolver",
+        "peer_capture_vad",
+        "peer_capture_vad_sink",
+    }
+)
+_EXPORT_SOURCES = {
+    "PeerCaptureAdmissionAdapter": "peer_capture_admission",
+    "PeerCaptureAudioLoopAdapter": "peer_capture_audio_loop",
+    "PeerCaptureAudioLoopDetailedEnabled": "peer_capture_audio_loop",
+    "PeerCaptureAudioLoopDetailedLog": "peer_capture_audio_loop",
+    "PeerCaptureAudioLoopRunner": "peer_capture_audio_loop",
+    "PeerCaptureDetailedEnabled": "peer_capture_source",
+    "PeerCaptureDetailedLog": "peer_capture_source",
+    "PeerCaptureLocalReadiness": "peer_capture_admission",
+    "PeerCaptureLoopbackSourceFactory": "peer_capture_source",
+    "PeerCapturePipelineFactory": "peer_capture_source",
+    "PeerCaptureProcessResolution": "peer_capture_target_resolver",
+    "PeerCaptureProcessResolver": "peer_capture_target_resolver",
+    "PeerCaptureProcessResolverFactory": "peer_capture_target_resolver",
+    "PeerCaptureProcessSourceFactory": "peer_capture_source",
+    "PeerCaptureProcessWatcherFactory": "peer_capture_source",
+    "PeerCaptureProviderAdapter": "peer_capture_provider",
+    "PeerCaptureRuntimeAvailable": "peer_capture_admission",
+    "PeerCaptureSourceAdapter": "peer_capture_source",
+    "PeerCaptureSourceWrapper": "peer_capture_source",
+    "PeerCaptureTargetResolverAdapter": "peer_capture_target_resolver",
+    "PeerCaptureTargetRuntimeEffectsAdapter": "peer_capture_inventory",
+    "PeerCaptureVadAdapter": "peer_capture_vad",
+    "PeerCaptureVadDetailedLog": "peer_capture_vad",
+    "PeerCaptureVadDiagnosticsEnabled": "peer_capture_vad",
+    "PeerCaptureVadEngineFactory": "peer_capture_vad",
+    "PeerCaptureVadGatingFactory": "peer_capture_vad",
+    "PeerCaptureVadModelPathResolver": "peer_capture_vad",
+    "PeerCaptureVadSinkAdapter": "peer_capture_vad_sink",
+    "WindowsLoopbackDeviceInventoryAdapter": "peer_capture_inventory",
+    "WindowsProcessCaptureInventoryAdapter": "peer_capture_inventory",
+}
 
-for _short in (
+__all__ = [
     "peer_capture_admission",
     "peer_capture_audio_loop",
     "peer_capture_inventory",
@@ -12,56 +54,6 @@ for _short in (
     "peer_capture_target_resolver",
     "peer_capture_vad",
     "peer_capture_vad_sink",
-):
-    _module = _import_module(f".{_short}", __name__)
-    _sys.modules[f"puripuly_heart.app.adapters.{_short}"] = _module
-    setattr(_parent, _short, _module)
-del _module, _short
-
-from .peer_capture_admission import (
-    PeerCaptureAdmissionAdapter,
-    PeerCaptureLocalReadiness,
-    PeerCaptureRuntimeAvailable,
-)
-from .peer_capture_audio_loop import (
-    PeerCaptureAudioLoopAdapter,
-    PeerCaptureAudioLoopDetailedEnabled,
-    PeerCaptureAudioLoopDetailedLog,
-    PeerCaptureAudioLoopRunner,
-)
-from .peer_capture_inventory import (
-    PeerCaptureTargetRuntimeEffectsAdapter,
-    WindowsLoopbackDeviceInventoryAdapter,
-    WindowsProcessCaptureInventoryAdapter,
-)
-from .peer_capture_provider import PeerCaptureProviderAdapter
-from .peer_capture_source import (
-    PeerCaptureDetailedEnabled,
-    PeerCaptureDetailedLog,
-    PeerCaptureLoopbackSourceFactory,
-    PeerCapturePipelineFactory,
-    PeerCaptureProcessSourceFactory,
-    PeerCaptureProcessWatcherFactory,
-    PeerCaptureSourceAdapter,
-    PeerCaptureSourceWrapper,
-)
-from .peer_capture_target_resolver import (
-    PeerCaptureProcessResolution,
-    PeerCaptureProcessResolver,
-    PeerCaptureProcessResolverFactory,
-    PeerCaptureTargetResolverAdapter,
-)
-from .peer_capture_vad import (
-    PeerCaptureVadAdapter,
-    PeerCaptureVadDetailedLog,
-    PeerCaptureVadDiagnosticsEnabled,
-    PeerCaptureVadEngineFactory,
-    PeerCaptureVadGatingFactory,
-    PeerCaptureVadModelPathResolver,
-)
-from .peer_capture_vad_sink import PeerCaptureVadSinkAdapter
-
-__all__ = [
     "PeerCaptureAdmissionAdapter",
     "PeerCaptureAudioLoopAdapter",
     "PeerCaptureAudioLoopDetailedEnabled",
@@ -92,12 +84,13 @@ __all__ = [
     "PeerCaptureVadSinkAdapter",
     "WindowsLoopbackDeviceInventoryAdapter",
     "WindowsProcessCaptureInventoryAdapter",
-    "peer_capture_admission",
-    "peer_capture_audio_loop",
-    "peer_capture_inventory",
-    "peer_capture_provider",
-    "peer_capture_source",
-    "peer_capture_target_resolver",
-    "peer_capture_vad",
-    "peer_capture_vad_sink",
 ]
+
+
+def __getattr__(name: str) -> object:
+    if name in _SUBMODULES:
+        return _import_module(f".{name}", __name__)
+    source = _EXPORT_SOURCES.get(name)
+    if source is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(_import_module(f".{source}", __name__), name)

@@ -1,87 +1,79 @@
-import sys as _sys
 from importlib import import_module as _import_module
 
-from puripuly_heart.app import services as _parent
+_SUBMODULES = frozenset(
+    {
+        "local_asr_cpu_repair",
+        "local_asr_diagnostics",
+        "local_asr_gpu_provisioning",
+        "local_asr_readiness",
+        "local_asr_selection",
+    }
+)
+_EXPORT_SOURCES = {
+    "local_asr_status_for_provider": "local_asr_selection",
+    "LOCAL_CPU_AUTO_PROVIDER": "local_asr_selection",
+    "LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER": "local_asr_selection",
+    "LOCAL_CPU_PROVIDERS": "local_asr_selection",
+    "LOCAL_QWEN_PROVIDER": "local_asr_selection",
+    "LocalASRBasicLogSink": "local_asr_diagnostics",
+    "LocalASRCpuModelIdsForProvider": "local_asr_cpu_repair",
+    "LocalASRCpuPeerResume": "local_asr_cpu_repair",
+    "LocalASRCpuProvisioningProvider": "local_asr_cpu_repair",
+    "LocalASRCpuRepairChannel": "local_asr_cpu_repair",
+    "LocalASRCpuRepairEffect": "local_asr_cpu_repair",
+    "LocalASRCpuRepairEffectSink": "local_asr_cpu_repair",
+    "LocalASRCpuRepairEffectType": "local_asr_cpu_repair",
+    "LocalASRCpuRepairOwner": "local_asr_cpu_repair",
+    "LocalASRCpuRepairRequest": "local_asr_cpu_repair",
+    "LocalASRCpuRepairRuntimeState": "local_asr_cpu_repair",
+    "LocalASRCpuRepairRuntimeStateProvider": "local_asr_cpu_repair",
+    "LocalASRCpuRepairSnapshot": "local_asr_cpu_repair",
+    "LocalASRCpuSelfProviderRebuild": "local_asr_cpu_repair",
+    "LocalASRCpuSelfResume": "local_asr_cpu_repair",
+    "LocalASRCpuStatusForProvider": "local_asr_cpu_repair",
+    "LocalASRDetailedLogSink": "local_asr_diagnostics",
+    "LocalASRDiagnosticsGpuEffect": "local_asr_diagnostics",
+    "LocalASRDiagnosticsGpuEffectSink": "local_asr_diagnostics",
+    "LocalASRDiagnosticsOwner": "local_asr_diagnostics",
+    "LocalASRGpuActivationRetry": "local_asr_gpu_provisioning",
+    "LocalASRGpuDiscoveryOriginProvider": "local_asr_diagnostics",
+    "LocalASRGpuProvisioningDiagnostic": "local_asr_gpu_provisioning",
+    "LocalASRGpuProvisioningDiagnosticSink": "local_asr_gpu_provisioning",
+    "LocalASRGpuProvisioningEffect": "local_asr_gpu_provisioning",
+    "LocalASRGpuProvisioningEffectSink": "local_asr_gpu_provisioning",
+    "LocalASRGpuProvisioningOwner": "local_asr_gpu_provisioning",
+    "LocalASRGpuProvisioningState": "local_asr_gpu_provisioning",
+    "LocalASRGpuProvisioningStateProvider": "local_asr_gpu_provisioning",
+    "LocalASRGpuProvisioningUiState": "local_asr_gpu_provisioning",
+    "LocalASRProvisioningProvider": "local_asr_gpu_provisioning",
+    "LocalASRReadinessAsyncEffect": "local_asr_readiness",
+    "LocalASRReadinessChannel": "local_asr_readiness",
+    "LocalASRReadinessChannelProvider": "local_asr_readiness",
+    "LocalASRReadinessEffect": "local_asr_readiness",
+    "LocalASRReadinessEffectSink": "local_asr_readiness",
+    "LocalASRReadinessEffectType": "local_asr_readiness",
+    "LocalASRReadinessFallback": "local_asr_readiness",
+    "LocalASRReadinessGpuPendingSink": "local_asr_readiness",
+    "LocalASRReadinessGpuStateProvider": "local_asr_readiness",
+    "LocalASRReadinessGpuValidator": "local_asr_readiness",
+    "LocalASRReadinessLoadLogSink": "local_asr_readiness",
+    "LocalASRReadinessOwner": "local_asr_readiness",
+    "LocalASRReadinessProviderAvailable": "local_asr_readiness",
+    "LocalASRReadinessProvisioningProvider": "local_asr_readiness",
+    "LocalASRReadinessState": "local_asr_readiness",
+    "LocalASRReadinessStateProvider": "local_asr_readiness",
+    "LocalASRSelectionDecision": "local_asr_selection",
+    "required_local_asr_model_ids": "local_asr_selection",
+    "resolve_local_asr_selection": "local_asr_selection",
+}
 
-for _short in (
+__all__ = [
     "local_asr_cpu_repair",
     "local_asr_diagnostics",
     "local_asr_gpu_provisioning",
     "local_asr_readiness",
     "local_asr_selection",
-):
-    _module = _import_module(f".{_short}", __name__)
-    _sys.modules[f"puripuly_heart.app.services.{_short}"] = _module
-    setattr(_parent, _short, _module)
-del _module, _short
-
-from .local_asr_cpu_repair import (
-    LocalASRCpuModelIdsForProvider,
-    LocalASRCpuPeerResume,
-    LocalASRCpuProvisioningProvider,
-    LocalASRCpuRepairChannel,
-    LocalASRCpuRepairEffect,
-    LocalASRCpuRepairEffectSink,
-    LocalASRCpuRepairEffectType,
-    LocalASRCpuRepairOwner,
-    LocalASRCpuRepairRequest,
-    LocalASRCpuRepairRuntimeState,
-    LocalASRCpuRepairRuntimeStateProvider,
-    LocalASRCpuRepairSnapshot,
-    LocalASRCpuSelfProviderRebuild,
-    LocalASRCpuSelfResume,
-    LocalASRCpuStatusForProvider,
-)
-from .local_asr_diagnostics import (
-    LocalASRBasicLogSink,
-    LocalASRDetailedLogSink,
-    LocalASRDiagnosticsGpuEffect,
-    LocalASRDiagnosticsGpuEffectSink,
-    LocalASRDiagnosticsOwner,
-    LocalASRGpuDiscoveryOriginProvider,
-)
-from .local_asr_gpu_provisioning import (
-    LocalASRGpuActivationRetry,
-    LocalASRGpuProvisioningDiagnostic,
-    LocalASRGpuProvisioningDiagnosticSink,
-    LocalASRGpuProvisioningEffect,
-    LocalASRGpuProvisioningEffectSink,
-    LocalASRGpuProvisioningOwner,
-    LocalASRGpuProvisioningState,
-    LocalASRGpuProvisioningStateProvider,
-    LocalASRGpuProvisioningUiState,
-    LocalASRProvisioningProvider,
-)
-from .local_asr_readiness import (
-    LocalASRReadinessAsyncEffect,
-    LocalASRReadinessChannel,
-    LocalASRReadinessChannelProvider,
-    LocalASRReadinessEffect,
-    LocalASRReadinessEffectSink,
-    LocalASRReadinessEffectType,
-    LocalASRReadinessFallback,
-    LocalASRReadinessGpuPendingSink,
-    LocalASRReadinessGpuStateProvider,
-    LocalASRReadinessGpuValidator,
-    LocalASRReadinessLoadLogSink,
-    LocalASRReadinessOwner,
-    LocalASRReadinessProviderAvailable,
-    LocalASRReadinessProvisioningProvider,
-    LocalASRReadinessState,
-    LocalASRReadinessStateProvider,
-)
-from .local_asr_selection import (
-    LOCAL_CPU_AUTO_PROVIDER,
-    LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER,
-    LOCAL_CPU_PROVIDERS,
-    LOCAL_QWEN_PROVIDER,
-    LocalASRSelectionDecision,
-    local_asr_status_for_provider,
-    required_local_asr_model_ids,
-    resolve_local_asr_selection,
-)
-
-__all__ = [
+    "local_asr_status_for_provider",
     "LOCAL_CPU_AUTO_PROVIDER",
     "LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER",
     "LOCAL_CPU_PROVIDERS",
@@ -134,12 +126,15 @@ __all__ = [
     "LocalASRReadinessState",
     "LocalASRReadinessStateProvider",
     "LocalASRSelectionDecision",
-    "local_asr_cpu_repair",
-    "local_asr_diagnostics",
-    "local_asr_gpu_provisioning",
-    "local_asr_readiness",
-    "local_asr_selection",
-    "local_asr_status_for_provider",
     "required_local_asr_model_ids",
     "resolve_local_asr_selection",
 ]
+
+
+def __getattr__(name: str) -> object:
+    if name in _SUBMODULES:
+        return _import_module(f".{name}", __name__)
+    source = _EXPORT_SOURCES.get(name)
+    if source is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(_import_module(f".{source}", __name__), name)

@@ -486,10 +486,22 @@ def test_application_composition_does_not_retain_dead_shutdown_or_provider_algor
         REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
     )
     provider_settings_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_settings.py"
+        REPO_ROOT
+        / "src"
+        / "puripuly_heart"
+        / "app"
+        / "services"
+        / "provider"
+        / "provider_settings.py"
     )
     provider_runtime_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_runtime_apply.py"
+        REPO_ROOT
+        / "src"
+        / "puripuly_heart"
+        / "app"
+        / "services"
+        / "provider"
+        / "provider_runtime_apply.py"
     )
     startup_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "application_startup.py"

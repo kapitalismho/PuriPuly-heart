@@ -1,98 +1,90 @@
-import sys as _sys
 from importlib import import_module as _import_module
 
-from puripuly_heart.app import services as _parent
+_SUBMODULES = frozenset(
+    {
+        "managed_auth",
+        "managed_auth_claims",
+        "managed_connection_auth",
+        "managed_key_delivery_ack",
+        "managed_status_refresh",
+        "managed_usage",
+    }
+)
+_EXPORT_SOURCES = {
+    "ACK_SOURCE_DISCORD": "managed_key_delivery_ack",
+    "ACK_SOURCE_QQ": "managed_key_delivery_ack",
+    "clear_pending_ack_in_settings_values": "managed_key_delivery_ack",
+    "DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET": "managed_key_delivery_ack",
+    "local_managed_auth_blocking_source": "managed_auth_claims",
+    "MANAGED_AUTH_CLAIM_SOURCE_DISCORD": "managed_auth_claims",
+    "MANAGED_AUTH_CLAIM_SOURCE_QQ": "managed_auth_claims",
+    "MANAGED_AUTH_CLAIM_SOURCES": "managed_auth_claims",
+    "ManagedAuthClaimGuard": "managed_auth_claims",
+    "ManagedAuthDiscordExecutor": "managed_auth",
+    "ManagedAuthExecutionResult": "managed_auth",
+    "ManagedAuthLogSink": "managed_auth",
+    "ManagedAuthMessageSink": "managed_auth",
+    "ManagedAuthOwner": "managed_auth",
+    "ManagedAuthPendingSink": "managed_auth",
+    "ManagedAuthQqExecutor": "managed_auth",
+    "ManagedAuthResultSink": "managed_auth",
+    "ManagedAuthRuntimeEnsurer": "managed_auth",
+    "ManagedAuthState": "managed_auth",
+    "ManagedAuthStateProvider": "managed_auth",
+    "ManagedAuthUsageRefreshSink": "managed_auth",
+    "ManagedAuthUsageViewSink": "managed_auth",
+    "ManagedConnectionAuthRequest": "managed_connection_auth",
+    "ManagedConnectionAuthService": "managed_connection_auth",
+    "ManagedKeyDeliveryAckService": "managed_key_delivery_ack",
+    "ManagedKeyDeliveryAckServiceResult": "managed_key_delivery_ack",
+    "ManagedKeyDeliveryAckTokenClearError": "managed_key_delivery_ack",
+    "ManagedKeyDeliveryAckTokenStoreError": "managed_key_delivery_ack",
+    "ManagedStatusRefreshDiagnosticsSink": "managed_status_refresh",
+    "ManagedStatusRefreshOwner": "managed_status_refresh",
+    "ManagedStatusRefreshWork": "managed_status_refresh",
+    "ManagedUsageAutoShowFounderLetterProvider": "managed_usage",
+    "ManagedUsageDisableTranslationSink": "managed_usage",
+    "ManagedUsageMetadataFetcher": "managed_usage",
+    "ManagedUsageMetadataResult": "managed_usage",
+    "ManagedUsageOwner": "managed_usage",
+    "ManagedUsagePendingSink": "managed_usage",
+    "ManagedUsageReferralNormalizer": "managed_usage",
+    "ManagedUsageReleaseServiceProvider": "managed_usage",
+    "ManagedUsageState": "managed_usage",
+    "ManagedUsageStateProvider": "managed_usage",
+    "ManagedUsageViewSink": "managed_usage",
+    "ManagedUsageViewState": "managed_usage",
+    "ManagedUsageWarningSink": "managed_usage",
+    "normalize_managed_claim_source": "managed_auth_claims",
+    "normalize_managed_claim_sources": "managed_auth_claims",
+    "OPENROUTER_MANAGED_API_KEY_SECRET": "managed_auth_claims",
+    "OPENROUTER_MANAGED_QQ_API_KEY_SECRET": "managed_auth_claims",
+    "OPENROUTER_MANAGED_USER_ID_MAX_LENGTH": "managed_auth_claims",
+    "OPENROUTER_MANAGED_USER_ID_SECRET": "managed_auth_claims",
+    "OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET": "managed_auth_claims",
+    "pending_ack_metadata_settings_values": "managed_key_delivery_ack",
+    "QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY": "managed_auth",
+    "QQ_MANAGED_DELIVERY_ACK_TOKEN_SECRET": "managed_key_delivery_ack",
+    "record_local_managed_claim_source": "managed_auth_claims",
+    "secret_key_for_ack_source": "managed_key_delivery_ack",
+    "store_pending_ack_in_settings_values": "managed_key_delivery_ack",
+}
 
-for _short in (
+__all__ = [
+    "ACK_SOURCE_DISCORD",
+    "ACK_SOURCE_QQ",
+    "clear_pending_ack_in_settings_values",
+    "DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET",
+    "local_managed_auth_blocking_source",
     "managed_auth",
+    "MANAGED_AUTH_CLAIM_SOURCE_DISCORD",
+    "MANAGED_AUTH_CLAIM_SOURCE_QQ",
+    "MANAGED_AUTH_CLAIM_SOURCES",
     "managed_auth_claims",
     "managed_connection_auth",
     "managed_key_delivery_ack",
     "managed_status_refresh",
     "managed_usage",
-):
-    _module = _import_module(f".{_short}", __name__)
-    _sys.modules[f"puripuly_heart.app.services.{_short}"] = _module
-    setattr(_parent, _short, _module)
-del _module, _short
-
-from .managed_auth import (
-    QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY,
-    ManagedAuthDiscordExecutor,
-    ManagedAuthExecutionResult,
-    ManagedAuthLogSink,
-    ManagedAuthMessageSink,
-    ManagedAuthOwner,
-    ManagedAuthPendingSink,
-    ManagedAuthQqExecutor,
-    ManagedAuthResultSink,
-    ManagedAuthRuntimeEnsurer,
-    ManagedAuthState,
-    ManagedAuthStateProvider,
-    ManagedAuthUsageRefreshSink,
-    ManagedAuthUsageViewSink,
-)
-from .managed_auth_claims import (
-    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
-    MANAGED_AUTH_CLAIM_SOURCE_QQ,
-    MANAGED_AUTH_CLAIM_SOURCES,
-    OPENROUTER_MANAGED_API_KEY_SECRET,
-    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
-    OPENROUTER_MANAGED_USER_ID_MAX_LENGTH,
-    OPENROUTER_MANAGED_USER_ID_SECRET,
-    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
-    ManagedAuthClaimGuard,
-    local_managed_auth_blocking_source,
-    normalize_managed_claim_source,
-    normalize_managed_claim_sources,
-    record_local_managed_claim_source,
-)
-from .managed_connection_auth import (
-    ManagedConnectionAuthRequest,
-    ManagedConnectionAuthService,
-)
-from .managed_key_delivery_ack import (
-    ACK_SOURCE_DISCORD,
-    ACK_SOURCE_QQ,
-    DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET,
-    QQ_MANAGED_DELIVERY_ACK_TOKEN_SECRET,
-    ManagedKeyDeliveryAckService,
-    ManagedKeyDeliveryAckServiceResult,
-    ManagedKeyDeliveryAckTokenClearError,
-    ManagedKeyDeliveryAckTokenStoreError,
-    clear_pending_ack_in_settings_values,
-    pending_ack_metadata_settings_values,
-    secret_key_for_ack_source,
-    store_pending_ack_in_settings_values,
-)
-from .managed_status_refresh import (
-    ManagedStatusRefreshDiagnosticsSink,
-    ManagedStatusRefreshOwner,
-    ManagedStatusRefreshWork,
-)
-from .managed_usage import (
-    ManagedUsageAutoShowFounderLetterProvider,
-    ManagedUsageDisableTranslationSink,
-    ManagedUsageMetadataFetcher,
-    ManagedUsageMetadataResult,
-    ManagedUsageOwner,
-    ManagedUsagePendingSink,
-    ManagedUsageReferralNormalizer,
-    ManagedUsageReleaseServiceProvider,
-    ManagedUsageState,
-    ManagedUsageStateProvider,
-    ManagedUsageViewSink,
-    ManagedUsageViewState,
-    ManagedUsageWarningSink,
-)
-
-__all__ = [
-    "ACK_SOURCE_DISCORD",
-    "ACK_SOURCE_QQ",
-    "DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET",
-    "MANAGED_AUTH_CLAIM_SOURCES",
-    "MANAGED_AUTH_CLAIM_SOURCE_DISCORD",
-    "MANAGED_AUTH_CLAIM_SOURCE_QQ",
     "ManagedAuthClaimGuard",
     "ManagedAuthDiscordExecutor",
     "ManagedAuthExecutionResult",
@@ -129,25 +121,26 @@ __all__ = [
     "ManagedUsageViewSink",
     "ManagedUsageViewState",
     "ManagedUsageWarningSink",
+    "normalize_managed_claim_source",
+    "normalize_managed_claim_sources",
     "OPENROUTER_MANAGED_API_KEY_SECRET",
     "OPENROUTER_MANAGED_QQ_API_KEY_SECRET",
     "OPENROUTER_MANAGED_USER_ID_MAX_LENGTH",
     "OPENROUTER_MANAGED_USER_ID_SECRET",
     "OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET",
+    "pending_ack_metadata_settings_values",
     "QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY",
     "QQ_MANAGED_DELIVERY_ACK_TOKEN_SECRET",
-    "clear_pending_ack_in_settings_values",
-    "local_managed_auth_blocking_source",
-    "managed_auth",
-    "managed_auth_claims",
-    "managed_connection_auth",
-    "managed_key_delivery_ack",
-    "managed_status_refresh",
-    "managed_usage",
-    "normalize_managed_claim_source",
-    "normalize_managed_claim_sources",
-    "pending_ack_metadata_settings_values",
     "record_local_managed_claim_source",
     "secret_key_for_ack_source",
     "store_pending_ack_in_settings_values",
 ]
+
+
+def __getattr__(name: str) -> object:
+    if name in _SUBMODULES:
+        return _import_module(f".{name}", __name__)
+    source = _EXPORT_SOURCES.get(name)
+    if source is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(_import_module(f".{source}", __name__), name)
