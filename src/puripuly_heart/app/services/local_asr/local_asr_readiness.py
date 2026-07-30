@@ -6,17 +6,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Literal
 
-from puripuly_heart.app.services.local_asr_cpu_repair import (
-    LocalASRCpuRepairOwner,
-    LocalASRCpuRepairRequest,
-)
-from puripuly_heart.app.services.local_asr_selection import (
-    LOCAL_CPU_AUTO_PROVIDER,
-    LOCAL_CPU_PROVIDERS,
-    local_asr_status_for_provider,
-    required_local_asr_model_ids,
-    resolve_local_asr_selection,
-)
 from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeChannelSnapshot,
 )
@@ -31,6 +20,18 @@ from puripuly_heart.core.local_stt_assets import (
     LocalSTTModelMissingError,
 )
 from puripuly_heart.core.local_stt_catalog import LocalCPUAutoUnavailableError
+
+from .local_asr_cpu_repair import (
+    LocalASRCpuRepairOwner,
+    LocalASRCpuRepairRequest,
+)
+from .local_asr_selection import (
+    LOCAL_CPU_AUTO_PROVIDER,
+    LOCAL_CPU_PROVIDERS,
+    local_asr_status_for_provider,
+    required_local_asr_model_ids,
+    resolve_local_asr_selection,
+)
 
 
 class LocalASRReadinessEffectType(str, Enum):

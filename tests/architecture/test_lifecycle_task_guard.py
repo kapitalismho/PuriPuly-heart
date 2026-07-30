@@ -457,7 +457,13 @@ def test_order44_local_asr_owner_retires_controller_background_scope() -> None:
         REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
     )
     cpu_repair_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "local_asr_cpu_repair.py"
+        REPO_ROOT
+        / "src"
+        / "puripuly_heart"
+        / "app"
+        / "services"
+        / "local_asr"
+        / "local_asr_cpu_repair.py"
     )
     provisioning_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "local_asr_provisioning.py"
