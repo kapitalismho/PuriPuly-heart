@@ -1360,6 +1360,14 @@
       "rationale": "These non-private modules are classified as implementation support unless an explicit __all__, existing public test import, packaging import, documented entry point, or approved facade appears in public_imports."
     },
     {
+      "surface": "puripuly_heart.core.discord domain grouping package",
+      "classification": "internal_domain_grouping_package",
+      "modules": [
+        "puripuly_heart.core.discord"
+      ],
+      "rationale": "Domain-aligned grouping package that re-exports the moved Discord OAuth modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+    },
+    {
       "surface": "broker source modules",
       "classification": "public_protocol_private_implementation",
       "rationale": "Broker /v1 paths, envelopes, public error codes, and classes are public compatibility; Cloudflare worker internals are not public Python import surfaces."

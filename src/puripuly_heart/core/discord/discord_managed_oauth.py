@@ -5,7 +5,7 @@ import webbrowser
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from puripuly_heart.core.discord_oauth_loopback import DiscordOAuthLoopbackListener
+from .discord_oauth_loopback import DiscordOAuthLoopbackListener
 
 MAX_DISCORD_OAUTH_WAIT_SECONDS = 300.0
 MIN_DISCORD_OAUTH_WAIT_SECONDS = 1.0

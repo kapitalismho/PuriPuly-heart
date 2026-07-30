@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import NoReturn
 from urllib.parse import parse_qs, urlsplit
 
-from puripuly_heart.core.oauth_callback_page import (
+from .oauth_callback_page import (
     render_oauth_callback_completion_page,
     resolve_oauth_callback_locale,
 )
