@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import pytest
 
+from tests.helpers.translation_owners import compose_translation_test_harness
 from tests.integration.helpers import (
     CHUNK_DELAY_S,
     ITERATION_DELAY_S,
@@ -136,7 +137,6 @@ async def test_e2e_latency_5_iterations():
     google_key = require_env("GOOGLE_API_KEY")
 
     from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
-    from puripuly_heart.core.orchestrator.hub import ClientHub
     from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
     from puripuly_heart.core.stt.controller import ManagedSTTProvider
     from puripuly_heart.domain.events import UIEventType
@@ -199,7 +199,7 @@ async def test_e2e_latency_5_iterations():
         system_prompt = system_prompt.replace("${sourceName}", get_llm_language_name(source_lang))
         system_prompt = system_prompt.replace("${targetName}", get_llm_language_name(target_lang))
 
-        hub = ClientHub(
+        harness = compose_translation_test_harness(
             stt=stt,
             llm=llm,
             osc=osc,
@@ -217,7 +217,7 @@ async def test_e2e_latency_5_iterations():
 
         async def track_events():
             while True:
-                event = await next_ui_event(hub.ui_events)
+                event = await next_ui_event(harness.ui_events)
                 if event is None:
                     continue
 
@@ -245,7 +245,7 @@ async def test_e2e_latency_5_iterations():
                 elif event.type == UIEventType.ERROR:
                     print(f"  [ERROR] {event.payload}")
 
-        await hub.start(auto_flush_osc=True)
+        await harness.start(auto_flush_osc=True)
         event_task = asyncio.create_task(track_events())
 
         # Wait for STT session to initialize
@@ -265,7 +265,7 @@ async def test_e2e_latency_5_iterations():
                 pytest.skip("Invalid chunk size for sample rate")
 
             if chunks:
-                await send_vad_events(hub, utterance_id, chunks, chunk_delay_s=CHUNK_DELAY_S)
+                await send_vad_events(harness, utterance_id, chunks, chunk_delay_s=CHUNK_DELAY_S)
 
             metrics.audio_send_end = time.perf_counter()
             print(
@@ -286,7 +286,7 @@ async def test_e2e_latency_5_iterations():
 
         finally:
             event_task.cancel()
-            await hub.stop()
+            await harness.stop()
             await asyncio.gather(event_task, return_exceptions=True)
 
         results.append(metrics)

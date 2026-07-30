@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.ui.i18n import t
 
 OverlayPeerSurfaceState = Literal["off", "starting", "on", "warning"]
@@ -75,6 +76,20 @@ def build_overlay_peer_consumer_contract(
         ),
     )
     return OverlayPeerConsumerContract(overlay=overlay_contract, peer=peer_contract)
+
+
+def build_overlay_peer_consumer_contract_from_state(
+    state: OverlayPeerPresentationState,
+) -> OverlayPeerConsumerContract:
+    return build_overlay_peer_consumer_contract(
+        overlay_intent_enabled=state.overlay_intent_enabled,
+        overlay_state=state.overlay_state,
+        overlay_failure_reason=state.overlay_failure_reason,
+        peer_intent_enabled=state.peer_intent_enabled,
+        peer_effective_enabled=state.peer_effective_enabled,
+        peer_warning_reason=state.peer_warning_reason,
+        peer_activation_starting=state.peer_activation_starting,
+    )
 
 
 def _overlay_surface_state(

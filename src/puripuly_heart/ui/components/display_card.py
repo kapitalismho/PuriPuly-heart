@@ -5,6 +5,11 @@ from typing import Callable
 import flet as ft
 
 from puripuly_heart.ui.components.glow import create_glow_stack
+from puripuly_heart.ui.flet_runtime import (
+    is_control_mounted,
+    run_control_method,
+    update_control_if_mounted,
+)
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL,
@@ -112,10 +117,10 @@ class DisplayCard(ft.Container):
             visible=False,
             bgcolor=COLOR_WARNING,
             border_radius=999,
-            padding=ft.padding.symmetric(horizontal=10, vertical=6),
+            padding=ft.Padding.symmetric(horizontal=10, vertical=6),
         )
         self._notice_action_button = ft.TextButton(
-            text="",
+            content="",
             visible=False,
             height=36,
             on_click=lambda _event: self._run_notice_action(),
@@ -153,8 +158,8 @@ class DisplayCard(ft.Container):
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 vertical_alignment=ft.CrossAxisAlignment.START,
             ),
-            alignment=ft.alignment.top_left,
-            padding=ft.padding.only(left=8),
+            alignment=ft.Alignment.TOP_LEFT,
+            padding=ft.Padding.only(left=8),
             expand=True,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
         )
@@ -162,13 +167,13 @@ class DisplayCard(ft.Container):
             [
                 ft.Container(
                     content=ft.Divider(height=1, color=ft.Colors.with_opacity(0.2, COLOR_NEUTRAL)),
-                    padding=ft.padding.only(bottom=4),
+                    padding=ft.Padding.only(bottom=4),
                 ),
                 ft.Row(
                     [
                         ft.Container(
                             content=ft.Text("•", size=36, color="#FFADAC"),
-                            padding=ft.padding.only(right=8),
+                            padding=ft.Padding.only(right=8),
                         ),
                         self._input_field,
                     ],
@@ -196,7 +201,7 @@ class DisplayCard(ft.Container):
             content=content_with_glow,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
-            border=ft.border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
             expand=True,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
             shadow=get_card_shadow(),
@@ -209,7 +214,7 @@ class DisplayCard(ft.Container):
             self._on_submit(text)
             e.control.value = ""
             e.control.update()
-            e.control.focus()
+            run_control_method(e.control, "focus")
 
     def _handle_input_change(self, e) -> None:
         self._emit_input_activity(bool((e.control.value or "").strip()))
@@ -231,7 +236,7 @@ class DisplayCard(ft.Container):
             self._on_input_activity(bool(has_text))
 
     def focus_input(self) -> None:
-        self._input_field.focus()
+        run_control_method(self._input_field, "focus")
 
     def set_display(
         self,
@@ -339,13 +344,12 @@ class DisplayCard(ft.Container):
         self._notice_tone = tone if self._notice_value else None
         self._notice_yields_to_content = bool(yields_to_content) if self._notice_value else False
         self._notice_action = on_action if self._notice_value and action_label else None
-        self._notice_action_button.text = action_label or ""
+        self._notice_action_button.content = action_label or ""
         self._notice_action_button.visible = self._notice_action is not None
         self._notice_text.value = ""
         self._notice_chip.visible = False
         self._sync_display()
-        if self._notice_action_button.page is not None:
-            self._notice_action_button.update()
+        update_control_if_mounted(self._notice_action_button)
 
     def _run_notice_action(self) -> None:
         action = self._notice_action
@@ -362,8 +366,7 @@ class DisplayCard(ft.Container):
         final_font = font_family if font_family else ""
         self._input_field.text_style = ft.TextStyle(font_family=final_font)
         # Hint style is now managed separately by apply_locale (using UI font)
-        if self._input_field.page is not None:
-            self._input_field.update()
+        update_control_if_mounted(self._input_field)
 
     def apply_locale(
         self,
@@ -382,8 +385,8 @@ class DisplayCard(ft.Container):
 
         if input_font_family is not None:
             self.set_input_font(input_font_family)
-        elif self._input_field.page is not None:
-            self._input_field.update()
+        else:
+            update_control_if_mounted(self._input_field)
         if self._showing_status:
             self._primary_value = _status_label(self._status)
             self._primary_font_family = display_font_family
@@ -522,15 +525,15 @@ class DisplayCard(ft.Container):
         self._display_secondary.color = text_color
         self._display_secondary.font_family = self._secondary_font_family
 
-        primary_update_issued = self._display_primary.page is not None
-        secondary_update_issued = self._display_secondary.page is not None
+        primary_update_issued = is_control_mounted(self._display_primary)
+        secondary_update_issued = is_control_mounted(self._display_secondary)
 
         flet_update_elapsed_us: int | None = None
         start_ns = time.perf_counter_ns() if measure_flet_update else 0
 
-        if self._display_primary.page is not None:
+        if primary_update_issued:
             self._display_primary.update()
-        if self._display_secondary.page is not None:
+        if secondary_update_issued:
             self._display_secondary.update()
 
         if measure_flet_update:

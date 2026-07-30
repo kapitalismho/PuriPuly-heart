@@ -38,6 +38,12 @@ DEBUG_PREVIEW_I18N_KEYS = {
     "debug_preview.stt_loading_button_cycle",
     "debug_preview.audio_fault_clear",
     "debug_preview.gpu_state_cycle",
+    "debug_preview.foundation_primitives",
+    "foundation.preview.title",
+    "foundation.preview.body",
+    "foundation.preview.ready",
+    "foundation.preview.action",
+    "foundation.preview.unavailable",
     "debug_preview.capture_fault_snackbar",
     "debug_preview.stt_fault_snackbar",
     "peer_translation_eula.body",
@@ -66,6 +72,7 @@ ACTION_KEYS = [
     "audio_fault_clear",
     "gpu_state_cycle",
     "stt_loading_button_cycle",
+    "foundation_primitives",
 ]
 
 
@@ -91,13 +98,12 @@ def _callbacks(seen: list[str]):
         "on_stt_fault_cycle": lambda: seen.append("stt_fault_cycle"),
         "on_audio_fault_clear": lambda: seen.append("audio_fault_clear"),
         "on_gpu_state_cycle": lambda: seen.append("gpu_state_cycle"),
+        "on_foundation_primitives": lambda: seen.append("foundation_primitives"),
         "on_stt_loading_button_cycle": lambda: seen.append("stt_loading_button_cycle"),
     }
 
 
 def _button_label(button) -> str:
-    if hasattr(button, "text"):
-        return button.text
     return button.content
 
 
@@ -196,23 +202,23 @@ def test_debug_preview_panel_apply_locale_refreshes_labels(
     )
 
 
-def test_debug_preview_panel_uses_text_button_label_api_when_available(
+def test_debug_preview_panel_uses_flet_086_text_button_content_api(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     created: list[object] = []
 
-    class TextOnlyButton:
-        def __init__(self, *, text, tooltip=None, on_click=None, style=None) -> None:
-            self.text = text
+    class ContentOnlyButton:
+        def __init__(self, *, content, tooltip=None, on_click=None, style=None) -> None:
+            self.content = content
             self.tooltip = tooltip
             self.on_click = on_click
             self.style = style
             created.append(self)
 
-    monkeypatch.setattr(panel_module.ft, "TextButton", TextOnlyButton)
+    monkeypatch.setattr(panel_module.ft, "TextButton", ContentOnlyButton)
     panel = DebugPreviewPanel(**_callbacks([]))
 
-    assert [button.text for button in created] == [
+    assert [button.content for button in created] == [
         "DBG",
         "Brake notice",
         "Revoked notice",
@@ -233,37 +239,38 @@ def test_debug_preview_panel_uses_text_button_label_api_when_available(
         "Clear audio faults",
         "Cycle GPU state",
         "Cycle STT loading button",
+        "Foundation primitives",
     ]
 
     monkeypatch.setattr(panel_module, "t", lambda key: f"label:{key}")
     panel.apply_locale()
 
-    assert panel._toggle_button.text == "label:debug_preview.button"
-    assert panel._action_buttons["brake_notice"].text == "label:debug_preview.brake_notice"
-    assert panel._action_buttons["discord_auth"].text == "label:debug_preview.discord_auth"
-    assert panel._action_buttons["qq_auth"].text == "label:debug_preview.qq_auth"
+    assert panel._toggle_button.content == "label:debug_preview.button"
+    assert panel._action_buttons["brake_notice"].content == "label:debug_preview.brake_notice"
+    assert panel._action_buttons["discord_auth"].content == "label:debug_preview.discord_auth"
+    assert panel._action_buttons["qq_auth"].content == "label:debug_preview.qq_auth"
     assert (
-        panel._action_buttons["qq_auth_recoverable_error"].text
+        panel._action_buttons["qq_auth_recoverable_error"].content
         == "label:debug_preview.qq_auth_recoverable_error"
     )
     assert (
-        panel._action_buttons["qq_auth_translation_gated"].text
+        panel._action_buttons["qq_auth_translation_gated"].content
         == "label:debug_preview.qq_auth_translation_gated"
     )
     assert (
-        panel._action_buttons["discord_callback_page"].text
+        panel._action_buttons["discord_callback_page"].content
         == "label:debug_preview.discord_callback_page"
     )
     assert (
-        panel._action_buttons["peer_translation_eula"].text
+        panel._action_buttons["peer_translation_eula"].content
         == "label:debug_preview.peer_translation_eula"
     )
     assert (
-        panel._action_buttons["local_qwen_hallucination_modal"].text
+        panel._action_buttons["local_qwen_hallucination_modal"].content
         == "label:debug_preview.local_qwen_hallucination_modal"
     )
     assert (
-        panel._action_buttons["talk_together_pass_invite_progress"].text
+        panel._action_buttons["talk_together_pass_invite_progress"].content
         == "label:debug_preview.talk_together_pass_invite_progress"
     )
 

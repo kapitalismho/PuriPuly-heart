@@ -1,20 +1,81 @@
 from __future__ import annotations
 
+import re
+import sys
+import tomllib
+from importlib.metadata import version
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 pytest.importorskip("flet")
 
+import flet as ft
+
 from puripuly_heart.ui.components.settings import api_key_field as api_key_field_module
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import DummyPage, attach_dummy_page
 
+ROOT = Path(__file__).resolve().parents[2]
+FLET_VERSION = "0.86.1"
 
-def test_api_key_field_uses_legacy_icon_name_api(monkeypatch: pytest.MonkeyPatch) -> None:
+
+def test_flet_runtime_and_lock_use_one_exact_0861_protocol() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    dependencies = pyproject["project"]["dependencies"]
+    build_dependencies = pyproject["project"]["optional-dependencies"]["build"]
+    lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
+    locked_versions = {
+        package["name"]: package["version"]
+        for package in lock["package"]
+        if package["name"] in {"flet", "flet-desktop", "flet-cli"}
+    }
+
+    assert f"flet=={FLET_VERSION}" in dependencies
+    assert f"flet-desktop=={FLET_VERSION}" in dependencies
+    assert f"flet-cli=={FLET_VERSION}" in build_dependencies
+    assert locked_versions == {
+        "flet": FLET_VERSION,
+        "flet-cli": FLET_VERSION,
+        "flet-desktop": FLET_VERSION,
+    }
+    assert version("flet") == FLET_VERSION
+    assert version("flet-desktop") == FLET_VERSION
+
+
+def test_gate_a_windows_runtime_uses_python_312() -> None:
+    if sys.platform != "win32":
+        pytest.skip("Gate A runtime version is verified on Windows")
+    assert sys.version_info[:2] == (3, 12)
+
+
+def test_ui_uses_flet_0861_dialog_api() -> None:
+    assert hasattr(ft.Page, "show_dialog")
+    assert hasattr(ft.Page, "pop_dialog")
+    assert not hasattr(ft.Page, "open")
+    assert not hasattr(ft.Page, "close")
+
+    removed_api = re.compile(
+        r"(?:\bpage|self\.page|self\._page)\.(?:open|close)\(|"
+        r"getattr\((?:self\.)?_?page,\s*[\"'](?:open|close)[\"']"
+    )
+    violations = []
+    for path in sorted((ROOT / "src" / "puripuly_heart" / "ui").rglob("*.py")):
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(),
+            start=1,
+        ):
+            if removed_api.search(line):
+                violations.append(f"{path.relative_to(ROOT)}:{line_number}:{line.strip()}")
+
+    assert violations == []
+
+
+def test_api_key_field_uses_flet_086_icon_api(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeIcon:
-        def __init__(self, *, name, color, size, tooltip):
-            self.name = name
+        def __init__(self, *, icon, color, size, tooltip):
+            self.icon = icon
             self.color = color
             self.size = size
             self.tooltip = tooltip
@@ -53,42 +114,44 @@ def test_api_key_field_uses_legacy_icon_name_api(monkeypatch: pytest.MonkeyPatch
     )
     field._set_status("success")
 
-    assert field._status_icon.name == api_key_field_module.icons.CHECK_CIRCLE_ROUNDED
+    assert field._status_icon.icon == api_key_field_module.icons.CHECK_CIRCLE_ROUNDED
 
 
-def test_make_text_button_uses_legacy_text_argument(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_make_text_button_uses_flet_086_content_argument(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     seen: dict[str, object] = {}
 
     class FakeTextButton:
-        def __init__(self, *, text, **kwargs):
-            seen["text"] = text
+        def __init__(self, *, content, **kwargs):
+            seen["content"] = content
             seen["kwargs"] = kwargs
-            self.text = text
+            self.content = content
 
     monkeypatch.setattr(settings_view.ft, "TextButton", FakeTextButton)
 
     button = settings_view._make_text_button("Gemma 4", style="style")
 
-    assert seen["text"] == "Gemma 4"
+    assert seen["content"] == "Gemma 4"
     assert seen["kwargs"] == {"style": "style"}
-    assert button.text == "Gemma 4"
+    assert button.content == "Gemma 4"
 
 
-def test_set_text_button_label_uses_legacy_text_property_only() -> None:
+def test_set_text_button_label_uses_flet_086_content_property() -> None:
     class FakeButton:
-        __slots__ = ("text",)
+        __slots__ = ("content",)
 
         def __init__(self) -> None:
-            self.text = ""
+            self.content = ""
 
     button = FakeButton()
 
     settings_view._set_text_button_label(button, "Managed")
 
-    assert button.text == "Managed"
+    assert button.content == "Managed"
 
 
-def test_make_overlay_anchor_dropdown_uses_legacy_on_change(
+def test_make_overlay_anchor_dropdown_uses_flet_086_on_select(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: dict[str, object] = {}
@@ -109,8 +172,8 @@ def test_make_overlay_anchor_dropdown_uses_legacy_on_change(
     settings_view._make_overlay_anchor_dropdown("center", on_change)
 
     assert seen["value"] == "center"
-    assert seen["on_change"] is on_change
-    assert "on_select" not in seen
+    assert seen["on_select"] is on_change
+    assert "on_change" not in seen
     assert len(seen["options"]) == len(settings_view.OVERLAY_CALIBRATION_ANCHORS)
 
 
@@ -149,8 +212,8 @@ def test_attach_dummy_page_uses_explicit_dummy_page(monkeypatch: pytest.MonkeyPa
     page = DummyPage()
 
     returned = attach_dummy_page(monkeypatch, control, page)
-    returned.open("dialog")
-    returned.close("dialog")
+    returned.show_dialog("dialog")
+    returned.pop_dialog()
 
     assert returned is page
     assert control.page is page

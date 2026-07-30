@@ -48,7 +48,7 @@ class LocalQwenHallucinationDialog:
     def close(self) -> None:
         if self._dialog is None:
             return
-        self._page.close(self._dialog)
+        self._page.pop_dialog()
 
     def _on_open_guide(self) -> None:
         self._on_open_guide_callback()

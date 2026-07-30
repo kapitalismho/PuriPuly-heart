@@ -31,13 +31,16 @@ class FakePage:
         self.dialog = None
         self.closed: list[object] = []
 
-    def open(self, dialog) -> None:
+    def show_dialog(self, dialog) -> None:
         self.dialog = dialog
 
-    def close(self, dialog) -> None:
+    def pop_dialog(self):
+        dialog = self.dialog
+        if dialog is None:
+            return None
         self.closed.append(dialog)
-        if self.dialog is dialog:
-            self.dialog = None
+        self.dialog = None
+        return dialog
 
 
 def _open_founder_letter(monkeypatch: pytest.MonkeyPatch) -> tuple[FakePage, list[str]]:
@@ -90,13 +93,12 @@ def _first_nested_column(page: FakePage):
 
 
 def _button_vertical_padding(button) -> tuple[int, int]:
-    padding = next(iter(button.style.padding.values()))
+    padding = button.style.padding
     return padding.top, padding.bottom
 
 
 def _button_text_size(button) -> int:
-    text_style = next(iter(button.style.text_style.values()))
-    return text_style.size
+    return button.style.text_style.size
 
 
 def _button_color(button, state: ft.ControlState) -> str:
@@ -225,7 +227,7 @@ def test_warm_document_dialog_supports_three_ordered_actions_with_close_policy()
 
     assert action_row is result.action_row
     assert result.initial_action_buttons == tuple(action_row.controls)
-    assert [button.text for button in action_row.controls] == ["BYOK", "Close", "Continue"]
+    assert [button.content for button in action_row.controls] == ["BYOK", "Close", "Continue"]
     assert [button.__class__.__name__ for button in action_row.controls] == [
         "TextButton",
         "TextButton",
@@ -293,7 +295,7 @@ def test_warm_document_dialog_can_replace_actions_with_shared_style() -> None:
 
     assert replacement_buttons == tuple(result.action_row.controls)
     assert result.action_row.controls == list(replacement_buttons)
-    assert [button.text for button in result.action_row.controls] == ["Cancel"]
+    assert [button.content for button in result.action_row.controls] == ["Cancel"]
     assert result.action_row.controls[0].style.color[ft.ControlState.DEFAULT] == COLOR_NEUTRAL_DARK
     assert result.action_row.controls[0].style.color[ft.ControlState.HOVERED] == COLOR_PRIMARY
     assert result.action_row.controls[0].style.animation_duration == 0

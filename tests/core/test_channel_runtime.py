@@ -11,8 +11,8 @@ from puripuly_heart.core.orchestrator.channel_runtime import (
     ContextEntry,
     _MergeBuffer,
 )
-from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.domain.models import Transcript
+from tests.helpers.translation_owners import compose_translation_test_harness
 
 
 @dataclass
@@ -63,35 +63,38 @@ def test_channel_runtime_keeps_merge_and_history_separate_per_channel() -> None:
     assert peer_runtime.merge_buffer.parts == ["peer part"]
 
 
-def test_client_hub_owns_fixed_self_and_peer_runtimes_while_self_path_stays_stable() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=FakeOscQueue())
+def test_translation_fixture_uses_fixed_self_and_peer_owner_runtimes() -> None:
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=FakeOscQueue())
 
-    assert hub.self_runtime.channel == "self"
-    assert hub.peer_runtime.channel == "peer"
-    assert hub.active_chatbox_channel == "self"
-    assert hub._translation_history is hub.self_runtime.translation_history
-    assert hub._translation_tasks is hub.self_runtime.translation_tasks
+    assert harness.self_runtime.channel == "self"
+    assert harness.peer_runtime.channel == "peer"
+    assert harness.self_owner.runtime is harness.self_runtime
+    assert harness.peer_owner.runtime is harness.peer_runtime
+    assert harness.self_owner.translation_requests is harness.translation_requests
+    assert harness.peer_owner.translation_requests is harness.translation_requests
+    assert harness.translation_requests.self_runtime is harness.self_runtime
+    assert harness.translation_requests.peer_runtime is harness.peer_runtime
 
 
-def test_self_runtime_reassignment_updates_hub_aliases() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=FakeOscQueue())
+def test_self_runtime_state_is_visible_through_the_self_owner() -> None:
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=FakeOscQueue())
     buffer = _MergeBuffer(merge_id=uuid4())
 
-    hub.self_runtime.merge_buffer = buffer
+    harness.self_runtime.merge_buffer = buffer
 
-    assert hub._merge_buffer is buffer
+    assert harness.self_owner.merge_buffer is buffer
 
 
 @pytest.mark.asyncio
 async def test_peer_transcript_stays_in_peer_runtime() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=FakeOscQueue())
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=FakeOscQueue())
     transcript = Transcript(utterance_id=uuid4(), text="peer text", is_final=True, channel="peer")
 
-    await hub._handle_transcript(transcript, is_final=True, source="Peer")
+    await harness.dispatch_transcript(transcript, is_final=True, source="Peer")
 
-    assert transcript.utterance_id not in hub.self_runtime.utterances
-    assert transcript.utterance_id in hub.peer_runtime.utterances
-    assert hub.peer_runtime.get_source(transcript.utterance_id) == "Peer"
+    assert transcript.utterance_id not in harness.self_runtime.utterances
+    assert transcript.utterance_id in harness.peer_runtime.utterances
+    assert harness.peer_runtime.get_source(transcript.utterance_id) == "Peer"
 
 
 @pytest.mark.asyncio
@@ -231,7 +234,7 @@ async def test_clear_live_translation_state_clears_standalone_translation_latenc
 
 @pytest.mark.asyncio
 async def test_reset_runtime_state_clears_both_channel_runtimes() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=FakeOscQueue())
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=FakeOscQueue())
     self_id = uuid4()
     peer_id = uuid4()
     self_task = asyncio.create_task(asyncio.sleep(60.0))
@@ -239,22 +242,22 @@ async def test_reset_runtime_state_clears_both_channel_runtimes() -> None:
     self_stt_task = asyncio.create_task(asyncio.sleep(60.0))
     peer_stt_task = asyncio.create_task(asyncio.sleep(60.0))
 
-    hub.self_runtime.stt_task = self_stt_task
-    hub.peer_runtime.stt_task = peer_stt_task
+    harness.self_runtime.stt_task = self_stt_task
+    harness.peer_runtime.stt_task = peer_stt_task
 
-    hub.self_runtime.translation_tasks[self_id] = self_task
-    hub.peer_runtime.translation_tasks[peer_id] = peer_task
-    hub.self_runtime.get_or_create_bundle(self_id)
-    hub.peer_runtime.get_or_create_bundle(peer_id)
-    hub.self_runtime.utterance_sources[self_id] = "Mic"
-    hub.peer_runtime.utterance_sources[peer_id] = "Peer"
-    hub.self_runtime.utterance_start_times[self_id] = 1.0
-    hub.peer_runtime.utterance_start_times[peer_id] = 2.0
-    hub.self_runtime.speech_ended_ids.add(self_id)
-    hub.peer_runtime.speech_ended_ids.add(peer_id)
-    hub.self_runtime.merge_buffer = _MergeBuffer(merge_id=uuid4(), utterance_ids=[self_id])
-    hub.peer_runtime.merge_buffer = _MergeBuffer(merge_id=uuid4(), utterance_ids=[peer_id])
-    hub.self_runtime.translation_history.append(
+    harness.self_runtime.translation_tasks[self_id] = self_task
+    harness.peer_runtime.translation_tasks[peer_id] = peer_task
+    harness.self_runtime.get_or_create_bundle(self_id)
+    harness.peer_runtime.get_or_create_bundle(peer_id)
+    harness.self_runtime.utterance_sources[self_id] = "Mic"
+    harness.peer_runtime.utterance_sources[peer_id] = "Peer"
+    harness.self_runtime.utterance_start_times[self_id] = 1.0
+    harness.peer_runtime.utterance_start_times[peer_id] = 2.0
+    harness.self_runtime.speech_ended_ids.add(self_id)
+    harness.peer_runtime.speech_ended_ids.add(peer_id)
+    harness.self_runtime.merge_buffer = _MergeBuffer(merge_id=uuid4(), utterance_ids=[self_id])
+    harness.peer_runtime.merge_buffer = _MergeBuffer(merge_id=uuid4(), utterance_ids=[peer_id])
+    harness.self_runtime.translation_history.append(
         ContextEntry(
             text="self line",
             source_language="en",
@@ -263,7 +266,7 @@ async def test_reset_runtime_state_clears_both_channel_runtimes() -> None:
             channel="self",
         )
     )
-    hub.peer_runtime.translation_history.append(
+    harness.peer_runtime.translation_history.append(
         ContextEntry(
             text="peer line",
             source_language="en",
@@ -274,25 +277,25 @@ async def test_reset_runtime_state_clears_both_channel_runtimes() -> None:
     )
 
     try:
-        await hub._reset_stt_runtime_state()
+        await harness.reset_runtime_state()
 
-        assert hub.self_runtime.translation_tasks == {}
-        assert hub.peer_runtime.translation_tasks == {}
-        assert hub.self_runtime.utterances == {}
-        assert hub.peer_runtime.utterances == {}
-        assert hub.self_runtime.utterance_sources == {}
-        assert hub.peer_runtime.utterance_sources == {}
-        assert hub.self_runtime.utterance_start_times == {}
-        assert hub.peer_runtime.utterance_start_times == {}
-        assert hub.self_runtime.speech_ended_ids == set()
-        assert hub.peer_runtime.speech_ended_ids == set()
-        assert hub.self_runtime.merge_buffer is None
-        assert hub.peer_runtime.merge_buffer is None
-        assert hub.self_runtime.translation_history == []
-        assert hub.peer_runtime.translation_history == []
-        assert hub.self_runtime.stt_task is None
-        assert hub.peer_runtime.stt_task is None
-        assert hub._stt_task is None
+        assert harness.self_runtime.translation_tasks == {}
+        assert harness.peer_runtime.translation_tasks == {}
+        assert harness.self_runtime.utterances == {}
+        assert harness.peer_runtime.utterances == {}
+        assert harness.self_runtime.utterance_sources == {}
+        assert harness.peer_runtime.utterance_sources == {}
+        assert harness.self_runtime.utterance_start_times == {}
+        assert harness.peer_runtime.utterance_start_times == {}
+        assert harness.self_runtime.speech_ended_ids == set()
+        assert harness.peer_runtime.speech_ended_ids == set()
+        assert harness.self_runtime.merge_buffer is None
+        assert harness.peer_runtime.merge_buffer is None
+        assert harness.self_runtime.translation_history == []
+        assert harness.peer_runtime.translation_history == []
+        assert harness.self_runtime.stt_task is None
+        assert harness.peer_runtime.stt_task is None
+        assert harness.self_runtime.stt_task is None
     finally:
         for task in (self_task, peer_task, self_stt_task, peer_stt_task):
             if not task.done():

@@ -6,7 +6,10 @@ from importlib import resources
 import flet as ft
 
 from puripuly_heart import __version__
+from puripuly_heart.ui.about.contract import AboutSurfaceSlots
+from puripuly_heart.ui.about.renderer import compose_about_surface
 from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
+from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
@@ -16,7 +19,7 @@ from puripuly_heart.ui.theme import (
     COLOR_SURFACE,
 )
 
-_CENTER_ALIGNMENT = ft.alignment.Alignment(0, 0)
+_CENTER_ALIGNMENT = ft.Alignment(0, 0)
 
 
 def _load_third_party_notices() -> str:
@@ -49,35 +52,21 @@ class AboutView(ft.Column):
 
     def _build_ui(self):
         """Build the About page UI."""
-        # First row: Credits + Inspired By (50/50 split, taller like 2 rows)
-        top_row = ft.Container(
-            content=ft.Row(
-                controls=[
-                    ft.Container(
-                        content=self._build_credits_card(),
-                        expand=True,
-                    ),
-                    ft.Container(
-                        content=self._build_inspired_by_card(),
-                        expand=True,
-                    ),
-                ],
-                spacing=16,
-                expand=True,
-            ),
+        regions = compose_about_surface(
+            AboutSurfaceSlots(
+                app_name_card=self._build_app_name_card(),
+                version_card=self._build_version_card(),
+                credits_card=self._build_credits_card(),
+                inspired_by_card=self._build_inspired_by_card(),
+                special_thanks_card=self._build_special_thanks_card(),
+                licenses_card=self._build_licenses_card(),
+            )
         )
+        self.controls = list(regions.controls)
 
-        self.controls = [
-            self._build_header(),
-            top_row,
-            self._build_special_thanks_card(),
-            self._build_licenses_card(),
-        ]
-
-    def _build_header(self) -> ft.Control:
-        """Build app name and version header as two separate cards."""
-        # Left card: App name
-        app_name_card = self._wrap_card(
+    def _build_app_name_card(self) -> ft.Control:
+        """Build the app name card."""
+        return self._wrap_card(
             ft.Container(
                 content=ft.Text(
                     t("app.title"),
@@ -89,8 +78,8 @@ class AboutView(ft.Column):
             )
         )
 
-        # Right card: Version (clickable, opens git repo)
-        # Same structure as settings view 1x1 boxes
+    def _build_version_card(self) -> ft.Control:
+        """Build the clickable version card that opens the git repository."""
         version_title = ft.Text(
             t("about.version"),
             size=24,
@@ -109,20 +98,7 @@ class AboutView(ft.Column):
             on_click=lambda _: webbrowser.open("https://github.com/kapitalismho/PuriPuly-heart"),
             on_hover=self._on_version_hover,
         )
-        version_card = self._wrap_card(
-            ft.Column([version_title, version_text], spacing=0, expand=True)
-        )
-
-        return ft.Container(
-            content=ft.Row(
-                controls=[
-                    ft.Container(content=app_name_card, expand=True),
-                    ft.Container(content=version_card, expand=True),
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
+        return self._wrap_card(ft.Column([version_title, version_text], spacing=0, expand=True))
 
     def _build_credits_card(self) -> ft.Control:
         """Build credits section with profile picture."""
@@ -134,7 +110,7 @@ class AboutView(ft.Column):
                     src=profile_path,
                     width=160,
                     height=160,
-                    fit=ft.ImageFit.COVER,
+                    fit=ft.BoxFit.COVER,
                     border_radius=100,
                 )
                 if profile_path
@@ -300,7 +276,7 @@ class AboutView(ft.Column):
                         selectable=True,
                     ),
                     width=float("inf"),
-                    border=ft.border.all(1, COLOR_DIVIDER),
+                    border=ft.Border.all(1, COLOR_DIVIDER),
                     border_radius=12,
                     padding=16,
                     bgcolor=COLOR_SURFACE,
@@ -324,25 +300,25 @@ class AboutView(ft.Column):
     def _on_name_hover(self, e):
         """Handle hover on name link."""
         text = e.control.content
-        text.color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+        text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         text.update()
 
     def _on_link_hover(self, e):
         """Handle hover on project links."""
         text = e.control.content
-        text.color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+        text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         text.update()
 
     def _on_version_hover(self, e):
         """Handle hover on version link."""
         text = e.control.content
-        text.color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+        text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         text.update()
 
     def _on_thanks_hover(self, e):
         """Handle hover on thanks text."""
         text = e.control.content
-        text.color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+        text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         text.update()
 
     def apply_locale(self) -> None:

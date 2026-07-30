@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import ast
 import hashlib
 import importlib
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -19,18 +17,6 @@ RAW_PREVIOUS_SECRET = "sk-test-order26-previous-secret-must-not-leak"
 RAW_RESTORE_DIAGNOSTIC = "sk-test-order26-restore-diagnostic-must-not-leak"
 RAW_VERIFY_SECRET = "sk-test-order27-verify-secret-must-not-leak"
 RAW_VERIFY_KEY_MATERIAL = "sk-order27-material-must-not-leak"
-
-FORBIDDEN_SERVICE_IMPORT_PREFIXES = (
-    "flet",
-    "keyring",
-    "puripuly_heart.app.adapters",
-    "puripuly_heart.app.wiring",
-    "puripuly_heart.config.settings",
-    "puripuly_heart.config.settings_vnext",
-    "puripuly_heart.core.storage",
-    "puripuly_heart.providers",
-    "puripuly_heart.ui",
-)
 
 
 class RecordingSecretStore:
@@ -443,29 +429,6 @@ def _assert_secret_snapshot_matches(
         expected_value,
         label=f"{label} value",
     )
-
-
-def _imported_modules(module_file: str) -> set[str]:
-    tree = ast.parse(Path(module_file).read_text(encoding="utf-8"))
-    imported: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imported.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imported.add(node.module)
-    return imported
-
-
-def test_secret_settings_transaction_service_has_no_ui_or_concrete_store_imports() -> None:
-    module = _service_module()
-    imports = _imported_modules(module.__file__ or "")
-
-    assert not {
-        imported
-        for imported in imports
-        for forbidden in FORBIDDEN_SERVICE_IMPORT_PREFIXES
-        if imported == forbidden or imported.startswith(f"{forbidden}.")
-    }
 
 
 @pytest.mark.asyncio

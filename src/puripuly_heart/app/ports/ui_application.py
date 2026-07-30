@@ -7,6 +7,12 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.ui_models import (
+    GpuNoticeAction,
+    OverlayPeerPresentationState,
+)
+from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
+from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
@@ -26,6 +32,19 @@ class UiApplicationState:
     overlay_target: str | None
     desktop_overlay_captions_locked: bool
     managed_auth_referral_bonus_applied: bool
+    translation_runtime_ready: bool | None = None
+
+
+class UiApplicationFactoryPort(Protocol):
+    def __call__(
+        self,
+        *,
+        presentation: UiPresentationPort,
+        config_path: Path,
+        allow_stable_settings_import: bool = False,
+        runtime_logging_sinks: object | None = None,
+        vrchat_osc_presence: VrchatOscPresencePort | None = None,
+    ) -> UiApplicationPort: ...
 
 
 class UiApplicationPort(Protocol):
@@ -40,9 +59,12 @@ class UiApplicationPort(Protocol):
 
     async def stop(self) -> None: ...
 
-    def application_shutdown_callbacks(self) -> Sequence[ApplicationShutdownCallback]: ...
+    def application_lifecycle(self) -> ApplicationShutdownCoordinator: ...
 
-    def bind_application_lifecycle(self, lifecycle: ApplicationShutdownCoordinator) -> None: ...
+    def register_application_shutdown_callbacks(
+        self,
+        callbacks: Sequence[ApplicationShutdownCallback],
+    ) -> None: ...
 
     def emit_application_shutdown_diagnostic(
         self,
@@ -65,7 +87,7 @@ class UiApplicationPort(Protocol):
 
     async def set_overlay_enabled(self, enabled: bool) -> object: ...
 
-    async def retry_peer_process_capture(self) -> None: ...
+    async def retry_peer_process_capture(self) -> bool: ...
 
     async def apply_loopback_capture_option(self, value: str) -> None: ...
 
@@ -87,6 +109,14 @@ class UiApplicationPort(Protocol):
     def capture_settings_view_change(self, settings: Any) -> object: ...
 
     def merge_settings_view_change_with_current(self, captured: object) -> Any: ...
+
+    def refresh_settings_projection(
+        self,
+        *,
+        preserve_custom_vocab_draft: bool = False,
+    ) -> bool: ...
+
+    def refresh_settings_after_openrouter_pkce_success(self) -> bool: ...
 
     def merge_settings_tab_apply_with_current_languages(self, settings: Any) -> Any: ...
 
@@ -127,7 +157,7 @@ class UiApplicationPort(Protocol):
 
     def cancel_overlay_calibration(self) -> object: ...
 
-    def build_overlay_peer_consumer_contract(self) -> object | None: ...
+    def overlay_peer_presentation_state(self) -> OverlayPeerPresentationState | None: ...
 
     def dashboard_managed_auth_action(self) -> str: ...
 
@@ -242,7 +272,7 @@ class UiApplicationPort(Protocol):
 
     def clear_debug_audio_fault_profiles(self) -> None: ...
 
-    def handle_gpu_notice_action(self) -> object: ...
+    def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object: ...
 
 
 __all__ = ["UiApplicationPort", "UiApplicationState"]

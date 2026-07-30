@@ -221,6 +221,13 @@ LAYER_RULES = (
         prefixes=(
             "puripuly_heart.app.services.canonical_settings_persistence",
             "puripuly_heart.app.services.capture_target_settings",
+            "puripuly_heart.app.services.github_star_prompt_settings",
+            "puripuly_heart.app.services.manual_local_asr_fallback",
+            "puripuly_heart.app.services.openrouter_pkce_flow",
+            "puripuly_heart.app.services.peer_capture_target_application",
+            "puripuly_heart.app.services.provider_settings",
+            "puripuly_heart.app.services.settings_application",
+            "puripuly_heart.app.services.settings_runtime_effects",
         ),
         forbidden_layers=frozenset(
             {
@@ -331,6 +338,7 @@ LAYER_RULES = (
 
 EXTERNAL_MODULE_LAYERS = {
     "flet": UI_ADAPTERS_RENDERERS,
+    "keyring": ADAPTERS,
 }
 
 KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
@@ -417,15 +425,7 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
         ),
         ImportViolation(
             rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.app.wiring",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
+            importer="src/puripuly_heart/ui/desktop_overlay.py",
             imported="puripuly_heart.config.settings",
             importer_layer="UI adapters/renderers",
             imported_layer="migration/serialization",
@@ -433,47 +433,15 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
         ),
         ImportViolation(
             rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.managed_openrouter_broker_client",
+            importer="src/puripuly_heart/ui/desktop_overlay_surface/contract.py",
+            imported="puripuly_heart.config.settings",
             importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
+            imported_layer="migration/serialization",
             reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
         ),
         ImportViolation(
             rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.chatbox_paginator",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.receiver",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.udp_sender",
-            importer_layer="UI adapters/renderers",
-            imported_layer="adapters",
-            reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
-        ),
-        ImportViolation(
-            rule_id="ui-adapters-avoid-provider-construction",
-            importer="src/puripuly_heart/ui/desktop_overlay.py",
+            importer="src/puripuly_heart/ui/desktop_overlay_surface/renderer.py",
             imported="puripuly_heart.config.settings",
             importer_layer="UI adapters/renderers",
             imported_layer="migration/serialization",
@@ -526,9 +494,24 @@ SETTINGS_PERSISTENCE_COMPOSITION_PATHS = frozenset(
 SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
     {
         "src/puripuly_heart/app/services/settings_mutation_legacy.py",
+        "src/puripuly_heart/app/services/github_star_prompt_settings.py",
+        "src/puripuly_heart/app/services/manual_local_asr_fallback.py",
+        "src/puripuly_heart/app/services/openrouter_pkce_flow.py",
+        "src/puripuly_heart/app/services/peer_capture_target_application.py",
+        "src/puripuly_heart/app/services/provider_settings.py",
+        "src/puripuly_heart/app/services/settings_application.py",
+        "src/puripuly_heart/app/services/settings_runtime_effects.py",
         "src/puripuly_heart/app/wiring_llm_factory.py",
+        "src/puripuly_heart/app/wiring_capture_runtime.py",
+        "src/puripuly_heart/app/wiring_local_asr_application.py",
         "src/puripuly_heart/app/wiring_managed_auth_factory.py",
+        "src/puripuly_heart/app/wiring_managed_account.py",
+        "src/puripuly_heart/app/wiring_microphone_test.py",
         "src/puripuly_heart/app/wiring_overlay_factory.py",
+        "src/puripuly_heart/app/wiring_peer_application.py",
+        "src/puripuly_heart/app/wiring_provider_runtime.py",
+        "src/puripuly_heart/app/wiring_provider_runtime_policy.py",
+        "src/puripuly_heart/app/wiring_runtime_pipeline.py",
         "src/puripuly_heart/app/wiring_stt_factory.py",
     }
 )
@@ -588,9 +571,9 @@ KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementVio
     {
         SettingsRuntimeConfinementViolation(
             "legacy-settings-api-import",
-            "src/puripuly_heart/ui/controller.py",
+            "src/puripuly_heart/composition/application_runtime.py",
             "AppSettings",
-            "GuiController retains the AppSettings compatibility DTO for view and runtime handoff while SettingsOwner exclusively owns load, normalization, migration, backup, and persistence.",
+            "The production composition root uses the AppSettings compatibility DTO only to connect focused owners while SettingsOwner exclusively owns load, normalization, migration, backup, and persistence.",
         ),
         SettingsRuntimeConfinementViolation(
             "legacy-settings-api-import",
@@ -1129,6 +1112,7 @@ def _legacy_settings_value_payload_text_symbol(
 def test_dependency_rule_vocabulary_distinguishes_required_layers() -> None:
     assert tuple(rule.layer for rule in LAYER_RULES) == REQUIRED_LAYER_VOCABULARY
     assert {rule.layer for rule in LAYER_RULES} == set(REQUIRED_LAYER_VOCABULARY)
+    assert _layer_for_module("keyring") == ADAPTERS
 
 
 def test_migration_serialization_forbids_runtime_owner_dependencies() -> None:
@@ -1191,7 +1175,7 @@ def test_settings_public_facade_delegates_persistence_helpers_to_vnext_facade() 
 
 
 def test_controller_consumes_only_settings_owner_and_public_binding_contract() -> None:
-    controller_path = SOURCE_PACKAGE_ROOT / "ui" / "controller.py"
+    controller_path = SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py"
     tree = ast.parse(controller_path.read_text(encoding="utf-8"))
     imports = {
         node.module: {alias.name for alias in node.names}
@@ -1199,11 +1183,8 @@ def test_controller_consumes_only_settings_owner_and_public_binding_contract() -
         if isinstance(node, ast.ImportFrom) and node.module is not None
     }
 
-    assert imports["puripuly_heart.app.ports.canonical_settings_persistence"] == {
-        "ProviderVerificationBinding",
-    }
+    assert "puripuly_heart.app.ports.canonical_settings_persistence" not in imports
     assert imports["puripuly_heart.app.services.canonical_settings_persistence"] == {
-        "SettingsOwner",
         "compose_settings_owner",
     }
     forbidden_modules = {
@@ -1348,12 +1329,12 @@ def test_internal_source_imports_canonical_overlay_calibration_not_ui_facade() -
     assert offenders == set()
 
 
-def test_ui_controller_uses_adapter_seam_instead_of_concrete_provider_imports() -> None:
-    controller_path = SOURCE_PACKAGE_ROOT / "ui" / "controller.py"
+def test_application_composition_uses_adapter_seam_instead_of_provider_imports() -> None:
+    composition_path = SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py"
     imported_modules = set(
         _imported_modules(
-            "puripuly_heart.ui.controller",
-            controller_path,
+            "puripuly_heart.composition.application_runtime",
+            composition_path,
             _internal_module_names(),
         )
     )
@@ -1366,9 +1347,9 @@ def test_ui_controller_uses_adapter_seam_instead_of_concrete_provider_imports() 
     }
 
 
-def test_ui_controller_active_overlay_logic_avoids_legacy_resource_mirrors() -> None:
-    controller_path = SOURCE_PACKAGE_ROOT / "ui" / "controller.py"
-    tree = ast.parse(controller_path.read_text(encoding="utf-8"))
+def test_application_composition_avoids_legacy_overlay_resource_mirrors() -> None:
+    composition_path = SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py"
+    tree = ast.parse(composition_path.read_text(encoding="utf-8"))
     legacy_mirror_fields = {
         "_overlay_presenter",
         "_overlay_bridge",
@@ -1401,41 +1382,17 @@ def test_ui_controller_active_overlay_logic_avoids_legacy_resource_mirrors() -> 
     assert offenders == []
 
 
-def test_current_concrete_osc_imports_are_adapter_boundary_violations() -> None:
+def test_application_composition_has_no_concrete_osc_import_violations() -> None:
     orchestrator_rule = _rule_for_layer(ORCHESTRATOR)
-    ui_rule = _rule_for_layer(UI_ADAPTERS_RENDERERS)
-    expected = {
-        ImportViolation(
-            rule_id=ui_rule.rule_id,
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.chatbox_paginator",
-            importer_layer=UI_ADAPTERS_RENDERERS,
-            imported_layer=ADAPTERS,
-            reason=ui_rule.reason,
-        ),
-        ImportViolation(
-            rule_id=ui_rule.rule_id,
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.receiver",
-            importer_layer=UI_ADAPTERS_RENDERERS,
-            imported_layer=ADAPTERS,
-            reason=ui_rule.reason,
-        ),
-        ImportViolation(
-            rule_id=ui_rule.rule_id,
-            importer="src/puripuly_heart/ui/controller.py",
-            imported="puripuly_heart.core.osc.udp_sender",
-            importer_layer=UI_ADAPTERS_RENDERERS,
-            imported_layer=ADAPTERS,
-            reason=ui_rule.reason,
-        ),
-    }
-
-    assert expected <= _dependency_violations()
+    assert not any(
+        violation.importer == "src/puripuly_heart/composition/application_runtime.py"
+        and ".core.osc." in violation.imported
+        for violation in _dependency_violations()
+    )
     assert (
         ImportViolation(
             rule_id=orchestrator_rule.rule_id,
-            importer="src/puripuly_heart/core/orchestrator/hub.py",
+            importer="src/puripuly_heart/core/orchestrator/peer_translation_channel.py",
             imported="puripuly_heart.core.osc.chatbox_paginator",
             importer_layer=ORCHESTRATOR,
             imported_layer=ADAPTERS,
@@ -1482,9 +1439,123 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
         "_desktop_renderer_events_task",
     }
     disallowed_private_shims = {
-        "src/puripuly_heart/ui/controller.py": (
+        "src/puripuly_heart/composition/application_runtime.py": (
             "_overlay_runtime_for_private_alias",
+            "def _get_github_star_prompt_runtime(",
+            "def _github_star_prompt_runtime(",
+            "@_github_star_prompt_runtime.setter",
+            "def _drain_github_star_prompt_translation_success_observation(",
             "def _sync_github_star_prompt_runtime_aliases",
+            "def _github_star_prompt_initial_launch_gate_satisfied(",
+            "def _get_github_star_prompt_persistence_lock(",
+            "def _github_star_prompt_state_snapshot(",
+            "def _restore_github_star_prompt_state_snapshot(",
+            "def _persist_github_star_prompt_mutation(",
+            "def _run_github_star_prompt_persistence_sync(",
+            "def record_github_star_prompt_opened(",
+            "def record_github_star_prompt_clicked(",
+            "def record_github_star_prompt_translation_success_observed(",
+            "def _persist_desktop_bounds_after_debounce(",
+            "def _desktop_bounds_persist_task(",
+            "def _pending_desktop_bounds(",
+            "@_pending_desktop_bounds.setter",
+            "def _build_initial_desktop_runtime_controls_from_resolved_config(",
+            "def _desktop_dimensions_for_size_preset(",
+            "def _desktop_launch_bounds_for_current_launch(",
+            "def _desktop_centered_bounds_for_dimensions(",
+            "def _broadcast_desktop_runtime_control(",
+            "def _broadcast_desktop_window_bounds_control(",
+            "def _handle_desktop_renderer_event(",
+            "def _handle_desktop_window_bounds_changed(",
+            "def _persist_desktop_bounds(",
+            "def _handle_desktop_overlay_reset_requested(",
+            "def _get_desktop_overlay_bounds_owner(",
+            "def _prepare_desktop_runtime_settings_update(",
+            "def _apply_desktop_size_preset_persistence_adjustment(",
+            "def _persist_overlay_calibration(",
+            "def _sync_overlay_calibration_cache(",
+            "def _emit_overlay_calibration_to_runtime(",
+            "def _get_overlay_calibration_owner(",
+            "_desktop_overlay_bounds_owner:",
+            "_overlay_calibration_owner:",
+            "def _overlay_runtime(",
+            "def _active_overlay_target(",
+            "def failure_reason(",
+            "def auto_restart_scheduled(",
+            "@overlay_calibration.setter",
+            "def _overlay_calibration_draft(",
+            "def desktop_overlay_interaction_mode(",
+            "def _normalized_overlay_target(",
+            "def _overlay_target_for_settings(",
+            "def _effective_overlay_target_for_start(",
+            "def _clear_overlay_session_desktop_fallback(",
+            "def _set_overlay_session_fallback_notice_active(",
+            "def _should_session_fallback_overlay_to_desktop(",
+            "def _replace_hub_overlay_sink(",
+            "def _overlay_process_runner_for_target(",
+            "def _new_overlay_runtime_handle(",
+            "def _ensure_overlay_runtime_handle(",
+            "def _overlay_runtime_is_current(",
+            "def _overlay_runtime_has_resources(",
+            "def _close_stale_overlay_start_runtime(",
+            "def _overlay_runtime_is_active(",
+            "def _current_overlay_presenter_for_direct_runtime_command(",
+            "def _current_overlay_bridge_for_direct_runtime_command(",
+            "def _previous_overlay_target_for_apply(",
+            "def _begin_overlay_start(",
+            "def _run_overlay_start(",
+            "def _shutdown_overlay_runtime(",
+            "def _teardown_overlay_runtime(",
+            "def on_overlay_start_failed(",
+            "def on_overlay_runtime_disconnected(",
+            "def on_overlay_runtime_crashed(",
+            "def _overlay_session_desktop_fallback_active(",
+            "def _set_vrchat_osc_notice_active(",
+            "def _run_vrchat_osc_presence_probe_loop(",
+            "def _vrchat_osc_probe_task(",
+            "def _local_stt_pending_enable_generation(",
+            "@_local_stt_pending_enable_generation.setter",
+            "def _local_stt_pending_peer_enable_after_install(",
+            "@_local_stt_pending_peer_enable_after_install.setter",
+            "def _apply_overlay_calibration_persistence(",
+            "def _schedule_overlay_calibration_persistence(",
+            "def _emit_overlay_calibration_update(",
+            "def _schedule_overlay_calibration_emit(",
+            "def _emit_overlay_shutdown(",
+            "def _managed_openrouter_fallback_branch_settings_for(",
+            "def _managed_openrouter_branch_settings_for(",
+            "_MANAGED_OPENROUTER_MODEL_BY_TRANSLATION_MODEL =",
+            "def _log_audio_environment_snapshot_async(",
+            "def _refresh_owned_referral_id_from_managed_status_best_effort(",
+            "def _request_local_asr_install(",
+            "def _show_local_stt_download_prompt(",
+            "def _on_local_stt_download_action(",
+            "def _transition_active_self_local_asr(",
+            "def _build_stt_runtime_signature(",
+            "def _peer_stt_runtime_custom_vocabulary_signature(",
+            "def _update_canonical_settings_from_compatibility_mutation(",
+            "def effective_context_mode(",
+            "def peer_warning_action_is_retry(",
+            "def _build_initial_desktop_runtime_controls(",
+            "def discord_managed_auth_in_progress(",
+            "def effective_peer_translation_enabled(",
+            "def _microphone_test_meter_level(",
+            "@_microphone_test_meter_level.setter",
+            "def microphone_test_meter_level(",
+            "def _verify_and_update_status(",
+            "def _rebuild_pipeline(",
+            "def _get_provider_status_verification_owner(",
+            "def _schedule_provider_status_verification(",
+            "def _build_provider_status_verification_request(",
+            "def _apply_provider_status_verification_result(",
+            "def _close_provider_status_verification_owner(",
+            "def _get_qwen_key_and_base_url(",
+            "_provider_status_verification_owner:",
+            'owner_name="ProviderStatusVerificationOwner"',
+            "_self_local_asr_transition:",
+            "_self_asr_model_loading:",
+            "class _LocalASRTransitionSuperseded(",
+            'owner_name="SelfLocalASRTransitionCoordinator"',
             "def _sync_local_stt_download_runtime_aliases",
             "def _sync_clipboard_runtime_aliases",
             "def _sync_microphone_test_runtime_aliases",
@@ -1492,15 +1563,50 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "_local_stt_download_task",
             "_local_stt_download_cancel_event",
             "_local_stt_download_origin",
+            "def _get_clipboard_watcher_lock(",
+            "def _get_clipboard_runtime(",
+            "def _clipboard_runtime(",
+            "@_clipboard_runtime.setter",
+            "def _stop_clipboard_watcher(",
+            "def _close_clipboard_runtime(",
+            "def _on_clipboard_text_from_thread(",
+            "def _schedule_clipboard_submit(",
+            "def _submit_clipboard_text(",
             "_clipboard_watcher: ClipboardWatcherRuntime",
             "_clipboard_loop: asyncio.AbstractEventLoop",
+            "_clipboard_runtime: ClipboardRuntime",
+            "_clipboard_watcher_lock:",
+            "_strict_runtime_errors_for_clipboard_watcher",
+            "def _get_oauth_runtime(",
+            "def _oauth_runtime(",
+            "@_oauth_runtime.setter",
+            "_oauth_runtime: OAuthRuntime",
+            "def _openrouter_pkce_client(",
+            "@_openrouter_pkce_client.setter",
+            "def _close_oauth_runtime_for_release(",
+            "_openrouter_pkce_client: OpenRouterPKCEClient",
+            "receiver: VrcOscReceiver",
+            "def _vrc_mic_receiver_runtime(",
+            "@_vrc_mic_receiver_runtime.setter",
+            "def _get_vrc_mic_receiver_runtime(",
+            "def _sync_vrc_mic_receiver_runtime_aliases(",
+            "_vrc_mic_receiver_runtime: VrcMicReceiverRuntime",
+            "_vrc_receiver_lock:",
+            "_last_vrc_mic_sync_enabled:",
             "_microphone_test_task",
         ),
         "src/puripuly_heart/ui/app.py": (
             "def _sync_github_star_prompt_runtime_aliases",
             "_github_star_prompt_launch_task",
         ),
-        "src/puripuly_heart/core/orchestrator/hub.py": (
+        "src/puripuly_heart/app/services/settings_runtime_effects.py": (
+            "def _prepare_desktop_runtime_settings_update(",
+            "def _sync_overlay_calibration_cache(",
+            "def _sync_desktop_overlay_interaction_mode_from_settings(",
+            "def _apply_desktop_size_preset_persistence_adjustment(",
+            "def _broadcast_desktop_runtime_control_payloads(",
+        ),
+        "src/puripuly_heart/core/orchestrator/peer_translation_channel.py": (
             "_osc_flush_task",
             "def _run_osc_flush_loop",
         ),
@@ -1521,18 +1627,21 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
 
     offenders: list[str] = []
     for relative_path, forbidden_tokens in disallowed_private_shims.items():
-        source = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        path = REPO_ROOT / relative_path
+        if not path.exists():
+            continue
+        source = path.read_text(encoding="utf-8")
         offenders.extend(
             f"{relative_path}: {token}" for token in forbidden_tokens if token in source
         )
 
-    controller_path = REPO_ROOT / "src/puripuly_heart/ui/controller.py"
-    controller_tree = ast.parse(controller_path.read_text(encoding="utf-8"))
-    for node in ast.walk(controller_tree):
+    composition_path = REPO_ROOT / "src/puripuly_heart/composition/application_runtime.py"
+    composition_tree = ast.parse(composition_path.read_text(encoding="utf-8"))
+    for node in ast.walk(composition_tree):
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             if node.name in controller_overlay_alias_shims:
                 offenders.append(
-                    f"src/puripuly_heart/ui/controller.py: def {node.name} "
+                    f"src/puripuly_heart/composition/application_runtime.py: def {node.name} "
                     f"at line {node.lineno}"
                 )
             continue
@@ -1543,17 +1652,21 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             and node.value.id == "self"
         ):
             offenders.append(
-                f"src/puripuly_heart/ui/controller.py: self.{node.attr} " f"at line {node.lineno}"
+                "src/puripuly_heart/composition/application_runtime.py: "
+                f"self.{node.attr} at line {node.lineno}"
             )
         if isinstance(node, ast.Assign | ast.AnnAssign):
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             for target in targets:
                 if isinstance(target, ast.Name) and target.id in controller_overlay_alias_shims:
                     offenders.append(
-                        "src/puripuly_heart/ui/controller.py: "
+                        "src/puripuly_heart/composition/application_runtime.py: "
                         f"field {target.id} at line {target.lineno}"
                     )
 
+    assert not (
+        REPO_ROOT / "src/puripuly_heart/app/services/provider_status_verification.py"
+    ).exists()
     assert offenders == []
 
 

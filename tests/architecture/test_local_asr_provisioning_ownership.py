@@ -26,8 +26,27 @@ def test_production_constructs_one_local_asr_provisioning_owner_in_composition()
     assert constructions == ["src/puripuly_heart/app/wiring.py"]
 
 
-def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> None:
-    source = (SOURCE_ROOT / "ui" / "controller.py").read_text(encoding="utf-8")
+def test_application_owners_delegate_provisioning_without_asset_or_task_ownership() -> None:
+    source = (SOURCE_ROOT / "composition" / "application_runtime.py").read_text(encoding="utf-8")
+    startup = (SOURCE_ROOT / "composition" / "application_startup.py").read_text(encoding="utf-8")
+    cpu_repair = (SOURCE_ROOT / "app" / "services" / "local_asr_cpu_repair.py").read_text(
+        encoding="utf-8"
+    )
+    gpu_provisioning = (
+        SOURCE_ROOT / "app" / "services" / "local_asr_gpu_provisioning.py"
+    ).read_text(encoding="utf-8")
+    gpu_interaction = (SOURCE_ROOT / "app" / "services" / "gpu_runtime_interaction.py").read_text(
+        encoding="utf-8"
+    )
+    readiness = (SOURCE_ROOT / "app" / "services" / "local_asr_readiness.py").read_text(
+        encoding="utf-8"
+    )
+    selection = (SOURCE_ROOT / "app" / "services" / "local_asr_selection.py").read_text(
+        encoding="utf-8"
+    )
+    application_wiring = (SOURCE_ROOT / "app" / "wiring_local_asr_application.py").read_text(
+        encoding="utf-8"
+    )
     tree = ast.parse(source)
     imports: set[str] = set()
     for node in ast.walk(tree):
@@ -37,10 +56,36 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
             imports.add(node.module)
 
     assert "create_local_asr_provisioning_owner(" in source
-    assert ".inspect_cpu(" in source
-    assert ".inspect_gpu(" in source
-    assert ".start_install(" in source
-    assert ".report_model_validation_failure(" in source
+    assert "create_local_asr_cpu_repair_owner(" not in source
+    assert "create_local_asr_cpu_repair_owner(" in application_wiring
+    assert "create_gpu_runtime_interaction_owner(" in source
+    assert "create_local_asr_readiness_owner(" not in source
+    assert "create_local_asr_readiness_owner(" in application_wiring
+    assert ".inspect_cpu(" not in source
+    assert ".inspect_cpu(" in startup
+    assert ".inspect_gpu(" not in source
+    assert ".inspect_gpu(" in startup
+    assert ".inspect_gpu(" in gpu_provisioning
+    assert ".inspect_gpu_readiness(" in gpu_interaction
+    assert ".start_install(" not in source
+    assert ".start_install(" in cpu_repair
+    assert ".start_install(" in gpu_provisioning
+    assert "result_handler=" in cpu_repair
+    assert ".report_model_validation_failure(" not in source
+    assert ".report_model_validation_failure(" in readiness
+    assert ".ensure_self_ready(" not in source
+    assert ".ensure_self_ready(" in application_wiring
+    assert ".ensure_peer_ready(" in source
+    assert ".ensure_peer_ready(" in application_wiring
+    assert "_probe_self_local_stt_runtime_load" not in source
+    assert "LocalCPUAutoUnavailableError" not in source
+    assert "LocalSTTModelMissingError" not in source
+    assert "_required_local_stt_model_ids_for_provider" not in source
+    assert "_local_stt_runtime_status_for_provider" not in source
+    assert "def required_local_asr_model_ids(" in selection
+    assert "def local_asr_status_for_provider(" in selection
+    assert "required_local_asr_model_ids(" in readiness
+    assert "local_asr_status_for_provider(" in readiness
     assert ".close()" in source
     assert "puripuly_heart.core.local_stt_runtime_installer" not in imports
     assert "puripuly_heart.core.local_stt_huggingface_xet_adapter" not in imports
@@ -62,6 +107,7 @@ def test_controller_delegates_provisioning_without_asset_or_task_ownership() -> 
     assert "_cancel_local_stt_download" not in source
     assert "_start_local_stt_download" not in source
     assert "_handle_local_stt_unavailable" not in source
+    assert "_ui_background_scope" not in source
 
 
 def test_provider_wiring_consumes_only_installed_path_contract() -> None:

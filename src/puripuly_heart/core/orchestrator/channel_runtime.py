@@ -4,19 +4,8 @@ import asyncio
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfigSnapshot
 from puripuly_heart.domain.models import ChannelId, UtteranceBundle
-
-_RUNTIME_TO_HUB_ALIAS_FIELDS = {
-    "stt": "stt",
-    "stt_task": "_stt_task",
-    "utterances": "_utterances",
-    "translation_tasks": "_translation_tasks",
-    "utterance_sources": "_utterance_sources",
-    "utterance_start_times": "_utterance_start_times",
-    "translation_history": "_translation_history",
-    "speech_ended_ids": "_speech_ended_ids",
-    "merge_buffer": "_merge_buffer",
-}
 
 
 def _validate_channel(channel: str) -> None:
@@ -47,6 +36,7 @@ class _MergeBuffer:
     spec_task: asyncio.Task[None] | None = None
     spec_text: str | None = None
     spec_translation: object | None = None
+    spec_config_snapshot: TranslationRuntimeConfigSnapshot | None = None
     spec_attempts: int = 0
     spec_started_at: float | None = None
     spec_done_at: float | None = None
@@ -77,22 +67,9 @@ class ChannelRuntime:
     translation_history: list[ContextEntry] = field(default_factory=list)
     speech_ended_ids: set[UUID] = field(default_factory=set)
     merge_buffer: _MergeBuffer | None = None
-    alias_target: object | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         _validate_channel(self.channel)
-
-    def __setattr__(self, name: str, value: object) -> None:
-        object.__setattr__(self, name, value)
-        if name == "alias_target":
-            return
-        alias_target = getattr(self, "alias_target", None)
-        if alias_target is None:
-            return
-        hub_field = _RUNTIME_TO_HUB_ALIAS_FIELDS.get(name)
-        if hub_field is None:
-            return
-        object.__setattr__(alias_target, hub_field, value)
 
     def get_or_create_bundle(self, utterance_id: UUID) -> UtteranceBundle:
         bundle = self.utterances.get(utterance_id)

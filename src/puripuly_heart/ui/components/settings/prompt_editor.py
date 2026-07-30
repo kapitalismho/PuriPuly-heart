@@ -5,7 +5,10 @@ from typing import Callable
 import flet as ft
 
 from puripuly_heart.config.prompts import load_prompt_for_provider
+from puripuly_heart.ui.flet_runtime import FILL_PARENT_WIDTH, update_control_if_mounted
 from puripuly_heart.ui.theme import COLOR_DIVIDER, COLOR_NEUTRAL_DARK, COLOR_PRIMARY
+
+PROMPT_FIELD_CONTENT_PADDING = ft.Padding.symmetric(horizontal=8, vertical=16)
 
 
 class PromptEditor(ft.Column):
@@ -25,6 +28,8 @@ class PromptEditor(ft.Column):
             min_lines=5,
             on_change=self._handle_change,
             on_blur=self._handle_blur,
+            width=FILL_PARENT_WIDTH,
+            content_padding=PROMPT_FIELD_CONTENT_PADDING,
             border_radius=12,
             border_color=COLOR_DIVIDER,
             focused_border_color=COLOR_PRIMARY,
@@ -46,8 +51,7 @@ class PromptEditor(ft.Column):
     def value(self, val: str) -> None:
         """Set prompt value."""
         self._text_field.value = val
-        if self._text_field.page:
-            self._text_field.update()
+        update_control_if_mounted(self._text_field)
 
     def set_provider(self, provider_name: str) -> None:
         """Update the current provider."""
@@ -80,5 +84,4 @@ class PromptEditor(ft.Column):
 
     def apply_locale(self) -> None:
         """Update labels when locale changes."""
-        if self.page:
-            self.update()
+        update_control_if_mounted(self)

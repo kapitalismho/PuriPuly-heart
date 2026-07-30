@@ -9,6 +9,14 @@ import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.app.services import canonical_settings_persistence as settings_module
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    compose_settings_owner,
+)
+from puripuly_heart.app.services.github_star_prompt_settings import (
+    compose_github_star_prompt_owner,
+)
+from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -21,8 +29,6 @@ from puripuly_heart.config.settings import (
 from puripuly_heart.domain.events import UIEvent, UIEventType
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
-from puripuly_heart.ui import controller as controller_module
-from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.event_bridge import (
     AppConversationEventDestination,
     AppDashboardEventDestination,
@@ -31,21 +37,51 @@ from puripuly_heart.ui.event_bridge import (
 )
 
 
-def _controller_for(settings: AppSettings) -> GuiController:
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=SimpleNamespace(),
-        config_path=Path("settings.json"),
-    )
-    controller.settings = settings
-    return controller
+class PromptBackend:
+    def __init__(self, settings: AppSettings) -> None:
+        self.settings_owner = compose_settings_owner(Path("settings.json"))
+        self.settings_owner.current = settings
+        self.usage = SimpleNamespace(usage_metadata=None)
+        self.owner = compose_github_star_prompt_owner(
+            settings=self.settings_owner,
+            managed_remaining_percent=lambda: ManagedUsageOwner.remaining_percent_for(
+                self.usage.usage_metadata
+            ),
+            transaction_result_sink=lambda _result: None,
+            save_failure_sink=lambda _context, _exc: None,
+            runtime_diagnostics_sink=lambda _event, _metadata: None,
+            mutation_service_provider=lambda: None,
+        )
+
+    @property
+    def settings(self) -> AppSettings:
+        return self.settings_owner.current
+
+    def _get_managed_usage_owner(self) -> object:
+        return self.usage
+
+    def _get_github_star_prompt_owner(self):
+        return self.owner
+
+    def is_github_star_prompt_eligible(self) -> bool:
+        return self.owner.is_eligible()
+
+    def schedule_github_star_prompt_translation_success_observed(self) -> bool:
+        return self.owner.schedule_translation_success_observed()
+
+    async def persist_github_star_prompt_translation_success_observed(self) -> bool:
+        return await self.owner.persist_translation_success_observed()
+
+
+def _prompt_backend_for(settings: AppSettings) -> PromptBackend:
+    return PromptBackend(settings)
 
 
 def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:
     def persist(owner) -> None:
         callback(owner.path, owner.compatibility_projection())
 
-    monkeypatch.setattr(controller_module.SettingsOwner, "persist", persist)
+    monkeypatch.setattr(settings_module.SettingsOwner, "persist", persist)
 
 
 def _settings_for_connection(connection: TranslationConnection) -> AppSettings:
@@ -70,23 +106,6 @@ async def _wait_until(predicate, *, attempts: int = 20) -> None:
     raise AssertionError("condition was not met in time")
 
 
-async def _async_noop(*_args: object, **_kwargs: object) -> None:
-    return None
-
-
-def _patch_stop_side_effects(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(GuiController, "_stop_clipboard_watcher", _async_noop)
-    monkeypatch.setattr(GuiController, "_close_local_asr_provisioning", _async_noop)
-    monkeypatch.setattr(GuiController, "set_stt_enabled", _async_noop)
-    monkeypatch.setattr(GuiController, "_configure_vrc_mic_receiver", _async_noop)
-    monkeypatch.setattr(GuiController, "_shutdown_overlay_runtime", _async_noop)
-    monkeypatch.setattr(
-        GuiController,
-        "_replace_managed_openrouter_release_service",
-        _async_noop,
-    )
-
-
 def test_official_byok_fixture_uses_supported_model_provider_combo() -> None:
     settings = _settings_for_connection(TranslationConnection.OFFICIAL_BYOK)
 
@@ -97,8 +116,8 @@ def test_official_byok_fixture_uses_supported_model_provider_combo() -> None:
 
 
 def test_github_star_prompt_is_eligible_for_managed_remaining_percent_at_threshold() -> None:
-    controller = _controller_for(_settings_for_connection(TranslationConnection.MANAGED))
-    controller._managed_trial_usage_metadata = OpenRouterKeyMetadata(  # noqa: SLF001
+    controller = _prompt_backend_for(_settings_for_connection(TranslationConnection.MANAGED))
+    controller._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=60.0,
         usage_usd=40.0,
@@ -119,8 +138,8 @@ def test_github_star_prompt_is_eligible_for_managed_remaining_percent_at_thresho
 def test_github_star_prompt_skips_managed_when_usage_metadata_is_unavailable(
     metadata: OpenRouterKeyMetadata | None,
 ) -> None:
-    controller = _controller_for(_settings_for_connection(TranslationConnection.MANAGED))
-    controller._managed_trial_usage_metadata = metadata  # noqa: SLF001
+    controller = _prompt_backend_for(_settings_for_connection(TranslationConnection.MANAGED))
+    controller._get_managed_usage_owner().usage_metadata = metadata
 
     assert controller.is_github_star_prompt_eligible() is False
 
@@ -134,13 +153,13 @@ def test_github_star_prompt_is_eligible_for_recorded_user_owned_cloud_success(
 ) -> None:
     settings = _settings_for_connection(connection)
     settings.ui.github_star_prompt_translation_success_observed = True
-    controller = _controller_for(settings)
+    controller = _prompt_backend_for(settings)
 
     assert controller.is_github_star_prompt_eligible() is True
 
 
 def test_github_star_prompt_skips_user_owned_cloud_without_recorded_success() -> None:
-    controller = _controller_for(_settings_for_connection(TranslationConnection.OPENROUTER))
+    controller = _prompt_backend_for(_settings_for_connection(TranslationConnection.OPENROUTER))
 
     assert controller.is_github_star_prompt_eligible() is False
 
@@ -148,7 +167,7 @@ def test_github_star_prompt_skips_user_owned_cloud_without_recorded_success() ->
 def test_github_star_prompt_excludes_local_ollama_from_user_owned_cloud_path() -> None:
     settings = _settings_for_connection(TranslationConnection.OLLAMA)
     settings.ui.github_star_prompt_translation_success_observed = True
-    controller = _controller_for(settings)
+    controller = _prompt_backend_for(settings)
 
     assert controller.is_github_star_prompt_eligible() is False
 
@@ -162,13 +181,13 @@ def test_github_star_prompt_excludes_managed_connections_from_user_owned_cloud_p
 ) -> None:
     settings = _settings_for_connection(connection)
     settings.ui.github_star_prompt_translation_success_observed = True
-    controller = _controller_for(settings)
+    controller = _prompt_backend_for(settings)
 
     assert controller.is_github_star_prompt_eligible() is False
 
 
 def test_github_star_prompt_skips_ineligible_new_user_state() -> None:
-    controller = _controller_for(AppSettings())
+    controller = _prompt_backend_for(AppSettings())
 
     assert controller.is_github_star_prompt_eligible() is False
 
@@ -182,7 +201,7 @@ def test_user_owned_cloud_translation_success_observation_persists_through_setti
     connection: TranslationConnection,
 ) -> None:
     settings = _settings_for_connection(connection)
-    controller = _controller_for(settings)
+    controller = _prompt_backend_for(settings)
     saved_payloads: list[dict[str, object]] = []
 
     def fake_save_settings(_path: Path, updated: AppSettings) -> None:
@@ -190,79 +209,12 @@ def test_user_owned_cloud_translation_success_observation_persists_through_setti
 
     _patch_settings_save(monkeypatch, fake_save_settings)
 
-    assert controller.record_github_star_prompt_translation_success_observed() is True
+    assert controller._get_github_star_prompt_owner().record_translation_success_observed() is True
 
     assert settings.ui.github_star_prompt_translation_success_observed is True
     assert saved_payloads
     restored = from_dict(saved_payloads[-1])
     assert restored.ui.github_star_prompt_translation_success_observed is True
-
-
-def test_translation_success_observation_restores_state_when_persistence_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    controller = _controller_for(settings)
-    saved_payloads: list[dict[str, object]] = []
-
-    def fail_save_settings(*_args: object, **_kwargs: object) -> None:
-        raise OSError("settings write failed")
-
-    _patch_settings_save(monkeypatch, fail_save_settings)
-
-    assert controller.record_github_star_prompt_translation_success_observed() is False
-    assert settings.ui.github_star_prompt_translation_success_observed is False
-
-    def capture_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
-
-    _patch_settings_save(monkeypatch, capture_save_settings)
-
-    assert controller.record_github_star_prompt_translation_success_observed() is True
-    assert settings.ui.github_star_prompt_translation_success_observed is True
-    assert saved_payloads
-
-
-@pytest.mark.asyncio
-async def test_pending_translation_success_observation_save_retargets_replaced_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    initial_settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    initial_settings.languages.target_language = "en"
-    controller = _controller_for(initial_settings)
-    saved_payloads: list[dict[str, object]] = []
-    first_to_thread_started = asyncio.Event()
-    release_first_to_thread = asyncio.Event()
-    to_thread_calls = 0
-
-    def fake_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
-
-    async def delayed_first_to_thread(func, /, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
-        nonlocal to_thread_calls
-        to_thread_calls += 1
-        if to_thread_calls == 1:
-            first_to_thread_started.set()
-            await release_first_to_thread.wait()
-        return func(*args, **kwargs)
-
-    _patch_settings_save(monkeypatch, fake_save_settings)
-    monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_first_to_thread)
-
-    persist_task = asyncio.create_task(
-        controller.persist_github_star_prompt_translation_success_observed()
-    )
-    await asyncio.wait_for(first_to_thread_started.wait(), timeout=1.0)
-
-    replacement_settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    replacement_settings.languages.target_language = "ja"
-    controller.settings = replacement_settings
-    release_first_to_thread.set()
-
-    assert await asyncio.wait_for(persist_task, timeout=1.0) is True
-    assert replacement_settings.ui.github_star_prompt_translation_success_observed is True
-    assert saved_payloads[-1]["languages"]["target_language"] == "ja"
-    assert saved_payloads[-1]["ui"]["github_star_prompt_translation_success_observed"] is True
 
 
 @pytest.mark.parametrize(
@@ -278,7 +230,7 @@ def test_translation_success_observation_ignores_non_user_owned_cloud_connection
     connection: TranslationConnection,
 ) -> None:
     settings = _settings_for_connection(connection)
-    controller = _controller_for(settings)
+    controller = _prompt_backend_for(settings)
     save_calls: list[str] = []
 
     _patch_settings_save(
@@ -286,7 +238,7 @@ def test_translation_success_observation_ignores_non_user_owned_cloud_connection
         lambda _path, _updated: save_calls.append("save"),
     )
 
-    assert controller.record_github_star_prompt_translation_success_observed() is False
+    assert controller._get_github_star_prompt_owner().record_translation_success_observed() is False
 
     assert settings.ui.github_star_prompt_translation_success_observed is False
     assert save_calls == []
@@ -347,7 +299,7 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    controller = _controller_for(settings)
+    controller = _prompt_backend_for(settings)
     saved_payloads: list[dict[str, object]] = []
 
     class Dashboard:
@@ -387,141 +339,3 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
 
     assert settings.ui.github_star_prompt_translation_success_observed is True
     assert saved_payloads
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "connection",
-    [
-        TranslationConnection.MANAGED,
-        TranslationConnection.MANAGED_CHINA,
-        TranslationConnection.OLLAMA,
-    ],
-)
-async def test_apply_settings_preserves_durable_observation_when_connection_switches_away(
-    monkeypatch: pytest.MonkeyPatch,
-    connection: TranslationConnection,
-) -> None:
-    settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    settings.ui.github_star_prompt_translation_success_observed = True
-    controller = _controller_for(settings)
-    replacement_settings = _settings_for_connection(connection)
-    saved_payloads: list[dict[str, object]] = []
-
-    monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", _async_noop)
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, updated: saved_payloads.append(to_dict(updated)),
-    )
-
-    await controller.apply_settings(replacement_settings)
-
-    assert replacement_settings.ui.github_star_prompt_translation_success_observed is True
-    assert controller.is_github_star_prompt_eligible() is False
-    assert saved_payloads[-1]["ui"]["github_star_prompt_translation_success_observed"] is True
-
-
-@pytest.mark.asyncio
-async def test_apply_providers_drains_pending_observation_before_settings_replacement(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    initial_settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    controller = _controller_for(initial_settings)
-    replacement_settings = _settings_for_connection(TranslationConnection.OLLAMA)
-    saved_payloads: list[dict[str, object]] = []
-    first_to_thread_started = asyncio.Event()
-    release_first_to_thread = asyncio.Event()
-
-    def fake_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
-
-    async def delayed_to_thread(func, /, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
-        first_to_thread_started.set()
-        await release_first_to_thread.wait()
-        return func(*args, **kwargs)
-
-    _patch_settings_save(monkeypatch, fake_save_settings)
-    monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_to_thread)
-    monkeypatch.setattr(GuiController, "_rebuild_llm_provider", _async_noop)
-    monkeypatch.setattr(GuiController, "_refresh_peer_stt_runtime", _async_noop)
-    monkeypatch.setattr(GuiController, "_replace_runtime_stt_provider", _async_noop)
-    monkeypatch.setattr(GuiController, "_rebuild_stt_provider", _async_noop)
-
-    runtime = controller._get_github_star_prompt_runtime()
-    persist_task = runtime.start_translation_success_observation(
-        controller.persist_github_star_prompt_translation_success_observed()
-    )
-    await asyncio.wait_for(first_to_thread_started.wait(), timeout=1.0)
-
-    apply_task = asyncio.create_task(controller.apply_providers(replacement_settings))
-    await asyncio.sleep(0)
-
-    assert not apply_task.done()
-
-    release_first_to_thread.set()
-    try:
-        await asyncio.wait_for(apply_task, timeout=1.0)
-        assert await asyncio.wait_for(persist_task, timeout=1.0) is True
-        assert controller.settings is not None
-        assert controller.settings.ui.github_star_prompt_translation_success_observed is True
-        assert controller.is_github_star_prompt_eligible() is False
-        assert saved_payloads[-1]["ui"]["github_star_prompt_translation_success_observed"] is True
-    finally:
-        if not apply_task.done():
-            apply_task.cancel()
-            await asyncio.gather(apply_task, return_exceptions=True)
-        if not persist_task.done():
-            persist_task.cancel()
-            await asyncio.gather(persist_task, return_exceptions=True)
-
-
-@pytest.mark.asyncio
-async def test_stop_cancels_pending_github_star_observation_via_runtime_owner(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _settings_for_connection(TranslationConnection.OPENROUTER)
-    controller = _controller_for(settings)
-    saved_payloads: list[dict[str, object]] = []
-    first_to_thread_started = asyncio.Event()
-    release_first_to_thread = asyncio.Event()
-
-    def fake_save_settings(_path: Path, updated: AppSettings) -> None:
-        saved_payloads.append(to_dict(updated))
-
-    async def delayed_to_thread(func, /, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
-        first_to_thread_started.set()
-        await release_first_to_thread.wait()
-        return func(*args, **kwargs)
-
-    _patch_settings_save(monkeypatch, fake_save_settings)
-    monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_to_thread)
-    _patch_stop_side_effects(monkeypatch)
-
-    runtime = controller._get_github_star_prompt_runtime()
-    persist_task = runtime.start_translation_success_observation(
-        controller.persist_github_star_prompt_translation_success_observed()
-    )
-    await asyncio.wait_for(first_to_thread_started.wait(), timeout=1.0)
-
-    stop_task = asyncio.create_task(controller.stop())
-    await asyncio.sleep(0)
-
-    assert not stop_task.done()
-    assert settings.ui.github_star_prompt_translation_success_observed is True
-
-    release_first_to_thread.set()
-    try:
-        await asyncio.wait_for(stop_task, timeout=1.0)
-
-        with pytest.raises(asyncio.CancelledError):
-            await asyncio.wait_for(persist_task, timeout=1.0)
-        assert runtime.translation_success_task is None
-        assert settings.ui.github_star_prompt_translation_success_observed is False
-        assert saved_payloads == []
-    finally:
-        if not stop_task.done():
-            stop_task.cancel()
-            await asyncio.gather(stop_task, return_exceptions=True)
-        if not persist_task.done():
-            persist_task.cancel()
-            await asyncio.gather(persist_task, return_exceptions=True)

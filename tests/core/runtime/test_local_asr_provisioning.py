@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from puripuly_heart.core.local_asr_provisioning import LocalASRInstallRequest
+from puripuly_heart.core.local_asr_provisioning import (
+    LocalASRInstallRequest,
+    LocalASRInstallResult,
+)
 from puripuly_heart.core.local_gpu_assets import LocalGPUInstallSnapshot
 from puripuly_heart.core.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
@@ -263,6 +266,101 @@ async def test_targeted_cpu_repair_preserves_valid_models_and_reports_progress()
 
 
 @pytest.mark.asyncio
+async def test_owner_delivers_install_result_through_owned_task() -> None:
+    states = _all_states()
+    states[LOCAL_STT_MODEL_ID] = _state("missing", LOCAL_STT_MODEL_ID)
+    owner = _owner(MutableProvisioningBackend(states))
+    delivered: list[LocalASRInstallResult] = []
+
+    result = await owner.start_install(
+        LocalASRInstallRequest(
+            backend="cpu",
+            model_ids=(LOCAL_STT_MODEL_ID,),
+            locale="en",
+            origin="manual",
+        ),
+        result_handler=lambda current: delivered.append(current),
+    )
+    for _ in range(20):
+        if delivered and not owner.active_result_delivery_task_names:
+            break
+        await asyncio.sleep(0)
+
+    assert delivered == [result]
+    assert owner.active_result_delivery_task_names == ()
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_owner_close_cancels_active_install_result_delivery() -> None:
+    states = _all_states()
+    states[LOCAL_STT_MODEL_ID] = _state("missing", LOCAL_STT_MODEL_ID)
+    owner = _owner(MutableProvisioningBackend(states))
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def handle_result(_result: LocalASRInstallResult) -> None:
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    await owner.start_install(
+        LocalASRInstallRequest(
+            backend="cpu",
+            model_ids=(LOCAL_STT_MODEL_ID,),
+            locale="en",
+            origin="manual",
+        ),
+        result_handler=handle_result,
+    )
+    await entered.wait()
+
+    assert len(owner.active_result_delivery_task_names) == 1
+
+    await owner.close()
+
+    assert cancelled.is_set()
+    assert owner.active_result_delivery_task_names == ()
+
+
+@pytest.mark.asyncio
+async def test_owner_contains_install_result_handler_failure_as_safe_diagnostic() -> None:
+    states = _all_states()
+    states[LOCAL_STT_MODEL_ID] = _state("missing", LOCAL_STT_MODEL_ID)
+    owner = _owner(MutableProvisioningBackend(states))
+
+    def fail(_result: LocalASRInstallResult) -> None:
+        raise RuntimeError("secret result payload")
+
+    await owner.start_install(
+        LocalASRInstallRequest(
+            backend="cpu",
+            model_ids=(LOCAL_STT_MODEL_ID,),
+            locale="en",
+            origin="manual",
+        ),
+        result_handler=fail,
+    )
+    for _ in range(20):
+        if any(item.event == "result_delivery" for item in owner.diagnostics):
+            break
+        await asyncio.sleep(0)
+
+    diagnostic = owner.diagnostics[-1]
+    assert diagnostic.event == "result_delivery"
+    assert diagnostic.backend == "cpu"
+    assert diagnostic.origin == "manual"
+    assert diagnostic.failure_type == "RuntimeError"
+    assert "secret result payload" not in repr(owner.diagnostics)
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_failed_repair_keeps_integrity_and_exposes_only_safe_failure_type() -> None:
     states = _all_states()
     states[LOCAL_STT_MODEL_ID] = _state("missing", LOCAL_STT_MODEL_ID)
@@ -495,12 +593,13 @@ def test_owner_lifecycle_inventory_names_all_provisioning_resources() -> None:
     assert snapshot["resource_fields"] == (
         "_cpu_install_runtime",
         "_gpu_install_runtime",
+        "_result_delivery_tasks",
         "installer cancel events",
         "Xet helper processes",
         "staging and backup directories",
         "model-root cross-process provisioning lease",
     )
-    assert "cancel CPU and GPU install tasks" in snapshot["shutdown_policy"]
+    assert "cancel CPU and GPU install and result-delivery tasks" in snapshot["shutdown_policy"]
     assert snapshot["late_callback_rule"] == (
-        "ignore status callbacks whose owner generation is no longer current"
+        "ignore stale status generations and drop install-result delivery after close"
     )

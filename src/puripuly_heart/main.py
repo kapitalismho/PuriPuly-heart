@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import argparse
-import inspect
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
     from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
+
+logger = logging.getLogger(__name__)
 
 
 def configure_main_logging(*, log_dir: Path | None = None):
@@ -180,28 +182,39 @@ def _run_gui(
     import flet as ft
 
     from puripuly_heart.app.adapters.vrchat_osc_presence import PsutilVrchatOscPresenceAdapter
+    from puripuly_heart.composition.ui_application import compose_ui_application
     from puripuly_heart.ui.app import main_gui
     from puripuly_heart.ui.fonts import assets_dir
 
     vrchat_osc_presence = PsutilVrchatOscPresenceAdapter()
 
     async def _target(page: ft.Page):
-        gui_kwargs = {
-            "config_path": config_path,
-            "debug_ui_preview": debug_ui_preview,
-        }
-        parameters = inspect.signature(main_gui).parameters
-        if "runtime_logging_sinks" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            gui_kwargs["runtime_logging_sinks"] = runtime_logging_sinks
-        if "vrchat_osc_presence" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            gui_kwargs["vrchat_osc_presence"] = vrchat_osc_presence
-        return await main_gui(page, **gui_kwargs)
+        try:
+            return await main_gui(
+                page,
+                config_path=config_path,
+                application_factory=compose_ui_application,
+                debug_ui_preview=debug_ui_preview,
+                runtime_logging_sinks=runtime_logging_sinks,
+                vrchat_osc_presence=vrchat_osc_presence,
+            )
+        except Exception as exc:
+            logger.exception(
+                "GUI startup failed: exception_type=%s exception_message=%s",
+                type(exc).__name__,
+                str(exc),
+            )
+            raise
 
-    ft.app(target=_target, assets_dir=str(assets_dir()))
+    try:
+        ft.run(main=_target, assets_dir=str(assets_dir()))
+    except Exception as exc:
+        logger.exception(
+            "Flet GUI runtime failed: exception_type=%s exception_message=%s",
+            type(exc).__name__,
+            str(exc),
+        )
+        raise
     return 0
 
 

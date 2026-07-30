@@ -3,6 +3,7 @@ from typing import Callable
 import flet as ft
 
 from puripuly_heart.ui.components.glow import create_glow_stack
+from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
     COLOR_SECONDARY,
@@ -33,7 +34,7 @@ class PowerButton(ft.Container):
         self._is_starting = False
         self._color_on = color_on if color_on is not None else COLOR_PRIMARY
 
-        self._icon_control = ft.Icon(name=icon, size=icon_size, color=COLOR_SECONDARY)
+        self._icon_control = ft.Icon(icon=icon, size=icon_size, color=COLOR_SECONDARY)
         self._progress_control = ft.ProgressRing(
             width=icon_size * 0.7,
             height=icon_size * 0.7,
@@ -46,7 +47,7 @@ class PowerButton(ft.Container):
             controls=[self._icon_control, self._progress_control],
             width=icon_size,
             height=icon_size,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
         self._label_control = ft.Text(
             label,
@@ -73,7 +74,7 @@ class PowerButton(ft.Container):
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     spacing=10,
                 ),
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment.CENTER,
             )
         )
 
@@ -126,11 +127,9 @@ class PowerButton(ft.Container):
             self._icon_control.color = COLOR_SECONDARY
             self._label_control.color = COLOR_SECONDARY
 
-        if self.page is not None:
-            self.update()
+        update_control_if_mounted(self)
 
     def set_label(self, label: str) -> None:
         self._label = label
         self._label_control.value = label
-        if self._label_control.page is not None:
-            self._label_control.update()
+        update_control_if_mounted(self._label_control)

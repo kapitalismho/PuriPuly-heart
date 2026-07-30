@@ -24,7 +24,7 @@ class BentoCard(ft.Container):
             expand=expand,
             height=height,
             width=width,
-            border=ft.border.all(1, COLOR_DIVIDER),
+            border=ft.Border.all(1, COLOR_DIVIDER),
             shadow=ft.BoxShadow(
                 spread_radius=0,
                 blur_radius=8,

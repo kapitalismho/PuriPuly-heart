@@ -5,7 +5,7 @@ import inspect
 from pathlib import Path
 
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
-from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
+from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.app.services.ui_application import (
     UI_APPLICATION_USER_INTENT_METHODS,
     UiApplicationBoundary,
@@ -14,13 +14,13 @@ from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_PATH = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "app.py"
-CONTROLLER_PATH = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "controller.py"
+APPLICATION_RUNTIME_PATH = (
+    REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
+)
 
 UI_APPLICATION_NON_INTENT_MEMBERS = {
-    "application_shutdown_callbacks",
-    "bind_application_lifecycle",
+    "application_lifecycle",
     "build_managed_openrouter_byok_target_settings",
-    "build_overlay_peer_consumer_contract",
     "cancel_managed_auth_task",
     "clear_managed_auth_task",
     "close_github_star_prompt_runtime",
@@ -44,6 +44,10 @@ UI_APPLICATION_NON_INTENT_MEMBERS = {
     "merge_settings_tab_apply_with_current_languages",
     "merge_settings_view_change_with_current",
     "overlay_calibration",
+    "overlay_peer_presentation_state",
+    "refresh_settings_after_openrouter_pkce_success",
+    "refresh_settings_projection",
+    "register_application_shutdown_callbacks",
     "should_show_github_star_prompt",
     "state",
     "stop",
@@ -104,11 +108,54 @@ def test_ui_application_contract_covers_every_translator_app_boundary_access() -
     assert contract <= implementation
     assert "__getattr__" not in UiApplicationBoundary.__dict__
     assert not hasattr(UiApplicationBoundary, "backend")
+    boundary_parameters = inspect.signature(UiApplicationBoundary).parameters
+    required_parameters = {
+        "startup",
+        "input_runtime",
+        "peer_capture",
+        "settings",
+        "provider",
+        "microphone",
+        "overlay",
+        "managed",
+        "engagement",
+        "diagnostics",
+        "state",
+        "runtime_shutdown",
+        "runtime_logging",
+    }
+    assert {
+        name: parameter.default
+        for name, parameter in boundary_parameters.items()
+        if name in required_parameters
+    } == dict.fromkeys(required_parameters, inspect.Parameter.empty)
+    state_owner_source = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "ui_application_state.py"
+    ).read_text(encoding="utf-8")
+    startup_port_source = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "ports" / "application_startup.py"
+    ).read_text(encoding="utf-8")
+    assert "getattr(" not in state_owner_source
+    assert "Any" not in startup_port_source
+    assert "_get_" not in startup_port_source
 
 
 def test_ui_boundary_implementations_match_every_declared_contract_signature() -> None:
     _assert_contract_signatures(UiApplicationPort, UiApplicationBoundary)
     _assert_contract_signatures(UiPresentationPort, FletUiPresentationAdapter)
+
+
+def test_ui_event_bridge_boundary_declares_every_consumed_operation() -> None:
+    assert _contract_members(UIEventBridgePort) == {
+        "close",
+        "report_overlay_state",
+        "run",
+        "wait_started",
+    }
+
+    source = APPLICATION_RUNTIME_PATH.read_text(encoding="utf-8")
+    assert "event_bridge: UIEventBridgePort | None" in source
+    assert "def start_event_bridge(bridge: UIEventBridgePort)" in source
 
 
 def test_every_ui_application_member_is_classified_as_guarded_intent_or_safe_operation() -> None:
@@ -144,11 +191,14 @@ def test_production_gui_constructor_wires_one_explicit_boundary_in_each_directio
     main_gui_source = ast.get_source_segment(source, main_gui)
 
     assert initializer_source.count("FletUiPresentationAdapter(self)") == 1
-    assert '"app": self._presentation_adapter' in initializer_source
-    assert initializer_source.count("GuiController(**controller_kwargs)") == 1
-    assert initializer_source.count("UiApplicationBoundary(self.controller)") == 1
-    assert 'application = getattr(app, "application", None)' in main_gui_source
-    assert "await application.start()" in main_gui_source
+    assert initializer_source.count("application_factory(") == 1
+    assert "presentation=self._presentation_adapter" in initializer_source
+    assert "page=" not in initializer_source.split("application_factory(", 1)[1].split(")", 1)[0]
+    assert "await app.application.start()" in main_gui_source
+    assert "await app.shutdown()" in main_gui_source
+    assert "app.schedule_after_launch_tasks()" in main_gui_source
+    assert "inspect.signature(TranslatorApp)" not in main_gui_source
+    assert "getattr(app," not in main_gui_source
 
 
 def test_translator_app_has_no_operational_controller_or_hub_reach_through() -> None:
@@ -189,19 +239,17 @@ def test_translator_app_imports_only_the_approved_backend_boundary_surface() -> 
 
     assert not any(module.startswith(forbidden_prefixes) for module in imports)
     assert "puripuly_heart.app.ports.ui_application" in imports
-    assert "puripuly_heart.app.services.ui_application" in imports
+    assert "puripuly_heart.app.services.ui_application" not in imports
 
 
-def test_controller_presentation_access_is_explicit_and_adapter_is_closed() -> None:
-    tree = ast.parse(CONTROLLER_PATH.read_text(encoding="utf-8"))
+def test_application_composition_presentation_access_is_explicit_and_adapter_is_closed() -> None:
+    tree = ast.parse(APPLICATION_RUNTIME_PATH.read_text(encoding="utf-8"))
     accessed: set[str] = set()
     for node in ast.walk(tree):
         if (
             isinstance(node, ast.Attribute)
-            and isinstance(node.value, ast.Attribute)
-            and isinstance(node.value.value, ast.Name)
-            and node.value.value.id == "self"
-            and node.value.attr == "app"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "presentation"
         ):
             accessed.add(node.attr)
         if (
@@ -209,17 +257,22 @@ def test_controller_presentation_access_is_explicit_and_adapter_is_closed() -> N
             and isinstance(node.func, ast.Name)
             and node.func.id == "getattr"
             and len(node.args) >= 2
-            and isinstance(node.args[0], ast.Attribute)
-            and isinstance(node.args[0].value, ast.Name)
-            and node.args[0].value.id == "self"
-            and node.args[0].attr == "app"
+            and isinstance(node.args[0], ast.Name)
+            and node.args[0].id == "presentation"
             and isinstance(node.args[1], ast.Constant)
             and isinstance(node.args[1].value, str)
         ):
             accessed.add(node.args[1].value)
 
-    assert accessed - {"_show_snackbar"} <= _contract_members(UiPresentationPort)
+    assert accessed <= _contract_members(UiPresentationPort)
     assert _contract_members(UiPresentationPort) <= _contract_members(FletUiPresentationAdapter)
     assert "__getattr__" not in FletUiPresentationAdapter.__dict__
     assert FletUiPresentationAdapter.__annotations__["_app"] == "UiPresentationPort"
     assert not hasattr(FletUiPresentationAdapter, "app")
+
+
+def test_application_runtime_has_no_flet_or_ui_module_dependencies() -> None:
+    imports = _imports(APPLICATION_RUNTIME_PATH)
+
+    assert "flet" not in imports
+    assert not any(module.startswith("puripuly_heart.ui") for module in imports)

@@ -6,12 +6,13 @@ with optional descriptions for each option.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Callable, Sequence
 
 import flet as ft
 
+from puripuly_heart.app.ports.ui_models import OptionItem
 from puripuly_heart.ui.components.glow import create_glow_stack
+from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL,
@@ -21,17 +22,6 @@ from puripuly_heart.ui.theme import (
     COLOR_SURFACE,
     get_card_shadow,
 )
-
-
-@dataclass
-class OptionItem:
-    """Option item for settings modal."""
-
-    value: str
-    label: str
-    description: str = ""
-    disabled: bool = False
-    section: str = ""
 
 
 class SettingsModal:
@@ -110,7 +100,7 @@ class SettingsModal:
             ),
             width=880 if is_two_column else 600,
             height=700,
-            padding=ft.padding.symmetric(horizontal=32, vertical=32),
+            padding=ft.Padding.symmetric(horizontal=32, vertical=32),
             bgcolor=COLOR_SURFACE,
             border_radius=28,
             shadow=get_card_shadow(),
@@ -122,10 +112,9 @@ class SettingsModal:
             content=create_glow_stack(modal_content),
             content_padding=0,
             bgcolor=ft.Colors.TRANSPARENT,
-            surface_tint_color=ft.Colors.TRANSPARENT,
         )
 
-        self._page.open(self._dialog)
+        self._page.show_dialog(self._dialog)
 
     def replace_options(self, options: Sequence[OptionItem]) -> None:
         """Replace the option list after the modal is open.
@@ -178,7 +167,7 @@ class SettingsModal:
             controls=items,
             expand=True,
             spacing=12,
-            padding=ft.padding.only(right=8, bottom=12),
+            padding=ft.Padding.only(right=8, bottom=12),
         )
         self._section_lists = None
         return self._option_list
@@ -191,7 +180,7 @@ class SettingsModal:
                 controls=self._build_column_items(current, assigned_sections),
                 expand=True,
                 spacing=12,
-                padding=ft.padding.only(right=8, bottom=12),
+                padding=ft.Padding.only(right=8, bottom=12),
             )
             self._section_lists.append((list_view, assigned_sections))
             columns.append(ft.Container(content=list_view, width=400))
@@ -328,8 +317,8 @@ class SettingsModal:
             bgcolor=bg_color,
             border_radius=16,
             border=border,
-            padding=ft.padding.all(24),
-            alignment=ft.alignment.center,
+            padding=ft.Padding.all(24),
+            alignment=ft.Alignment.CENTER,
             on_click=None if option.disabled else lambda e, val=option.value: self._select(val),
             on_hover=None if option.disabled else self._on_item_hover,
             animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
@@ -348,7 +337,7 @@ class SettingsModal:
             ),
             bgcolor=COLOR_BACKGROUND,
             border_radius=16,
-            padding=ft.padding.all(24),
+            padding=ft.Padding.all(24),
             height=110,
         )
 
@@ -367,7 +356,7 @@ class SettingsModal:
         )
         return ft.Container(
             content=ft.Column(controls, spacing=0),
-            padding=ft.padding.symmetric(horizontal=4),
+            padding=ft.Padding.symmetric(horizontal=4),
         )
 
     def _on_item_hover(self, e: ft.ControlEvent) -> None:
@@ -375,7 +364,7 @@ class SettingsModal:
         container = e.control
         content = container.content
 
-        is_hovering = e.data == "true"
+        is_hovering = is_hover_active(e)
 
         # Get text control (could be Text or Column with Text)
         if isinstance(content, ft.Text):
@@ -405,5 +394,5 @@ class SettingsModal:
     def _select(self, value: str) -> None:
         """Handle option selection."""
         if self._dialog:
-            self._page.close(self._dialog)
+            self._page.pop_dialog()
         self._on_select(value)

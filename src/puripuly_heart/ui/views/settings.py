@@ -65,6 +65,11 @@ from puripuly_heart.ui.components.settings import (
 )
 from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 from puripuly_heart.ui.components.subtab_shell import TextSubtab, TextSubtabShell
+from puripuly_heart.ui.flet_runtime import (
+    is_control_mounted,
+    is_hover_active,
+    update_control_if_mounted,
+)
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 from puripuly_heart.ui.i18n import (
@@ -76,6 +81,23 @@ from puripuly_heart.ui.i18n import (
     t,
 )
 from puripuly_heart.ui.overlay_peer_contract import OverlayPeerConsumerContract
+from puripuly_heart.ui.settings.contract import (
+    SettingsApiSurfaceSlots,
+    SettingsGeneralIntents,
+    SettingsGeneralSurfaceSlots,
+    SettingsOverlayIntents,
+    SettingsOverlaySurfaceSlots,
+    SettingsPromptIntents,
+    SettingsPromptSurfaceSlots,
+    SettingsProviderIntents,
+    SettingsSurfaceIntents,
+)
+from puripuly_heart.ui.settings.renderer import (
+    compose_settings_api_surface,
+    compose_settings_general_surface,
+    compose_settings_overlay_surface,
+    compose_settings_prompt_surface,
+)
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
     COLOR_NEUTRAL,
@@ -87,8 +109,8 @@ from puripuly_heart.ui.theme import (
 logger = logging.getLogger(__name__)
 
 _CJK_START = 0x3000
-_CENTER_ALIGNMENT = ft.alignment.Alignment(0, 0)
-_CENTER_RIGHT_ALIGNMENT = ft.alignment.Alignment(1, 0)
+_CENTER_ALIGNMENT = ft.Alignment(0, 0)
+_CENTER_RIGHT_ALIGNMENT = ft.Alignment(1, 0)
 _SETTINGS_SUBTAB_ORDER = ("api", "general", "prompt", "overlay")
 _OVERLAY_DISTANCE_MIN = 0.5
 _OVERLAY_DISTANCE_MAX = 2.0
@@ -222,11 +244,11 @@ _TRANSLATION_FALLBACK_DESCRIPTION_KEY_BY_VALUE = {
 
 
 def _make_text_button(label: str, **kwargs) -> ft.TextButton:
-    return ft.TextButton(text=label, **kwargs)
+    return ft.TextButton(content=label, **kwargs)
 
 
 def _set_text_button_label(button: ft.TextButton, label: str) -> None:
-    button.text = label
+    button.content = label
 
 
 def _reject_json_constant(value: str) -> None:
@@ -234,14 +256,7 @@ def _reject_json_constant(value: str) -> None:
 
 
 def _update_control_if_mounted(control: ft.Control) -> None:
-    """Update a Flet control only while it is attached to a page."""
-    if getattr(control, "page", None) is None:
-        return
-    try:
-        control.update()
-    except AssertionError as exc:
-        if "Control must be added" not in str(exc):
-            raise
+    update_control_if_mounted(control)
 
 
 def _make_overlay_anchor_dropdown(value: str, on_change) -> ft.Dropdown:
@@ -258,7 +273,7 @@ def _make_overlay_anchor_dropdown(value: str, on_change) -> ft.Dropdown:
         border_radius=10,
         border_color=COLOR_DIVIDER,
         focused_border_color=COLOR_PRIMARY,
-        on_change=on_change,
+        on_select=on_change,
     )
 
 
@@ -377,6 +392,81 @@ class SettingsView(ft.Column):
 
     def set_local_cpu_auto_available(self, available: bool) -> None:
         self._local_cpu_auto_available = bool(available)
+
+    def self_stt_control(self) -> ft.Control:
+        return self._self_stt_card
+
+    def peer_stt_control(self) -> ft.Control:
+        return self._peer_stt_card
+
+    def translation_provider_control(self) -> ft.Control:
+        return self._translation_provider_card
+
+    def translation_connection_control(self) -> ft.Control:
+        return self._translation_connection_card
+
+    def translation_fallback_control(self) -> ft.Control:
+        return self._openrouter_fallback_card
+
+    def gpu_device_control(self) -> ft.Control:
+        return self._gpu_device_card
+
+    def local_llm_connection_control(self) -> ft.Control:
+        return self._local_llm_connection_card
+
+    def managed_key_control(self) -> ft.Control:
+        return self._managed_key_card
+
+    def peer_expected_language_control(self) -> ft.Control:
+        return self._peer_auto_languages_card
+
+    def api_keys_control(self) -> ft.Control:
+        return self._api_keys_card
+
+    def bind_settings_intents(
+        self,
+        *,
+        surface: SettingsSurfaceIntents,
+        provider: SettingsProviderIntents,
+        general: SettingsGeneralIntents,
+        prompt: SettingsPromptIntents,
+        overlay: SettingsOverlayIntents,
+    ) -> None:
+        self.on_settings_changed = surface.settings_changed
+        self.show_snackbar = surface.show_snackbar
+        if surface.runtime_log_basic is not None:
+            self.runtime_log_basic = surface.runtime_log_basic
+        if surface.runtime_log_detailed is not None:
+            self.runtime_log_detailed = surface.runtime_log_detailed
+        self.on_providers_changed = provider.providers_changed
+        self.on_request_openrouter_pkce = provider.request_openrouter_pkce
+        self.on_verify_api_key = provider.verify_api_key
+        self.on_provider_secret_change = provider.provider_secret_change
+        self.on_secret_cleared = provider.secret_cleared
+        self.on_local_llm_secret_changed = provider.local_llm_secret_changed
+        self.on_gpu_discovery_requested = provider.gpu_discovery_requested
+        self.on_start_microphone_test = general.start_microphone_test
+        self.on_telemetry_consent_change = general.telemetry_consent_change
+        self.on_list_loopback_capture_options = general.list_loopback_capture_options
+        self.on_list_loopback_process_options = general.list_loopback_process_options
+        self.on_list_loopback_device_options = general.list_loopback_device_options
+        self.on_current_loopback_capture_option = general.current_loopback_capture_option
+        self.on_apply_loopback_capture_option = general.apply_loopback_capture_option
+        self.on_loopback_capture_summary = general.loopback_capture_summary
+        self.on_prompt_apply_settings = prompt.prompt_apply_settings
+        self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
+        self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
+        self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
+        self.on_desktop_overlay_position_reset = overlay.desktop_overlay_position_reset
+        self.on_view_logs = overlay.view_logs
+        if overlay.calibration_begin is not None:
+            self.on_overlay_calibration_begin = overlay.calibration_begin
+        if overlay.calibration_change is not None:
+            self.on_overlay_calibration_change = overlay.calibration_change
+        if overlay.calibration_apply is not None:
+            self.on_overlay_calibration_apply = overlay.calibration_apply
+        if overlay.calibration_cancel is not None:
+            self.on_overlay_calibration_cancel = overlay.calibration_cancel
 
     # --- Card Wrapper (About page pattern) ---
     def _wrap_card(
@@ -545,7 +635,7 @@ class SettingsView(ft.Column):
             self._loopback_audio_text,
             summary or t("settings.default_option"),
         )
-        if getattr(self._loopback_audio_text, "page", None) is not None:
+        if is_control_mounted(self._loopback_audio_text):
             self._loopback_audio_text.update()
 
     def _rebase_retained_loopback_capture_target(self, settings: AppSettings) -> None:
@@ -561,7 +651,7 @@ class SettingsView(ft.Column):
         """Handle hover effect on clickable text."""
         container = e.control
         text_control = container.content
-        next_color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+        next_color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         if text_control.color == next_color:
             return
         text_control.color = next_color
@@ -569,11 +659,11 @@ class SettingsView(ft.Column):
 
     def _make_overlay_step_hover_handler(self, text_control: ft.Text):
         def _on_hover(e: ft.ControlEvent) -> None:
-            next_color = COLOR_PRIMARY if e.data == "true" else COLOR_ON_BACKGROUND
+            next_color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
             if text_control.color == next_color:
                 return
             text_control.color = next_color
-            if text_control.page is not None:
+            if is_control_mounted(text_control):
                 text_control.update()
 
         return _on_hover
@@ -617,11 +707,11 @@ class SettingsView(ft.Column):
     ) -> tuple[ft.Stack, ft.Container, ft.Container, ft.Text, ft.Text]:
         decrease_visual, decrease_glyph = self._build_overlay_step_visual_lane(
             decrease_text,
-            alignment=ft.alignment.center_right,
+            alignment=ft.Alignment.CENTER_RIGHT,
         )
         increase_visual, increase_glyph = self._build_overlay_step_visual_lane(
             increase_text,
-            alignment=ft.alignment.center_left,
+            alignment=ft.Alignment.CENTER_LEFT,
         )
         decrease_lane = self._build_overlay_step_hit_lane(
             on_decrease,
@@ -637,7 +727,7 @@ class SettingsView(ft.Column):
                 ft.Container(
                     content=value_text,
                     width=84,
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment.CENTER,
                 ),
                 increase_visual,
             ],
@@ -652,7 +742,7 @@ class SettingsView(ft.Column):
                 ft.Container(
                     content=visual_row,
                     expand=True,
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment.CENTER,
                 ),
             ],
             spacing=0,
@@ -670,7 +760,7 @@ class SettingsView(ft.Column):
             ],
             fit=ft.StackFit.EXPAND,
             expand=True,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
         return stack, decrease_lane, increase_lane, decrease_glyph, increase_glyph
 
@@ -879,7 +969,7 @@ class SettingsView(ft.Column):
         self._stt_provider_label = ft.Text(
             t("settings.self_stt_provider"), size=16, color=COLOR_ON_BACKGROUND
         )
-        stt_card = self._wrap_unit_card(
+        self._self_stt_card = self._wrap_unit_card(
             title=self._stt_title,
             value=self._stt_text,
         )
@@ -897,7 +987,7 @@ class SettingsView(ft.Column):
         self._translation_provider_label = ft.Text(
             t("settings.shared_translation_provider"), size=16, color=COLOR_ON_BACKGROUND
         )
-        trans_card = self._wrap_unit_card(
+        self._translation_provider_card = self._wrap_unit_card(
             title=self._trans_title,
             value=self._llm_text,
         )
@@ -1158,7 +1248,7 @@ class SettingsView(ft.Column):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
-        api_card = self._wrap_card(
+        self._api_keys_card = self._wrap_card(
             ft.Column(
                 [
                     api_header,
@@ -1169,7 +1259,6 @@ class SettingsView(ft.Column):
             ),
             height=None,
         )
-        api_keys_row = api_card
 
         # === General Tab Row 1 ===
         self._ui_text = self._build_clickable_text(
@@ -1260,17 +1349,8 @@ class SettingsView(ft.Column):
             value=self._microphone_test_text,
         )
 
-        general_primary_row = ft.Container(
-            content=ft.Row(
-                [
-                    ui_card,
-                    chatbox_source_card,
-                    self._wrap_empty_unit_card(),
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
+        self._general_ui_card = ui_card
+        self._general_chatbox_source_card = chatbox_source_card
 
         # === General Tab Row 2: Host API / Microphone Audio / Loopback Audio ===
         self._mic_audio_text = self._build_clickable_text(
@@ -1316,13 +1396,9 @@ class SettingsView(ft.Column):
             title=self._loopback_audio_title,
             value=self._loopback_audio_text,
         )
-        general_audio_row = ft.Container(
-            content=ft.Row(
-                [host_api_card, mic_audio_card, loopback_audio_card],
-                spacing=16,
-                expand=True,
-            ),
-        )
+        self._general_host_api_card = host_api_card
+        self._general_mic_audio_card = mic_audio_card
+        self._general_loopback_audio_card = loopback_audio_card
 
         # === General Tab Row 3: VRChat Mute Sync / Self VAD / Peer VAD ===
         self._self_vad_title = ft.Text(
@@ -1385,23 +1461,21 @@ class SettingsView(ft.Column):
                 expand=True,
             ),
         )
-        general_vad_row = ft.Container(
-            content=ft.Row(
-                [microphone_test_card, self._self_vad_card, self._peer_vad_card],
-                spacing=16,
-                expand=True,
+        self._general_surface = compose_settings_general_surface(
+            SettingsGeneralSurfaceSlots(
+                ui=self._general_ui_card,
+                chatbox_source=self._general_chatbox_source_card,
+                audio_host_api=self._general_host_api_card,
+                microphone=self._general_mic_audio_card,
+                loopback=self._general_loopback_audio_card,
+                microphone_test=microphone_test_card,
+                self_vad=self._self_vad_card,
+                peer_vad=self._peer_vad_card,
+                clipboard_auto_translate=clipboard_auto_translate_card,
+                vrchat_mic_intercept=vrc_mic_card,
+                telemetry_consent=self._telemetry_consent_card,
             ),
-        )
-        general_clipboard_row = ft.Container(
-            content=ft.Row(
-                [
-                    clipboard_auto_translate_card,
-                    vrc_mic_card,
-                    self._telemetry_consent_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
+            placeholder_factory=self._wrap_empty_unit_card,
         )
 
         # === Peer STT card ===
@@ -1425,12 +1499,9 @@ class SettingsView(ft.Column):
             size=16,
             color=COLOR_ON_BACKGROUND,
         )
-        peer_stt_card = self._wrap_unit_card(
+        self._peer_stt_card = self._wrap_unit_card(
             title=self._peer_provider_title,
             value=self._peer_stt_text,
-        )
-        row1 = ft.Container(
-            content=ft.Row([stt_card, peer_stt_card, trans_card], spacing=16, expand=True),
         )
 
         self._gpu_device_title = ft.Text(
@@ -1450,20 +1521,6 @@ class SettingsView(ft.Column):
             value=self._gpu_device_text,
         )
         self._gpu_device_card.visible = False
-        gpu_placeholder_1 = self._wrap_empty_unit_card()
-        gpu_placeholder_2 = self._wrap_empty_unit_card()
-        self._gpu_device_row = ft.Container(
-            content=ft.Row(
-                [
-                    self._gpu_device_card,
-                    gpu_placeholder_1,
-                    gpu_placeholder_2,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
-        self._gpu_device_row.visible = False
 
         self._overlay_translation_title = ft.Text(
             t("settings.overlay.show_translation"),
@@ -1804,77 +1861,32 @@ class SettingsView(ft.Column):
         self._overlay_desktop_reset_spacer_a = self._wrap_empty_unit_card()
         self._overlay_desktop_reset_spacer_b = self._wrap_empty_unit_card()
 
-        overlay_row1 = ft.Container(
-            content=ft.Row(
-                [
-                    self._overlay_target_card,
-                    self._overlay_translation_card,
-                    self._overlay_peer_original_card,
-                ],
-                spacing=16,
-                expand=True,
+        self._overlay_surface = compose_settings_overlay_surface(
+            SettingsOverlaySurfaceSlots(
+                overlay_target=self._overlay_target_card,
+                overlay_translation=self._overlay_translation_card,
+                overlay_peer_original=self._overlay_peer_original_card,
+                anchor=self._overlay_anchor_card,
+                distance=self._overlay_distance_card,
+                offset_x=self._overlay_offset_x_card,
+                offset_y=self._overlay_offset_y_card,
+                text_scale=self._overlay_text_scale_card,
+                vr_reset=self._overlay_vr_reset_card,
+                desktop_size=self._desktop_overlay_size_card,
+                desktop_lock=self._desktop_overlay_lock_card,
+                desktop_background_alpha=self._desktop_overlay_background_alpha_card,
+                desktop_reset=self._overlay_desktop_reset_card,
+                desktop_reset_spacer_a=self._overlay_desktop_reset_spacer_a,
+                desktop_reset_spacer_b=self._overlay_desktop_reset_spacer_b,
+                desktop_status=self._desktop_overlay_status_card,
+                desktop_status_trailing=self._overlay_empty_card,
             ),
+            placeholder_factory=self._wrap_empty_unit_card,
         )
-        overlay_row2 = ft.Container(
-            content=ft.Row(
-                [
-                    self._overlay_anchor_card,
-                    self._overlay_distance_card,
-                    self._overlay_offset_x_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
-        overlay_row3 = ft.Container(
-            content=ft.Row(
-                [
-                    self._overlay_offset_y_card,
-                    self._overlay_text_scale_card,
-                    self._overlay_vr_reset_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
-        overlay_row4 = ft.Container(
-            content=ft.Row(
-                [
-                    self._desktop_overlay_size_card,
-                    self._desktop_overlay_lock_card,
-                    self._desktop_overlay_background_alpha_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
-        overlay_row5 = ft.Container(
-            content=ft.Row(
-                [
-                    self._overlay_desktop_reset_card,
-                    self._overlay_desktop_reset_spacer_a,
-                    self._overlay_desktop_reset_spacer_b,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-        )
-        overlay_row6 = ft.Container(
-            content=ft.Row(
-                [
-                    self._desktop_overlay_status_card,
-                    self._wrap_empty_unit_card(),
-                    self._overlay_empty_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-            visible=False,
-        )
-        self._overlay_vr_rows = (overlay_row2, overlay_row3)
-        self._overlay_desktop_rows = (overlay_row4, overlay_row5)
-        self._desktop_overlay_controls_row = overlay_row4
-        self._desktop_overlay_recovery_row = overlay_row6
+        self._overlay_vr_rows = self._overlay_surface.vr_rows
+        self._overlay_desktop_rows = self._overlay_surface.desktop_rows
+        self._desktop_overlay_controls_row = self._overlay_surface.desktop_controls_row
+        self._desktop_overlay_recovery_row = self._overlay_surface.recovery_row
         self._sync_overlay_target_specific_visibility()
 
         self._translation_connection_title = ft.Text(
@@ -1910,19 +1922,6 @@ class SettingsView(ft.Column):
             title=self._openrouter_fallback_title,
             value=self._openrouter_fallback_text,
         )
-        self._translation_connection_row = ft.Container(
-            content=ft.Row(
-                [
-                    self._wrap_empty_unit_card(),
-                    self._translation_connection_card,
-                    self._openrouter_fallback_card,
-                ],
-                spacing=16,
-                expand=True,
-            ),
-            visible=True,
-        )
-        self._openrouter_routing_row = self._translation_connection_row
 
         self._local_llm_connection_title = ft.Text(
             t("settings.local_llm.connection"),
@@ -2119,32 +2118,24 @@ class SettingsView(ft.Column):
             expand=False,
         )
 
+        self._api_surface = compose_settings_api_surface(
+            SettingsApiSurfaceSlots.from_slot_provider(self),
+            placeholder_factory=self._wrap_empty_unit_card,
+        )
+        self._translation_connection_row = self._api_surface.translation_connection_row
+        self._openrouter_routing_row = self._translation_connection_row
+        self._gpu_device_row = self._api_surface.gpu_device_row
+
+        self._prompt_surface = compose_settings_prompt_surface(
+            SettingsPromptSurfaceSlots(custom_vocabulary=row7, persona=persona_card)
+        )
+
         self._settings_subtab_shell = self._build_settings_subtab_shell(
             {
-                "api": [
-                    row1,
-                    self._translation_connection_row,
-                    self._gpu_device_row,
-                    self._local_llm_connection_card,
-                    self._managed_key_card,
-                    self._peer_auto_languages_card,
-                    api_keys_row,
-                ],
-                "general": [
-                    general_primary_row,
-                    general_audio_row,
-                    general_vad_row,
-                    general_clipboard_row,
-                ],
-                "prompt": [row7, persona_card],
-                "overlay": [
-                    overlay_row1,
-                    overlay_row2,
-                    overlay_row3,
-                    overlay_row4,
-                    overlay_row5,
-                    overlay_row6,
-                ],
+                "api": list(self._api_surface.rows),
+                "general": list(self._general_surface.rows),
+                "prompt": list(self._prompt_surface.rows),
+                "overlay": list(self._overlay_surface.rows),
             }
         )
         self.controls = [self._settings_subtab_shell]
@@ -2197,7 +2188,7 @@ class SettingsView(ft.Column):
         return name.strip()
 
     def _on_gpu_device_click(self, _event) -> None:
-        if not self.page:
+        if not is_control_mounted(self):
             return
         settings = self._build_settings_with_provider_draft()
         selected = settings.stt.gpu_device_id if settings is not None else "auto"
@@ -2477,7 +2468,7 @@ class SettingsView(ft.Column):
             peer_auto_languages_editor, "apply_locale"
         ):
             peer_auto_languages_editor.apply_locale()
-        if self.page:
+        if is_control_mounted(self):
             for control in (
                 self._prompt_for_text,
                 self._custom_vocab_description_text,
@@ -2678,7 +2669,7 @@ class SettingsView(ft.Column):
         else:
             self._managed_trial_usage_remaining_percent = None
         self._sync_managed_key_card()
-        if self.page:
+        if is_control_mounted(self):
             with contextlib.suppress(Exception):
                 self._repaint_managed_key_card()
 
@@ -2823,7 +2814,7 @@ class SettingsView(ft.Column):
         self._local_llm_extra_body_error_kwargs = dict(kwargs)
         self._local_llm_extra_body_error.value = message
         self._local_llm_extra_body_error.visible = True
-        self._local_llm_extra_body.error_text = message
+        self._local_llm_extra_body.error = message
         _update_control_if_mounted(self._local_llm_extra_body)
         _update_control_if_mounted(self._local_llm_extra_body_error)
 
@@ -2842,7 +2833,7 @@ class SettingsView(ft.Column):
         self._local_llm_extra_body_error_kwargs = {}
         self._local_llm_extra_body_error.value = ""
         self._local_llm_extra_body_error.visible = False
-        self._local_llm_extra_body.error_text = None
+        self._local_llm_extra_body.error = None
         _update_control_if_mounted(self._local_llm_extra_body)
         _update_control_if_mounted(self._local_llm_extra_body_error)
 
@@ -2854,11 +2845,11 @@ class SettingsView(ft.Column):
         try:
             normalized = _normalize_local_llm_base_url(raw_value)
         except ValueError:
-            self._local_llm_base_url.error_text = t("settings.local_llm.base_url.invalid")
+            self._local_llm_base_url.error = t("settings.local_llm.base_url.invalid")
             _update_control_if_mounted(self._local_llm_base_url)
             return
 
-        self._local_llm_base_url.error_text = None
+        self._local_llm_base_url.error = None
         self._local_llm_base_url.value = normalized
         current = self._provider_settings_draft or self._settings
         if current.local_llm.base_url != normalized:
@@ -2873,11 +2864,11 @@ class SettingsView(ft.Column):
             return
         model = (self._local_llm_model.value or "").strip()
         if not model:
-            self._local_llm_model.error_text = t("settings.local_llm.model.required")
+            self._local_llm_model.error = t("settings.local_llm.model.required")
             _update_control_if_mounted(self._local_llm_model)
             return
 
-        self._local_llm_model.error_text = None
+        self._local_llm_model.error = None
         self._local_llm_model.value = model
         current = self._provider_settings_draft or self._settings
         if current.local_llm.model != model:
@@ -3078,9 +3069,9 @@ class SettingsView(ft.Column):
         )
         self._sync_openrouter_fallback_card(settings)
         self._local_llm_base_url.value = settings.local_llm.base_url
-        self._local_llm_base_url.error_text = None
+        self._local_llm_base_url.error = None
         self._local_llm_model.value = settings.local_llm.model
-        self._local_llm_model.error_text = None
+        self._local_llm_model.error = None
         self._local_llm_extra_body.value = json.dumps(
             settings.local_llm.extra_body,
             ensure_ascii=False,
@@ -3144,7 +3135,7 @@ class SettingsView(ft.Column):
         # Load secrets
         self._load_secrets(settings, config_path)
 
-        if self.page:
+        if is_control_mounted(self):
             self.update()
 
     def refresh_after_openrouter_pkce_success(
@@ -3194,13 +3185,13 @@ class SettingsView(ft.Column):
             self._cerebras_key.value = store.get("cerebras_api_key") or ""
             self._restore_api_key_icons(settings)
 
-        if self.page:
+        if is_control_mounted(self):
             self.update()
 
     def sync_telemetry_settings(self, settings: AppSettings) -> None:
         self._settings = settings
         self._sync_telemetry_consent_card(settings)
-        if self.page:
+        if is_control_mounted(self):
             _update_control_if_mounted(self._telemetry_consent_card)
 
     def _load_secrets(self, settings: AppSettings, config_path: Path) -> None:
@@ -3288,7 +3279,7 @@ class SettingsView(ft.Column):
             default_color=COLOR_NEUTRAL_DARK,
             disabled_color=COLOR_NEUTRAL_DARK,
         )
-        if getattr(self._openrouter_pkce_button, "page", None):
+        if is_control_mounted(self._openrouter_pkce_button):
             self._openrouter_pkce_button.update()
 
     # --- Visibility Updates ---
@@ -3321,7 +3312,7 @@ class SettingsView(ft.Column):
         if peer_auto_languages_card is not None:
             peer_auto_languages_card.visible = peer_stt == STTProviderName.SONIOX
             self._sync_peer_auto_languages_editor(settings)
-            if self.page:
+            if is_control_mounted(self):
                 try:
                     peer_auto_languages_card.update()
                 except Exception:
@@ -3378,7 +3369,7 @@ class SettingsView(ft.Column):
     # --- Event Handlers ---
     def _on_stt_click(self, e) -> None:
         """Open STT provider selection modal."""
-        if not self.page:
+        if not is_control_mounted(self):
             return
         ordered_providers = [
             provider
@@ -3447,13 +3438,13 @@ class SettingsView(ft.Column):
             message = t(warning.key, language=language_name(warning.language_code))
             self._show_stt_selection_notice(message)
 
-        if self.page:
+        if is_control_mounted(self):
             self._qwen_region_btn.update()
             self._api_keys_column.update()
             self._stt_text.update()
 
     def _on_peer_stt_click(self, e) -> None:
-        if not self.page:
+        if not is_control_mounted(self):
             return
         ordered_providers = [
             provider
@@ -3508,7 +3499,7 @@ class SettingsView(ft.Column):
         self._set_unit_card_value_text(self._peer_stt_text, provider_label(value))
         self._update_api_visibility()
         self._sync_gpu_device_card()
-        if self.page:
+        if is_control_mounted(self):
             self._peer_stt_text.update()
             self._qwen_region_btn.update()
             self._api_keys_column.update()
@@ -3517,21 +3508,21 @@ class SettingsView(ft.Column):
     def _show_stt_selection_notice(self, message: str) -> None:
         if self.show_snackbar:
             self.show_snackbar(message, ft.Colors.ORANGE_700)
-        elif self.page:
-            self.page.open(
+        elif is_control_mounted(self):
+            self.page.show_dialog(
                 ft.SnackBar(
                     ft.Text(message, color=ft.Colors.WHITE),
                     bgcolor=ft.Colors.ORANGE_700,
                     duration=4000,
                     behavior=ft.SnackBarBehavior.FLOATING,
-                    margin=ft.margin.only(bottom=90),
+                    margin=ft.Margin.only(bottom=90),
                     padding=20,
                 )
             )
 
     def _on_llm_click(self, e) -> None:
         """Open LLM provider selection modal."""
-        if not self.page:
+        if not is_control_mounted(self):
             return
         options = [
             OptionItem(
@@ -3652,7 +3643,7 @@ class SettingsView(ft.Column):
             draft.system_prompt = next_prompt
         self._sync_prompt_tab_copy()
 
-        if self.page:
+        if is_control_mounted(self):
             self._qwen_region_btn.update()
             self._repaint_managed_key_card()
             self._llm_text.update()
@@ -3680,7 +3671,7 @@ class SettingsView(ft.Column):
         self._apply_translation_selection(model, connection)
 
     def _on_translation_connection_click(self, e) -> None:
-        if not self.page:
+        if not is_control_mounted(self):
             return
         display_settings = self._build_settings_with_provider_draft()
         model = (
@@ -3725,7 +3716,7 @@ class SettingsView(ft.Column):
         self._apply_translation_selection(model, connection)
 
     def _on_openrouter_fallback_click(self, e) -> None:
-        if not self.page:
+        if not is_control_mounted(self):
             return
         options: list[OptionItem] = [
             OptionItem(
@@ -3785,13 +3776,13 @@ class SettingsView(ft.Column):
 
         display_settings = self._build_settings_with_provider_draft()
         self._sync_openrouter_fallback_card(display_settings)
-        if self.page:
+        if is_control_mounted(self):
             self._api_keys_column.update()
             self._translation_connection_row.update()
 
     def _on_ui_click(self, e) -> None:
         """Open UI language selection modal."""
-        if not self.page:
+        if not is_control_mounted(self):
             return
         options = [OptionItem(value=code, label=locale_label(code)) for code in available_locales()]
         current = self._settings.ui.locale if self._settings else "en"
@@ -3814,13 +3805,13 @@ class SettingsView(ft.Column):
 
         # Update text
         self._ui_text.content.value = locale_label(value)
-        if self.page:
+        if is_control_mounted(self):
             self._ui_text.update()
         self._emit_settings_changed()
 
     def _on_qwen_region_click(self, e) -> None:
         """Open Qwen region selection modal."""
-        if not self.page:
+        if not is_control_mounted(self):
             return
         options = [OptionItem(value=r.value, label=t(f"region.{r.value}")) for r in QwenRegion]
         display_settings = self._build_settings_with_provider_draft()
@@ -3857,11 +3848,11 @@ class SettingsView(ft.Column):
             self._qwen_region_btn,
             f"{t('settings.qwen_region')} {t(f'region.{value}')}",
         )
-        if self.page:
+        if is_control_mounted(self):
             self._qwen_region_btn.update()
 
         self._update_api_visibility()
-        if self.page:
+        if is_control_mounted(self):
             self._api_keys_column.update()
 
     def _on_openrouter_pkce_click(self, _e) -> None:
@@ -3958,7 +3949,7 @@ class SettingsView(ft.Column):
         self._emit_settings_changed()
 
     def _on_mic_host_api_click(self, e) -> None:
-        if not self.page:
+        if not is_control_mounted(self):
             return
         options = self._audio_settings._get_host_api_options()
         modal = SettingsModal(
@@ -3974,13 +3965,13 @@ class SettingsView(ft.Column):
         self._audio_settings.host_api = value
         self._audio_settings.microphone = ""
         self._sync_general_audio_card_texts()
-        if self.page:
+        if is_control_mounted(self):
             self._mic_audio_text.update()
             self._audio_host_api_text.update()
         self._on_audio_change()
 
     def _on_mic_audio_click(self, e) -> None:
-        if not self.page:
+        if not is_control_mounted(self):
             return
         options = self._audio_settings._get_microphone_options()
         modal = SettingsModal(
@@ -3995,12 +3986,12 @@ class SettingsView(ft.Column):
     def _on_mic_audio_selected(self, value: str) -> None:
         self._audio_settings.microphone = value
         self._sync_general_audio_card_texts()
-        if self.page:
+        if is_control_mounted(self):
             self._mic_audio_text.update()
         self._on_audio_change()
 
     def _on_loopback_audio_click(self, e) -> None:
-        if not self.page:
+        if not is_control_mounted(self):
             return
         list_process_options = getattr(self, "on_list_loopback_process_options", None)
         list_device_options = getattr(self, "on_list_loopback_device_options", None)
@@ -4076,12 +4067,12 @@ class SettingsView(ft.Column):
                 self._loopback_audio_text,
                 summary or t("settings.default_option"),
             )
-            if self.page:
+            if is_control_mounted(self):
                 self._loopback_audio_text.update()
             return
         self._audio_settings.desktop_output_device = value
         self._sync_general_audio_card_texts()
-        if self.page:
+        if is_control_mounted(self):
             self._loopback_audio_text.update()
         self._on_audio_change()
 
@@ -4279,7 +4270,7 @@ class SettingsView(ft.Column):
 
     def _on_overlay_target_click(self, e) -> None:
         _ = e
-        if not self.page or not self._settings:
+        if not is_control_mounted(self) or not self._settings:
             return
         options = [
             OptionItem(
@@ -4314,7 +4305,11 @@ class SettingsView(ft.Column):
 
     def _on_desktop_overlay_size_click(self, e) -> None:
         _ = e
-        if not self.page or not self._settings or self._desktop_overlay_size_button.disabled:
+        if (
+            not is_control_mounted(self)
+            or not self._settings
+            or self._desktop_overlay_size_button.disabled
+        ):
             return
         options = [
             OptionItem(
@@ -4387,7 +4382,7 @@ class SettingsView(ft.Column):
         )
         if current == next_alpha:
             self._sync_desktop_overlay_main_controls()
-            if self.page:
+            if is_control_mounted(self):
                 self.update()
             return
         updated = copy.deepcopy(self._settings)
@@ -4396,7 +4391,7 @@ class SettingsView(ft.Column):
         desktop_visual.validate()
         self._settings = updated
         self._sync_desktop_overlay_main_controls()
-        if self.page:
+        if is_control_mounted(self):
             self.update()
         self._emit_settings_changed()
 
@@ -4506,7 +4501,7 @@ class SettingsView(ft.Column):
             self._settings.overlay.calibration = calibration.copy()
         self._sync_overlay_calibration_controls(self._overlay_calibration)
 
-        if self.page:
+        if is_control_mounted(self):
             self.update()
 
         if self.on_overlay_calibration_apply is None:
@@ -4533,7 +4528,7 @@ class SettingsView(ft.Column):
         self._apply_overlay_calibration_field_immediately("distance", round(next_value, 2))
 
     def _on_overlay_anchor_click(self, e) -> None:
-        if not self.page or not self._settings:
+        if not is_control_mounted(self) or not self._settings:
             return
         options = [
             OptionItem(value=anchor, label=t(f"settings.overlay.calibration.anchor.{anchor}"))
@@ -4560,7 +4555,7 @@ class SettingsView(ft.Column):
         self._apply_overlay_calibration_field_immediately("offset_y", current + delta)
 
     def _on_overlay_text_scale_click(self, e) -> None:
-        if not self.page or not self._settings:
+        if not is_control_mounted(self) or not self._settings:
             return
         options = [
             OptionItem(
@@ -4626,7 +4621,7 @@ class SettingsView(ft.Column):
             self._settings.ui.overlay_enabled = contract.overlay.intent_enabled
             self._settings.ui.peer_translation_enabled = contract.peer.intent_enabled
             self._update_api_visibility()
-            if self.page:
+            if is_control_mounted(self):
                 self._api_keys_column.update()
         self._sync_overlay_controls()
 
@@ -4664,7 +4659,7 @@ class SettingsView(ft.Column):
         self._desktop_overlay_background_alpha_increase_button.disabled = self._settings is None
         self._overlay_vr_reset_button.disabled = self._settings is None
         self._overlay_desktop_reset_button.disabled = self._settings is None
-        if self.page:
+        if is_control_mounted(self):
             self.update()
 
     def set_overlay_runtime_state(
@@ -4696,7 +4691,7 @@ class SettingsView(ft.Column):
         self._overlay_calibration_draft = OverlayCalibration()
         self._sync_overlay_calibration_controls(self._overlay_calibration_draft)
 
-        if self.page:
+        if is_control_mounted(self):
             self.update()
 
     def _on_overlay_translation_click(self, e) -> None:
@@ -4855,13 +4850,13 @@ class SettingsView(ft.Column):
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if new_value else "settings.vrc_mic.off"
         )
-        if self.page:
+        if is_control_mounted(self):
             self._vrc_mic_text.update()
         self._emit_settings_changed()
 
     def _on_chatbox_source_click(self, e) -> None:
         """Open chatbox source inclusion selection modal."""
-        if not self.page:
+        if not is_control_mounted(self):
             return
         options = [
             OptionItem(value="on", label=t("settings.chatbox_source.on")),
@@ -4888,7 +4883,7 @@ class SettingsView(ft.Column):
         self._chatbox_source_text.content.value = t(
             "settings.chatbox_source.on" if new_value else "settings.chatbox_source.off"
         )
-        if self.page:
+        if is_control_mounted(self):
             self._chatbox_source_text.update()
         self._emit_settings_changed()
 
@@ -4911,13 +4906,13 @@ class SettingsView(ft.Column):
             if new_value
             else "settings.clipboard_auto_translate.off"
         )
-        if self.page:
+        if is_control_mounted(self):
             self._clipboard_auto_translate_text.update()
         self._emit_settings_changed()
 
     def _on_telemetry_consent_click(self, e) -> None:
         _ = e
-        if not self.page or not self._settings:
+        if not is_control_mounted(self) or not self._settings:
             return
 
         def _select(value: str) -> None:
@@ -5130,17 +5125,17 @@ class SettingsView(ft.Column):
         self._local_llm_api_key_helper.visible = bool(local_llm_api_key_description.strip())
         self._local_llm_extra_body.label = t("settings.local_llm.extra_body")
         self._local_llm_extra_body_helper.value = t("settings.local_llm.extra_body.description")
-        if self._local_llm_base_url.error_text:
-            self._local_llm_base_url.error_text = t("settings.local_llm.base_url.invalid")
-        if self._local_llm_model.error_text:
-            self._local_llm_model.error_text = t("settings.local_llm.model.required")
+        if self._local_llm_base_url.error:
+            self._local_llm_base_url.error = t("settings.local_llm.base_url.invalid")
+        if self._local_llm_model.error:
+            self._local_llm_model.error = t("settings.local_llm.model.required")
         if self._local_llm_extra_body_error.visible:
             error_key = self._local_llm_extra_body_error_key
             error_kwargs = self._local_llm_extra_body_error_kwargs
             if error_key:
                 message = self._local_llm_extra_body_error_message(error_key, **error_kwargs)
                 self._local_llm_extra_body_error.value = message
-                self._local_llm_extra_body.error_text = message
+                self._local_llm_extra_body.error = message
         self._persona_title.value = t("settings.section.persona")
         self._custom_vocab_title.value = t("settings.section.custom_vocabulary")
         self._vrc_mic_title.value = t("settings.vrc_mic_intercept")
@@ -5272,7 +5267,7 @@ class SettingsView(ft.Column):
         self._prompt_editor.apply_locale()
         self._sync_gpu_device_card()
 
-        if self.page:
+        if is_control_mounted(self):
             self.update()
 
     def refresh_prompt_if_empty(self) -> None:

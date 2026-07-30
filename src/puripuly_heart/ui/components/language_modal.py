@@ -10,6 +10,7 @@ from typing import Callable, Sequence
 import flet as ft
 
 from puripuly_heart.ui.components.glow import create_glow_stack
+from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.i18n import language_name, t
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
@@ -118,7 +119,7 @@ class LanguageModal:
             ),
             width=600,  # Larger width
             height=700,  # Larger height
-            padding=ft.padding.symmetric(horizontal=32, vertical=32),
+            padding=ft.Padding.symmetric(horizontal=32, vertical=32),
             bgcolor=COLOR_SURFACE,
             border_radius=28,
             shadow=get_card_shadow(),
@@ -130,10 +131,9 @@ class LanguageModal:
             content=create_glow_stack(modal_content),
             content_padding=0,
             bgcolor=ft.Colors.TRANSPARENT,
-            surface_tint_color=ft.Colors.TRANSPARENT,
         )
 
-        self._page.open(self._dialog)
+        self._page.show_dialog(self._dialog)
 
     def _build_recent_grid(self, recent: list[str], current: str) -> ft.Control | None:
         """Build grid controls for recent languages (up to 6)."""
@@ -170,8 +170,8 @@ class LanguageModal:
                 ),
                 bgcolor=bg_color,
                 border_radius=16,
-                padding=ft.padding.symmetric(horizontal=8, vertical=16),  # Taller padding
-                alignment=ft.alignment.center,
+                padding=ft.Padding.symmetric(horizontal=8, vertical=16),  # Taller padding
+                alignment=ft.Alignment.CENTER,
                 on_click=lambda e, code=lang_code: self._select(code),
                 on_hover=self._on_chip_hover,
                 animate=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
@@ -261,8 +261,8 @@ class LanguageModal:
                 bgcolor=bg_color,
                 border_radius=16,
                 border=border,
-                padding=ft.padding.all(24),
-                alignment=ft.alignment.center,
+                padding=ft.Padding.all(24),
+                alignment=ft.Alignment.CENTER,
                 on_click=None if is_disabled else lambda e, selected=code: self._select(selected),
                 on_hover=None if is_disabled else self._on_item_hover,
                 animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
@@ -275,7 +275,7 @@ class LanguageModal:
             controls=items,
             expand=True,
             spacing=16,
-            padding=ft.padding.only(right=8, bottom=12),
+            padding=ft.Padding.only(right=8, bottom=12),
         )
 
     def _on_chip_hover(self, e: ft.ControlEvent) -> None:
@@ -290,7 +290,7 @@ class LanguageModal:
         if text_control.color == ft.Colors.WHITE:
             return
 
-        if e.data == "true":
+        if is_hover_active(e):
             text_control.color = COLOR_PRIMARY
             # container.bgcolor = ft.Colors.with_opacity(0.05, COLOR_PRIMARY) # Removed per user request
         else:
@@ -304,7 +304,7 @@ class LanguageModal:
         container = e.control
         content = container.content
 
-        is_hovering = e.data == "true"
+        is_hovering = is_hover_active(e)
         # If text is white, it's selected. Don't hover.
         if isinstance(content, ft.Column) and content.controls:
             text_control = content.controls[0]
@@ -331,5 +331,5 @@ class LanguageModal:
         """Handle language selection."""
         logger.info("[LanguageModal] Selection requested: %s", name)
         if self._dialog:
-            self._page.close(self._dialog)
+            self._page.pop_dialog()
         self._on_select(name)

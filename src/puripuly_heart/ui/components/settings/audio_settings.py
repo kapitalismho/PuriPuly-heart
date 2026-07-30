@@ -15,11 +15,12 @@ from puripuly_heart.config.audio_host_api import (
     normalize_input_host_api,
 )
 from puripuly_heart.ui.components.settings.settings_modal import OptionItem, SettingsModal
+from puripuly_heart.ui.flet_runtime import is_control_mounted, is_hover_active
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import COLOR_ON_BACKGROUND, COLOR_PRIMARY
 
 logger = logging.getLogger(__name__)
-_CENTER_ALIGNMENT = ft.alignment.Alignment(0, 0)
+_CENTER_ALIGNMENT = ft.Alignment(0, 0)
 
 
 class AudioSettings(ft.Column):
@@ -139,7 +140,7 @@ class AudioSettings(ft.Column):
         """Handle hover effect on clickable text."""
         container = e.control
         text_control = container.content
-        if e.data == "true":
+        if is_hover_active(e):
             text_control.color = COLOR_PRIMARY
         else:
             text_control.color = COLOR_ON_BACKGROUND
@@ -155,7 +156,7 @@ class AudioSettings(ft.Column):
         self._current_host_api = val
         display = self._host_api_label_for(val)
         self._host_api_text.content.value = display
-        if self._host_api_text.page:
+        if is_control_mounted(self._host_api_text):
             self._host_api_text.update()
 
     @property
@@ -168,7 +169,7 @@ class AudioSettings(ft.Column):
         self._current_microphone = val
         display = val or self._default_option_label
         self._mic_text.content.value = display
-        if self._mic_text.page:
+        if is_control_mounted(self._mic_text):
             self._mic_text.update()
 
     @property
@@ -180,7 +181,7 @@ class AudioSettings(ft.Column):
         self._current_desktop_output_device = val
         display = val or self._default_option_label
         self._desktop_output_text.content.value = display
-        if self._desktop_output_text.page:
+        if is_control_mounted(self._desktop_output_text):
             self._desktop_output_text.update()
 
     @property
@@ -193,7 +194,7 @@ class AudioSettings(ft.Column):
         field = getattr(self, "_desktop_vad_field", None)
         if field is not None:
             field.value = f"{self._current_desktop_vad_threshold:.2f}"
-            if field.page:
+            if is_control_mounted(field):
                 field.update()
 
     @property
@@ -206,7 +207,7 @@ class AudioSettings(ft.Column):
         field = getattr(self, "_desktop_hangover_field", None)
         if field is not None:
             field.value = str(self._current_desktop_hangover_ms)
-            if field.page:
+            if is_control_mounted(field):
                 field.update()
 
     @property
@@ -219,7 +220,7 @@ class AudioSettings(ft.Column):
         field = getattr(self, "_desktop_pre_roll_field", None)
         if field is not None:
             field.value = str(self._current_desktop_pre_roll_ms)
-            if field.page:
+            if is_control_mounted(field):
                 field.update()
 
     def _get_host_api_options(self) -> list[OptionItem]:
@@ -329,7 +330,7 @@ class AudioSettings(ft.Column):
 
     def _on_host_api_click(self, e) -> None:
         """Open Host API selection modal."""
-        if not self.page:
+        if not is_control_mounted(self):
             return
         options = self._get_host_api_options()
         modal = SettingsModal(
@@ -350,7 +351,7 @@ class AudioSettings(ft.Column):
 
     def _on_mic_click(self, e) -> None:
         """Open Microphone selection modal."""
-        if not self.page:
+        if not is_control_mounted(self):
             return
         options = self._get_microphone_options()
         modal = SettingsModal(
@@ -369,7 +370,7 @@ class AudioSettings(ft.Column):
 
     def _on_desktop_output_click(self, e) -> None:
         """Open desktop loopback output selection modal."""
-        if not self.page:
+        if not is_control_mounted(self):
             return
         options = self._get_desktop_output_options()
         modal = SettingsModal(
@@ -458,5 +459,5 @@ class AudioSettings(ft.Column):
             self._current_desktop_output_device or self._default_option_label
         )
 
-        if self.page:
+        if is_control_mounted(self):
             self.update()

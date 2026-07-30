@@ -2,6 +2,7 @@ from typing import Callable
 
 import flet as ft
 
+from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_DIVIDER,
@@ -38,7 +39,7 @@ class BottomNavBar(ft.Container):
             content=tabs_row,
             bgcolor=COLOR_BACKGROUND,
             height=80,
-            border=ft.border.only(top=ft.BorderSide(1, COLOR_DIVIDER)),
+            border=ft.Border.only(top=ft.BorderSide(1, COLOR_DIVIDER)),
         )
 
     def _build_tabs(self):
@@ -49,13 +50,13 @@ class BottomNavBar(ft.Container):
             is_selected = i == self._selected
             icon_color = COLOR_PRIMARY if is_selected else COLOR_NEUTRAL
 
-            icon = ft.Icon(name=icon_name, size=30, color=icon_color)
+            icon = ft.Icon(icon=icon_name, size=30, color=icon_color)
             self._icons.append(icon)
 
             container = ft.Container(
                 content=icon,
                 expand=True,
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment.CENTER,
                 on_click=lambda _, idx=i: self._on_tab_click(idx),
                 on_hover=lambda e, idx=i: self._on_tab_hover(e, idx),
             )
@@ -81,7 +82,7 @@ class BottomNavBar(ft.Container):
         """Handle tab hover."""
         if index != self._selected:
             icon = self._icons[index]
-            icon.color = COLOR_PRIMARY if e.data == "true" else COLOR_NEUTRAL
+            icon.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_NEUTRAL
             icon.update()
 
     def _update_visuals(self):

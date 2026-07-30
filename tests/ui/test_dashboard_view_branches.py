@@ -7,6 +7,12 @@ import pytest
 
 ft = pytest.importorskip("flet")
 
+from puripuly_heart.ui.dashboard import capture as dashboard_capture_module
+from puripuly_heart.ui.dashboard import renderer as dashboard_renderer_module
+from puripuly_heart.ui.dashboard.contract import (
+    DashboardCaptureIntents,
+    DashboardTranslationIntents,
+)
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice
 from puripuly_heart.ui.overlay_peer_contract import (
     OverlayPeerConsumerContract,
@@ -173,10 +179,13 @@ class FakeLanguageModal:
 
 def _make_dashboard(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(dashboard_module, "PowerButton", FakePowerButton)
+    monkeypatch.setattr(dashboard_capture_module, "PowerButton", FakePowerButton)
     monkeypatch.setattr(dashboard_module, "DisplayCard", FakeDisplayCard)
     monkeypatch.setattr(dashboard_module, "LanguageCard", FakeLanguageCard)
     monkeypatch.setattr(dashboard_module, "LanguageModal", FakeLanguageModal)
-    monkeypatch.setattr(dashboard_module, "create_background_glow_stack", lambda content: content)
+    monkeypatch.setattr(
+        dashboard_renderer_module, "create_background_glow_stack", lambda content: content
+    )
     monkeypatch.setattr(dashboard_module, "font_for_language", lambda code: f"font-{code}")
     monkeypatch.setattr(dashboard_module, "language_name", lambda code: f"name-{code}")
     monkeypatch.setattr(dashboard_module, "get_locale", lambda: "en")
@@ -1191,6 +1200,7 @@ def test_dashboard_peer_and_overlay_button_labels_render_from_i18n(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(dashboard_module, "t", lambda key, **_kwargs: f"i18n:{key}")
+    monkeypatch.setattr(dashboard_capture_module, "t", lambda key, **_kwargs: f"i18n:{key}")
     view = _make_dashboard(monkeypatch)
 
     assert view.peer_button.label == "i18n:dashboard.peer_label"
@@ -1218,3 +1228,53 @@ def test_dashboard_local_stt_notice_can_change_and_clear_without_touching_displa
         (dashboard_module.t("dashboard.local_stt_notice_downloading_progress", percent=63), "info"),
         (None, None),
     ]
+
+
+def test_dashboard_bound_intents_receive_every_owned_interaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    calls: dict[str, list] = {
+        "submit": [],
+        "translation": [],
+        "language": [],
+        "activity": [],
+        "self_capture": [],
+        "peer_capture": [],
+        "overlay": [],
+        "retry_peer": [],
+        "gpu": [],
+    }
+    view.bind_dashboard_intents(
+        translation=DashboardTranslationIntents(
+            submit_message=lambda source, text: calls["submit"].append((source, text)),
+            toggle_translation=lambda enabled: calls["translation"].append(enabled),
+            change_language=lambda change: calls["language"].append(change),
+            report_input_activity=lambda has_text: calls["activity"].append(has_text),
+        ),
+        capture=DashboardCaptureIntents(
+            toggle_self_capture=lambda enabled: calls["self_capture"].append(enabled),
+            toggle_peer_capture=lambda enabled: calls["peer_capture"].append(enabled),
+            toggle_overlay=lambda enabled: calls["overlay"].append(enabled),
+            retry_peer_process_capture=lambda: calls["retry_peer"].append(True),
+            run_gpu_notice_action=lambda action: calls["gpu"].append(action),
+        ),
+    )
+
+    view._on_submit("hello")
+    view._on_message_input_activity(True)
+    view._toggle_translation()
+    view._toggle_stt()
+    view._toggle_peer_translation()
+    view._toggle_overlay()
+    view._on_source_select("ja")
+
+    assert calls["submit"] == [("You", "hello")]
+    assert calls["activity"] == [True]
+    assert calls["translation"] == [True]
+    assert calls["self_capture"] == [True]
+    assert calls["peer_capture"] == [True]
+    assert calls["overlay"] == [True]
+    assert [change.source_code for change in calls["language"]] == ["ja"]
+    assert calls["retry_peer"] == []
+    assert calls["gpu"] == []

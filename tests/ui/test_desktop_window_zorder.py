@@ -13,15 +13,51 @@ class FakeWin32WindowApi:
         styles: tuple[int, ...] = (desktop_window_zorder._WS_EX_TRANSPARENT,),
         set_result: tuple[bool, int | None] = (True, None),
         enum_error: int | None = None,
+        titles: dict[int, str] | None = None,
+        visible: bool = False,
+        hide_after_show: int = 0,
+        show_result: tuple[bool, int | None] = (True, None),
     ) -> None:
         self.windows = windows
         self.styles = list(styles)
         self.current_style = self.styles[-1] if self.styles else 0
         self.set_result = set_result
         self.enum_error = enum_error
+        self.titles = titles if titles is not None else {window: "" for window in windows}
+        self.visible = visible
+        self.hide_after_show = hide_after_show
+        self.show_result = show_result
         self.window_queries: list[int] = []
+        self.all_window_queries: list[int] = []
+        self.title_queries: list[int] = []
+        self.show_calls: list[int] = []
         self.set_calls: list[int] = []
         self.pid = 4321
+
+    def all_top_level_windows_for_process(
+        self, pid: int
+    ) -> desktop_window_zorder.WindowEnumerationResult:
+        self.all_window_queries.append(pid)
+        return desktop_window_zorder.WindowEnumerationResult(
+            windows=self.windows,
+            win32_error=self.enum_error,
+        )
+
+    def is_window_visible(self, hwnd: int) -> bool:
+        return self.visible
+
+    def window_title(self, hwnd: int) -> str:
+        self.title_queries.append(hwnd)
+        return self.titles.get(hwnd, "")
+
+    def show_window_no_activate(self, hwnd: int) -> tuple[bool, int | None]:
+        self.show_calls.append(hwnd)
+        if self.show_result[0]:
+            self.visible = True
+            if self.hide_after_show > 0:
+                self.hide_after_show -= 1
+                self.visible = False
+        return self.show_result
 
     def top_level_windows_for_process(
         self, pid: int
@@ -292,6 +328,107 @@ async def test_windows_zorder_port_close_discards_process_binding() -> None:
     assert result.applied is False
     assert result.reason == "closed"
     assert api.window_queries == []
+
+
+@pytest.mark.asyncio
+async def test_windows_zorder_port_reveals_hidden_overlay_window_by_title() -> None:
+    api = FakeWin32WindowApi(titles={101: "PuriPuly Overlay"}, visible=False)
+    port = desktop_window_zorder.WindowsWindowZOrderPort(
+        api=api,
+        reveal_retain_s=0.0,
+    )
+    port.bind_process(4321)
+
+    result = await port.reveal_window("PuriPuly Overlay")
+
+    assert result.applied is True
+    assert result.reason == "applied"
+    assert result.hwnd == 101
+    assert result.title_confirmed is True
+    assert result.visible_confirmed is True
+    assert api.show_calls == [101]
+
+
+@pytest.mark.asyncio
+async def test_windows_zorder_port_reshows_window_the_client_hides_after_startup() -> None:
+    api = FakeWin32WindowApi(titles={101: "PuriPuly Overlay"}, visible=False, hide_after_show=2)
+    port = desktop_window_zorder.WindowsWindowZOrderPort(
+        api=api,
+        reveal_retain_s=0.0,
+        poll_interval_s=0.001,
+    )
+    port.bind_process(4321)
+
+    result = await port.reveal_window("PuriPuly Overlay")
+
+    assert result.applied is True
+    assert api.show_calls == [101, 101, 101], (
+        "a single show is not enough: the Flet 0.86.1 client hides the overlay window "
+        "again while it finishes startup"
+    )
+
+
+@pytest.mark.asyncio
+async def test_windows_zorder_port_requires_visibility_to_be_retained() -> None:
+    api = FakeWin32WindowApi(titles={101: "PuriPuly Overlay"}, visible=False, hide_after_show=1000)
+    port = desktop_window_zorder.WindowsWindowZOrderPort(
+        api=api,
+        reveal_timeout_s=0.05,
+        reveal_retain_s=0.02,
+        poll_interval_s=0.001,
+    )
+    port.bind_process(4321)
+
+    result = await port.reveal_window("PuriPuly Overlay")
+
+    assert result.applied is False
+    assert result.reason == "visibility_not_retained"
+    assert len(api.show_calls) > 1
+
+
+@pytest.mark.asyncio
+async def test_windows_zorder_port_reveal_requires_bound_process() -> None:
+    api = FakeWin32WindowApi(titles={101: "PuriPuly Overlay"})
+    port = desktop_window_zorder.WindowsWindowZOrderPort(api=api)
+
+    result = await port.reveal_window("PuriPuly Overlay")
+
+    assert result == desktop_window_zorder.WindowRevealResult(
+        applied=False,
+        reason="process_unbound",
+    )
+    assert api.show_calls == []
+
+
+@pytest.mark.asyncio
+async def test_windows_zorder_port_reveal_reports_enumeration_failure() -> None:
+    api = FakeWin32WindowApi(titles={101: "PuriPuly Overlay"}, enum_error=5)
+    port = desktop_window_zorder.WindowsWindowZOrderPort(api=api, reveal_timeout_s=0.02)
+    port.bind_process(4321)
+
+    result = await port.reveal_window("PuriPuly Overlay")
+
+    assert result.applied is False
+    assert result.reason == "enum_windows_failed"
+    assert result.win32_error == 5
+
+
+@pytest.mark.asyncio
+async def test_windows_zorder_port_reveal_falls_back_to_single_window_without_title_match() -> None:
+    api = FakeWin32WindowApi(titles={101: "Flet"}, visible=False)
+    port = desktop_window_zorder.WindowsWindowZOrderPort(
+        api=api,
+        reveal_timeout_s=0.02,
+        reveal_retain_s=0.0,
+        poll_interval_s=0.001,
+    )
+    port.bind_process(4321)
+
+    result = await port.reveal_window("PuriPuly Overlay")
+
+    assert result.applied is True
+    assert result.title_confirmed is False
+    assert api.show_calls == [101]
 
 
 @pytest.mark.asyncio

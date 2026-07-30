@@ -873,7 +873,7 @@
     {
       "module": "puripuly_heart.providers.llm.gemini",
       "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/providers/llm/gemini.py", "tests/ui/test_controller_branch_paths.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/providers/llm/gemini.py", "tests/providers/test_gemini_provider.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [{"name": "GeminiLLMProvider", "kind": "attribute"}]
@@ -1010,15 +1010,131 @@
       "classification": "internal_adapter_implementation_contract",
       "modules": [
         "puripuly_heart.app.adapters.provider_verifier",
-        "puripuly_heart.app.adapters.gpu_worker_process"
+        "puripuly_heart.app.adapters.gpu_worker_process",
+        "puripuly_heart.app.adapters.local_asr_application",
+        "puripuly_heart.app.adapters.peer_application_state",
+        "puripuly_heart.app.adapters.peer_capture_inventory"
       ],
       "rationale": "ProviderVerifierAdapter is an app adapter implementation of the provider-verifier port; the adapter class is importable for wiring/tests but is not an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters microphone test capture adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.microphone_test_capture"
+      ],
+      "rationale": "MicrophoneTestCaptureAdapter implements the internal microphone-test capture port and is reached through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Self capture admission adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.self_capture_admission"
+      ],
+      "rationale": "SelfCaptureAdmissionAdapter implements the internal Self capture admission port with explicit state and effect DTOs through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Self capture source adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.self_capture_source"
+      ],
+      "rationale": "SelfCaptureSourceAdapter implements the internal Self capture source-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Self capture VAD adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.self_capture_vad"
+      ],
+      "rationale": "SelfCaptureVadAdapter implements the internal Self capture VAD-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Self capture audio loop adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.self_capture_audio_loop"
+      ],
+      "rationale": "SelfCaptureAudioLoopAdapter implements the internal Self capture audio-loop contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Self capture VAD sink adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.self_capture_vad_sink"
+      ],
+      "rationale": "SelfCaptureVadSinkAdapter implements the internal Self capture VAD-event sink boundary through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Peer capture source adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture_source"
+      ],
+      "rationale": "PeerCaptureSourceAdapter implements the internal Peer capture source-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Peer capture target resolver adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture_target_resolver"
+      ],
+      "rationale": "PeerCaptureTargetResolverAdapter implements the internal Peer capture target-resolver port through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Peer capture VAD adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture_vad"
+      ],
+      "rationale": "PeerCaptureVadAdapter implements the internal Peer capture VAD-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Peer capture audio loop adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture_audio_loop"
+      ],
+      "rationale": "PeerCaptureAudioLoopAdapter implements the internal Peer capture audio-loop contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Peer capture admission adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture_admission"
+      ],
+      "rationale": "PeerCaptureAdmissionAdapter implements the internal Peer capture admission port through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters Peer capture VAD sink adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture_vad_sink"
+      ],
+      "rationale": "PeerCaptureVadSinkAdapter implements the internal Peer capture VAD-event sink boundary through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters synchronous SecretStore adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.sync_secret_store"
+      ],
+      "rationale": "SyncSecretStoreAdapter implements the internal asynchronous SecretStore port for the canonical synchronous store and is reached through application composition rather than an external public compatibility facade."
     },
     {
       "surface": "puripuly_heart.app provider runtime wiring modules",
       "classification": "internal_provider_runtime_wiring",
       "modules": [
-        "puripuly_heart.app.wiring_local_asr_provider_runtime"
+        "puripuly_heart.app.wiring_capture_runtime",
+        "puripuly_heart.app.wiring_local_asr_application",
+        "puripuly_heart.app.wiring_local_asr_provider_runtime",
+        "puripuly_heart.app.wiring_managed_account",
+        "puripuly_heart.app.wiring_microphone_test",
+        "puripuly_heart.app.wiring_peer_application",
+        "puripuly_heart.app.wiring_provider_runtime",
+        "puripuly_heart.app.wiring_provider_runtime_policy",
+        "puripuly_heart.app.wiring_runtime_pipeline",
+        "puripuly_heart.app.wiring_vrc_mic_sync"
       ],
       "rationale": "The provider runtime wiring module is the internal application composition adapter for the provider-runtime owner and is not an external public compatibility facade."
     },
@@ -1158,7 +1274,63 @@
       "modules": [
         "puripuly_heart.ui.presentation_adapter"
       ],
-      "rationale": "The Flet presentation adapter is the internal G10 production composition boundary passed to GuiController. It is not an external import compatibility surface."
+      "rationale": "The Flet presentation adapter is the internal production UI composition boundary. It is not an external import compatibility surface."
+    },
+    {
+      "surface": "puripuly_heart.ui.dashboard modules",
+      "classification": "internal_ui_dashboard_surface",
+      "module_prefixes": [
+        "puripuly_heart.ui.dashboard"
+      ],
+      "rationale": "The dashboard surface slot/intent contract and renderer are internal UI composition boundaries consumed by DashboardView and the later capture-control Goal, not external import compatibility surfaces."
+    },
+    {
+      "surface": "puripuly_heart.ui.settings modules",
+      "classification": "internal_ui_settings_surface",
+      "module_prefixes": [
+        "puripuly_heart.ui.settings"
+      ],
+      "rationale": "The settings surface slot/intent contract and renderer are internal UI composition boundaries consumed by SettingsView and the later settings-migration gates, not external import compatibility surfaces."
+    },
+    {
+      "surface": "puripuly_heart.ui.logs modules",
+      "classification": "internal_ui_logs_surface",
+      "module_prefixes": [
+        "puripuly_heart.ui.logs"
+      ],
+      "rationale": "The logs surface slot/intent contract and renderer are internal UI composition boundaries consumed by LogsView and TranslatorApp, not external import compatibility surfaces."
+    },
+    {
+      "surface": "puripuly_heart.ui.about modules",
+      "classification": "internal_ui_about_surface",
+      "module_prefixes": [
+        "puripuly_heart.ui.about"
+      ],
+      "rationale": "The about surface slot contract and renderer are internal UI composition boundaries consumed by AboutView, not external import compatibility surfaces."
+    },
+    {
+      "surface": "puripuly_heart.ui.shell modules",
+      "classification": "internal_ui_shell_surface",
+      "module_prefixes": [
+        "puripuly_heart.ui.shell"
+      ],
+      "rationale": "The application shell slot contract and renderer are internal UI composition boundaries consumed by TranslatorApp, not external import compatibility surfaces."
+    },
+    {
+      "surface": "puripuly_heart.ui.desktop_overlay_surface modules",
+      "classification": "internal_ui_desktop_overlay_surface",
+      "module_prefixes": [
+        "puripuly_heart.ui.desktop_overlay_surface"
+      ],
+      "rationale": "The desktop overlay caption plan/slot contract and its Flet renderer are internal UI composition boundaries consumed by the desktop overlay renderer window, not external import compatibility surfaces."
+    },
+    {
+      "surface": "puripuly_heart.ui.foundation modules",
+      "classification": "internal_ui_foundation",
+      "module_prefixes": [
+        "puripuly_heart.ui.foundation"
+      ],
+      "rationale": "The Gate B Flet adapter, runtime, resource, token, primitive, and preview modules are internal UI implementation boundaries for later screen Goals, not external import compatibility surfaces."
     },
     {
       "surface": "puripuly_heart.core.orchestrator implementation modules",

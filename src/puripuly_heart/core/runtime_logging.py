@@ -88,43 +88,43 @@ class LatencyTracePointContract:
 LATENCY_TRACE_POINT_CONTRACTS: dict[str, LatencyTracePointContract] = {
     "speech_end": LatencyTracePointContract(
         name="speech_end",
-        timing_semantics="Shared latency zero boundary recorded when the hub accepts SpeechEnd for the utterance.",
+        timing_semantics="Shared latency zero boundary recorded when the channel owner accepts SpeechEnd for the utterance.",
         acceptance_expectation="Record the post-VAD SpeechEnd boundary; published e2e_ms adds the channel-specific VAD hangover for user-facing latency.",
     ),
     "stt_final": LatencyTracePointContract(
         name="stt_final",
-        timing_semantics="Recorded when the hub accepts the final STT transcript that will feed the final output path.",
+        timing_semantics="Recorded when the channel owner accepts the final STT transcript that will feed the final output path.",
         acceptance_expectation="Emit at most once per output path using the final transcript text that survives to output publication.",
     ),
     "llm_request_start": LatencyTracePointContract(
         name="llm_request_start",
-        timing_semantics="Recorded immediately before the hub calls the translation provider for the output path.",
+        timing_semantics="Recorded immediately before the translation request owner calls the provider for the output path.",
         acceptance_expectation="Use the request that contributes to the published output, not cancelled exploratory retries.",
     ),
     "llm_first_chunk": LatencyTracePointContract(
         name="llm_first_chunk",
-        timing_semantics="Recorded when the hub receives the first streaming translation chunk for the output path.",
+        timing_semantics="Recorded when the translation request owner receives the first streaming chunk for the output path.",
         acceptance_expectation="Emit only for streaming paths and only on the first chunk that belongs to the published output.",
     ),
     "llm_done": LatencyTracePointContract(
         name="llm_done",
-        timing_semantics="Recorded when the hub has the completed translation text ready for publication.",
+        timing_semantics="Recorded when the translation request owner has completed text ready for publication.",
         acceptance_expectation="Use the completed translation that is about to be published, whether it came from a streaming or non-streaming provider.",
     ),
     "self_chatbox_enqueue": LatencyTracePointContract(
         name="self_chatbox_enqueue",
-        timing_semantics="Recorded when the hub enqueues the final self output into ChatboxPaginator.",
-        acceptance_expectation="This is the official self Basic latency end boundary because it is the final self output handoff point owned by the hub.",
+        timing_semantics="Recorded when the output projection enqueues the final self output into ChatboxPaginator.",
+        acceptance_expectation="This is the official self Basic latency end boundary because it is the final self output handoff point owned by the output projection.",
     ),
     "peer_overlay_first_emit": LatencyTracePointContract(
         name="peer_overlay_first_emit",
-        timing_semantics="Recorded at the first peer overlay output emitted by the hub: paired source+translation when translation succeeds, or source-only fallback when translation is unavailable, fails, or is cancelled.",
+        timing_semantics="Recorded at the first peer overlay output emitted by the output projection: paired source+translation when translation succeeds, or source-only fallback when translation is unavailable, fails, or is cancelled.",
         acceptance_expectation="Use the first overlay_sink.emit call that carries peer-visible text for that peer logical turn; when translation is enabled and succeeds, wait for the paired source+translation overlay output.",
     ),
     "peer_overlay_first_render": LatencyTracePointContract(
         name="peer_overlay_first_render",
         timing_semantics="Recorded by the local overlay when the first local visible peer source or translation overlay output for the logical turn appears on this client.",
-        acceptance_expectation="Emit once per peer logical turn after peer_overlay_first_emit at the first local visible peer source or translation overlay output for that turn; do not wait for lifecycle completion, cleanup, or any hub terminal summary stage.",
+        acceptance_expectation="Emit once per peer logical turn after peer_overlay_first_emit at the first local visible peer source or translation overlay output for that turn; do not wait for lifecycle completion, cleanup, or any channel-owner terminal summary stage.",
     ),
 }
 
@@ -186,7 +186,7 @@ def format_translation_ready_for_output(
     elapsed_ms: int | None,
 ) -> str:
     parts = [
-        "[Detailed][Hub] translation_ready_for_output",
+        "[Detailed][Translation] translation_ready_for_output",
         f"channel={channel}",
         f"utterance_id={utterance_id}",
         f"update_id={update_id}",
@@ -204,6 +204,26 @@ def format_translation_ready_for_output(
 
 class RealtimeLogSink(Protocol):
     def append_log(self, line: str) -> None: ...
+
+
+class RealtimeLogHandler(logging.Handler):
+    def __init__(self, sink: RealtimeLogSink):
+        super().__init__()
+        self._sink = sink
+        self.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
+        )
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            message = self.format(record)
+            append_threadsafe = getattr(self._sink, "append_log_threadsafe", None)
+            if callable(append_threadsafe):
+                append_threadsafe(message)
+            else:
+                self._sink.append_log(message)
+        except Exception:
+            return
 
 
 ObservabilityRunner = Callable[[Awaitable[None]], None]

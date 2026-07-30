@@ -12,6 +12,7 @@ Set-StrictMode -Version Latest
 
 $PinnedOpenVrVendorDllSha256 = "bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a"
 $PinnedNotoCjkFontSha256 = "197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce"
+$PrepareFletRuntimeScript = Join-Path $PSScriptRoot "prepare-flet-runtime.ps1"
 
 function Invoke-External {
     param(
@@ -489,6 +490,9 @@ Invoke-External -FilePath $overlayStagedPath -ArgumentList @("--check-startup-co
 Write-Host "Cleaning previous PyInstaller outputs..."
 Remove-Item -Recurse -Force $pyInstallerBuildDir -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force $distDir -ErrorAction SilentlyContinue
+
+Write-Host "Preparing pinned Flet desktop runtime..."
+Invoke-External -FilePath "pwsh" -ArgumentList @("-File", $PrepareFletRuntimeScript)
 
 Write-Host "Building Windows executable..."
 Invoke-ExternalProcess -FilePath $pythonCommand -ArgumentList @(

@@ -40,14 +40,17 @@ class FakePage:
         self.opened: list[object] = []
         self.closed: list[object] = []
 
-    def open(self, dialog) -> None:
+    def show_dialog(self, dialog) -> None:
         self.dialog = dialog
         self.opened.append(dialog)
 
-    def close(self, dialog) -> None:
+    def pop_dialog(self):
+        dialog = self.dialog
+        if dialog is None:
+            return None
         self.closed.append(dialog)
-        if self.dialog is dialog:
-            self.dialog = None
+        self.dialog = None
+        return dialog
 
 
 def _dialog_module():
@@ -193,7 +196,7 @@ def test_local_qwen_guidance_dialog_renders_large_readable_two_action_modal(
         "TextButton",
         "TextButton",
     ]
-    assert [button.text for button in action_row.controls] == [
+    assert [button.content for button in action_row.controls] == [
         "Close",
         "Open guide",
     ]

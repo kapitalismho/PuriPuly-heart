@@ -23,6 +23,9 @@ PINNED_INNOSETUP_VERSION = 'INNOSETUP_VERSION: "6.6.1"'
 SHARED_SETUP_ACTION = "./.github/actions/setup-uv-environment"
 PINNED_SOXR_SPECIFIER = "soxr==1.0.0"
 SOXR_RELEASE_INPUTS_SCRIPT = "scripts/ci/prepare-soxr-release-inputs.ps1"
+FLET_RUNTIME_PREPARATION_SCRIPT = "scripts/ci/prepare-flet-runtime.ps1"
+FLET_RUNTIME_VERSION = "0.86.1"
+FLET_RUNTIME_SHA256 = "2cf0865b31bd0e394a24a6c2d270e084cf9dad9c711e0b5d0cf9fa9bfac31e14"
 SOXR_RELEASE_INPUTS_MANIFEST_PATH = "build/soxr-release-inputs/manifest.json"
 SOXR_PACKAGED_RUNTIME_RELATIVE_DIR = "soxr"
 SOXR_COMPLIANCE_BUNDLE_RELATIVE_DIR = "third_party\\soxr"
@@ -751,6 +754,34 @@ def test_build_spec_uses_prepared_soxr_release_inputs_and_guards_packaged_layout
     assert '"soxr.soxr_ext"' in spec
     assert "soxr.dll" in spec
     assert 'collect_dynamic_libs("soxr")' not in spec
+
+
+def test_flet_runtime_preparation_and_build_spec_pin_the_official_windows_archive() -> None:
+    script = (ROOT / FLET_RUNTIME_PREPARATION_SCRIPT).read_text(encoding="utf-8")
+    spec = (ROOT / "build.spec").read_text(encoding="utf-8")
+
+    assert f'$FletVersion = "{FLET_RUNTIME_VERSION}"' in script
+    assert f'$ExpectedSha256 = "{FLET_RUNTIME_SHA256}"' in script
+    assert "/releases/download/v$FletVersion/flet-windows.zip" in script
+    assert FLET_RUNTIME_PREPARATION_SCRIPT in spec
+    assert FLET_RUNTIME_SHA256 in spec
+    assert '(str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH), "flet_desktop/app")' in spec
+
+
+def test_windows_packaging_paths_prepare_flet_runtime_before_pyinstaller() -> None:
+    push_workflow = (ROOT / ".github" / "workflows" / "push-ci.yml").read_text(encoding="utf-8")
+    release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    release_script = (ROOT / FULL_WINDOWS_RELEASE_SCRIPT).read_text(encoding="utf-8")
+
+    for workflow, job_name in (
+        (push_workflow, "windows-release-path"),
+        (release_workflow, "build-installer"),
+    ):
+        job_block = _workflow_job_block(workflow, job_name)
+        assert FLET_RUNTIME_PREPARATION_SCRIPT in job_block
+        assert job_block.index(FLET_RUNTIME_PREPARATION_SCRIPT) < job_block.index("PyInstaller")
+    assert "prepare-flet-runtime.ps1" in release_script
+    assert release_script.index("prepare-flet-runtime.ps1") < release_script.index('"PyInstaller"')
 
 
 def test_build_spec_deduplicates_any_root_level_auto_collected_soxr_dll() -> None:

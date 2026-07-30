@@ -7,16 +7,23 @@ from types import SimpleNamespace
 
 import pytest
 
+from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationIntentRejectedError,
-    ApplicationShutdownCoordinator,
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.ui_application import (
     UI_APPLICATION_USER_INTENT_METHODS,
-    UiApplicationBoundary,
+)
+from puripuly_heart.app.services.ui_application import (
+    UiApplicationBoundary as ProductionUiApplicationBoundary,
 )
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FREEZE_INGRESS
+from tests.helpers.ui_application import compose_test_ui_application_boundary
+
+
+def UiApplicationBoundary(backend: object) -> ProductionUiApplicationBoundary:
+    return compose_test_ui_application_boundary(backend)
 
 
 class RecordingBackend:
@@ -37,20 +44,11 @@ class RecordingBackend:
         self.microphone_test_active = True
         self.desktop_overlay_captions_locked = True
         self.last_discord_managed_auth_referral_bonus_applied = True
+        self.peer_retry_result = True
         self.events: list[tuple[object, ...]] = []
 
     async def start(self) -> None:
         self.events.append(("start",))
-
-    async def stop(self) -> None:
-        self.events.append(("stop",))
-
-    def application_shutdown_callbacks(self) -> tuple[object, ...]:
-        self.events.append(("shutdown-callbacks",))
-        return ("callback",)
-
-    def bind_application_lifecycle(self, lifecycle: object) -> None:
-        self.events.append(("bind-lifecycle", lifecycle))
 
     def emit_application_shutdown_diagnostic(self, diagnostic: object) -> None:
         self.events.append(("shutdown-diagnostic", diagnostic))
@@ -80,12 +78,25 @@ class RecordingBackend:
         self.events.append(("overlay", enabled))
         return enabled
 
-    async def retry_peer_process_capture(self) -> None:
+    async def retry_peer_process_capture(self) -> bool:
         self.events.append(("peer-retry",))
+        return self.peer_retry_result
 
     async def apply_settings(self, settings: object) -> None:
         self.settings = settings
         self.events.append(("settings", settings))
+
+    def refresh_settings_projection(
+        self,
+        *,
+        preserve_custom_vocab_draft: bool = False,
+    ) -> bool:
+        self.events.append(("settings-projection", preserve_custom_vocab_draft))
+        return True
+
+    def refresh_settings_after_openrouter_pkce_success(self) -> bool:
+        self.events.append(("settings-pkce-projection",))
+        return True
 
     async def apply_providers(self, *args, **kwargs) -> None:
         self.events.append(("providers", args, kwargs))
@@ -159,9 +170,17 @@ class RecordingBackend:
         self.events.append(("calibration-cancel",))
         return True
 
-    def build_overlay_peer_consumer_contract(self) -> object:
+    def overlay_peer_presentation_state(self) -> OverlayPeerPresentationState:
         self.events.append(("overlay-peer-contract",))
-        return "peer-contract"
+        return OverlayPeerPresentationState(
+            overlay_intent_enabled=True,
+            overlay_state="connected",
+            overlay_failure_reason=None,
+            peer_intent_enabled=True,
+            peer_effective_enabled=True,
+            peer_warning_reason=None,
+            peer_activation_starting=False,
+        )
 
     def cycle_debug_capture_fault_profile(self) -> str:
         self.events.append(("capture-fault",))
@@ -174,8 +193,8 @@ class RecordingBackend:
     def clear_debug_audio_fault_profiles(self) -> None:
         self.events.append(("fault-clear",))
 
-    def handle_gpu_notice_action(self) -> object:
-        self.events.append(("gpu-retry",))
+    def handle_gpu_notice_action(self, action: str) -> object:
+        self.events.append(("gpu-retry", action))
         return "retrying"
 
     async def persist_github_star_prompt_opened(
@@ -219,6 +238,19 @@ def test_compatibility_settings_is_detached_and_missing_ui_state_stays_unknown()
     assert boundary.state().peer_translation_eula_accepted is None
 
 
+def test_settings_projection_operations_delegate_without_exposing_the_view() -> None:
+    backend = RecordingBackend()
+    boundary = UiApplicationBoundary(backend)
+
+    assert boundary.refresh_settings_projection(preserve_custom_vocab_draft=True) is True
+    assert boundary.refresh_settings_after_openrouter_pkce_success() is True
+
+    assert backend.events == [
+        ("settings-projection", True),
+        ("settings-pkce-projection",),
+    ]
+
+
 @pytest.mark.asyncio
 async def test_primary_intents_delegate_once_and_preserve_results() -> None:
     backend = RecordingBackend()
@@ -234,8 +266,36 @@ async def test_primary_intents_delegate_once_and_preserve_results() -> None:
         ("start",),
         ("submit", "hello"),
         ("translation", True),
-        ("stop",),
     ]
+    assert boundary.application_lifecycle().is_terminal
+
+
+@pytest.mark.asyncio
+async def test_start_failure_runs_owned_shutdown_and_preserves_original_error() -> None:
+    class FailingBackend(RecordingBackend):
+        async def start(self) -> None:
+            self.events.append(("start",))
+            raise RuntimeError("pipeline failed")
+
+    backend = FailingBackend()
+    boundary = UiApplicationBoundary(backend)
+    cleanup: list[str] = []
+    boundary.register_application_shutdown_callbacks(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="TestRuntime",
+                callback_name="cleanup",
+                callback=lambda: cleanup.append("cleanup"),
+            ),
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="pipeline failed"):
+        await boundary.start()
+
+    assert cleanup == ["cleanup"]
+    assert boundary.application_lifecycle().is_terminal
 
 
 @pytest.mark.asyncio
@@ -272,22 +332,30 @@ async def test_provider_apply_preserves_no_argument_and_forced_rebuild_contracts
 async def test_lifecycle_callbacks_diagnostics_and_logging_stay_behind_boundary() -> None:
     backend = RecordingBackend()
     boundary = UiApplicationBoundary(backend)
-    lifecycle = object()
     diagnostic = object()
+    closed: list[str] = []
 
-    assert boundary.application_shutdown_callbacks() == ("callback",)
-    boundary.bind_application_lifecycle(lifecycle)
+    boundary.register_application_shutdown_callbacks(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="TestRuntime",
+                callback_name="close",
+                callback=lambda: closed.append("closed"),
+            ),
+        )
+    )
     assert boundary.emit_application_shutdown_diagnostic(diagnostic) is None
     boundary.log_basic("basic", level=10)
     boundary.log_detailed("detailed", level=20)
+    await boundary.stop()
 
     assert backend.events == [
-        ("shutdown-callbacks",),
-        ("bind-lifecycle", lifecycle),
         ("shutdown-diagnostic", diagnostic),
         ("log-basic", "basic", 10),
         ("log-detailed", "detailed", 20),
     ]
+    assert closed == ["closed"]
 
 
 @pytest.mark.asyncio
@@ -301,7 +369,7 @@ async def test_every_user_intent_is_rejected_after_freeze_without_backend_invoca
         freeze_started.set()
         await release_freeze.wait()
 
-    lifecycle = ApplicationShutdownCoordinator(
+    boundary.register_application_shutdown_callbacks(
         (
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
@@ -311,7 +379,7 @@ async def test_every_user_intent_is_rejected_after_freeze_without_backend_invoca
             ),
         )
     )
-    boundary.bind_application_lifecycle(lifecycle)
+    lifecycle = boundary.application_lifecycle()
     shutdown_task = asyncio.create_task(lifecycle.shutdown())
     await freeze_started.wait()
     backend.events.clear()
@@ -342,7 +410,7 @@ async def test_self_peer_overlay_and_retry_intents_preserve_channel_results() ->
     assert await boundary.set_stt_enabled(False) is False
     assert await boundary.set_peer_translation_enabled(True) is True
     assert await boundary.set_overlay_enabled(True) is True
-    await boundary.retry_peer_process_capture()
+    assert await boundary.retry_peer_process_capture() is True
 
     assert backend.events == [
         ("self", False),
@@ -350,6 +418,16 @@ async def test_self_peer_overlay_and_retry_intents_preserve_channel_results() ->
         ("overlay", True),
         ("peer-retry",),
     ]
+
+
+@pytest.mark.asyncio
+async def test_retry_intent_preserves_false_backend_result_exactly_once() -> None:
+    backend = RecordingBackend()
+    backend.peer_retry_result = False
+    boundary = UiApplicationBoundary(backend)
+
+    assert await boundary.retry_peer_process_capture() is False
+    assert backend.events == [("peer-retry",)]
 
 
 @pytest.mark.asyncio
@@ -362,7 +440,7 @@ async def test_local_asr_gpu_install_discovery_failure_and_retry_intents_delegat
     assert boundary.cycle_debug_capture_fault_profile() == "capture-failure"
     assert boundary.cycle_debug_stt_fault_profile() == "stt-failure"
     boundary.clear_debug_audio_fault_profiles()
-    assert boundary.handle_gpu_notice_action() == "retrying"
+    assert boundary.handle_gpu_notice_action("restart") == "retrying"
 
     assert backend.events == [
         ("gpu-install",),
@@ -370,7 +448,7 @@ async def test_local_asr_gpu_install_discovery_failure_and_retry_intents_delegat
         ("capture-fault",),
         ("stt-fault",),
         ("fault-clear",),
-        ("gpu-retry",),
+        ("gpu-retry", "restart"),
     ]
 
 
@@ -386,9 +464,9 @@ async def test_provider_verification_secret_and_managed_auth_transitions_delegat
     assert (
         await boundary.start_discord_managed_auth_from_dialog(stage="waiting") == "discord-result"
     )
-    assert boundary.supports_discord_managed_auth_reopen() is True
-    assert boundary.reopen_discord_managed_auth_browser() is True
-    assert boundary.cancel_discord_managed_auth() is True
+    assert boundary.supports_discord_managed_auth_reopen() is False
+    assert boundary.reopen_discord_managed_auth_browser() is None
+    assert boundary.cancel_discord_managed_auth() is None
 
     assert backend.events == [
         ("verify", "openrouter", "key"),
@@ -396,8 +474,6 @@ async def test_provider_verification_secret_and_managed_auth_transitions_delegat
         ("secret", "llm", "secret"),
         ("qq-auth", {"stage": "retry"}),
         ("discord-auth", {"stage": "waiting"}),
-        ("discord-reopen",),
-        ("discord-cancel",),
     ]
 
 
@@ -413,7 +489,15 @@ async def test_overlay_projection_calibration_apply_cancel_and_reset_delegate() 
     assert boundary.set_overlay_calibration_field("opacity", 0.8) == 0.8
     assert boundary.apply_overlay_calibration() is True
     assert boundary.cancel_overlay_calibration() is True
-    assert boundary.build_overlay_peer_consumer_contract() == "peer-contract"
+    assert boundary.overlay_peer_presentation_state() == OverlayPeerPresentationState(
+        overlay_intent_enabled=True,
+        overlay_state="connected",
+        overlay_failure_reason=None,
+        peer_intent_enabled=True,
+        peer_effective_enabled=True,
+        peer_warning_reason=None,
+        peer_activation_starting=False,
+    )
 
     assert backend.events == [
         ("overlay-lock", True),
@@ -477,7 +561,7 @@ async def test_telemetry_and_verification_mutations_stay_behind_named_intents() 
 
 
 @pytest.mark.asyncio
-async def test_boundary_owns_managed_auth_task_cancellation_and_terminal_close() -> None:
+async def test_boundary_stop_owns_managed_auth_task_cancellation_and_terminal_close() -> None:
     boundary = UiApplicationBoundary(RecordingBackend())
     started = asyncio.Event()
     cancelled = asyncio.Event()
@@ -498,16 +582,17 @@ async def test_boundary_owns_managed_auth_task_cancellation_and_terminal_close()
     await started.wait()
 
     assert boundary.managed_auth_task_names() == ("discord-managed-auth-dialog",)
-    await boundary.close_managed_auth_tasks()
+    await boundary.stop()
     await asyncio.gather(handle, return_exceptions=True)
 
     assert handle.cancelled() is True
     assert cancelled.is_set() is True
     assert boundary.managed_auth_tasks_open() is False
+    assert boundary.application_lifecycle().is_terminal
 
 
 @pytest.mark.asyncio
-async def test_boundary_owns_github_prompt_generation_and_cancellation() -> None:
+async def test_boundary_stop_owns_github_prompt_generation_and_cancellation() -> None:
     boundary = UiApplicationBoundary(RecordingBackend())
     started = asyncio.Event()
     cancelled = asyncio.Event()
@@ -523,8 +608,8 @@ async def test_boundary_owns_github_prompt_generation_and_cancellation() -> None
 
     task = boundary.start_github_star_prompt(prompt)
     await started.wait()
-    boundary.stop_github_star_prompt_ingress()
-    await boundary.close_github_star_prompt_runtime()
+    await boundary.stop()
 
     assert await task is False
     assert cancelled.is_set() is True
+    assert boundary.application_lifecycle().is_terminal

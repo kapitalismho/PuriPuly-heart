@@ -1,23 +1,13 @@
-"""Runtime-apply port adapters owned by the app-service boundary.
-
-The ``RuntimeApplyPort`` implementations live here so the GuiController
-dispatches provider/settings runtime apply *intent* instead of owning the
-apply orchestration adapters inline. Each adapter delegates the actual runtime
-mutation to a narrow ``ControllerRuntimeApplyBoundary`` protocol implemented
-(structurally) by the controller, and returns a ``RuntimeApplyResult`` with
-metadata-only diagnostics.
-
-This module owns the runtime-apply result-construction family (degraded/save-
-failed transaction builders and post-apply availability checks) so the
-controller no longer carries runtime-apply orchestration state.
-"""
+"""Application-owned provider and settings runtime orchestration."""
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Protocol
+from dataclasses import field as dataclass_field
 
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
+from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeState
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_LIFECYCLE,
@@ -32,46 +22,196 @@ from puripuly_heart.core.messages import (
     TransactionResult,
     UserMessageRef,
 )
+from puripuly_heart.core.runtime.provider_rebuild import ProviderRuntimeRebuildService
 
 
 @dataclass(frozen=True, slots=True)
-class _ProviderRuntimeApplyPlan:
+class ProviderRuntimeApplyPlan:
     should_rebuild_llm: bool
     should_refresh_peer: bool
     should_refresh_self_stt: bool
     coordinated_gpu_restart: bool = False
 
 
-class ControllerRuntimeApplyBoundary(Protocol):
-    """Narrow controller surface used by the runtime-apply port adapters.
+@dataclass(frozen=True, slots=True)
+class ProviderRuntimeState:
+    runtime_available: bool
+    llm_available: bool
+    self_stt_available: bool
+    peer_stt_available: bool
+    self_stt_desired: bool
+    peer_stt_desired: bool
 
-    The controller implements this protocol structurally. The adapters call
-    these methods to mutate runtime state and to query post-apply
-    availability; the controller keeps its settings-shape and hub knowledge
-    while the app-service module owns the apply/result orchestration.
-    """
 
-    _stt_desired: bool
-    hub: object | None
+ProviderRuntimeStateProvider = Callable[[object], ProviderRuntimeState]
+ProviderRuntimeCommonEffect = Callable[[object], None]
+ProviderRuntimeAsyncEffect = Callable[[], Awaitable[None]]
+ProviderRuntimeGpuEffect = Callable[
+    [object, ProviderRuntimeApplyPlan],
+    Awaitable[None],
+]
+ProviderRuntimeSignatureSink = Callable[[object], None]
+ProviderRuntimeRetrySink = Callable[[], None]
+ProviderRuntimeSettingsProvider = Callable[[], object | None]
+ProviderRuntimeSignatureCacheProvider = Callable[
+    [],
+    tuple[object | None, object | None, object | None],
+]
+ProviderRuntimeSignatureBuilder = Callable[[object], object]
+ProviderRuntimePeerSignatureBuilder = Callable[[object, object | None], object]
+ProviderRuntimeGpuRestartDecision = Callable[[object, object], bool]
+LlmProviderReplace = Callable[[object | None], Awaitable[object | None]]
+LlmProviderFactory = Callable[[object], object | Awaitable[object | None] | None]
+LlmProviderRebuildContextProvider = Callable[[], "LlmProviderRebuildContext | None"]
+LlmProviderAvailabilitySink = Callable[[bool], None]
+LlmProviderMessageSink = Callable[[str], None]
 
-    async def _apply_provider_runtime_plan(
+
+@dataclass(frozen=True, slots=True)
+class LlmProviderRebuildContext:
+    settings: object
+    replace_provider: LlmProviderReplace
+    requires_secret: bool
+
+
+@dataclass(slots=True)
+class LlmProviderRebuildOwner:
+    context_provider: LlmProviderRebuildContextProvider
+    provider_factory: LlmProviderFactory
+    availability_sink: LlmProviderAvailabilitySink
+    usage_refresh: ProviderRuntimeAsyncEffect
+    failure_sink: LlmProviderMessageSink
+    success_sink: LlmProviderMessageSink
+    runtime: ProviderRuntimeRebuildService = dataclass_field(
+        default_factory=ProviderRuntimeRebuildService,
+    )
+
+    async def rebuild(self) -> None:
+        context = self.context_provider()
+        if context is None:
+            return
+        outcome = await self.runtime.rebuild_llm_provider(
+            replace_provider=context.replace_provider,
+            create_provider=lambda: self.provider_factory(context.settings),
+        )
+        provider = outcome.provider
+        self.availability_sink(provider is None and context.requires_secret)
+        await self.usage_refresh()
+        if provider is None:
+            self.failure_sink("LLM provider not available")
+            return
+        self.success_sink("[Settings] LLM provider rebuilt successfully")
+
+
+@dataclass(slots=True)
+class ProviderRuntimeOwner:
+    state_provider: ProviderRuntimeStateProvider
+    common_effect: ProviderRuntimeCommonEffect
+    rebuild_llm: ProviderRuntimeAsyncEffect
+    recover_gpu: ProviderRuntimeGpuEffect
+    refresh_peer: ProviderRuntimeAsyncEffect
+    refresh_self_stt: ProviderRuntimeAsyncEffect
+    signature_sink: ProviderRuntimeSignatureSink
+    llm_retry_sink: ProviderRuntimeRetrySink
+    current_settings_provider: ProviderRuntimeSettingsProvider
+    signature_cache_provider: ProviderRuntimeSignatureCacheProvider
+    self_signature_builder: ProviderRuntimeSignatureBuilder
+    peer_signature_builder: ProviderRuntimePeerSignatureBuilder
+    llm_signature_builder: ProviderRuntimeSignatureBuilder
+    gpu_restart_decision: ProviderRuntimeGpuRestartDecision
+
+    def build_plan(
         self,
-        settings: object,
-        plan: "_ProviderRuntimeApplyPlan",
-    ) -> None: ...
-
-    async def _apply_settings_direct(
-        self,
-        settings: object,
+        next_settings: object,
         *,
-        persist: bool = True,
-        strict_runtime_errors: bool = False,
-        reload_settings_view: bool = True,
-    ) -> None: ...
+        force_rebuild_llm: bool,
+        canonical_settings: object | None = None,
+    ) -> ProviderRuntimeApplyPlan:
+        current_settings = self.current_settings_provider()
+        self_signature, peer_signature, llm_signature = self.signature_cache_provider()
+        if current_settings is not None:
+            if self_signature is None:
+                self_signature = self.self_signature_builder(current_settings)
+            if peer_signature is None:
+                peer_signature = self.peer_signature_builder(current_settings, None)
+            if llm_signature is None:
+                llm_signature = self.llm_signature_builder(current_settings)
+        next_self_signature = self.self_signature_builder(next_settings)
+        next_peer_signature = self.peer_signature_builder(
+            next_settings,
+            canonical_settings,
+        )
+        next_llm_signature = self.llm_signature_builder(next_settings)
+        return ProviderRuntimeApplyPlan(
+            should_rebuild_llm=(
+                force_rebuild_llm or llm_signature is None or next_llm_signature != llm_signature
+            ),
+            should_refresh_peer=(peer_signature is None or next_peer_signature != peer_signature),
+            should_refresh_self_stt=(
+                self_signature is None or next_self_signature != self_signature
+            ),
+            coordinated_gpu_restart=(
+                current_settings is not None
+                and self.gpu_restart_decision(current_settings, next_settings)
+            ),
+        )
 
-    def _peer_runtime_should_be_active(self, settings: object) -> bool: ...
+    async def apply(
+        self,
+        settings: object,
+        plan: ProviderRuntimeApplyPlan,
+    ) -> None:
+        self.common_effect(settings)
+        if plan.should_rebuild_llm:
+            await self.rebuild_llm()
+        if plan.coordinated_gpu_restart:
+            await self.recover_gpu(settings, plan)
+            self.signature_sink(settings)
+            if plan.should_rebuild_llm and not self.state_provider(settings).llm_available:
+                self.llm_retry_sink()
+            return
+        if plan.should_refresh_peer:
+            await self.refresh_peer()
+        if plan.should_refresh_self_stt:
+            await self.refresh_self_stt()
+        self.signature_sink(settings)
+        if plan.should_rebuild_llm and not self.state_provider(settings).llm_available:
+            self.llm_retry_sink()
 
-    def _is_qwen_llm(self, settings: object) -> bool: ...
+    def unavailable_result(
+        self,
+        settings: object,
+        plan: ProviderRuntimeApplyPlan,
+        *,
+        operation: str,
+        surface: str,
+    ) -> RuntimeApplyResult | None:
+        state = self.state_provider(settings)
+        if not state.runtime_available:
+            return None
+        if plan.should_rebuild_llm and not state.llm_available:
+            return _runtime_apply_failed_result(
+                operation=operation,
+                code="provider_runtime_apply_unavailable",
+                surface=surface,
+            )
+        if plan.should_refresh_self_stt and state.self_stt_desired and not state.self_stt_available:
+            return _runtime_apply_failed_result(
+                operation=operation,
+                code="stt_runtime_apply_unavailable",
+                surface=surface,
+            )
+        if plan.should_refresh_peer and state.peer_stt_desired and not state.peer_stt_available:
+            return _runtime_apply_failed_result(
+                operation=operation,
+                code="peer_stt_runtime_apply_unavailable",
+                surface=surface,
+            )
+        return None
+
+
+SettingsRuntimeApplyEffect = Callable[[object, bool], Awaitable[None]]
+SettingsRuntimeStateProvider = Callable[[object], SettingsRuntimeState]
 
 
 def _settings_mutation_diagnostics(
@@ -130,65 +270,41 @@ def _runtime_apply_result_as_degraded_transaction(
 
 def _provider_runtime_apply_unavailable_result(
     *,
-    controller: ControllerRuntimeApplyBoundary,
+    owner: ProviderRuntimeOwner,
     settings: object,
-    plan: _ProviderRuntimeApplyPlan,
+    plan: ProviderRuntimeApplyPlan,
     operation: str,
     surface: str,
 ) -> RuntimeApplyResult | None:
-    if controller.hub is None:
-        return None
-    if plan.should_rebuild_llm and controller.hub.llm is None:
-        return _runtime_apply_failed_result(
-            operation=operation,
-            code="provider_runtime_apply_unavailable",
-            surface=surface,
-        )
-    if (
-        plan.should_refresh_self_stt
-        and controller._stt_desired
-        and not controller.hub.has_stt_provider("self")
-    ):
-        return _runtime_apply_failed_result(
-            operation=operation,
-            code="stt_runtime_apply_unavailable",
-            surface=surface,
-        )
-    if (
-        plan.should_refresh_peer
-        and controller._peer_runtime_should_be_active(settings)
-        and not controller.hub.has_stt_provider("peer")
-    ):
-        return _runtime_apply_failed_result(
-            operation=operation,
-            code="peer_stt_runtime_apply_unavailable",
-            surface=surface,
-        )
-    return None
+    return owner.unavailable_result(
+        settings,
+        plan,
+        operation=operation,
+        surface=surface,
+    )
 
 
 def _stt_language_audio_runtime_unavailable_result(
     *,
-    controller: ControllerRuntimeApplyBoundary,
+    state: SettingsRuntimeState,
     settings: object,
 ) -> RuntimeApplyResult | None:
-    if controller.hub is None:
+    _ = settings
+    if not state.runtime_available:
         return None
-    if controller._stt_desired and not controller.hub.has_stt_provider("self"):
+    if state.self_stt_desired and not state.self_stt_available:
         return _runtime_apply_failed_result(
             operation="apply_stt_language_audio_runtime",
             code="stt_language_audio_runtime_unavailable",
             surface="stt_language_audio",
         )
-    if controller._peer_runtime_should_be_active(settings) and not controller.hub.has_stt_provider(
-        "peer"
-    ):
+    if state.peer_stt_desired and not state.peer_stt_available:
         return _runtime_apply_failed_result(
             operation="apply_stt_language_audio_runtime",
             code="peer_stt_language_audio_runtime_unavailable",
             surface="stt_language_audio",
         )
-    if controller._is_qwen_llm(settings) and controller.hub.llm is None:
+    if state.qwen_llm_desired and not state.llm_available:
         return _runtime_apply_failed_result(
             operation="apply_stt_language_audio_runtime",
             code="llm_stt_language_audio_runtime_unavailable",
@@ -302,17 +418,17 @@ def _ui_prompt_clipboard_state_save_failed_transaction_result(
 
 
 @dataclass(slots=True)
-class _ControllerProviderRuntimeApply:
-    controller: ControllerRuntimeApplyBoundary
+class ProviderRuntimeApplyAdapter:
+    owner: ProviderRuntimeOwner
     settings: object
-    plan: _ProviderRuntimeApplyPlan
+    plan: ProviderRuntimeApplyPlan
     surface: str = "translation_provider"
     operation: str = "apply_provider_runtime"
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
         try:
-            await self.controller._apply_provider_runtime_plan(self.settings, self.plan)
+            await self.owner.apply(self.settings, self.plan)
         except Exception:
             return RuntimeApplyResult(
                 status=RUNTIME_APPLY_STATUS_FAILED,
@@ -330,7 +446,7 @@ class _ControllerProviderRuntimeApply:
                 ),
             )
         unavailable_result = _provider_runtime_apply_unavailable_result(
-            controller=self.controller,
+            owner=self.owner,
             settings=self.settings,
             plan=self.plan,
             operation=self.operation,
@@ -346,19 +462,18 @@ class _ControllerProviderRuntimeApply:
 
 
 @dataclass(slots=True)
-class _ControllerSttLanguageAudioRuntimeApply:
-    controller: ControllerRuntimeApplyBoundary
+class SttLanguageAudioRuntimeApplyAdapter:
+    apply_settings: SettingsRuntimeApplyEffect
+    state_provider: SettingsRuntimeStateProvider
     settings: object
     reload_settings_view: bool = True
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
         try:
-            await self.controller._apply_settings_direct(
+            await self.apply_settings(
                 self.settings,
-                persist=False,
-                strict_runtime_errors=True,
-                reload_settings_view=self.reload_settings_view,
+                self.reload_settings_view,
             )
         except Exception:
             return RuntimeApplyResult(
@@ -377,7 +492,7 @@ class _ControllerSttLanguageAudioRuntimeApply:
                 ),
             )
         unavailable_result = _stt_language_audio_runtime_unavailable_result(
-            controller=self.controller,
+            state=self.state_provider(self.settings),
             settings=self.settings,
         )
         if unavailable_result is not None:
@@ -390,17 +505,16 @@ class _ControllerSttLanguageAudioRuntimeApply:
 
 
 @dataclass(slots=True)
-class _ControllerOverlayOscOutputRuntimeApply:
-    controller: ControllerRuntimeApplyBoundary
+class OverlayOscOutputRuntimeApplyAdapter:
+    apply_settings: SettingsRuntimeApplyEffect
     settings: object
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
         try:
-            await self.controller._apply_settings_direct(
+            await self.apply_settings(
                 self.settings,
-                persist=False,
-                strict_runtime_errors=True,
+                True,
             )
         except Exception:
             return _runtime_apply_failed_result(
@@ -416,17 +530,16 @@ class _ControllerOverlayOscOutputRuntimeApply:
 
 
 @dataclass(slots=True)
-class _ControllerUiPromptClipboardStateRuntimeApply:
-    controller: ControllerRuntimeApplyBoundary
+class UiPromptClipboardStateRuntimeApplyAdapter:
+    apply_settings: SettingsRuntimeApplyEffect
     settings: object
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
         try:
-            await self.controller._apply_settings_direct(
+            await self.apply_settings(
                 self.settings,
-                persist=False,
-                strict_runtime_errors=True,
+                True,
             )
         except Exception:
             return _runtime_apply_failed_result(
@@ -442,7 +555,7 @@ class _ControllerUiPromptClipboardStateRuntimeApply:
 
 
 @dataclass(slots=True)
-class _ControllerNoopRuntimeApply:
+class NoopRuntimeApply:
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
         return RuntimeApplyResult(
@@ -453,5 +566,15 @@ class _ControllerNoopRuntimeApply:
 
 
 __all__ = [
-    "ControllerRuntimeApplyBoundary",
+    "LlmProviderRebuildContext",
+    "LlmProviderRebuildOwner",
+    "NoopRuntimeApply",
+    "OverlayOscOutputRuntimeApplyAdapter",
+    "ProviderRuntimeApplyAdapter",
+    "ProviderRuntimeApplyPlan",
+    "ProviderRuntimeOwner",
+    "ProviderRuntimeState",
+    "SettingsRuntimeState",
+    "SttLanguageAudioRuntimeApplyAdapter",
+    "UiPromptClipboardStateRuntimeApplyAdapter",
 ]

@@ -137,7 +137,6 @@ def _run_isolated_cli_import_probe(
         "puripuly_heart.providers.stt.qwen_asr",
         "puripuly_heart.providers.stt.soniox",
         "puripuly_heart.ui.app",
-        "puripuly_heart.ui.controller",
     ]
     script = "\n".join(
         [

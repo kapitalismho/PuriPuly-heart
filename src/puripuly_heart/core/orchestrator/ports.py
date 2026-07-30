@@ -2,13 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from typing import Protocol
-from uuid import UUID
-
-from puripuly_heart.core.overlay.sink import OverlayEventUnion
-from puripuly_heart.domain.models import ChannelId, OSCMessage, Transcript
 
 
-class HubRuntimeLoggingPort(Protocol):
+class TranslationRuntimeLoggingPort(Protocol):
     @property
     def mode(self) -> object: ...
 
@@ -22,75 +18,6 @@ class HubRuntimeLoggingPort(Protocol):
         *,
         level: int = ...,
     ) -> bool: ...
-
-
-class HubChatboxPort(Protocol):
-    def enqueue(self, message: OSCMessage) -> None: ...
-    def send_immediate(self, text: str) -> bool: ...
-    def send_typing(self, is_typing: bool) -> None: ...
-    def set_typing_reason(self, reason: str, active: bool) -> None: ...
-    def clear_typing_reasons(self) -> None: ...
-    def process_due(self) -> None: ...
-
-
-class HubOverlaySinkPort(Protocol):
-    async def emit(self, event: OverlayEventUnion) -> None: ...
-    def active_self_overlay_metadata(self) -> object | None: ...
-
-
-class HubOverlayEventFactoryPort(Protocol):
-    def transcript_final(
-        self,
-        transcript: Transcript,
-        *,
-        source_language: str,
-        target_language: str,
-    ) -> OverlayEventUnion: ...
-
-    def translation_final(
-        self,
-        *,
-        utterance_id: UUID,
-        channel: ChannelId,
-        text: str,
-        source_language: str,
-        target_language: str,
-        applied_context_mode: object | None,
-        created_at: float,
-        source_text: str | None = ...,
-        update_id: str | None = ...,
-        origin_wall_clock_ms: int | None = ...,
-        session_scope: str | None = ...,
-        source_text_hash: str | None = ...,
-        source_text_len: int | None = ...,
-        logical_turn_key: str | None = ...,
-    ) -> OverlayEventUnion: ...
-
-    def utterance_closed(
-        self,
-        *,
-        utterance_id: UUID,
-        channel: ChannelId,
-        is_final: bool,
-    ) -> OverlayEventUnion: ...
-
-    def self_active_update(
-        self,
-        *,
-        text: str,
-        utterance_id: UUID,
-        secondary_text: str,
-        occupant_key: str,
-        source_language: str,
-        target_language: str,
-        created_at: float,
-        update_id: str | None = ...,
-        origin_wall_clock_ms: int | None = ...,
-        session_scope: str | None = ...,
-        source_text_hash: str | None = ...,
-        source_text_len: int | None = ...,
-        logical_turn_key: str | None = ...,
-    ) -> OverlayEventUnion: ...
 
 
 def runtime_logging_mode_is_detailed(mode: object) -> bool:
@@ -192,7 +119,7 @@ def format_translation_ready_for_output(
     elapsed_ms: int | None,
 ) -> str:
     parts = [
-        "[Detailed][Hub] translation_ready_for_output",
+        "[Detailed][Translation] translation_ready_for_output",
         f"channel={channel}",
         f"utterance_id={utterance_id}",
         f"update_id={update_id}",
@@ -209,10 +136,7 @@ def format_translation_ready_for_output(
 
 
 __all__ = [
-    "HubChatboxPort",
-    "HubOverlayEventFactoryPort",
-    "HubOverlaySinkPort",
-    "HubRuntimeLoggingPort",
+    "TranslationRuntimeLoggingPort",
     "compute_latency_dominant_stage",
     "format_basic_latency_summary",
     "format_detailed_latency_breakdown",

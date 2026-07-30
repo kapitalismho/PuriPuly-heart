@@ -6,6 +6,11 @@ import flet as ft
 
 from puripuly_heart.core.language import get_all_language_options
 from puripuly_heart.ui.components.language_modal import LanguageModal
+from puripuly_heart.ui.flet_runtime import (
+    control_page,
+    is_hover_active,
+    update_control_if_mounted,
+)
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import get_locale, language_name, t
 from puripuly_heart.ui.theme import (
@@ -23,13 +28,7 @@ _CHIP_VERTICAL_PADDING = 14
 
 
 def _update_control_if_mounted(control: ft.Control) -> None:
-    if getattr(control, "page", None) is None:
-        return
-    try:
-        control.update()
-    except AssertionError as exc:
-        if "Control must be added" not in str(exc):
-            raise
+    update_control_if_mounted(control)
 
 
 class LanguageHintEditor(ft.Column):
@@ -60,7 +59,7 @@ class LanguageHintEditor(ft.Column):
         )
 
         self._add_button = ft.TextButton(
-            text=t("settings.peer_auto_languages.add"),
+            content=t("settings.peer_auto_languages.add"),
             on_click=self._open_modal,
             style=ft.ButtonStyle(
                 color={
@@ -88,7 +87,7 @@ class LanguageHintEditor(ft.Column):
         )
 
     def apply_locale(self) -> None:
-        self._add_button.text = t("settings.peer_auto_languages.add")
+        self._add_button.content = t("settings.peer_auto_languages.add")
         self._add_button.style = ft.ButtonStyle(
             color={
                 ft.ControlState.HOVERED: COLOR_PRIMARY,
@@ -129,9 +128,9 @@ class LanguageHintEditor(ft.Column):
         return ft.Container(
             data=code,
             bgcolor=COLOR_PRIMARY_CONTAINER,
-            border=ft.border.all(1, COLOR_DIVIDER),
+            border=ft.Border.all(1, COLOR_DIVIDER),
             border_radius=_CHIP_RADIUS,
-            padding=ft.padding.only(
+            padding=ft.Padding.only(
                 left=_CHIP_HORIZONTAL_PADDING,
                 right=_CHIP_HORIZONTAL_PADDING,
                 top=_CHIP_VERTICAL_PADDING,
@@ -146,14 +145,14 @@ class LanguageHintEditor(ft.Column):
     def _handle_chip_hover(self, event: ft.ControlEvent) -> None:
         chip = event.control
         term_text = chip.content
-        hovered = event.data == "true"
+        hovered = is_hover_active(event)
         chip.bgcolor = COLOR_PRIMARY if hovered else COLOR_PRIMARY_CONTAINER
-        chip.border = ft.border.all(1, COLOR_PRIMARY if hovered else COLOR_DIVIDER)
+        chip.border = ft.Border.all(1, COLOR_PRIMARY if hovered else COLOR_DIVIDER)
         term_text.color = ft.Colors.WHITE if hovered else COLOR_ON_PRIMARY_CONTAINER
         _update_control_if_mounted(chip)
 
     def _open_modal(self, _event: ft.ControlEvent | None = None) -> None:
-        page = self.page
+        page = control_page(self)
         if page is None:
             return
         languages = get_all_language_options()

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, TypeVar
 
 _TaskResultT = TypeVar("_TaskResultT")
@@ -255,7 +255,9 @@ class OverlayRuntimeHandle:
         self,
         *,
         preserve_presenter_state: bool,
-        hub: object | None,
+        overlay_sink_detach: Callable[[object | None], Awaitable[bool]] | None = None,
+        preview_reset: Callable[[], Awaitable[None]] | None = None,
+        diagnostics_detach: Callable[[object | None], object] | None = None,
         emit_shutdown: bool = True,
     ) -> None:
         if self._close_completed and not self._has_resources():
@@ -266,13 +268,15 @@ class OverlayRuntimeHandle:
                 return
             self._closing = True
             failures: list[Exception] = []
-            hub_ingress_detached = False
+            output_ingress_detached = False
+            output_ingress_detach_failed = False
             try:
-                hub_ingress_detached = await self._detach_hub_overlay_ingress(
-                    hub,
+                output_ingress_detached = await self._detach_overlay_ingress(
                     self._presenter,
+                    overlay_sink_detach,
                 )
             except Exception as exc:
+                output_ingress_detach_failed = True
                 failures.append(exc)
             try:
                 if emit_shutdown:
@@ -281,9 +285,11 @@ class OverlayRuntimeHandle:
                 await self._cancel_owned_tasks(failures)
                 await self._close_presenter(
                     preserve_presenter_state,
-                    hub,
                     failures,
-                    hub_ingress_detached=hub_ingress_detached,
+                    output_ingress_detached=output_ingress_detached,
+                    output_ingress_detach_failed=output_ingress_detach_failed,
+                    preview_reset=preview_reset,
+                    diagnostics_detach=diagnostics_detach,
                 )
                 await self._stop_process_manager(failures)
                 await self._stop_bridge(failures)
@@ -391,43 +397,14 @@ class OverlayRuntimeHandle:
         if callable(mark_shutdown_requested):
             mark_shutdown_requested()
 
-    async def _detach_hub_overlay_ingress(
+    async def _detach_overlay_ingress(
         self,
-        hub: object | None,
         presenter: object | None,
+        overlay_sink_detach: Callable[[object | None], Awaitable[bool]] | None,
     ) -> bool:
-        if hub is None or presenter is None:
+        if presenter is None or overlay_sink_detach is None:
             return False
-        if getattr(hub, "overlay_sink", None) is not presenter:
-            return False
-        return await self._replace_hub_overlay_sink(
-            hub,
-            None,
-            expected_current=presenter,
-            require_match=True,
-        )
-
-    @staticmethod
-    async def _replace_hub_overlay_sink(
-        hub: object,
-        overlay_sink: object | None,
-        *,
-        expected_current: object | None,
-        require_match: bool,
-    ) -> bool:
-        replace_overlay_sink = getattr(hub, "replace_overlay_sink", None)
-        if callable(replace_overlay_sink):
-            return bool(
-                await replace_overlay_sink(
-                    overlay_sink,
-                    expected_current=expected_current,
-                    require_match=require_match,
-                )
-            )
-        if require_match and getattr(hub, "overlay_sink", None) is not expected_current:
-            return False
-        setattr(hub, "overlay_sink", overlay_sink)
-        return True
+        return await overlay_sink_detach(presenter)
 
     async def _cancel_owned_tasks(self, failures: list[Exception]) -> None:
         current_task = asyncio.current_task()
@@ -463,10 +440,12 @@ class OverlayRuntimeHandle:
     async def _close_presenter(
         self,
         preserve_presenter_state: bool,
-        hub: object | None,
         failures: list[Exception],
         *,
-        hub_ingress_detached: bool,
+        output_ingress_detached: bool,
+        output_ingress_detach_failed: bool,
+        preview_reset: Callable[[], Awaitable[None]] | None,
+        diagnostics_detach: Callable[[object | None], object] | None,
     ) -> None:
         presenter = self._presenter
         if presenter is None:
@@ -487,30 +466,13 @@ class OverlayRuntimeHandle:
             except Exception as exc:
                 failures.append(exc)
 
-        hub_sink = getattr(hub, "overlay_sink", None) if hub is not None else None
-        hub_sink_is_presenter = hub_sink is presenter
-        if hub is not None and hub_sink_is_presenter:
+        if not preserve_presenter_state and diagnostics_detach is not None:
             try:
-                hub_sink_is_presenter = await self._replace_hub_overlay_sink(
-                    hub,
-                    None,
-                    expected_current=presenter,
-                    require_match=True,
-                )
+                diagnostics_detach(self._diagnostics)
             except Exception as exc:
                 failures.append(exc)
-                hub_sink_is_presenter = False
-            if hub_sink_is_presenter:
-                hub_sink = None
-
-        should_clear_hub_state = hub_sink_is_presenter or (
-            hub_ingress_detached and hub_sink is None
-        )
-        if hub is not None and should_clear_hub_state:
-            if not preserve_presenter_state:
-                if hasattr(hub, "overlay_diagnostics"):
-                    setattr(hub, "overlay_diagnostics", None)
-                await self._attempt(failures, getattr(hub, "reset_overlay_preview", None))
+        if not preserve_presenter_state and output_ingress_detached:
+            await self._attempt(failures, preview_reset)
 
         if preserve_presenter_state:
             return
@@ -521,7 +483,7 @@ class OverlayRuntimeHandle:
                 reset_scene()
             except Exception as exc:
                 failures.append(exc)
-        if len(failures) == before:
+        if len(failures) == before and not output_ingress_detach_failed:
             self._presenter = None
 
     async def _stop_process_manager(self, failures: list[Exception]) -> None:

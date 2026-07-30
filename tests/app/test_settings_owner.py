@@ -171,6 +171,38 @@ def test_owner_failed_save_keeps_last_persisted_state(
     assert owner.canonical.intent.ui.locale == "en"
 
 
+def test_owner_nested_completion_keeps_outer_rollback_snapshot(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "settings.json"
+    _write_json(path, serialization.to_dict(AppSettingsVNext()))
+    owner = compose_settings_owner(path)
+    loaded = owner.start()
+    legacy_before = copy.deepcopy(loaded.settings)
+    canonical_before = copy.deepcopy(owner.canonical)
+    owner.authoritative = True
+
+    owner.begin(legacy_snapshot=legacy_before)
+    assert owner.current is not None
+    owner.current.ui.locale = "ja"
+    owner.apply_legacy_delta(legacy_before, owner.current)
+    owner.begin()
+    owner.complete()
+
+    assert owner.rollback_pending is True
+    assert owner.mutation_depth == 1
+    assert owner.current.ui.locale == "ja"
+    assert owner.canonical != canonical_before
+
+    owner.rollback()
+
+    assert owner.current == legacy_before
+    assert owner.canonical == canonical_before
+    assert owner.authoritative is True
+    assert owner.rollback_pending is False
+    assert owner.mutation_depth == 0
+
+
 def test_owner_legacy_delta_projection_is_side_effect_free(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
     _write_json(path, serialization.to_dict(AppSettingsVNext()))

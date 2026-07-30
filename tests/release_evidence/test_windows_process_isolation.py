@@ -8,6 +8,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from puripuly_heart.app.services.peer_application import PeerApplicationOwner
+from puripuly_heart.core.peer_capture import PeerCaptureFailureReason
 from puripuly_heart.release_evidence.windows_process_isolation import (
     CHANNELS,
     CONTROL_FREQUENCY_HZ,
@@ -21,16 +23,17 @@ from puripuly_heart.release_evidence.windows_process_isolation import (
     _worker_command,
     build_blocked_evidence,
     build_fixture_capture_target,
+    build_gui_process_retry_action,
     classify_native_capability,
     invoke_gui_process_retry,
     isolation_passes,
+    latest_peer_failure_reason,
     lifecycle_passes,
     load_thresholds,
     measure_isolation,
     run,
     validate_direct_child_topology,
 )
-from puripuly_heart.ui.controller import GuiController
 
 THRESHOLDS = IsolationThresholds(
     target_present_amplitude_min=0.05,
@@ -110,8 +113,8 @@ def test_threshold_math_requires_measured_target_and_control_exclusion() -> None
 
 def test_lifecycle_contract_requires_ordered_teardown_fresh_pid_and_gui_retry() -> None:
     facts = dict(
-        events=["provider_closed", "source_closed", "typed_warning"],
-        warning_reason="process_target_exited",
+        events=["source_closed", "provider_closed", "typed_warning"],
+        warning_reason=PeerCaptureFailureReason.PROCESS_TARGET_EXITED.value,
         loop_task_done_at_warning=True,
         process_source_pids=[101, 202],
         closed_source_pids={101},
@@ -128,6 +131,23 @@ def test_lifecycle_contract_requires_ordered_teardown_fresh_pid_and_gui_retry() 
     assert lifecycle_passes(**{**facts, "no_automatic_reconnect": False}) is False
 
 
+def test_latest_peer_failure_reason_ignores_later_nonfailure_diagnostics() -> None:
+    reason = type(
+        "Reason",
+        (),
+        {"value": PeerCaptureFailureReason.PROCESS_TARGET_EXITED.value},
+    )()
+    diagnostics = [
+        type("Diagnostic", (), {"reason": reason})(),
+        type("Diagnostic", (), {"reason": None})(),
+    ]
+
+    assert (
+        latest_peer_failure_reason(diagnostics)
+        == PeerCaptureFailureReason.PROCESS_TARGET_EXITED.value
+    )
+
+
 @pytest.mark.asyncio
 async def test_fixture_invokes_the_committed_gui_retry_action_contract() -> None:
     class Runtime:
@@ -135,31 +155,24 @@ async def test_fixture_invokes_the_committed_gui_retry_action_contract() -> None
             assert config == "fresh-resolved-config"
             return True
 
-    class GuiActionContract:
-        settings = object()
-        _peer_runtime = Runtime()
-        _peer_process_warning_reason = "process_target_exited"
+    warning = ["process_target_exited"]
+    action = build_gui_process_retry_action(
+        runtime=Runtime(),
+        config="fresh-resolved-config",
+        warning_clear=lambda: warning.__setitem__(0, None),
+    )
 
-        def _peer_runtime_should_be_active(self, _settings) -> bool:  # noqa: ANN001
-            return True
-
-        async def _ensure_peer_local_stt_ready(self) -> bool:
-            return True
-
-        def _build_peer_runtime_config(self, _settings) -> str:  # noqa: ANN001
-            return "fresh-resolved-config"
-
-        def _sync_effective_hub_flags(self, _settings) -> None:  # noqa: ANN001
-            return None
-
-        def _refresh_overlay_peer_consumers(self) -> None:
-            return None
-
-    action = GuiActionContract()
-
-    assert GUI_PROCESS_RETRY_ACTION is GuiController.retry_peer_process_capture
+    assert GUI_PROCESS_RETRY_ACTION is PeerApplicationOwner.retry_process_capture
     assert await invoke_gui_process_retry(action) is True
-    assert action._peer_process_warning_reason is None
+    assert warning[0] is None
+    source = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "puripuly_heart"
+        / "release_evidence"
+        / "windows_process_isolation.py"
+    ).read_text(encoding="utf-8")
+    assert '"retry_action": "PeerApplicationOwner.retry_process_capture"' in source
 
 
 def test_fixture_builds_the_committed_resolved_process_target_contract() -> None:

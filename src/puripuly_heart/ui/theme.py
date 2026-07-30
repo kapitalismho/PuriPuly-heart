@@ -1,30 +1,46 @@
 import flet as ft
 
+from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
+
 # Light Theme - Material Design 3 (Seed: #FF6B6B)
-COLOR_BACKGROUND = "#FFF8F6"  # Surface
-COLOR_SURFACE = "#FFF0EE"  # Surface Container
-COLOR_ON_BACKGROUND = "#5C4D4C"  # Neutral Dark
-COLOR_PRIMARY = "#FF6B6B"  # Primary
-COLOR_ERROR = "#FF5449"  # Error
-COLOR_SUCCESS = "#66BB6A"
-COLOR_WARNING = "#FF8A65"  # Coral orange for warning states
-COLOR_DIVIDER = "#E8D4D2"  # Divider
-COLOR_PRIMARY_CONTAINER = "#ffdad8"
-COLOR_ON_PRIMARY_CONTAINER = "#733332"
-COLOR_ON_SURFACE_VARIANT = "#534341"
-COLOR_SURFACE_DIM = "#d7c1c0"  # OFF state background
+COLOR_BACKGROUND = FOUNDATION_DESIGN_TOKENS.palette.background
+COLOR_SURFACE = FOUNDATION_DESIGN_TOKENS.palette.surface
+COLOR_ON_BACKGROUND = FOUNDATION_DESIGN_TOKENS.palette.on_background
+COLOR_PRIMARY = FOUNDATION_DESIGN_TOKENS.palette.primary
+COLOR_ERROR = FOUNDATION_DESIGN_TOKENS.palette.error
+COLOR_SUCCESS = FOUNDATION_DESIGN_TOKENS.palette.success
+COLOR_WARNING = FOUNDATION_DESIGN_TOKENS.palette.warning
+COLOR_DIVIDER = FOUNDATION_DESIGN_TOKENS.palette.divider
+COLOR_PRIMARY_CONTAINER = FOUNDATION_DESIGN_TOKENS.palette.primary_container
+COLOR_ON_PRIMARY_CONTAINER = FOUNDATION_DESIGN_TOKENS.palette.on_primary_container
+COLOR_ON_SURFACE_VARIANT = FOUNDATION_DESIGN_TOKENS.palette.on_surface_variant
+COLOR_SURFACE_DIM = FOUNDATION_DESIGN_TOKENS.palette.surface_dim
 
 # Additional colors for light theme
-COLOR_SECONDARY = "#B78481"  # Secondary text/icons
-COLOR_TERTIARY = "#B28A44"  # Arrow icon
-COLOR_TRANS_TONAL = "#F5DEDC"  # Toggle button background (OFF state)
-COLOR_TRANS_ON = "#D64058"  # TRANS button ON state
-COLOR_NEUTRAL = "#998E8D"  # Inactive icons
-COLOR_NEUTRAL_DARK = "#5C4D4C"  # Main text
-COLOR_SURFACE_TONAL = "#FCEBE9"  # Alternative surface (hover state)
+COLOR_SECONDARY = FOUNDATION_DESIGN_TOKENS.palette.secondary
+COLOR_TERTIARY = FOUNDATION_DESIGN_TOKENS.palette.tertiary
+COLOR_TRANS_TONAL = FOUNDATION_DESIGN_TOKENS.palette.translation_tonal
+COLOR_TRANS_ON = FOUNDATION_DESIGN_TOKENS.palette.translation_on
+COLOR_NEUTRAL = FOUNDATION_DESIGN_TOKENS.palette.neutral
+COLOR_NEUTRAL_DARK = FOUNDATION_DESIGN_TOKENS.palette.neutral_dark
+COLOR_SURFACE_TONAL = FOUNDATION_DESIGN_TOKENS.palette.surface_tonal
+
+
+TEXT_BUTTON_PADDING = ft.Padding.symmetric(horizontal=8, vertical=8)
+
+
+def _clickable_button_style() -> ft.ButtonStyle:
+    return ft.ButtonStyle(
+        padding=TEXT_BUTTON_PADDING,
+        mouse_cursor={
+            ft.ControlState.DISABLED: ft.MouseCursor.BASIC,
+            ft.ControlState.DEFAULT: ft.MouseCursor.CLICK,
+        },
+    )
 
 
 def get_app_theme(font_family: str | None = None) -> ft.Theme:
+    clickable = _clickable_button_style()
     return ft.Theme(
         color_scheme=ft.ColorScheme(
             surface=COLOR_SURFACE,
@@ -32,12 +48,17 @@ def get_app_theme(font_family: str | None = None) -> ft.Theme:
             primary=COLOR_PRIMARY,
             error=COLOR_ERROR,
             outline=COLOR_DIVIDER,
-            background=COLOR_BACKGROUND,
+            surface_container_lowest=COLOR_BACKGROUND,
             secondary=COLOR_SECONDARY,
             tertiary=COLOR_TERTIARY,
         ),
         font_family=font_family,
         visual_density=ft.VisualDensity.COMPACT,
+        button_theme=ft.ButtonTheme(style=clickable),
+        text_button_theme=ft.TextButtonTheme(style=clickable),
+        outlined_button_theme=ft.OutlinedButtonTheme(style=clickable),
+        filled_button_theme=ft.FilledButtonTheme(style=clickable),
+        icon_button_theme=ft.IconButtonTheme(style=clickable),
         page_transitions=ft.PageTransitionsTheme(
             windows=ft.PageTransitionTheme.NONE,
             macos=ft.PageTransitionTheme.NONE,
@@ -53,8 +74,14 @@ def get_card_shadow() -> ft.BoxShadow:
     blends naturally with the pink/coral color scheme.
     """
     return ft.BoxShadow(
-        blur_radius=10,
-        color=ft.Colors.with_opacity(0.05, COLOR_ON_PRIMARY_CONTAINER),
-        offset=ft.Offset(0, 2),
-        spread_radius=0,
+        blur_radius=FOUNDATION_DESIGN_TOKENS.shadow.blur_radius,
+        color=ft.Colors.with_opacity(
+            FOUNDATION_DESIGN_TOKENS.shadow.opacity,
+            COLOR_ON_PRIMARY_CONTAINER,
+        ),
+        offset=ft.Offset(
+            FOUNDATION_DESIGN_TOKENS.shadow.offset_x,
+            FOUNDATION_DESIGN_TOKENS.shadow.offset_y,
+        ),
+        spread_radius=FOUNDATION_DESIGN_TOKENS.shadow.spread_radius,
     )

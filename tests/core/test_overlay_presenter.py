@@ -38,7 +38,7 @@ from puripuly_heart.core.overlay.state import (
 from puripuly_heart.core.runtime_logging import SessionLoggingMode
 from puripuly_heart.domain.models import Transcript
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
-from tests.core.test_hub_branch_coverage import (
+from tests.core.test_translation_owner_branch_coverage import (
     _make_runtime_logging_capture,
     _runtime_log_messages,
 )

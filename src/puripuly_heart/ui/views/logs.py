@@ -13,15 +13,15 @@ from typing import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import GLOW_CARD, create_glow_stack
+from puripuly_heart.ui.flet_runtime import control_page, update_control_if_mounted
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import get_locale, source_label, t
+from puripuly_heart.ui.logs.contract import LogsIntents, LogsSurfaceSlots
+from puripuly_heart.ui.logs.renderer import compose_logs_surface
 from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
-    COLOR_SURFACE,
-    get_card_shadow,
 )
 
 MAX_LOG_ENTRIES = 4000
@@ -219,41 +219,22 @@ class LogsView(ft.Column):
 
         # Folder open button (brown, hover -> primary)
         self._folder_button = ft.TextButton(
-            text=t("logs.open_folder"),
+            content=t("logs.open_folder"),
             icon=ft.Icons.FOLDER_OPEN,
             style=self._get_button_style(font_family),
             on_click=self._open_log_folder,
         )
         self._mode_button = ft.TextButton(
-            text=self._mode_button_label(),
+            content=self._mode_button_label(),
             icon=ft.Icons.ARTICLE,
             style=self._get_button_style(font_family),
             on_click=self._on_mode_button_click,
         )
         self._conversation_button = ft.TextButton(
-            text=self._conversation_button_label(),
+            content=self._conversation_button_label(),
             icon=ft.Icons.CHAT_BUBBLE_OUTLINE,
             style=self._get_button_style(font_family),
             on_click=self._on_conversation_button_click,
-        )
-
-        # Header rows
-        self._header_button_row = ft.Row(
-            controls=[self._folder_button, self._mode_button, self._conversation_button],
-            spacing=4,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-        header = ft.Container(
-            content=ft.Row(
-                controls=[
-                    self._title_text,
-                    ft.Container(expand=True),
-                    self._header_button_row,
-                ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            ),
-            padding=ft.padding.only(left=16, right=8, top=8, bottom=0),
         )
 
         # Single selectable text for all logs (enables multi-line drag selection)
@@ -265,43 +246,22 @@ class LogsView(ft.Column):
             selectable=True,
         )
 
-        # Scrollable container for log text
-        self._log_scroll = ft.Column(
-            controls=[
-                ft.Container(
-                    content=self._log_text,
-                    padding=ft.padding.only(left=16, right=16, top=8, bottom=16),
-                )
-            ],
-            expand=True,
-            scroll=ft.ScrollMode.AUTO,
+        # Header rows
+        regions = compose_logs_surface(
+            LogsSurfaceSlots(
+                title=self._title_text,
+                folder_button=self._folder_button,
+                mode_button=self._mode_button,
+                conversation_button=self._conversation_button,
+                log_text=self._log_text,
+            )
         )
+        self._header_button_row = regions.header_button_row
+        self._log_scroll = regions.log_scroll
+        self.controls = [regions.root]
 
-        # Card content
-        card_content = ft.Column(
-            controls=[header, self._log_scroll],
-            spacing=0,
-            expand=True,
-        )
-
-        # Wrap in glow stack
-        content_with_glow = create_glow_stack(
-            ft.Container(content=card_content, expand=True),
-            config=GLOW_CARD,
-        )
-
-        # Outer card container
-        card = ft.Container(
-            content=content_with_glow,
-            bgcolor=COLOR_SURFACE,
-            border_radius=16,
-            border=ft.border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
-            expand=True,
-            clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            shadow=get_card_shadow(),
-        )
-
-        self.controls = [card]
+    def bind_logs_intents(self, intents: LogsIntents) -> None:
+        self.on_mode_change = intents.runtime_logging_mode_change
 
     def attach_log_handler(self) -> None:
         """Attach this view as a logging handler to capture app logs."""
@@ -323,7 +283,7 @@ class LogsView(ft.Column):
 
     def append_log_threadsafe(self, record: str) -> None:
         """Append a log entry from any thread without mutating Flet state off-loop."""
-        page = self.page
+        page = control_page(self)
         loop = getattr(page, "loop", None) if page is not None else None
         if loop is None:
             self.append_log(record)
@@ -371,11 +331,11 @@ class LogsView(ft.Column):
         )
         if self._showing_conversation:
             self._render_conversation_text()
-            if self.page and self._log_text is not None:
-                self._log_text.update()
+            if self._log_text is not None:
+                update_control_if_mounted(self._log_text)
 
     def _schedule_log_append(self, record: str) -> bool:
-        page = self.page
+        page = control_page(self)
         loop = getattr(page, "loop", None) if page is not None else None
         if loop is None:
             return False
@@ -427,8 +387,7 @@ class LogsView(ft.Column):
         self._last_update = time.time()
         self._pending_update = False
 
-        if self.page:
-            self._log_text.update()
+        update_control_if_mounted(self._log_text)
 
     def _rebuild_visible_text(self) -> None:
         assert self._log_text is not None
@@ -459,13 +418,12 @@ class LogsView(ft.Column):
     def _on_conversation_button_click(self, _e: ft.ControlEvent | object) -> None:
         self._showing_conversation = not self._showing_conversation
         if self._conversation_button is not None:
-            self._conversation_button.text = self._conversation_button_label()
+            self._conversation_button.content = self._conversation_button_label()
         if self._showing_conversation:
             self._render_conversation_text()
         else:
             self._rebuild_visible_text()
-        if self.page:
-            self.update()
+        update_control_if_mounted(self)
 
     def apply_locale(self) -> None:
         """Refresh UI text when locale changes."""
@@ -473,19 +431,18 @@ class LogsView(ft.Column):
         if self._title_text:
             self._title_text.value = t("logs.title")
         if self._folder_button:
-            self._folder_button.text = t("logs.open_folder")
+            self._folder_button.content = t("logs.open_folder")
             self._folder_button.style = self._get_button_style(font_family)
         if self._mode_button:
-            self._mode_button.text = self._mode_button_label()
+            self._mode_button.content = self._mode_button_label()
             self._mode_button.style = self._get_button_style(font_family)
         if self._conversation_button:
-            self._conversation_button.text = self._conversation_button_label()
+            self._conversation_button.content = self._conversation_button_label()
             self._conversation_button.style = self._get_button_style(font_family)
         if self._showing_conversation and self._log_text is not None:
             self._render_conversation_text()
         # Only update if added to page
-        if self.page:
-            self.update()
+        update_control_if_mounted(self)
 
     @property
     def runtime_logging_mode(self) -> str:
@@ -494,9 +451,8 @@ class LogsView(ft.Column):
     def set_runtime_logging_mode(self, mode: str) -> None:
         self._runtime_logging_mode = self._normalize_mode(mode)
         if self._mode_button is not None:
-            self._mode_button.text = self._mode_button_label()
-        if self.page:
-            self.update()
+            self._mode_button.content = self._mode_button_label()
+        update_control_if_mounted(self)
 
     def _normalize_mode(self, mode: str) -> str:
         normalized = str(getattr(mode, "value", mode)).lower()
@@ -515,7 +471,7 @@ class LogsView(ft.Column):
 
     async def scroll_to_bottom(self) -> None:
         """Scroll to the latest log entry."""
-        if self._log_scroll and self.page:
+        if self._log_scroll and control_page(self) is not None:
             if self._pending_update:
                 self._flush_logs()
             result = self._log_scroll.scroll_to(offset=-1, duration=0)

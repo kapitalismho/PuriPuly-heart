@@ -10,6 +10,7 @@ from puripuly_heart.core.messages import (
     ErrorDiagnostics,
     UserMessageRef,
 )
+from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
 
 ProviderVerificationStatus = Literal["verified", "failed", "skipped"]
 PROVIDER_VERIFICATION_STATUS_VERIFIED: Final[ProviderVerificationStatus] = "verified"
@@ -55,6 +56,30 @@ class ProviderVerificationResult:
 
 
 class ProviderVerifierPort(Protocol):
+    async def verify_api_key(
+        self,
+        provider: str,
+        api_key: str,
+        *,
+        model: str | None = None,
+        base_url: str | None = None,
+        low_latency: bool = False,
+    ) -> bool: ...
+
+    async def verify_qwen_llm_api_key(
+        self,
+        api_key: str,
+        *,
+        base_url: str,
+        model: str | None,
+        low_latency: bool,
+    ) -> bool: ...
+
+    async def fetch_openrouter_key_metadata(
+        self,
+        api_key: str,
+    ) -> OpenRouterKeyMetadata | None: ...
+
     async def verify_provider_secret(
         self,
         request: ProviderVerificationRequest,

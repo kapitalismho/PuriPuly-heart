@@ -10,7 +10,14 @@ import pytest
 pytest.importorskip("flet")
 import flet as ft
 
-from puripuly_heart.app.services.ui_application import UiApplicationBoundary
+from puripuly_heart.app.services import canonical_settings_persistence as settings_module
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    compose_settings_owner,
+)
+from puripuly_heart.app.services.github_star_prompt_settings import (
+    compose_github_star_prompt_owner,
+)
+from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 from puripuly_heart.config.settings import (
     AppSettings,
     STTProviderName,
@@ -21,11 +28,10 @@ from puripuly_heart.config.settings import (
 )
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
 from puripuly_heart.ui import app as app_module
-from puripuly_heart.ui import controller as controller_module
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
 from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
-from puripuly_heart.ui.controller import GuiController
+from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
 class DummyPage:
@@ -35,15 +41,19 @@ class DummyPage:
         self.tasks: list[object] = []
         self.updated = 0
 
-    def open(self, control) -> None:  # noqa: ANN001
+    def show_dialog(self, control) -> None:  # noqa: ANN001
         if hasattr(control, "open"):
             control.open = True
         self.opened.append(control)
 
-    def close(self, control) -> None:  # noqa: ANN001
+    def pop_dialog(self):
+        if not self.opened:
+            return None
+        control = self.opened[-1]
         if hasattr(control, "open"):
             control.open = False
         self.closed.append(control)
+        return control
 
     def run_task(self, task_factory) -> None:  # noqa: ANN001
         self.tasks.append(task_factory)
@@ -56,30 +66,7 @@ def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:
     def persist(owner) -> None:
         callback(owner.path, owner.compatibility_projection())
 
-    monkeypatch.setattr(controller_module.SettingsOwner, "persist", persist)
-
-
-class Flet028SnackBarPage(DummyPage):
-    """Model Flet 0.28.3's state-only SnackBar close behavior.
-
-    Flet 0.28.3 sets the Python-side ``open`` flag to false on ``page.close()``,
-    but the visible Flutter SnackBar is not removed until another SnackBar is
-    opened or the duration expires.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.visible_snackbar: ft.SnackBar | None = None
-
-    def open(self, control) -> None:  # noqa: ANN001
-        super().open(control)
-        if isinstance(control, ft.SnackBar):
-            self.visible_snackbar = control
-
-    def close(self, control) -> None:  # noqa: ANN001
-        if hasattr(control, "open"):
-            control.open = False
-        self.closed.append(control)
+    monkeypatch.setattr(settings_module.SettingsOwner, "persist", persist)
 
 
 def _settings_for_connection(connection: TranslationConnection) -> AppSettings:
@@ -98,24 +85,54 @@ def _settings_for_connection(connection: TranslationConnection) -> AppSettings:
     return settings
 
 
-def _controller_for(settings: AppSettings) -> GuiController:
-    controller = GuiController(
-        page=SimpleNamespace(),
-        app=SimpleNamespace(),
-        config_path=Path("settings.json"),
-    )
-    controller.settings = settings
-    return controller
+class PromptBackend:
+    def __init__(self, settings: AppSettings) -> None:
+        self.config_path = Path("settings.json")
+        self.settings_owner = compose_settings_owner(self.config_path)
+        self.settings_owner.current = settings
+        self.usage = SimpleNamespace(usage_metadata=None)
+        self.owner = compose_github_star_prompt_owner(
+            settings=self.settings_owner,
+            managed_remaining_percent=lambda: ManagedUsageOwner.remaining_percent_for(
+                self.usage.usage_metadata
+            ),
+            transaction_result_sink=lambda _result: None,
+            save_failure_sink=lambda _context, _exc: None,
+            runtime_diagnostics_sink=lambda _event, _metadata: None,
+            mutation_service_provider=lambda: None,
+        )
+
+    @property
+    def settings(self) -> AppSettings:
+        return self.settings_owner.current
+
+    def _get_managed_usage_owner(self) -> object:
+        return self.usage
+
+    def _get_github_star_prompt_owner(self):
+        return self.owner
+
+    def should_show_github_star_prompt(self, *, now: datetime | None = None) -> bool:
+        return self.owner.should_show(now=now)
+
+    async def persist_github_star_prompt_eligible_launch(self) -> bool:
+        return await self.owner.persist_eligible_launch()
+
+    async def persist_github_star_prompt_opened(self, *, should_open=None) -> bool:
+        return await self.owner.persist_opened(should_open=should_open)
+
+    async def persist_github_star_prompt_clicked(self) -> bool:
+        return await self.owner.persist_clicked()
 
 
-def _eligible_managed_controller() -> GuiController:
-    controller = _controller_for(_settings_for_connection(TranslationConnection.MANAGED))
-    controller._managed_trial_usage_metadata = OpenRouterKeyMetadata(  # noqa: SLF001
+def _eligible_managed_backend() -> PromptBackend:
+    backend = PromptBackend(_settings_for_connection(TranslationConnection.MANAGED))
+    backend._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=50.0,
         usage_usd=50.0,
     )
-    return controller
+    return backend
 
 
 def _utc_z(value: datetime) -> str:
@@ -125,23 +142,18 @@ def _utc_z(value: datetime) -> str:
 def _eligible_app(
     page: DummyPage | None = None,
     settings: AppSettings | None = None,
-) -> tuple[TranslatorApp, DummyPage, GuiController]:
+) -> tuple[TranslatorApp, DummyPage, PromptBackend]:
     page = page or DummyPage()
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = page
-    controller = GuiController(
-        page=page,
-        app=app,
-        config_path=Path("settings.json"),
-    )
-    controller.settings = settings or _settings_for_connection(TranslationConnection.MANAGED)
-    controller._managed_trial_usage_metadata = OpenRouterKeyMetadata(  # noqa: SLF001
+    backend = PromptBackend(settings or _settings_for_connection(TranslationConnection.MANAGED))
+    backend._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=50.0,
         usage_usd=50.0,
     )
-    app.controller = controller
-    return app, page, controller
+    app._ui_application = compose_test_ui_application_boundary(backend)
+    return app, page, backend
 
 
 async def _async_noop(*_args: object, **_kwargs: object) -> None:
@@ -149,7 +161,7 @@ async def _async_noop(*_args: object, **_kwargs: object) -> None:
 
 
 def test_github_star_prompt_state_blocks_clicked_and_recent_shows() -> None:
-    controller = _eligible_managed_controller()
+    controller = _eligible_managed_backend()
     now = datetime(2026, 5, 24, 12, 0, tzinfo=timezone.utc)
 
     assert controller.should_show_github_star_prompt(now=now) is False
@@ -221,7 +233,7 @@ async def test_launch_github_star_snackbar_does_not_count_ineligible_launch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app, page, controller = _eligible_app()
-    controller._managed_trial_usage_metadata = None  # noqa: SLF001
+    controller._get_managed_usage_owner().usage_metadata = None
     saved_payloads: list[dict[str, object]] = []
 
     async def fail_sleep(_seconds: float) -> None:
@@ -239,50 +251,6 @@ async def test_launch_github_star_snackbar_does_not_count_ineligible_launch(
     assert page.opened == []
     assert controller.settings.ui.github_star_prompt_eligible_launch_count == 0
     assert saved_payloads == []
-
-
-def test_record_github_star_prompt_opened_persists_timestamp_count_and_not_clicked(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _eligible_managed_controller()
-    controller.settings.ui.github_star_prompt_show_count = 2
-    saved_payloads: list[dict[str, object]] = []
-    opened_at = datetime(2026, 5, 24, 12, 34, 56, tzinfo=timezone.utc)
-
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, updated: saved_payloads.append(to_dict(updated)),
-    )
-
-    assert controller.record_github_star_prompt_opened(opened_at=opened_at) is True
-
-    assert controller.settings.ui.github_star_prompt_last_shown_at == "2026-05-24T12:34:56Z"
-    assert controller.settings.ui.github_star_prompt_show_count == 3
-    assert controller.settings.ui.github_star_prompt_clicked is False
-    assert saved_payloads[-1]["ui"]["github_star_prompt_last_shown_at"] == ("2026-05-24T12:34:56Z")
-    assert saved_payloads[-1]["ui"]["github_star_prompt_show_count"] == 3
-    assert saved_payloads[-1]["ui"]["github_star_prompt_clicked"] is False
-
-
-def test_record_github_star_prompt_clicked_persists_permanent_suppression(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = _eligible_managed_controller()
-    saved_payloads: list[dict[str, object]] = []
-
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, updated: saved_payloads.append(to_dict(updated)),
-    )
-
-    assert controller.record_github_star_prompt_clicked() is True
-
-    assert controller.settings.ui.github_star_prompt_clicked is True
-    assert saved_payloads[-1]["ui"]["github_star_prompt_clicked"] is True
-    assert (
-        controller.should_show_github_star_prompt(now=datetime(2026, 5, 24, tzinfo=timezone.utc))
-        is False
-    )
 
 
 @pytest.mark.asyncio
@@ -303,7 +271,7 @@ async def test_prompt_open_persistence_uses_async_save_before_display(
         return func(*args, **kwargs)
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(controller_module.asyncio, "to_thread", fake_to_thread)
+    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
     _patch_settings_save(
         monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
@@ -341,145 +309,6 @@ async def test_prompt_open_refuses_display_and_restores_state_when_persistence_f
     assert controller.settings.ui.github_star_prompt_last_shown_at is None
     assert controller.settings.ui.github_star_prompt_show_count == 0
     assert controller.settings.ui.github_star_prompt_clicked is False
-
-
-@pytest.mark.asyncio
-async def test_apply_settings_preserves_current_github_star_prompt_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    current = _settings_for_connection(TranslationConnection.MANAGED)
-    current.ui.github_star_prompt_clicked = True
-    current.ui.github_star_prompt_last_shown_at = "2026-05-24T12:34:56Z"
-    current.ui.github_star_prompt_show_count = 4
-    current.ui.github_star_prompt_translation_success_observed = True
-    current.ui.github_star_prompt_eligible_launch_count = 2
-    controller = _controller_for(current)
-    replacement = _settings_for_connection(TranslationConnection.OPENROUTER)
-    replacement.ui.github_star_prompt_eligible_launch_count = 1
-    saved_payloads: list[dict[str, object]] = []
-
-    async def noop(*_args: object, **_kwargs: object) -> None:
-        return None
-
-    monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", noop)
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, updated: saved_payloads.append(to_dict(updated)),
-    )
-
-    controller.page = SimpleNamespace()
-    controller.app = SimpleNamespace(view_settings=None)
-    controller.hub = None
-
-    await controller.apply_settings(replacement)
-
-    assert replacement.ui.github_star_prompt_clicked is True
-    assert replacement.ui.github_star_prompt_last_shown_at == "2026-05-24T12:34:56Z"
-    assert replacement.ui.github_star_prompt_show_count == 4
-    assert replacement.ui.github_star_prompt_translation_success_observed is True
-    assert replacement.ui.github_star_prompt_eligible_launch_count == 2
-    assert saved_payloads[-1]["ui"]["github_star_prompt_clicked"] is True
-    assert saved_payloads[-1]["ui"]["github_star_prompt_eligible_launch_count"] == 2
-
-
-@pytest.mark.asyncio
-async def test_prompt_open_persistence_does_not_stale_overwrite_replaced_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    initial = _settings_for_connection(TranslationConnection.MANAGED)
-    initial.languages.target_language = "en"
-    controller = _controller_for(initial)
-    controller.app = SimpleNamespace(view_settings=None)
-    controller.hub = None
-    replacement = _settings_for_connection(TranslationConnection.MANAGED)
-    replacement.languages.target_language = "ja"
-    saved_payloads: list[dict[str, object]] = []
-    first_to_thread_started = asyncio.Event()
-    release_first_to_thread = asyncio.Event()
-    to_thread_calls = 0
-    opened_at = datetime(2026, 5, 24, 12, 34, 56, tzinfo=timezone.utc)
-
-    async def delayed_first_to_thread(func, /, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
-        nonlocal to_thread_calls
-        to_thread_calls += 1
-        if to_thread_calls == 1:
-            first_to_thread_started.set()
-            await release_first_to_thread.wait()
-        return func(*args, **kwargs)
-
-    monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", _async_noop)
-    monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_first_to_thread)
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, updated: saved_payloads.append(to_dict(updated)),
-    )
-
-    open_task = asyncio.create_task(
-        controller.persist_github_star_prompt_opened(opened_at=opened_at)
-    )
-    await asyncio.wait_for(first_to_thread_started.wait(), timeout=1.0)
-
-    apply_task = asyncio.create_task(controller.apply_settings(replacement))
-    await asyncio.sleep(0)
-
-    assert not apply_task.done()
-
-    release_first_to_thread.set()
-    assert await asyncio.wait_for(open_task, timeout=1.0) is True
-    await asyncio.wait_for(apply_task, timeout=1.0)
-
-    assert controller.settings is replacement
-    assert saved_payloads[-1]["languages"]["target_language"] == "ja"
-    assert saved_payloads[-1]["ui"]["github_star_prompt_last_shown_at"] == ("2026-05-24T12:34:56Z")
-    assert saved_payloads[-1]["ui"]["github_star_prompt_show_count"] == 1
-
-
-@pytest.mark.asyncio
-async def test_prompt_click_persistence_does_not_stale_overwrite_replaced_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    initial = _settings_for_connection(TranslationConnection.MANAGED)
-    initial.languages.target_language = "en"
-    controller = _controller_for(initial)
-    controller.app = SimpleNamespace(view_settings=None)
-    controller.hub = None
-    replacement = _settings_for_connection(TranslationConnection.MANAGED)
-    replacement.languages.target_language = "ja"
-    saved_payloads: list[dict[str, object]] = []
-    first_to_thread_started = asyncio.Event()
-    release_first_to_thread = asyncio.Event()
-    to_thread_calls = 0
-
-    async def delayed_first_to_thread(func, /, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
-        nonlocal to_thread_calls
-        to_thread_calls += 1
-        if to_thread_calls == 1:
-            first_to_thread_started.set()
-            await release_first_to_thread.wait()
-        return func(*args, **kwargs)
-
-    monkeypatch.setattr(GuiController, "_sync_clipboard_watcher", _async_noop)
-    monkeypatch.setattr(controller_module.asyncio, "to_thread", delayed_first_to_thread)
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, updated: saved_payloads.append(to_dict(updated)),
-    )
-
-    click_task = asyncio.create_task(controller.persist_github_star_prompt_clicked())
-    await asyncio.wait_for(first_to_thread_started.wait(), timeout=1.0)
-
-    apply_task = asyncio.create_task(controller.apply_settings(replacement))
-    await asyncio.sleep(0)
-
-    assert not apply_task.done()
-
-    release_first_to_thread.set()
-    assert await asyncio.wait_for(click_task, timeout=1.0) is True
-    await asyncio.wait_for(apply_task, timeout=1.0)
-
-    assert controller.settings is replacement
-    assert saved_payloads[-1]["languages"]["target_language"] == "ja"
-    assert saved_payloads[-1]["ui"]["github_star_prompt_clicked"] is True
 
 
 @pytest.mark.asyncio
@@ -526,7 +355,7 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
     message = snackbar.content.controls[0]
     action = snackbar.content.controls[1]
     assert message.value == "PuriPuly가 도움이 됐다면 GitHub에서 Star를 눌러주세요! 큰 힘이 되어요!"
-    assert action.text == "이동"
+    assert action.content == "이동"
 
     in_click_callback = True
     click_callback_save_calls: list[dict[str, object]] = []
@@ -555,11 +384,10 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
 
 
 @pytest.mark.asyncio
-async def test_github_star_action_displaces_visible_snackbar_when_page_close_is_state_only(
+async def test_github_star_action_pops_visible_snackbar(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    flet028_page = Flet028SnackBarPage()
-    app, page, _controller = _eligible_app(flet028_page)
+    app, page, _controller = _eligible_app()
     opened_urls: list[str] = []
 
     _patch_settings_save(monkeypatch, lambda _path, _updated: None)
@@ -569,13 +397,13 @@ async def test_github_star_action_displaces_visible_snackbar_when_page_close_is_
 
     assert shown is True
     snackbar = page.opened[0]
-    assert flet028_page.visible_snackbar is snackbar
 
     action = snackbar.content.controls[1]
     action.on_click(None)
 
     assert opened_urls == ["https://github.com/kapitalismho/PuriPuly-heart"]
-    assert flet028_page.visible_snackbar is not snackbar
+    assert page.closed == [snackbar]
+    assert snackbar.open is False
 
 
 @pytest.mark.asyncio
@@ -686,7 +514,7 @@ async def test_launch_github_star_snackbar_skips_and_restores_if_feedback_appear
         return func(*args, **kwargs)
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(controller_module.asyncio, "to_thread", feedback_during_first_to_thread)
+    monkeypatch.setattr(asyncio, "to_thread", feedback_during_first_to_thread)
     _patch_settings_save(
         monkeypatch,
         lambda _path, updated: saved_payloads.append(to_dict(updated)),
@@ -751,10 +579,34 @@ async def test_main_gui_runs_github_star_prompt_after_update_check(
             events.append("start")
 
     class FakeApp:
-        def __init__(self, incoming_page, *, config_path, debug_ui_preview=False):  # noqa: ANN001
-            _ = (incoming_page, config_path, debug_ui_preview)
+        def __init__(
+            self,
+            incoming_page,
+            *,
+            config_path,
+            application_factory,
+            debug_ui_preview=False,
+            allow_stable_settings_import=False,
+            runtime_logging_sinks=None,
+            vrchat_osc_presence=None,
+        ):  # noqa: ANN001
+            _ = (
+                config_path,
+                application_factory,
+                debug_ui_preview,
+                allow_stable_settings_import,
+                runtime_logging_sinks,
+                vrchat_osc_presence,
+            )
             self.page = incoming_page
-            self.controller = FakeController()
+            backend = FakeController()
+            self.application = compose_test_ui_application_boundary(backend)
+
+        async def _on_page_lifecycle_end(self, _event=None) -> None:
+            return None
+
+        async def shutdown(self) -> None:
+            await self.application.stop()
 
         def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
@@ -782,7 +634,11 @@ async def test_main_gui_runs_github_star_prompt_after_update_check(
     monkeypatch.setattr(app_module, "TranslatorApp", FakeApp)
     monkeypatch.setattr(app_module, "_check_and_notify_update", fake_check_and_notify_update)
 
-    await app_module.main_gui(page, config_path=Path("settings.json"))
+    await app_module.main_gui(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=lambda **_kwargs: None,
+    )
     assert events == ["start"]
     assert not after_launch_tasks[0].done()
 
@@ -799,6 +655,7 @@ async def test_after_launch_update_failure_still_runs_github_star_prompt(
     events: list[str] = []
     logged: list[str] = []
     app = TranslatorApp.__new__(TranslatorApp)
+    app._ui_application = compose_test_ui_application_boundary(None)
     app.page = DummyPage()
     app._log_detailed = lambda message, **_kwargs: logged.append(message)
 
@@ -847,7 +704,8 @@ async def test_after_launch_usage_and_update_run_in_parallel_before_github_star(
         async def prepare_runtime_after_launch(self) -> None:
             events.append("runtime-preparation")
 
-    app.controller = Controller()
+    backend = Controller()
+    app._ui_application = compose_test_ui_application_boundary(backend)
 
     async def check_update(_page, **_kwargs) -> None:
         events.append("update-started")
@@ -900,7 +758,8 @@ async def test_after_launch_high_priority_feedback_suppresses_github_star(
         async def prepare_runtime_after_launch(self) -> None:
             return None
 
-    app.controller = Controller()
+    backend = Controller()
+    app._ui_application = compose_test_ui_application_boundary(backend)
 
     async def check_update(_page, **kwargs) -> None:
         if priority == "update":
@@ -936,8 +795,8 @@ async def test_after_launch_close_cancels_owner_before_prompt_runtime_close() ->
             events.append("prompt-runtime-closed")
 
     app._after_launch_task_handle = asyncio.create_task(after_launch())
-    app.controller = SimpleNamespace()
-    app._ui_application = UiApplicationBoundary(app.controller)
+    backend = SimpleNamespace()
+    app._ui_application = compose_test_ui_application_boundary(backend)
     app._ui_application._github_star_prompt_runtime = Runtime()
     await asyncio.sleep(0)
 
@@ -997,10 +856,11 @@ def test_stt_compatibility_snackbar_marks_launch_high_priority_feedback(
     monkeypatch.setattr(
         app_module, "get_stt_compatibility_warning", lambda *_args, **_kwargs: warning
     )
-    app.controller = SimpleNamespace(
+    backend = SimpleNamespace(
         settings=settings,
         on_dashboard_language_change=fake_on_dashboard_language_change,
     )
+    app._ui_application = compose_test_ui_application_boundary(backend)
 
     app._on_language_change(
         app_module.LanguageSelectionChange(
@@ -1041,12 +901,13 @@ def test_debug_preview_panel_includes_github_star_snackbar_action() -> None:
         on_stt_fault_cycle=noop,
         on_audio_fault_clear=noop,
         on_gpu_state_cycle=noop,
+        on_foundation_primitives=noop,
         on_github_star_snackbar=lambda: invoked.append("github-star"),
         on_telemetry_consent=noop,
     )
 
     action = panel._action_buttons["github_star_snackbar"]  # noqa: SLF001
-    assert action.text == "GitHub Star"
+    assert action.content == "GitHub Star"
 
     action.on_click(None)
 
@@ -1058,9 +919,9 @@ def test_debug_preview_github_star_snackbar_opens_without_mutating_prompt_state(
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    controller = _eligible_managed_controller()
-    initial_prompt_state = to_dict(controller.settings)["ui"]
-    app.controller = controller
+    backend = _eligible_managed_backend()
+    initial_prompt_state = to_dict(backend.settings)["ui"]
+    app._ui_application = compose_test_ui_application_boundary(backend)
     opened_urls: list[str] = []
     previous_locale = i18n_module.get_locale()
 
@@ -1073,7 +934,7 @@ def test_debug_preview_github_star_snackbar_opens_without_mutating_prompt_state(
         i18n_module.set_locale(previous_locale)
 
     assert len(app.page.opened) == 1
-    assert to_dict(controller.settings)["ui"] == initial_prompt_state
+    assert to_dict(backend.settings)["ui"] == initial_prompt_state
 
     snackbar = app.page.opened[0]
     assert snackbar.bgcolor == app_module.COLOR_SUCCESS
@@ -1084,11 +945,11 @@ def test_debug_preview_github_star_snackbar_opens_without_mutating_prompt_state(
     message = snackbar.content.controls[0]
     action = snackbar.content.controls[1]
     assert message.value == "PuriPuly가 도움이 됐다면 GitHub에서 Star를 눌러주세요! 큰 힘이 되어요!"
-    assert action.text == "이동"
+    assert action.content == "이동"
 
     action.on_click(None)
 
     assert opened_urls == ["https://github.com/kapitalismho/PuriPuly-heart"]
     assert app.page.closed == [snackbar]
     assert snackbar.open is False
-    assert to_dict(controller.settings)["ui"] == initial_prompt_state
+    assert to_dict(backend.settings)["ui"] == initial_prompt_state

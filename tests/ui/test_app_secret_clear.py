@@ -8,6 +8,7 @@ import pytest
 pytest.importorskip("flet")
 
 from puripuly_heart.ui.app import TranslatorApp
+from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
 class DummyDashboard:
@@ -48,6 +49,7 @@ def _make_app_with_verified_state(save_settings=None) -> TranslatorApp:
 
     controller.clear_provider_verification = clear_provider_verification
     app.controller = controller
+    app._ui_application = compose_test_ui_application_boundary(controller)
     app.view_dashboard = DummyDashboard()
     return app
 
@@ -124,6 +126,7 @@ async def test_on_provider_secret_change_routes_atomic_invalidation_before_verif
         return True
 
     app.controller = SimpleNamespace(persist_provider_secret_change=persist)
+    app._ui_application = compose_test_ui_application_boundary(app.controller)
     app.view_dashboard = DummyDashboard()
 
     result = await app._on_provider_secret_change(
@@ -145,6 +148,7 @@ async def test_on_provider_secret_change_skips_dashboard_update_when_transaction
         return False
 
     app.controller = SimpleNamespace(persist_provider_secret_change=persist)
+    app._ui_application = compose_test_ui_application_boundary(app.controller)
     app.view_dashboard = DummyDashboard()
 
     result = await app._on_provider_secret_change(

@@ -38,14 +38,17 @@ class DummyPage:
         self.opened: list[object] = []
         self.closed: list[object] = []
 
-    def open(self, dialog) -> None:
+    def show_dialog(self, dialog) -> None:
         self.dialog = dialog
         self.opened.append(dialog)
 
-    def close(self, dialog) -> None:
+    def pop_dialog(self):
+        dialog = self.dialog
+        if dialog is None:
+            return None
         self.closed.append(dialog)
-        if self.dialog is dialog:
-            self.dialog = None
+        self.dialog = None
+        return dialog
 
 
 def _body_text_value(page: DummyPage) -> str:
@@ -89,8 +92,8 @@ def test_founder_letter_dialog_opens_with_two_actions() -> None:
     assert dialog._acknowledge_button is not None
     assert dialog._cancel_button is not None
     assert len(page.opened) == 1
-    assert dialog._cancel_button.text == "닫기"
-    assert dialog._acknowledge_button.text == "README 열기"
+    assert dialog._cancel_button.content == "닫기"
+    assert dialog._acknowledge_button.content == "README 열기"
 
 
 def test_founder_letter_dialog_uses_requested_letter_copy() -> None:

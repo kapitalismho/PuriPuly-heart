@@ -17,17 +17,20 @@ import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from types import MappingProxyType
 from typing import Literal
 
 import numpy as np
 
+from puripuly_heart.app.services.peer_application import (
+    PeerApplicationOwner,
+    PeerApplicationState,
+)
 from puripuly_heart.config.process_capture_platform import (
     PROCESS_CAPTURE_MIN_WINDOWS_BUILD,
     get_process_capture_platform_availability,
 )
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
-from puripuly_heart.ui.controller import GuiController
+from puripuly_heart.core.peer_capture import PeerCaptureFailureReason
 
 EVIDENCE_SCHEMA = "puripuly-heart/windows-process-isolation/v1"
 SAMPLE_RATE_HZ = 48000
@@ -38,7 +41,7 @@ EMITTER_AMPLITUDE = 0.18
 CAPTURE_SECONDS = 3.0
 PROTOCOL_VERSION = 1
 WORKER_MODULE = "puripuly_heart.release_evidence.windows_process_isolation"
-GUI_PROCESS_RETRY_ACTION = GuiController.retry_peer_process_capture
+GUI_PROCESS_RETRY_ACTION = PeerApplicationOwner.retry_process_capture
 
 EvidenceStatus = Literal["passed", "failed", "blocked"]
 
@@ -149,13 +152,13 @@ def lifecycle_passes(
     gui_retry_succeeded: bool,
     gui_warning_cleared: bool,
 ) -> bool:
-    required_events = ("provider_closed", "source_closed", "typed_warning")
+    required_events = ("source_closed", "provider_closed", "typed_warning")
     try:
         event_indexes = tuple(events.index(event) for event in required_events)
     except ValueError:
         return False
     return (
-        warning_reason == "process_target_exited"
+        warning_reason == PeerCaptureFailureReason.PROCESS_TARGET_EXITED.value
         and event_indexes == tuple(sorted(event_indexes))
         and loop_task_done_at_warning
         and list(process_source_pids) == [first_pid, retry_pid]
@@ -169,6 +172,55 @@ def lifecycle_passes(
 
 async def invoke_gui_process_retry(action: object) -> bool:
     return await GUI_PROCESS_RETRY_ACTION(action)
+
+
+def build_gui_process_retry_action(
+    *,
+    runtime: object,
+    config: object,
+    warning_clear: Callable[[], None],
+) -> PeerApplicationOwner:
+    owner = PeerApplicationOwner(
+        state_provider=lambda: PeerApplicationState(
+            settings_available=True,
+            peer_intent_enabled=True,
+            eula_accepted=True,
+            overlay_intent_enabled=True,
+            peer_provider_id="soniox",
+            runtime_available=True,
+            peer_provider_available=True,
+            overlay_state="connected",
+            overlay_command_available=True,
+        ),
+        config_factory=lambda: config,
+        peer_intent_sink=lambda _enabled: None,
+        overlay_intent_sink=lambda _enabled: None,
+        persist_manual_fallback=lambda: True,
+        ensure_local_ready=lambda _generation: asyncio.sleep(0, result=True),
+        clear_cpu_pending=lambda: None,
+        clear_gpu_pending=lambda: None,
+        clear_switched_pending=lambda: None,
+        sync_local_notice=lambda: None,
+        presentation_changed=lambda: None,
+        begin_overlay_start=lambda: asyncio.sleep(0),
+        effective_sink=lambda _peer, _context: None,
+        disclosure_sink=lambda: None,
+        superseded_sink=lambda: None,
+        log_basic=lambda _message: None,
+        log_detailed=lambda _message: None,
+        log_failure=lambda _message: None,
+    )
+    owner.bind_runtime(runtime)
+    owner.process_warning_reason = "process_target_exited"
+    original_presentation_changed = owner.presentation_changed
+
+    def publish_retry_result() -> None:
+        if owner.process_warning_reason is None:
+            warning_clear()
+        original_presentation_changed()
+
+    owner.presentation_changed = publish_retry_result
+    return owner
 
 
 def build_fixture_capture_target(executable: str) -> ResolvedDesktopAudioCaptureTarget:
@@ -321,6 +373,15 @@ def classify_fixture_failure(exc: Exception) -> str:
         if code.endswith("_startup_timeout") or code.endswith("_startup_failed"):
             return "emitter_startup_failed"
     return "fixture_execution_failed"
+
+
+def latest_peer_failure_reason(diagnostics: Sequence[object]) -> str | None:
+    for diagnostic in reversed(diagnostics):
+        reason = getattr(diagnostic, "reason", None)
+        value = getattr(reason, "value", None)
+        if isinstance(value, str):
+            return value
+    return None
 
 
 def write_evidence(path: Path, evidence: dict[str, object]) -> None:
@@ -530,46 +591,33 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
     import psutil
 
     from puripuly_heart.config.process_capture_resolution import ResolvedProcessCaptureIdentity
-    from puripuly_heart.config.resolved import (
-        ResolvedCredentialRequirement,
-        ResolvedSTTConfig,
+    from puripuly_heart.config.settings_vnext.schema import (
+        ProcessCaptureTargetIntent as ProcessCaptureSelection,
     )
-    from puripuly_heart.config.settings import STTProviderName
-    from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent
     from puripuly_heart.core.audio.process_identity import PsutilProcessIdentityWatcher
     from puripuly_heart.core.audio.process_source import (
         ProcessAudioCaptureSource,
         ProcTapProcessAudioCaptureFactory,
         verify_proctap_1_0_3_process_specific,
     )
-    from puripuly_heart.core.runtime.peer_channel import (
-        PeerChannelRuntime,
-        PeerChannelRuntimeState,
-        PeerRuntimeConfig,
-        PeerRuntimeFailureReason,
+    from puripuly_heart.core.peer_capture import (
+        PeerCaptureAdmission,
+        PeerCaptureAdmissionStatus,
+        PeerCaptureLanguageFacts,
+        PeerCaptureProviderMutation,
+        PeerCaptureProviderMutationStatus,
+        PeerCaptureResolvedTarget,
+        PeerCaptureSessionConfig,
+        PeerCaptureSessionState,
+        PeerCaptureTargetIntent,
+        PeerCaptureTargetResolution,
+        PeerCaptureTargetStatus,
     )
+    from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 
     class Clock:
         def now(self) -> float:
             return time.monotonic()
-
-    class Provider:
-        def __init__(self, events: list[str]) -> None:
-            self.events = events
-            self.closed = False
-
-        async def close_backend(self) -> None:
-            self.closed = True
-            self.events.append("provider_closed")
-
-    class Hub:
-        def __init__(self) -> None:
-            self.peer_stt = None
-
-        async def replace_peer_stt_provider(self, provider, *, start=True) -> None:  # noqa: ANN001
-            previous, self.peer_stt = self.peer_stt, provider
-            if previous is not None and previous is not provider:
-                await previous.close_backend()
 
     events: list[str] = []
     samples: list[np.ndarray] = []
@@ -580,6 +628,92 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
     activation_times: list[float] = []
     current_root: _EmitterProcess | None = None
     fixture_started = time.monotonic()
+
+    class Admission:
+        async def admit(self, _config: PeerCaptureSessionConfig) -> PeerCaptureAdmission:
+            return PeerCaptureAdmission(PeerCaptureAdmissionStatus.ADMITTED)
+
+    class TargetResolver:
+        async def resolve(
+            self,
+            intent: PeerCaptureTargetIntent,
+        ) -> PeerCaptureTargetResolution:
+            if current_root is None or current_root.process.poll() is not None:
+                return PeerCaptureTargetResolution(
+                    PeerCaptureTargetStatus.UNAVAILABLE,
+                    reason="target root unavailable",
+                )
+            process = psutil.Process(current_root.ready.pid)
+            identity = ResolvedProcessCaptureIdentity(
+                pid=process.pid,
+                target=ProcessCaptureSelection.generic_executable(sys.executable),
+                instance_id=f"{process.pid}:{process.create_time()}",
+            )
+            return PeerCaptureTargetResolution(
+                PeerCaptureTargetStatus.RESOLVED,
+                target=PeerCaptureResolvedTarget(
+                    intent=intent,
+                    capture_descriptor=identity,
+                ),
+            )
+
+    class Provider:
+        def __init__(self, provider_events: list[str]) -> None:
+            self.events = provider_events
+            self.provider_id: str | None = None
+
+        def is_ready(self, config: PeerCaptureSessionConfig) -> bool:
+            return self.provider_id == config.provider_id
+
+        async def replace(
+            self,
+            request,
+            *,
+            start: bool,
+            on_terminal_failure,
+        ) -> PeerCaptureProviderMutation:
+            _ = start, on_terminal_failure
+            self.provider_id = str(request)
+            return PeerCaptureProviderMutation(PeerCaptureProviderMutationStatus.APPLIED)
+
+        async def handoff(
+            self,
+            request,
+            *,
+            start: bool,
+            on_terminal_failure,
+        ) -> PeerCaptureProviderMutation:
+            return await self.replace(
+                request,
+                start=start,
+                on_terminal_failure=on_terminal_failure,
+            )
+
+        async def cancel_handoff(self) -> bool:
+            return False
+
+        async def start_ingress(self) -> None:
+            return None
+
+        async def warmup(self) -> None:
+            return None
+
+        async def reconfigure(self, _session_options: object) -> None:
+            return None
+
+        async def release(
+            self,
+            *,
+            mode: str,
+            release_backend_after: float | None = None,
+        ) -> None:
+            _ = mode, release_backend_after
+            self.provider_id = None
+            self.events.append("provider_closed")
+
+    class VadSink:
+        async def handle_vad_event(self, _event: object) -> None:
+            return None
 
     class ObservedCapture:
         def __init__(self, capture) -> None:  # noqa: ANN001
@@ -620,23 +754,21 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
             source_closed.add(self.pid)
             events.append("source_closed")
 
-    def source_factory(_config: PeerRuntimeConfig) -> ObservedSource:
-        if current_root is None or current_root.process.poll() is not None:
-            raise RuntimeError("target root unavailable")
-        process = psutil.Process(current_root.ready.pid)
-        identity = ResolvedProcessCaptureIdentity(
-            pid=process.pid,
-            target=ProcessCaptureTargetIntent.generic_executable(sys.executable),
-            instance_id=f"{process.pid}:{process.create_time()}",
-        )
-        process_source_pids.append(process.pid)
+    def source_factory(
+        _config: PeerCaptureSessionConfig,
+        resolved_target: PeerCaptureResolvedTarget,
+    ) -> ObservedSource:
+        identity = resolved_target.capture_descriptor
+        if not isinstance(identity, ResolvedProcessCaptureIdentity):
+            raise RuntimeError("resolved process identity unavailable")
+        process_source_pids.append(identity.pid)
         return ObservedSource(
             ProcessAudioCaptureSource(
                 identity=identity,
                 watcher=PsutilProcessIdentityWatcher(),
                 capture_factory=observed_capture_factory,
             ),
-            process.pid,
+            identity.pid,
         )
 
     async def collect_loop(*, source, **_kwargs) -> None:  # noqa: ANN001
@@ -647,60 +779,49 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
             loop_failure_types.append(type(exc).__name__)
             raise
 
-    credential = ResolvedCredentialRequirement(source="none", required=False, reference=None)
-    backend = ResolvedSTTConfig(
-        channel="peer",
-        source_language="en",
-        provider=STTProviderName.DEEPGRAM,
-        model=None,
-        endpoint=None,
-        region=None,
-        credential=credential,
-        input_host_api=None,
-        input_device=None,
-        output_device=None,
-        sample_rate_hz=SAMPLE_RATE_HZ,
-        channels=CHANNELS,
-        ring_buffer_ms=1000,
-        drain_timeout_s=1.0,
+    target = build_fixture_capture_target(sys.executable)
+    capture_target = PeerCaptureTargetIntent(
+        kind="process",
+        process_kind=target.process_kind,
+        executable_identity=target.executable_identity,
+    )
+    config = PeerCaptureSessionConfig(
+        provider_id="deepgram",
+        provider_signature=("deepgram", "fixture"),
+        runtime_signature=("deepgram", "fixture", capture_target),
+        capture_signature=("fixture", capture_target),
+        capture_target=capture_target,
+        language=PeerCaptureLanguageFacts(
+            source_mode="manual",
+            source_language="en",
+        ),
+        target_sample_rate_hz=SAMPLE_RATE_HZ,
         vad_speech_threshold=0.5,
         vad_hangover_ms=0,
         vad_pre_roll_ms=0,
-        low_latency_enabled=False,
-        low_latency_merge_gap_ms=0,
-        low_latency_spec_retry_max=0,
-        custom_vocabulary_enabled=False,
-        custom_terms=MappingProxyType({}),
-        provider_options=MappingProxyType({}),
-    )
-    target = build_fixture_capture_target(sys.executable)
-    config = PeerRuntimeConfig(
-        backend=backend,
-        output_device="",
-        vad_threshold=0.5,
-        vad_hangover_ms=0,
-        vad_pre_roll_ms=0,
-        provider_signature=("fixture",),
-        runtime_signature=("fixture",),
-        capture_target=target,
+        warmup=False,
     )
     diagnostics = []
     loop_task_at_warning: list[bool] = []
     initial_loop_task = None
 
     def diagnostic_sink(diagnostic) -> None:  # noqa: ANN001
-        events.append("typed_warning")
         diagnostics.append(diagnostic)
+        if diagnostic.reason is None:
+            return
+        events.append("typed_warning")
         loop_task_at_warning.append(initial_loop_task is not None and initial_loop_task.done())
 
-    runtime = PeerChannelRuntime(
-        hub=Hub(),
+    runtime = PeerCaptureSessionOwner(
+        admission=Admission(),
+        target_resolver=TargetResolver(),
+        provider=Provider(events),
         clock=Clock(),
-        stt_factory=lambda _config, _failure: Provider(events),
+        provider_request_factory=lambda session_config, _warmup: session_config.provider_id,
         source_factory=source_factory,
-        vad_factory=lambda _config, _path: object(),
-        vad_model_resolver=lambda: runtime_dir / "unused-vad.onnx",
+        vad_factory=lambda _config: object(),
         run_audio_loop=collect_loop,
+        vad_sink=VadSink(),
         diagnostic_sink=diagnostic_sink,
     )
     control: _EmitterProcess | None = None
@@ -771,7 +892,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
         deadline = time.monotonic() + CAPTURE_SECONDS + 5
         required_frames = int(CAPTURE_SECONDS * SAMPLE_RATE_HZ)
         while sum(frame.shape[0] for frame in samples) < required_frames:
-            if runtime.state == PeerChannelRuntimeState.FAULTED:
+            if runtime.state == PeerCaptureSessionState.FAULTED:
                 failure = runtime.last_failure
                 reason = failure.reason.value if failure is not None else "unknown"
                 if loop_failure_types:
@@ -786,46 +907,31 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
         measurements = measure_isolation(measured_samples)
         current_root.stop()
         deadline = time.monotonic() + 8
-        while runtime.state != PeerChannelRuntimeState.FAULTED:
+        while runtime.state != PeerCaptureSessionState.FAULTED:
             if time.monotonic() >= deadline:
                 raise RuntimeError("target_exit_timeout")
             await asyncio.sleep(0.05)
         sources_after_exit = len(process_source_pids)
-        await runtime.apply_policy(config=config, desired_active=True)
+        await asyncio.sleep(0.1)
         no_automatic_reconnect = len(process_source_pids) == sources_after_exit
         current_root = _start_emitter("target_root", runtime_dir)
         second_pid = current_root.ready.pid
         retry_root_ready_s = current_root.ready_monotonic_s - fixture_started
 
-        class GuiRetryAction:
-            settings = object()
-            _peer_runtime = runtime
-            _peer_process_warning_reason = "process_target_exited"
-
-            def _peer_runtime_should_be_active(self, _settings) -> bool:  # noqa: ANN001
-                return True
-
-            async def _ensure_peer_local_stt_ready(self) -> bool:
-                return True
-
-            def _build_peer_runtime_config(self, _settings) -> PeerRuntimeConfig:  # noqa: ANN001
-                return config
-
-            def _sync_effective_hub_flags(self, _settings) -> None:  # noqa: ANN001
-                return None
-
-            def _refresh_overlay_peer_consumers(self) -> None:
-                return None
-
-        gui_action = GuiRetryAction()
+        retry_warning = ["process_target_exited"]
+        gui_action = build_gui_process_retry_action(
+            runtime=runtime,
+            config=config,
+            warning_clear=lambda: retry_warning.__setitem__(0, None),
+        )
         retried = await invoke_gui_process_retry(gui_action)
         await asyncio.sleep(0.1)
+        terminal_warning_reason = latest_peer_failure_reason(diagnostics)
         lifecycle_passed_result = lifecycle_passes(
             events=events,
             warning_reason=(
-                diagnostics[-1].reason.value
-                if diagnostics
-                and diagnostics[-1].reason is PeerRuntimeFailureReason.PROCESS_TARGET_EXITED
+                terminal_warning_reason
+                if terminal_warning_reason == PeerCaptureFailureReason.PROCESS_TARGET_EXITED.value
                 else None
             ),
             loop_task_done_at_warning=bool(loop_task_at_warning and loop_task_at_warning[-1]),
@@ -835,7 +941,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
             retry_pid=second_pid,
             no_automatic_reconnect=no_automatic_reconnect,
             gui_retry_succeeded=retried,
-            gui_warning_cleared=gui_action._peer_process_warning_reason is None,
+            gui_warning_cleared=retry_warning[0] is None,
         )
         passed = isolation_passes(measurements, thresholds) and lifecycle_passed_result
         activation_order_verified = (
@@ -921,7 +1027,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
                 },
             },
             "lifecycle": {
-                "typed_warning": diagnostics[-1].reason.value if diagnostics else None,
+                "typed_warning": terminal_warning_reason,
                 "warning_after_provider_source_task_teardown": lifecycle_passed_result,
                 "provider_close_before_warning": provider_close_before_warning,
                 "source_close_before_warning": source_close_before_warning,
@@ -929,7 +1035,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
                     loop_task_at_warning and loop_task_at_warning[-1]
                 ),
                 "automatic_reconnect": not no_automatic_reconnect,
-                "retry_action": "GuiController.retry_peer_process_capture",
+                "retry_action": "PeerApplicationOwner.retry_process_capture",
                 "retry_succeeded": retried,
                 "fresh_pid": first_pid != second_pid,
             },

@@ -3,6 +3,7 @@ from typing import Callable
 import flet as ft
 
 from puripuly_heart.ui.components.glow import create_glow_stack
+from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
 from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
@@ -76,42 +77,42 @@ class _LanguageRow(ft.Container):
             overflow=ft.TextOverflow.ELLIPSIS,
         )
         self._arrow_icon = ft.Icon(
-            name=ft.Icons.ARROW_RIGHT_ALT,
+            icon=ft.Icons.ARROW_RIGHT_ALT,
             size=34 + _ARROW_SIZE_DELTA,
             color=COLOR_SECONDARY,
         )
 
         caption = ft.Container(
             content=self._label_text,
-            alignment=ft.alignment.top_left,
-            padding=ft.padding.only(left=12),
+            alignment=ft.Alignment.TOP_LEFT,
+            padding=ft.Padding.only(left=12),
         )
         self._arrow = ft.Container(
             content=self._arrow_icon,
-            padding=ft.padding.symmetric(horizontal=6, vertical=8),
+            padding=ft.Padding.symmetric(horizontal=6, vertical=8),
             border_radius=14,
             on_click=lambda _: self._on_swap_click() if self._on_swap_click else None,
             on_hover=self._on_arrow_hover,
         )
         self._source_btn = ft.Container(
             content=self._source_text,
-            padding=ft.padding.symmetric(horizontal=12, vertical=10),
+            padding=ft.Padding.symmetric(horizontal=12, vertical=10),
             border_radius=14,
             bgcolor=ft.Colors.TRANSPARENT,
             on_hover=self._on_source_hover,
             on_click=lambda _: self._on_source_click(),
             expand=True,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
         self._target_btn = ft.Container(
             content=self._target_text,
-            padding=ft.padding.symmetric(horizontal=12, vertical=10),
+            padding=ft.Padding.symmetric(horizontal=12, vertical=10),
             border_radius=14,
             bgcolor=ft.Colors.TRANSPARENT,
             on_hover=self._on_target_hover,
             on_click=lambda _: self._on_target_click(),
             expand=True,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
 
         pair = ft.Container(
@@ -121,7 +122,7 @@ class _LanguageRow(ft.Container):
                 alignment=ft.MainAxisAlignment.CENTER,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
         )
 
         row_content = ft.Column(
@@ -132,25 +133,24 @@ class _LanguageRow(ft.Container):
 
         super().__init__(
             content=row_content,
-            padding=ft.padding.symmetric(vertical=4),
+            padding=ft.Padding.symmetric(vertical=4),
         )
 
     def _on_source_hover(self, e):
-        self._source_text.color = COLOR_PRIMARY if e.data == "true" else COLOR_NEUTRAL_DARK
+        self._source_text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_NEUTRAL_DARK
         self._source_text.update()
 
     def _on_target_hover(self, e):
-        self._target_text.color = COLOR_PRIMARY if e.data == "true" else COLOR_NEUTRAL_DARK
+        self._target_text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_NEUTRAL_DARK
         self._target_text.update()
 
     def _on_arrow_hover(self, e):
-        self._arrow_icon.color = COLOR_PRIMARY if e.data == "true" else COLOR_SECONDARY
+        self._arrow_icon.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_SECONDARY
         self._arrow_icon.update()
 
     def set_label(self, label: str) -> None:
         self._label_text.value = label
-        if self._label_text.page is not None:
-            self._label_text.update()
+        update_control_if_mounted(self._label_text)
 
     def set_languages(self, source: str, target: str, *, size: int | None = None) -> None:
         resolved_size = size if size is not None else _row_text_size(source, target)
@@ -160,12 +160,9 @@ class _LanguageRow(ft.Container):
         self._source_text.value = source
         self._target_text.value = target
 
-        if self._source_text.page is not None:
-            self._source_text.update()
-        if self._target_text.page is not None:
-            self._target_text.update()
-        if self._arrow_icon.page is not None:
-            self._arrow_icon.update()
+        update_control_if_mounted(self._source_text)
+        update_control_if_mounted(self._target_text)
+        update_control_if_mounted(self._arrow_icon)
 
 
 class LanguageCard(ft.Container):
@@ -201,7 +198,7 @@ class LanguageCard(ft.Container):
                     alignment=ft.MainAxisAlignment.CENTER,
                 ),
                 expand=True,
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment.CENTER,
                 padding=16,
             )
         )
@@ -210,7 +207,7 @@ class LanguageCard(ft.Container):
             content=content_with_glow,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
-            border=ft.border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
             expand=True,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
             shadow=get_card_shadow(),

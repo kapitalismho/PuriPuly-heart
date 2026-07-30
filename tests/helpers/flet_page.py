@@ -10,11 +10,15 @@ class DummyPage:
     opened: list[object] = field(default_factory=list)
     closed: list[object] = field(default_factory=list)
 
-    def open(self, dialog: object) -> None:
+    def show_dialog(self, dialog: object) -> None:
         self.opened.append(dialog)
 
-    def close(self, dialog: object) -> None:
+    def pop_dialog(self) -> object | None:
+        if not self.opened:
+            return None
+        dialog = self.opened[-1]
         self.closed.append(dialog)
+        return dialog
 
 
 def attach_dummy_page(

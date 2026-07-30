@@ -1,0 +1,26 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from puripuly_heart.app.ports.capture_vad_runtime import (
+    PeerCaptureVadEventRuntime,
+    PeerCaptureVadEventRuntimeProvider,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class PeerCaptureVadSinkAdapter:
+    runtime_provider: PeerCaptureVadEventRuntimeProvider
+
+    async def handle_vad_event(self, event: object) -> None:
+        runtime = self.runtime_provider()
+        if runtime is None:
+            raise RuntimeError("Peer VAD sink requires the Peer translation owner")
+        await runtime.handle_peer_vad_event(event)
+
+
+__all__ = [
+    "PeerCaptureVadEventRuntime",
+    "PeerCaptureVadEventRuntimeProvider",
+    "PeerCaptureVadSinkAdapter",
+]

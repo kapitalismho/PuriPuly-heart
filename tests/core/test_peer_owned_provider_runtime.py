@@ -56,9 +56,12 @@ class Sink:
         return None
 
 
-class FakePeerOwner:
-    def __init__(self) -> None:
+class FakePeerRuntime:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
         self.releases: list[tuple[str, str, float | None]] = []
+        self.requests: list[ProviderRuntimeBuildRequest] = []
+        self.start_calls = 0
         self._peer = ProviderRuntimeChannelSnapshot(
             channel="peer",
             provider_id=None,
@@ -97,7 +100,15 @@ class FakePeerOwner:
             ),
         )
 
-    def attach(self, request: ProviderRuntimeBuildRequest, *, start: bool) -> None:
+    async def replace_provider(
+        self,
+        request: ProviderRuntimeBuildRequest,
+        *,
+        start: bool,
+        on_terminal_failure,
+    ) -> ProviderRuntimeMutationResult:
+        _ = on_terminal_failure
+        self.requests.append(request)
         self._peer = replace(
             self._peer,
             provider_id=request.provider_id,
@@ -105,6 +116,39 @@ class FakePeerOwner:
             phase="running" if start else "dormant",
             has_resources=True,
         )
+        return ProviderRuntimeMutationResult(
+            status="applied",
+            request=request,
+            previous_provider_id=None,
+            snapshot=self.snapshot,
+        )
+
+    async def handoff_provider(
+        self,
+        request: ProviderRuntimeBuildRequest,
+        *,
+        start: bool,
+        on_terminal_failure,
+    ) -> ProviderRuntimeMutationResult:
+        return await self.replace_provider(
+            request,
+            start=start,
+            on_terminal_failure=on_terminal_failure,
+        )
+
+    async def cancel_handoff(self, channel: str) -> bool:
+        _ = channel
+        return False
+
+    async def start_channel(self, channel: str) -> None:
+        _ = channel
+        self.start_calls += 1
+
+    async def warmup_channel(self, channel: str) -> None:
+        _ = channel
+
+    async def reconfigure_channel(self, channel: str, options: object) -> None:
+        _ = channel, options
 
     async def release_channel(
         self,
@@ -113,6 +157,7 @@ class FakePeerOwner:
         mode: str,
         release_backend_after: float | None = None,
     ) -> None:
+        self.events.append(f"release:{channel}:{mode}")
         self.releases.append((channel, mode, release_backend_after))
         if mode == "abort":
             self._peer = replace(
@@ -124,34 +169,37 @@ class FakePeerOwner:
             )
 
 
-class FakeOwnedPeerHub:
-    def __init__(self) -> None:
-        self.local_asr_provider_runtime = FakePeerOwner()
-        self.requests: list[ProviderRuntimeBuildRequest] = []
-        self.start_calls = 0
+class ChannelReset:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+        self.pending_turn = False
+        self.channel_runtime_state = False
+        self.logical_turn_state = False
+        self.latency_state = False
 
-    async def replace_peer_stt_provider_request(
-        self,
-        request: ProviderRuntimeBuildRequest,
-        *,
-        start: bool,
-        on_terminal_failure,
-    ) -> ProviderRuntimeMutationResult:
-        _ = on_terminal_failure
-        self.requests.append(request)
-        self.local_asr_provider_runtime.attach(request, start=start)
-        return ProviderRuntimeMutationResult(
-            status="applied",
-            request=request,
-            previous_provider_id=None,
-            snapshot=self.local_asr_provider_runtime.snapshot,
+    def mark_pending_state(self) -> None:
+        self.pending_turn = True
+        self.channel_runtime_state = True
+        self.logical_turn_state = True
+        self.latency_state = True
+
+    async def reset_provider_channel(self, channel: str) -> None:
+        self.pending_turn = False
+        self.channel_runtime_state = False
+        self.logical_turn_state = False
+        self.latency_state = False
+        self.events.append(f"reset:{channel}")
+
+    @property
+    def state_cleared(self) -> bool:
+        return not any(
+            (
+                self.pending_turn,
+                self.channel_runtime_state,
+                self.logical_turn_state,
+                self.latency_state,
+            )
         )
-
-    async def start_peer_stt_provider_ingress(self) -> None:
-        self.start_calls += 1
-
-    async def warmup_stt_channel(self, _channel: str) -> None:
-        return None
 
 
 def make_config(provider: str) -> PeerCaptureSessionConfig:
@@ -203,12 +251,17 @@ def make_config(provider: str) -> PeerCaptureSessionConfig:
     )
 
 
-def make_runtime(hub: FakeOwnedPeerHub, sources: list[DummySource]):
+def make_runtime(
+    provider_runtime: FakePeerRuntime,
+    channel_reset: ChannelReset,
+    sources: list[DummySource],
+):
     async def run_loop(**_kwargs) -> None:
         await asyncio.Event().wait()
 
     return compose_peer_capture_session_owner(
-        hub=hub,
+        provider_runtime=provider_runtime,
+        channel_reset=channel_reset,
         admission=Admission(),
         target_resolver=Resolver(),
         clock=FakeClock(),
@@ -225,39 +278,50 @@ def make_runtime(hub: FakeOwnedPeerHub, sources: list[DummySource]):
 
 
 async def test_peer_capture_owner_requests_provider_and_never_constructs_it() -> None:
-    hub = FakeOwnedPeerHub()
+    events: list[str] = []
+    channel_reset = ChannelReset(events)
+    provider_runtime = FakePeerRuntime(events)
     sources: list[DummySource] = []
     config = make_config("soniox")
-    runtime = make_runtime(hub, sources)
+    runtime = make_runtime(provider_runtime, channel_reset, sources)
 
     await runtime.apply_intent(config, enabled=True)
     assert runtime.state is PeerCaptureSessionState.RUNNING
-    assert [request.config for request in hub.requests] == [config.provider_context]
-    assert hub.start_calls == 1
+    assert [request.config for request in provider_runtime.requests] == [config.provider_context]
+    assert provider_runtime.start_calls == 1
 
+    events.clear()
+    channel_reset.mark_pending_state()
     await runtime.apply_intent(config, enabled=False, stop_mode="release")
     assert runtime.state is PeerCaptureSessionState.STOPPED
     assert sources[0].close_calls == 1
-    assert hub.local_asr_provider_runtime.releases == [("peer", "abort", None)]
+    assert channel_reset.state_cleared
+    assert events == ["reset:peer", "release:peer:abort"]
+    assert provider_runtime.releases == [("peer", "abort", None)]
 
 
 async def test_peer_capture_owner_reuses_retained_local_qwen_provider() -> None:
-    hub = FakeOwnedPeerHub()
+    events: list[str] = []
+    channel_reset = ChannelReset(events)
+    provider_runtime = FakePeerRuntime(events)
     sources: list[DummySource] = []
     config = make_config("local_qwen")
-    runtime = make_runtime(hub, sources)
+    runtime = make_runtime(provider_runtime, channel_reset, sources)
 
     await runtime.apply_intent(config, enabled=True)
+    events.clear()
     await runtime.apply_intent(config, enabled=False, stop_mode="retain")
     await runtime.apply_intent(config, enabled=True)
 
-    assert len(hub.requests) == 1
-    assert hub.start_calls == 2
-    assert hub.local_asr_provider_runtime.releases == [("peer", "drain", 600.0)]
+    assert len(provider_runtime.requests) == 1
+    assert provider_runtime.start_calls == 2
+    assert provider_runtime.releases == [("peer", "drain", 600.0)]
+    assert "reset:peer" not in events
+    assert events[0] == "release:peer:drain"
     assert len(sources) == 2
     assert sources[0].close_calls == 1
     assert runtime.state is PeerCaptureSessionState.RUNNING
 
     await runtime.close()
     assert sources[1].close_calls == 1
-    assert hub.local_asr_provider_runtime.releases[-1] == ("peer", "abort", None)
+    assert provider_runtime.releases[-1] == ("peer", "abort", None)

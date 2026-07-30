@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningSnapshot
 from puripuly_heart.core.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     PARAKEET_V3_MODEL_ID,
+    REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
 from puripuly_heart.core.local_stt_catalog import (
     LocalSTTUnsupportedLanguageError,
@@ -31,6 +33,21 @@ class LocalASRSelectionDecision:
     model_id: str | None
     supported: bool
     fallback_applied: bool
+
+
+def required_local_asr_model_ids(provider: str) -> tuple[str, ...]:
+    if provider == LOCAL_CPU_AUTO_PROVIDER:
+        return REQUIRED_CPU_LOCAL_STT_MODEL_IDS
+    model_id = LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER.get(provider)
+    return (model_id,) if model_id is not None else ()
+
+
+def local_asr_status_for_provider(
+    snapshot: LocalASRProvisioningSnapshot,
+    provider: str,
+) -> str:
+    model_ids = required_local_asr_model_ids(provider)
+    return snapshot.status_for(model_ids) if model_ids else "ready"
 
 
 def resolve_local_asr_selection(

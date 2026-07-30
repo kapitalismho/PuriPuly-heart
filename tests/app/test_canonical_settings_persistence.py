@@ -14,15 +14,23 @@ from puripuly_heart.app.adapters import (
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
+from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
 from puripuly_heart.app.ports.canonical_settings_persistence import (
     CanonicalSettingsPersistencePort,
     ProviderVerificationBinding,
 )
+from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.provider_settings import (
+    ProviderSettingsOwner,
+    provider_verification_context,
+)
+from puripuly_heart.app.services.provider_verification_binding import (
+    ProviderVerificationBindingOwner,
+)
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.ui import controller as controller_module
-from puripuly_heart.ui.controller import GuiController
+from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 
 class MemorySecretStore:
@@ -57,16 +65,41 @@ class BlockingByKeySecretStore(MemorySecretStore):
         self.values[key] = value
 
 
-def _controller_with_verified_openrouter(
+def _provider_settings_owner(
     path: Path,
     store: MemorySecretStore,
-    monkeypatch: pytest.MonkeyPatch,
-) -> GuiController:
-    controller = GuiController(page=SimpleNamespace(), app=SimpleNamespace(), config_path=path)
-    controller.settings = AppSettings()
-    controller.settings.api_key_verified.openrouter = True
-    owner = controller._get_settings_owner()
-    owner.canonical = AppSettingsVNext()
+) -> ProviderSettingsOwner:
+    settings = AppSettings()
+    owner = SettingsOwner(
+        path=path,
+        persistence=SettingsVNextCanonicalPersistenceAdapter(),
+        canonical=AppSettingsVNext(),
+        current=settings,
+        authoritative=True,
+        projection_snapshot=copy.deepcopy(settings),
+    )
+    return ProviderSettingsOwner(
+        settings=owner,
+        binding=ProviderVerificationBindingOwner(
+            context_provider=lambda provider: provider_verification_context(
+                owner.current,
+                provider,
+                low_latency=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
+            ),
+        ),
+        secret_store_factory=lambda _settings: SyncSecretStoreAdapter(store),
+        active_secret_provider=lambda _settings, key: store.get(key),
+    )
+
+
+def _owner_with_verified_openrouter(
+    path: Path,
+    store: MemorySecretStore,
+) -> ProviderSettingsOwner:
+    provider_settings = _provider_settings_owner(path, store)
+    owner = provider_settings.settings
+    assert owner.current is not None
+    owner.current.api_key_verified.openrouter = True
     owner.bind_provider_verification(
         ProviderVerificationBinding(
             provider="openrouter",
@@ -77,15 +110,9 @@ def _controller_with_verified_openrouter(
             verifier_evidence={"source": "provider_verifier"},
         )
     )
-    controller._vnext_settings_authoritative = True
     owner.persist()
-    controller._remember_canonical_legacy_projection(controller.settings)
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: store,
-    )
-    return controller
+    owner.remember_projection(owner.current)
+    return provider_settings
 
 
 def test_canonical_settings_persistence_port_covers_load_project_delta_save_and_rollback(
@@ -143,6 +170,66 @@ def test_canonical_settings_persistence_port_covers_load_project_delta_save_and_
     assert restored == updated_canonical
     assert restored is not snapshot
 
+    owner = SettingsOwner(
+        path=path,
+        persistence=adapter,
+        canonical=projected,
+        current=copy.deepcopy(settings),
+        authoritative=True,
+        projection_snapshot=copy.deepcopy(settings),
+    )
+    owner.current.ui.locale = "ja"
+    assert owner.save_current()
+    assert owner.current.ui.locale == "ja"
+    assert owner.projection_snapshot is not None
+    assert owner.projection_snapshot.ui.locale == "ja"
+    assert owner.mutation_depth == 0
+
+    failures: list[BaseException] = []
+
+    def fail_save(_path: Path, _value: AppSettingsVNext) -> None:
+        raise OSError("injected save failure")
+
+    monkeypatch.setattr(adapter_module, "save_vnext_settings", fail_save)
+    owner.current.ui.locale = "ko"
+    assert not owner.save_current(failure_sink=failures.append)
+    assert len(failures) == 1
+    assert isinstance(failures[0], OSError)
+    assert owner.current.ui.locale == "ja"
+    assert owner.mutation_depth == 0
+
+    with pytest.raises(OSError, match="injected save failure"):
+        owner.persist_current()
+
+    monkeypatch.setattr(
+        adapter_module,
+        "save_vnext_settings",
+        lambda _path, value: saved.append(value) or SimpleNamespace(ok=True),
+    )
+    stale_settings = copy.deepcopy(owner.current)
+    persist_managed_identity = owner.managed_identity_persistence_callback(stale_settings)
+    active_settings = copy.deepcopy(stale_settings)
+    active_settings.ui.locale = "ru"
+    owner.current = active_settings
+    owner.remember_projection(active_settings)
+    owner.persist_current()
+
+    stale_settings.managed_identity.referral_id = "234567"
+    persist_managed_identity(stale_settings)
+
+    assert owner.current.ui.locale == "ru"
+    assert owner.current.managed_identity.referral_id == "234567"
+    assert owner.canonical.state.managed_connection.referral_id == "234567"
+
+    active_before_failure = copy.deepcopy(owner.current)
+    stale_before_failure = copy.deepcopy(stale_settings)
+    monkeypatch.setattr(adapter_module, "save_vnext_settings", fail_save)
+    stale_settings.managed_identity.referral_id = "345678"
+    with pytest.raises(OSError, match="injected save failure"):
+        persist_managed_identity(stale_settings)
+    assert owner.current == active_before_failure
+    assert stale_settings == stale_before_failure
+
 
 def test_canonical_delta_requires_bound_evidence_and_preserves_invalidation() -> None:
     adapter = SettingsVNextCanonicalPersistenceAdapter()
@@ -183,24 +270,14 @@ def test_canonical_delta_requires_bound_evidence_and_preserves_invalidation() ->
     assert invalidated.state.provider_verification.openrouter.status == "unknown"
 
 
-def test_controller_persist_settings_roundtrips_verification_transitions(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_settings_owner_roundtrips_verification_transitions(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
-    controller = GuiController(page=SimpleNamespace(), app=SimpleNamespace(), config_path=path)
-    controller.settings = AppSettings()
-    controller.vnext_settings = AppSettingsVNext()
-    controller._vnext_settings_authoritative = True
-    controller._remember_canonical_legacy_projection(controller.settings)
-
     raw_secret = "raw-openrouter-secret-value"
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: SimpleNamespace(get=lambda _key: raw_secret),
+    provider_settings = _provider_settings_owner(
+        path,
+        MemorySecretStore({"openrouter_api_key": raw_secret}),
     )
-    controller.persist_api_key_verification("openrouter", raw_secret, True)
+    provider_settings.persist_verification("openrouter", raw_secret, True)
 
     verified = load_vnext_settings(path)
     assert verified.settings is not None
@@ -214,62 +291,60 @@ def test_controller_persist_settings_roundtrips_verification_transitions(
     assert entry.verifier_evidence == {"source": "provider_verifier"}
     assert raw_secret not in path.read_text(encoding="utf-8")
 
-    controller.persist_api_key_verification("openrouter", raw_secret, False)
+    provider_settings.persist_verification("openrouter", raw_secret, False)
 
     invalidated = load_vnext_settings(path)
     assert invalidated.settings is not None
     assert invalidated.settings.state.provider_verification.openrouter.status == "unknown"
 
 
-def test_controller_rejects_verification_for_nonmatching_secret_store_value(
+def test_settings_owner_rejects_verification_for_nonmatching_secret_store_value(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     path = tmp_path / "settings.json"
-    controller = GuiController(page=SimpleNamespace(), app=SimpleNamespace(), config_path=path)
-    controller.settings = AppSettings()
-    controller.vnext_settings = AppSettingsVNext()
-    controller._vnext_settings_authoritative = True
-    controller._remember_canonical_legacy_projection(controller.settings)
-    monkeypatch.setattr(
-        controller_module,
-        "create_secret_store",
-        lambda *_args, **_kwargs: SimpleNamespace(get=lambda _key: "different-secret"),
+    provider_settings = _provider_settings_owner(
+        path,
+        MemorySecretStore({"openrouter_api_key": "different-secret"}),
     )
 
     with pytest.raises(
         RuntimeError,
         match="verified credential does not match the active SecretStore value",
     ):
-        controller.persist_api_key_verification(
+        provider_settings.persist_verification(
             "openrouter",
             "verified-but-not-stored",
             True,
         )
 
-    assert controller.settings.api_key_verified.openrouter is False
-    assert controller.vnext_settings.state.provider_verification.openrouter.status == "unknown"
-    assert controller._canonical_mutation_depth == 0
+    owner = provider_settings.settings
+    assert owner.current is not None
+    assert owner.current.api_key_verified.openrouter is False
+    assert owner.canonical is not None
+    assert owner.canonical.state.provider_verification.openrouter.status == "unknown"
+    assert owner.mutation_depth == 0
     assert not path.exists()
 
 
 @pytest.mark.asyncio
 async def test_provider_secret_change_invalidates_before_reverification_and_relaunch(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     path = tmp_path / "settings.json"
     store = MemorySecretStore({"openrouter_api_key": "old-secret"})
-    controller = _controller_with_verified_openrouter(path, store, monkeypatch)
+    provider_settings = _owner_with_verified_openrouter(path, store)
 
-    assert await controller.persist_provider_secret_change(
+    assert await provider_settings.change_secret(
         "openrouter_api_key",
         "new-secret",
     )
 
     assert store.get("openrouter_api_key") == "new-secret"
-    assert controller.settings.api_key_verified.openrouter is False
-    assert controller.vnext_settings.state.provider_verification.openrouter.status == "unknown"
+    owner = provider_settings.settings
+    assert owner.current is not None
+    assert owner.current.api_key_verified.openrouter is False
+    assert owner.canonical is not None
+    assert owner.canonical.state.provider_verification.openrouter.status == "unknown"
     reloaded = load_vnext_settings(path)
     assert reloaded.settings is not None
     assert reloaded.settings.state.provider_verification.openrouter.status == "unknown"
@@ -282,36 +357,38 @@ async def test_provider_secret_change_restores_secret_and_verification_on_commit
 ) -> None:
     path = tmp_path / "settings.json"
     store = MemorySecretStore({"openrouter_api_key": "old-secret"})
-    controller = _controller_with_verified_openrouter(path, store, monkeypatch)
+    provider_settings = _owner_with_verified_openrouter(path, store)
     persisted_before = path.read_bytes()
 
     def fail_persist(_path: Path, _settings: AppSettingsVNext) -> None:
         raise OSError("injected persistence failure")
 
-    monkeypatch.setattr(controller._get_settings_owner().persistence, "persist", fail_persist)
+    monkeypatch.setattr(provider_settings.settings.persistence, "persist", fail_persist)
 
-    assert not await controller.persist_provider_secret_change(
+    assert not await provider_settings.change_secret(
         "openrouter_api_key",
         "new-secret",
     )
 
     assert store.get("openrouter_api_key") == "old-secret"
-    assert controller.settings.api_key_verified.openrouter is True
-    assert controller.vnext_settings.state.provider_verification.openrouter.status == "verified"
+    owner = provider_settings.settings
+    assert owner.current is not None
+    assert owner.current.api_key_verified.openrouter is True
+    assert owner.canonical is not None
+    assert owner.canonical.state.provider_verification.openrouter.status == "verified"
     assert path.read_bytes() == persisted_before
 
 
 @pytest.mark.asyncio
 async def test_provider_secret_change_finishes_invalidation_when_caller_is_cancelled(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     path = tmp_path / "settings.json"
     store = MemorySecretStore({"openrouter_api_key": "old-secret"})
     store.block_set = True
-    controller = _controller_with_verified_openrouter(path, store, monkeypatch)
+    provider_settings = _owner_with_verified_openrouter(path, store)
     task = asyncio.create_task(
-        controller.persist_provider_secret_change(
+        provider_settings.change_secret(
             "openrouter_api_key",
             "new-secret",
         )
@@ -324,7 +401,8 @@ async def test_provider_secret_change_finishes_invalidation_when_caller_is_cance
         await task
 
     assert store.get("openrouter_api_key") == "new-secret"
-    assert controller.settings.api_key_verified.openrouter is False
+    assert provider_settings.settings.current is not None
+    assert provider_settings.settings.current.api_key_verified.openrouter is False
     reloaded = load_vnext_settings(path)
     assert reloaded.settings is not None
     assert reloaded.settings.state.provider_verification.openrouter.status == "unknown"
@@ -342,7 +420,6 @@ async def test_overlapping_provider_secret_changes_preserve_both_invalidations(
     first_key: str,
     second_key: str,
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     path = tmp_path / "settings.json"
     keys = ("openrouter_api_key", "deepseek_api_key")
@@ -353,9 +430,11 @@ async def test_overlapping_provider_secret_changes_preserve_both_invalidations(
         },
         keys,
     )
-    controller = _controller_with_verified_openrouter(path, store, monkeypatch)
-    controller.settings.api_key_verified.deepseek = True
-    controller._get_settings_owner().bind_provider_verification(
+    provider_settings = _owner_with_verified_openrouter(path, store)
+    owner = provider_settings.settings
+    assert owner.current is not None
+    owner.current.api_key_verified.deepseek = True
+    owner.bind_provider_verification(
         ProviderVerificationBinding(
             provider="deepseek",
             secret_key="deepseek_api_key",
@@ -365,15 +444,13 @@ async def test_overlapping_provider_secret_changes_preserve_both_invalidations(
             verifier_evidence={"source": "provider_verifier"},
         )
     )
-    controller._get_settings_owner().persist()
-    controller._remember_canonical_legacy_projection(controller.settings)
+    owner.persist()
+    owner.remember_projection(owner.current)
 
-    first_task = asyncio.create_task(
-        controller.persist_provider_secret_change(first_key, f"new-{first_key}")
-    )
+    first_task = asyncio.create_task(provider_settings.change_secret(first_key, f"new-{first_key}"))
     assert await asyncio.to_thread(store.started[first_key].wait, 2)
     second_task = asyncio.create_task(
-        controller.persist_provider_secret_change(second_key, f"new-{second_key}")
+        provider_settings.change_secret(second_key, f"new-{second_key}")
     )
     await asyncio.sleep(0.05)
     assert not store.started[second_key].is_set()
@@ -386,10 +463,12 @@ async def test_overlapping_provider_secret_changes_preserve_both_invalidations(
     assert await second_task
     assert store.get("openrouter_api_key") == "new-openrouter_api_key"
     assert store.get("deepseek_api_key") == "new-deepseek_api_key"
-    assert controller.settings.api_key_verified.openrouter is False
-    assert controller.settings.api_key_verified.deepseek is False
-    assert controller.vnext_settings.state.provider_verification.openrouter.status == "unknown"
-    assert controller.vnext_settings.state.provider_verification.deepseek.status == "unknown"
+    assert owner.current is not None
+    assert owner.current.api_key_verified.openrouter is False
+    assert owner.current.api_key_verified.deepseek is False
+    assert owner.canonical is not None
+    assert owner.canonical.state.provider_verification.openrouter.status == "unknown"
+    assert owner.canonical.state.provider_verification.deepseek.status == "unknown"
     reloaded = load_vnext_settings(path)
     assert reloaded.settings is not None
     assert reloaded.settings.state.provider_verification.openrouter.status == "unknown"

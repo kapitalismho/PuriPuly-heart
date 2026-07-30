@@ -9,19 +9,20 @@ from pathlib import Path
 import flet as ft
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
-from puripuly_heart.app.ports.ui_application import UiApplicationPort
+from puripuly_heart.app.ports.ui_application import (
+    UiApplicationFactoryPort,
+    UiApplicationPort,
+)
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
     ApplicationShutdownCoordinator,
     application_shutdown_callback,
 )
-from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.core.discord_oauth_loopback import (
     render_discord_oauth_callback_completion_page,
 )
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
-    SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
@@ -38,8 +39,16 @@ from puripuly_heart.ui.components.peer_translation_eula_dialog import PeerTransl
 from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog
 from puripuly_heart.ui.components.telemetry_consent_dialog import TelemetryConsentDialog
 from puripuly_heart.ui.components.title_bar import TitleBar
-from puripuly_heart.ui.controller import GuiController
+from puripuly_heart.ui.dashboard.contract import (
+    DashboardCaptureIntents,
+    DashboardTranslationIntents,
+)
 from puripuly_heart.ui.fonts import font_for_language, register_fonts
+from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
+from puripuly_heart.ui.foundation.preview import FoundationPreviewSurface
+from puripuly_heart.ui.foundation.resources import DEFAULT_FOUNDATION_RESOURCES
+from puripuly_heart.ui.foundation.runtime import FletFoundationRuntime
+from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice
 from puripuly_heart.ui.i18n import (
@@ -47,7 +56,17 @@ from puripuly_heart.ui.i18n import (
     language_name,
     t,
 )
+from puripuly_heart.ui.logs.contract import LogsIntents
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from puripuly_heart.ui.settings.contract import (
+    SettingsGeneralIntents,
+    SettingsOverlayIntents,
+    SettingsPromptIntents,
+    SettingsProviderIntents,
+    SettingsSurfaceIntents,
+)
+from puripuly_heart.ui.shell.contract import AppShellSlots
+from puripuly_heart.ui.shell.renderer import compose_app_shell
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_PRIMARY,
@@ -61,11 +80,9 @@ from puripuly_heart.ui.views.settings import SettingsView
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_WINDOW_WIDTH = 1136
-DEFAULT_WINDOW_HEIGHT = 850
-MIN_WINDOW_WIDTH = 1024
-MIN_WINDOW_HEIGHT = 760
-APP_CONTENT_PADDING = 16
+DEFAULT_WINDOW_WIDTH = FOUNDATION_DESIGN_TOKENS.window.width
+DEFAULT_WINDOW_HEIGHT = FOUNDATION_DESIGN_TOKENS.window.height
+APP_CONTENT_PADDING = FOUNDATION_DESIGN_TOKENS.spacing.page
 FOUNDER_CONTACT_URL = "https://x.com/kapitalismho"
 FOUNDER_README_BASE_URL = "https://github.com/kapitalismho/PuriPuly-heart/blob/main"
 FOUNDER_README_PATH_BY_LOCALE = {
@@ -122,6 +139,7 @@ class TranslatorApp:
         page: ft.Page,
         *,
         config_path,
+        application_factory: UiApplicationFactoryPort,
         debug_ui_preview: bool = False,
         allow_stable_settings_import: bool = False,
         runtime_logging_sinks=None,
@@ -129,30 +147,20 @@ class TranslatorApp:
     ):
         self.page = page
         self._presentation_adapter = FletUiPresentationAdapter(self)
-        controller_kwargs = {
-            "page": page,
-            "app": self._presentation_adapter,
-            "config_path": config_path,
-        }
-        parameters = inspect.signature(GuiController).parameters
-        if "allow_stable_settings_import" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            controller_kwargs["allow_stable_settings_import"] = allow_stable_settings_import
-        if "runtime_logging_sinks" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            controller_kwargs["runtime_logging_sinks"] = runtime_logging_sinks
-        if "vrchat_osc_presence" in parameters or any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-        ):
-            controller_kwargs["vrchat_osc_presence"] = vrchat_osc_presence
-        self.controller = GuiController(**controller_kwargs)
-        self._ui_application = UiApplicationBoundary(self.controller)
-        self._tracked_page_tasks: set[object] = set()
+        application = application_factory(
+            presentation=self._presentation_adapter,
+            config_path=config_path,
+            allow_stable_settings_import=allow_stable_settings_import,
+            runtime_logging_sinks=runtime_logging_sinks,
+            vrchat_osc_presence=vrchat_osc_presence,
+        )
+        if application is None:
+            raise RuntimeError("Application factory did not compose an application boundary")
+        self._ui_application = application
         self._shutdown_lock: asyncio.Lock | None = None
         self._shutdown_complete = False
         self._shutting_down = False
+        self._window_close_requested = False
         self.overlay_state = "off"
         self.overlay_failure_reason: str | None = None
         self.overlay_peer_contract = None
@@ -173,80 +181,98 @@ class TranslatorApp:
         self._github_star_prompt_shown_this_launch = False
         self._microphone_test_dialog: MicrophoneTestDialog | None = None
         self._telemetry_consent_dialog: TelemetryConsentDialog | None = None
+        self._foundation_preview_dialog: ft.AlertDialog | None = None
+        self._foundation_adapter = FletFoundationAdapter(
+            self.application,
+            self._presentation_adapter,
+        )
+        self._foundation_runtime = FletFoundationRuntime(
+            self.page,
+            self._foundation_adapter,
+        )
         self._application_lifecycle = self._compose_application_lifecycle()
         self._setup_page()
         self._build_layout()
 
         # Link Dashboard callbacks
-        self.view_dashboard.on_send_message = self._on_manual_submit
-        self.view_dashboard.on_message_input_activity = self._on_message_input_activity
-        self.view_dashboard.on_toggle_translation = self._on_translation_toggle
-        self.view_dashboard.on_toggle_stt = self._on_stt_toggle
-        self.view_dashboard.on_toggle_overlay = self._on_overlay_toggle
-        self.view_dashboard.on_toggle_peer_translation = self._on_peer_translation_toggle
-        self.view_dashboard.on_retry_peer_process_capture = self._on_retry_peer_process_capture
-        self.view_dashboard.on_language_change = self._on_language_change
-        self.view_dashboard.on_gpu_notice_action = self.application.handle_gpu_notice_action
+        self.view_dashboard.bind_dashboard_intents(
+            translation=DashboardTranslationIntents(
+                submit_message=self._on_manual_submit,
+                toggle_translation=self._on_translation_toggle,
+                change_language=self._on_language_change,
+                report_input_activity=self._on_message_input_activity,
+            ),
+            capture=DashboardCaptureIntents(
+                toggle_self_capture=self._on_stt_toggle,
+                toggle_peer_capture=self._on_peer_translation_toggle,
+                toggle_overlay=self._on_overlay_toggle,
+                retry_peer_process_capture=self._on_retry_peer_process_capture,
+                run_gpu_notice_action=self.application.handle_gpu_notice_action,
+            ),
+        )
 
-        self.view_settings.on_settings_changed = self._on_settings_changed
-        self.view_settings.on_prompt_apply_settings = self._on_prompt_apply_settings
-        self.view_settings.on_providers_changed = self._on_providers_changed
-        self.view_settings.on_request_openrouter_pkce = self._on_request_openrouter_pkce
-        self.view_settings.on_verify_api_key = self._on_verify_api_key
-        self.view_settings.on_provider_secret_change = self._on_provider_secret_change
-        self.view_settings.on_secret_cleared = self._on_secret_cleared
-        self.view_settings.on_local_llm_secret_changed = self._on_local_llm_secret_changed
-        self.view_settings.on_start_microphone_test = self._on_start_microphone_test
-        self.view_settings.on_gpu_discovery_requested = self._on_gpu_discovery_requested
-        self.view_settings.on_telemetry_consent_change = self._on_telemetry_consent_change
-        self.view_settings.on_list_loopback_capture_options = (
-            lambda: self.application.list_loopback_capture_options()
-        )
-        self.view_settings.on_list_loopback_process_options = (
-            lambda: self.application.list_loopback_process_options()
-        )
-        self.view_settings.on_list_loopback_device_options = (
-            lambda: self.application.list_loopback_device_options()
-        )
-        self.view_settings.on_current_loopback_capture_option = (
-            lambda: self.application.current_loopback_capture_option_value()
-        )
-        self.view_settings.on_apply_loopback_capture_option = self._on_apply_loopback_capture_option
-        self.view_settings.on_loopback_capture_summary = (
-            lambda: self.application.loopback_capture_summary()
-        )
-        self.view_settings.on_desktop_overlay_lock_change = self._on_desktop_overlay_lock_change
-        self.view_settings.on_desktop_overlay_size_change = self._on_desktop_overlay_size_change
-        self.view_settings.on_desktop_overlay_recovery_action = (
-            self._on_desktop_overlay_recovery_action
-        )
-        self.view_settings.on_desktop_overlay_position_reset = (
-            self._on_desktop_overlay_position_reset
-        )
-        self.view_settings.on_view_logs = self._open_logs_tab
-        self.view_settings.show_snackbar = self._show_snackbar
-        self.view_logs.on_mode_change = self._on_runtime_logging_mode_change
-        self.view_logs.set_runtime_logging_mode(self.application.state().runtime_logging_mode)
         runtime_log_basic = self.application.log_basic
         runtime_log_detailed = self.application.log_detailed
-        if callable(runtime_log_basic):
-            self.view_settings.runtime_log_basic = runtime_log_basic
-        if callable(runtime_log_detailed):
-            self.view_settings.runtime_log_detailed = runtime_log_detailed
-        self.view_dashboard.runtime_log_detailed = self._log_detailed
-
         calibration_begin = self.application.begin_overlay_calibration
         calibration_change = self.application.set_overlay_calibration_field
         calibration_apply = self.application.apply_overlay_calibration
         calibration_cancel = self.application.cancel_overlay_calibration
-        if callable(calibration_begin):
-            self.view_settings.on_overlay_calibration_begin = calibration_begin
-        if callable(calibration_change):
-            self.view_settings.on_overlay_calibration_change = calibration_change
-        if callable(calibration_apply):
-            self.view_settings.on_overlay_calibration_apply = calibration_apply
-        if callable(calibration_cancel):
-            self.view_settings.on_overlay_calibration_cancel = calibration_cancel
+        self.view_settings.bind_settings_intents(
+            surface=SettingsSurfaceIntents(
+                settings_changed=self._on_settings_changed,
+                show_snackbar=self._show_snackbar,
+                runtime_log_basic=(runtime_log_basic if callable(runtime_log_basic) else None),
+                runtime_log_detailed=(
+                    runtime_log_detailed if callable(runtime_log_detailed) else None
+                ),
+            ),
+            provider=SettingsProviderIntents(
+                providers_changed=self._on_providers_changed,
+                request_openrouter_pkce=self._on_request_openrouter_pkce,
+                verify_api_key=self._on_verify_api_key,
+                provider_secret_change=self._on_provider_secret_change,
+                secret_cleared=self._on_secret_cleared,
+                local_llm_secret_changed=self._on_local_llm_secret_changed,
+                gpu_discovery_requested=self._on_gpu_discovery_requested,
+            ),
+            general=SettingsGeneralIntents(
+                start_microphone_test=self._on_start_microphone_test,
+                telemetry_consent_change=self._on_telemetry_consent_change,
+                list_loopback_capture_options=(
+                    lambda: self.application.list_loopback_capture_options()
+                ),
+                list_loopback_process_options=(
+                    lambda: self.application.list_loopback_process_options()
+                ),
+                list_loopback_device_options=(
+                    lambda: self.application.list_loopback_device_options()
+                ),
+                current_loopback_capture_option=(
+                    lambda: self.application.current_loopback_capture_option_value()
+                ),
+                apply_loopback_capture_option=self._on_apply_loopback_capture_option,
+                loopback_capture_summary=(lambda: self.application.loopback_capture_summary()),
+            ),
+            prompt=SettingsPromptIntents(
+                prompt_apply_settings=self._on_prompt_apply_settings,
+            ),
+            overlay=SettingsOverlayIntents(
+                desktop_overlay_lock_change=self._on_desktop_overlay_lock_change,
+                desktop_overlay_size_change=self._on_desktop_overlay_size_change,
+                desktop_overlay_recovery_action=self._on_desktop_overlay_recovery_action,
+                desktop_overlay_position_reset=self._on_desktop_overlay_position_reset,
+                view_logs=self._open_logs_tab,
+                calibration_begin=(calibration_begin if callable(calibration_begin) else None),
+                calibration_change=(calibration_change if callable(calibration_change) else None),
+                calibration_apply=(calibration_apply if callable(calibration_apply) else None),
+                calibration_cancel=(calibration_cancel if callable(calibration_cancel) else None),
+            ),
+        )
+        self.view_logs.bind_logs_intents(
+            LogsIntents(runtime_logging_mode_change=self._on_runtime_logging_mode_change)
+        )
+        self.view_logs.set_runtime_logging_mode(self.application.state().runtime_logging_mode)
+        self.view_dashboard.runtime_log_detailed = self._log_detailed
 
         set_overlay_calibration = getattr(self.view_settings, "set_overlay_calibration", None)
         overlay_calibration = self.application.overlay_calibration
@@ -255,32 +281,32 @@ class TranslatorApp:
 
     @property
     def application(self) -> UiApplicationPort:
-        backend = getattr(self, "controller", None)
-        boundary = getattr(self, "_ui_application", None)
-        if boundary is None or not boundary.wraps(backend):
-            boundary = UiApplicationBoundary(backend)
-            self._ui_application = boundary
-        return boundary
+        return self._ui_application
 
     def _run_page_task(self, coroutine, *args):
-        lifecycle = getattr(self, "_application_lifecycle", None)
-        if getattr(self, "_shutting_down", False) or (
-            lifecycle is not None and not lifecycle.accepting_intents
-        ):
+        if getattr(self, "_shutting_down", False):
             close = getattr(coroutine, "close", None)
             if callable(close):
                 close()
             return None
-        task = self.page.run_task(coroutine, *args)
-        tracked = getattr(self, "_tracked_page_tasks", None)
-        if tracked is None:
-            tracked = set()
-            self._tracked_page_tasks = tracked
-        tracked.add(task)
-        add_done_callback = getattr(task, "add_done_callback", None)
-        if callable(add_done_callback):
-            add_done_callback(tracked.discard)
-        return task
+        runtime = self._ensure_foundation_runtime()
+        if not runtime.snapshot.lifecycle_bound:
+            runtime.bind_application_lifecycle(self._get_application_lifecycle())
+        return runtime.run_page_task(coroutine, *args)
+
+    def _ensure_foundation_runtime(self) -> FletFoundationRuntime:
+        runtime = getattr(self, "_foundation_runtime", None)
+        if runtime is not None:
+            return runtime
+        presentation = getattr(self, "_presentation_adapter", None)
+        if presentation is None:
+            presentation = FletUiPresentationAdapter(self)
+            self._presentation_adapter = presentation
+        adapter = FletFoundationAdapter(self.application, presentation)
+        runtime = FletFoundationRuntime(self.page, adapter)
+        self._foundation_adapter = adapter
+        self._foundation_runtime = runtime
+        return runtime
 
     async def shutdown(self) -> None:
         lifecycle = self._get_application_lifecycle()
@@ -290,24 +316,12 @@ class TranslatorApp:
             self._shutdown_complete = lifecycle.is_terminal
 
     def _compose_application_lifecycle(self) -> ApplicationShutdownCoordinator:
-        callbacks = list(self._application_shutdown_callbacks())
-        controller_callbacks = self.application.application_shutdown_callbacks()
-        if controller_callbacks:
-            callbacks.extend(controller_callbacks)
-        else:
-            callbacks.append(
-                application_shutdown_callback(
-                    phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
-                    owner_name="GuiControllerCompatibilityFacade",
-                    callback_name="stop",
-                    callback=self.application.stop,
-                )
-            )
-        lifecycle = ApplicationShutdownCoordinator(
-            callbacks,
-            diagnostics_sink=self.application.emit_application_shutdown_diagnostic,
+        foundation_runtime = self._ensure_foundation_runtime()
+        self.application.register_application_shutdown_callbacks(
+            self._application_shutdown_callbacks()
         )
-        self.application.bind_application_lifecycle(lifecycle)
+        lifecycle = self.application.application_lifecycle()
+        foundation_runtime.bind_application_lifecycle(lifecycle)
         return lifecycle
 
     def _get_application_lifecycle(self) -> ApplicationShutdownCoordinator:
@@ -318,6 +332,7 @@ class TranslatorApp:
         return lifecycle
 
     def _application_shutdown_callbacks(self) -> tuple[ApplicationShutdownCallback, ...]:
+        foundation_runtime = self._ensure_foundation_runtime()
         return (
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
@@ -325,29 +340,18 @@ class TranslatorApp:
                 callback_name="freeze_ui_ingress",
                 callback=self._freeze_ui_ingress,
             ),
+            *foundation_runtime.application_shutdown_callbacks(),
             application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
-                owner_name="GithubStarPromptRuntime",
-                callback_name="stop_app_ingress",
-                callback=self._stop_after_launch_ingress,
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="TranslatorApp",
+                callback_name="close_after_launch_tasks",
+                callback=self._close_after_launch_ui_tasks,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
                 owner_name="TranslatorApp",
-                callback_name="cancel_tracked_page_tasks",
-                callback=self._cancel_tracked_page_tasks,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="GithubStarPromptRuntime",
-                callback_name="close_app_runtime",
-                callback=self.close_after_launch_tasks,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
-                owner_name="OAuthRuntime",
-                callback_name="close_app_runtime",
-                callback=self.close_oauth_runtime,
+                callback_name="close_managed_auth_tasks",
+                callback=self._close_managed_auth_ui_tasks,
             ),
         )
 
@@ -355,28 +359,28 @@ class TranslatorApp:
         self._shutting_down = True
         self._settings_mutation_queue = []
 
-    def _stop_after_launch_ingress(self) -> None:
-        self.application.stop_github_star_prompt_ingress()
-
-    async def _cancel_tracked_page_tasks(self) -> None:
-        current_task = asyncio.current_task()
-        tracked = getattr(self, "_tracked_page_tasks", set())
-        tasks = tuple(
-            task
-            for task in tracked
-            if task is not current_task and not getattr(task, "done", lambda: True)()
-        )
-        for task in tasks:
-            cancel = getattr(task, "cancel", None)
-            if callable(cancel):
-                cancel()
-        awaitables = tuple(task for task in tasks if inspect.isawaitable(task))
-        if awaitables:
-            await asyncio.gather(*awaitables, return_exceptions=True)
-        tracked.difference_update(tasks)
-
     async def _on_page_lifecycle_end(self, _event=None) -> None:
         await self.shutdown()
+
+    def _on_window_event(self, event) -> None:
+        event_type = getattr(event, "type", getattr(event, "data", None))
+        if event_type not in {ft.WindowEventType.CLOSE, ft.WindowEventType.CLOSE.value}:
+            return
+        self._request_window_close()
+
+    def _request_window_close(self) -> None:
+        if self._window_close_requested:
+            return
+        self._window_close_requested = True
+        self._run_page_task(self._close_after_window_request)
+
+    async def _close_after_window_request(self) -> None:
+        try:
+            await self.shutdown()
+        finally:
+            destroy_result = self.page.window.destroy()
+            if inspect.isawaitable(destroy_result):
+                await destroy_result
 
     def _setup_page(self):
         self.page.title = t("app.title")
@@ -385,13 +389,20 @@ class TranslatorApp:
         self.page.theme = get_app_theme(font_family=font_for_language(get_locale()))
         self.page.bgcolor = COLOR_BACKGROUND
         self.page.padding = 0
-        self.page.window.frameless = True
-        self.page.window.resizable = True  # Ensure resizing is allowed
+        self.page.window.frameless = FOUNDATION_DESIGN_TOKENS.window.frameless
+        self.page.window.resizable = FOUNDATION_DESIGN_TOKENS.window.resizable
+        self.page.window.maximizable = FOUNDATION_DESIGN_TOKENS.window.maximizable
         self.page.window.width = DEFAULT_WINDOW_WIDTH
         self.page.window.height = DEFAULT_WINDOW_HEIGHT
-        self.page.window.min_width = MIN_WINDOW_WIDTH
-        self.page.window.min_height = MIN_WINDOW_HEIGHT
-        self.page.window.icon = "icons/icon.ico"
+        self.page.window.min_width = DEFAULT_WINDOW_WIDTH
+        self.page.window.max_width = DEFAULT_WINDOW_WIDTH
+        self.page.window.min_height = DEFAULT_WINDOW_HEIGHT
+        self.page.window.max_height = DEFAULT_WINDOW_HEIGHT
+        self.page.window.prevent_close = True
+        self.page.window.on_event = self._on_window_event
+        self.page.window.icon = DEFAULT_FOUNDATION_RESOURCES.asset_url(
+            FOUNDATION_DESIGN_TOKENS.icon_asset
+        )
         self.page.on_keyboard_event = self._on_keyboard_event
 
     def _build_layout(self):
@@ -402,45 +413,26 @@ class TranslatorApp:
         self.view_settings.set_overlay_runtime_state(self.overlay_state)
 
         # Custom title bar
-        self.title_bar = TitleBar(self.page)
+        self.title_bar = TitleBar(self.page, on_close=self._request_window_close)
 
         # Bottom navigation (order: Home, Settings, Logs, About)
         self.bottom_nav = BottomNavBar(on_change=self._on_nav_change)
 
-        # Content area
-        self.content_area = ft.Container(
-            expand=True,
-            padding=APP_CONTENT_PADDING,
-            content=self.view_dashboard,
+        self.debug_preview_panel = (
+            self._build_debug_preview_panel() if self.debug_ui_preview else None
         )
-
-        # Main layout: TitleBar -> Content -> BottomNav
-        self.layout = ft.Column(
-            controls=[
-                self.title_bar,
-                self.content_area,
-                self.bottom_nav,
-            ],
-            expand=True,
-            spacing=0,
-        )
-
-        root_content = ft.Container(content=self.layout, expand=True, padding=0)
-        if self.debug_ui_preview:
-            self.debug_preview_panel = self._build_debug_preview_panel()
-            self.page.add(
-                ft.Container(
-                    content=ft.Stack(
-                        controls=[root_content, self.debug_preview_panel],
-                        fit=ft.StackFit.EXPAND,
-                        expand=True,
-                    ),
-                    expand=True,
-                    padding=0,
-                )
+        shell = compose_app_shell(
+            AppShellSlots(
+                title_bar=self.title_bar,
+                content=self.view_dashboard,
+                bottom_nav=self.bottom_nav,
+                content_padding=APP_CONTENT_PADDING,
+                debug_panel=self.debug_preview_panel,
             )
-        else:
-            self.page.add(root_content)
+        )
+        self.content_area = shell.content_area
+        self.layout = shell.layout
+        self.page.add(shell.root)
 
     def _build_debug_preview_panel(self) -> DebugPreviewPanel:
         return DebugPreviewPanel(
@@ -465,6 +457,7 @@ class TranslatorApp:
             on_github_star_snackbar=self._preview_github_star_snackbar,
             on_telemetry_consent=self._preview_telemetry_consent,
             on_stt_loading_button_cycle=self._cycle_debug_preview_stt_loading_button,
+            on_foundation_primitives=self._preview_foundation_primitives,
         )
 
     def _mark_launch_high_priority_feedback_shown(
@@ -622,7 +615,7 @@ class TranslatorApp:
                 level=logging.WARNING,
             )
 
-    async def close_after_launch_tasks(self) -> None:
+    async def _close_after_launch_ui_tasks(self) -> None:
         handle = getattr(self, "_after_launch_task_handle", None)
         if handle is not None:
             if not handle.done():
@@ -641,6 +634,10 @@ class TranslatorApp:
             finally:
                 if self._after_launch_task_handle is handle:
                     self._after_launch_task_handle = None
+        self._github_star_prompt_launch_pending = False
+
+    async def close_after_launch_tasks(self) -> None:
+        await self._close_after_launch_ui_tasks()
         await self.close_github_star_prompt_runtime()
 
     async def _open_github_star_prompt_snackbar(self, *, should_open=None) -> bool:  # noqa: ANN001
@@ -662,7 +659,7 @@ class TranslatorApp:
 
         snackbar = self._build_github_star_prompt_snackbar(_open_repository)
         self._github_star_prompt_shown_this_launch = True
-        self.page.open(snackbar)
+        self.page.show_dialog(snackbar)
         return True
 
     def _build_github_star_prompt_snackbar(self, on_click) -> ft.SnackBar:  # noqa: ANN001
@@ -677,7 +674,7 @@ class TranslatorApp:
                         expand=True,
                     ),
                     ft.TextButton(
-                        text=t("github_star.snackbar.action"),
+                        content=t("github_star.snackbar.action"),
                         on_click=on_click,
                         style=ft.ButtonStyle(
                             color=ft.Colors.WHITE,
@@ -696,43 +693,19 @@ class TranslatorApp:
             bgcolor=COLOR_SUCCESS,
             duration=GITHUB_STAR_PROMPT_DURATION_MS,
             behavior=ft.SnackBarBehavior.FLOATING,
-            margin=ft.margin.only(bottom=90),
+            margin=ft.Margin.only(bottom=90),
             padding=20,
         )
 
     def _close_github_star_prompt_snackbar(self, snackbar: ft.SnackBar) -> None:
-        close = getattr(self.page, "close", None)
-        if callable(close):
+        pop_dialog = getattr(self.page, "pop_dialog", None)
+        if callable(pop_dialog):
             with contextlib.suppress(Exception):
-                close(snackbar)
+                pop_dialog()
         else:
             snackbar.open = False
             with contextlib.suppress(Exception):
                 self.page.update()
-        self._displace_current_snackbar_for_flet_028()
-
-    def _displace_current_snackbar_for_flet_028(self) -> None:
-        """Force-dismiss the visible SnackBar on Flet 0.28.x.
-
-        Flet 0.28.3 updates the Python-side ``SnackBar.open`` flag on
-        ``page.close(snackbar)`` but the Flutter-side snackbar remains visible
-        until its duration expires. Opening another SnackBar first removes the
-        current one, so use a transparent 1 ms replacement as a narrow shim.
-        """
-
-        open_control = getattr(self.page, "open", None)
-        if not callable(open_control):
-            return
-        dismissor = ft.SnackBar(
-            content=ft.Text("", size=0),
-            bgcolor=ft.Colors.TRANSPARENT,
-            duration=1,
-            behavior=ft.SnackBarBehavior.FLOATING,
-            margin=ft.margin.only(bottom=90),
-            padding=0,
-        )
-        with contextlib.suppress(Exception):
-            open_control(dismissor)
 
     def _preview_github_star_snackbar(self) -> None:
         snackbar = None
@@ -743,7 +716,7 @@ class TranslatorApp:
                 self._close_github_star_prompt_snackbar(snackbar)
 
         snackbar = self._build_github_star_prompt_snackbar(_open_repository)
-        self.page.open(snackbar)
+        self.page.show_dialog(snackbar)
 
     def _preview_telemetry_consent(self) -> None:
         dialog = TelemetryConsentDialog(
@@ -838,6 +811,17 @@ class TranslatorApp:
         self.application.clear_debug_audio_fault_profiles()
         self._show_snackbar(t("debug_preview.audio_fault_clear"), ft.Colors.GREEN_700)
 
+    def _preview_foundation_primitives(self) -> None:
+        if not self._foundation_adapter.debug_preview_enabled:
+            return
+        dialog = ft.AlertDialog(
+            modal=False,
+            content=FoundationPreviewSurface(get_locale()),
+            bgcolor=COLOR_BACKGROUND,
+        )
+        self._foundation_preview_dialog = dialog
+        self.page.show_dialog(dialog)
+
     def _show_peer_translation_eula(self, on_accept) -> None:
         dialog = PeerTranslationEulaDialog(
             self.page,
@@ -889,12 +873,11 @@ class TranslatorApp:
             microphone_test_dialog.close(notify=True)
             return
 
-        dialog = getattr(self.page, "dialog", None)
-        close_dialog = getattr(self.page, "close", None)
-        if dialog is None or not callable(close_dialog):
+        pop_dialog = getattr(self.page, "pop_dialog", None)
+        if not callable(pop_dialog):
             return
         try:
-            close_dialog(dialog)
+            pop_dialog()
         except Exception:
             logger.exception("Failed to close dialog during navigation")
 
@@ -1014,6 +997,9 @@ class TranslatorApp:
         apply_debug_locale = getattr(debug_preview_panel, "apply_locale", None)
         if callable(apply_debug_locale):
             apply_debug_locale()
+        foundation_preview_dialog = getattr(self, "_foundation_preview_dialog", None)
+        if foundation_preview_dialog is not None:
+            foundation_preview_dialog.content = FoundationPreviewSurface(get_locale())
         self.page.update()
 
     def _cycle_debug_preview_stt_loading_button(self) -> None:
@@ -1070,18 +1056,13 @@ class TranslatorApp:
                 )
 
     def refresh_overlay_peer_contract(self) -> None:
-        contract = self.application.build_overlay_peer_consumer_contract()
-        self.overlay_peer_contract = contract
-        if contract is None:
-            return
-        view_settings = getattr(self, "view_settings", None)
-        set_settings_contract = getattr(view_settings, "set_overlay_peer_contract", None)
-        if callable(set_settings_contract):
-            set_settings_contract(contract)
-        view_dashboard = getattr(self, "view_dashboard", None)
-        set_dashboard_contract = getattr(view_dashboard, "set_overlay_peer_contract", None)
-        if callable(set_dashboard_contract):
-            set_dashboard_contract(contract)
+        presentation = getattr(self, "_presentation_adapter", None)
+        if presentation is None:
+            presentation = FletUiPresentationAdapter(self)
+            self._presentation_adapter = presentation
+        presentation.refresh_overlay_peer_contract(
+            self.application.overlay_peer_presentation_state()
+        )
 
     def _sync_settings_overlay_runtime_state(self) -> None:
         view_settings = getattr(self, "view_settings", None)
@@ -1321,11 +1302,11 @@ class TranslatorApp:
                 bgcolor=ft.Colors.ORANGE_700,
                 duration=4000,
                 behavior=ft.SnackBarBehavior.FLOATING,
-                margin=ft.margin.only(bottom=90),
+                margin=ft.Margin.only(bottom=90),
                 padding=20,
             )
             self._mark_launch_high_priority_feedback_shown("stt_compatibility", snackbar)
-            self.page.open(snackbar)
+            self.page.show_dialog(snackbar)
 
         async def _task():
             await self.application.on_dashboard_language_change(change)
@@ -1457,22 +1438,7 @@ class TranslatorApp:
                     launch_source=launch_source,
                 )
                 if ok:
-                    refresh_after_openrouter_pkce_success = getattr(
-                        self.view_settings,
-                        "refresh_after_openrouter_pkce_success",
-                        None,
-                    )
-                    if callable(refresh_after_openrouter_pkce_success):
-                        refresh_after_openrouter_pkce_success(
-                            self.application.compatibility_settings(),
-                            config_path=self.application.state().config_path,
-                        )
-                    else:
-                        self.view_settings.load_from_settings(
-                            self.application.compatibility_settings(),
-                            config_path=self.application.state().config_path,
-                            preserve_custom_vocab_draft=True,
-                        )
+                    self.application.refresh_settings_after_openrouter_pkce_success()
                     self._show_snackbar(t("openrouter.pkce.connected"), COLOR_SUCCESS)
             finally:
                 self._openrouter_pkce_request_active = False
@@ -1641,9 +1607,6 @@ class TranslatorApp:
             and self.application.managed_auth_tasks_open()
         )
 
-    def _translation_enable_succeeded(self, _controller: object, result: object) -> bool:
-        return self.application.translation_enable_succeeded(result)
-
     def _start_discord_managed_auth(self) -> None:
         dialog = getattr(self, "_discord_managed_auth_dialog", None)
         raw_referral_id = getattr(dialog, "referral_id", "")
@@ -1698,7 +1661,7 @@ class TranslatorApp:
             generation=generation,
         )
 
-    async def close_oauth_runtime(self) -> None:
+    async def _close_managed_auth_ui_tasks(self) -> None:
         self._discord_managed_auth_cancelled = True
         self._qq_managed_auth_cancelled = True
         self._discord_managed_auth_generation = (
@@ -1717,6 +1680,9 @@ class TranslatorApp:
             task_handle,
             task_name="discord-managed-auth-dialog",
         )
+
+    async def close_oauth_runtime(self) -> None:
+        await self._close_managed_auth_ui_tasks()
         await self.application.close_managed_auth_tasks()
 
     def mark_discord_managed_auth_callback_received(self, generation: int | None = None) -> None:
@@ -1894,11 +1860,11 @@ class TranslatorApp:
             bgcolor=bgcolor,
             duration=duration,
             behavior=ft.SnackBarBehavior.FLOATING,
-            margin=ft.margin.only(bottom=90),
+            margin=ft.Margin.only(bottom=90),
             padding=20,
         )
         self._mark_launch_high_priority_feedback_shown("snackbar", snackbar)
-        self.page.open(snackbar)
+        self.page.show_dialog(snackbar)
 
     def show_snackbar(self, message: str, bgcolor) -> None:
         self._show_snackbar(message, bgcolor)
@@ -1945,52 +1911,30 @@ async def main_gui(
     page: ft.Page,
     *,
     config_path,
+    application_factory: UiApplicationFactoryPort,
     debug_ui_preview: bool = False,
     allow_stable_settings_import: bool = False,
     runtime_logging_sinks=None,
     vrchat_osc_presence=None,
 ):
-    app_kwargs = {
-        "config_path": config_path,
-        "debug_ui_preview": debug_ui_preview,
-    }
-    parameters = inspect.signature(TranslatorApp).parameters
-    if "allow_stable_settings_import" in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    ):
-        app_kwargs["allow_stable_settings_import"] = allow_stable_settings_import
-    if "runtime_logging_sinks" in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    ):
-        app_kwargs["runtime_logging_sinks"] = runtime_logging_sinks
-    if "vrchat_osc_presence" in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    ):
-        app_kwargs["vrchat_osc_presence"] = vrchat_osc_presence
-    app = TranslatorApp(page, **app_kwargs)
-    lifecycle_handler = getattr(app, "_on_page_lifecycle_end", None)
-    if callable(lifecycle_handler):
-        page.on_disconnect = lifecycle_handler
-        page.on_close = lifecycle_handler
-    application = getattr(app, "application", None)
-    if application is None:
-        application = UiApplicationBoundary(getattr(app, "controller", None))
+    app = TranslatorApp(
+        page,
+        config_path=config_path,
+        application_factory=application_factory,
+        debug_ui_preview=debug_ui_preview,
+        allow_stable_settings_import=allow_stable_settings_import,
+        runtime_logging_sinks=runtime_logging_sinks,
+        vrchat_osc_presence=vrchat_osc_presence,
+    )
+    page.on_disconnect = app._on_page_lifecycle_end
+    page.on_close = app._on_page_lifecycle_end
     try:
-        await application.start()
+        await app.application.start()
     except BaseException:
-        shutdown = getattr(app, "shutdown", None)
-        if callable(shutdown):
-            with contextlib.suppress(BaseException):
-                await shutdown()
-        else:
-            stop = getattr(application, "stop", None)
-            if callable(stop):
-                with contextlib.suppress(BaseException):
-                    await stop()
+        with contextlib.suppress(BaseException):
+            await app.shutdown()
         raise
-    schedule_after_launch = getattr(app, "schedule_after_launch_tasks", None)
-    if callable(schedule_after_launch):
-        schedule_after_launch()
+    app.schedule_after_launch_tasks()
 
 
 async def _check_and_notify_update(
@@ -2016,7 +1960,7 @@ async def _check_and_notify_update(
             content=ft.Row(
                 controls=[
                     ft.Icon(
-                        name=ft.Icons.SYSTEM_UPDATE,
+                        icon=ft.Icons.SYSTEM_UPDATE,
                         color=ft.Colors.WHITE,
                         size=28,
                     ),
@@ -2028,7 +1972,7 @@ async def _check_and_notify_update(
                         expand=True,
                     ),
                     ft.TextButton(
-                        text=t("update.download"),
+                        content=t("update.download"),
                         on_click=_open_download,
                         style=ft.ButtonStyle(
                             color=ft.Colors.WHITE,
@@ -2046,13 +1990,13 @@ async def _check_and_notify_update(
             ),
             bgcolor=COLOR_SUCCESS,
             behavior=ft.SnackBarBehavior.FLOATING,
-            margin=ft.margin.only(bottom=90),
+            margin=ft.Margin.only(bottom=90),
             padding=20,
             duration=30000,  # 30초
             show_close_icon=True,
             close_icon_color=ft.Colors.WHITE,
         )
-        page.open(snackbar)
+        page.show_dialog(snackbar)
         if callable(on_launch_snackbar_shown):
             on_launch_snackbar_shown(snackbar)
 

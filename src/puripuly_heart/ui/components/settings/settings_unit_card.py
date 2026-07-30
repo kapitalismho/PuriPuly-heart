@@ -22,7 +22,7 @@ class SettingsUnitCard(SharedCardWrapper):
     ) -> None:
         controls: list[ft.Control] = [
             title,
-            ft.Container(content=value, expand=True, alignment=ft.alignment.center),
+            ft.Container(content=value, expand=True, alignment=ft.Alignment.CENTER),
         ]
         if extra_controls:
             controls.append(ft.Container(height=12))

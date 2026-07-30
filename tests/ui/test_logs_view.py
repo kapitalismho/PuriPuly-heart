@@ -21,26 +21,23 @@ from puripuly_heart.ui.views.logs import (
 
 
 class TestLogsView:
-    def test_logs_view_folder_button_uses_text_api(self):
+    def test_logs_view_folder_button_uses_content_api(self):
         view = LogsView()
 
-        assert view._folder_button.text == logs_module.t("logs.open_folder")
-        assert view._folder_button.content is None
+        assert view._folder_button.content == logs_module.t("logs.open_folder")
 
     def test_logs_view_exposes_mode_button_with_current_mode_label_and_icon(self):
         view = LogsView()
 
         assert view.runtime_logging_mode == "basic"
-        assert view._mode_button.text == logs_module.t("logs.mode.basic")
+        assert view._mode_button.content == logs_module.t("logs.mode.basic")
         assert view._mode_button.icon == logs_module.ft.Icons.ARTICLE
-        assert view._mode_button.content is None
 
     def test_logs_view_exposes_conversation_button_after_mode_button(self):
         view = LogsView()
 
-        assert view._conversation_button.text == logs_module.t("logs.conversation.show")
+        assert view._conversation_button.content == logs_module.t("logs.conversation.show")
         assert view._conversation_button.icon == logs_module.ft.Icons.CHAT_BUBBLE_OUTLINE
-        assert view._conversation_button.content is None
 
         assert view._header_button_row.controls == [
             view._folder_button,
@@ -56,16 +53,16 @@ class TestLogsView:
             view._on_conversation_button_click(SimpleNamespace())
 
             assert view._log_text.value == logs_module.t("logs.conversation.empty")
-            assert view._conversation_button.text == logs_module.t("logs.conversation.hide")
+            assert view._conversation_button.content == logs_module.t("logs.conversation.hide")
 
             view.set_runtime_logging_mode("detailed")
-            assert view._conversation_button.text == logs_module.t("logs.conversation.hide")
-            assert view._mode_button.text == logs_module.t("logs.mode.detailed")
+            assert view._conversation_button.content == logs_module.t("logs.conversation.hide")
+            assert view._mode_button.content == logs_module.t("logs.mode.detailed")
 
             view._on_conversation_button_click(SimpleNamespace())
 
         assert view._log_text.value == "system line"
-        assert view._conversation_button.text == logs_module.t("logs.conversation.show")
+        assert view._conversation_button.content == logs_module.t("logs.conversation.show")
 
     def test_conversation_records_render_with_runtime_localized_source_labels(self):
         view = LogsView()
@@ -291,14 +288,14 @@ class TestLogsView:
             view._on_mode_button_click(SimpleNamespace())
 
         assert view.runtime_logging_mode == "detailed"
-        assert view._mode_button.text == logs_module.t("logs.mode.detailed")
+        assert view._mode_button.content == logs_module.t("logs.mode.detailed")
         assert seen == ["detailed"]
 
         with patch.object(type(view), "page", new_callable=PropertyMock, return_value=None):
             view._on_mode_button_click(SimpleNamespace())
 
         assert view.runtime_logging_mode == "basic"
-        assert view._mode_button.text == logs_module.t("logs.mode.basic")
+        assert view._mode_button.content == logs_module.t("logs.mode.basic")
         assert seen == ["detailed", "basic"]
 
     def test_logs_view_preserves_existing_lines_when_switching_back_to_basic(self):
@@ -386,9 +383,8 @@ class TestLogsView:
             view.set_runtime_logging_mode("detailed")
             view.apply_locale()
         assert view._title_text.value == logs_module.t("logs.title")
-        assert view._folder_button.text == logs_module.t("logs.open_folder")
-        assert view._folder_button.content is None
-        assert view._mode_button.text == logs_module.t("logs.mode.detailed")
+        assert view._folder_button.content == logs_module.t("logs.open_folder")
+        assert view._mode_button.content == logs_module.t("logs.mode.detailed")
         assert view._mode_button.icon == logs_module.ft.Icons.ARTICLE
 
     def test_open_log_folder_uses_platform_specific_launcher(self):

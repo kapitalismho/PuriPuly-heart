@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import ast
 import hashlib
 import importlib
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -22,18 +20,6 @@ SERVICE_MODULE = "puripuly_heart.app.services.openrouter_pkce_handoff"
 RAW_PKCE_SECRET = "sk-test-order29-pkce-secret-must-not-leak"
 RAW_PREVIOUS_SECRET = "sk-test-order29-previous-secret-must-not-leak"
 RAW_PROVIDER_PAYLOAD = "sk-test-order29-provider-payload-must-not-leak"
-
-FORBIDDEN_SERVICE_IMPORT_PREFIXES = (
-    "flet",
-    "keyring",
-    "puripuly_heart.app.adapters",
-    "puripuly_heart.app.wiring",
-    "puripuly_heart.config.settings",
-    "puripuly_heart.config.settings_vnext",
-    "puripuly_heart.core.storage",
-    "puripuly_heart.providers",
-    "puripuly_heart.ui",
-)
 
 FORBIDDEN_RAW_SECRET_VALUES = (
     RAW_PKCE_SECRET,
@@ -420,29 +406,6 @@ def _assert_rejected_unsafe_settings_before_side_effects(
     assert result.diagnostics.code == "unsafe_settings_values"
     assert result.diagnostics.content_policy == messages.CONTENT_POLICY_METADATA_ONLY
     _assert_no_raw_secret_values(result.diagnostics, label="unsafe settings diagnostics")
-
-
-def _imported_modules(module_file: str) -> set[str]:
-    tree = ast.parse(Path(module_file).read_text(encoding="utf-8"))
-    imported: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imported.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imported.add(node.module)
-    return imported
-
-
-def test_openrouter_pkce_handoff_service_has_no_ui_or_concrete_store_imports() -> None:
-    module = _service_module()
-    imports = _imported_modules(module.__file__ or "")
-
-    assert not {
-        imported
-        for imported in imports
-        for forbidden in FORBIDDEN_SERVICE_IMPORT_PREFIXES
-        if imported == forbidden or imported.startswith(f"{forbidden}.")
-    }
 
 
 def test_request_repr_does_not_expose_raw_bad_settings_values() -> None:

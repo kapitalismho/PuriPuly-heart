@@ -207,7 +207,7 @@ async def _product_process_source_probe(
     return facts
 
 
-def _peer_probe_owner(hub: object) -> Any:
+def _peer_probe_owner(vad_sink: object) -> Any:
     from puripuly_heart.core.clock import SystemClock
     from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 
@@ -237,21 +237,21 @@ def _peer_probe_owner(hub: object) -> Any:
         source_factory=lambda *_args: None,
         vad_factory=lambda *_args: None,
         run_audio_loop=lambda **_kwargs: asyncio.sleep(0),
-        vad_sink=hub,
+        vad_sink=vad_sink,
     )
 
 
 async def _peer_generation_probe() -> dict[str, Any]:
 
-    class Hub:
+    class RecordingVadSink:
         def __init__(self) -> None:
             self.events: list[object] = []
 
-        async def handle_peer_vad_event(self, event: object) -> None:
+        async def handle_vad_event(self, event: object) -> None:
             self.events.append(event)
 
-    hub = Hub()
-    runtime = _peer_probe_owner(hub)
+    vad_sink = RecordingVadSink()
+    runtime = _peer_probe_owner(vad_sink)
     generation = runtime._generation
     sink = runtime.guard_vad_sink(generation)
     await runtime.close()
@@ -259,8 +259,8 @@ async def _peer_generation_probe() -> dict[str, Any]:
     await sink.handle_vad_event(object())
     return {
         "attempted": attempted,
-        "published": len(hub.events),
-        "rejected": attempted - len(hub.events),
+        "published": len(vad_sink.events),
+        "rejected": attempted - len(vad_sink.events),
         "generation_before": generation,
         "generation_after": runtime._generation,
         "loop_task_released": runtime.loop_task is None,
@@ -270,15 +270,15 @@ async def _peer_generation_probe() -> dict[str, Any]:
 def _active_peer_publication_gate() -> tuple[Any, Any, Any, dict[str, Any]]:
     from puripuly_heart.core.peer_capture import PeerCaptureSessionState
 
-    class Hub:
+    class RecordingVadSink:
         def __init__(self) -> None:
             self.events: list[object] = []
 
-        async def handle_peer_vad_event(self, event: object) -> None:
+        async def handle_vad_event(self, event: object) -> None:
             self.events.append(event)
 
-    hub = Hub()
-    runtime = _peer_probe_owner(hub)
+    vad_sink = RecordingVadSink()
+    runtime = _peer_probe_owner(vad_sink)
     runtime._desired_active = True
     runtime._state = PeerCaptureSessionState.RUNNING
     runtime._loop_task = asyncio.current_task()
@@ -289,7 +289,7 @@ def _active_peer_publication_gate() -> tuple[Any, Any, Any, dict[str, Any]]:
     async def publish() -> None:
         facts["attempted"] += 1
         await sink.handle_vad_event(object())
-        facts["published"] = len(hub.events)
+        facts["published"] = len(vad_sink.events)
 
     async def supersede() -> None:
         await runtime.close()

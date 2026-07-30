@@ -144,6 +144,14 @@ class _GenerationGuardedVadSink:
         await cast(_VadSink, self.sink).handle_vad_event(event)
 
 
+PeerCaptureSourceFactory = Callable[
+    [PeerCaptureSessionConfig, PeerCaptureResolvedTarget],
+    Awaitable[object] | object,
+]
+PeerCaptureVadFactory = Callable[[PeerCaptureSessionConfig], object]
+PeerCaptureAudioLoop = Callable[..., Awaitable[None]]
+
+
 class PeerCaptureSessionOwner:
     resource_fields = (
         "_audio_source",
@@ -169,12 +177,9 @@ class PeerCaptureSessionOwner:
             [PeerCaptureSessionConfig, bool],
             object,
         ],
-        source_factory: Callable[
-            [PeerCaptureSessionConfig, PeerCaptureResolvedTarget],
-            Awaitable[object] | object,
-        ],
-        vad_factory: Callable[[PeerCaptureSessionConfig], object],
-        run_audio_loop: Callable[..., Awaitable[None]],
+        source_factory: PeerCaptureSourceFactory,
+        vad_factory: PeerCaptureVadFactory,
+        run_audio_loop: PeerCaptureAudioLoop,
         vad_sink: object,
         state_changed: Callable[[PeerCaptureSessionSnapshot], object] | None = None,
         diagnostic_sink: Callable[[PeerCaptureDiagnostic], object] | None = None,

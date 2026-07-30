@@ -186,6 +186,12 @@ class SelfCaptureSessionOwner:
             and self._loop_task is not None
         )
 
+    def invalidate_intent(self) -> SelfCaptureSessionSnapshot:
+        self._desired_active = False
+        self._generation += 1
+        self._notify_state_changed()
+        return self.snapshot
+
     def guard_vad_sink(self, generation: int | None = None) -> object:
         return _GenerationGuardedVadSink(
             sink=self._vad_sink,

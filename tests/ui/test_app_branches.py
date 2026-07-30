@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 from pathlib import Path
-from types import MethodType, SimpleNamespace
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -12,7 +12,12 @@ pytest.importorskip("flet")
 import flet as ft
 
 import puripuly_heart.ui.app as app_module
+from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.services.application_shutdown import (
+    application_shutdown_callback,
+)
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
+from puripuly_heart.composition.ui_application import compose_ui_application
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -25,19 +30,57 @@ from puripuly_heart.config.settings import (
     TranslationConnection,
     TranslationModel,
     TranslationSettings,
+    build_managed_openrouter_byok_target_settings,
     with_telemetry_consent,
 )
+from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
-from puripuly_heart.ui.controller import GuiController
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 MISSING = object()
 
 
+def _application_boundary_with_stop(controller: object) -> UiApplicationBoundary:
+    boundary = compose_test_ui_application_boundary(controller)
+    boundary.register_application_shutdown_callbacks(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+                owner_name="ApplicationTestRuntime",
+                callback_name="stop",
+                callback=controller.stop,
+            ),
+        )
+    )
+    return boundary
+
+
+@pytest.fixture(autouse=True)
+def _compose_explicit_application_test_double(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application_getter = TranslatorApp.application.fget
+
+    def resolve_application(self: TranslatorApp):
+        if getattr(self, "_ui_application", None) is None and hasattr(self, "controller"):
+            self._ui_application = compose_test_ui_application_boundary(self.controller)
+        return application_getter(self)
+
+    monkeypatch.setattr(
+        TranslatorApp,
+        "application",
+        property(resolve_application),
+    )
+
+
 class DummyPage:
     def __init__(self) -> None:
+        async def destroy_window() -> None:
+            self.window.destroy_calls += 1
+
         self.opened: list[object] = []
         self.closed: list[object] = []
         self.tasks: list[object] = []
@@ -51,10 +94,17 @@ class DummyPage:
         self.window = SimpleNamespace(
             frameless=False,
             resizable=False,
+            maximizable=True,
             width=0,
             height=0,
             min_width=0,
+            max_width=0,
             min_height=0,
+            max_height=0,
+            prevent_close=False,
+            on_event=None,
+            destroy_calls=0,
+            destroy=destroy_window,
             icon="",
             center_calls=0,
             center=lambda: None,
@@ -64,13 +114,21 @@ class DummyPage:
         )
         self.dialog = None
 
-    def open(self, control) -> None:
+    def show_dialog(self, control) -> None:
+        if hasattr(control, "open"):
+            control.open = True
         self.opened.append(control)
+        self.dialog = control
 
-    def close(self, control) -> None:
+    def pop_dialog(self):
+        control = self.dialog
+        if control is None:
+            return None
+        if hasattr(control, "open"):
+            control.open = False
         self.closed.append(control)
-        if self.dialog is control:
-            self.dialog = None
+        self.dialog = None
+        return control
 
     def run_task(self, coro_fn) -> None:
         self.tasks.append(coro_fn)
@@ -290,6 +348,17 @@ class ConstructionDummyDashboardView(ft.Container):
         self.overlay_peer_contract = None
         self.runtime_log_detailed = None
 
+    def bind_dashboard_intents(self, *, translation, capture) -> None:
+        self.on_send_message = translation.submit_message
+        self.on_toggle_translation = translation.toggle_translation
+        self.on_language_change = translation.change_language
+        self.on_message_input_activity = translation.report_input_activity
+        self.on_toggle_stt = capture.toggle_self_capture
+        self.on_toggle_peer_translation = capture.toggle_peer_capture
+        self.on_toggle_overlay = capture.toggle_overlay
+        self.on_retry_peer_process_capture = capture.retry_peer_process_capture
+        self.on_gpu_notice_action = capture.run_gpu_notice_action
+
     def set_overlay_peer_contract(self, contract) -> None:
         self.overlay_peer_contract = contract
 
@@ -319,6 +388,39 @@ class ConstructionDummySettingsView(ft.Container):
         self.has_pending_prompt_changes = False
         self.synced_desktop_settings: list[AppSettings] = []
 
+    def bind_settings_intents(self, *, surface, provider, general, prompt, overlay) -> None:
+        self.on_settings_changed = surface.settings_changed
+        self.show_snackbar = surface.show_snackbar
+        if surface.runtime_log_basic is not None:
+            self.runtime_log_basic = surface.runtime_log_basic
+        if surface.runtime_log_detailed is not None:
+            self.runtime_log_detailed = surface.runtime_log_detailed
+        self.on_providers_changed = provider.providers_changed
+        self.on_request_openrouter_pkce = provider.request_openrouter_pkce
+        self.on_verify_api_key = provider.verify_api_key
+        self.on_provider_secret_change = provider.provider_secret_change
+        self.on_secret_cleared = provider.secret_cleared
+        self.on_local_llm_secret_changed = provider.local_llm_secret_changed
+        self.on_gpu_discovery_requested = provider.gpu_discovery_requested
+        self.on_start_microphone_test = general.start_microphone_test
+        self.on_telemetry_consent_change = general.telemetry_consent_change
+        self.on_list_loopback_capture_options = general.list_loopback_capture_options
+        self.on_list_loopback_process_options = general.list_loopback_process_options
+        self.on_list_loopback_device_options = general.list_loopback_device_options
+        self.on_current_loopback_capture_option = general.current_loopback_capture_option
+        self.on_apply_loopback_capture_option = general.apply_loopback_capture_option
+        self.on_loopback_capture_summary = general.loopback_capture_summary
+        self.on_prompt_apply_settings = prompt.prompt_apply_settings
+        self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
+        self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
+        self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
+        self.on_desktop_overlay_position_reset = overlay.desktop_overlay_position_reset
+        self.on_view_logs = overlay.view_logs
+        self.on_overlay_calibration_begin = overlay.calibration_begin
+        self.on_overlay_calibration_change = overlay.calibration_change
+        self.on_overlay_calibration_apply = overlay.calibration_apply
+        self.on_overlay_calibration_cancel = overlay.calibration_cancel
+
     def set_overlay_runtime_state(self, *_args, **_kwargs) -> None:
         return None
 
@@ -339,7 +441,12 @@ class ConstructionDummyLogsView(ft.Container):
     def __init__(self) -> None:
         super().__init__()
         self.on_mode_change = None
+        self.bound_logs_intents: list[object] = []
         self.runtime_logging_mode = "basic"
+
+    def bind_logs_intents(self, intents: object) -> None:
+        self.bound_logs_intents.append(intents)
+        self.on_mode_change = getattr(intents, "runtime_logging_mode_change", None)
 
     def set_runtime_logging_mode(self, mode: str) -> None:
         self.runtime_logging_mode = mode
@@ -357,13 +464,38 @@ class ConstructionDummyLogsView(ft.Container):
         _ = (message, level)
 
 
+def _construction_application_factory(
+    *,
+    presentation,
+    config_path,
+    allow_stable_settings_import=False,
+    runtime_logging_sinks=None,
+    vrchat_osc_presence=None,
+):
+    _ = (
+        allow_stable_settings_import,
+        runtime_logging_sinks,
+        vrchat_osc_presence,
+    )
+    controller = ConstructionDummyController(
+        page=None,
+        app=presentation,
+        config_path=config_path,
+    )
+    presentation._app.controller = controller
+    return compose_test_ui_application_boundary(controller)
+
+
 def _patch_app_construction(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(app_module, "GuiController", ConstructionDummyController)
     monkeypatch.setattr(app_module, "DashboardView", ConstructionDummyDashboardView)
     monkeypatch.setattr(app_module, "SettingsView", ConstructionDummySettingsView)
     monkeypatch.setattr(app_module, "LogsView", ConstructionDummyLogsView)
     monkeypatch.setattr(app_module, "AboutView", lambda: ft.Container())
-    monkeypatch.setattr(app_module, "TitleBar", lambda _page: ft.Container())
+    monkeypatch.setattr(
+        app_module,
+        "TitleBar",
+        lambda _page, *, on_close: ft.Container(data=on_close),
+    )
     monkeypatch.setattr(app_module, "BottomNavBar", lambda on_change: ft.Container(data=on_change))
     monkeypatch.setattr(app_module, "register_fonts", lambda _page: None)
     monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")
@@ -377,18 +509,25 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     _patch_app_construction(monkeypatch)
 
     page = DummyPage()
-    app = TranslatorApp(page, config_path=Path("settings.json"))
+    app = TranslatorApp(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
 
     assert app.controller.config_path == Path("settings.json")
     assert page.title == app_module.t("app.title")
     assert page.window.frameless is True
-    assert page.window.resizable is True
+    assert page.window.resizable is False
+    assert page.window.maximizable is False
     assert page.window.width == app_module.DEFAULT_WINDOW_WIDTH
     assert page.window.height == app_module.DEFAULT_WINDOW_HEIGHT
-    assert page.window.min_width == app_module.MIN_WINDOW_WIDTH
-    assert page.window.min_height == app_module.MIN_WINDOW_HEIGHT
-    assert page.window.width >= page.window.min_width
-    assert page.window.height >= page.window.min_height
+    assert page.window.min_width == app_module.DEFAULT_WINDOW_WIDTH
+    assert page.window.max_width == app_module.DEFAULT_WINDOW_WIDTH
+    assert page.window.min_height == app_module.DEFAULT_WINDOW_HEIGHT
+    assert page.window.max_height == app_module.DEFAULT_WINDOW_HEIGHT
+    assert page.window.prevent_close is True
+    assert page.window.on_event == app._on_window_event
     assert page.window.center_calls == 0
     assert page.added
     assert app.view_dashboard.on_send_message == app._on_manual_submit
@@ -414,9 +553,84 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_logs.on_mode_change == app._on_runtime_logging_mode_change
     assert app.view_logs.runtime_logging_mode == "detailed"
     assert isinstance(app.application, UiApplicationBoundary)
-    assert app.application.wraps(app.controller)
+    assert app.application is app._ui_application
     assert isinstance(app.controller.app, FletUiPresentationAdapter)
     assert app.controller.app is app._presentation_adapter
+
+
+def test_application_property_preserves_factory_port_without_controller_compatibility() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    application = object()
+    app._ui_application = application
+
+    assert app.application is application
+
+
+def test_translator_app_consumes_production_application_factory_without_controller_reach_through(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_app_construction(monkeypatch)
+
+    app = TranslatorApp(
+        DummyPage(),
+        config_path=Path("settings.json"),
+        application_factory=compose_ui_application,
+    )
+
+    assert app.application is app._ui_application
+    assert app.application.state().config_path == Path("settings.json")
+    assert not hasattr(app, "controller")
+
+
+def test_translator_app_rejects_an_empty_application_factory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_app_construction(monkeypatch)
+
+    with pytest.raises(
+        RuntimeError,
+        match="Application factory did not compose an application boundary",
+    ):
+        TranslatorApp(
+            DummyPage(),
+            config_path=Path("settings.json"),
+            application_factory=lambda **_kwargs: None,
+        )
+
+
+@pytest.mark.asyncio
+async def test_window_close_awaits_application_shutdown_before_destroy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_app_construction(monkeypatch)
+    page = DummyPage()
+    app = TranslatorApp(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
+    transitions: list[str] = []
+
+    async def shutdown() -> None:
+        transitions.append("shutdown")
+
+    async def destroy() -> None:
+        transitions.append("destroy")
+
+    app.shutdown = shutdown
+    page.window.destroy = destroy
+
+    app._on_window_event(SimpleNamespace(type=ft.WindowEventType.RESIZE))
+    assert page.tasks == []
+
+    app.title_bar.data()
+    assert len(page.tasks) == 1
+    app._on_window_event(SimpleNamespace(type=ft.WindowEventType.CLOSE))
+    assert len(page.tasks) == 1
+
+    await page.tasks[0]()
+
+    assert transitions == ["shutdown", "destroy"]
 
 
 @pytest.mark.asyncio
@@ -426,20 +640,36 @@ async def test_main_gui_constructs_the_real_application_and_presentation_boundar
     _patch_app_construction(monkeypatch)
     constructed: dict[str, object] = {}
 
-    def controller_factory(**kwargs):
-        controller = ConstructionDummyController(
-            page=kwargs["page"],
-            app=kwargs["app"],
-            config_path=kwargs["config_path"],
+    def application_factory(
+        *,
+        presentation,
+        config_path,
+        allow_stable_settings_import=False,
+        runtime_logging_sinks=None,
+        vrchat_osc_presence=None,
+    ):
+        _ = (
+            allow_stable_settings_import,
+            runtime_logging_sinks,
+            vrchat_osc_presence,
         )
+        controller = ConstructionDummyController(
+            page=None,
+            app=presentation,
+            config_path=config_path,
+        )
+        presentation._app.controller = controller
         constructed["controller"] = controller
-        return controller
+        return compose_test_ui_application_boundary(controller)
 
-    monkeypatch.setattr(app_module, "GuiController", controller_factory)
     monkeypatch.setattr(TranslatorApp, "schedule_after_launch_tasks", lambda self: None)
 
     page = DummyPage()
-    await app_module.main_gui(page, config_path=Path("settings.json"))
+    await app_module.main_gui(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=application_factory,
+    )
 
     controller = constructed["controller"]
     assert isinstance(controller, ConstructionDummyController)
@@ -447,7 +677,7 @@ async def test_main_gui_constructs_the_real_application_and_presentation_boundar
     translator_app = controller.app._app
     assert isinstance(translator_app, TranslatorApp)
     assert isinstance(translator_app.application, UiApplicationBoundary)
-    assert translator_app.application.wraps(controller)
+    assert translator_app.application is translator_app._ui_application
     assert controller.start_calls == 1
 
 
@@ -458,7 +688,11 @@ async def test_desktop_gui_state_actions_are_dispatched_through_translator_app(
     _patch_app_construction(monkeypatch)
 
     page = DummyPage()
-    app = TranslatorApp(page, config_path=Path("settings.json"))
+    app = TranslatorApp(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
     locked_requests: list[bool] = []
     size_requests: list[str] = []
     retry_requests: list[bool] = []
@@ -505,7 +739,11 @@ async def test_desktop_gui_state_actions_refresh_settings_view_after_runtime_upd
     _patch_app_construction(monkeypatch)
 
     page = DummyPage()
-    app = TranslatorApp(page, config_path=Path("settings.json"))
+    app = TranslatorApp(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
     app.controller.settings = AppSettings()
     app.controller.settings.overlay.desktop_flet.position.x = 80
     app.controller.settings.overlay.desktop_flet.position.y = 90
@@ -551,7 +789,11 @@ def test_translator_app_does_not_mount_debug_preview_by_default(
     _patch_app_construction(monkeypatch)
 
     page = DummyPage()
-    app = TranslatorApp(page, config_path=Path("settings.json"))
+    app = TranslatorApp(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
 
     assert app.debug_ui_preview is False
     assert app.debug_preview_panel is None
@@ -576,6 +818,7 @@ def test_translator_app_mounts_debug_preview_when_enabled(
     app = TranslatorApp(
         page,
         config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
         debug_ui_preview=True,
     )
 
@@ -600,6 +843,7 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_stt_fault_cycle",
         "on_audio_fault_clear",
         "on_gpu_state_cycle",
+        "on_foundation_primitives",
         "on_stt_loading_button_cycle",
     }
     discord_callback = seen["callbacks"]["on_discord_auth"]
@@ -759,7 +1003,10 @@ def test_debug_preview_panel_wires_audio_fault_actions(monkeypatch) -> None:
 
     monkeypatch.setattr(app_module, "DebugPreviewPanel", FakeDebugPreviewPanel)
     app = app_module.TranslatorApp(
-        DummyPage(), config_path=Path("settings.json"), debug_ui_preview=True
+        DummyPage(),
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+        debug_ui_preview=True,
     )
     monkeypatch.setattr(
         app, "_show_snackbar", lambda message, color=None: snackbars.append((message, color))
@@ -803,7 +1050,10 @@ def test_debug_audio_fault_actions_do_not_call_persistence_or_providers(monkeypa
     )
 
     app = app_module.TranslatorApp(
-        DummyPage(), config_path=Path("settings.json"), debug_ui_preview=True
+        DummyPage(),
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+        debug_ui_preview=True,
     )
     monkeypatch.setattr(app, "_show_snackbar", lambda *_args, **_kwargs: None)
 
@@ -850,7 +1100,11 @@ def test_local_qwen_guidance_modal_open_guide_opens_github_api_key_guide_safely(
     monkeypatch.setattr(app_module, "get_locale", lambda: "ko")
 
     page = DummyPage()
-    app = TranslatorApp(page, config_path=Path("settings.json"))
+    app = TranslatorApp(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
     monkeypatch.setattr(app.content_area, "update", lambda: None)
     app.controller.apply_settings = lambda *args, **kwargs: forbidden_calls.append("apply_settings")
     app.controller.apply_providers = lambda *args, **kwargs: forbidden_calls.append(
@@ -943,6 +1197,7 @@ def test_debug_preview_discord_callback_page_opens_local_preview_without_oauth(
 
 def test_mark_discord_managed_auth_callback_received_updates_open_dialog() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
+    app._ui_application = compose_test_ui_application_boundary(None)
     calls: list[str] = []
     app._discord_managed_auth_generation = 7
     app._discord_managed_auth_cancelled = False
@@ -980,17 +1235,33 @@ def test_translator_app_keeps_debug_ui_preview_out_of_controller(
             super().__init__(page, app, config_path)
             seen["controller_args"] = (page, app, config_path)
 
-    monkeypatch.setattr(app_module, "GuiController", RecordingController)
+    def application_factory(
+        *,
+        presentation,
+        config_path,
+        allow_stable_settings_import=False,
+        runtime_logging_sinks=None,
+        vrchat_osc_presence=None,
+    ):
+        _ = (
+            allow_stable_settings_import,
+            runtime_logging_sinks,
+            vrchat_osc_presence,
+        )
+        controller = RecordingController(None, presentation, config_path)
+        presentation._app.controller = controller
+        return compose_test_ui_application_boundary(controller)
 
     app = TranslatorApp(
         DummyPage(),
         config_path=Path("settings.json"),
+        application_factory=application_factory,
         debug_ui_preview=True,
     )
 
     assert app.debug_ui_preview is True
     assert seen["controller_args"] == (
-        app.page,
+        None,
         app._presentation_adapter,
         Path("settings.json"),
     )
@@ -1030,6 +1301,17 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
             self.on_language_change = None
             self.runtime_log_detailed = None
 
+        def bind_dashboard_intents(self, *, translation, capture) -> None:
+            self.on_send_message = translation.submit_message
+            self.on_toggle_translation = translation.toggle_translation
+            self.on_language_change = translation.change_language
+            self.on_message_input_activity = translation.report_input_activity
+            self.on_toggle_stt = capture.toggle_self_capture
+            self.on_toggle_peer_translation = capture.toggle_peer_capture
+            self.on_toggle_overlay = capture.toggle_overlay
+            self.on_retry_peer_process_capture = capture.retry_peer_process_capture
+            self.on_gpu_notice_action = capture.run_gpu_notice_action
+
         def apply_locale(self) -> None:
             return None
 
@@ -1043,6 +1325,20 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
             self.on_secret_cleared = None
             self.show_snackbar = None
 
+        def bind_settings_intents(self, *, surface, provider, general, prompt, overlay) -> None:
+            self.on_settings_changed = surface.settings_changed
+            self.show_snackbar = surface.show_snackbar
+            self.on_providers_changed = provider.providers_changed
+            self.on_request_openrouter_pkce = provider.request_openrouter_pkce
+            self.on_verify_api_key = provider.verify_api_key
+            self.on_provider_secret_change = provider.provider_secret_change
+            self.on_secret_cleared = provider.secret_cleared
+            self.on_local_llm_secret_changed = provider.local_llm_secret_changed
+            self.on_gpu_discovery_requested = provider.gpu_discovery_requested
+            self.on_start_microphone_test = general.start_microphone_test
+            self.on_prompt_apply_settings = prompt.prompt_apply_settings
+            self.on_view_logs = overlay.view_logs
+
         def set_overlay_runtime_state(self, *_args, **_kwargs) -> None:
             return None
 
@@ -1054,6 +1350,9 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
             super().__init__()
             self.on_mode_change = None
 
+        def bind_logs_intents(self, intents: object) -> None:
+            self.on_mode_change = getattr(intents, "runtime_logging_mode_change", None)
+
         def set_runtime_logging_mode(self, mode: str) -> None:
             _ = mode
 
@@ -1063,19 +1362,43 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
         async def scroll_to_bottom(self) -> None:
             return None
 
-    monkeypatch.setattr(app_module, "GuiController", DummyController)
     monkeypatch.setattr(app_module, "DashboardView", DummyDashboardView)
     monkeypatch.setattr(app_module, "SettingsView", DummySettingsView)
     monkeypatch.setattr(app_module, "LogsView", DummyLogsView)
     monkeypatch.setattr(app_module, "AboutView", lambda: ft.Container())
-    monkeypatch.setattr(app_module, "TitleBar", lambda _page: ft.Container())
+    monkeypatch.setattr(
+        app_module,
+        "TitleBar",
+        lambda _page, *, on_close: ft.Container(data=on_close),
+    )
     monkeypatch.setattr(app_module, "BottomNavBar", lambda on_change: ft.Container(data=on_change))
     monkeypatch.setattr(app_module, "register_fonts", lambda _page: None)
     monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")
     monkeypatch.setattr(app_module, "font_for_language", lambda _code: "font")
     monkeypatch.setattr(app_module, "get_locale", lambda: "en")
 
-    app = TranslatorApp(DummyPage(), config_path=Path("settings.json"))
+    def application_factory(
+        *,
+        presentation,
+        config_path,
+        allow_stable_settings_import=False,
+        runtime_logging_sinks=None,
+        vrchat_osc_presence=None,
+    ):
+        _ = (
+            allow_stable_settings_import,
+            runtime_logging_sinks,
+            vrchat_osc_presence,
+        )
+        controller = DummyController(None, presentation, config_path)
+        presentation._app.controller = controller
+        return compose_test_ui_application_boundary(controller)
+
+    app = TranslatorApp(
+        DummyPage(),
+        config_path=Path("settings.json"),
+        application_factory=application_factory,
+    )
 
     assert app.view_dashboard.runtime_log_detailed == app._log_detailed
 
@@ -1083,7 +1406,11 @@ def test_translator_app_wires_runtime_log_detailed_into_dashboard_visual_commit_
 def test_settings_view_pkce_callback_is_wired(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_app_construction(monkeypatch)
 
-    app = TranslatorApp(DummyPage(), config_path=Path("settings.json"))
+    app = TranslatorApp(
+        DummyPage(),
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
 
     assert app.view_settings.on_request_openrouter_pkce == app._on_request_openrouter_pkce
 
@@ -1094,7 +1421,11 @@ def test_translator_app_4x3_window_keeps_shell_navigation_usable(
     _patch_app_construction(monkeypatch)
 
     page = DummyPage()
-    app = TranslatorApp(page, config_path=Path("settings.json"))
+    app = TranslatorApp(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
     monkeypatch.setattr(app.content_area, "update", lambda: None)
 
     assert app.content_area.padding == app_module.APP_CONTENT_PADDING
@@ -1175,56 +1506,34 @@ async def test_main_gui_routes_update_check_through_app_log_helper(
             seen["started"] = True
 
     class FakeApp:
-        def __init__(self, incoming_page, *, config_path, debug_ui_preview=False):
+        def __init__(
+            self,
+            incoming_page,
+            *,
+            config_path,
+            application_factory,
+            debug_ui_preview=False,
+            allow_stable_settings_import=False,
+            runtime_logging_sinks=None,
+            vrchat_osc_presence=None,
+        ):
             seen["init"] = (incoming_page, config_path, debug_ui_preview)
             seen["app"] = self
             self.page = incoming_page
-            self.controller = FakeController()
+            _ = (
+                application_factory,
+                allow_stable_settings_import,
+                runtime_logging_sinks,
+                vrchat_osc_presence,
+            )
+            backend = FakeController()
+            self.application = compose_test_ui_application_boundary(backend)
 
-        def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
-            _ = (message, level)
+        async def _on_page_lifecycle_end(self, _event=None) -> None:
+            return None
 
-        def schedule_after_launch_tasks(self) -> None:
-            async def run() -> None:
-                await app_module._check_and_notify_update(
-                    self.page,
-                    log_detailed=self._log_detailed,
-                )
-
-            seen["after_launch_task"] = asyncio.create_task(run())
-
-    async def fake_check_and_notify_update(incoming_page, *, log_detailed=None) -> None:
-        seen["check"] = (incoming_page, log_detailed)
-
-    monkeypatch.setattr(app_module, "TranslatorApp", FakeApp)
-    monkeypatch.setattr(app_module, "_check_and_notify_update", fake_check_and_notify_update)
-
-    await app_module.main_gui(page, config_path=Path("settings.json"))
-    await seen["after_launch_task"]
-
-    assert seen["started"] is True
-    assert seen["check"][0] is page
-    assert getattr(seen["check"][1], "__self__", None) is seen["app"]
-    assert getattr(seen["check"][1], "__func__", None) is FakeApp._log_detailed
-    assert seen["init"] == (page, Path("settings.json"), False)
-
-
-@pytest.mark.asyncio
-async def test_main_gui_forwards_debug_ui_preview_flag(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    page = DummyPage()
-    seen: dict[str, object] = {}
-
-    class FakeController:
-        async def start(self) -> None:
-            seen["started"] = True
-
-    class FakeApp:
-        def __init__(self, incoming_page, *, config_path, debug_ui_preview=False):
-            seen["init"] = (incoming_page, config_path, debug_ui_preview)
-            self.page = incoming_page
-            self.controller = FakeController()
+        async def shutdown(self) -> None:
+            await self.application.stop()
 
         def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
             _ = (message, level)
@@ -1247,6 +1556,79 @@ async def test_main_gui_forwards_debug_ui_preview_flag(
     await app_module.main_gui(
         page,
         config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
+    await seen["after_launch_task"]
+
+    assert seen["started"] is True
+    assert seen["check"][0] is page
+    assert getattr(seen["check"][1], "__self__", None) is seen["app"]
+    assert getattr(seen["check"][1], "__func__", None) is FakeApp._log_detailed
+    assert seen["init"] == (page, Path("settings.json"), False)
+
+
+@pytest.mark.asyncio
+async def test_main_gui_forwards_debug_ui_preview_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = DummyPage()
+    seen: dict[str, object] = {}
+
+    class FakeController:
+        async def start(self) -> None:
+            seen["started"] = True
+
+    class FakeApp:
+        def __init__(
+            self,
+            incoming_page,
+            *,
+            config_path,
+            application_factory,
+            debug_ui_preview=False,
+            allow_stable_settings_import=False,
+            runtime_logging_sinks=None,
+            vrchat_osc_presence=None,
+        ):
+            seen["init"] = (incoming_page, config_path, debug_ui_preview)
+            self.page = incoming_page
+            _ = (
+                application_factory,
+                allow_stable_settings_import,
+                runtime_logging_sinks,
+                vrchat_osc_presence,
+            )
+            backend = FakeController()
+            self.application = compose_test_ui_application_boundary(backend)
+
+        async def _on_page_lifecycle_end(self, _event=None) -> None:
+            return None
+
+        async def shutdown(self) -> None:
+            await self.application.stop()
+
+        def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
+            _ = (message, level)
+
+        def schedule_after_launch_tasks(self) -> None:
+            async def run() -> None:
+                await app_module._check_and_notify_update(
+                    self.page,
+                    log_detailed=self._log_detailed,
+                )
+
+            seen["after_launch_task"] = asyncio.create_task(run())
+
+    async def fake_check_and_notify_update(incoming_page, *, log_detailed=None) -> None:
+        seen["check"] = (incoming_page, log_detailed)
+
+    monkeypatch.setattr(app_module, "TranslatorApp", FakeApp)
+    monkeypatch.setattr(app_module, "_check_and_notify_update", fake_check_and_notify_update)
+
+    await app_module.main_gui(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
         debug_ui_preview=True,
     )
     await seen["after_launch_task"]
@@ -1609,9 +1991,11 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
     settings.openrouter.llm_model = OpenRouterLLMModel.QWEN_35_FLASH_02_23
-    app.controller = SimpleNamespace(settings=settings)
-    app.controller.build_managed_openrouter_byok_target_settings = MethodType(
-        GuiController.build_managed_openrouter_byok_target_settings, app.controller
+    app.controller = SimpleNamespace(
+        settings=settings,
+        build_managed_openrouter_byok_target_settings=(
+            lambda: build_managed_openrouter_byok_target_settings(settings)
+        ),
     )
     pkce_calls: list[tuple[AppSettings, str]] = []
     app._on_request_openrouter_pkce = (
@@ -1651,9 +2035,11 @@ def test_discord_managed_auth_byok_clears_managed_china_translation_state() -> N
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
     settings.openrouter.llm_model = OpenRouterLLMModel.DEEPSEEK_V4_FLASH
     settings.openrouter.provider_routing = OpenRouterProviderRouting.DEEPSEEK_ONLY
-    app.controller = SimpleNamespace(settings=settings)
-    app.controller.build_managed_openrouter_byok_target_settings = MethodType(
-        GuiController.build_managed_openrouter_byok_target_settings, app.controller
+    app.controller = SimpleNamespace(
+        settings=settings,
+        build_managed_openrouter_byok_target_settings=(
+            lambda: build_managed_openrouter_byok_target_settings(settings)
+        ),
     )
 
     target_settings = app._build_managed_openrouter_byok_target_settings()
@@ -2264,7 +2650,7 @@ def test_discord_managed_auth_waiting_hides_reopen_when_controller_cannot_reopen
     dialog.set_waiting()
 
     assert dialog._reopen_browser_button is None
-    assert [control.text for control in dialog._actions.controls] == [
+    assert [control.content for control in dialog._actions.controls] == [
         app_module.t("discord_auth.cancel")
     ]
 
@@ -3150,7 +3536,11 @@ def test_on_request_openrouter_pkce_uses_settings_mutation_queue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_app_construction(monkeypatch)
-    app = TranslatorApp(DummyPage(), config_path=Path("settings.json"))
+    app = TranslatorApp(
+        DummyPage(),
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
     target_settings = AppSettings()
     queued: list[object] = []
     monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
@@ -3254,14 +3644,10 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         settings=updated_settings,
         config_path=Path("settings.json"),
-    )
-    app.view_settings = SimpleNamespace(
-        refresh_after_openrouter_pkce_success=lambda settings, *, config_path: refresh_calls.append(
-            (settings, config_path)
-        ),
-        load_from_settings=lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("full load_from_settings refresh should not run on PKCE success")
-        ),
+        refresh_settings_after_openrouter_pkce_success=lambda: refresh_calls.append(
+            (updated_settings, Path("settings.json"))
+        )
+        or True,
     )
     app._show_snackbar = lambda message, bgcolor: snackbar_calls.append((message, bgcolor))
     queued: list[object] = []
@@ -3300,14 +3686,10 @@ async def test_on_request_openrouter_pkce_does_not_refresh_settings_view_on_fail
         connect_openrouter_via_pkce=fake_connect_openrouter_via_pkce,
         settings=AppSettings(),
         config_path=Path("settings.json"),
-    )
-    app.view_settings = SimpleNamespace(
-        refresh_after_openrouter_pkce_success=lambda settings, *, config_path: refresh_calls.append(
-            (settings, config_path)
-        ),
-        load_from_settings=lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("full load_from_settings refresh should not run on PKCE failure")
-        ),
+        refresh_settings_after_openrouter_pkce_success=lambda: refresh_calls.append(
+            (AppSettings(), Path("settings.json"))
+        )
+        or True,
     )
     queued: list[object] = []
     monkeypatch.setattr(app, "_queue_settings_mutation_task", queued.append)
@@ -3419,13 +3801,14 @@ def test_on_nav_change_closes_open_dialog_before_switching_tabs() -> None:
     dialog = object()
     app.page.dialog = dialog
 
-    def fake_close(control) -> None:
+    def fake_pop_dialog():
+        control = app.page.dialog
         events.append(("close", control))
         app.page.closed.append(control)
-        if app.page.dialog is control:
-            app.page.dialog = None
+        app.page.dialog = None
+        return control
 
-    app.page.close = fake_close
+    app.page.pop_dialog = fake_pop_dialog
     app._current_tab = 0
     app.view_dashboard = object()
     app.view_settings = SimpleNamespace(
@@ -3449,6 +3832,7 @@ def test_on_nav_change_closes_open_dialog_before_switching_tabs() -> None:
 
 def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
+    app._ui_application = compose_test_ui_application_boundary(None)
     app.page = DummyPage()
     app.title_bar = SimpleNamespace(set_title=lambda value: setattr(app, "_title", value))
     view_calls: list[str] = []
@@ -3468,6 +3852,7 @@ def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_refresh_overlay_peer_contract_ignores_missing_controller() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
+    app._ui_application = compose_test_ui_application_boundary(None)
     app.view_dashboard = SimpleNamespace(
         set_overlay_peer_contract=lambda contract: (_ for _ in ()).throw(
             AssertionError(f"unexpected dashboard contract: {contract}")
@@ -3486,10 +3871,18 @@ def test_refresh_overlay_peer_contract_ignores_missing_controller() -> None:
 
 def test_on_overlay_state_changed_updates_settings_view_runtime_state() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    contract = object()
+    state = OverlayPeerPresentationState(
+        overlay_intent_enabled=True,
+        overlay_state="failed",
+        overlay_failure_reason="runtime_crashed",
+        peer_intent_enabled=True,
+        peer_effective_enabled=False,
+        peer_warning_reason="overlay_failed",
+        peer_activation_starting=False,
+    )
     seen: list[tuple[str, str | None, str | None, bool | None]] = []
     refreshed: list[object] = []
-    app.controller = SimpleNamespace(build_overlay_peer_consumer_contract=lambda: contract)
+    app.controller = SimpleNamespace(overlay_peer_presentation_state=lambda: state)
     app.view_dashboard = SimpleNamespace(
         set_overlay_peer_contract=lambda incoming: refreshed.append(("dashboard", incoming))
     )
@@ -3510,7 +3903,10 @@ def test_on_overlay_state_changed_updates_settings_view_runtime_state() -> None:
     assert app.overlay_state == "failed"
     assert app.overlay_failure_reason == "runtime_crashed"
     assert seen == [("failed", "runtime_crashed", None, False)]
-    assert refreshed == [("settings", contract), ("dashboard", contract)]
+    assert refreshed == [
+        ("settings", app.overlay_peer_contract),
+        ("dashboard", app.overlay_peer_contract),
+    ]
 
 
 @pytest.mark.asyncio
@@ -4060,18 +4456,21 @@ async def test_shutdown_is_idempotent_and_cancels_tracked_page_tasks() -> None:
             background_cancelled.set()
 
     app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
     app.controller = Controller()
-    app._tracked_page_tasks = {asyncio.create_task(background())}
+    app._ui_application = _application_boundary_with_stop(app.controller)
     app._shutdown_lock = None
     app._shutdown_complete = False
     app._shutting_down = False
     app._settings_mutation_queue = [object()]
+    foundation_runtime = app._ensure_foundation_runtime()
+    foundation_runtime._tracked_tasks = {asyncio.create_task(background())}
 
     await asyncio.gather(app.shutdown(), app.shutdown())
 
     assert stop_calls == 1
     assert background_cancelled.is_set()
-    assert app._tracked_page_tasks == set()
+    assert foundation_runtime.snapshot.tracked_task_count == 0
     assert app._settings_mutation_queue == []
 
 
@@ -4096,6 +4495,7 @@ async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
         incoming_page,
         *,
         config_path,
+        application_factory,
         debug_ui_preview=False,
         allow_stable_settings_import=False,
         runtime_logging_sinks=None,
@@ -4103,13 +4503,15 @@ async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
     ) -> None:
         _ = (
             config_path,
+            application_factory,
             debug_ui_preview,
             allow_stable_settings_import,
             runtime_logging_sinks,
             vrchat_osc_presence,
         )
         self.page = incoming_page
-        self.controller = Controller()
+        backend = Controller()
+        self._ui_application = _application_boundary_with_stop(backend)
         self._tracked_page_tasks = set()
         self._shutdown_lock = None
         self._shutdown_complete = False
@@ -4119,7 +4521,11 @@ async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
 
     monkeypatch.setattr(TranslatorApp, "__init__", fake_init)
 
-    await app_module.main_gui(page, config_path=Path("settings.json"))
+    await app_module.main_gui(
+        page,
+        config_path=Path("settings.json"),
+        application_factory=_construction_application_factory,
+    )
 
     assert asyncio.iscoroutinefunction(page.on_close)
     assert page.on_close == page.on_disconnect

@@ -160,11 +160,22 @@ class ApplicationShutdownCoordinator:
             raise ApplicationIntentRejectedError(intent_name, self._state)
 
     def register_callback(self, callback: ApplicationShutdownCallback) -> None:
+        self.register_callbacks((callback,))
+
+    def register_callbacks(
+        self,
+        callbacks: Sequence[ApplicationShutdownCallback],
+        *,
+        before_existing: bool = False,
+    ) -> None:
         if self._state != "running" or self._shutdown_task is not None:
             raise ApplicationShutdownRegistrationError(
                 "Application shutdown callbacks cannot be registered after shutdown begins"
             )
-        self._callbacks.append(callback)
+        if before_existing:
+            self._callbacks[0:0] = callbacks
+        else:
+            self._callbacks.extend(callbacks)
 
     async def shutdown(self) -> ApplicationLifecycleSnapshot:
         task = self._shutdown_task

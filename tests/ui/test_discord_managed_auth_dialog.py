@@ -32,14 +32,17 @@ class DummyPage:
         self.opened: list[object] = []
         self.closed: list[object] = []
 
-    def open(self, dialog) -> None:
+    def show_dialog(self, dialog) -> None:
         self.dialog = dialog
         self.opened.append(dialog)
 
-    def close(self, dialog) -> None:
+    def pop_dialog(self):
+        dialog = self.dialog
+        if dialog is None:
+            return None
         self.closed.append(dialog)
-        if self.dialog is dialog:
-            self.dialog = None
+        self.dialog = None
+        return dialog
 
 
 class SnapshotOpenPage(DummyPage):
@@ -47,13 +50,13 @@ class SnapshotOpenPage(DummyPage):
         super().__init__()
         self.body_control_classes_at_open: list[str] = []
 
-    def open(self, dialog) -> None:
+    def show_dialog(self, dialog) -> None:
         modal_content = dialog.content
         body_column = modal_content.content.controls[0]
         self.body_control_classes_at_open = [
             control.__class__.__name__ for control in body_column.controls
         ]
-        super().open(dialog)
+        super().show_dialog(dialog)
 
 
 def _dialog(
@@ -107,8 +110,7 @@ def _action_row(page: DummyPage):
 
 
 def _button_text_size(button) -> int:
-    text_style = next(iter(button.style.text_style.values()))
-    return text_style.size
+    return button.style.text_style.size
 
 
 def test_discord_managed_auth_dialog_declares_initial_action_labels() -> None:
@@ -164,7 +166,7 @@ def test_discord_managed_auth_dialog_uses_warm_document_layout(
         "TextButton",
         "TextButton",
     ]
-    assert [button.text for button in action_row.controls] == [
+    assert [button.content for button in action_row.controls] == [
         "value:discord_auth.close",
         "value:discord_auth.continue",
     ]
@@ -194,7 +196,7 @@ def test_discord_managed_auth_dialog_renders_optional_referral_id_field() -> Non
     assert toggle is not None
     assert label is not None
     assert field.label == t("discord_auth.referral_id.label")
-    assert field.helper_text == t("discord_auth.referral_id.helper")
+    assert field.helper == t("discord_auth.referral_id.helper")
     assert getattr(field, "hint_text", None) in (None, "")
     assert field.value == ""
     assert field.visible is False
@@ -308,7 +310,7 @@ def test_discord_managed_auth_dialog_waiting_state_uses_waiting_labels() -> None
     assert dialog._body_text.value == t("discord_auth.waiting_body")
     assert dialog._reopen_browser_button is not None
     assert dialog._cancel_button is not None
-    assert [control.text for control in dialog._actions.controls] == [
+    assert [control.content for control in dialog._actions.controls] == [
         t("discord_auth.cancel"),
         t("discord_auth.reopen_browser"),
     ]
@@ -346,7 +348,7 @@ def test_discord_managed_auth_dialog_callback_received_expands_body() -> None:
 
     assert dialog._body_text is not None
     assert dialog._body_text.value == t("discord_auth.callback_received_body")
-    assert [control.text for control in dialog._actions.controls] == [
+    assert [control.content for control in dialog._actions.controls] == [
         t("discord_auth.cancel"),
         t("discord_auth.reopen_browser"),
     ]
@@ -479,7 +481,7 @@ def test_discord_managed_auth_dialog_hides_reopen_when_callback_is_absent() -> N
 
     assert dialog._reopen_browser_button is None
     assert dialog._cancel_button is not None
-    assert [control.text for control in dialog._actions.controls] == [t("discord_auth.cancel")]
+    assert [control.content for control in dialog._actions.controls] == [t("discord_auth.cancel")]
 
 
 def test_discord_managed_auth_dialog_waiting_cancel_falls_back_to_close_callback() -> None:

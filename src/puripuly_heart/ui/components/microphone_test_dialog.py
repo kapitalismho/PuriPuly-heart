@@ -5,6 +5,7 @@ from collections.abc import Callable
 import flet as ft
 
 from puripuly_heart.ui.components.glow import create_glow_stack
+from puripuly_heart.ui.flet_runtime import is_control_mounted
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import get_locale, t
 from puripuly_heart.ui.theme import (
@@ -67,7 +68,7 @@ class MicrophoneTestDialog:
         self._close_notified = False
         self._dialog = self._build_dialog()
         self._is_open = True
-        self._page.open(self._dialog)
+        self._page.show_dialog(self._dialog)
 
     def close(self, *, notify: bool = False) -> None:
         dialog = self._dialog
@@ -81,9 +82,9 @@ class MicrophoneTestDialog:
         else:
             self._close_notified = True
         if was_open:
-            close = getattr(self._page, "close", None)
-            if callable(close):
-                close(dialog)
+            pop_dialog = getattr(self._page, "pop_dialog", None)
+            if callable(pop_dialog):
+                pop_dialog()
 
     def reset(self) -> None:
         self._level = 0.0
@@ -124,15 +125,15 @@ class MicrophoneTestDialog:
             padding=28,
             bgcolor=COLOR_SURFACE,
             border_radius=30,
-            border=ft.border.all(1, ft.Colors.with_opacity(0.35, COLOR_DIVIDER)),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.35, COLOR_DIVIDER)),
             shadow=get_card_shadow(),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment.CENTER,
             content=ft.Column(
                 controls=[
                     ft.Container(
                         width=_CONTENT_SIZE,
                         content=self._level_text,
-                        alignment=ft.alignment.center,
+                        alignment=ft.Alignment.CENTER,
                         bgcolor=ft.Colors.TRANSPARENT,
                         expand=True,
                     ),
@@ -150,7 +151,6 @@ class MicrophoneTestDialog:
             content=create_glow_stack(modal_content),
             content_padding=0,
             bgcolor=ft.Colors.TRANSPARENT,
-            surface_tint_color=ft.Colors.TRANSPARENT,
             semantics_label=t("settings.microphone_test"),
             on_dismiss=self._handle_dismiss,
         )
@@ -172,7 +172,7 @@ class MicrophoneTestDialog:
         self._level_text.value = self._text_value()
         self._level_text.size = self._text_size()
         self._level_text.color = self._text_color()
-        if getattr(self._level_text, "page", None) is None:
+        if not is_control_mounted(self._level_text):
             return
         try:
             self._level_text.update()

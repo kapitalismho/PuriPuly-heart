@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from types import SimpleNamespace
 
@@ -48,8 +49,21 @@ def test_display_card_helpers_cover_length_and_status_labels() -> None:
     )
 
 
-def test_display_card_submit_and_state_transitions(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_display_card_submit_and_state_transitions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     submitted: list[str] = []
+    tasks: list[asyncio.Task[object]] = []
+
+    def run_task(func, *args):
+        task = asyncio.create_task(func(*args))
+        tasks.append(task)
+        return task
+
+    async def focus() -> None:
+        submitted.append("focused")
+
     card = DisplayCard(on_submit=lambda text: submitted.append(text))
     monkeypatch.setattr(type(card._input_field), "update", lambda self: None)
 
@@ -57,10 +71,12 @@ def test_display_card_submit_and_state_transitions(monkeypatch: pytest.MonkeyPat
         control=SimpleNamespace(
             value="  hello  ",
             update=lambda: None,
-            focus=lambda: submitted.append("focused"),
+            focus=focus,
+            page=SimpleNamespace(run_task=run_task),
         )
     )
     card._handle_submit(event)
+    await asyncio.gather(*tasks)
     assert submitted == ["hello", "focused"]
     assert event.control.value == ""
 
@@ -87,20 +103,37 @@ def test_display_card_submit_and_state_transitions(monkeypatch: pytest.MonkeyPat
     assert card._display_primary.font_family == "font-c"
 
 
-def test_display_card_tracks_input_focus_and_can_refocus(
+@pytest.mark.asyncio
+async def test_display_card_tracks_input_focus_and_can_refocus(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     focus_changes: list[bool] = []
     focus_calls: list[str] = []
+    tasks: list[asyncio.Task[object]] = []
+
+    def run_task(func, *args):
+        task = asyncio.create_task(func(*args))
+        tasks.append(task)
+        return task
+
+    async def focus(_self) -> None:
+        focus_calls.append("focus")
+
     card = DisplayCard(
         on_submit=lambda _text: None,
         on_input_focus_change=focus_changes.append,
     )
-    monkeypatch.setattr(type(card._input_field), "focus", lambda self: focus_calls.append("focus"))
+    monkeypatch.setattr(type(card._input_field), "focus", focus)
+    attach_dummy_page(
+        monkeypatch,
+        card._input_field,
+        SimpleNamespace(run_task=run_task),
+    )
 
     card._handle_input_focus(SimpleNamespace(control=card._input_field))
     card._handle_input_blur(SimpleNamespace(control=card._input_field))
     card.focus_input()
+    await asyncio.gather(*tasks)
 
     assert focus_changes == [True, False]
     assert card.input_is_focused is False
@@ -202,11 +235,11 @@ def test_display_card_display_text_is_always_selectable() -> None:
 def test_display_card_primary_and_secondary_wrap_to_two_lines() -> None:
     card = DisplayCard(on_submit=lambda _text: None)
 
-    assert card._display_primary._get_attr("nowrap") is False
+    assert card._display_primary.no_wrap is False
     assert card._display_primary.max_lines == 2
     assert card._display_primary.overflow == display_card_module.ft.TextOverflow.ELLIPSIS
 
-    assert card._display_secondary._get_attr("nowrap") is False
+    assert card._display_secondary.no_wrap is False
     assert card._display_secondary.max_lines == 2
     assert card._display_secondary.overflow == display_card_module.ft.TextOverflow.ELLIPSIS
 

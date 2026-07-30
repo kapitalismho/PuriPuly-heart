@@ -14,10 +14,6 @@ class DummyWindow:
     def __init__(self) -> None:
         self.minimized = False
         self.maximized = False
-        self.closed = False
-
-    def close(self) -> None:
-        self.closed = True
 
 
 class DummyPage:
@@ -31,20 +27,19 @@ class DummyPage:
 
 def test_title_bar_window_controls_and_hover(monkeypatch: pytest.MonkeyPatch) -> None:
     page = DummyPage()
-    bar = TitleBar(page)
+    close_calls: list[str] = []
+    bar = TitleBar(page, on_close=lambda: close_calls.append("close"))
     monkeypatch.setattr(type(bar._title_text), "update", lambda self: None)
 
     bar._minimize(None)
     assert page.window.minimized is True
-
-    bar._maximize(None)
-    assert page.window.maximized is True
-    bar._maximize(None)
+    assert bar._maximize_btn.disabled is True
+    assert bar._maximize_btn.on_click is None
     assert page.window.maximized is False
 
     bar._close(None)
-    assert page.window.closed is True
-    assert page.updated >= 3
+    assert close_calls == ["close"]
+    assert page.updated == 1
 
     icon = SimpleNamespace(color=COLOR_NEUTRAL, update=lambda: None)
     bar._on_btn_hover(SimpleNamespace(control=SimpleNamespace(content=icon), data="true"))
@@ -64,7 +59,7 @@ def test_title_bar_window_controls_and_hover(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_title_bar_set_title_updates_text(monkeypatch: pytest.MonkeyPatch) -> None:
-    bar = TitleBar(DummyPage())
+    bar = TitleBar(DummyPage(), on_close=lambda: None)
     monkeypatch.setattr(type(bar._title_text), "update", lambda self: None)
     bar.set_title("New Title")
     assert bar._title_text.value == "New Title"
