@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from dataclasses import dataclass
 from types import SimpleNamespace
 
 import pytest
@@ -10,6 +12,11 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     ProviderRuntimeApplyPlan,
     ProviderRuntimeOwner,
     ProviderRuntimeState,
+)
+from puripuly_heart.app.services.translation_enable import (
+    ManagedTranslationPreparation,
+    TranslationEnableOwner,
+    TranslationEnableState,
 )
 
 
@@ -227,5 +234,109 @@ async def test_llm_provider_rebuild_owner_noops_without_runtime_context() -> Non
     assert events == []
 
 
+@pytest.mark.asyncio
+async def test_managed_provider_rebuild_blocks_concurrent_enable_from_closing_byok_llm() -> None:
+    close_started = asyncio.Event()
+    release_close = asyncio.Event()
+    replacement_llm = object()
+    runtime_values: list[bool] = []
+    dashboard_values: list[bool] = []
+    context_clears: list[str] = []
+
+    class SlowClosingByokLlm:
+        async def close(self) -> None:
+            close_started.set()
+            await release_close.wait()
+
+    @dataclass
+    class RuntimeState:
+        llm: object | None
+        translation_enabled: bool = False
+
+    runtime = RuntimeState(llm=SlowClosingByokLlm())
+
+    async def replace_provider(provider: object | None) -> None:
+        previous = runtime.llm
+        runtime.llm = provider
+        if previous is not None:
+            await previous.close()
+
+    rebuild = LlmProviderRebuildOwner(
+        context_provider=lambda: LlmProviderRebuildContext(
+            settings=SimpleNamespace(selected_source="managed"),
+            replace_provider=replace_provider,
+            requires_secret=False,
+        ),
+        provider_factory=lambda _settings: replacement_llm,
+        availability_sink=lambda _value: None,
+        usage_refresh=lambda: _record_async([], "usage"),
+        failure_sink=lambda _message: None,
+        success_sink=lambda _message: None,
+    )
+
+    def translation_state() -> TranslationEnableState:
+        return TranslationEnableState(
+            runtime_available=True,
+            translation_enabled=runtime.translation_enabled,
+            llm_available=runtime.llm is not None,
+            settings_available=True,
+            provider_name="openrouter",
+            qwen_region=None,
+            managed_selected=True,
+            managed_china=False,
+            managed_local_key_available=False,
+            managed_release_service_available=False,
+            ingress_frozen=False,
+        )
+
+    def set_runtime(enabled: bool) -> None:
+        runtime_values.append(enabled)
+        runtime.translation_enabled = enabled
+
+    async def prepare() -> ManagedTranslationPreparation:
+        raise AssertionError("managed preparation must wait for the provider switch")
+
+    translation = TranslationEnableOwner(
+        state_provider=translation_state,
+        managed_prepare=prepare,
+        founder_route=lambda: _false_async(),
+        pending_sink=lambda _value: None,
+        runtime_ensurer=lambda _mode: _false_async(),
+        usage_refresh_sink=lambda: None,
+        usage_refresh_now=lambda: _record_async([], "usage"),
+        runtime_sink=set_runtime,
+        dashboard_sink=dashboard_values.append,
+        clear_context=lambda: context_clears.append("clear"),
+        warmup=lambda: _record_async([], "warmup"),
+        message_sink=lambda _key, _values: None,
+        qq_dialog_sink=lambda: None,
+        result_sink=lambda _result: None,
+        log_basic=lambda _message: None,
+        log_detailed=lambda _message: None,
+        log_error=lambda _message: None,
+        founder_letter_sink=lambda: None,
+    )
+
+    rebuild_task = asyncio.create_task(rebuild.rebuild())
+    await close_started.wait()
+
+    assert runtime.llm is None
+    assert await translation.set_enabled(True) is False
+    assert runtime.llm is None
+    assert runtime.translation_enabled is False
+    assert runtime_values == [False]
+    assert dashboard_values == [False]
+    assert context_clears == []
+
+    release_close.set()
+    await rebuild_task
+
+    assert runtime.llm is replacement_llm
+
+
 async def _record_async(events: list[object], value: object) -> None:
     events.append(value)
+
+
+async def _false_async() -> bool:
+    return False

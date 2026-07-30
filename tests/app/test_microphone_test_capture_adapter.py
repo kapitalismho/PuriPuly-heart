@@ -159,3 +159,53 @@ async def test_adapter_reports_route_miss_without_opening_source() -> None:
     assert any("[MicTest] open attempted=False opened=False" in message for message in logs)
     assert any("[MicTest] level " in message and "frames=0" in message for message in logs)
     assert any("[MicTest] end opened=False frames_total=0" in message for message in logs)
+
+
+@pytest.mark.asyncio
+async def test_adapter_contains_eligible_source_open_failure_and_clears_meter() -> None:
+    raw_message = "bad failure usable near_silence 마이크"
+    logs: list[str] = []
+    meter: list[float] = []
+
+    async def set_meter(
+        value: float,
+        _callback,
+        _generation: int | None,
+    ) -> None:
+        meter.append(value)
+
+    def fail_source(**_kwargs):
+        raise RuntimeError(raw_message)
+
+    adapter = MicrophoneTestCaptureAdapter(
+        clock=FakeClock(),
+        log_sink=logs.append,
+        meter_sink=set_meter,
+        route_observer=lambda **_kwargs: _route(),
+        channel_decision=lambda **_kwargs: _decision(),
+        source_factory=fail_source,
+    )
+    runtime = MicTestRuntime()
+
+    await adapter.capture(
+        MicrophoneTestCaptureRequest(
+            saved_host_api="Windows WASAPI",
+            requested_device="Microphone",
+            internal_channels=1,
+        ),
+        runtime=runtime,
+    )
+
+    open_messages = [message for message in logs if message.startswith("[MicTest] open ")]
+    end_messages = [message for message in logs if message.startswith("[MicTest] end ")]
+    assert meter == [0.0, 0.0]
+    assert runtime.source is None
+    assert runtime.has_active_direct_capture is False
+    assert len(open_messages) == 1
+    assert "attempted=True opened=False" in open_messages[0]
+    assert "exception_class='RuntimeError'" in open_messages[0]
+    assert f"exception_message={raw_message!r}" in open_messages[0]
+    assert len(end_messages) == 1
+    assert "opened=False frames_total=0" in end_messages[0]
+    assert "exception_class='RuntimeError'" in end_messages[0]
+    assert f"exception_message={raw_message!r}" in end_messages[0]
