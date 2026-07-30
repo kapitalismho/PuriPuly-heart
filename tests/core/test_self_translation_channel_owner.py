@@ -8,14 +8,14 @@ import pytest
 from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry, _MergeBuffer
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
-from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import RecordingOscQueue
+from tests.helpers.translation_owners import compose_translation_test_harness
 
 
 @pytest.mark.asyncio
 async def test_self_owner_rejects_closed_ingress_and_non_self_events() -> None:
-    harness = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue())
-    owner = harness.self_translation_channel
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
+    owner = harness.self_owner
     utterance_id = uuid4()
 
     await owner.close_ingress()
@@ -39,8 +39,8 @@ async def test_self_owner_rejects_closed_ingress_and_non_self_events() -> None:
 
 @pytest.mark.asyncio
 async def test_self_owner_reset_clears_only_self_translation_state() -> None:
-    harness = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue())
-    owner = harness.self_translation_channel
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
+    owner = harness.self_owner
     self_id = uuid4()
     peer_id = uuid4()
     owner.runtime.get_or_create_bundle(self_id)
@@ -60,8 +60,8 @@ async def test_self_owner_reset_clears_only_self_translation_state() -> None:
 
 @pytest.mark.asyncio
 async def test_self_owner_close_cancels_and_awaits_owned_runtime_tasks() -> None:
-    harness = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue())
-    owner = harness.self_translation_channel
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
+    owner = harness.self_owner
     utterance_id = uuid4()
     translation_task = asyncio.create_task(asyncio.sleep(60.0))
     spec_task = asyncio.create_task(asyncio.sleep(60.0))
@@ -84,8 +84,8 @@ async def test_self_owner_close_cancels_and_awaits_owned_runtime_tasks() -> None
 
 
 def test_self_owner_requires_self_runtime() -> None:
-    harness = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue())
-    owner = harness.self_translation_channel
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
+    owner = harness.self_owner
 
     with pytest.raises(ValueError, match="Self channel"):
         type(owner)(

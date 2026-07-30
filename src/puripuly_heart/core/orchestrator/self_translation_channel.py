@@ -213,7 +213,7 @@ class SelfTranslationChannelOwner:
             if event.channel != "self":
                 raise ValueError("Self translation owner received a non-Self session event")
             self._emit_basic(
-                "[Hub] STT state: channel=%s state=%s",
+                "[Translation] STT state: channel=%s state=%s",
                 event.channel,
                 event.state.name,
             )
@@ -247,7 +247,7 @@ class SelfTranslationChannelOwner:
             if low_latency_mode:
                 return
             self._emit_detailed(
-                "[Hub] STT Partial: channel=%s utterance_id=%s text_len=%s",
+                "[Translation] STT Partial: channel=%s utterance_id=%s text_len=%s",
                 event.channel,
                 event.transcript.utterance_id,
                 len(event.transcript.text),

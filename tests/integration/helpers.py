@@ -333,7 +333,7 @@ async def wait_for_event(event: asyncio.Event, *, timeout_s: float | None = None
 
 
 async def send_vad_events(
-    hub,
+    owner,
     utterance_id,
     chunks: list[np.ndarray],
     *,
@@ -345,12 +345,12 @@ async def send_vad_events(
 
     delay = CHUNK_DELAY_S if chunk_delay_s is None else chunk_delay_s
     pre_roll = np.zeros(len(chunks[0]), dtype=np.float32)
-    await hub.handle_vad_event(SpeechStart(utterance_id, pre_roll=pre_roll, chunk=chunks[0]))
+    await owner.handle_vad_event(SpeechStart(utterance_id, pre_roll=pre_roll, chunk=chunks[0]))
     await asyncio.sleep(delay)
     for chunk in chunks[1:]:
-        await hub.handle_vad_event(SpeechChunk(utterance_id, chunk=chunk))
+        await owner.handle_vad_event(SpeechChunk(utterance_id, chunk=chunk))
         await asyncio.sleep(delay)
-    await hub.handle_vad_event(SpeechEnd(utterance_id))
+    await owner.handle_vad_event(SpeechEnd(utterance_id))
 
 
 async def stream_silence(

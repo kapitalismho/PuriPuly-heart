@@ -197,7 +197,7 @@ class TranslationRequestOwner:
     def clear_context(self) -> None:
         self.self_runtime.clear_context()
         self.peer_runtime.clear_context()
-        self.diagnostics.emit(RuntimeDiagnostic(message="[Hub] Context history cleared"))
+        self.diagnostics.emit(RuntimeDiagnostic(message="[Translation] Context history cleared"))
 
     @property
     def provider_available(self) -> bool:

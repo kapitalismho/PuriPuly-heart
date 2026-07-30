@@ -15,7 +15,7 @@ class SelfCaptureVadSinkAdapter:
     async def handle_vad_event(self, event: object) -> None:
         runtime = self.runtime_provider()
         if runtime is None:
-            raise RuntimeError("Self VAD sink requires the production hub")
+            raise RuntimeError("Self VAD sink requires the Self translation owner")
         await runtime.handle_vad_event(event)
 
 

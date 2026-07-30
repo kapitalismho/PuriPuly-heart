@@ -9,7 +9,7 @@ from puripuly_heart.config.prompts import _reset_prompt_cache_for_tests
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.orchestrator.translation_request import DirectTranslationRequest
 from puripuly_heart.domain.models import Translation
-from tests.helpers.client_hub import compose_client_hub
+from tests.helpers.translation_owners import compose_translation_test_harness
 
 
 @dataclass
@@ -68,9 +68,9 @@ class FakeLLMProvider:
 
 
 @pytest.mark.asyncio
-async def test_hub_substitutes_language_placeholders() -> None:
+async def test_translation_substitutes_language_placeholders() -> None:
     fake_llm = FakeLLMProvider()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -80,7 +80,7 @@ async def test_hub_substitutes_language_placeholders() -> None:
         system_prompt="Translate ${sourceName} to ${targetName}.",
     )
 
-    await hub._translate_and_enqueue(uuid4(), "hello")
+    await harness.process_translation(uuid4(), "hello")
 
     assert fake_llm.last_prompt is not None
     assert "${sourceName}" not in fake_llm.last_prompt
@@ -90,9 +90,9 @@ async def test_hub_substitutes_language_placeholders() -> None:
 
 
 @pytest.mark.asyncio
-async def test_hub_renders_dynamic_prompt_placeholders() -> None:
+async def test_translation_renders_dynamic_prompt_placeholders() -> None:
     fake_llm = FakeLLMProvider()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -102,7 +102,7 @@ async def test_hub_renders_dynamic_prompt_placeholders() -> None:
         system_prompt=("${sourceName}|${targetName}|${targetLanguageRules}|${translationExamples}"),
     )
 
-    await hub._translate_and_enqueue(uuid4(), "안녕")
+    await harness.process_translation(uuid4(), "안녕")
 
     assert fake_llm.last_prompt is not None
     assert "Korean|English" in fake_llm.last_prompt
@@ -112,8 +112,8 @@ async def test_hub_renders_dynamic_prompt_placeholders() -> None:
     assert "${translationExamples}" not in fake_llm.last_prompt
 
 
-def test_hub_renders_peer_runtime_dynamic_prompt_placeholders() -> None:
-    hub = compose_client_hub(
+def test_translation_renders_peer_runtime_dynamic_prompt_placeholders() -> None:
+    harness = compose_translation_test_harness(
         stt=None,
         llm=FakeLLMProvider(),
         osc=FakeOscQueue(),
@@ -126,7 +126,7 @@ def test_hub_renders_peer_runtime_dynamic_prompt_placeholders() -> None:
         system_prompt=("${sourceName}|${targetName}|${targetLanguageRules}|${translationExamples}"),
     )
 
-    prompt, _, _ = hub._prepare_llm_request("hello", runtime=hub.peer_runtime)
+    prompt, _, _ = harness.prepare_translation_request("hello", runtime=harness.peer_runtime)
 
     assert "English|Japanese" in prompt
     assert "Korean|English" not in prompt
@@ -142,7 +142,7 @@ def test_hub_renders_peer_runtime_dynamic_prompt_placeholders() -> None:
 async def test_detected_peer_language_drives_prompt_context_and_request() -> None:
     fake_llm = FakeLLMProvider()
     clock = FakeClock()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -152,14 +152,14 @@ async def test_detected_peer_language_drives_prompt_context_and_request() -> Non
         peer_target_language="ja",
         system_prompt="${sourceName}|${targetName}",
     )
-    hub.peer_runtime.remember_context(
+    harness.peer_runtime.remember_context(
         "previous Chinese run",
         timestamp=clock.now(),
         source_language="zh",
         target_language="ja",
     )
 
-    await hub.translation_requests.translate(
+    await harness.translation_requests.translate(
         DirectTranslationRequest(
             utterance_id=uuid4(),
             text="你好",
@@ -177,7 +177,7 @@ async def test_detected_peer_language_drives_prompt_context_and_request() -> Non
 @pytest.mark.asyncio
 async def test_sequential_detected_peer_runs_reuse_normalized_language_context() -> None:
     fake_llm = FakeLLMProvider()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -188,28 +188,31 @@ async def test_sequential_detected_peer_runs_reuse_normalized_language_context()
         system_prompt="${sourceName}|${targetName}",
     )
 
-    await hub._translate_and_enqueue(
+    await harness.process_translation(
         uuid4(),
         "first Chinese run",
-        runtime=hub.peer_runtime,
+        runtime=harness.peer_runtime,
         detected_language="zh",
     )
-    await hub._translate_and_enqueue(
+    await harness.process_translation(
         uuid4(),
         "second Chinese run",
-        runtime=hub.peer_runtime,
+        runtime=harness.peer_runtime,
         detected_language="zh",
     )
 
     assert [call["source_language"] for call in fake_llm.calls] == ["zh", "zh"]
     assert "first Chinese run" in fake_llm.calls[1]["context"]
-    assert [entry.source_language for entry in hub.peer_runtime.translation_history] == ["zh", "zh"]
+    assert [entry.source_language for entry in harness.peer_runtime.translation_history] == [
+        "zh",
+        "zh",
+    ]
 
 
 @pytest.mark.asyncio
 async def test_unmapped_detected_peer_language_uses_source_only_path() -> None:
     fake_llm = FakeLLMProvider()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -219,21 +222,21 @@ async def test_unmapped_detected_peer_language_uses_source_only_path() -> None:
         peer_target_language="ja",
     )
 
-    await hub._translate_and_enqueue(
+    await harness.process_translation(
         uuid4(),
         "unmapped",
-        runtime=hub.peer_runtime,
+        runtime=harness.peer_runtime,
         detected_language="xx",
     )
 
     assert fake_llm.last_prompt is None
-    assert hub.peer_runtime.translation_history == []
+    assert harness.peer_runtime.translation_history == []
 
 
 @pytest.mark.asyncio
-async def test_hub_renders_custom_prompt_without_dynamic_placeholders() -> None:
+async def test_translation_renders_custom_prompt_without_dynamic_placeholders() -> None:
     fake_llm = FakeLLMProvider()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -243,16 +246,16 @@ async def test_hub_renders_custom_prompt_without_dynamic_placeholders() -> None:
         system_prompt="Custom ${sourceName} to ${targetName} prompt.",
     )
 
-    await hub._translate_and_enqueue(uuid4(), "こんにちは")
+    await harness.process_translation(uuid4(), "こんにちは")
 
     assert fake_llm.last_prompt == "Custom Japanese to Korean prompt."
 
 
 @pytest.mark.asyncio
-async def test_hub_request_does_not_read_prompt_files_after_warmup(monkeypatch) -> None:
+async def test_translation_request_does_not_read_prompt_files_after_warmup(monkeypatch) -> None:
     _reset_prompt_cache_for_tests()
     fake_llm = FakeLLMProvider()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -263,11 +266,11 @@ async def test_hub_request_does_not_read_prompt_files_after_warmup(monkeypatch) 
     )
 
     def fail_read(_path):
-        raise AssertionError("prompt files must not be read during hub request assembly")
+        raise AssertionError("prompt files must not be read during request assembly")
 
     monkeypatch.setattr("puripuly_heart.config.prompts._read_prompt_text", fail_read)
 
-    await hub._translate_and_enqueue(uuid4(), "hello")
+    await harness.process_translation(uuid4(), "hello")
 
     assert fake_llm.last_prompt is not None
     assert "English|Japanese" in fake_llm.last_prompt

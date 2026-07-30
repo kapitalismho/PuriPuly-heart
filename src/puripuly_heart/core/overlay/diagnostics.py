@@ -21,7 +21,7 @@ _CHILD_LINE_LIMIT = 100
 _PRESENTER_SNAPSHOT_LIMIT = 30
 _PRESENTER_REMOVAL_LIMIT = 50
 _BRIDGE_EVENT_LIMIT = 30
-_HUB_EVENT_LIMIT = 50
+_TRANSLATION_EVENT_LIMIT = 50
 
 
 def default_overlay_diagnostics_dir() -> Path:
@@ -83,8 +83,8 @@ class OverlayDiagnosticsRecorder:
     bridge_events: deque[dict[str, Any]] = field(
         default_factory=lambda: deque(maxlen=_BRIDGE_EVENT_LIMIT)
     )
-    hub_events: deque[dict[str, Any]] = field(
-        default_factory=lambda: deque(maxlen=_HUB_EVENT_LIMIT)
+    translation_events: deque[dict[str, Any]] = field(
+        default_factory=lambda: deque(maxlen=_TRANSLATION_EVENT_LIMIT)
     )
     last_dump_path: Path | None = None
 
@@ -114,7 +114,7 @@ class OverlayDiagnosticsRecorder:
         _ = (event, fields)
         return {}
 
-    def record_hub(self, event: str, **fields: Any) -> dict[str, Any]:
+    def record_translation(self, event: str, **fields: Any) -> dict[str, Any]:
         _ = (event, fields)
         return {}
 

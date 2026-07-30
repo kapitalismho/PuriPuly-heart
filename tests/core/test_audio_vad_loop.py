@@ -17,8 +17,8 @@ from puripuly_heart.core.vad.gating import VadGating
 from puripuly_heart.domain.events import STTSessionState
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from tests.helpers.audio import FakeAudioSource, make_frames
-from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import FakeSender, SpeechAwareFakeBackend, SpeechAwareFakeSession
+from tests.helpers.translation_owners import compose_translation_test_harness
 from tests.helpers.vad import SequenceVadEngine
 
 
@@ -28,8 +28,10 @@ async def test_audio_vad_loop_pipeline_smoke():
     osc = ChatboxPaginator(sender=sender, clock=clock)
 
     stt = ManagedSTTProvider(backend=SpeechAwareFakeBackend(), sample_rate_hz=16000, clock=clock)
-    hub = compose_client_hub(stt=stt, llm=None, osc=osc, clock=clock, fallback_transcript_only=True)
-    await hub.start(auto_flush_osc=False)
+    harness = compose_translation_test_harness(
+        stt=stt, llm=None, osc=osc, clock=clock, fallback_transcript_only=True
+    )
+    await harness.start(auto_flush_osc=False)
 
     probs = [0.0, 0.0, 0.9, 0.9, 0.0, 0.0, 0.0]
     vad = VadGating(
@@ -51,7 +53,12 @@ async def test_audio_vad_loop_pipeline_smoke():
     splits = [1000, 1000, 1000, audio.size - 3000]
     frames = make_frames(audio, sample_rate_hz=16000, splits=splits)
     source = FakeAudioSource(frames)
-    await run_audio_vad_loop(source=source, vad=vad, sink=hub, target_sample_rate_hz=16000)
+    await run_audio_vad_loop(
+        source=source,
+        vad=vad,
+        sink=harness.self_owner,
+        target_sample_rate_hz=16000,
+    )
 
     for _ in range(50):
         if "FINAL" in sender.sent:
@@ -59,7 +66,7 @@ async def test_audio_vad_loop_pipeline_smoke():
         await asyncio.sleep(0.01)
 
     assert "FINAL" in sender.sent
-    await hub.stop()
+    await harness.stop()
 
 
 async def test_audio_vad_loop_ingests_next_utterance_while_local_decode_is_blocked(
@@ -161,11 +168,11 @@ async def test_run_audio_vad_loop_applies_audio_gate_before_forwarding_to_sink()
 
 
 class _PeerOnlySink:
-    def __init__(self, hub: PeerTranslationChannelOwner) -> None:
-        self._hub = hub
+    def __init__(self, harness: PeerTranslationChannelOwner) -> None:
+        self._harness = harness
 
     async def handle_vad_event(self, event) -> None:  # noqa: ANN001
-        await self._hub.handle_peer_vad_event(event)
+        await self._harness.peer_owner.handle_peer_vad_event(event)
 
 
 class _RecordingSpeechBackend:
@@ -191,8 +198,10 @@ async def test_peer_pipeline_drops_short_candidate_before_opening_stt_session():
         channel="peer",
         clock=clock,
     )
-    hub = compose_client_hub(stt=None, peer_stt=peer_stt, llm=None, osc=osc, clock=clock)
-    await hub.start(auto_flush_osc=False)
+    harness = compose_translation_test_harness(
+        stt=None, peer_stt=peer_stt, llm=None, osc=osc, clock=clock
+    )
+    await harness.start(auto_flush_osc=False)
 
     probs = [0.0, 0.9, 0.9, 0.0]
     vad = VadGating(
@@ -213,15 +222,15 @@ async def test_peer_pipeline_drops_short_candidate_before_opening_stt_session():
     await run_audio_vad_loop(
         source=source,
         vad=vad,
-        sink=_PeerOnlySink(hub),
+        sink=_PeerOnlySink(harness),
         target_sample_rate_hz=16000,
     )
 
     assert backend.open_calls == 0
     assert peer_stt.state == STTSessionState.DISCONNECTED
-    assert hub.peer_runtime.utterances == {}
+    assert harness.peer_runtime.utterances == {}
 
-    await hub.stop()
+    await harness.stop()
 
 
 async def test_peer_pipeline_commits_after_candidate_reaches_minimum_length():
@@ -235,8 +244,10 @@ async def test_peer_pipeline_commits_after_candidate_reaches_minimum_length():
         channel="peer",
         clock=clock,
     )
-    hub = compose_client_hub(stt=None, peer_stt=peer_stt, llm=None, osc=osc, clock=clock)
-    await hub.start(auto_flush_osc=False)
+    harness = compose_translation_test_harness(
+        stt=None, peer_stt=peer_stt, llm=None, osc=osc, clock=clock
+    )
+    await harness.start(auto_flush_osc=False)
 
     probs = [0.0, 0.0, 0.9, 0.9, 0.9, 0.0, 0.0, 0.0]
     vad = VadGating(
@@ -257,16 +268,16 @@ async def test_peer_pipeline_commits_after_candidate_reaches_minimum_length():
     await run_audio_vad_loop(
         source=source,
         vad=vad,
-        sink=_PeerOnlySink(hub),
+        sink=_PeerOnlySink(harness),
         target_sample_rate_hz=16000,
     )
 
     for _ in range(50):
-        if hub.peer_runtime.utterances:
+        if harness.peer_runtime.utterances:
             break
         await asyncio.sleep(0.01)
 
     assert backend.open_calls == 1
-    assert hub.peer_runtime.utterances
+    assert harness.peer_runtime.utterances
 
-    await hub.stop()
+    await harness.stop()

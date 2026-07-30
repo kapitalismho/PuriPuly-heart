@@ -7,13 +7,13 @@ import pytest
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
     PeerTranslationChannelOwner,
 )
-from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import RecordingOscQueue
+from tests.helpers.translation_owners import compose_translation_test_harness
 
 
 def test_peer_owner_rejects_non_peer_runtime() -> None:
-    harness = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue())
-    current = harness._peer_owner
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
+    current = harness.peer_owner
 
     with pytest.raises(ValueError, match="requires the Peer channel runtime"):
         PeerTranslationChannelOwner(
@@ -30,8 +30,8 @@ def test_peer_owner_rejects_non_peer_runtime() -> None:
 
 @pytest.mark.asyncio
 async def test_peer_owner_rejects_stt_and_vad_after_ingress_closes() -> None:
-    harness = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue())
-    owner = harness._peer_owner
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
+    owner = harness.peer_owner
 
     await owner.close_ingress()
 
@@ -47,8 +47,8 @@ async def test_peer_owner_rejects_stt_and_vad_after_ingress_closes() -> None:
 
 @pytest.mark.asyncio
 async def test_peer_owner_close_clears_runtime_logical_turns_and_latency() -> None:
-    harness = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue())
-    owner = harness._peer_owner
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
+    owner = harness.peer_owner
     parent_id = uuid4()
     child_id = uuid4()
     owner.runtime.get_or_create_bundle(child_id)
@@ -76,8 +76,8 @@ async def test_peer_owner_close_clears_runtime_logical_turns_and_latency() -> No
 
 @pytest.mark.asyncio
 async def test_peer_owner_reset_and_language_clear_reject_non_peer_channels() -> None:
-    harness = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue())
-    owner = harness._peer_owner
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
+    owner = harness.peer_owner
 
     with pytest.raises(ValueError, match="cannot reset a non-Peer channel"):
         await owner.reset_provider_channel("self")

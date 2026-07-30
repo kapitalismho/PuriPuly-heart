@@ -89,7 +89,7 @@ class SelfCaptureApplicationOwner:
         settings = self.settings_provider()
         if settings is None:
             self.log_detailed(
-                "[STT] Enable requested before hub is ready",
+                "[STT] Enable requested before Self translation owner is ready",
                 logging.WARNING,
             )
             return None

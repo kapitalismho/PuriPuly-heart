@@ -15,7 +15,7 @@ class PeerCaptureVadSinkAdapter:
     async def handle_vad_event(self, event: object) -> None:
         runtime = self.runtime_provider()
         if runtime is None:
-            raise RuntimeError("Peer VAD sink requires the production hub")
+            raise RuntimeError("Peer VAD sink requires the Peer translation owner")
         await runtime.handle_peer_vad_event(event)
 
 

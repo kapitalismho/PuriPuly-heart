@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from typing import Protocol
 
 
-class HubRuntimeLoggingPort(Protocol):
+class TranslationRuntimeLoggingPort(Protocol):
     @property
     def mode(self) -> object: ...
 
@@ -119,7 +119,7 @@ def format_translation_ready_for_output(
     elapsed_ms: int | None,
 ) -> str:
     parts = [
-        "[Detailed][Hub] translation_ready_for_output",
+        "[Detailed][Translation] translation_ready_for_output",
         f"channel={channel}",
         f"utterance_id={utterance_id}",
         f"update_id={update_id}",
@@ -136,7 +136,7 @@ def format_translation_ready_for_output(
 
 
 __all__ = [
-    "HubRuntimeLoggingPort",
+    "TranslationRuntimeLoggingPort",
     "compute_latency_dominant_stage",
     "format_basic_latency_summary",
     "format_detailed_latency_breakdown",

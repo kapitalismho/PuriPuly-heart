@@ -23,7 +23,7 @@ from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 
 
 class OverlayDiagnostics:
-    def record_hub(self, event: str, **fields: object) -> None:
+    def record_translation(self, event: str, **fields: object) -> None:
         _ = event, fields
 
 

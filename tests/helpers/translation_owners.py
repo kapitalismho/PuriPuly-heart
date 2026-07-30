@@ -4,9 +4,10 @@ import asyncio
 from dataclasses import replace
 from uuid import UUID, uuid4
 
-from puripuly_heart.core.clock import SystemClock
+from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
+    LocalASRProviderRuntimePort,
 )
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
 from puripuly_heart.core.orchestrator.configuration import (
@@ -47,7 +48,7 @@ from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
 
 
-class ClientHubTestHarness:
+class TranslationOwnersTestHarness:
     __slots__ = (
         "_peer_owner",
         "_self_owner",
@@ -60,7 +61,6 @@ class ClientHubTestHarness:
         "_ui_events",
         "_stt_sessions",
         "_started",
-        "_active_chatbox_channel",
     )
 
     def __init__(
@@ -70,7 +70,7 @@ class ClientHubTestHarness:
         self_owner: SelfTranslationChannelOwner,
         translation_runtime_configuration: TranslationRuntimeConfigurationOwner,
         llm_runtime: ProviderRuntimeHandle,
-        local_asr_runtime: object,
+        local_asr_runtime: LocalASRProviderRuntimePort,
         output_runtime: OutputRuntime,
         output_projection: TranslationOutputProjectionOwner,
         osc: object,
@@ -92,187 +92,107 @@ class ClientHubTestHarness:
         object.__setattr__(self, "_ui_events", ui_events)
         object.__setattr__(self, "_stt_sessions", stt_sessions)
         object.__setattr__(self, "_started", False)
-        object.__setattr__(self, "_active_chatbox_channel", "self")
 
-    def __getattr__(self, name: str) -> object:
-        if name == "llm":
-            return self._llm_runtime.provider
-        if name == "self_translation_channel":
-            return self._self_owner
-        if name == "self_runtime":
-            return self._self_owner.runtime
-        if name == "peer_runtime":
-            return self._peer_owner.runtime
-        if name == "translation_runtime_configuration":
-            return self._translation_runtime_configuration
-        if name in TranslationRuntimeConfig.__dataclass_fields__:
-            return getattr(self._translation_runtime_configuration.snapshot().value, name)
-        if name in {"stt", "peer_stt"}:
-            return None
-        if name == "local_asr_provider_runtime":
-            return self._local_asr_runtime
-        if name == "output_runtime":
-            return self._output_runtime
-        if name == "output_projection":
-            return self._output_projection
-        if name == "translation_diagnostics":
-            return self._peer_owner.diagnostics
-        if name == "_local_asr_provider_runtime":
-            return self._peer_owner.local_asr_runtime
-        if name == "peer_final_runs":
-            return self._peer_owner.translation_turns
-        if name == "overlay_event_adapter":
-            return self._output_projection.overlay_event_adapter
-        if name == "overlay_sink":
-            return self._output_projection.overlay_sink
-        if name == "ui_events":
-            return self._ui_events
-        if name == "osc":
-            return self._osc
-        if name == "provider_runtime_handles":
-            return {"llm": self._llm_runtime}
-        if name == "_running":
-            return self._started
-        if name == "active_chatbox_channel":
-            return self._active_chatbox_channel
-        if name == "_merge_buffer":
-            return self._self_owner.merge_buffer
-        if name == "_last_promo_time":
-            return self._self_owner._last_promo_time
-        if name in {
-            "_translation_tasks",
-            "_translation_history",
-            "_speech_ended_ids",
-            "_utterance_start_times",
-            "_stt_task",
-        }:
-            runtime_name = {
-                "_translation_tasks": "translation_tasks",
-                "_translation_history": "translation_history",
-                "_speech_ended_ids": "speech_ended_ids",
-                "_utterance_start_times": "utterance_start_times",
-                "_stt_task": "stt_task",
-            }[name]
-            return getattr(self._self_owner.runtime, runtime_name)
-        if name in {
-            "handle_vad_event",
-            "submit_text",
-            "mark_promo_eligible",
-            "_handle_low_latency_final",
-            "_merge_text",
-            "_merge_with_overlap",
-            "_relaxed_overlap_merge",
-            "_strip_trailing_boundary",
-            "_strip_leading_boundary",
-            "_is_boundary_char",
-            "_needs_space",
-            "_is_ascii_alnum",
-            "_upsert_merge_part",
-            "_clear_resume_state",
-            "_clear_spec_latency_state",
-            "_record_spec_latency_stage",
-            "_promote_spec_latency_to_output",
-            "_clear_spec_state",
-            "_maybe_update_buffer_end_time",
-            "_cancel_finalize_wait",
-            "_maybe_start_finalize_wait",
-            "_cancel_awaiting_vad_timeout",
-            "_start_awaiting_vad_timeout",
-            "_awaiting_vad_timeout",
-            "_cancel_resume_end_timeout",
-            "_start_resume_end_timeout",
-            "_resume_end_timeout",
-            "_restart_post_end_grace",
-            "_finalize_wait_timeout",
-            "_mark_resume_pending",
-            "_maybe_confirm_resume",
-            "_maybe_clear_resume_on_end",
-            "_commit_merge",
-            "_maybe_restart_spec",
-            "_run_spec_translation",
-            "_handle_stale_spec_translation",
-            "_try_commit_after_spec",
-            "_sync_overlay_active_self",
-            "_send_stt_connected_notification",
-            "_overlay_translation_will_follow",
-        }:
-            return getattr(self._self_owner, name)
-        return getattr(self._peer_owner, name)
+    @property
+    def self_owner(self) -> SelfTranslationChannelOwner:
+        return self._self_owner
 
-    def __setattr__(self, name: str, value: object) -> None:
-        if name in ClientHubTestHarness.__slots__:
-            object.__setattr__(self, name, value)
-            return
-        if name == "llm":
-            self._llm_runtime.attach_provider_reference(value)
-            return
-        if name in {"stt", "peer_stt"}:
-            if value is not None:
-                raise RuntimeError("concrete STT assignment is disabled")
-            return
-        if name == "_running":
-            object.__setattr__(self, "_started", bool(value))
-            return
-        if name == "active_chatbox_channel":
-            object.__setattr__(self, "_active_chatbox_channel", value)
-            return
-        if name == "_merge_buffer":
-            self._self_owner.merge_buffer = value
-            return
-        if name == "_last_promo_time":
-            self._self_owner._last_promo_time = value
-            return
-        if name in {
-            "_translation_tasks",
-            "_translation_history",
-            "_speech_ended_ids",
-            "_utterance_start_times",
-            "_stt_task",
-        }:
-            runtime_name = {
-                "_translation_tasks": "translation_tasks",
-                "_translation_history": "translation_history",
-                "_speech_ended_ids": "speech_ended_ids",
-                "_utterance_start_times": "utterance_start_times",
-                "_stt_task": "stt_task",
-            }[name]
-            setattr(self._self_owner.runtime, runtime_name, value)
-            return
-        if name == "clock":
-            self._self_owner.set_clock(value)
-            self._peer_owner.set_clock(value)
-            self._output_projection.set_clock(value)
-            self._peer_owner.diagnostics.clock = value
-            self._peer_owner.translation_requests.set_clock(value)
-            return
-        if name == "translation_runtime_configuration":
-            if value is not self._translation_runtime_configuration:
-                raise RuntimeError("translation runtime configuration owner is fixed")
-            return
-        if name in TranslationRuntimeConfig.__dataclass_fields__:
-            self._translation_runtime_configuration.transform(
-                lambda current: replace(current, **{name: value})
-            )
-            return
-        if name == "translation_turns":
-            self._self_owner.translation_turns = value
-            self._peer_owner.translation_turns = value
-            return
-        setattr(self._peer_owner, name, value)
+    @property
+    def peer_owner(self) -> PeerTranslationChannelOwner:
+        return self._peer_owner
 
-    async def _handle_stt_event(self, event: object) -> None:
+    @property
+    def configuration(self) -> TranslationRuntimeConfigurationOwner:
+        return self._translation_runtime_configuration
+
+    @property
+    def llm_runtime(self) -> ProviderRuntimeHandle:
+        return self._llm_runtime
+
+    @property
+    def local_asr_runtime(self) -> LocalASRProviderRuntimePort:
+        return self._local_asr_runtime
+
+    @property
+    def output_runtime(self) -> OutputRuntime:
+        return self._output_runtime
+
+    @property
+    def output_projection(self) -> TranslationOutputProjectionOwner:
+        return self._output_projection
+
+    @property
+    def osc(self) -> object:
+        return self._osc
+
+    @property
+    def ui_events(self) -> asyncio.Queue:
+        return self._ui_events
+
+    @property
+    def stt_sessions(self) -> SttSessionStateProjection:
+        return self._stt_sessions
+
+    @property
+    def self_runtime(self) -> ChannelRuntime:
+        return self._self_owner.runtime
+
+    @property
+    def peer_runtime(self) -> ChannelRuntime:
+        return self._peer_owner.runtime
+
+    @property
+    def translation_turns(self) -> TranslationTurnLifecycleOwner:
+        return self._peer_owner.translation_turns
+
+    @property
+    def translation_requests(self) -> TranslationRequestOwner:
+        return self._self_owner.translation_requests
+
+    @property
+    def translation_diagnostics(self) -> TranslationLatencyDiagnosticsOwner:
+        return self._peer_owner.diagnostics
+
+    @property
+    def clock(self) -> Clock:
+        return self._self_owner.clock
+
+    @property
+    def started(self) -> bool:
+        return self._started
+
+    def replace_configuration(self, **changes: object) -> None:
+        self._translation_runtime_configuration.transform(
+            lambda current: replace(current, **changes)
+        )
+
+    def set_clock(self, clock: Clock) -> None:
+        self._self_owner.set_clock(clock)
+        self._peer_owner.set_clock(clock)
+        self._output_projection.set_clock(clock)
+        self._peer_owner.diagnostics.clock = clock
+        self._peer_owner.translation_requests.set_clock(clock)
+
+    def set_started_for_test(self, started: bool) -> None:
+        object.__setattr__(self, "_started", started)
+
+    def replace_translation_turn_owner_for_test(self, owner: object) -> None:
+        self._self_owner.translation_turns = owner
+        self._peer_owner.translation_turns = owner
+
+    async def dispatch_stt_event(self, event: object) -> None:
         if getattr(event, "channel", "self") == "self":
             await self._self_owner.handle_stt_event(event)
             return
         await self._peer_owner.handle_stt_event(event)
 
-    async def _handle_retired_stt_event(self, event: object) -> None:
+    async def dispatch_retired_stt_event(self, event: object) -> None:
         if getattr(event, "channel", "self") == "self":
             await self._self_owner.handle_retired_stt_event(event)
             return
         await self._peer_owner.handle_retired_stt_event(event)
 
-    async def _handle_stt_event_loop_exception(
+    async def dispatch_stt_failure(
         self,
         exc: Exception,
         *,
@@ -283,21 +203,21 @@ class ClientHubTestHarness:
             return
         await self._peer_owner.handle_stt_event_loop_exception(exc, channel="peer")
 
-    async def _handle_transcript(self, *args: object, **kwargs: object) -> None:
+    async def dispatch_transcript(self, *args: object, **kwargs: object) -> None:
         transcript = args[0] if args else kwargs.get("transcript")
         if getattr(transcript, "channel", "self") == "self":
             await self._self_owner._handle_transcript(*args, **kwargs)
             return
         await self._peer_owner._handle_transcript(*args, **kwargs)
 
-    async def _ensure_translation(self, *args: object, **kwargs: object) -> None:
+    async def ensure_translation(self, *args: object, **kwargs: object) -> None:
         transcript = args[0] if args else kwargs.get("transcript")
         if getattr(transcript, "channel", "self") == "self":
             await self._self_owner._ensure_translation(*args, **kwargs)
             return
         await self._peer_owner._ensure_translation(*args, **kwargs)
 
-    async def _translate_and_enqueue(
+    async def process_translation(
         self,
         utterance_id: object,
         text: str,
@@ -381,26 +301,26 @@ class ClientHubTestHarness:
             return
         await self._peer_owner.reset_provider_channel(channel)
 
-    async def clear_language_runtime_state(self, *, channel: str) -> None:
+    async def clear_channel_language_state(self, *, channel: str) -> None:
         if channel == "self":
             await self._self_owner.clear_language_runtime_state()
             return
         await self._peer_owner.clear_language_runtime_state(channel=channel)
 
-    async def _reset_stt_runtime_state(self) -> None:
+    async def reset_runtime_state(self) -> None:
         await self._self_owner.runtime.reset_runtime_state()
         await self._peer_owner.reset_provider_channel("peer")
 
     def clear_context(self) -> None:
         self._self_owner.translation_requests.clear_context()
 
-    def _get_valid_context(self) -> object:
+    def get_valid_context(self) -> object:
         return self._self_owner.translation_requests.get_valid_context()
 
-    def _format_context_for_llm(self, context: object) -> str:
+    def format_context(self, context: object) -> str:
         return self._self_owner.translation_requests.format_context(context)
 
-    def _remember_context_entry(
+    def remember_context(
         self,
         text: str,
         timestamp: float,
@@ -418,7 +338,7 @@ class ClientHubTestHarness:
             source_language=source_language,
         )
 
-    def _prepare_llm_request(
+    def prepare_translation_request(
         self,
         text: str,
         *,
@@ -437,7 +357,7 @@ class ClientHubTestHarness:
         )
         return prepared.system_prompt, prepared.context, prepared.requested_at
 
-    def _prepare_llm_request_with_mode(
+    def prepare_translation_request_with_mode(
         self,
         text: str,
         *,
@@ -461,7 +381,7 @@ class ClientHubTestHarness:
             prepared.applied_context_mode,
         )
 
-    def get_or_create_bundle(self, utterance_id: object, *, channel: str = "self") -> object:
+    def bundle_for(self, utterance_id: object, *, channel: str = "self") -> object:
         runtime = self._self_owner.runtime if channel == "self" else self._peer_owner.runtime
         return runtime.get_or_create_bundle(utterance_id)
 
@@ -622,7 +542,7 @@ class ClientHubTestHarness:
         await self._local_asr_runtime.reconfigure_channel(channel, options)
 
 
-def compose_client_hub(**values: object) -> ClientHubTestHarness:
+def compose_translation_test_harness(**values: object) -> TranslationOwnersTestHarness:
     stt = values.pop("stt", None)
     peer_stt = values.pop("peer_stt", None)
     llm = values.pop("llm", None)
@@ -727,7 +647,7 @@ def compose_client_hub(**values: object) -> ClientHubTestHarness:
     )
     callbacks.bind_self(self_owner)
     callbacks.bind_peer(peer_owner)
-    return ClientHubTestHarness(
+    return TranslationOwnersTestHarness(
         peer_owner=peer_owner,
         self_owner=self_owner,
         translation_runtime_configuration=config_owner,
@@ -748,10 +668,10 @@ def _raise_failures(failures: list[BaseException]) -> None:
         raise failures[0]
     if all(isinstance(failure, Exception) for failure in failures):
         raise ExceptionGroup(
-            "ClientHub test lifecycle cleanup failed",
+            "translation-owner test lifecycle cleanup failed",
             [failure for failure in failures if isinstance(failure, Exception)],
         )
-    raise BaseExceptionGroup("ClientHub test lifecycle cleanup failed", failures)
+    raise BaseExceptionGroup("translation-owner test lifecycle cleanup failed", failures)
 
 
-__all__ = ["ClientHubTestHarness", "compose_client_hub"]
+__all__ = ["TranslationOwnersTestHarness", "compose_translation_test_harness"]

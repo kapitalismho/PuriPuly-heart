@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from tests.helpers.client_hub import compose_client_hub
+from tests.helpers.translation_owners import compose_translation_test_harness
 from tests.integration.helpers import (
     WARMUP_DELAY_S,
     MockOscSender,
@@ -95,7 +95,7 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
     system_prompt = system_prompt.replace("${sourceName}", get_llm_language_name(source_lang))
     system_prompt = system_prompt.replace("${targetName}", get_llm_language_name(target_lang))
 
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=stt,
         llm=llm,
         osc=osc,
@@ -113,7 +113,7 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
     async def track_events() -> None:
         nonlocal translation_text, error_message
         while True:
-            event = await next_ui_event(hub.ui_events)
+            event = await next_ui_event(harness.ui_events)
             if event is None:
                 continue
 
@@ -124,7 +124,7 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
                 error_message = str(event.payload)
                 got_result.set()
 
-    await hub.start(auto_flush_osc=True)
+    await harness.start(auto_flush_osc=True)
     event_task = asyncio.create_task(track_events())
     await asyncio.sleep(WARMUP_DELAY_S)
 
@@ -137,13 +137,13 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
         if not chunks:
             pytest.skip("Audio file is empty")
 
-        await send_vad_events(hub, utterance_id, chunks)
+        await send_vad_events(harness, utterance_id, chunks)
 
         if not await wait_for_event(got_result):
             pytest.fail("Pipeline did not complete in time")
     finally:
         event_task.cancel()
-        await hub.stop()
+        await harness.stop()
         await asyncio.gather(event_task, return_exceptions=True)
 
     if error_message:

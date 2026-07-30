@@ -111,7 +111,7 @@ def test_threshold_math_requires_measured_target_and_control_exclusion() -> None
 
 def test_lifecycle_contract_requires_ordered_teardown_fresh_pid_and_gui_retry() -> None:
     facts = dict(
-        events=["provider_closed", "source_closed", "typed_warning"],
+        events=["source_closed", "provider_closed", "typed_warning"],
         warning_reason="process_target_exited",
         loop_task_done_at_warning=True,
         process_source_pids=[101, 202],

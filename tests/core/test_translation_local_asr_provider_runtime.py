@@ -19,7 +19,7 @@ from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
 from puripuly_heart.core.vad.gating import SpeechEnd
-from tests.helpers.client_hub import compose_client_hub
+from tests.helpers.translation_owners import compose_translation_test_harness
 
 
 @dataclass
@@ -170,9 +170,9 @@ def _request() -> ProviderRuntimeBuildRequest:
     )
 
 
-async def test_hub_delegates_self_provider_execution_and_close_to_one_owner() -> None:
+async def test_translation_delegates_self_provider_execution_and_close_to_one_owner() -> None:
     factory = FakeOwnedRuntimeFactory()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=FakeOscQueue(messages=[]),
@@ -180,11 +180,11 @@ async def test_hub_delegates_self_provider_execution_and_close_to_one_owner() ->
     )
     request = _request()
 
-    result = await hub.replace_stt_provider_request(request, start=False)
-    await hub.start()
+    result = await harness.replace_stt_provider_request(request, start=False)
+    await harness.start()
     event = SpeechEnd(uuid4())
-    await hub.handle_vad_event(event)
-    await hub.stop()
+    await harness.self_owner.handle_vad_event(event)
+    await harness.stop()
 
     assert factory.callbacks is not None
     assert result.status == "applied"
@@ -193,24 +193,24 @@ async def test_hub_delegates_self_provider_execution_and_close_to_one_owner() ->
     assert factory.runtime.vad_events == [("self", event)]
     assert factory.runtime.commits == ["self"]
     assert factory.runtime.closed == 1
-    assert set(hub.provider_runtime_handles) == {"llm"}
+    assert harness.llm_runtime.owner_name == "ProviderRuntimeHandle:llm"
 
 
-async def test_hub_prebuilt_compatibility_uses_the_canonical_owner() -> None:
+async def test_translation_prebuilt_compatibility_uses_the_canonical_owner() -> None:
     provider = PrebuiltProvider()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=provider,
         llm=None,
         osc=FakeOscQueue(messages=[]),
     )
 
-    runtime = hub.local_asr_provider_runtime
+    runtime = harness.local_asr_runtime
 
     assert isinstance(runtime, LocalASRProviderRuntimeOwner)
     assert runtime.current_provider("self") is provider
     assert runtime.snapshot.channel_for("self").has_resources
 
-    await hub.stop()
+    await harness.stop()
 
     assert provider.close_calls == 0
     assert provider.close_backend_calls == 1

@@ -98,7 +98,7 @@ class ProviderRuntimeHandle:
         return {
             "owner": self.owner_name,
             "resource_fields": self.resource_fields,
-            "stop_ingress": "detach from hub/runtime coordinator",
+            "stop_ingress": "detach from channel owner/runtime coordinator",
             "toggle_off_policy": self.toggle_off_policy,
             "shutdown_policy": self.shutdown_policy,
             "late_callback_rule": self.late_callback_rule,

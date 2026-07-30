@@ -27,7 +27,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 from puripuly_heart.core.translation_policy import TranslationRuntimePolicy
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
-from tests.helpers.client_hub import compose_client_hub
+from tests.helpers.translation_owners import compose_translation_test_harness
 
 
 class RecordingOutput:
@@ -112,19 +112,19 @@ def test_policy_rejects_retired_fast_translation_off_choice() -> None:
 
 
 def test_channel_owners_use_one_injected_generic_translation_owner() -> None:
-    hub = compose_client_hub(stt=None, llm=None, osc=object())
-    hub_source = inspect.getsource(inspect.getmodule(PeerTranslationChannelOwner))
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=object())
+    peer_owner_source = inspect.getsource(inspect.getmodule(PeerTranslationChannelOwner))
     self_source = inspect.getsource(inspect.getmodule(SelfTranslationChannelOwner))
-    assert hub.translation_turns is hub.peer_final_runs
-    assert type(hub.translation_turns.output).__name__ == ("TranslationChannelOwnerCallbacks")
-    assert hub.translation_turns.lifecycle_owner_snapshot()["owner"] == (
+    assert harness.translation_turns is harness.translation_turns
+    assert type(harness.translation_turns.output).__name__ == ("TranslationChannelOwnerCallbacks")
+    assert harness.translation_turns.lifecycle_owner_snapshot()["owner"] == (
         "TranslationTurnLifecycleOwner"
     )
-    assert "PeerFinalRunsLifecycleOwner" not in hub_source
-    assert "TranslationTurnLifecycleOwner(" not in hub_source
-    assert hub_source.count('self.translation_turns.cancel_pending(channel="peer")') == 3
+    assert "PeerFinalRunsLifecycleOwner" not in peer_owner_source
+    assert "TranslationTurnLifecycleOwner(" not in peer_owner_source
+    assert peer_owner_source.count('self.translation_turns.cancel_pending(channel="peer")') == 3
     assert self_source.count('self.translation_turns.cancel_pending(channel="self")') == 2
-    assert "self.translation_turns.cancel_pending()" not in hub_source
+    assert "self.translation_turns.cancel_pending()" not in peer_owner_source
 
     source_root = Path(__file__).resolve().parents[2] / "src" / "puripuly_heart"
     legacy_owner_references = {
@@ -134,7 +134,7 @@ def test_channel_owners_use_one_injected_generic_translation_owner() -> None:
     }
     assert legacy_owner_references == {"core/orchestrator/peer_final_runs.py"}
     assert not any(
-        "._translate_and_enqueue(" in source_file.read_text(encoding="utf-8")
+        ".process_translation(" in source_file.read_text(encoding="utf-8")
         for source_file in source_root.rglob("*.py")
     )
 
@@ -148,19 +148,19 @@ async def test_production_manual_self_and_peer_finals_enter_the_generic_owner() 
             recorded.append((request, wait_for_parent))
             return (request.transcript.utterance_id,)
 
-    hub = compose_client_hub(stt=None, llm=None, osc=object())
-    hub.translation_turns = RecordingOwner()
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=object())
+    harness.replace_translation_turn_owner_for_test(RecordingOwner())
 
-    await hub.submit_text("manual")
+    await harness.self_owner.submit_text("manual")
     self_id = uuid4()
-    await hub._handle_stt_event(
+    await harness.dispatch_stt_event(
         STTFinalEvent(
             self_id,
             Transcript(self_id, "self", is_final=True, channel="self"),
         )
     )
     peer_id = uuid4()
-    await hub._handle_stt_event(
+    await harness.dispatch_stt_event(
         STTFinalEvent(
             peer_id,
             Transcript(peer_id, "peer", is_final=True, channel="peer"),

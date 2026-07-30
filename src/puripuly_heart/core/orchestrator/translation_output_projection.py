@@ -172,7 +172,7 @@ class TranslationOutputProjectionOwner:
     def publish_system_disclosure(self, text: str) -> OutputPublicationResult:
         self.diagnostics.emit(
             RuntimeDiagnostic(
-                message="[Hub] OSC disclosure enqueue: channel=peer text_len=%s",
+                message="[Translation] OSC disclosure enqueue: channel=peer text_len=%s",
                 args=(len(text),),
                 fallback_level=logging.INFO,
                 detailed=True,
@@ -748,7 +748,7 @@ class TranslationOutputProjectionOwner:
         if result.decision.decision != "published":
             self.diagnostics.emit(
                 RuntimeDiagnostic(
-                    message="[Hub] OSC enqueue skipped: channel=%s route=%s reason=%s",
+                    message="[Translation] OSC enqueue skipped: channel=%s route=%s reason=%s",
                     args=(
                         projection.channel,
                         result.decision.route,
@@ -768,7 +768,7 @@ class TranslationOutputProjectionOwner:
         self.diagnostics.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Hub] OSC enqueue preview: channel=%s text_len=%s "
+                    "[Translation] OSC enqueue preview: channel=%s text_len=%s "
                     "translation_text_present=%s include_source=%s"
                 ),
                 args=(
@@ -817,7 +817,7 @@ class TranslationOutputProjectionOwner:
         )
         self.diagnostics.emit(
             RuntimeDiagnostic(
-                message="[Hub] OSC enqueue skipped: channel=%s route=%s reason=%s",
+                message="[Translation] OSC enqueue skipped: channel=%s route=%s reason=%s",
                 args=("peer", result.decision.route, result.decision.reason),
                 fallback_level=logging.INFO,
                 detailed=True,

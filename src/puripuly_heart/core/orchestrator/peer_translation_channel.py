@@ -397,7 +397,7 @@ class PeerTranslationChannelOwner:
             if event.channel != "peer":
                 raise ValueError("Peer translation owner received a non-Peer session event")
             self._emit_basic(
-                "[Hub] STT state: channel=%s state=%s",
+                "[Translation] STT state: channel=%s state=%s",
                 event.channel,
                 event.state.name,
             )

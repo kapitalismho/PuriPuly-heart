@@ -19,7 +19,7 @@ from puripuly_heart.core.orchestrator.configuration import (
 )
 from puripuly_heart.core.orchestrator.context import ContextMode
 from puripuly_heart.core.orchestrator.ports import (
-    HubRuntimeLoggingPort,
+    TranslationRuntimeLoggingPort,
     format_basic_latency_summary,
     format_detailed_latency_breakdown,
     format_detailed_latency_trace,
@@ -212,10 +212,10 @@ class _LatencyTimeline:
 class TranslationLatencyDiagnosticsOwner:
     clock: Clock
     config_snapshot: Callable[[], TranslationRuntimeConfigSnapshot]
-    runtime_logging: HubRuntimeLoggingPort | None = None
+    runtime_logging: TranslationRuntimeLoggingPort | None = None
     overlay_diagnostics: OverlayDiagnosticsRecorder | None = None
     fallback_logger: logging.Logger = field(
-        default_factory=lambda: logging.getLogger("puripuly_heart.core.orchestrator.hub"),
+        default_factory=lambda: logging.getLogger("puripuly_heart.core.orchestrator.translation"),
         repr=False,
     )
     _last_context_modes: dict[ChannelId, ContextMode | None] = field(
@@ -289,7 +289,7 @@ class TranslationLatencyDiagnosticsOwner:
         if self.runtime_logging is None:
             self.emit(
                 RuntimeDiagnostic(
-                    message="[Hub] STT event loop crashed: %s",
+                    message="[Translation] STT event loop crashed: %s",
                     args=(diagnostic.exception,),
                     level=logging.ERROR,
                     safe_exceptions=True,
@@ -308,7 +308,7 @@ class TranslationLatencyDiagnosticsOwner:
         )
         self.emit(
             RuntimeDiagnostic(
-                message="[Hub] STT event loop crashed: %s",
+                message="[Translation] STT event loop crashed: %s",
                 args=(format_error_report_for_log(report),),
                 level=logging.ERROR,
             )
@@ -318,7 +318,8 @@ class TranslationLatencyDiagnosticsOwner:
         self.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Hub] Translation skipped " "(stage=%s, channel=%s, publish_chatbox=%s): %s"
+                    "[Translation] Translation skipped "
+                    "(stage=%s, channel=%s, publish_chatbox=%s): %s"
                 ),
                 args=(
                     diagnostic.stage,
@@ -342,7 +343,7 @@ class TranslationLatencyDiagnosticsOwner:
         )
         self.emit(
             RuntimeDiagnostic(
-                message="[Hub] Translation failed (stage=%s, channel=%s): %s",
+                message="[Translation] Translation failed (stage=%s, channel=%s): %s",
                 args=(
                     diagnostic.stage,
                     diagnostic.channel,
@@ -361,7 +362,7 @@ class TranslationLatencyDiagnosticsOwner:
         self._last_context_modes[diagnostic.channel] = diagnostic.applied_mode
         self.emit(
             RuntimeDiagnostic(
-                message="[Hub] Context mode: channel=%s mode=%s",
+                message="[Translation] Context mode: channel=%s mode=%s",
                 args=(diagnostic.channel, diagnostic.applied_mode),
             )
         )
@@ -384,7 +385,7 @@ class TranslationLatencyDiagnosticsOwner:
         self.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Hub] Context apply: channel=%s mode=%s request_chars=%s "
+                    "[Translation] Context apply: channel=%s mode=%s request_chars=%s "
                     "entries=%s self_entries=%s peer_entries=%s context_chars=%s"
                 ),
                 args=(
@@ -501,7 +502,7 @@ class TranslationLatencyDiagnosticsOwner:
             emitted = self.emit(
                 RuntimeDiagnostic(
                     message=(
-                        "[Hub] active_self_secondary merge_id=%s source=%s "
+                        "[Translation] active_self_secondary merge_id=%s source=%s "
                         "active_len=%s secondary_len=%s spec_text_len=%s "
                         "spec_translation_len=%s cached_secondary_len=%s "
                         "reuse_mode=%s resume_pending=%s resume_confirmed=%s"
@@ -528,7 +529,7 @@ class TranslationLatencyDiagnosticsOwner:
         if recorder is None or signature == self._last_overlay_diagnostics_signature:
             return
         self._last_overlay_diagnostics_signature = signature
-        recorder.record_hub(
+        recorder.record_translation(
             "active_self_secondary",
             merge_id=str(diagnostic.merge_id),
             source=diagnostic.source,
@@ -546,7 +547,7 @@ class TranslationLatencyDiagnosticsOwner:
         recorder = self.overlay_diagnostics
         if recorder is None:
             return
-        recorder.record_hub(
+        recorder.record_translation(
             "overlay_emit",
             event_kind=diagnostic.event_kind,
             utterance_id=str(diagnostic.utterance_id),
@@ -559,7 +560,7 @@ class TranslationLatencyDiagnosticsOwner:
         self._last_error_source = "overlay_sink"
         self.emit(
             RuntimeDiagnostic(
-                message="[Hub] Overlay sink emit failed: %s",
+                message="[Translation] Overlay sink emit failed: %s",
                 args=(error_type,),
                 level=logging.ERROR,
             )
@@ -572,7 +573,7 @@ class TranslationLatencyDiagnosticsOwner:
         return self.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Detailed][Hub] overlay_sink_emit_duration "
+                    "[Detailed][Translation] overlay_sink_emit_duration "
                     "event_type=%s channel=%s utterance_id=%s "
                     "update_id=%s elapsed_ms=%s"
                 ),

@@ -53,7 +53,7 @@ class OverlayDiagnostics:
     def __init__(self) -> None:
         self.records: list[tuple[str, dict[str, object]]] = []
 
-    def record_hub(self, event: str, **fields: object) -> None:
+    def record_translation(self, event: str, **fields: object) -> None:
         self.records.append((event, fields))
 
 
@@ -309,7 +309,7 @@ def test_owner_keeps_detailed_message_building_lazy_in_basic_mode() -> None:
 
     assert not owner.emit(
         RuntimeDiagnostic(
-            message="[Hub] detail=%s",
+            message="[Translation] detail=%s",
             args=(ExplodingString(),),
             detailed=True,
         )

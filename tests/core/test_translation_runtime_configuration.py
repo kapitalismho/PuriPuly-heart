@@ -21,7 +21,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnProcessResult,
 )
 from puripuly_heart.domain.models import Transcript, Translation
-from tests.helpers.client_hub import compose_client_hub
+from tests.helpers.translation_owners import compose_translation_test_harness
 
 _CONFIG_FIELD_NAMES = {field.name for field in fields(TranslationRuntimeConfig)}
 
@@ -144,23 +144,23 @@ def test_peer_owner_has_no_mutable_translation_configuration_fields() -> None:
     assert "translation_runtime_configuration" not in owner_fields
 
 
-def test_client_hub_compatibility_access_delegates_to_the_owner() -> None:
+def test_translation_fixture_compatibility_access_delegates_to_the_owner() -> None:
     owner = TranslationRuntimeConfigurationOwner()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=FakeOsc(),
         translation_runtime_configuration=owner,
     )
 
-    hub.source_language = "ja"
+    harness.replace_configuration(source_language="ja")
 
-    assert hub.source_language == "ja"
+    assert harness.configuration.snapshot().value.source_language == "ja"
     assert owner.snapshot().revision == 1
     assert owner.snapshot().value.source_language == "ja"
 
 
-def test_client_hub_compatibility_assignment_is_linearizable_with_owner_updates() -> None:
+def test_fixture_configuration_update_is_linearizable_with_owner_updates() -> None:
     barrier = Barrier(2)
 
     class CoordinatedOwner(TranslationRuntimeConfigurationOwner):
@@ -169,7 +169,7 @@ def test_client_hub_compatibility_assignment_is_linearizable_with_owner_updates(
             return super().transform(transformer)
 
     owner = CoordinatedOwner()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=FakeOsc(),
@@ -177,7 +177,10 @@ def test_client_hub_compatibility_assignment_is_linearizable_with_owner_updates(
     )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        compatibility_future = executor.submit(setattr, hub, "source_language", "ja")
+        compatibility_future = executor.submit(
+            harness.replace_configuration,
+            source_language="ja",
+        )
         owner_future = executor.submit(
             owner.transform,
             lambda value: replace(value, translation_enabled=False),
@@ -243,9 +246,9 @@ async def test_translation_turn_submit_parent_captures_the_configuration_revisio
 
 
 @pytest.mark.asyncio
-async def test_client_hub_captures_configuration_when_the_turn_is_created() -> None:
+async def test_translation_fixture_captures_configuration_when_the_turn_is_created() -> None:
     owner = TranslationRuntimeConfigurationOwner(TranslationRuntimeConfig(target_language="en"))
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=FakeOsc(),
@@ -259,7 +262,7 @@ async def test_client_hub_captures_configuration_when_the_turn_is_created() -> N
             captured.append(request)
             return (request.transcript.utterance_id,)
 
-    hub.translation_turns = Turns()
+    harness.replace_translation_turn_owner_for_test(Turns())
     transcript = Transcript(
         utterance_id=uuid4(),
         text="hello",
@@ -268,7 +271,7 @@ async def test_client_hub_captures_configuration_when_the_turn_is_created() -> N
         channel="self",
     )
 
-    await hub._ensure_translation(transcript)
+    await harness.ensure_translation(transcript)
     owner.replace(replace(owner.snapshot().value, target_language="fr"))
 
     assert len(captured) == 1
@@ -318,7 +321,7 @@ async def test_in_flight_turn_keeps_output_policy_and_later_turn_uses_replacemen
     )
     llm = GatedLLM()
     osc = FakeOsc()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=llm,
         osc=osc,
@@ -333,7 +336,7 @@ async def test_in_flight_turn_keeps_output_policy_and_later_turn_uses_replacemen
             channel="self",
         )
         task = asyncio.create_task(
-            hub._ensure_translation(
+            harness.ensure_translation(
                 transcript,
                 wait_for_parent=True,
             )
@@ -351,7 +354,7 @@ async def test_in_flight_turn_keeps_output_policy_and_later_turn_uses_replacemen
         await llm.release.put(None)
         await second
     finally:
-        await hub.translation_turns.close()
+        await harness.translation_turns.close()
 
     assert [message.text for message in osc.messages] == [
         "first (translated)",

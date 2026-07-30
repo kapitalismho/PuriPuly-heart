@@ -39,7 +39,7 @@ async def test_adapter_resolves_current_runtime_for_each_peer_event() -> None:
 async def test_adapter_rejects_event_without_current_runtime() -> None:
     adapter = PeerCaptureVadSinkAdapter(runtime_provider=lambda: None)
 
-    with pytest.raises(RuntimeError, match="Peer VAD sink requires the production hub"):
+    with pytest.raises(RuntimeError, match="Peer VAD sink requires the Peer translation owner"):
         await adapter.handle_vad_event(object())
 
 

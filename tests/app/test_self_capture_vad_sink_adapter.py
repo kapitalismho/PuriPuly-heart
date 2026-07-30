@@ -39,7 +39,7 @@ async def test_adapter_resolves_current_runtime_for_each_self_event() -> None:
 async def test_adapter_rejects_event_without_current_runtime() -> None:
     adapter = SelfCaptureVadSinkAdapter(runtime_provider=lambda: None)
 
-    with pytest.raises(RuntimeError, match="Self VAD sink requires the production hub"):
+    with pytest.raises(RuntimeError, match="Self VAD sink requires the Self translation owner"):
         await adapter.handle_vad_event(object())
 
 

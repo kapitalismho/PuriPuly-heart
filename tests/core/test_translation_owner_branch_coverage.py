@@ -36,8 +36,8 @@ from puripuly_heart.domain.events import (
     UIEventType,
 )
 from puripuly_heart.domain.models import Transcript, Translation
-from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import RecordingOscQueue
+from tests.helpers.translation_owners import compose_translation_test_harness
 
 
 @dataclass(slots=True)
@@ -257,11 +257,11 @@ def _make_runtime_logging_capture() -> tuple[SessionRuntimeLoggingService, io.St
     stream_handler = logging.StreamHandler(stream)
     stream_handler.setFormatter(logging.Formatter("%(message)s"))
 
-    root_logger = logging.getLogger(f"test.hub.runtime.root.{uuid4()}")
+    root_logger = logging.getLogger(f"test.translation.runtime.root.{uuid4()}")
     root_logger.handlers.clear()
     root_logger.propagate = False
 
-    session_logger = logging.getLogger(f"test.hub.runtime.session.{uuid4()}")
+    session_logger = logging.getLogger(f"test.translation.runtime.session.{uuid4()}")
     session_logger.handlers.clear()
     session_logger.propagate = False
 
@@ -283,44 +283,46 @@ def _runtime_log_messages(stream: io.StringIO) -> list[str]:
 
 def test_peer_translation_disclosure_enqueues_chatbox_notice_without_context_history() -> None:
     osc = RecordingOscQueue()
-    hub = compose_client_hub(stt=None, llm=None, osc=osc, clock=FakeClock(12.0))
-    hub.self_runtime.remember_context(
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=osc, clock=FakeClock(12.0))
+    harness.self_runtime.remember_context(
         "existing context",
         timestamp=10.0,
         source_language="ko",
         target_language="en",
     )
-    before_history = list(hub._translation_history)
+    before_history = list(harness.self_runtime.translation_history)
 
-    hub.output_projection.publish_system_disclosure("Peer translation is on")
+    harness.output_projection.publish_system_disclosure("Peer translation is on")
 
     assert [message.text for message in osc.messages] == ["Peer translation is on"]
     assert osc.messages[0].created_at == 12.0
-    assert hub._translation_history == before_history
+    assert harness.self_runtime.translation_history == before_history
 
 
 @pytest.mark.asyncio
-async def test_hub_drops_stale_partial_and_keeps_final_order() -> None:
-    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+async def test_translation_drops_stale_partial_and_keeps_final_order() -> None:
+    harness = compose_translation_test_harness(
+        stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
+    )
     buffer = _MergeBuffer(merge_id=uuid4())
     utterance_id = uuid4()
 
-    hub._upsert_merge_part(buffer, utterance_id, "hello world")
-    hub._upsert_merge_part(buffer, utterance_id, "hello")
-    hub._upsert_merge_part(buffer, utterance_id, "hello world!!!")
+    harness.self_owner._upsert_merge_part(buffer, utterance_id, "hello world")
+    harness.self_owner._upsert_merge_part(buffer, utterance_id, "hello")
+    harness.self_owner._upsert_merge_part(buffer, utterance_id, "hello world!!!")
 
     partial = Transcript(utterance_id=utterance_id, text="he", is_final=False, created_at=1.0)
     final = Transcript(
         utterance_id=utterance_id, text="hello world!!!", is_final=True, created_at=2.0
     )
 
-    await hub._handle_transcript(partial, is_final=False, source="Mic")
-    await hub._handle_transcript(final, is_final=True, source="Mic")
-    await hub._handle_transcript(partial, is_final=False, source="Mic")
+    await harness.dispatch_transcript(partial, is_final=False, source="Mic")
+    await harness.dispatch_transcript(final, is_final=True, source="Mic")
+    await harness.dispatch_transcript(partial, is_final=False, source="Mic")
 
-    bundle = hub.get_or_create_bundle(utterance_id)
+    bundle = harness.bundle_for(utterance_id)
     assert buffer.parts == ["hello world!!!"]
-    assert hub._merge_text(buffer.parts) == "hello world!!!"
+    assert harness.self_owner._merge_text(buffer.parts) == "hello world!!!"
     assert bundle.final is not None
     assert bundle.final.text == "hello world!!!"
     assert bundle.partial is None
@@ -330,21 +332,23 @@ async def test_hub_drops_stale_partial_and_keeps_final_order() -> None:
 async def test_stop_cancels_pending_tasks_and_closes_providers() -> None:
     stt = StubSTT()
     llm = StubLLM()
-    hub = compose_client_hub(stt=stt, llm=llm, osc=RecordingOscQueue(), clock=FakeClock())
-    hub._running = True
+    harness = compose_translation_test_harness(
+        stt=stt, llm=llm, osc=RecordingOscQueue(), clock=FakeClock()
+    )
+    harness.set_started_for_test(True)
 
-    hub._translation_tasks[uuid4()] = asyncio.create_task(asyncio.sleep(60.0))
+    harness.self_runtime.translation_tasks[uuid4()] = asyncio.create_task(asyncio.sleep(60.0))
     buffer = _MergeBuffer(merge_id=uuid4())
     buffer.spec_task = asyncio.create_task(asyncio.sleep(60.0))
     buffer.finalize_wait_task = asyncio.create_task(asyncio.sleep(60.0))
     buffer.awaiting_vad_timeout_task = asyncio.create_task(asyncio.sleep(60.0))
     buffer.resume_end_timeout_task = asyncio.create_task(asyncio.sleep(60.0))
-    hub._merge_buffer = buffer
+    harness.self_owner.merge_buffer = buffer
 
-    await hub.stop()
+    await harness.stop()
 
-    assert hub._translation_tasks == {}
-    assert hub._merge_buffer is None
+    assert harness.self_runtime.translation_tasks == {}
+    assert harness.self_owner.merge_buffer is None
     assert stt.closed is True
     assert llm.closed is True
 
@@ -352,16 +356,18 @@ async def test_stop_cancels_pending_tasks_and_closes_providers() -> None:
 @pytest.mark.asyncio
 async def test_start_is_idempotent_and_creates_background_tasks() -> None:
     stt = StubSTT()
-    hub = compose_client_hub(stt=stt, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock())
+    harness = compose_translation_test_harness(
+        stt=stt, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock()
+    )
 
-    await hub.start(auto_flush_osc=True)
-    stt_task = hub._stt_task
-    osc_task = hub.output_runtime.chatbox_flush_task
-    await hub.start(auto_flush_osc=True)
+    await harness.start(auto_flush_osc=True)
+    stt_task = harness.self_runtime.stt_task
+    osc_task = harness.output_runtime.chatbox_flush_task
+    await harness.start(auto_flush_osc=True)
 
-    assert hub._stt_task is stt_task
-    assert hub.output_runtime.chatbox_flush_task is osc_task
-    await hub.stop()
+    assert harness.self_runtime.stt_task is stt_task
+    assert harness.output_runtime.chatbox_flush_task is osc_task
+    await harness.stop()
 
 
 @pytest.mark.asyncio
@@ -376,7 +382,7 @@ async def test_clear_language_runtime_state_self_preserves_stt_task_and_clears_o
             secondary_text="secondary",
         )
     )
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -403,19 +409,19 @@ async def test_clear_language_runtime_state_self_preserves_stt_task_and_clears_o
         resume_end_timeout_task,
     ]
 
-    hub.self_runtime.stt_task = stt_task
-    hub.self_runtime.translation_tasks[self_id] = translation_task
-    hub.self_runtime.translation_tasks[standalone_id] = standalone_translation_task
-    hub.self_runtime.get_or_create_bundle(self_id)
-    hub.self_runtime.get_or_create_bundle(standalone_id)
-    hub.self_runtime.utterance_sources[self_id] = "Mic"
-    hub.self_runtime.utterance_sources[standalone_id] = "Mic"
-    hub.self_runtime.utterance_start_times[self_id] = 1.0
-    hub.self_runtime.utterance_start_times[standalone_id] = 1.5
-    hub.self_runtime.speech_ended_ids.add(self_id)
-    hub.self_runtime.speech_ended_ids.add(standalone_id)
-    hub.self_runtime.translation_history.append(ContextEntry("history", "ko", "en", 1.0))
-    hub.self_runtime.merge_buffer = _MergeBuffer(
+    harness.self_runtime.stt_task = stt_task
+    harness.self_runtime.translation_tasks[self_id] = translation_task
+    harness.self_runtime.translation_tasks[standalone_id] = standalone_translation_task
+    harness.self_runtime.get_or_create_bundle(self_id)
+    harness.self_runtime.get_or_create_bundle(standalone_id)
+    harness.self_runtime.utterance_sources[self_id] = "Mic"
+    harness.self_runtime.utterance_sources[standalone_id] = "Mic"
+    harness.self_runtime.utterance_start_times[self_id] = 1.0
+    harness.self_runtime.utterance_start_times[standalone_id] = 1.5
+    harness.self_runtime.speech_ended_ids.add(self_id)
+    harness.self_runtime.speech_ended_ids.add(standalone_id)
+    harness.self_runtime.translation_history.append(ContextEntry("history", "ko", "en", 1.0))
+    harness.self_runtime.merge_buffer = _MergeBuffer(
         merge_id=preview_merge_id,
         utterance_ids=[self_id],
         spec_task=spec_task,
@@ -423,14 +429,14 @@ async def test_clear_language_runtime_state_self_preserves_stt_task_and_clears_o
         awaiting_vad_timeout_task=awaiting_vad_timeout_task,
         resume_end_timeout_task=resume_end_timeout_task,
     )
-    hub._record_latency_stage(
+    harness.peer_owner._record_latency_stage(
         channel="self",
         utterance_id=self_id,
         stage="speech_end",
         timestamp=1.0,
         publish_now=False,
     )
-    hub._record_latency_stage(
+    harness.peer_owner._record_latency_stage(
         channel="peer",
         utterance_id=peer_id,
         stage="speech_end",
@@ -439,19 +445,21 @@ async def test_clear_language_runtime_state_self_preserves_stt_task_and_clears_o
     )
 
     try:
-        await hub.clear_language_runtime_state(channel="self")
+        await harness.clear_channel_language_state(channel="self")
 
-        assert hub.self_runtime.stt_task is stt_task
-        assert hub._stt_task is stt_task
-        assert hub.self_runtime.translation_tasks == {}
-        assert hub.self_runtime.merge_buffer is None
-        assert standalone_id in hub.self_runtime.utterances
-        assert hub.self_runtime.utterance_sources == {standalone_id: "Mic"}
-        assert hub.self_runtime.utterance_start_times == {}
-        assert hub.self_runtime.speech_ended_ids == set()
-        assert hub.self_runtime.translation_history == [ContextEntry("history", "ko", "en", 1.0)]
+        assert harness.self_runtime.stt_task is stt_task
+        assert harness.self_runtime.stt_task is stt_task
+        assert harness.self_runtime.translation_tasks == {}
+        assert harness.self_runtime.merge_buffer is None
+        assert standalone_id in harness.self_runtime.utterances
+        assert harness.self_runtime.utterance_sources == {standalone_id: "Mic"}
+        assert harness.self_runtime.utterance_start_times == {}
+        assert harness.self_runtime.speech_ended_ids == set()
+        assert harness.self_runtime.translation_history == [
+            ContextEntry("history", "ko", "en", 1.0)
+        ]
         assert overlay_sink.active_self_overlay_metadata() is None
-        timeline_keys = hub.translation_diagnostics.snapshot().timeline_keys
+        timeline_keys = harness.translation_diagnostics.snapshot().timeline_keys
         assert ("self", self_id) not in timeline_keys
         assert ("peer", peer_id) in timeline_keys
         assert translation_task.cancelled() is True
@@ -471,14 +479,16 @@ async def test_clear_language_runtime_state_self_preserves_stt_task_and_clears_o
 @pytest.mark.asyncio
 async def test_language_change_updates_next_self_translation_request_target() -> None:
     llm = RecordingLanguageLLM()
-    hub = compose_client_hub(stt=None, llm=llm, osc=RecordingOscQueue(), clock=FakeClock())
+    harness = compose_translation_test_harness(
+        stt=None, llm=llm, osc=RecordingOscQueue(), clock=FakeClock()
+    )
 
-    await hub.translation_requests.translate(
+    await harness.translation_requests.translate(
         DirectTranslationRequest(utterance_id=uuid4(), text="hello")
     )
-    hub.target_language = "ja"
-    await hub.clear_language_runtime_state(channel="self")
-    await hub.translation_requests.translate(
+    harness.replace_configuration(target_language="ja")
+    await harness.clear_channel_language_state(channel="self")
+    await harness.translation_requests.translate(
         DirectTranslationRequest(utterance_id=uuid4(), text="world")
     )
 
@@ -501,38 +511,38 @@ async def test_language_change_updates_next_self_translation_request_target() ->
 def test_send_stt_connected_notification_respects_eligibility_and_interval() -> None:
     clock = FakeClock()
     osc = RecordingOscQueue(immediate_result=True)
-    hub = compose_client_hub(stt=None, llm=None, osc=osc, clock=clock)
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=osc, clock=clock)
 
-    hub._send_stt_connected_notification()
+    harness.self_owner._send_stt_connected_notification()
     assert osc.immediate_messages == []
 
-    hub.mark_promo_eligible()
-    hub._send_stt_connected_notification()
+    harness.self_owner.mark_promo_eligible()
+    harness.self_owner._send_stt_connected_notification()
     assert osc.immediate_messages == ["PuriPuly ON!"]
-    assert hub._last_promo_time == 0.0
+    assert harness.self_owner._last_promo_time == 0.0
 
     clock.advance(30.0)
-    hub.mark_promo_eligible()
-    hub._send_stt_connected_notification()
+    harness.self_owner.mark_promo_eligible()
+    harness.self_owner._send_stt_connected_notification()
     assert osc.immediate_messages == ["PuriPuly ON!"]
 
     clock.advance(301.0)
-    hub.mark_promo_eligible()
-    hub._send_stt_connected_notification()
+    harness.self_owner.mark_promo_eligible()
+    harness.self_owner._send_stt_connected_notification()
     assert osc.immediate_messages == ["PuriPuly ON!", "PuriPuly ON!"]
 
 
 def test_send_stt_connected_notification_does_not_update_time_on_failed_send() -> None:
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(immediate_result=False),
         clock=FakeClock(),
     )
 
-    hub.mark_promo_eligible()
-    hub._send_stt_connected_notification()
-    assert hub._last_promo_time is None
+    harness.self_owner.mark_promo_eligible()
+    harness.self_owner._send_stt_connected_notification()
+    assert harness.self_owner._last_promo_time is None
 
 
 def test_prepare_llm_request_routes_context_logs_by_runtime_visibility() -> None:
@@ -540,14 +550,14 @@ def test_prepare_llm_request_routes_context_logs_by_runtime_visibility() -> None
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
     detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
 
-    basic_hub = compose_client_hub(
+    basic_harness = compose_translation_test_harness(
         stt=None,
         llm=StubLLM(),
         osc=RecordingOscQueue(),
         clock=FakeClock(_now=10.0),
         runtime_logging=basic_runtime_logging,
     )
-    detailed_hub = compose_client_hub(
+    detailed_harness = compose_translation_test_harness(
         stt=None,
         llm=StubLLM(),
         osc=RecordingOscQueue(),
@@ -556,27 +566,27 @@ def test_prepare_llm_request_routes_context_logs_by_runtime_visibility() -> None
     )
 
     try:
-        basic_hub._remember_context_entry("안녕", 9.0)
-        detailed_hub._remember_context_entry("안녕", 9.0)
+        basic_harness.remember_context("안녕", 9.0)
+        detailed_harness.remember_context("안녕", 9.0)
 
-        basic_hub._prepare_llm_request_with_mode("입력")
-        detailed_hub._prepare_llm_request_with_mode("입력")
+        basic_harness.prepare_translation_request_with_mode("입력")
+        detailed_harness.prepare_translation_request_with_mode("입력")
 
         basic_messages = _runtime_log_messages(basic_stream)
         detailed_messages = _runtime_log_messages(detailed_stream)
         expected_context_chars = len('- [self, 1s ago] "안녕"')
         expected_context_apply_log = (
-            "[Hub] Context apply: channel=self mode=local "
+            "[Translation] Context apply: channel=self mode=local "
             "request_chars=2 entries=1 self_entries=1 peer_entries=0 "
             f"context_chars={expected_context_chars}"
         )
 
-        assert "[Hub] Context mode: channel=self mode=local" in basic_messages
+        assert "[Translation] Context mode: channel=self mode=local" in basic_messages
         assert expected_context_apply_log in basic_messages
         assert not any("입력" in message for message in basic_messages)
         assert not any("안녕" in message for message in basic_messages)
 
-        assert "[Hub] Context mode: channel=self mode=local" in detailed_messages
+        assert "[Translation] Context mode: channel=self mode=local" in detailed_messages
         assert expected_context_apply_log in detailed_messages
         assert not any("입력" in message for message in detailed_messages)
         assert not any("안녕" in message for message in detailed_messages)
@@ -588,7 +598,7 @@ def test_prepare_llm_request_routes_context_logs_by_runtime_visibility() -> None
 @pytest.mark.asyncio
 async def test_handle_stt_event_logs_basic_channel_state_breadcrumb() -> None:
     runtime_logging, log_stream = _make_runtime_logging_capture()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -597,14 +607,16 @@ async def test_handle_stt_event_logs_basic_channel_state_breadcrumb() -> None:
     )
 
     try:
-        await hub._handle_stt_event(
+        await harness.dispatch_stt_event(
             STTSessionStateEvent(state=STTSessionState.STREAMING, channel="peer")
         )
 
-        event = await hub.ui_events.get()
+        event = await harness.ui_events.get()
         assert event.type == UIEventType.SESSION_STATE_CHANGED
         assert event.channel == "peer"
-        assert "[Hub] STT state: channel=peer state=STREAMING" in _runtime_log_messages(log_stream)
+        assert "[Translation] STT state: channel=peer state=STREAMING" in _runtime_log_messages(
+            log_stream
+        )
     finally:
         runtime_logging.close()
 
@@ -619,7 +631,9 @@ async def test_retired_stt_ingress_forwards_only_final_events(
         handled.append(event)
 
     monkeypatch.setattr(SelfTranslationChannelOwner, "handle_stt_event", record_event)
-    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    harness = compose_translation_test_harness(
+        stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
+    )
     utterance_id = uuid4()
     transcript = Transcript(
         utterance_id=utterance_id,
@@ -635,12 +649,14 @@ async def test_retired_stt_ingress_forwards_only_final_events(
     )
     final_event = STTFinalEvent(utterance_id=utterance_id, transcript=transcript)
 
-    await hub._handle_retired_stt_event(STTSessionStateEvent(state=STTSessionState.DISCONNECTED))
-    await hub._handle_retired_stt_event(STTErrorEvent(message="retired failure"))
-    await hub._handle_retired_stt_event(
+    await harness.dispatch_retired_stt_event(
+        STTSessionStateEvent(state=STTSessionState.DISCONNECTED)
+    )
+    await harness.dispatch_retired_stt_event(STTErrorEvent(message="retired failure"))
+    await harness.dispatch_retired_stt_event(
         STTPartialEvent(utterance_id=utterance_id, transcript=partial)
     )
-    await hub._handle_retired_stt_event(final_event)
+    await harness.dispatch_retired_stt_event(final_event)
 
     assert handled == [final_event]
 
@@ -651,7 +667,7 @@ async def test_handle_stt_partial_runtime_log_uses_metadata_without_transcript_t
     runtime_logging.set_mode(SessionLoggingMode.DETAILED)
     utterance_id = uuid4()
     raw_partial = "raw partial transcript should not enter runtime logs"
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -660,7 +676,7 @@ async def test_handle_stt_partial_runtime_log_uses_metadata_without_transcript_t
     )
 
     try:
-        await hub._handle_stt_event(
+        await harness.dispatch_stt_event(
             STTPartialEvent(
                 utterance_id=utterance_id,
                 transcript=Transcript(
@@ -672,12 +688,12 @@ async def test_handle_stt_partial_runtime_log_uses_metadata_without_transcript_t
             )
         )
 
-        event = await hub.ui_events.get()
+        event = await harness.ui_events.get()
         messages = _runtime_log_messages(log_stream)
 
         assert event.type == UIEventType.TRANSCRIPT_PARTIAL
         assert any(
-            message.startswith("[Hub] STT Partial:")
+            message.startswith("[Translation] STT Partial:")
             and "channel=self" in message
             and f"utterance_id={utterance_id}" in message
             and f"text_len={len(raw_partial)}" in message
@@ -697,14 +713,14 @@ async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
     detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
 
-    basic_hub = compose_client_hub(
+    basic_harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
         clock=FakeClock(),
         runtime_logging=basic_runtime_logging,
     )
-    detailed_hub = compose_client_hub(
+    detailed_harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -714,7 +730,7 @@ async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed
     utterance_id = uuid4()
 
     try:
-        await basic_hub.output_projection.publish_chatbox(
+        await basic_harness.output_projection.publish_chatbox(
             ChatboxProjection(
                 utterance_id=utterance_id,
                 channel="self",
@@ -724,7 +740,7 @@ async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed
                 source=None,
             )
         )
-        await detailed_hub.output_projection.publish_chatbox(
+        await detailed_harness.output_projection.publish_chatbox(
             ChatboxProjection(
                 utterance_id=utterance_id,
                 channel="self",
@@ -735,8 +751,8 @@ async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed
             )
         )
 
-        basic_event = await basic_hub.ui_events.get()
-        detailed_event = await detailed_hub.ui_events.get()
+        basic_event = await basic_harness.ui_events.get()
+        detailed_event = await detailed_harness.ui_events.get()
         assert basic_event.type == UIEventType.OSC_SENT
         assert detailed_event.type == UIEventType.OSC_SENT
 
@@ -745,7 +761,7 @@ async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed
 
         assert not any("OSC enqueue preview" in message for message in basic_messages)
         assert any(
-            message.startswith("[Hub] OSC enqueue preview:")
+            message.startswith("[Translation] OSC enqueue preview:")
             and "text_len=" in message
             and "translation_text_present=True" in message
             for message in detailed_messages
@@ -758,9 +774,9 @@ async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed
 
 
 @pytest.mark.asyncio
-async def test_publish_chatbox_candidate_after_hub_stop_skips_without_user_text() -> None:
+async def test_publish_chatbox_candidate_after_translation_stop_skips_without_user_text() -> None:
     osc = RecordingOscQueue()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=osc,
@@ -768,9 +784,9 @@ async def test_publish_chatbox_candidate_after_hub_stop_skips_without_user_text(
     )
     utterance_id = uuid4()
 
-    await hub.start(auto_flush_osc=True)
-    await hub.stop()
-    await hub.output_projection.publish_chatbox(
+    await harness.start(auto_flush_osc=True)
+    await harness.stop()
+    await harness.output_projection.publish_chatbox(
         ChatboxProjection(
             utterance_id=utterance_id,
             channel="self",
@@ -782,8 +798,8 @@ async def test_publish_chatbox_candidate_after_hub_stop_skips_without_user_text(
     )
 
     assert osc.messages == []
-    assert hub.ui_events.empty()
-    decision = hub.output_runtime.routing_decisions[-1]
+    assert harness.ui_events.empty()
+    decision = harness.output_runtime.routing_decisions[-1]
     assert decision.decision == "skipped"
     assert decision.reason == "output_runtime_closed"
     assert "closed secret transcript" not in repr(decision)
@@ -793,7 +809,7 @@ async def test_publish_chatbox_candidate_after_hub_stop_skips_without_user_text(
 @pytest.mark.asyncio
 async def test_stop_without_start_closes_output_runtime_ingress() -> None:
     osc = RecordingOscQueue()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=osc,
@@ -801,8 +817,8 @@ async def test_stop_without_start_closes_output_runtime_ingress() -> None:
     )
     utterance_id = uuid4()
 
-    await hub.stop()
-    await hub.output_projection.publish_chatbox(
+    await harness.stop()
+    await harness.output_projection.publish_chatbox(
         ChatboxProjection(
             utterance_id=utterance_id,
             channel="self",
@@ -814,32 +830,32 @@ async def test_stop_without_start_closes_output_runtime_ingress() -> None:
     )
 
     assert osc.messages == []
-    decision = hub.output_runtime.routing_decisions[-1]
+    decision = harness.output_runtime.routing_decisions[-1]
     assert decision.decision == "skipped"
     assert decision.reason == "output_runtime_closed"
     assert "never started secret transcript" not in repr(decision)
 
 
 @pytest.mark.asyncio
-async def test_restart_after_output_runtime_closed_failure_keeps_hub_not_running() -> None:
-    hub = compose_client_hub(
+async def test_restart_after_output_runtime_closed_failure_keeps_owners_not_running() -> None:
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
         clock=FakeClock(),
     )
 
-    await hub.start(auto_flush_osc=False)
-    await hub.stop()
+    await harness.start(auto_flush_osc=False)
+    await harness.stop()
 
     with pytest.raises(RuntimeError, match="closed"):
-        await hub.start(auto_flush_osc=False)
+        await harness.start(auto_flush_osc=False)
 
-    assert hub._running is False
+    assert harness.started is False
 
 
 @pytest.mark.asyncio
-async def test_restart_after_failed_output_runtime_close_keeps_hub_not_running() -> None:
+async def test_restart_after_failed_output_runtime_close_keeps_owners_not_running() -> None:
     class DropPendingFailsOnceOsc(RecordingOscQueue):
         def __init__(self) -> None:
             super().__init__()
@@ -850,46 +866,48 @@ async def test_restart_after_failed_output_runtime_close_keeps_hub_not_running()
                 self.fail_next_drop = False
                 raise RuntimeError("drop pending failed")
 
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=DropPendingFailsOnceOsc(),
         clock=FakeClock(),
     )
 
-    await hub.start(auto_flush_osc=False)
+    await harness.start(auto_flush_osc=False)
     with pytest.raises(RuntimeError, match="drop pending failed"):
-        await hub.stop()
+        await harness.stop()
 
     with pytest.raises(RuntimeError, match="closing"):
-        await hub.start(auto_flush_osc=False)
+        await harness.start(auto_flush_osc=False)
 
-    assert hub._running is False
+    assert harness.started is False
 
 
 @pytest.mark.asyncio
 async def test_handle_stt_event_routes_non_low_latency_events() -> None:
     runtime_logging, log_stream = _make_runtime_logging_capture()
     runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
         clock=FakeClock(),
         runtime_logging=runtime_logging,
     )
-    hub.mark_promo_eligible()
+    harness.self_owner.mark_promo_eligible()
     utterance_id = uuid4()
     partial = Transcript(utterance_id=utterance_id, text="hel", is_final=False, created_at=1.0)
     final = Transcript(utterance_id=utterance_id, text="hello", is_final=True, created_at=2.0)
 
     try:
-        await hub._handle_stt_event(STTSessionStateEvent(state=STTSessionState.STREAMING))
-        await hub._handle_stt_event(STTErrorEvent(message="boom"))
-        await hub._handle_stt_event(STTPartialEvent(utterance_id=utterance_id, transcript=partial))
-        await hub._handle_stt_event(STTFinalEvent(utterance_id=utterance_id, transcript=final))
+        await harness.dispatch_stt_event(STTSessionStateEvent(state=STTSessionState.STREAMING))
+        await harness.dispatch_stt_event(STTErrorEvent(message="boom"))
+        await harness.dispatch_stt_event(
+            STTPartialEvent(utterance_id=utterance_id, transcript=partial)
+        )
+        await harness.dispatch_stt_event(STTFinalEvent(utterance_id=utterance_id, transcript=final))
 
-        events = [await hub.ui_events.get() for _ in range(5)]
+        events = [await harness.ui_events.get() for _ in range(5)]
         assert [event.type for event in events] == [
             UIEventType.SESSION_STATE_CHANGED,
             UIEventType.ERROR,
@@ -898,11 +916,11 @@ async def test_handle_stt_event_routes_non_low_latency_events() -> None:
             UIEventType.OSC_SENT,
         ]
         assert events[1].runtime_log_handled is False
-        assert hub.osc.immediate_messages == ["PuriPuly ON!"]
-        assert len(hub.osc.messages) == 1
-        assert hub.osc.messages[0].text == "hello"
+        assert harness.osc.immediate_messages == ["PuriPuly ON!"]
+        assert len(harness.osc.messages) == 1
+        assert harness.osc.messages[0].text == "hello"
         assert (
-            "[Hub] Translation skipped (stage=final, channel=self, publish_chatbox=True): "
+            "[Translation] Translation skipped (stage=final, channel=self, publish_chatbox=True): "
             "llm unavailable"
         ) in _runtime_log_messages(log_stream)
     finally:
@@ -911,7 +929,7 @@ async def test_handle_stt_event_routes_non_low_latency_events() -> None:
 
 @pytest.mark.asyncio
 async def test_handle_stt_event_ignores_partial_in_low_latency_mode() -> None:
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -921,16 +939,16 @@ async def test_handle_stt_event_ignores_partial_in_low_latency_mode() -> None:
     utterance_id = uuid4()
     partial = Transcript(utterance_id=utterance_id, text="hel", is_final=False, created_at=1.0)
 
-    await hub._handle_stt_event(STTPartialEvent(utterance_id=utterance_id, transcript=partial))
+    await harness.dispatch_stt_event(STTPartialEvent(utterance_id=utterance_id, transcript=partial))
 
-    assert hub.ui_events.empty()
+    assert harness.ui_events.empty()
 
 
 @pytest.mark.asyncio
 async def test_translate_and_enqueue_emits_error_and_fallback_transcript() -> None:
     llm = StubLLM(should_fail=True)
     runtime_logging, log_stream = _make_runtime_logging_capture()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -941,14 +959,14 @@ async def test_translate_and_enqueue_emits_error_and_fallback_transcript() -> No
     utterance_id = uuid4()
 
     try:
-        await hub._translate_and_enqueue(utterance_id, "hello")
+        await harness.process_translation(utterance_id, "hello")
 
-        events = [await hub.ui_events.get() for _ in range(2)]
+        events = [await harness.ui_events.get() for _ in range(2)]
         assert [event.type for event in events] == [UIEventType.ERROR, UIEventType.OSC_SENT]
         assert events[0].runtime_log_handled is True
-        assert hub.osc.messages[0].text == "hello"
+        assert harness.osc.messages[0].text == "hello"
         assert (
-            "[Hub] Translation failed (stage=final, channel=self): "
+            "[Translation] Translation failed (stage=final, channel=self): "
             "category=unknown code=provider.unknown" in _runtime_log_messages(log_stream)
         )
         assert "llm failed" not in "\n".join(_runtime_log_messages(log_stream))
@@ -959,7 +977,7 @@ async def test_translate_and_enqueue_emits_error_and_fallback_transcript() -> No
 @pytest.mark.asyncio
 async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
     runtime_logging, log_stream = _make_runtime_logging_capture()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=ManagedAuthFailingLLM(
             diagnostics=ManagedOpenRouterReleaseDiagnostics(
@@ -979,9 +997,9 @@ async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
     utterance_id = uuid4()
 
     try:
-        await hub._translate_and_enqueue(utterance_id, "hello")
+        await harness.process_translation(utterance_id, "hello")
 
-        events = [await hub.ui_events.get() for _ in range(2)]
+        events = [await harness.ui_events.get() for _ in range(2)]
         assert [event.type for event in events] == [UIEventType.ERROR, UIEventType.OSC_SENT]
         assert events[0].runtime_log_handled is True
         payload = events[0].payload
@@ -1011,9 +1029,11 @@ async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
 async def test_try_commit_after_spec_respects_allow_fallback_flag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    hub = compose_client_hub(stt=None, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock())
+    harness = compose_translation_test_harness(
+        stt=None, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock()
+    )
     buffer = _MergeBuffer(merge_id=uuid4(), parts=["text"])
-    hub._merge_buffer = buffer
+    harness.self_owner.merge_buffer = buffer
     called: list[str] = []
 
     async def fake_commit(
@@ -1026,8 +1046,12 @@ async def test_try_commit_after_spec_respects_allow_fallback_flag(
 
     monkeypatch.setattr(SelfTranslationChannelOwner, "_commit_merge", fake_commit)
 
-    await hub._try_commit_after_spec(buffer, reason="spec_failed", allow_fallback=False)
-    await hub._try_commit_after_spec(buffer, reason="spec_failed", allow_fallback=True)
+    await harness.self_owner._try_commit_after_spec(
+        buffer, reason="spec_failed", allow_fallback=False
+    )
+    await harness.self_owner._try_commit_after_spec(
+        buffer, reason="spec_failed", allow_fallback=True
+    )
 
     assert called == ["spec_failed"]
 
@@ -1038,7 +1062,7 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
     detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
 
-    basic_hub = compose_client_hub(
+    basic_harness = compose_translation_test_harness(
         stt=None,
         llm=StubLLM(should_fail=True),
         osc=RecordingOscQueue(),
@@ -1046,7 +1070,7 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
         runtime_logging=basic_runtime_logging,
         low_latency_mode=True,
     )
-    detailed_hub = compose_client_hub(
+    detailed_harness = compose_translation_test_harness(
         stt=None,
         llm=StubLLM(should_fail=True),
         osc=RecordingOscQueue(),
@@ -1060,20 +1084,22 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
     detailed_buffer = _MergeBuffer(
         merge_id=uuid4(), parts=["hello"], spec_text="hello", spec_attempts=1
     )
-    basic_hub._merge_buffer = basic_buffer
-    detailed_hub._merge_buffer = detailed_buffer
+    basic_harness.self_owner.merge_buffer = basic_buffer
+    detailed_harness.self_owner.merge_buffer = detailed_buffer
 
     try:
-        await basic_hub._run_spec_translation(basic_buffer.merge_id, "hello", 1)
-        await detailed_hub._run_spec_translation(detailed_buffer.merge_id, "hello", 1)
+        await basic_harness.self_owner._run_spec_translation(basic_buffer.merge_id, "hello", 1)
+        await detailed_harness.self_owner._run_spec_translation(
+            detailed_buffer.merge_id, "hello", 1
+        )
 
         assert not any(
-            "[Hub] Translation failed (stage=spec, channel=self): "
+            "[Translation] Translation failed (stage=spec, channel=self): "
             "category=unknown code=provider.unknown" in message
             for message in _runtime_log_messages(basic_stream)
         )
         assert any(
-            "[Hub] Translation failed (stage=spec, channel=self): "
+            "[Translation] Translation failed (stage=spec, channel=self): "
             "category=unknown code=provider.unknown" in message
             for message in _runtime_log_messages(detailed_stream)
         )
@@ -1085,13 +1111,15 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
 
 @pytest.mark.asyncio
 async def test_handle_stt_event_preserves_runtime_logged_flag_from_stt_errors() -> None:
-    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    harness = compose_translation_test_harness(
+        stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
+    )
 
-    await hub._handle_stt_event(
+    await harness.dispatch_stt_event(
         STTErrorEvent(message="session failed", channel="peer", runtime_log_handled=True)
     )
 
-    event = await hub.ui_events.get()
+    event = await harness.ui_events.get()
     assert event.type == UIEventType.ERROR
     assert event.channel == "peer"
     assert event.runtime_log_handled is True
@@ -1101,25 +1129,27 @@ async def test_handle_stt_event_preserves_runtime_logged_flag_from_stt_errors() 
 async def test_peer_stt_event_loop_failure_without_runtime_logging_is_safe(
     caplog,
 ) -> None:
-    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    harness = compose_translation_test_harness(
+        stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
+    )
 
-    with caplog.at_level(logging.ERROR, logger="puripuly_heart.core.orchestrator.hub"):
-        await hub._handle_stt_event_loop_exception(
+    with caplog.at_level(logging.ERROR, logger="puripuly_heart.core.orchestrator.translation"):
+        await harness.dispatch_stt_failure(
             RuntimeError("loop boom"),
             channel="peer",
         )
 
-    assert "[Hub] STT event loop crashed: RuntimeError" in caplog.messages
+    assert "[Translation] STT event loop crashed: RuntimeError" in caplog.messages
     assert "loop boom" not in "\n".join(caplog.messages)
     assert any(record.levelno == logging.ERROR for record in caplog.records)
 
 
 @pytest.mark.asyncio
 async def test_peer_stt_event_loop_failure_with_runtime_logging_is_safe() -> None:
-    raw_detail = "stt event loop socket failed token=hub-stt-secret-123"
+    raw_detail = "stt event loop socket failed token=translation-stt-secret-123"
     runtime_logging, log_stream = _make_runtime_logging_capture()
     runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1128,15 +1158,17 @@ async def test_peer_stt_event_loop_failure_with_runtime_logging_is_safe() -> Non
     )
 
     try:
-        await hub._handle_stt_event_loop_exception(
+        await harness.dispatch_stt_failure(
             ConnectionError(raw_detail),
             channel="peer",
         )
 
         runtime_log = "\n".join(_runtime_log_messages(log_stream))
-        assert "[Hub] STT event loop crashed: category=network code=stt.network" in runtime_log
+        assert (
+            "[Translation] STT event loop crashed: category=network code=stt.network" in runtime_log
+        )
         assert raw_detail not in runtime_log
-        assert "hub-stt-secret-123" not in runtime_log
+        assert "translation-stt-secret-123" not in runtime_log
         assert "Traceback (most recent call last):" not in runtime_log
     finally:
         runtime_logging.close()
@@ -1144,10 +1176,10 @@ async def test_peer_stt_event_loop_failure_with_runtime_logging_is_safe() -> Non
 
 @pytest.mark.asyncio
 async def test_handle_stt_event_loop_exception_with_runtime_logging_uses_safe_stt_report() -> None:
-    raw_detail = "stt owner task socket failed token=hub-stt-secret-456"
+    raw_detail = "stt owner task socket failed token=translation-stt-secret-456"
     runtime_logging, log_stream = _make_runtime_logging_capture()
     runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1156,12 +1188,14 @@ async def test_handle_stt_event_loop_exception_with_runtime_logging_uses_safe_st
     )
 
     try:
-        await hub._handle_stt_event_loop_exception(ConnectionError(raw_detail))
+        await harness.dispatch_stt_failure(ConnectionError(raw_detail))
 
         runtime_log = "\n".join(_runtime_log_messages(log_stream))
-        assert "[Hub] STT event loop crashed: category=network code=stt.network" in runtime_log
+        assert (
+            "[Translation] STT event loop crashed: category=network code=stt.network" in runtime_log
+        )
         assert raw_detail not in runtime_log
-        assert "hub-stt-secret-456" not in runtime_log
+        assert "translation-stt-secret-456" not in runtime_log
         assert "Traceback (most recent call last):" not in runtime_log
     finally:
         runtime_logging.close()
@@ -1173,7 +1207,7 @@ async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
     detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
 
-    basic_hub = compose_client_hub(
+    basic_harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1181,7 +1215,7 @@ async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
         clock=FakeClock(),
         runtime_logging=basic_runtime_logging,
     )
-    detailed_hub = compose_client_hub(
+    detailed_harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1191,15 +1225,15 @@ async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
     )
 
     try:
-        await basic_hub.output_projection.publish_overlay_event(
-            basic_hub.overlay_event_adapter.utterance_closed(
+        await basic_harness.output_projection.publish_overlay_event(
+            basic_harness.output_projection.overlay_event_adapter.utterance_closed(
                 utterance_id=uuid4(),
                 channel="self",
                 is_final=True,
             )
         )
-        await detailed_hub.output_projection.publish_overlay_event(
-            detailed_hub.overlay_event_adapter.utterance_closed(
+        await detailed_harness.output_projection.publish_overlay_event(
+            detailed_harness.output_projection.overlay_event_adapter.utterance_closed(
                 utterance_id=uuid4(),
                 channel="self",
                 is_final=True,
@@ -1209,12 +1243,12 @@ async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
         basic_messages = _runtime_log_messages(basic_stream)
         detailed_messages = _runtime_log_messages(detailed_stream)
 
-        assert "[Hub] Overlay sink emit failed: RuntimeError" in basic_messages
+        assert "[Translation] Overlay sink emit failed: RuntimeError" in basic_messages
         assert not any(
             "Traceback (most recent call last):" in message for message in basic_messages
         )
 
-        assert "[Hub] Overlay sink emit failed: RuntimeError" in detailed_messages
+        assert "[Translation] Overlay sink emit failed: RuntimeError" in detailed_messages
         assert not any(
             "Traceback (most recent call last):" in message for message in detailed_messages
         )
@@ -1228,9 +1262,11 @@ async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
 async def test_maybe_restart_spec_replaces_previous_task_and_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    hub = compose_client_hub(stt=None, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock())
+    harness = compose_translation_test_harness(
+        stt=None, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock()
+    )
     buffer = _MergeBuffer(merge_id=uuid4(), parts=["final text"])
-    hub._merge_buffer = buffer
+    harness.self_owner.merge_buffer = buffer
     old_task = asyncio.create_task(asyncio.sleep(60.0))
     buffer.spec_task = old_task
     buffer.spec_text = "old"
@@ -1246,7 +1282,7 @@ async def test_maybe_restart_spec_replaces_previous_task_and_state(
         seen.append((merge_id, text, attempt))
 
     monkeypatch.setattr(SelfTranslationChannelOwner, "_run_spec_translation", fake_run_spec)
-    await hub._maybe_restart_spec(buffer)
+    await harness.self_owner._maybe_restart_spec(buffer)
     await asyncio.sleep(0)
 
     assert old_task.done() is True
@@ -1259,16 +1295,16 @@ async def test_maybe_restart_spec_replaces_previous_task_and_state(
 async def test_handle_vad_event_speech_end_tracks_timing_and_forwards_to_stt() -> None:
     stt = StubSTT()
     clock = FakeClock(_now=10.0)
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=stt, llm=None, osc=RecordingOscQueue(), clock=clock, low_latency_mode=True
     )
     utterance_id = uuid4()
 
-    await hub.handle_vad_event(SpeechEnd(utterance_id))
+    await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
 
-    assert hub.osc.typing == [True]
-    assert hub._utterance_start_times[utterance_id] == 10.0
-    assert utterance_id in hub._speech_ended_ids
+    assert harness.osc.typing == [True]
+    assert harness.self_runtime.utterance_start_times[utterance_id] == 10.0
+    assert utterance_id in harness.self_runtime.speech_ended_ids
     assert stt.handled == [SpeechEnd(utterance_id)]
 
 
@@ -1277,7 +1313,7 @@ async def test_handle_vad_event_forwards_resume_confirming_chunk_before_overlay_
     stt = StubSTT()
     sink = BlockingOverlaySink()
     clock = FakeClock(_now=10.0)
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=stt,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1290,7 +1326,7 @@ async def test_handle_vad_event_forwards_resume_confirming_chunk_before_overlay_
     merge_id = uuid4()
     chunk = SpeechChunk(resumed_utterance_id, chunk=np.zeros((1,), dtype=np.float32))
 
-    hub._merge_buffer = _MergeBuffer(
+    harness.self_owner.merge_buffer = _MergeBuffer(
         merge_id=merge_id,
         parts=["hello live"],
         utterance_ids=[first_utterance_id],
@@ -1306,7 +1342,7 @@ async def test_handle_vad_event_forwards_resume_confirming_chunk_before_overlay_
         secondary_text="translated live",
     )
 
-    task = asyncio.create_task(hub.handle_vad_event(chunk))
+    task = asyncio.create_task(harness.self_owner.handle_vad_event(chunk))
     await sink.started.wait()
 
     assert len(stt.handled) == 1
@@ -1324,26 +1360,28 @@ async def test_handle_vad_event_forwards_resume_confirming_chunk_before_overlay_
 
 @pytest.mark.asyncio
 async def test_submit_text_validates_input_and_enqueues_without_llm() -> None:
-    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    harness = compose_translation_test_harness(
+        stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
+    )
 
     with pytest.raises(ValueError, match="text must be non-empty"):
-        await hub.submit_text("   ")
+        await harness.self_owner.submit_text("   ")
 
-    utterance_id = await hub.submit_text("hello", source="You")
-    events = [await hub.ui_events.get(), await hub.ui_events.get()]
+    utterance_id = await harness.self_owner.submit_text("hello", source="You")
+    events = [await harness.ui_events.get(), await harness.ui_events.get()]
     assert [event.type for event in events] == [UIEventType.TRANSCRIPT_FINAL, UIEventType.OSC_SENT]
-    assert hub.osc.messages[-1].utterance_id == utterance_id
-    assert hub.osc.messages[-1].text == "hello"
+    assert harness.osc.messages[-1].utterance_id == utterance_id
+    assert harness.osc.messages[-1].text == "hello"
 
 
 @pytest.mark.asyncio
 async def test_submit_text_clipboard_source_uses_manual_fallback_without_llm() -> None:
     osc = RecordingOscQueue()
-    hub = compose_client_hub(stt=None, llm=None, osc=osc, clock=FakeClock())
-    hub.translation_enabled = False
+    harness = compose_translation_test_harness(stt=None, llm=None, osc=osc, clock=FakeClock())
+    harness.replace_configuration(translation_enabled=False)
 
-    utterance_id = await hub.submit_text("clipboard fallback", source="Clipboard")
-    events = [await hub.ui_events.get(), await hub.ui_events.get()]
+    utterance_id = await harness.self_owner.submit_text("clipboard fallback", source="Clipboard")
+    events = [await harness.ui_events.get(), await harness.ui_events.get()]
 
     assert [event.type for event in events] == [UIEventType.TRANSCRIPT_FINAL, UIEventType.OSC_SENT]
     assert events[0].source == "Clipboard"
@@ -1352,11 +1390,13 @@ async def test_submit_text_clipboard_source_uses_manual_fallback_without_llm() -
 
 
 def test_merge_helpers_cover_overlap_and_spacing_paths() -> None:
-    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    harness = compose_translation_test_harness(
+        stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
+    )
 
-    assert hub._merge_with_overlap("same text", "text done") == "same text done"
-    assert hub._merge_with_overlap("go", "home") == "go home"
-    assert hub._merge_with_overlap("abc", "...abc") == "abc"
-    assert hub._merge_with_overlap("가다.", "가다고") == "가다.가다고"
-    assert hub._strip_trailing_boundary("abc. ") == ("abc", 2)
-    assert hub._strip_leading_boundary(" ..abc") == ("abc", 3)
+    assert harness.self_owner._merge_with_overlap("same text", "text done") == "same text done"
+    assert harness.self_owner._merge_with_overlap("go", "home") == "go home"
+    assert harness.self_owner._merge_with_overlap("abc", "...abc") == "abc"
+    assert harness.self_owner._merge_with_overlap("가다.", "가다고") == "가다.가다고"
+    assert harness.self_owner._strip_trailing_boundary("abc. ") == ("abc", 2)
+    assert harness.self_owner._strip_leading_boundary(" ..abc") == ("abc", 3)

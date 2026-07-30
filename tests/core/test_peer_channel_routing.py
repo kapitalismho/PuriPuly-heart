@@ -12,8 +12,8 @@ from puripuly_heart.core.stt.controller import ManagedSTTProvider
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
-from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import RecordingOscQueue, samples
+from tests.helpers.translation_owners import compose_translation_test_harness
 
 
 @dataclass(slots=True)
@@ -140,14 +140,16 @@ async def test_peer_desktop_transcripts_are_routed_to_peer_runtime_and_never_sen
     None
 ):
     osc = RecordingOscQueue()
-    hub = compose_client_hub(stt=None, llm=None, osc=osc, clock=FakeClock(_now=10.0))
+    harness = compose_translation_test_harness(
+        stt=None, llm=None, osc=osc, clock=FakeClock(_now=10.0)
+    )
 
-    utterance_id = await hub.handle_peer_transcript_final_for_test(
+    utterance_id = await harness.handle_peer_transcript_final_for_test(
         text="peer line",
     )
 
-    bundle = hub.get_or_create_bundle(utterance_id, channel="peer")
-    event = await hub.ui_events.get()
+    bundle = harness.bundle_for(utterance_id, channel="peer")
+    event = await harness.ui_events.get()
 
     assert bundle.final is not None
     assert bundle.final.channel == "peer"
@@ -159,7 +161,7 @@ async def test_peer_desktop_transcripts_are_routed_to_peer_runtime_and_never_sen
 
 @pytest.mark.asyncio
 async def test_peer_final_runs_owner_creates_ordered_children_for_language_runs() -> None:
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock(_now=10.0)
     )
     parent_utterance_id = uuid4()
@@ -168,7 +170,7 @@ async def test_peer_final_runs_owner_creates_ordered_children_for_language_runs(
         FinalLanguageRun(text="中文", language="zh"),
     )
 
-    child_ids = await hub.peer_final_runs.submit_parent(
+    child_ids = await harness.translation_turns.submit_parent(
         Transcript(
             utterance_id=parent_utterance_id,
             text="日本語中文",
@@ -182,7 +184,8 @@ async def test_peer_final_runs_owner_creates_ordered_children_for_language_runs(
     assert len(child_ids) == 2
     assert parent_utterance_id not in child_ids
     assert [
-        hub.peer_runtime.utterances[child_id].final.final_language_runs for child_id in child_ids
+        harness.peer_runtime.utterances[child_id].final.final_language_runs
+        for child_id in child_ids
     ] == [
         (runs[0],),
         (runs[1],),
@@ -191,7 +194,7 @@ async def test_peer_final_runs_owner_creates_ordered_children_for_language_runs(
 
 @pytest.mark.asyncio
 async def test_peer_final_event_preserves_language_runs_at_the_current_consumer_boundary() -> None:
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock(_now=10.0)
     )
     parent_utterance_id = uuid4()
@@ -204,9 +207,9 @@ async def test_peer_final_event_preserves_language_runs_at_the_current_consumer_
         final_language_runs=runs,
     )
 
-    await hub._handle_stt_event(STTFinalEvent(parent_utterance_id, transcript))
+    await harness.dispatch_stt_event(STTFinalEvent(parent_utterance_id, transcript))
 
-    event = await hub.ui_events.get()
+    event = await harness.ui_events.get()
     assert event.type == UIEventType.TRANSCRIPT_FINAL
     assert isinstance(event.payload, Transcript)
     assert event.payload.final_language_runs == runs
@@ -215,7 +218,7 @@ async def test_peer_final_event_preserves_language_runs_at_the_current_consumer_
 @pytest.mark.asyncio
 async def test_integrated_context_always_includes_peer_entries() -> None:
     clock = FakeClock(_now=112.0)
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -223,24 +226,24 @@ async def test_integrated_context_always_includes_peer_entries() -> None:
         integrated_context_enabled=True,
         peer_translation_enabled=True,
     )
-    hub.source_language = "en"
-    hub.target_language = "ko"
-    hub.self_runtime.remember_context(
+    harness.replace_configuration(source_language="en")
+    harness.replace_configuration(target_language="ko")
+    harness.self_runtime.remember_context(
         "self line",
         timestamp=100.0,
         source_language="en",
         target_language="ko",
     )
-    hub.peer_runtime.remember_context(
+    harness.peer_runtime.remember_context(
         "peer line",
         timestamp=105.0,
         source_language="en",
         target_language="ko",
     )
 
-    context, mode = hub.translation_requests.context_resolver.resolve_for_request(
-        runtime=hub.self_runtime,
-        other_runtime=hub.peer_runtime,
+    context, mode = harness.translation_requests.context_resolver.resolve_for_request(
+        runtime=harness.self_runtime,
+        other_runtime=harness.peer_runtime,
         requested_mode="integrated",
         peer_translation_enabled=True,
         source_language="en",
@@ -254,7 +257,7 @@ async def test_integrated_context_always_includes_peer_entries() -> None:
 
 def test_integrated_context_includes_opposite_direction_peer_entries() -> None:
     clock = FakeClock(_now=112.0)
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -262,20 +265,20 @@ def test_integrated_context_includes_opposite_direction_peer_entries() -> None:
         integrated_context_enabled=True,
         peer_translation_enabled=True,
     )
-    hub.source_language = "ko"
-    hub.target_language = "en"
-    hub.peer_source_language = "en"
-    hub.peer_target_language = "ko"
-    hub._remember_context_entry("self previous", timestamp=100.0, runtime=hub.self_runtime)
-    hub._remember_context_entry("peer previous", timestamp=105.0, runtime=hub.peer_runtime)
+    harness.replace_configuration(source_language="ko")
+    harness.replace_configuration(target_language="en")
+    harness.replace_configuration(peer_source_language="en")
+    harness.replace_configuration(peer_target_language="ko")
+    harness.remember_context("self previous", timestamp=100.0, runtime=harness.self_runtime)
+    harness.remember_context("peer previous", timestamp=105.0, runtime=harness.peer_runtime)
 
-    _, self_context, _, self_mode = hub._prepare_llm_request_with_mode(
+    _, self_context, _, self_mode = harness.prepare_translation_request_with_mode(
         "self current",
-        runtime=hub.self_runtime,
+        runtime=harness.self_runtime,
     )
-    _, peer_context, _, peer_mode = hub._prepare_llm_request_with_mode(
+    _, peer_context, _, peer_mode = harness.prepare_translation_request_with_mode(
         "peer current",
-        runtime=hub.peer_runtime,
+        runtime=harness.peer_runtime,
     )
 
     assert self_mode == "integrated"
@@ -287,7 +290,7 @@ def test_integrated_context_includes_opposite_direction_peer_entries() -> None:
 @pytest.mark.asyncio
 async def test_peer_translation_respects_master_translation_toggle() -> None:
     llm = FakeLLM()
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -296,9 +299,9 @@ async def test_peer_translation_respects_master_translation_toggle() -> None:
         peer_translation_enabled=True,
     )
 
-    utterance_id = await hub.handle_peer_transcript_final_for_test(text="peer line")
-    bundle = hub.get_or_create_bundle(utterance_id, channel="peer")
-    event = await hub.ui_events.get()
+    utterance_id = await harness.handle_peer_transcript_final_for_test(text="peer line")
+    bundle = harness.bundle_for(utterance_id, channel="peer")
+    event = await harness.ui_events.get()
 
     assert event.type == UIEventType.TRANSCRIPT_FINAL
     assert bundle.translation is None
@@ -323,35 +326,35 @@ async def test_peer_transcripts_stay_peer_routed_across_runtime_swap_without_dup
         drain_timeout_s=0.05,
         finalize_grace_s=0.0,
     )
-    hub = compose_client_hub(
+    harness = compose_translation_test_harness(
         stt=None,
         peer_stt=old_peer,
         llm=None,
         osc=RecordingOscQueue(),
         clock=FakeClock(_now=10.0),
     )
-    await hub.start(auto_flush_osc=False)
+    await harness.start(auto_flush_osc=False)
 
     first_id = __import__("uuid").uuid4()
-    await hub.handle_peer_vad_event(
+    await harness.peer_owner.handle_peer_vad_event(
         SpeechStart(first_id, pre_roll=samples(0.0), chunk=samples(1.0))
     )
-    await hub.handle_peer_vad_event(SpeechEnd(first_id))
-    first_final = await _next_transcript_final_event(hub.ui_events)
+    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(first_id))
+    first_final = await _next_transcript_final_event(harness.ui_events)
 
-    await hub.local_asr_provider_runtime.replace_prebuilt_provider("peer", new_peer, start=True)
+    await harness.local_asr_runtime.replace_prebuilt_provider("peer", new_peer, start=True)
 
     second_id = __import__("uuid").uuid4()
-    await hub.handle_peer_vad_event(
+    await harness.peer_owner.handle_peer_vad_event(
         SpeechStart(second_id, pre_roll=samples(0.0), chunk=samples(1.0))
     )
-    await hub.handle_peer_vad_event(SpeechEnd(second_id))
-    second_final = await _next_transcript_final_event(hub.ui_events)
+    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(second_id))
+    second_final = await _next_transcript_final_event(harness.ui_events)
 
     await asyncio.sleep(0.05)
     remaining_events: list[object] = []
-    while not hub.ui_events.empty():
-        remaining_events.append(await hub.ui_events.get())
+    while not harness.ui_events.empty():
+        remaining_events.append(await harness.ui_events.get())
 
     finals = [first_final, second_final] + [
         event
@@ -362,4 +365,4 @@ async def test_peer_transcripts_stay_peer_routed_across_runtime_swap_without_dup
     assert len(finals) == 2
     assert [event.channel for event in finals] == ["peer", "peer"]
     assert [event.payload.text for event in finals] == ["old final", "new final"]
-    await hub.stop()
+    await harness.stop()
