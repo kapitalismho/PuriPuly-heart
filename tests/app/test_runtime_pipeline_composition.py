@@ -122,10 +122,12 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
     assert pipeline.hub.self_runtime is pipeline.self_runtime
     assert pipeline.hub.peer_runtime is pipeline.peer_runtime
     assert pipeline.hub.translation_turns is pipeline.translation_turns
-    assert pipeline.hub.context_resolver is pipeline.context_resolver
+    assert pipeline.translation_requests.context_resolver is pipeline.context_resolver
     assert pipeline.hub.translation_diagnostics is pipeline.translation_diagnostics
     assert pipeline.hub._local_asr_provider_runtime is pipeline.local_asr_runtime
-    assert pipeline.hub._llm_provider_runtime is pipeline.llm_runtime
+    assert pipeline.translation_requests.provider_runtime is pipeline.llm_runtime
+    assert pipeline.hub.translation_requests is pipeline.translation_requests
+    assert not hasattr(pipeline.hub, "_llm_provider_runtime")
     assert pipeline.resource_owner.output_runtime is pipeline.output_runtime
     assert pipeline.resource_owner.local_asr_runtime is pipeline.local_asr_runtime
     assert captured["self"] == (

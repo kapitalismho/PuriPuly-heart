@@ -36,6 +36,7 @@ def test_pipeline_constructs_direct_durable_owners_and_hub_constructs_none() -> 
     assert pipeline_calls.count("ProviderRuntimeHandle") == 1
     assert pipeline_calls.count("TranslationLatencyDiagnosticsOwner") == 1
     assert pipeline_calls.count("TranslationOutputProjectionOwner") == 1
+    assert pipeline_calls.count("TranslationRequestOwner") == 1
     assert {
         "OutputRuntime",
         "ChannelRuntime",
@@ -44,6 +45,7 @@ def test_pipeline_constructs_direct_durable_owners_and_hub_constructs_none() -> 
         "ProviderRuntimeHandle",
         "TranslationLatencyDiagnosticsOwner",
         "TranslationOutputProjectionOwner",
+        "TranslationRequestOwner",
     }.isdisjoint(hub_calls)
 
 

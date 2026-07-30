@@ -238,7 +238,7 @@ async def test_integrated_context_always_includes_peer_entries() -> None:
         target_language="ko",
     )
 
-    context, mode = hub.context_resolver.resolve_for_request(
+    context, mode = hub.translation_requests.context_resolver.resolve_for_request(
         runtime=hub.self_runtime,
         other_runtime=hub.peer_runtime,
         requested_mode="integrated",

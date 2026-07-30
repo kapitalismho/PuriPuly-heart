@@ -406,7 +406,7 @@ class TestContextInternalPaths:
         )
         hub.self_runtime.remember_context("self only", timestamp=100.0)
 
-        context, mode = hub.context_resolver.resolve_for_request(
+        context, mode = hub.translation_requests.context_resolver.resolve_for_request(
             runtime=hub.self_runtime,
             other_runtime=hub.peer_runtime,
             requested_mode="integrated",
@@ -527,7 +527,7 @@ class TestContextInternalPaths:
             "self newest", timestamp=72.0, source_language="en", target_language="ko"
         )
 
-        context, mode = hub.context_resolver.resolve_for_request(
+        context, mode = hub.translation_requests.context_resolver.resolve_for_request(
             runtime=hub.self_runtime,
             other_runtime=hub.peer_runtime,
             requested_mode="integrated",
@@ -571,7 +571,7 @@ class TestContextInternalPaths:
             "self 3", timestamp=74.0, source_language="en", target_language="ko"
         )
 
-        context, mode = hub.context_resolver.resolve_for_request(
+        context, mode = hub.translation_requests.context_resolver.resolve_for_request(
             runtime=hub.self_runtime,
             other_runtime=hub.peer_runtime,
             requested_mode="integrated",

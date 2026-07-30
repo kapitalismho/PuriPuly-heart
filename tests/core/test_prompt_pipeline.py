@@ -7,6 +7,7 @@ import pytest
 
 from puripuly_heart.config.prompts import _reset_prompt_cache_for_tests
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.orchestrator.translation_request import DirectTranslationRequest
 from puripuly_heart.domain.models import Translation
 from tests.helpers.client_hub import compose_client_hub
 
@@ -158,11 +159,13 @@ async def test_detected_peer_language_drives_prompt_context_and_request() -> Non
         target_language="ja",
     )
 
-    await hub._translate_text(
-        uuid4(),
-        "你好",
-        runtime=hub.peer_runtime,
-        detected_language="zh",
+    await hub.translation_requests.translate(
+        DirectTranslationRequest(
+            utterance_id=uuid4(),
+            text="你好",
+            channel="peer",
+            detected_language="zh",
+        )
     )
 
     assert fake_llm.last_prompt == "Chinese|Japanese"

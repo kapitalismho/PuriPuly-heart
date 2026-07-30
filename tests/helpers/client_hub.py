@@ -24,6 +24,7 @@ from puripuly_heart.core.orchestrator.translation_output_projection import (
     TranslationOutputProjectionOwner,
     TranslationUiMessageQueue,
 )
+from puripuly_heart.core.orchestrator.translation_request import TranslationRequestOwner
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnLifecycleOwner,
 )
@@ -336,16 +337,25 @@ def compose_client_hub(**values: object) -> ClientHubTestHarness:
         )
     )
     llm_runtime = ProviderRuntimeHandle(name="llm", provider=llm)
+    translation_requests = TranslationRequestOwner(
+        config_snapshot=config_owner.snapshot,
+        self_runtime=self_runtime,
+        peer_runtime=peer_runtime,
+        context_resolver=context_resolver,
+        provider_runtime=llm_runtime,
+        diagnostics=translation_diagnostics,
+        presentation=translation_output_projection,
+        clock=clock,
+    )
     hub = ClientHub(
         translation_runtime_configuration=config_owner,
         direct_self_runtime=self_runtime,
         direct_peer_runtime=peer_runtime,
         direct_translation_turns=translation_turns,
         direct_local_asr_runtime=local_asr_runtime,
-        direct_llm_runtime=llm_runtime,
-        direct_context_resolver=context_resolver,
         direct_translation_diagnostics=translation_diagnostics,
         direct_output_projection=translation_output_projection,
+        direct_translation_requests=translation_requests,
         clock=clock,
         **values,
     )

@@ -19,6 +19,7 @@ from puripuly_heart.core.orchestrator.hub import ClientHub, ContextEntry, _Merge
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     ChatboxProjection,
 )
+from puripuly_heart.core.orchestrator.translation_request import DirectTranslationRequest
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRuntimeLoggingService
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
@@ -479,10 +480,14 @@ async def test_language_change_updates_next_self_translation_request_target() ->
     llm = RecordingLanguageLLM()
     hub = compose_client_hub(stt=None, llm=llm, osc=RecordingOscQueue(), clock=FakeClock())
 
-    await hub._translate_text(uuid4(), "hello")
+    await hub.translation_requests.translate(
+        DirectTranslationRequest(utterance_id=uuid4(), text="hello")
+    )
     hub.target_language = "ja"
     await hub.clear_language_runtime_state(channel="self")
-    await hub._translate_text(uuid4(), "world")
+    await hub.translation_requests.translate(
+        DirectTranslationRequest(utterance_id=uuid4(), text="world")
+    )
 
     assert llm.calls == [
         {

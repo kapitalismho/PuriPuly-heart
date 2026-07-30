@@ -2,26 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import InitVar, dataclass, field, replace
-from typing import Protocol, cast
+from typing import Protocol
 from uuid import UUID, uuid4
 
-from puripuly_heart.config.prompts import render_translation_prompt_template, warm_prompt_cache
 from puripuly_heart.core.clock import Clock, SystemClock
-from puripuly_heart.core.language import (
-    DetectedLanguageForLLM,
-    get_llm_language_name,
-    map_detected_language_for_llm,
-)
-from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterUserFacingError,
-)
 from puripuly_heart.core.messages import (
-    SEVERITY_ERROR,
-    SafeMessageParam,
     UserErrorReport,
     UserMessageRef,
 )
@@ -35,10 +23,8 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigSnapshot,
     TranslationRuntimeConfigurationOwner,
 )
-from puripuly_heart.core.orchestrator.context import ContextMode, ContextResolver
+from puripuly_heart.core.orchestrator.context import ContextMode
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
-    ContextApplicationDiagnostic,
-    ContextModeDiagnostic,
     LatencyInheritanceDiagnostic,
     LatencyStageDiagnostic,
     LatencyTimelineDiagnostic,
@@ -46,12 +32,17 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     SttEventLoopFailureDiagnostic,
     TranslationFailureDiagnostic,
     TranslationLatencyDiagnosticsOwner,
-    TranslationSkipDiagnostic,
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     ActiveSelfProjection,
     TranslationOutputProjectionOwner,
     TranslationUiMessage,
+)
+from puripuly_heart.core.orchestrator.translation_request import (
+    DirectTranslationRequest,
+    StaleProviderCompletion,
+    TranslationProcessRequest,
+    TranslationRequestPort,
 )
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
@@ -63,7 +54,6 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnRequest,
 )
 from puripuly_heart.core.runtime.output import SELF_SPEECH_TYPING_REASON
-from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.translation_policy import TranslationContextPolicy
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart, VadEvent
 from puripuly_heart.domain.events import (
@@ -130,24 +120,6 @@ _TRANSLATION_RUNTIME_CONFIG_FIELDS = frozenset(
 )
 
 
-class _StaleProviderCompletion(Exception):
-    """Internal signal for provider calls completed by a replaced provider handle."""
-
-
-class _UnmappedDetectedLanguage(Exception):
-    pass
-
-
-def _safe_user_message_params(params: Mapping[str, object]) -> dict[str, SafeMessageParam]:
-    safe_params: dict[str, SafeMessageParam] = {}
-    for key, value in params.items():
-        if not isinstance(key, str) or len(key) > 64:
-            continue
-        if value is None or isinstance(value, str | int | float | bool):
-            safe_params[key] = value
-    return safe_params
-
-
 @dataclass(slots=True)
 class ClientHub:
     translation_runtime_configuration: TranslationRuntimeConfigurationOwner
@@ -155,10 +127,9 @@ class ClientHub:
     direct_peer_runtime: InitVar[ChannelRuntime]
     direct_translation_turns: InitVar[TranslationTurnLifecycleOwner]
     direct_local_asr_runtime: InitVar[LocalASRProviderRuntimePort]
-    direct_llm_runtime: InitVar[ProviderRuntimeHandle]
-    direct_context_resolver: InitVar[ContextResolver]
     direct_translation_diagnostics: InitVar[TranslationLatencyDiagnosticsOwner]
     direct_output_projection: InitVar[TranslationOutputProjectionOwner]
+    direct_translation_requests: InitVar[TranslationRequestPort]
     clock: Clock = SystemClock()
     source_language: InitVar[str | None] = None
     target_language: InitVar[str | None] = None
@@ -204,15 +175,14 @@ class ClientHub:
     _peer_completed_turn_ids: set[UUID] = field(default_factory=set)
     _peer_parent_speech_end_times: dict[UUID, float] = field(default_factory=dict)
     _peer_translation_parent_ids: set[UUID] = field(default_factory=set)
-    context_resolver: ContextResolver = field(init=False)
     active_chatbox_channel: ChannelId = field(init=False, default="self")
     translation_diagnostics: TranslationLatencyDiagnosticsOwner = field(init=False)
     output_projection: TranslationOutputProjectionOwner = field(init=False)
+    translation_requests: TranslationRequestPort = field(init=False)
     _local_asr_provider_runtime: LocalASRProviderRuntimePort | None = field(
         init=False,
         default=None,
     )
-    _llm_provider_runtime: ProviderRuntimeHandle = field(init=False)
 
     def __post_init__(
         self,
@@ -220,10 +190,9 @@ class ClientHub:
         direct_peer_runtime: ChannelRuntime,
         direct_translation_turns: TranslationTurnLifecycleOwner,
         direct_local_asr_runtime: LocalASRProviderRuntimePort,
-        direct_llm_runtime: ProviderRuntimeHandle,
-        direct_context_resolver: ContextResolver,
         direct_translation_diagnostics: TranslationLatencyDiagnosticsOwner,
         direct_output_projection: TranslationOutputProjectionOwner,
+        direct_translation_requests: TranslationRequestPort,
         source_language: str | None,
         target_language: str | None,
         peer_source_language: str | None,
@@ -289,11 +258,9 @@ class ClientHub:
         self.translation_turns = direct_translation_turns
         self.peer_final_runs = self.translation_turns
         self._local_asr_provider_runtime = direct_local_asr_runtime
-        self._llm_provider_runtime = direct_llm_runtime
-        self.context_resolver = direct_context_resolver
         self.translation_diagnostics = direct_translation_diagnostics
         self.output_projection = direct_output_projection
-        warm_prompt_cache()
+        self.translation_requests = direct_translation_requests
         self._sync_self_runtime_aliases()
 
     def __getattribute__(self, name: str) -> object:
@@ -324,10 +291,6 @@ class ClientHub:
         object.__setattr__(self, name, value)
         if name == "clock":
             try:
-                resolver = object.__getattribute__(self, "context_resolver")
-            except AttributeError:
-                resolver = None
-            try:
                 output_projection = object.__getattribute__(self, "output_projection")
             except AttributeError:
                 output_projection = None
@@ -338,12 +301,16 @@ class ClientHub:
                 )
             except AttributeError:
                 translation_diagnostics = None
-            if resolver is not None:
-                resolver.clock = value  # type: ignore[assignment]
+            try:
+                translation_requests = object.__getattribute__(self, "translation_requests")
+            except AttributeError:
+                translation_requests = None
             if output_projection is not None:
                 output_projection.set_clock(value)  # type: ignore[arg-type]
             if translation_diagnostics is not None:
                 translation_diagnostics.clock = value  # type: ignore[assignment]
+            if translation_requests is not None:
+                translation_requests.set_clock(value)
         runtime_field = _SELF_RUNTIME_FIELDS.get(name)
         if runtime_field is None:
             return
@@ -594,29 +561,6 @@ class ClientHub:
             )
         )
 
-    def _log_translation_skipped(
-        self,
-        *,
-        stage: str,
-        runtime: ChannelRuntime,
-        publish_chatbox: bool,
-        configuration: TranslationRuntimeConfig | None = None,
-    ) -> None:
-        resolved_configuration = (
-            self.translation_runtime_config_snapshot().value
-            if configuration is None
-            else configuration
-        )
-        self.translation_diagnostics.record_translation_skip(
-            TranslationSkipDiagnostic(
-                stage=stage,
-                channel=runtime.channel,
-                publish_chatbox=publish_chatbox,
-                llm_available=self._llm_provider_runtime.provider is not None,
-                configuration=resolved_configuration,
-            )
-        )
-
     def _log_translation_failure(
         self,
         *,
@@ -632,19 +576,6 @@ class ClientHub:
                 exception=exc,
                 detailed=detailed,
             )
-        )
-
-    @staticmethod
-    def _translation_error_payload(exc: Exception, report: UserErrorReport) -> UserErrorReport:
-        if not isinstance(exc, ManagedOpenRouterUserFacingError):
-            return report
-        return UserErrorReport(
-            message=UserMessageRef(
-                key=exc.message_key,
-                params=_safe_user_message_params(exc.message_kwargs),
-                severity=SEVERITY_ERROR,
-            ),
-            diagnostics=report.diagnostics,
         )
 
     @staticmethod
@@ -682,24 +613,10 @@ class ClientHub:
         self._emit_basic("[Hub] Context history cleared")
 
     def _get_valid_context(self) -> list[ContextEntry]:
-        """Get context entries within time window and max entries limit."""
-        configuration = self.translation_runtime_config_snapshot().value
-        return self.context_resolver.get_local_entries(
-            runtime=self.self_runtime,
-            source_language=self._source_language_for(
-                self.self_runtime,
-                configuration,
-            ),
-            target_language=self._target_language_for(
-                self.self_runtime,
-                configuration,
-            ),
-            configuration=configuration,
-        )
+        return self.translation_requests.get_valid_context()
 
     def _format_context_for_llm(self, context: list[ContextEntry]) -> str:
-        """Format context entries as a string for LLM prompt."""
-        return self.context_resolver.format_local(context)
+        return self.translation_requests.format_context(context)
 
     def _remember_context_entry(
         self,
@@ -711,46 +628,12 @@ class ClientHub:
         source_language: str | None = None,
     ) -> None:
         runtime = runtime or self.self_runtime
-        config_snapshot = config_snapshot or self.translation_runtime_config_snapshot()
-        configuration = config_snapshot.value
-        runtime.remember_context(
+        self.translation_requests.remember_context(
             text,
-            timestamp=timestamp,
-            source_language=source_language or self._source_language_for(runtime, configuration),
-            target_language=self._target_language_for(runtime, configuration),
-            max_entries=max(
-                configuration.context_max_entries,
-                configuration.integrated_context_max_entries,
-            ),
-        )
-
-    def _log_context_mode_change(
-        self,
-        *,
-        runtime: ChannelRuntime,
-        applied_mode: ContextMode,
-    ) -> None:
-        self.translation_diagnostics.record_context_mode(
-            ContextModeDiagnostic(
-                channel=runtime.channel,
-                applied_mode=applied_mode,
-            )
-        )
-
-    def _log_context_application(
-        self,
-        *,
-        text: str,
-        runtime: ChannelRuntime,
-        context: str,
-    ) -> None:
-        self.translation_diagnostics.record_context_application(
-            ContextApplicationDiagnostic(
-                channel=runtime.channel,
-                request_chars=len(text),
-                context_lines=tuple(context.splitlines()) if context else (),
-                context_chars=len(context),
-            )
+            timestamp,
+            channel=runtime.channel,
+            config_snapshot=config_snapshot,
+            source_language=source_language,
         )
 
     async def handle_vad_event(self, event: VadEvent) -> None:
@@ -844,7 +727,7 @@ class ClientHub:
             transcript,
             turn_kind="manual",
             wait_for_parent=(
-                self._llm_provider_runtime.provider is None
+                not self.translation_requests.provider_available
                 or not self.translation_runtime_config_snapshot().value.translation_enabled
             ),
         )
@@ -974,7 +857,7 @@ class ClientHub:
                     event.transcript,
                     turn_kind="peer",
                     wait_for_parent=(
-                        self._llm_provider_runtime.provider is None
+                        not self.translation_requests.provider_available
                         or not self._translation_enabled_for_runtime(runtime)
                     ),
                 )
@@ -994,7 +877,7 @@ class ClientHub:
                 event.transcript,
                 turn_kind="self",
                 wait_for_parent=(
-                    self._llm_provider_runtime.provider is None
+                    not self.translation_requests.provider_available
                     or not self._translation_enabled_for_runtime(runtime)
                 ),
             )
@@ -1176,18 +1059,20 @@ class ClientHub:
                     translation=child.precomputed_translation,
                 ),
             )
-        result = await self._build_translation_process_result(
-            parent_utterance_id=child.parent_utterance_id,
-            utterance_id=child.utterance_id,
-            sequence=child.sequence,
-            text=child.transcript.text,
-            runtime=runtime,
-            source=child.source,
-            target_language=target_language,
-            context_policy=child.context_policy,
-            detected_language=child.detected_language,
+        result = await self.translation_requests.process(
+            TranslationProcessRequest(
+                parent_utterance_id=child.parent_utterance_id,
+                utterance_id=child.utterance_id,
+                sequence=child.sequence,
+                text=child.transcript.text,
+                channel=runtime.channel,
+                source=child.source,
+                target_language=target_language,
+                context_policy=child.context_policy,
+                detected_language=child.detected_language,
+                config_snapshot=config_snapshot,
+            ),
             cancellation_requested=cancellation_requested,
-            config_snapshot=config_snapshot,
         )
         if cancellation_requested():
             raise asyncio.CancelledError
@@ -1259,7 +1144,7 @@ class ClientHub:
     def _overlay_translation_will_follow(self, runtime: ChannelRuntime) -> bool:
         return (
             self.output_projection.has_overlay_destination
-            and self._llm_provider_runtime.provider is not None
+            and self.translation_requests.provider_available
             and self._translation_enabled_for_runtime(runtime)
         )
 
@@ -1267,7 +1152,7 @@ class ClientHub:
         if runtime.channel != "peer":
             return False
         return (
-            self._llm_provider_runtime.provider is not None
+            self.translation_requests.provider_available
             and self._translation_enabled_for_runtime(runtime)
         ) or self.output_projection.chatbox_is_denied(runtime.channel)
 
@@ -1658,7 +1543,7 @@ class ClientHub:
             wait_ms,
         )
         if (
-            self._llm_provider_runtime.provider is None
+            not self.translation_requests.provider_available
             or not self.translation_runtime_config_snapshot().value.translation_enabled
         ):
             await self._commit_merge(buffer, reason="post_end_grace")
@@ -1788,7 +1673,7 @@ class ClientHub:
             )
 
         if (
-            self._llm_provider_runtime.provider is None
+            not self.translation_requests.provider_available
             or not self.translation_runtime_config_snapshot().value.translation_enabled
         ):
             await self._commit_merge(buffer, reason="final_no_llm")
@@ -1904,7 +1789,7 @@ class ClientHub:
         )
 
         if (
-            self._llm_provider_runtime.provider is None
+            not self.translation_requests.provider_available
             or not config_snapshot.value.translation_enabled
         ):
             await self._ensure_translation(
@@ -1963,7 +1848,7 @@ class ClientHub:
     async def _maybe_restart_spec(self, buffer: _MergeBuffer) -> None:
         config_snapshot = self.translation_runtime_config_snapshot()
         if (
-            self._llm_provider_runtime.provider is None
+            not self.translation_requests.provider_available
             or not config_snapshot.value.translation_enabled
         ):
             return
@@ -1996,7 +1881,7 @@ class ClientHub:
         *,
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> None:
-        if self._llm_provider_runtime.provider is None:
+        if not self.translation_requests.provider_available:
             return
         buffer = self._merge_buffer
         if buffer is None or buffer.merge_id != merge_id:
@@ -2011,15 +1896,17 @@ class ClientHub:
         buffer.spec_config_snapshot = config_snapshot
         self._record_spec_latency_stage(buffer, stage="llm_request_start")
         try:
-            translation = await self._translate_text(
-                merge_id,
-                text,
-                record_latency=False,
-                config_snapshot=config_snapshot,
+            translation = await self.translation_requests.translate(
+                DirectTranslationRequest(
+                    utterance_id=merge_id,
+                    text=text,
+                    record_latency=False,
+                    config_snapshot=config_snapshot,
+                )
             )
         except asyncio.CancelledError:
             return
-        except _StaleProviderCompletion:
+        except StaleProviderCompletion:
             await self._handle_stale_spec_translation(merge_id, text, attempt)
             return
         except Exception as exc:
@@ -2153,111 +2040,24 @@ class ClientHub:
         runtime: ChannelRuntime,
         configuration: TranslationRuntimeConfig | None = None,
     ) -> str:
-        configuration = (
-            self.translation_runtime_config_snapshot().value
-            if configuration is None
-            else configuration
-        )
-        if runtime.channel == "peer" and configuration.peer_source_language:
-            return configuration.peer_source_language
-        return configuration.source_language
+        return self.translation_requests.source_language_for(runtime.channel, configuration)
 
     def _target_language_for(
         self,
         runtime: ChannelRuntime,
         configuration: TranslationRuntimeConfig | None = None,
     ) -> str:
-        configuration = (
-            self.translation_runtime_config_snapshot().value
-            if configuration is None
-            else configuration
-        )
-        if runtime.channel == "peer" and configuration.peer_target_language:
-            return configuration.peer_target_language
-        return configuration.target_language
-
-    @staticmethod
-    def _language_or_fallback(language: str | None, fallback: str) -> str:
-        if language is not None and language.strip():
-            return language
-        return fallback
-
-    def _format_system_prompt(
-        self,
-        runtime: ChannelRuntime | None = None,
-        *,
-        source_name: str | None = None,
-        configuration: TranslationRuntimeConfig | None = None,
-    ) -> str:
-        runtime = runtime or self.self_runtime
-        configuration = (
-            self.translation_runtime_config_snapshot().value
-            if configuration is None
-            else configuration
-        )
-        return render_translation_prompt_template(
-            configuration.system_prompt,
-            source_name=source_name
-            or get_llm_language_name(self._source_language_for(runtime, configuration)),
-            target_name=get_llm_language_name(self._target_language_for(runtime, configuration)),
-        )
-
-    def _detected_language_for_llm(
-        self,
-        detected_language: str | None,
-    ) -> DetectedLanguageForLLM | None:
-        if detected_language is None:
-            return None
-        return map_detected_language_for_llm(detected_language)
-
-    def _request_source_language(
-        self,
-        runtime: ChannelRuntime,
-        *,
-        detected_language: str | None = None,
-        configuration: TranslationRuntimeConfig | None = None,
-    ) -> tuple[str, str] | None:
-        detected = self._detected_language_for_llm(detected_language)
-        if detected_language is not None:
-            if detected is None:
-                return None
-            return detected.code, detected.name
-        source_language = self._source_language_for(runtime, configuration)
-        return source_language, get_llm_language_name(source_language)
-
-    def _other_runtime(self, runtime: ChannelRuntime) -> ChannelRuntime:
-        return self.peer_runtime if runtime is self.self_runtime else self.self_runtime
+        return self.translation_requests.target_language_for(runtime.channel, configuration)
 
     def _translation_enabled_for_runtime(
         self,
         runtime: ChannelRuntime,
         configuration: TranslationRuntimeConfig | None = None,
     ) -> bool:
-        configuration = (
-            self.translation_runtime_config_snapshot().value
-            if configuration is None
-            else configuration
+        return self.translation_requests.translation_enabled_for(
+            runtime.channel,
+            configuration,
         )
-        if runtime.channel == "peer":
-            return configuration.translation_enabled and configuration.peer_translation_enabled
-        return configuration.translation_enabled
-
-    def _capture_llm_provider_request(self) -> tuple[LLMProvider, int] | None:
-        provider, generation = self._llm_provider_runtime.current_provider_generation()
-        if provider is None:
-            return None
-        return cast(LLMProvider, provider), generation
-
-    def _raise_if_stale_llm_provider_request(
-        self,
-        provider: LLMProvider,
-        generation: int,
-    ) -> None:
-        if not self._llm_provider_runtime.is_current_provider_generation(
-            provider=provider,
-            generation=generation,
-        ):
-            raise _StaleProviderCompletion
 
     def _prepare_llm_request(
         self,
@@ -2268,14 +2068,14 @@ class ClientHub:
         context_policy: TranslationContextPolicy = "integrated_preferred",
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> tuple[str, str, float]:
-        formatted_prompt, context_str, now, _ = self._prepare_llm_request_with_mode(
+        prepared = self.translation_requests.prepare(
             text,
-            runtime=runtime,
+            channel=(runtime or self.self_runtime).channel,
             detected_language=detected_language,
             context_policy=context_policy,
             config_snapshot=config_snapshot,
         )
-        return formatted_prompt, context_str, now
+        return prepared.system_prompt, prepared.context, prepared.requested_at
 
     def _prepare_llm_request_with_mode(
         self,
@@ -2286,144 +2086,18 @@ class ClientHub:
         context_policy: TranslationContextPolicy = "integrated_preferred",
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> tuple[str, str, float, ContextMode]:
-        _ = text
-        runtime = runtime or self.self_runtime
-        config_snapshot = config_snapshot or self.translation_runtime_config_snapshot()
-        configuration = config_snapshot.value
-        request_source = self._request_source_language(
-            runtime,
-            detected_language=detected_language,
-            configuration=configuration,
-        )
-        if request_source is None:
-            raise _UnmappedDetectedLanguage
-        source_language, source_name = request_source
-        if context_policy != "integrated_preferred":
-            raise ValueError("unsupported translation context policy")
-        requested_mode: ContextMode = "integrated"
-        now = self.clock.now()
-        other_runtime = self._other_runtime(runtime)
-        context_str, applied_mode = self.context_resolver.resolve_for_request(
-            runtime=runtime,
-            other_runtime=other_runtime,
-            requested_mode=requested_mode,
-            peer_translation_enabled=configuration.peer_translation_enabled,
-            source_language=source_language,
-            target_language=self._target_language_for(runtime, configuration),
-            other_source_language=self._source_language_for(
-                other_runtime,
-                configuration,
-            ),
-            other_target_language=self._target_language_for(
-                other_runtime,
-                configuration,
-            ),
-            configuration=configuration,
-        )
-        self._log_context_mode_change(runtime=runtime, applied_mode=applied_mode)
-        self._log_context_application(text=text, runtime=runtime, context=context_str)
-        formatted_prompt = self._format_system_prompt(
-            runtime,
-            source_name=source_name,
-            configuration=configuration,
-        )
-        return formatted_prompt, context_str, now, applied_mode
-
-    def _normalize_translation(
-        self,
-        translation: Translation,
-        *,
-        runtime: ChannelRuntime,
-        text: str,
-        source_language: str,
-        target_language: str,
-    ) -> Translation:
-        return Translation(
-            utterance_id=translation.utterance_id,
-            translated_text=translation.text,
-            source_text=text,
-            source_language=self._language_or_fallback(
-                translation.source_language,
-                source_language,
-            ),
-            target_language=self._language_or_fallback(
-                translation.target_language,
-                target_language,
-            ),
-            channel=runtime.channel,
-            created_at=translation.created_at,
-            update_id=translation.update_id,
-            origin_wall_clock_ms=translation.origin_wall_clock_ms,
-            session_scope=translation.session_scope,
-            source_text_hash=translation.source_text_hash,
-            source_text_len=translation.source_text_len,
-            logical_turn_key=f"{runtime.channel}:{translation.utterance_id}",
-        )
-
-    async def _translate_text(
-        self,
-        utterance_id: UUID,
-        text: str,
-        *,
-        runtime: ChannelRuntime | None = None,
-        record_latency: bool = True,
-        detected_language: str | None = None,
-        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
-    ) -> Translation:
-        config_snapshot = config_snapshot or self.translation_runtime_config_snapshot()
-        configuration = config_snapshot.value
-        llm_request = self._capture_llm_provider_request()
-        if llm_request is None:
-            raise RuntimeError("LLM is not configured")
-        llm, llm_generation = llm_request
-
-        runtime = runtime or self.self_runtime
-        formatted_prompt, context_str, _ = self._prepare_llm_request(
+        prepared = self.translation_requests.prepare(
             text,
-            runtime=runtime,
+            channel=(runtime or self.self_runtime).channel,
             detected_language=detected_language,
+            context_policy=context_policy,
             config_snapshot=config_snapshot,
         )
-        if record_latency:
-            self._record_latency_stage(
-                channel=runtime.channel,
-                utterance_id=utterance_id,
-                stage="llm_request_start",
-            )
-        request_source = self._request_source_language(
-            runtime,
-            detected_language=detected_language,
-            configuration=configuration,
-        )
-        if request_source is None:
-            raise _UnmappedDetectedLanguage
-        request_source_language, _ = request_source
-        request_target_language = self._target_language_for(runtime, configuration)
-        try:
-            translation = await llm.translate(
-                utterance_id=utterance_id,
-                text=text,
-                system_prompt=formatted_prompt,
-                source_language=request_source_language,
-                target_language=request_target_language,
-                context=context_str,
-            )
-        except Exception:
-            self._raise_if_stale_llm_provider_request(llm, llm_generation)
-            raise
-        self._raise_if_stale_llm_provider_request(llm, llm_generation)
-        if record_latency:
-            self._record_latency_stage(
-                channel=runtime.channel,
-                utterance_id=utterance_id,
-                stage="llm_done",
-            )
-        return self._normalize_translation(
-            translation,
-            runtime=runtime,
-            text=text,
-            source_language=request_source_language,
-            target_language=request_target_language,
+        return (
+            prepared.system_prompt,
+            prepared.context,
+            prepared.requested_at,
+            prepared.applied_context_mode,
         )
 
     async def _ensure_translation(
@@ -2453,204 +2127,6 @@ class ClientHub:
                 config_snapshot=config_snapshot,
             ),
             wait_for_parent=wait_for_parent,
-        )
-
-    async def _build_translation_process_result(
-        self,
-        *,
-        parent_utterance_id: UUID,
-        utterance_id: UUID,
-        sequence: int,
-        text: str,
-        runtime: ChannelRuntime,
-        source: str,
-        target_language: str,
-        context_policy: TranslationContextPolicy,
-        detected_language: str | None = None,
-        cancellation_requested: Callable[[], bool] | None = None,
-        config_snapshot: TranslationRuntimeConfigSnapshot,
-    ) -> TranslationTurnProcessResult:
-        configuration = config_snapshot.value
-        llm_request = self._capture_llm_provider_request()
-        if llm_request is None or not self._translation_enabled_for_runtime(
-            runtime,
-            configuration,
-        ):
-            self._log_translation_skipped(
-                stage="final",
-                runtime=runtime,
-                publish_chatbox=self.output_projection.chatbox_is_eligible(runtime.channel),
-                configuration=configuration,
-            )
-            return TranslationTurnProcessResult(
-                "source_only",
-                TranslationOutputSubmission(
-                    parent_utterance_id=parent_utterance_id,
-                    child_utterance_id=utterance_id,
-                    sequence=sequence,
-                    channel=runtime.channel,
-                    source=source,
-                    source_text=text,
-                    source_language=detected_language,
-                    target_language=target_language,
-                    outcome="source_only",
-                    config_snapshot=config_snapshot,
-                    failure_code="translation_unavailable",
-                ),
-            )
-        llm, llm_generation = llm_request
-        request_source = self._request_source_language(
-            runtime,
-            detected_language=detected_language,
-            configuration=configuration,
-        )
-        if request_source is None:
-            outcome: TranslationTurnOutcome = (
-                "source_only" if runtime.channel == "peer" else "failed"
-            )
-            if outcome == "failed":
-                exc = _UnmappedDetectedLanguage()
-                report = self._log_translation_failure(stage="final", runtime=runtime, exc=exc)
-                await self.output_projection.publish_ui(
-                    TranslationUiMessage(
-                        event_type=UIEventType.ERROR,
-                        utterance_id=utterance_id,
-                        payload=report,
-                        source=source,
-                        channel=runtime.channel,
-                        runtime_log_handled=True,
-                    )
-                )
-            return TranslationTurnProcessResult(
-                outcome,
-                TranslationOutputSubmission(
-                    parent_utterance_id=parent_utterance_id,
-                    child_utterance_id=utterance_id,
-                    sequence=sequence,
-                    channel=runtime.channel,
-                    source=source,
-                    source_text=text,
-                    source_language=detected_language,
-                    target_language=target_language,
-                    outcome=outcome,
-                    config_snapshot=config_snapshot,
-                    failure_code="unsupported_source_language",
-                ),
-            )
-
-        request_source_language, _ = request_source
-        applied_mode: ContextMode | None = None
-        try:
-            formatted_prompt, context_str, now, applied_mode = self._prepare_llm_request_with_mode(
-                text,
-                runtime=runtime,
-                detected_language=detected_language,
-                context_policy=context_policy,
-                config_snapshot=config_snapshot,
-            )
-            self._remember_context_entry(
-                text,
-                now,
-                config_snapshot=config_snapshot,
-                runtime=runtime,
-                source_language=request_source_language,
-            )
-            self._record_latency_stage(
-                channel=runtime.channel,
-                utterance_id=utterance_id,
-                stage="llm_request_start",
-            )
-            try:
-                raw_translation = await llm.translate(
-                    utterance_id=utterance_id,
-                    text=text,
-                    system_prompt=formatted_prompt,
-                    source_language=request_source_language,
-                    target_language=target_language,
-                    context=context_str,
-                )
-            except Exception:
-                self._raise_if_stale_llm_provider_request(llm, llm_generation)
-                raise
-            self._raise_if_stale_llm_provider_request(llm, llm_generation)
-            if cancellation_requested is not None and cancellation_requested():
-                raise asyncio.CancelledError
-            translation = self._normalize_translation(
-                raw_translation,
-                runtime=runtime,
-                text=text,
-                source_language=request_source_language,
-                target_language=target_language,
-            )
-            self._record_latency_stage(
-                channel=runtime.channel,
-                utterance_id=utterance_id,
-                stage="llm_done",
-            )
-        except asyncio.CancelledError:
-            raise
-        except _StaleProviderCompletion:
-            return TranslationTurnProcessResult(
-                "failed",
-                TranslationOutputSubmission(
-                    parent_utterance_id=parent_utterance_id,
-                    child_utterance_id=utterance_id,
-                    sequence=sequence,
-                    channel=runtime.channel,
-                    source=source,
-                    source_text=text,
-                    source_language=request_source_language,
-                    target_language=target_language,
-                    outcome="failed",
-                    config_snapshot=config_snapshot,
-                    failure_code="stale_provider_completion",
-                ),
-            )
-        except Exception as exc:
-            report = self._log_translation_failure(stage="final", runtime=runtime, exc=exc)
-            await self.output_projection.publish_ui(
-                TranslationUiMessage(
-                    event_type=UIEventType.ERROR,
-                    utterance_id=utterance_id,
-                    payload=self._translation_error_payload(exc, report),
-                    source=source,
-                    channel=runtime.channel,
-                    runtime_log_handled=True,
-                )
-            )
-            return TranslationTurnProcessResult(
-                "failed",
-                TranslationOutputSubmission(
-                    parent_utterance_id=parent_utterance_id,
-                    child_utterance_id=utterance_id,
-                    sequence=sequence,
-                    channel=runtime.channel,
-                    source=source,
-                    source_text=text,
-                    source_language=request_source_language,
-                    target_language=target_language,
-                    outcome="failed",
-                    config_snapshot=config_snapshot,
-                    failure_code="provider_error",
-                ),
-            )
-
-        return TranslationTurnProcessResult(
-            "translated",
-            TranslationOutputSubmission(
-                parent_utterance_id=parent_utterance_id,
-                child_utterance_id=utterance_id,
-                sequence=sequence,
-                channel=runtime.channel,
-                source=source,
-                source_text=text,
-                source_language=request_source_language,
-                target_language=target_language,
-                outcome="translated",
-                config_snapshot=config_snapshot,
-                translation=translation,
-                applied_context_mode=applied_mode,
-            ),
         )
 
     async def submit_translation_output(self, submission: TranslationOutputSubmission) -> None:
@@ -2691,21 +2167,23 @@ class ClientHub:
         source = self._get_source(utterance_id, channel=runtime.channel)
         if source is None:
             source = "Peer" if runtime.channel == "peer" else "Mic"
-        result = await self._build_translation_process_result(
-            parent_utterance_id=utterance_id,
-            utterance_id=utterance_id,
-            sequence=0,
-            text=text,
-            runtime=runtime,
-            source=source,
-            target_language=self._target_language_for(
-                runtime,
-                config_snapshot.value,
+        result = await self.translation_requests.process(
+            TranslationProcessRequest(
+                parent_utterance_id=utterance_id,
+                utterance_id=utterance_id,
+                sequence=0,
+                text=text,
+                channel=runtime.channel,
+                source=source,
+                target_language=self._target_language_for(
+                    runtime,
+                    config_snapshot.value,
+                ),
+                context_policy=self.translation_turns.policy.context_policy,
+                detected_language=detected_language,
+                config_snapshot=config_snapshot,
             ),
-            context_policy=self.translation_turns.policy.context_policy,
-            detected_language=detected_language,
             cancellation_requested=cancellation_requested,
-            config_snapshot=config_snapshot,
         )
         if result.output is not None:
             await self.submit_translation_output(result.output)
@@ -2731,7 +2209,7 @@ class ClientHub:
             )
         )
         if (
-            self._llm_provider_runtime.provider is None
+            not self.translation_requests.provider_available
             or not self._translation_enabled_for_runtime(self.peer_runtime)
         ):
             await self.translation_turns.wait_for_idle()

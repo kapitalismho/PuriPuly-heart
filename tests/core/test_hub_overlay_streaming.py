@@ -15,6 +15,7 @@ from puripuly_heart.core.orchestrator.hub import ClientHub, _MergeBuffer
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     TranslationOverlayProjection,
 )
+from puripuly_heart.core.orchestrator.translation_request import DirectTranslationRequest
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter
@@ -673,11 +674,12 @@ async def test_hub_translate_text_preserves_provider_language_after_settings_cha
     utterance_id = uuid4()
 
     task = asyncio.create_task(
-        hub._translate_text(
-            utterance_id,
-            "こんにちは",
-            runtime=hub.self_runtime,
-            record_latency=False,
+        hub.translation_requests.translate(
+            DirectTranslationRequest(
+                utterance_id=utterance_id,
+                text="こんにちは",
+                record_latency=False,
+            )
         )
     )
     await asyncio.wait_for(llm.started.wait(), timeout=1.0)
