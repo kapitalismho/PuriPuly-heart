@@ -220,11 +220,11 @@ LAYER_RULES = (
         layer=APP_COMPOSITION,
         prefixes=(
             "puripuly_heart.app.services.canonical_settings_persistence",
-            "puripuly_heart.app.services.capture_target_settings",
+            "puripuly_heart.app.services.capture.capture_target_settings",
             "puripuly_heart.app.services.github_star_prompt_settings",
             "puripuly_heart.app.services.manual_local_asr_fallback",
             "puripuly_heart.app.services.openrouter_pkce_flow",
-            "puripuly_heart.app.services.peer_capture_target_application",
+            "puripuly_heart.app.services.capture.peer_capture_target_application",
             "puripuly_heart.app.services.provider_settings",
             "puripuly_heart.app.services.settings_application",
             "puripuly_heart.app.services.settings_runtime_effects",
@@ -487,7 +487,7 @@ SETTINGS_PERSISTENCE_COMPOSITION_PATHS = frozenset(
     {
         "src/puripuly_heart/app/adapters/settings_vnext_canonical_persistence.py",
         "src/puripuly_heart/app/services/canonical_settings_persistence.py",
-        "src/puripuly_heart/app/services/capture_target_settings.py",
+        "src/puripuly_heart/app/services/capture/capture_target_settings.py",
     }
 )
 
@@ -497,7 +497,7 @@ SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
         "src/puripuly_heart/app/services/github_star_prompt_settings.py",
         "src/puripuly_heart/app/services/manual_local_asr_fallback.py",
         "src/puripuly_heart/app/services/openrouter_pkce_flow.py",
-        "src/puripuly_heart/app/services/peer_capture_target_application.py",
+        "src/puripuly_heart/app/services/capture/peer_capture_target_application.py",
         "src/puripuly_heart/app/services/provider_settings.py",
         "src/puripuly_heart/app/services/settings_application.py",
         "src/puripuly_heart/app/services/settings_runtime_effects.py",
@@ -1244,7 +1244,9 @@ def test_canonical_settings_persistence_composition_uses_only_public_settings_ty
 
 
 def test_capture_target_compatibility_service_delegates_to_settings_owner() -> None:
-    service_path = SOURCE_PACKAGE_ROOT / "app" / "services" / "capture_target_settings.py"
+    service_path = (
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "capture" / "capture_target_settings.py"
+    )
     tree = ast.parse(service_path.read_text(encoding="utf-8"))
     imports = {
         node.module: {alias.name for alias in node.names}

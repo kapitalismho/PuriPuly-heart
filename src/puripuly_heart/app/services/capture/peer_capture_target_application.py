@@ -11,13 +11,14 @@ from puripuly_heart.app.ports.peer_capture_target import (
 )
 from puripuly_heart.app.ports.ui_models import OptionItem
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.peer_capture_target import PeerCaptureTargetResolutionService
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings_vnext.schema import (
     CaptureTargetIntent,
     ProcessCaptureTargetIntent,
 )
+
+from .peer_capture_target import PeerCaptureTargetResolutionService
 
 Localizer = Callable[[str], str]
 SettingsPresentationSink = Callable[[AppSettings], None]
