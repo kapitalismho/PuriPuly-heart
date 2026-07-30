@@ -263,7 +263,7 @@ class _LocalASRProductionCompositionAccess:
 
     @property
     def self_vad(self) -> SelfCaptureVadEventRuntime:
-        return self._components().hub
+        return self._components().self_translation_channel
 
     @property
     def peer_vad(self) -> PeerCaptureVadEventRuntime:
@@ -271,7 +271,7 @@ class _LocalASRProductionCompositionAccess:
 
     @property
     def channel_reset(self) -> ProviderChannelResetPort:
-        return self._components().hub
+        return self._components().channel_reset
 
     @property
     def start_callbacks(self) -> RuntimePipelineStartCallbacks:
@@ -788,7 +788,7 @@ def compose_application_runtime(
                     if current_settings() is not None
                     else None
                 ),
-                runtime_available=lambda: pipeline.hub is not None,
+                runtime_available=lambda: pipeline.self_translation_channel is not None,
                 capture_owner=lambda: require_runtime_components().self_capture_owner(),
                 capture_owner_if_created=lambda: pipeline.self_capture,
                 persist_manual_fallback=lambda: (
@@ -798,7 +798,9 @@ def compose_application_runtime(
                 clear_gpu_pending=lambda: require_gpu().clear_pending("self"),
                 overlay_state_provider=lambda: require_overlay().snapshot.state,
                 mark_promo_eligible=lambda: (
-                    pipeline.hub.mark_promo_eligible() if pipeline.hub is not None else None
+                    pipeline.self_translation_channel.mark_promo_eligible()
+                    if pipeline.self_translation_channel is not None
+                    else None
                 ),
                 dashboard_enabled_sink=presentation.set_dashboard_stt_enabled,
                 dashboard_needs_key_sink=presentation.set_dashboard_stt_needs_key,
@@ -858,8 +860,8 @@ def compose_application_runtime(
                 return pipeline.translation_output_projection
 
             def completion_provider(utterance_id: object) -> object | None:
-                hub = pipeline.hub
-                runtime = getattr(hub, "self_runtime", None)
+                owner = pipeline.self_translation_channel
+                runtime = getattr(owner, "runtime", None)
                 tasks = getattr(runtime, "translation_tasks", None)
                 return tasks.get(utterance_id) if isinstance(tasks, dict) else None
 
@@ -874,8 +876,9 @@ def compose_application_runtime(
         return manual_typing
 
     async def submit_clipboard(text: str) -> None:
-        if pipeline.hub is not None:
-            await pipeline.hub.submit_text(text, source="Clipboard")
+        owner = pipeline.self_translation_channel
+        if owner is not None:
+            await owner.submit_text(text, source="Clipboard")
 
     def require_clipboard() -> ClipboardAutoTranslationOwner:
         nonlocal clipboard
@@ -1486,7 +1489,7 @@ def compose_application_runtime(
         results=require_settings_application().results,
         runtime=ManagedTranslationRuntimeAccess(
             llm_runtime_provider=lambda: pipeline.llm_runtime,
-            context_provider=lambda: pipeline.hub,
+            context_provider=lambda: pipeline.translation_requests,
             translation_runtime_configuration_provider=(
                 lambda: pipeline.translation_runtime_configuration
             ),

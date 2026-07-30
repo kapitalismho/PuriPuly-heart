@@ -15,8 +15,6 @@ from puripuly_heart.core.messages import (
 )
 from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
-    ContextEntry,
-    _MergeBuffer,
 )
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
@@ -27,20 +25,16 @@ from puripuly_heart.core.orchestrator.context import ContextMode
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
     LatencyInheritanceDiagnostic,
     LatencyStageDiagnostic,
-    LatencyTimelineDiagnostic,
     RuntimeDiagnostic,
     SttEventLoopFailureDiagnostic,
     TranslationFailureDiagnostic,
     TranslationLatencyDiagnosticsOwner,
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import (
-    ActiveSelfProjection,
     TranslationOutputProjectionOwner,
     TranslationUiMessage,
 )
 from puripuly_heart.core.orchestrator.translation_request import (
-    DirectTranslationRequest,
-    StaleProviderCompletion,
     TranslationProcessRequest,
     TranslationRequestPort,
 )
@@ -53,14 +47,12 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnProcessResult,
     TranslationTurnRequest,
 )
-from puripuly_heart.core.runtime.output import SELF_SPEECH_TYPING_REASON
 from puripuly_heart.core.translation_policy import TranslationContextPolicy
-from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart, VadEvent
+from puripuly_heart.core.vad.gating import SpeechEnd, VadEvent
 from puripuly_heart.domain.events import (
     STTErrorEvent,
     STTFinalEvent,
     STTPartialEvent,
-    STTSessionState,
     STTSessionStateEvent,
     UIErrorPayload,
     UIEventType,
@@ -79,20 +71,6 @@ class STTProvider(Protocol):
     def events(self): ...
 
 
-_PROMO_INTERVAL_SEC: float = 300.0  # 5 minutes
-_RELAXED_OVERLAP_MIN_CHARS: int = 3
-_BOUNDARY_PUNCT = {".", ",", ";", ":", "!", "?"}
-_SELF_RUNTIME_FIELDS = {
-    "stt": "stt",
-    "_stt_task": "stt_task",
-    "_utterances": "utterances",
-    "_translation_tasks": "translation_tasks",
-    "_utterance_sources": "utterance_sources",
-    "_utterance_start_times": "utterance_start_times",
-    "_translation_history": "translation_history",
-    "_speech_ended_ids": "speech_ended_ids",
-    "_merge_buffer": "merge_buffer",
-}
 _TRANSLATION_RUNTIME_CONFIG_FIELDS = frozenset(
     {
         "source_language",
@@ -123,7 +101,6 @@ _TRANSLATION_RUNTIME_CONFIG_FIELDS = frozenset(
 @dataclass(slots=True)
 class ClientHub:
     translation_runtime_configuration: TranslationRuntimeConfigurationOwner
-    direct_self_runtime: InitVar[ChannelRuntime]
     direct_peer_runtime: InitVar[ChannelRuntime]
     direct_translation_turns: InitVar[TranslationTurnLifecycleOwner]
     direct_local_asr_runtime: InitVar[LocalASRProviderRuntimePort]
@@ -153,20 +130,7 @@ class ClientHub:
     low_latency_finalize_wait_ms: InitVar[int | None] = None
     low_latency_awaiting_vad_timeout_s: InitVar[float | None] = None
 
-    _utterances: dict[UUID, UtteranceBundle] = field(default_factory=dict)
-    _translation_tasks: dict[UUID, asyncio.Task[None]] = field(default_factory=dict)
-    _utterance_sources: dict[UUID, str] = field(default_factory=dict)
-    _utterance_start_times: dict[UUID, float] = field(
-        default_factory=dict
-    )  # For E2E latency tracking
-    _translation_history: list[ContextEntry] = field(default_factory=list)  # Context memory
-    _speech_ended_ids: set[UUID] = field(default_factory=set)  # Track SpeechEnd arrivals
-    _stt_task: asyncio.Task[None] | None = None
     _peer_stt_task: asyncio.Task[None] | None = None
-    _last_promo_time: float | None = None
-    _promo_eligible: bool = False
-    _merge_buffer: _MergeBuffer | None = None
-    self_runtime: ChannelRuntime = field(init=False)
     peer_runtime: ChannelRuntime = field(init=False)
     translation_turns: TranslationTurnLifecycleOwner = field(init=False)
     peer_final_runs: TranslationTurnLifecycleOwner = field(init=False)
@@ -175,7 +139,6 @@ class ClientHub:
     _peer_completed_turn_ids: set[UUID] = field(default_factory=set)
     _peer_parent_speech_end_times: dict[UUID, float] = field(default_factory=dict)
     _peer_translation_parent_ids: set[UUID] = field(default_factory=set)
-    active_chatbox_channel: ChannelId = field(init=False, default="self")
     translation_diagnostics: TranslationLatencyDiagnosticsOwner = field(init=False)
     output_projection: TranslationOutputProjectionOwner = field(init=False)
     translation_requests: TranslationRequestPort = field(init=False)
@@ -186,7 +149,6 @@ class ClientHub:
 
     def __post_init__(
         self,
-        direct_self_runtime: ChannelRuntime,
         direct_peer_runtime: ChannelRuntime,
         direct_translation_turns: TranslationTurnLifecycleOwner,
         direct_local_asr_runtime: LocalASRProviderRuntimePort,
@@ -251,9 +213,6 @@ class ClientHub:
         config_owner = self.translation_runtime_configuration
         if config_overrides:
             config_owner.replace(replace(config_owner.snapshot().value, **config_overrides))
-        self.self_runtime = direct_self_runtime
-        self.self_runtime.alias_target = self
-        self._sync_self_runtime_aliases()
         self.peer_runtime = direct_peer_runtime
         self.translation_turns = direct_translation_turns
         self.peer_final_runs = self.translation_turns
@@ -261,7 +220,6 @@ class ClientHub:
         self.translation_diagnostics = direct_translation_diagnostics
         self.output_projection = direct_output_projection
         self.translation_requests = direct_translation_requests
-        self._sync_self_runtime_aliases()
 
     def __getattribute__(self, name: str) -> object:
         if name in _TRANSLATION_RUNTIME_CONFIG_FIELDS:
@@ -311,30 +269,12 @@ class ClientHub:
                 translation_diagnostics.clock = value  # type: ignore[assignment]
             if translation_requests is not None:
                 translation_requests.set_clock(value)
-        runtime_field = _SELF_RUNTIME_FIELDS.get(name)
-        if runtime_field is None:
-            return
-        try:
-            runtime = object.__getattribute__(self, "self_runtime")
-        except AttributeError:
-            return
-        object.__setattr__(runtime, runtime_field, value)
 
     def translation_runtime_config_snapshot(self) -> TranslationRuntimeConfigSnapshot:
         owner = self.translation_runtime_configuration
         if owner is None:
             raise RuntimeError("translation runtime configuration is unavailable")
         return owner.snapshot()
-
-    def _sync_self_runtime_aliases(self) -> None:
-        self._stt_task = self.self_runtime.stt_task
-        self._utterances = self.self_runtime.utterances
-        self._translation_tasks = self.self_runtime.translation_tasks
-        self._utterance_sources = self.self_runtime.utterance_sources
-        self._utterance_start_times = self.self_runtime.utterance_start_times
-        self._translation_history = self.self_runtime.translation_history
-        self._speech_ended_ids = self.self_runtime.speech_ended_ids
-        self._merge_buffer = self.self_runtime.merge_buffer
 
     def _emit_basic(
         self,
@@ -551,7 +491,7 @@ class ClientHub:
         exc: Exception,
         *,
         provider: STTProvider | None = None,
-        channel: ChannelId = "self",
+        channel: ChannelId = "peer",
     ) -> None:
         self.translation_diagnostics.record_stt_event_loop_failure(
             SttEventLoopFailureDiagnostic(
@@ -585,38 +525,18 @@ class ClientHub:
         return event.message
 
     async def reset_provider_channel(self, channel: ChannelId) -> None:
-        await self.translation_turns.cancel_pending(channel=channel)
-        runtime = self._runtime_for_channel(channel)
-        if channel == "self":
-            await self.output_projection.reset_overlay_preview()
-        await runtime.reset_runtime_state()
-        if channel == "peer":
-            self._clear_peer_logical_turn_state()
-        self._clear_latency_state(channel=channel)
-        if channel == "self":
-            self._sync_self_runtime_aliases()
+        if channel != "peer":
+            raise ValueError("Peer translation owner cannot reset a non-Peer channel")
+        await self.translation_turns.cancel_pending(channel="peer")
+        await self.peer_runtime.reset_runtime_state()
+        self._clear_peer_logical_turn_state()
+        self._clear_latency_state(channel="peer")
 
     def _require_local_asr_provider_runtime(self) -> LocalASRProviderRuntimePort:
         runtime = self._local_asr_provider_runtime
         if runtime is None:
             raise RuntimeError("local ASR provider runtime is not configured")
         return runtime
-
-    def mark_promo_eligible(self) -> None:
-        """Mark that user clicked STT button. Next STREAMING state will send promo."""
-        self._promo_eligible = True
-
-    def clear_context(self) -> None:
-        """Clear the translation context history."""
-        self.self_runtime.clear_context()
-        self.peer_runtime.clear_context()
-        self._emit_basic("[Hub] Context history cleared")
-
-    def _get_valid_context(self) -> list[ContextEntry]:
-        return self.translation_requests.get_valid_context()
-
-    def _format_context_for_llm(self, context: list[ContextEntry]) -> str:
-        return self.translation_requests.format_context(context)
 
     def _remember_context_entry(
         self,
@@ -627,7 +547,9 @@ class ClientHub:
         runtime: ChannelRuntime | None = None,
         source_language: str | None = None,
     ) -> None:
-        runtime = runtime or self.self_runtime
+        runtime = runtime or self.peer_runtime
+        if runtime.channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer runtime")
         self.translation_requests.remember_context(
             text,
             timestamp,
@@ -635,50 +557,6 @@ class ClientHub:
             config_snapshot=config_snapshot,
             source_language=source_language,
         )
-
-    async def handle_vad_event(self, event: VadEvent) -> None:
-        resume_overlay_resync_buffer: _MergeBuffer | None = None
-        low_latency_mode = self.translation_runtime_config_snapshot().value.low_latency_mode
-
-        if isinstance(event, SpeechStart):
-            if low_latency_mode:
-                self._mark_resume_pending(event)
-
-        if isinstance(event, SpeechChunk):
-            if low_latency_mode:
-                resume_overlay_resync_buffer = self._maybe_confirm_resume(event)
-
-        # Record start time for E2E latency tracking (from speech end)
-        if isinstance(event, SpeechEnd):
-            speech_end_at = self.clock.now()
-            self.output_projection.set_self_chatbox_typing_reason(
-                SELF_SPEECH_TYPING_REASON,
-                True,
-            )
-            self._utterance_start_times[event.utterance_id] = speech_end_at
-            self._speech_ended_ids.add(event.utterance_id)
-            self._record_latency_stage(
-                channel="self",
-                utterance_id=event.utterance_id,
-                stage="speech_end",
-                timestamp=speech_end_at,
-                publish_now=not low_latency_mode,
-            )
-            if low_latency_mode:
-                self._maybe_update_buffer_end_time(event.utterance_id)
-                self._maybe_start_finalize_wait(event.utterance_id)
-                await self._maybe_clear_resume_on_end(event)
-
-        await self._require_local_asr_provider_runtime().handle_vad_event("self", event)
-
-        if isinstance(event, SpeechEnd):
-            await self._require_local_asr_provider_runtime().commit_handoff("self")
-
-        if (
-            resume_overlay_resync_buffer is not None
-            and self._merge_buffer is resume_overlay_resync_buffer
-        ):
-            await self._sync_overlay_active_self(resume_overlay_resync_buffer)
 
     async def handle_peer_vad_event(self, event: VadEvent) -> None:
         if isinstance(event, SpeechEnd) and not self.translation_turns.is_parent_closed(
@@ -707,62 +585,25 @@ class ClientHub:
         if isinstance(event, SpeechEnd):
             await self._require_local_asr_provider_runtime().commit_handoff("peer")
 
-    async def submit_text(self, text: str, *, source: str = "You") -> UUID:
-        text = text.strip()
-        if not text:
-            raise ValueError("text must be non-empty")
-
-        utterance_id = uuid4()
-        self._remember_source(utterance_id, source)
-
-        transcript = Transcript(
-            utterance_id=utterance_id,
-            text=text,
-            is_final=True,
-            created_at=self.clock.now(),
-        )
-        await self._handle_transcript(transcript, is_final=True, source=source)
-
-        await self._ensure_translation(
-            transcript,
-            turn_kind="manual",
-            wait_for_parent=(
-                not self.translation_requests.provider_available
-                or not self.translation_runtime_config_snapshot().value.translation_enabled
-            ),
-        )
-
-        return utterance_id
-
     def _runtime_for_channel(self, channel: ChannelId) -> ChannelRuntime:
-        return self.self_runtime if channel == "self" else self.peer_runtime
+        if channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer channel")
+        return self.peer_runtime
 
     async def clear_language_runtime_state(self, *, channel: ChannelId) -> None:
-        runtime = self._runtime_for_channel(channel)
-        await self.translation_turns.cancel_pending(channel=channel)
-        await runtime.clear_live_translation_state()
-        if channel == "peer":
-            self._clear_peer_logical_turn_state()
-        self._clear_latency_state(channel=channel)
-        if channel == "self":
-            await self.output_projection.reset_overlay_preview()
-            self._sync_self_runtime_aliases()
-
-    def _runtime_for_utterance(
-        self, utterance_id: UUID, *, default_channel: ChannelId = "self"
-    ) -> ChannelRuntime:
-        if utterance_id in self.self_runtime.utterances:
-            return self.self_runtime
-        if utterance_id in self.peer_runtime.utterances:
-            return self.peer_runtime
-        return self._runtime_for_channel(default_channel)
+        if channel != "peer":
+            raise ValueError("Peer translation owner cannot clear a non-Peer channel")
+        await self.translation_turns.cancel_pending(channel="peer")
+        await self.peer_runtime.clear_live_translation_state()
+        self._clear_peer_logical_turn_state()
+        self._clear_latency_state(channel="peer")
 
     def get_or_create_bundle(
-        self, utterance_id: UUID, *, channel: ChannelId = "self"
+        self, utterance_id: UUID, *, channel: ChannelId = "peer"
     ) -> UtteranceBundle:
-        return self._runtime_for_utterance(
-            utterance_id, default_channel=channel
-        ).get_or_create_bundle(utterance_id)
+        if channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer bundle")
+        return self.peer_runtime.get_or_create_bundle(utterance_id)
 
     async def _run_stt_event_loop(self, provider: STTProvider) -> None:
         try:
@@ -771,22 +612,24 @@ class ClientHub:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._emit_stt_event_loop_failure(exc, provider=provider)
+            self._emit_stt_event_loop_failure(exc, provider=provider, channel="peer")
             raise
 
     async def _handle_stt_event_loop_exception(
         self,
         exc: Exception,
         *,
-        channel: ChannelId = "self",
+        channel: ChannelId = "peer",
     ) -> None:
+        if channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer exception")
         self._emit_stt_event_loop_failure(exc, channel=channel)
 
     async def _stop_stt_event_loop(self) -> None:
         return
 
     async def _stop_stt_task(self, attr_name: str) -> None:
-        if attr_name in {"_stt_task", "_peer_stt_task"}:
+        if attr_name == "_peer_stt_task":
             return
         task = getattr(self, attr_name)
         if task is None:
@@ -796,15 +639,14 @@ class ClientHub:
         await asyncio.gather(task, return_exceptions=True)
 
     async def _reset_stt_runtime_state(self) -> None:
-        await self.self_runtime.reset_runtime_state()
         await self.peer_runtime.reset_runtime_state()
         self._clear_peer_logical_turn_state()
-        self._clear_latency_state()
-        self._sync_self_runtime_aliases()
+        self._clear_latency_state(channel="peer")
 
     async def _handle_stt_event(self, event: object) -> None:
-        low_latency_mode = self.translation_runtime_config_snapshot().value.low_latency_mode
         if isinstance(event, STTSessionStateEvent):
+            if event.channel != "peer":
+                raise ValueError("Peer translation owner received a non-Peer session event")
             self._emit_basic(
                 "[Hub] STT state: channel=%s state=%s",
                 event.channel,
@@ -817,97 +659,51 @@ class ClientHub:
                     channel=event.channel,
                 )
             )
-            if event.state == STTSessionState.STREAMING and event.channel == "self":
-                self._send_stt_connected_notification()
             return
 
         if isinstance(event, STTErrorEvent):
+            if event.channel != "peer":
+                raise ValueError("Peer translation owner received a non-Peer error event")
             await self.output_projection.publish_ui(
                 TranslationUiMessage(
                     event_type=UIEventType.ERROR,
                     payload=self._stt_error_event_payload(event),
-                    source="Peer" if event.channel == "peer" else "Mic",
-                    channel=event.channel,
+                    source="Peer",
+                    channel="peer",
                     runtime_log_handled=event.runtime_log_handled,
                 )
             )
             return
 
         if isinstance(event, STTPartialEvent):
-            if event.channel == "peer":
-                return
-            self._send_stt_connected_notification()
-            if low_latency_mode:
-                return
-            self._emit_detailed(
-                "[Hub] STT Partial: channel=%s utterance_id=%s text_len=%s",
-                event.channel,
-                event.transcript.utterance_id,
-                len(event.transcript.text),
-                fallback_level=logging.DEBUG,
-            )
-            await self._handle_transcript(event.transcript, is_final=False, source="Mic")
+            if event.channel != "peer":
+                raise ValueError("Peer translation owner received a non-Peer partial event")
             return
 
         if isinstance(event, STTFinalEvent):
-            runtime = self._runtime_for_channel(event.channel)
-            source = "Peer" if runtime.channel == "peer" else "Mic"
-            if runtime.channel == "peer":
-                await self._ensure_translation(
-                    event.transcript,
-                    turn_kind="peer",
-                    wait_for_parent=(
-                        not self.translation_requests.provider_available
-                        or not self._translation_enabled_for_runtime(runtime)
-                    ),
-                )
-                return
-            if runtime.channel == "self":
-                self._send_stt_connected_notification()
-            if low_latency_mode and runtime.channel == "self":
-                await self._handle_low_latency_final(event.transcript)
-                return
-            self._record_latency_stage(
-                channel=runtime.channel,
-                utterance_id=event.transcript.utterance_id,
-                stage="stt_final",
-            )
-            await self._handle_transcript(event.transcript, is_final=True, source=source)
+            if event.channel != "peer":
+                raise ValueError("Peer translation owner received a non-Peer final event")
             await self._ensure_translation(
                 event.transcript,
-                turn_kind="self",
+                turn_kind="peer",
                 wait_for_parent=(
                     not self.translation_requests.provider_available
-                    or not self._translation_enabled_for_runtime(runtime)
+                    or not self._translation_enabled_for_runtime(self.peer_runtime)
                 ),
             )
-            return
 
     async def _handle_retired_stt_event(self, event: object) -> None:
-        if isinstance(event, STTFinalEvent):
+        if isinstance(event, STTFinalEvent) and event.channel == "peer":
             await self._handle_stt_event(event)
-
-    def _send_stt_connected_notification(self) -> None:
-        """Send promo message when STT connects (only if user clicked button)."""
-        if not self._promo_eligible:
-            return  # Skip if not triggered by user button click
-        self._promo_eligible = False
-
-        now = self.clock.now()
-        if self._last_promo_time is not None:
-            if now - self._last_promo_time < _PROMO_INTERVAL_SEC:
-                return
-        result = self.output_projection.publish_system_immediate("PuriPuly ON!")
-        if result.decision.decision == "published":
-            self._last_promo_time = now
 
     async def _handle_transcript(
         self, transcript: Transcript, *, is_final: bool, source: str | None
     ) -> None:
-        runtime = self._runtime_for_channel(transcript.channel)
-        bundle = self.get_or_create_bundle(transcript.utterance_id, channel=transcript.channel)
+        if transcript.channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer transcript")
+        bundle = self.peer_runtime.get_or_create_bundle(transcript.utterance_id)
         bundle.with_transcript(transcript)
-        self._remember_source(transcript.utterance_id, source, channel=transcript.channel)
+        self._remember_source(transcript.utterance_id, source, channel="peer")
         await self.output_projection.publish_ui(
             TranslationUiMessage(
                 event_type=(
@@ -918,68 +714,49 @@ class ClientHub:
                 source=source,
             )
         )
-        if is_final:
-            if runtime.channel == "peer":
-                deny_peer_chatbox_attempt = self.output_projection.chatbox_is_denied(
-                    runtime.channel
-                )
-                peer_terminal_work_will_follow = self._peer_terminal_work_will_follow(runtime)
-                if self._overlay_translation_will_follow(runtime):
-                    await self._ensure_translation(transcript, turn_kind="peer")
-                elif self.output_projection.has_overlay_destination:
-                    configuration = self.translation_runtime_config_snapshot().value
-                    finalized = await self.output_projection.project_peer_source_only(
-                        transcript=transcript,
-                        source_language=self._source_language_for(
-                            runtime,
-                            configuration,
-                        ),
-                        target_language=self._target_language_for(
-                            runtime,
-                            configuration,
-                        ),
-                        close_is_final=True,
-                        finalize_latency=not peer_terminal_work_will_follow,
-                    )
-                    if finalized:
-                        self._clear_runtime_latency_bookkeeping(
-                            channel="peer",
-                            utterance_id=transcript.utterance_id,
-                        )
-                    if deny_peer_chatbox_attempt:
-                        await self.output_projection.publish_peer_chatbox_denial(
-                            transcript.utterance_id
-                        )
-                        self._clear_runtime_latency_bookkeeping(
-                            channel="peer",
-                            utterance_id=transcript.utterance_id,
-                        )
-                elif deny_peer_chatbox_attempt:
-                    await self.output_projection.publish_peer_chatbox_denial(
-                        transcript.utterance_id
-                    )
-                    self._clear_runtime_latency_bookkeeping(
-                        channel="peer",
-                        utterance_id=transcript.utterance_id,
-                    )
-                elif not peer_terminal_work_will_follow:
-                    self._finalize_latency_timeline(
-                        channel=transcript.channel,
-                        utterance_id=transcript.utterance_id,
-                    )
-                return
+        if not is_final:
+            return
+        deny_peer_chatbox_attempt = self.output_projection.chatbox_is_denied("peer")
+        peer_terminal_work_will_follow = self._peer_terminal_work_will_follow(self.peer_runtime)
+        if self._overlay_translation_will_follow(self.peer_runtime):
+            await self._ensure_translation(transcript, turn_kind="peer")
+        elif self.output_projection.has_overlay_destination:
             configuration = self.translation_runtime_config_snapshot().value
-            finalized = await self.output_projection.project_self_final_transcript(
+            finalized = await self.output_projection.project_peer_source_only(
                 transcript=transcript,
-                source_language=self._source_language_for(runtime, configuration),
-                target_language=self._target_language_for(runtime, configuration),
-                translation_will_follow=self._overlay_translation_will_follow(runtime),
+                source_language=self._source_language_for(
+                    self.peer_runtime,
+                    configuration,
+                ),
+                target_language=self._target_language_for(
+                    self.peer_runtime,
+                    configuration,
+                ),
+                close_is_final=True,
+                finalize_latency=not peer_terminal_work_will_follow,
             )
             if finalized:
                 self._clear_runtime_latency_bookkeeping(
-                    channel=transcript.channel,
+                    channel="peer",
                     utterance_id=transcript.utterance_id,
                 )
+            if deny_peer_chatbox_attempt:
+                await self.output_projection.publish_peer_chatbox_denial(transcript.utterance_id)
+                self._clear_runtime_latency_bookkeeping(
+                    channel="peer",
+                    utterance_id=transcript.utterance_id,
+                )
+        elif deny_peer_chatbox_attempt:
+            await self.output_projection.publish_peer_chatbox_denial(transcript.utterance_id)
+            self._clear_runtime_latency_bookkeeping(
+                channel="peer",
+                utterance_id=transcript.utterance_id,
+            )
+        elif not peer_terminal_work_will_follow:
+            self._finalize_latency_timeline(
+                channel="peer",
+                utterance_id=transcript.utterance_id,
+            )
 
     async def _handle_peer_final_transcript(
         self,
@@ -1008,25 +785,26 @@ class ClientHub:
         )
 
     async def _on_peer_final_run_child_created(self, child: TranslationTurnChild) -> None:
-        if child.channel == "peer":
-            self._register_peer_logical_turn(
-                parent_utterance_id=child.parent_utterance_id,
-                peer_turn_id=child.utterance_id,
-            )
-            await self._handle_peer_final_transcript(
-                child.transcript,
-                parent_utterance_id=child.parent_utterance_id,
-                source=child.source,
-            )
-        elif child.utterance_id != child.parent_utterance_id:
-            await self._handle_transcript(child.transcript, is_final=True, source=child.source)
+        if child.channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer child")
+        self._register_peer_logical_turn(
+            parent_utterance_id=child.parent_utterance_id,
+            peer_turn_id=child.utterance_id,
+        )
+        await self._handle_peer_final_transcript(
+            child.transcript,
+            parent_utterance_id=child.parent_utterance_id,
+            source=child.source,
+        )
 
     async def _process_peer_final_run_child(
         self,
         child: TranslationTurnChild,
         cancellation_requested: Callable[[], bool],
     ) -> TranslationTurnProcessResult:
-        runtime = self._runtime_for_channel(child.channel)
+        if child.channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer child")
+        runtime = self.peer_runtime
         config_snapshot = child.config_snapshot
         if cancellation_requested():
             raise asyncio.CancelledError
@@ -1083,16 +861,20 @@ class ClientHub:
         child: TranslationTurnChild,
         task: asyncio.Task[TranslationTurnProcessResult],
     ) -> None:
-        self._runtime_for_channel(child.channel).translation_tasks[child.utterance_id] = task
+        if child.channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer child")
+        self.peer_runtime.translation_tasks[child.utterance_id] = task
 
     async def _on_peer_final_run_child_terminal(
         self,
         child: TranslationTurnChild,
         outcome: TranslationTurnOutcome,
     ) -> None:
-        runtime = self._runtime_for_channel(child.channel)
+        if child.channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer child")
+        runtime = self.peer_runtime
         runtime.translation_tasks.pop(child.utterance_id, None)
-        if outcome == "cancelled" and child.channel == "peer":
+        if outcome == "cancelled":
             configuration = child.config_snapshot.value
             await self.output_projection.project_peer_source_only(
                 transcript=child.transcript,
@@ -1103,26 +885,13 @@ class ClientHub:
             )
             await self.output_projection.publish_peer_chatbox_denial(child.utterance_id)
             self._clear_runtime_latency_bookkeeping(
-                channel=child.channel,
+                channel="peer",
                 utterance_id=child.utterance_id,
             )
-        elif outcome == "cancelled":
-            finalized = await self.output_projection.close_overlay_utterance(
-                utterance_id=child.utterance_id,
-                channel=child.channel,
-                is_final=False,
-                finalize_latency=not self.output_projection.chatbox_is_eligible(child.channel),
-            )
-            if finalized:
-                self._clear_runtime_latency_bookkeeping(
-                    channel=child.channel,
-                    utterance_id=child.utterance_id,
-                )
-        if child.channel == "peer":
-            self._complete_peer_logical_turn(
-                child.utterance_id,
-                preserve_parent_speech_end_time=True,
-            )
+        self._complete_peer_logical_turn(
+            child.utterance_id,
+            preserve_parent_speech_end_time=True,
+        )
 
     async def _on_peer_final_run_parent_closed(self, parent_utterance_id: UUID) -> None:
         if parent_utterance_id in self._peer_translation_parent_ids:
@@ -1156,884 +925,21 @@ class ClientHub:
             and self._translation_enabled_for_runtime(runtime)
         ) or self.output_projection.chatbox_is_denied(runtime.channel)
 
-    async def _sync_overlay_active_self(
-        self, buffer: _MergeBuffer | None, *, created_at: float | None = None
-    ) -> None:
-        if buffer is None:
-            return
-        active_text = self._merge_text(buffer.parts)
-        if not active_text:
-            return
-        await self.output_projection.sync_active_self(
-            ActiveSelfProjection(
-                merge_id=buffer.merge_id,
-                active_text=active_text,
-                spec_text=buffer.spec_text,
-                spec_translation=(
-                    buffer.spec_translation
-                    if isinstance(buffer.spec_translation, Translation)
-                    else None
-                ),
-                source_language=self._source_language_for(self.self_runtime),
-                target_language=self._target_language_for(self.self_runtime),
-                resume_pending=buffer.resume_pending,
-                resume_confirmed=buffer.resume_confirmed,
-                created_at=created_at,
-            )
-        )
-
-    def _merge_text(self, parts: list[str]) -> str:
-        merged = ""
-        for part in parts:
-            part_clean = part.strip()
-            if not part_clean:
-                continue
-            if not merged:
-                merged = part_clean
-                continue
-            merged = self._merge_with_overlap(merged, part_clean)
-        return merged.strip()
-
-    def _merge_with_overlap(self, existing: str, addition: str) -> str:
-        if not existing:
-            return addition
-        if not addition:
-            return existing
-        if existing.endswith(addition):
-            return existing
-
-        max_overlap = min(len(existing), len(addition))
-        overlap_len = 0
-        for i in range(1, max_overlap + 1):
-            if existing[-i:] == addition[:i]:
-                overlap_len = i
-        if overlap_len:
-            return existing + addition[overlap_len:]
-
-        relaxed_merge = self._relaxed_overlap_merge(existing, addition)
-        if relaxed_merge is not None:
-            return relaxed_merge
-
-        if self._needs_space(existing, addition):
-            return f"{existing} {addition}"
-        return f"{existing}{addition}"
-
-    def _relaxed_overlap_merge(self, existing: str, addition: str) -> str | None:
-        if not existing or not addition:
-            return None
-
-        left_trimmed, left_trimmed_len = self._strip_trailing_boundary(existing)
-        right_trimmed, right_trimmed_len = self._strip_leading_boundary(addition)
-        if left_trimmed_len == 0 and right_trimmed_len == 0:
-            return None
-        if not left_trimmed or not right_trimmed:
-            return None
-
-        max_overlap = min(len(left_trimmed), len(right_trimmed))
-        overlap_len = 0
-        for i in range(1, max_overlap + 1):
-            if left_trimmed[-i:] == right_trimmed[:i]:
-                overlap_len = i
-
-        if overlap_len < _RELAXED_OVERLAP_MIN_CHARS:
-            return None
-
-        cut = right_trimmed_len + overlap_len
-        if cut <= 0 or cut > len(addition):
-            return None
-
-        base = existing[:-left_trimmed_len] if left_trimmed_len else existing
-        if cut >= len(addition):
-            return base
-        return f"{base}{addition[cut:]}"
-
-    def _strip_trailing_boundary(self, text: str) -> tuple[str, int]:
-        idx = len(text)
-        while idx > 0 and self._is_boundary_char(text[idx - 1]):
-            idx -= 1
-        return text[:idx], len(text) - idx
-
-    def _strip_leading_boundary(self, text: str) -> tuple[str, int]:
-        idx = 0
-        while idx < len(text) and self._is_boundary_char(text[idx]):
-            idx += 1
-        return text[idx:], idx
-
-    def _is_boundary_char(self, ch: str) -> bool:
-        return ch.isspace() or ch in _BOUNDARY_PUNCT
-
-    def _needs_space(self, left: str, right: str) -> bool:
-        if not left or not right:
-            return False
-        left_ch = left[-1]
-        right_ch = right[0]
-        if self._is_ascii_alnum(left_ch) and self._is_ascii_alnum(right_ch):
-            return True
-        if (" " in left or " " in right) and left_ch.isalnum() and right_ch.isalnum():
-            return True
-        return False
-
-    def _is_ascii_alnum(self, ch: str) -> bool:
-        return ord(ch) < 128 and ch.isalnum()
-
-    def _upsert_merge_part(self, buffer: _MergeBuffer, utterance_id: UUID, text: str) -> None:
-        if not text:
-            return
-        for idx in range(len(buffer.utterance_ids) - 1, -1, -1):
-            if buffer.utterance_ids[idx] == utterance_id:
-                existing = buffer.parts[idx]
-                if existing == text:
-                    return
-                if text in existing:
-                    return
-                if existing in text:
-                    merged = text
-                else:
-                    merged = self._merge_with_overlap(existing, text)
-                if merged != existing:
-                    buffer.parts[idx] = merged
-                    self._emit_metric(
-                        "[Metric] final_update id=%s index=%s text_len=%s",
-                        str(buffer.merge_id)[:8],
-                        idx,
-                        len(merged),
-                    )
-                return
-        buffer.parts.append(text)
-        buffer.utterance_ids.append(utterance_id)
-
-    def _clear_resume_state(self, buffer: _MergeBuffer) -> None:
-        buffer.resume_pending = False
-        buffer.resume_confirmed = False
-        buffer.resume_utterance_id = None
-        buffer.resume_chunk_count = 0
-        buffer.resume_started_at = None
-        self._cancel_resume_end_timeout(buffer)
-
-    def _clear_spec_latency_state(self, buffer: _MergeBuffer) -> None:
-        buffer.spec_latency_stage_times.clear()
-
-    def _record_spec_latency_stage(
-        self,
-        buffer: _MergeBuffer,
-        *,
-        stage: str,
-        timestamp: float | None = None,
-    ) -> None:
-        buffer.spec_latency_stage_times[stage] = (
-            self.clock.now() if timestamp is None else timestamp
-        )
-
-    def _promote_spec_latency_to_output(self, buffer: _MergeBuffer) -> None:
-        if not buffer.spec_latency_stage_times:
-            return
-        for stage in ("llm_request_start", "llm_first_chunk", "llm_done"):
-            timestamp = buffer.spec_latency_stage_times.get(stage)
-            if timestamp is None:
-                continue
-            self._record_latency_stage(
-                channel="self",
-                utterance_id=buffer.merge_id,
-                stage=stage,
-                timestamp=timestamp,
-                publish_now=False,
-            )
-        self._clear_spec_latency_state(buffer)
-        self.translation_diagnostics.publish_latency(
-            LatencyTimelineDiagnostic(
-                channel="self",
-                utterance_id=buffer.merge_id,
-            )
-        )
-
-    def _clear_spec_state(self, buffer: _MergeBuffer, *, reason: str) -> bool:
-        had_spec_state = any(
-            value is not None
-            for value in (
-                buffer.spec_task,
-                buffer.spec_translation,
-                buffer.spec_text,
-                buffer.spec_config_snapshot,
-                buffer.spec_started_at,
-                buffer.spec_done_at,
-            )
-        ) or bool(buffer.spec_latency_stage_times)
-        if not had_spec_state:
-            return False
-        if (
-            buffer.spec_task is not None
-            and not buffer.spec_task.done()
-            and buffer.spec_task is not asyncio.current_task()
-        ):
-            buffer.spec_task.cancel()
-            self._emit_metric(
-                "[Metric] spec_cancel id=%s reason=%s",
-                str(buffer.merge_id)[:8],
-                reason,
-            )
-        elif buffer.spec_translation is not None:
-            self._emit_metric(
-                "[Metric] spec_cancel id=%s reason=%s",
-                str(buffer.merge_id)[:8],
-                reason,
-            )
-        self._clear_spec_latency_state(buffer)
-        buffer.spec_task = None
-        buffer.spec_translation = None
-        buffer.spec_text = None
-        buffer.spec_config_snapshot = None
-        buffer.spec_started_at = None
-        buffer.spec_done_at = None
-        return True
-
-    def _maybe_update_buffer_end_time(self, utterance_id: UUID) -> None:
-        buffer = self._merge_buffer
-        if buffer is None or utterance_id not in buffer.utterance_ids:
-            return
-        end_time = self._utterance_start_times.get(utterance_id)
-        if end_time is None:
-            return
-        if buffer.start_time is None or end_time < buffer.start_time:
-            buffer.start_time = end_time
-        if buffer.last_end_time is None or end_time > buffer.last_end_time:
-            buffer.last_end_time = end_time
-
-    def _cancel_finalize_wait(self, buffer: _MergeBuffer) -> None:
-        task = buffer.finalize_wait_task
-        if task is not None and task is not asyncio.current_task():
-            if not task.done():
-                task.cancel()
-        buffer.finalize_wait_task = None
-        buffer.finalize_wait_started_at = None
-
-    def _maybe_start_finalize_wait(self, utterance_id: UUID) -> None:
-        buffer = self._merge_buffer
-        if buffer is None:
-            return
-        if not buffer.awaiting_vad_end or buffer.awaiting_vad_utterance_id != utterance_id:
-            return
-        buffer.awaiting_vad_end = False
-        buffer.awaiting_vad_utterance_id = None
-        self._cancel_awaiting_vad_timeout(buffer)
-        self._restart_post_end_grace(buffer)
-
-    def _cancel_awaiting_vad_timeout(self, buffer: _MergeBuffer) -> None:
-        task = buffer.awaiting_vad_timeout_task
-        if task is not None and task is not asyncio.current_task():
-            if not task.done():
-                task.cancel()
-        buffer.awaiting_vad_timeout_task = None
-
-    def _start_awaiting_vad_timeout(self, buffer: _MergeBuffer) -> None:
-        timeout_s = (
-            self.translation_runtime_config_snapshot().value.low_latency_awaiting_vad_timeout_s
-        )
-        if timeout_s <= 0:
-            return
-        self._cancel_awaiting_vad_timeout(buffer)
-        buffer.awaiting_vad_timeout_task = asyncio.create_task(
-            self._awaiting_vad_timeout(buffer.merge_id, timeout_s)
-        )
-
-    async def _awaiting_vad_timeout(self, merge_id: UUID, timeout_s: float) -> None:
-        try:
-            await asyncio.sleep(timeout_s)
-        except asyncio.CancelledError:
-            return
-        buffer = self._merge_buffer
-        if buffer is None or buffer.merge_id != merge_id:
-            return
-        if not buffer.awaiting_vad_end:
-            return
-        self._emit_metric(
-            "[Metric] awaiting_vad_timeout id=%s timeout_s=%s",
-            str(merge_id)[:8],
-            timeout_s,
-        )
-        buffer.awaiting_vad_end = False
-        buffer.awaiting_vad_utterance_id = None
-        buffer.awaiting_vad_timeout_task = None
-        self._restart_post_end_grace(buffer)
-
-    def _cancel_resume_end_timeout(self, buffer: _MergeBuffer) -> None:
-        task = buffer.resume_end_timeout_task
-        if task is not None and task is not asyncio.current_task():
-            if not task.done():
-                task.cancel()
-        buffer.resume_end_timeout_task = None
-        buffer.resume_end_utterance_id = None
-
-    def _start_resume_end_timeout(self, buffer: _MergeBuffer, utterance_id: UUID) -> None:
-        self._cancel_resume_end_timeout(buffer)
-        buffer.resume_end_utterance_id = utterance_id
-        timeout_s = (
-            self.translation_runtime_config_snapshot().value.low_latency_awaiting_vad_timeout_s
-        )
-        buffer.resume_end_timeout_task = asyncio.create_task(
-            self._resume_end_timeout(buffer.merge_id, utterance_id, timeout_s)
-        )
-
-    async def _resume_end_timeout(
-        self,
-        merge_id: UUID,
-        utterance_id: UUID,
-        timeout_s: float,
-    ) -> None:
-        try:
-            await asyncio.sleep(timeout_s)
-        except asyncio.CancelledError:
-            return
-        buffer = self._merge_buffer
-        if buffer is None or buffer.merge_id != merge_id:
-            return
-        if buffer.resume_end_utterance_id != utterance_id:
-            return
-        if not buffer.resume_confirmed:
-            return
-        self._emit_metric(
-            "[Metric] resume_end_timeout id=%s vad_id=%s timeout_s=%s",
-            str(merge_id)[:8],
-            str(utterance_id)[:8],
-            timeout_s,
-        )
-        self._clear_resume_state(buffer)
-        self._cancel_finalize_wait(buffer)
-        await self._try_commit_after_spec(buffer, reason="resume_end_timeout", allow_fallback=True)
-
-    def _restart_post_end_grace(self, buffer: _MergeBuffer) -> None:
-        wait_ms = self.translation_runtime_config_snapshot().value.low_latency_finalize_wait_ms
-        if wait_ms <= 0:
-            self._cancel_finalize_wait(buffer)
-            return
-        self._cancel_finalize_wait(buffer)
-        buffer.finalize_wait_started_at = self.clock.now()
-        buffer.finalize_wait_task = asyncio.create_task(
-            self._finalize_wait_timeout(
-                buffer.merge_id,
-                buffer.finalize_wait_started_at,
-                wait_ms,
-            )
-        )
-        self._emit_metric(
-            "[Metric] post_end_grace_start id=%s wait_ms=%s",
-            str(buffer.merge_id)[:8],
-            wait_ms,
-        )
-
-    async def _finalize_wait_timeout(
-        self,
-        merge_id: UUID,
-        started_at: float,
-        wait_ms: int,
-    ) -> None:
-        try:
-            await asyncio.sleep(wait_ms / 1000.0)
-        except asyncio.CancelledError:
-            return
-        buffer = self._merge_buffer
-        if buffer is None or buffer.merge_id != merge_id:
-            return
-        if buffer.finalize_wait_started_at != started_at:
-            return
-        buffer.finalize_wait_task = None
-        buffer.finalize_wait_started_at = None
-        self._emit_metric(
-            "[Metric] post_end_grace_timeout id=%s wait_ms=%s",
-            str(merge_id)[:8],
-            wait_ms,
-        )
-        if (
-            not self.translation_requests.provider_available
-            or not self.translation_runtime_config_snapshot().value.translation_enabled
-        ):
-            await self._commit_merge(buffer, reason="post_end_grace")
-            return
-        await self._try_commit_after_spec(buffer, reason="post_end_grace", allow_fallback=False)
-
-    def _mark_resume_pending(self, event: SpeechStart) -> None:
-        buffer = self._merge_buffer
-        if buffer is None:
-            return
-        if buffer.resume_pending and buffer.resume_utterance_id == event.utterance_id:
-            return
-        # 새 resume 시작 시 이전 타임아웃 취소
-        self._cancel_resume_end_timeout(buffer)
-        buffer.resume_pending = True
-        buffer.resume_confirmed = False
-        buffer.resume_utterance_id = event.utterance_id
-        buffer.resume_chunk_count = 0
-        buffer.resume_started_at = self.clock.now()
-        self._emit_metric(
-            "[Metric] resume_pending id=%s vad_id=%s",
-            str(buffer.merge_id)[:8],
-            str(event.utterance_id)[:8],
-        )
-
-    def _maybe_confirm_resume(self, event: SpeechChunk) -> _MergeBuffer | None:
-        buffer = self._merge_buffer
-        if buffer is None or not buffer.resume_pending:
-            return None
-        if buffer.resume_utterance_id != event.utterance_id:
-            return None
-        if buffer.resume_confirmed:
-            return None
-        buffer.resume_chunk_count += 1
-        if buffer.resume_chunk_count < 3:
-            return None
-        buffer.resume_confirmed = True
-        confirm_ms = 0
-        if buffer.resume_started_at is not None:
-            confirm_ms = int((self.clock.now() - buffer.resume_started_at) * 1000)
-        self._emit_metric(
-            "[Metric] resume_confirmed id=%s confirm_ms=%s chunk_count=%s",
-            str(buffer.merge_id)[:8],
-            confirm_ms,
-            buffer.resume_chunk_count,
-        )
-        cleared_spec_state = self._clear_spec_state(buffer, reason="resume_confirmed")
-        if not cleared_spec_state:
-            return None
-        return buffer
-
-    async def _maybe_clear_resume_on_end(self, event: SpeechEnd) -> None:
-        buffer = self._merge_buffer
-        if buffer is None:
-            return
-        if buffer.resume_utterance_id != event.utterance_id:
-            return
-        if buffer.resume_confirmed:
-            # resume_confirmed 상태에서 SpeechEnd → STT Final 대기 타임아웃 시작
-            self._start_resume_end_timeout(buffer, event.utterance_id)
-            return
-        if not buffer.resume_pending:
-            return
-        false_ms = 0
-        if buffer.resume_started_at is not None:
-            false_ms = int((self.clock.now() - buffer.resume_started_at) * 1000)
-        self._emit_metric(
-            "[Metric] resume_false_start id=%s false_ms=%s chunk_count=%s",
-            str(buffer.merge_id)[:8],
-            false_ms,
-            buffer.resume_chunk_count,
-        )
-        self._clear_resume_state(buffer)
-        await self._try_commit_after_spec(buffer, reason="resume_false_start", allow_fallback=True)
-
-    async def _handle_low_latency_final(self, transcript: Transcript) -> None:
-        text = transcript.text.strip()
-        if not text:
-            return
-
-        self._record_latency_stage(
-            channel="self",
-            utterance_id=transcript.utterance_id,
-            stage="stt_final",
-            publish_now=False,
-        )
-
-        now = self.clock.now()
-        buffer = self._merge_buffer
-        if buffer is None:
-            buffer = _MergeBuffer(merge_id=uuid4(), start_time=now, last_final_at=now)
-            self._merge_buffer = buffer
-        if buffer.resume_pending or buffer.resume_confirmed:
-            self._clear_resume_state(buffer)
-        self._upsert_merge_part(buffer, transcript.utterance_id, text)
-        buffer.last_final_at = now
-        await self._sync_overlay_active_self(buffer, created_at=transcript.created_at)
-
-        end_time = self._utterance_start_times.get(transcript.utterance_id)
-        speech_already_ended = transcript.utterance_id in self._speech_ended_ids
-
-        if end_time is None and not speech_already_ended:
-            # SpeechEnd has not arrived yet - wait for it
-            buffer.awaiting_vad_end = True
-            buffer.awaiting_vad_utterance_id = transcript.utterance_id
-            self._cancel_finalize_wait(buffer)
-            self._start_awaiting_vad_timeout(buffer)
-            self._emit_metric(
-                "[Metric] final_phase id=%s phase=pre_end vad_id=%s",
-                str(buffer.merge_id)[:8],
-                str(transcript.utterance_id)[:8],
-            )
-        else:
-            # SpeechEnd already arrived (or end_time exists) - proceed to post_end
-            self._maybe_update_buffer_end_time(transcript.utterance_id)
-            if (
-                buffer.awaiting_vad_end
-                and buffer.awaiting_vad_utterance_id == transcript.utterance_id
-            ):
-                buffer.awaiting_vad_end = False
-                buffer.awaiting_vad_utterance_id = None
-            self._restart_post_end_grace(buffer)
-            self._emit_metric(
-                "[Metric] final_phase id=%s phase=post_end vad_id=%s",
-                str(buffer.merge_id)[:8],
-                str(transcript.utterance_id)[:8],
-            )
-
-        if (
-            not self.translation_requests.provider_available
-            or not self.translation_runtime_config_snapshot().value.translation_enabled
-        ):
-            await self._commit_merge(buffer, reason="final_no_llm")
-            return
-
-        await self._maybe_restart_spec(buffer)
-
-    async def _commit_merge(self, buffer: _MergeBuffer, *, reason: str) -> None:
-        if buffer.resume_pending or buffer.resume_confirmed:
-            hold_ms = 0
-            if buffer.spec_done_at is not None:
-                hold_ms = int((self.clock.now() - buffer.spec_done_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_blocked id=%s reason=%s hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                reason,
-                hold_ms,
-            )
-            return
-        if buffer.awaiting_vad_end:
-            hold_ms = 0
-            if buffer.finalize_wait_started_at is not None:
-                hold_ms = int((self.clock.now() - buffer.finalize_wait_started_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_blocked id=%s reason=await_vad_end hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                hold_ms,
-            )
-            return
-        if buffer.finalize_wait_task is not None:
-            hold_ms = 0
-            if buffer.finalize_wait_started_at is not None:
-                hold_ms = int((self.clock.now() - buffer.finalize_wait_started_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_deferred id=%s reason=post_end_grace hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                hold_ms,
-            )
-            return
-        self._cancel_finalize_wait(buffer)
-        buffer.awaiting_vad_end = False
-        buffer.awaiting_vad_utterance_id = None
-        for utterance_id in buffer.utterance_ids:
-            self._utterance_start_times.pop(utterance_id, None)
-            self._speech_ended_ids.discard(utterance_id)
-        if self._merge_buffer is buffer:
-            self._merge_buffer = None
-
-        final_text = self._merge_text(buffer.parts)
-        if not final_text:
-            await self.output_projection.reset_overlay_preview()
-            return
-
-        reuse_mode = None
-        if buffer.spec_translation is not None:
-            reuse_mode = self.output_projection.soft_reuse_mode(
-                buffer.spec_text,
-                final_text,
-            )
-
-        if self.output_projection.should_blank_stale_active_secondary(
-            final_text=final_text,
-            reuse_mode=reuse_mode,
-        ):
-            configuration = self.translation_runtime_config_snapshot().value
-            source_language, target_language = (
-                self.output_projection.self_overlay_languages_for_utterance(
-                    utterance_id=buffer.merge_id,
-                    source_language=configuration.source_language,
-                    target_language=configuration.target_language,
-                )
-            )
-            await self.output_projection.blank_active_self(
-                utterance_id=buffer.merge_id,
-                text=final_text,
-                source_language=source_language,
-                target_language=target_language,
-                created_at=self.clock.now(),
-            )
-
-        if (
-            buffer.spec_task is not None
-            and not buffer.spec_task.done()
-            and buffer.spec_task is not asyncio.current_task()
-        ):
-            buffer.spec_task.cancel()
-
-        if buffer.last_end_time is not None:
-            self._utterance_start_times[buffer.merge_id] = buffer.last_end_time
-        elif buffer.start_time is not None:
-            self._utterance_start_times[buffer.merge_id] = buffer.start_time
-        self._inherit_latency_for_output(
-            channel="self",
-            output_utterance_id=buffer.merge_id,
-            source_utterance_ids=buffer.utterance_ids,
-        )
-        for utterance_id in buffer.utterance_ids:
-            self._clear_latency_timeline(channel="self", utterance_id=utterance_id)
-
-        transcript = Transcript(
-            utterance_id=buffer.merge_id,
-            text=final_text,
-            is_final=True,
-            created_at=self.clock.now(),
-        )
-        await self._handle_transcript(transcript, is_final=True, source="Mic")
-        config_snapshot = (
-            buffer.spec_config_snapshot
-            if reuse_mode is not None
-            and buffer.spec_translation is not None
-            and buffer.spec_config_snapshot is not None
-            else self.translation_runtime_config_snapshot()
-        )
-
-        if (
-            not self.translation_requests.provider_available
-            or not config_snapshot.value.translation_enabled
-        ):
-            await self._ensure_translation(
-                transcript,
-                turn_kind="self",
-                wait_for_parent=True,
-                config_snapshot=config_snapshot,
-            )
-            return
-
-        reuse_spec = reuse_mode is not None
-        commit_delay_ms = 0
-        if buffer.start_time is not None:
-            commit_delay_ms = int((self.clock.now() - buffer.start_time) * 1000)
-        self._emit_metric(
-            "[Metric] merge_commit id=%s used_spec=%s parts=%s text_len=%s commit_delay_ms=%s reason=%s",
-            str(buffer.merge_id)[:8],
-            reuse_spec,
-            len(buffer.parts),
-            len(final_text),
-            commit_delay_ms,
-            reason,
-        )
-        if reuse_spec:
-            translation = buffer.spec_translation
-            if translation is not None:
-                self._promote_spec_latency_to_output(buffer)
-                self._emit_metric(
-                    "[Metric] spec_reuse id=%s translation_len=%s after_final=%s",
-                    str(buffer.merge_id)[:8],
-                    len(translation.text),
-                    True,
-                )
-                await self._ensure_translation(
-                    transcript,
-                    turn_kind="self",
-                    precomputed_translation=translation,
-                    wait_for_parent=True,
-                    config_snapshot=config_snapshot,
-                )
-                return
-
-        if buffer.spec_translation is not None and reuse_mode is None:
-            self._clear_spec_latency_state(buffer)
-            self._emit_metric(
-                "[Metric] spec_cancel id=%s reason=final_mismatch", str(buffer.merge_id)[:8]
-            )
-
-        await self._ensure_translation(
-            transcript,
-            turn_kind="self",
-            wait_for_parent=True,
-            config_snapshot=config_snapshot,
-        )
-
-    async def _maybe_restart_spec(self, buffer: _MergeBuffer) -> None:
-        config_snapshot = self.translation_runtime_config_snapshot()
-        if (
-            not self.translation_requests.provider_available
-            or not config_snapshot.value.translation_enabled
-        ):
-            return
-
-        self._clear_spec_state(buffer, reason="spec_retry")
-
-        merged_text = self._merge_text(buffer.parts)
-        if not merged_text:
-            return
-
-        buffer.spec_attempts += 1
-        buffer.spec_text = merged_text
-        buffer.spec_config_snapshot = config_snapshot
-        buffer.spec_started_at = self.clock.now()
-        self._emit_metric(
-            "[Metric] spec_start id=%s text_len=%s attempt=%s",
-            str(buffer.merge_id)[:8],
-            len(merged_text),
-            buffer.spec_attempts,
-        )
-        buffer.spec_task = asyncio.create_task(
-            self._run_spec_translation(buffer.merge_id, merged_text, buffer.spec_attempts)
-        )
-
-    async def _run_spec_translation(
-        self,
-        merge_id: UUID,
-        text: str,
-        attempt: int,
-        *,
-        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
-    ) -> None:
-        if not self.translation_requests.provider_available:
-            return
-        buffer = self._merge_buffer
-        if buffer is None or buffer.merge_id != merge_id:
-            return
-        if buffer.spec_text != text or buffer.spec_attempts != attempt:
-            return
-        config_snapshot = (
-            config_snapshot
-            or buffer.spec_config_snapshot
-            or self.translation_runtime_config_snapshot()
-        )
-        buffer.spec_config_snapshot = config_snapshot
-        self._record_spec_latency_stage(buffer, stage="llm_request_start")
-        try:
-            translation = await self.translation_requests.translate(
-                DirectTranslationRequest(
-                    utterance_id=merge_id,
-                    text=text,
-                    record_latency=False,
-                    config_snapshot=config_snapshot,
-                )
-            )
-        except asyncio.CancelledError:
-            return
-        except StaleProviderCompletion:
-            await self._handle_stale_spec_translation(merge_id, text, attempt)
-            return
-        except Exception as exc:
-            self._log_translation_failure(
-                stage="spec",
-                runtime=self.self_runtime,
-                exc=exc,
-                detailed=True,
-            )
-            buffer = self._merge_buffer
-            if buffer is None or buffer.merge_id != merge_id:
-                return
-            if buffer.spec_text != text or buffer.spec_attempts != attempt:
-                return
-            self._clear_spec_latency_state(buffer)
-            buffer.spec_done_at = self.clock.now()
-            await self._try_commit_after_spec(buffer, reason="spec_failed", allow_fallback=True)
-            return
-
-        buffer = self._merge_buffer
-        if buffer is None or buffer.merge_id != merge_id:
-            return
-        if buffer.spec_text != text or buffer.spec_attempts != attempt:
-            return
-
-        self._record_spec_latency_stage(buffer, stage="llm_done")
-        buffer.spec_translation = translation
-        buffer.spec_done_at = self.clock.now()
-        if buffer.spec_started_at is None:
-            latency_ms = 0
-        else:
-            latency_ms = int((self.clock.now() - buffer.spec_started_at) * 1000)
-        self._emit_metric(
-            "[Metric] spec_done id=%s spec_latency_ms=%s translation_len=%s",
-            str(merge_id)[:8],
-            latency_ms,
-            len(translation.text),
-        )
-        await self._sync_overlay_active_self(buffer, created_at=translation.created_at)
-        await self._try_commit_after_spec(buffer, reason="spec_done", allow_fallback=False)
-
-    async def _handle_stale_spec_translation(
-        self,
-        merge_id: UUID,
-        text: str,
-        attempt: int,
-    ) -> None:
-        buffer = self._merge_buffer
-        if buffer is None or buffer.merge_id != merge_id:
-            return
-        if buffer.spec_text != text or buffer.spec_attempts != attempt:
-            return
-        self._clear_spec_latency_state(buffer)
-        buffer.spec_translation = None
-        buffer.spec_done_at = self.clock.now()
-        await self._try_commit_after_spec(buffer, reason="spec_stale", allow_fallback=True)
-
-    async def _try_commit_after_spec(
-        self, buffer: _MergeBuffer, *, reason: str, allow_fallback: bool
-    ) -> None:
-        if self._merge_buffer is None or self._merge_buffer is not buffer:
-            return
-        if buffer.resume_pending or buffer.resume_confirmed:
-            hold_ms = 0
-            if buffer.spec_done_at is not None:
-                hold_ms = int((self.clock.now() - buffer.spec_done_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_blocked id=%s reason=%s hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                reason,
-                hold_ms,
-            )
-            return
-        if buffer.awaiting_vad_end:
-            hold_ms = 0
-            if buffer.finalize_wait_started_at is not None:
-                hold_ms = int((self.clock.now() - buffer.finalize_wait_started_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_blocked id=%s reason=await_vad_end hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                hold_ms,
-            )
-            return
-        if buffer.finalize_wait_task is not None:
-            hold_ms = 0
-            if buffer.finalize_wait_started_at is not None:
-                hold_ms = int((self.clock.now() - buffer.finalize_wait_started_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_deferred id=%s reason=post_end_grace hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                hold_ms,
-            )
-            return
-
-        final_text = self._merge_text(buffer.parts)
-        if not final_text:
-            return
-
-        if buffer.spec_translation is None:
-            if not allow_fallback:
-                return
-            await self._commit_merge(buffer, reason=reason)
-            return
-
-        if self.output_projection.soft_reuse_mode(buffer.spec_text, final_text) is None:
-            return
-
-        await self._commit_merge(buffer, reason=reason)
-
     def _remember_source(
         self,
         utterance_id: UUID,
         source: str | None,
         *,
-        channel: ChannelId = "self",
+        channel: ChannelId = "peer",
     ) -> None:
-        self._runtime_for_utterance(utterance_id, default_channel=channel).remember_source(
-            utterance_id, source
-        )
+        if channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer source")
+        self.peer_runtime.remember_source(utterance_id, source)
 
-    def _get_source(self, utterance_id: UUID, *, channel: ChannelId = "self") -> str | None:
-        runtime = self._runtime_for_utterance(utterance_id, default_channel=channel)
-        source = runtime.get_source(utterance_id)
-        if source is not None:
-            return source
-        other_runtime = self.peer_runtime if runtime is self.self_runtime else self.self_runtime
-        return other_runtime.get_source(utterance_id)
+    def _get_source(self, utterance_id: UUID, *, channel: ChannelId = "peer") -> str | None:
+        if channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer source")
+        return self.peer_runtime.get_source(utterance_id)
 
     def _source_language_for(
         self,
@@ -2068,9 +974,12 @@ class ClientHub:
         context_policy: TranslationContextPolicy = "integrated_preferred",
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> tuple[str, str, float]:
+        runtime = runtime or self.peer_runtime
+        if runtime.channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer request")
         prepared = self.translation_requests.prepare(
             text,
-            channel=(runtime or self.self_runtime).channel,
+            channel="peer",
             detected_language=detected_language,
             context_policy=context_policy,
             config_snapshot=config_snapshot,
@@ -2086,9 +995,12 @@ class ClientHub:
         context_policy: TranslationContextPolicy = "integrated_preferred",
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> tuple[str, str, float, ContextMode]:
+        runtime = runtime or self.peer_runtime
+        if runtime.channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer request")
         prepared = self.translation_requests.prepare(
             text,
-            channel=(runtime or self.self_runtime).channel,
+            channel="peer",
             detected_language=detected_language,
             context_policy=context_policy,
             config_snapshot=config_snapshot,
@@ -2109,14 +1021,17 @@ class ClientHub:
         wait_for_parent: bool = False,
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> None:
-        runtime = self._runtime_for_channel(transcript.channel)
+        if transcript.channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer transcript")
+        runtime = self.peer_runtime
         config_snapshot = config_snapshot or self.translation_runtime_config_snapshot()
-        resolved_kind = turn_kind or ("peer" if runtime.channel == "peer" else "self")
-        if runtime.channel == "peer":
-            self._peer_translation_parent_ids.add(transcript.utterance_id)
-        source = self._get_source(transcript.utterance_id, channel=runtime.channel)
+        resolved_kind = turn_kind or "peer"
+        if resolved_kind != "peer":
+            raise ValueError("Peer translation owner received a non-Peer turn")
+        self._peer_translation_parent_ids.add(transcript.utterance_id)
+        source = self._get_source(transcript.utterance_id, channel="peer")
         if source is None:
-            source = "Peer" if runtime.channel == "peer" else "Mic"
+            source = "Peer"
         await self.translation_turns.submit(
             TranslationTurnRequest(
                 transcript=transcript,
@@ -2130,13 +1045,17 @@ class ClientHub:
         )
 
     async def submit_translation_output(self, submission: TranslationOutputSubmission) -> None:
+        if submission.channel != "peer":
+            raise ValueError("Peer translation owner received non-Peer output")
         await self._publish_translation_result(submission)
 
     async def _publish_translation_result(
         self,
         submission: TranslationOutputSubmission,
     ) -> None:
-        runtime = self._runtime_for_channel(submission.channel)
+        if submission.channel != "peer":
+            raise ValueError("Peer translation owner received non-Peer output")
+        runtime = self.peer_runtime
         utterance_id = submission.child_utterance_id
         translation = submission.translation
         if translation is not None:
@@ -2162,11 +1081,13 @@ class ClientHub:
         detected_language: str | None = None,
         cancellation_requested: Callable[[], bool] | None = None,
     ) -> None:
-        runtime = runtime or self.self_runtime
+        runtime = runtime or self.peer_runtime
+        if runtime.channel != "peer":
+            raise ValueError("Peer translation owner received a non-Peer runtime")
         config_snapshot = self.translation_runtime_config_snapshot()
-        source = self._get_source(utterance_id, channel=runtime.channel)
+        source = self._get_source(utterance_id, channel="peer")
         if source is None:
-            source = "Peer" if runtime.channel == "peer" else "Mic"
+            source = "Peer"
         result = await self.translation_requests.process(
             TranslationProcessRequest(
                 parent_utterance_id=utterance_id,

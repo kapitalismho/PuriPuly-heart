@@ -9,11 +9,8 @@ from uuid import uuid4
 
 import pytest
 
-from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
+from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime, ContextEntry
 from puripuly_heart.core.orchestrator.context import ContextResolver
-from puripuly_heart.core.orchestrator.hub import (
-    ContextEntry,
-)
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import Transcript, Translation
 from tests.helpers.client_hub import compose_client_hub

@@ -9,8 +9,11 @@ from uuid import UUID, uuid4
 import numpy as np
 import pytest
 
-from puripuly_heart.core.orchestrator.hub import ClientHub, _MergeBuffer
+from puripuly_heart.core.orchestrator.channel_runtime import _MergeBuffer
 from puripuly_heart.core.orchestrator.ports import compute_latency_dominant_stage
+from puripuly_heart.core.orchestrator.self_translation_channel import (
+    SelfTranslationChannelOwner,
+)
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime_logging import SessionLoggingMode
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
@@ -2263,7 +2266,7 @@ class TestSpecCommitPaths:
             _ = (self, commit_buffer)
             called.append(reason)
 
-        monkeypatch.setattr(ClientHub, "_commit_merge", fake_commit)
+        monkeypatch.setattr(SelfTranslationChannelOwner, "_commit_merge", fake_commit)
 
         await hub._try_commit_after_spec(buffer, reason="spec_done", allow_fallback=False)
         assert called == ["spec_done"]
@@ -2292,7 +2295,7 @@ class TestSpecCommitPaths:
             _ = (self, commit_buffer)
             called.append(reason)
 
-        monkeypatch.setattr(ClientHub, "_commit_merge", fake_commit)
+        monkeypatch.setattr(SelfTranslationChannelOwner, "_commit_merge", fake_commit)
 
         await hub._try_commit_after_spec(buffer, reason="spec_done", allow_fallback=False)
         assert called == []
@@ -2321,7 +2324,7 @@ class TestSpecCommitPaths:
             _ = (self, commit_buffer)
             called.append(reason)
 
-        monkeypatch.setattr(ClientHub, "_commit_merge", fake_commit)
+        monkeypatch.setattr(SelfTranslationChannelOwner, "_commit_merge", fake_commit)
 
         await hub._try_commit_after_spec(buffer, reason="spec_done", allow_fallback=False)
         assert called == []

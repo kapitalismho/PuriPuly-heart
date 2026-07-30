@@ -11,7 +11,8 @@ from puripuly_heart.core import messages
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.orchestrator import hub as hub_module
-from puripuly_heart.core.orchestrator.hub import ClientHub, _MergeBuffer
+from puripuly_heart.core.orchestrator.channel_runtime import _MergeBuffer
+from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     TranslationOverlayProjection,
 )

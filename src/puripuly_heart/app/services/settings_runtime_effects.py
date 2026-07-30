@@ -505,11 +505,14 @@ class SettingsRuntimeEffectsAdapter:
         *,
         strict_runtime_errors: bool,
     ) -> None:
-        hub = self._pipeline.hub
-        if hub is None:
+        owner = self._pipeline.self_translation_channel if channel == "self" else self._pipeline.hub
+        if owner is None:
             return
         try:
-            await hub.clear_language_runtime_state(channel=channel)
+            if channel == "self":
+                await owner.clear_language_runtime_state()
+            else:
+                await owner.clear_language_runtime_state(channel=channel)
         except Exception as exc:
             if strict_runtime_errors:
                 self._runtime_logging.emit_basic(

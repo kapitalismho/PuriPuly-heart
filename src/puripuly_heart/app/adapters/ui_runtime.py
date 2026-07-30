@@ -58,8 +58,8 @@ class UiInputRuntimeAdapter:
     self_capture: SelfCaptureApplicationOwner
 
     async def submit_text(self, text: str) -> None:
-        hub = self.pipeline.hub
-        submit = None if hub is None else lambda: hub.submit_text(text, source="You")
+        owner = self.pipeline.self_translation_channel
+        submit = None if owner is None else lambda: owner.submit_text(text, source="You")
         await self.manual_typing.submit(submit)
 
     def set_manual_input_activity(self, has_text: bool) -> None:

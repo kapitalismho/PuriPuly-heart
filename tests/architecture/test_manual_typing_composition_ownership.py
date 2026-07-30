@@ -37,4 +37,4 @@ def test_application_manual_typing_owner_is_only_factory_composition() -> None:
 def test_ui_manual_submit_preserves_self_source() -> None:
     method = _method_source(UI_RUNTIME_PATH, "UiInputRuntimeAdapter", "submit_text")
 
-    assert 'hub.submit_text(text, source="You")' in method
+    assert 'owner.submit_text(text, source="You")' in method

@@ -38,6 +38,7 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimeFactoryPort,
     LocalASRProviderRuntimePort,
+    ProviderRuntimeChannel,
 )
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
 from puripuly_heart.core.orchestrator.configuration import (
@@ -47,6 +48,9 @@ from puripuly_heart.core.orchestrator.context import ContextResolver
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.orchestrator.hub_callbacks import (
     ClientHubDurableOwnerCallbacks,
+)
+from puripuly_heart.core.orchestrator.self_translation_channel import (
+    SelfTranslationChannelOwner,
 )
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
     TranslationLatencyDiagnosticsOwner,
@@ -71,12 +75,28 @@ from puripuly_heart.domain.events import UIEvent
 
 
 @dataclass(slots=True)
+class RuntimePipelineChannelResetRouter:
+    self_owner: SelfTranslationChannelOwner = field(repr=False)
+    peer_owner: ProviderChannelResetPort = field(repr=False)
+
+    async def reset_provider_channel(self, channel: ProviderRuntimeChannel) -> None:
+        if channel == "self":
+            await self.self_owner.reset_provider_channel(channel)
+            return
+        if channel == "peer":
+            await self.peer_owner.reset_provider_channel(channel)
+            return
+        raise ValueError(f"invalid channel: {channel!r}")
+
+
+@dataclass(slots=True)
 class RuntimePipelineResourceOwner:
     pending_llm: LLMProvider | None = None
     sender: VrchatOscUdpSender | None = None
     output_runtime: OutputRuntime | None = None
     self_runtime: ChannelRuntime | None = None
     peer_runtime: ChannelRuntime | None = None
+    self_translation_channel: SelfTranslationChannelOwner | None = None
     translation_turns: TranslationTurnLifecycleOwner | None = None
     local_asr_runtime: LocalASRProviderRuntimePort | None = None
     llm_runtime: ProviderRuntimeHandle | None = None
@@ -120,6 +140,7 @@ class RuntimePipelineResourceOwner:
                     self.output_runtime,
                     self.self_runtime,
                     self.peer_runtime,
+                    self.self_translation_channel,
                     self.translation_turns,
                     self.local_asr_runtime,
                     self.llm_runtime,
@@ -138,10 +159,18 @@ class RuntimePipelineResourceOwner:
         await runtime.start(auto_flush_chatbox=auto_flush_chatbox)
 
     async def open_self_ingress(self) -> None:
-        owner = self.translation_turns
-        if owner is None:
+        channel_owner = self.self_translation_channel
+        turns = self.translation_turns
+        if channel_owner is None:
+            raise RuntimeError("runtime pipeline Self translation owner is unavailable")
+        if turns is None:
             raise RuntimeError("runtime pipeline translation-turn owner is unavailable")
-        await owner.open_channel_ingress("self")
+        await channel_owner.open_ingress()
+        try:
+            await turns.open_channel_ingress("self")
+        except BaseException:
+            await channel_owner.close_ingress()
+            raise
         self.self_ingress_open = True
 
     async def open_peer_ingress(self) -> None:
@@ -182,11 +211,12 @@ class RuntimePipelineResourceOwner:
     async def close_self_ingress(self) -> None:
         if not self.self_ingress_open:
             return
-        owner = self.translation_turns
-        if owner is None:
-            self.self_ingress_open = False
-            return
-        await owner.close_channel_ingress("self")
+        channel_owner = self.self_translation_channel
+        turns = self.translation_turns
+        if channel_owner is not None:
+            await channel_owner.close_ingress()
+        if turns is not None:
+            await turns.close_channel_ingress("self")
         self.self_ingress_open = False
 
     async def close_peer_ingress(self) -> None:
@@ -216,11 +246,18 @@ class RuntimePipelineResourceOwner:
             self.output_runtime = None
 
     async def close_self_channel(self) -> None:
-        owner = self.self_runtime
+        owner = self.self_translation_channel
         if owner is None:
+            runtime = self.self_runtime
+            if runtime is not None:
+                await runtime.reset_runtime_state()
+                if self.self_runtime is runtime:
+                    self.self_runtime = None
             return
-        await owner.reset_runtime_state()
-        if self.self_runtime is owner:
+        await owner.close()
+        if self.self_translation_channel is owner:
+            self.self_translation_channel = None
+        if self.self_runtime is owner.runtime:
             self.self_runtime = None
 
     async def close_peer_channel(self) -> None:
@@ -309,6 +346,8 @@ class RuntimePipelineComponents:
     translation_diagnostics: TranslationLatencyDiagnosticsOwner
     translation_output_projection: TranslationOutputProjectionOwner
     translation_requests: TranslationRequestOwner
+    self_translation_channel: SelfTranslationChannelOwner
+    channel_reset: RuntimePipelineChannelResetRouter
     stt_sessions: SttSessionStateProjection
     ui_events: asyncio.Queue[UIEvent]
     resource_owner: RuntimePipelineResourceOwner = field(repr=False)
@@ -346,6 +385,14 @@ class RuntimePipelineHandle:
         default=None,
     )
     translation_requests: TranslationRequestOwner | None = field(init=False, default=None)
+    self_translation_channel: SelfTranslationChannelOwner | None = field(
+        init=False,
+        default=None,
+    )
+    channel_reset: RuntimePipelineChannelResetRouter | None = field(
+        init=False,
+        default=None,
+    )
     stt_sessions: SttSessionStateProjection | None = field(init=False, default=None)
     ui_events: asyncio.Queue[UIEvent] | None = field(init=False, default=None)
     self_capture: SelfCaptureSessionOwner | None = field(init=False, default=None)
@@ -368,6 +415,8 @@ class RuntimePipelineHandle:
         self.translation_diagnostics = components.translation_diagnostics
         self.translation_output_projection = components.translation_output_projection
         self.translation_requests = components.translation_requests
+        self.self_translation_channel = components.self_translation_channel
+        self.channel_reset = components.channel_reset
         self.stt_sessions = components.stt_sessions
         self.ui_events = components.ui_events
         self.self_capture = components.self_capture
@@ -391,6 +440,8 @@ class RuntimePipelineHandle:
             self.translation_diagnostics = None
             self.translation_output_projection = None
             self.translation_requests = None
+            self.self_translation_channel = None
+            self.channel_reset = None
             self.stt_sessions = None
             self.ui_events = None
             self.self_capture = None
@@ -725,10 +776,22 @@ async def _compose_runtime_pipeline(
         )
     )
     resources.local_asr_runtime = local_asr_runtime
+    self_translation_channel = SelfTranslationChannelOwner(
+        runtime=self_runtime,
+        config_snapshot=translation_runtime_configuration.snapshot,
+        translation_turns=translation_turns,
+        local_asr_runtime=local_asr_runtime,
+        translation_requests=translation_requests,
+        output_projection=translation_output_projection,
+        diagnostics=translation_diagnostics,
+        clock=clock,
+    )
+    await self_translation_channel.close_ingress()
+    resources.self_translation_channel = self_translation_channel
+    callbacks.bind_self(self_translation_channel)
     hub = ClientHub(
         clock=clock,
         translation_runtime_configuration=translation_runtime_configuration,
-        direct_self_runtime=self_runtime,
         direct_peer_runtime=peer_runtime,
         direct_translation_turns=translation_turns,
         direct_local_asr_runtime=local_asr_runtime,
@@ -736,7 +799,11 @@ async def _compose_runtime_pipeline(
         direct_output_projection=translation_output_projection,
         direct_translation_requests=translation_requests,
     )
-    callbacks.bind(hub)
+    callbacks.bind_peer(hub)
+    channel_reset = RuntimePipelineChannelResetRouter(
+        self_owner=self_translation_channel,
+        peer_owner=hub,
+    )
     state = vrc_mic_state or VrcMicState()
     gate = vrc_mic_audio_gate
     if gate is None:
@@ -750,7 +817,12 @@ async def _compose_runtime_pipeline(
     gate.set_receiver_active(receiver_active)
     gate.reset()
 
-    self_capture = self_capture_factory(hub, local_asr_runtime, hub, gate)
+    self_capture = self_capture_factory(
+        self_translation_channel,
+        local_asr_runtime,
+        self_translation_channel,
+        gate,
+    )
     resources.self_capture = self_capture
     peer_capture = peer_capture_factory(hub, local_asr_runtime, hub)
     resources.peer_capture = peer_capture
@@ -774,6 +846,8 @@ async def _compose_runtime_pipeline(
         translation_diagnostics=translation_diagnostics,
         translation_output_projection=translation_output_projection,
         translation_requests=translation_requests,
+        self_translation_channel=self_translation_channel,
+        channel_reset=channel_reset,
         stt_sessions=stt_sessions,
         ui_events=ui_events,
         resource_owner=resources,
@@ -784,6 +858,7 @@ async def _compose_runtime_pipeline(
 
 __all__ = [
     "RuntimePipelineComponents",
+    "RuntimePipelineChannelResetRouter",
     "RuntimePipelineHandle",
     "RuntimePipelineLauncher",
     "RuntimePipelineResourceOwner",

@@ -69,6 +69,8 @@ class TranslationRequestPort(Protocol):
 
     def set_clock(self, clock: Clock) -> None: ...
 
+    def clear_context(self) -> None: ...
+
     def source_language_for(
         self,
         channel: ChannelId,
@@ -190,6 +192,10 @@ class TranslationRequestOwner:
     def set_clock(self, clock: Clock) -> None:
         self.clock = clock
         self.context_resolver.clock = clock
+
+    def clear_context(self) -> None:
+        self.self_runtime.clear_context()
+        self.peer_runtime.clear_context()
 
     @property
     def provider_available(self) -> bool:

@@ -15,7 +15,10 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterUserFacingError,
 )
 from puripuly_heart.core.messages import UserErrorReport
-from puripuly_heart.core.orchestrator.hub import ClientHub, ContextEntry, _MergeBuffer
+from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry, _MergeBuffer
+from puripuly_heart.core.orchestrator.self_translation_channel import (
+    SelfTranslationChannelOwner,
+)
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     ChatboxProjection,
 )
@@ -622,10 +625,10 @@ async def test_retired_stt_ingress_forwards_only_final_events(
 ) -> None:
     handled: list[object] = []
 
-    async def record_event(_self: ClientHub, event: object) -> None:
+    async def record_event(_self: SelfTranslationChannelOwner, event: object) -> None:
         handled.append(event)
 
-    monkeypatch.setattr(ClientHub, "_handle_stt_event", record_event)
+    monkeypatch.setattr(SelfTranslationChannelOwner, "handle_stt_event", record_event)
     hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
     utterance_id = uuid4()
     transcript = Transcript(
@@ -1023,10 +1026,15 @@ async def test_try_commit_after_spec_respects_allow_fallback_flag(
     hub._merge_buffer = buffer
     called: list[str] = []
 
-    async def fake_commit(_self: ClientHub, _buffer: _MergeBuffer, *, reason: str) -> None:
+    async def fake_commit(
+        _self: SelfTranslationChannelOwner,
+        _buffer: _MergeBuffer,
+        *,
+        reason: str,
+    ) -> None:
         called.append(reason)
 
-    monkeypatch.setattr(ClientHub, "_commit_merge", fake_commit)
+    monkeypatch.setattr(SelfTranslationChannelOwner, "_commit_merge", fake_commit)
 
     await hub._try_commit_after_spec(buffer, reason="spec_failed", allow_fallback=False)
     await hub._try_commit_after_spec(buffer, reason="spec_failed", allow_fallback=True)
@@ -1237,10 +1245,15 @@ async def test_maybe_restart_spec_replaces_previous_task_and_state(
     buffer.spec_translation = Translation(utterance_id=buffer.merge_id, text="old")
     seen: list[tuple[UUID, str, int]] = []
 
-    async def fake_run_spec(_self: ClientHub, merge_id: UUID, text: str, attempt: int) -> None:
+    async def fake_run_spec(
+        _self: SelfTranslationChannelOwner,
+        merge_id: UUID,
+        text: str,
+        attempt: int,
+    ) -> None:
         seen.append((merge_id, text, attempt))
 
-    monkeypatch.setattr(ClientHub, "_run_spec_translation", fake_run_spec)
+    monkeypatch.setattr(SelfTranslationChannelOwner, "_run_spec_translation", fake_run_spec)
     await hub._maybe_restart_spec(buffer)
     await asyncio.sleep(0)
 

@@ -27,7 +27,6 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
             ASYNCIO_CREATE_TASK,
         ): 1,
         ("src/puripuly_heart/core/stt/controller.py", ASYNCIO_CREATE_TASK): 6,
-        ("src/puripuly_heart/core/orchestrator/hub.py", ASYNCIO_CREATE_TASK): 4,
         ("src/puripuly_heart/core/overlay/bridge.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/overlay/presenter.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/overlay/process.py", ASYNCIO_CREATE_TASK): 2,
@@ -46,6 +45,10 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
 
 NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
     {
+        (
+            "src/puripuly_heart/core/orchestrator/self_translation_channel.py",
+            ASYNCIO_CREATE_TASK,
+        ): 4,
         ("src/puripuly_heart/core/runtime/peer_channel.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/provider_handle.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/self_capture.py", ASYNCIO_CREATE_TASK): 3,
@@ -101,9 +104,9 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         ASYNCIO_CREATE_TASK,
     ): "managed STT provider still owns session consumer and reset timers until STT lifecycle is folded into an explicit runtime owner",
     (
-        "src/puripuly_heart/core/orchestrator/hub.py",
+        "src/puripuly_heart/core/orchestrator/self_translation_channel.py",
         ASYNCIO_CREATE_TASK,
-    ): "orchestrator owns per-utterance timeout/speculation tasks with explicit buffer cleanup; broader owner extraction is deferred work",
+    ): "Self translation owner owns per-utterance timeout and speculation tasks and cancels them through its explicit channel lifecycle",
     (
         "src/puripuly_heart/core/overlay/bridge.py",
         ASYNCIO_CREATE_TASK,
