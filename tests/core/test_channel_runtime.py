@@ -70,8 +70,10 @@ def test_translation_fixture_uses_fixed_self_and_peer_owner_runtimes() -> None:
     assert harness.peer_runtime.channel == "peer"
     assert harness.self_owner.runtime is harness.self_runtime
     assert harness.peer_owner.runtime is harness.peer_runtime
-    assert harness.self_runtime.translation_history is harness.self_runtime.translation_history
-    assert harness.self_runtime.translation_tasks is harness.self_runtime.translation_tasks
+    assert harness.self_owner.translation_requests is harness.translation_requests
+    assert harness.peer_owner.translation_requests is harness.translation_requests
+    assert harness.translation_requests.self_runtime is harness.self_runtime
+    assert harness.translation_requests.peer_runtime is harness.peer_runtime
 
 
 def test_self_runtime_state_is_visible_through_the_self_owner() -> None:

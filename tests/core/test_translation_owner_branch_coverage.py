@@ -448,7 +448,7 @@ async def test_clear_language_runtime_state_self_preserves_stt_task_and_clears_o
         await harness.clear_channel_language_state(channel="self")
 
         assert harness.self_runtime.stt_task is stt_task
-        assert harness.self_runtime.stt_task is stt_task
+        assert harness.self_owner.runtime.stt_task is stt_task
         assert harness.self_runtime.translation_tasks == {}
         assert harness.self_runtime.merge_buffer is None
         assert standalone_id in harness.self_runtime.utterances

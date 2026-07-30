@@ -115,7 +115,8 @@ def test_channel_owners_use_one_injected_generic_translation_owner() -> None:
     harness = compose_translation_test_harness(stt=None, llm=None, osc=object())
     peer_owner_source = inspect.getsource(inspect.getmodule(PeerTranslationChannelOwner))
     self_source = inspect.getsource(inspect.getmodule(SelfTranslationChannelOwner))
-    assert harness.translation_turns is harness.translation_turns
+    assert harness.self_owner.translation_turns is harness.translation_turns
+    assert harness.peer_owner.translation_turns is harness.translation_turns
     assert type(harness.translation_turns.output).__name__ == ("TranslationChannelOwnerCallbacks")
     assert harness.translation_turns.lifecycle_owner_snapshot()["owner"] == (
         "TranslationTurnLifecycleOwner"
