@@ -26,7 +26,6 @@ from puripuly_heart.app.services.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
-from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
@@ -53,6 +52,8 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigChange,
 )
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
+
+from .settings_projection import SettingsProjectionOwner
 
 
 @dataclass(slots=True)

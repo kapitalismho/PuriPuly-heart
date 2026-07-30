@@ -182,7 +182,7 @@ def test_cut_over_consumers_do_not_reach_nested_channel_owners() -> None:
         SOURCE_ROOT / "app" / "adapters" / "peer_application_state.py",
         SOURCE_ROOT / "app" / "adapters" / "peer_capture" / "peer_capture_provider.py",
         SOURCE_ROOT / "app" / "adapters" / "self_capture" / "self_capture_provider.py",
-        SOURCE_ROOT / "app" / "services" / "settings_runtime_effects.py",
+        SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
         SOURCE_ROOT / "app" / "wiring_local_asr_application.py",
         SOURCE_ROOT / "app" / "wiring_managed_account.py",
         SOURCE_ROOT / "app" / "wiring_peer_application.py",

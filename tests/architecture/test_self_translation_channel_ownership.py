@@ -119,7 +119,7 @@ def test_production_self_consumers_do_not_route_through_hub() -> None:
     application_runtime_path = SOURCE_ROOT / "composition" / "application_runtime.py"
     paths = (
         SOURCE_ROOT / "app" / "adapters" / "ui_runtime.py",
-        SOURCE_ROOT / "app" / "services" / "settings_runtime_effects.py",
+        SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
         application_runtime_path,
     )
     forbidden = (

@@ -7,7 +7,8 @@ from pathlib import Path
 
 from puripuly_heart.app.ports._settings_values import freeze_settings_values
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
-from puripuly_heart.app.services.settings_mutation_legacy import (
+
+from .settings_mutation_legacy import (
     _apply_settings_path_patch,
     _SettingsPathSnapshot,
     build_overlay_osc_output_settings_path_patch,

@@ -226,8 +226,8 @@ LAYER_RULES = (
             "puripuly_heart.app.services.openrouter_pkce_flow",
             "puripuly_heart.app.services.capture.peer_capture_target_application",
             "puripuly_heart.app.services.provider.provider_settings",
-            "puripuly_heart.app.services.settings_application",
-            "puripuly_heart.app.services.settings_runtime_effects",
+            "puripuly_heart.app.services.settings.settings_application",
+            "puripuly_heart.app.services.settings.settings_runtime_effects",
         ),
         forbidden_layers=frozenset(
             {
@@ -493,14 +493,14 @@ SETTINGS_PERSISTENCE_COMPOSITION_PATHS = frozenset(
 
 SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
     {
-        "src/puripuly_heart/app/services/settings_mutation_legacy.py",
+        "src/puripuly_heart/app/services/settings/settings_mutation_legacy.py",
         "src/puripuly_heart/app/services/github_star_prompt_settings.py",
         "src/puripuly_heart/app/services/manual_local_asr_fallback.py",
         "src/puripuly_heart/app/services/openrouter_pkce_flow.py",
         "src/puripuly_heart/app/services/capture/peer_capture_target_application.py",
         "src/puripuly_heart/app/services/provider/provider_settings.py",
-        "src/puripuly_heart/app/services/settings_application.py",
-        "src/puripuly_heart/app/services/settings_runtime_effects.py",
+        "src/puripuly_heart/app/services/settings/settings_application.py",
+        "src/puripuly_heart/app/services/settings/settings_runtime_effects.py",
         "src/puripuly_heart/app/wiring_llm_factory.py",
         "src/puripuly_heart/app/wiring_capture_runtime.py",
         "src/puripuly_heart/app/wiring_local_asr_application.py",
@@ -1011,9 +1011,10 @@ def _flat_settings_patch_violations(
 
     violations: set[SettingsRuntimeConfinementViolation] = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == (
-            "puripuly_heart.app.services.settings_mutation"
-        ):
+        if isinstance(node, ast.ImportFrom) and node.module in {
+            "puripuly_heart.app.services.settings_mutation",
+            "puripuly_heart.app.services.settings.settings_mutation",
+        }:
             for alias in node.names:
                 if alias.name in FLAT_SETTINGS_PATCH_SYMBOLS:
                     violations.add(
@@ -1604,7 +1605,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "def _sync_github_star_prompt_runtime_aliases",
             "_github_star_prompt_launch_task",
         ),
-        "src/puripuly_heart/app/services/settings_runtime_effects.py": (
+        "src/puripuly_heart/app/services/settings/settings_runtime_effects.py": (
             "def _prepare_desktop_runtime_settings_update(",
             "def _sync_overlay_calibration_cache(",
             "def _sync_desktop_overlay_interaction_mode_from_settings(",

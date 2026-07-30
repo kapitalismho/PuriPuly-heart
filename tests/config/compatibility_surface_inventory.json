@@ -1159,7 +1159,7 @@
       ],
       "examples": [
         "puripuly_heart.app.services.secret_settings_transaction",
-        "puripuly_heart.app.services.settings_mutation",
+        "puripuly_heart.app.services.settings.settings_mutation",
         "puripuly_heart.app.services.managed_connection_auth"
       ],
       "rationale": "Application services are internal use-case boundaries. Their public names are stable execution inputs for later gates, but this inventory does not classify them as external public import compatibility."

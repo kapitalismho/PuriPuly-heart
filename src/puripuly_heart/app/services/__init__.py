@@ -42,5 +42,13 @@ _install_moved_module_aliases(
         "provider_verification_binding": (
             "puripuly_heart.app.services.provider.provider_verification_binding"
         ),
+        "settings_application": "puripuly_heart.app.services.settings.settings_application",
+        "settings_mutation": "puripuly_heart.app.services.settings.settings_mutation",
+        "settings_mutation_legacy": "puripuly_heart.app.services.settings.settings_mutation_legacy",
+        "settings_projection": "puripuly_heart.app.services.settings.settings_projection",
+        "settings_runtime_effects": "puripuly_heart.app.services.settings.settings_runtime_effects",
+        "settings_transaction_result": (
+            "puripuly_heart.app.services.settings.settings_transaction_result"
+        ),
     },
 )

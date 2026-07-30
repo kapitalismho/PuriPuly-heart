@@ -96,7 +96,7 @@ def test_peer_owner_has_explicit_ingress_lifecycle_and_dependencies() -> None:
 def test_production_peer_consumers_bind_directly_without_hub_residue() -> None:
     paths = (
         SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py",
-        SOURCE_ROOT / "app" / "services" / "settings_runtime_effects.py",
+        SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
         SOURCE_ROOT / "composition" / "application_runtime.py",
     )
 

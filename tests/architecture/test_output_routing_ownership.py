@@ -55,9 +55,9 @@ def test_output_projection_owner_is_the_only_channel_output_side_effect_boundary
     overlay_source = (
         SOURCE_ROOT / "app" / "services" / "overlay" / "overlay_application.py"
     ).read_text(encoding="utf-8")
-    settings_source = (SOURCE_ROOT / "app" / "services" / "settings_runtime_effects.py").read_text(
-        encoding="utf-8"
-    )
+    settings_source = (
+        SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py"
+    ).read_text(encoding="utf-8")
     output_source = (SOURCE_ROOT / "core" / "runtime" / "output.py").read_text(encoding="utf-8")
     projection_source = (
         SOURCE_ROOT / "core" / "orchestrator" / "translation_output_projection.py"
