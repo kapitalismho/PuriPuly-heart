@@ -5,13 +5,14 @@ import contextlib
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 
-from puripuly_heart.app.services.managed_status_refresh import ManagedStatusRefreshOwner
 from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterStatusRefreshResult,
     TalkTogetherPassStatus,
 )
 from puripuly_heart.core.openrouter_handoff import is_effectively_exhausted
 from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
+
+from .managed_status_refresh import ManagedStatusRefreshOwner
 
 ManagedUsageStateProvider = Callable[[], "ManagedUsageState"]
 ManagedUsageReleaseServiceProvider = Callable[[], object | None]

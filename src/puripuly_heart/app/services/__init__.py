@@ -27,5 +27,11 @@ _install_moved_module_aliases(
         "overlay_session_transition": (
             "puripuly_heart.app.services.overlay.overlay_session_transition"
         ),
+        "managed_auth": "puripuly_heart.app.services.managed.managed_auth",
+        "managed_auth_claims": "puripuly_heart.app.services.managed.managed_auth_claims",
+        "managed_connection_auth": "puripuly_heart.app.services.managed.managed_connection_auth",
+        "managed_key_delivery_ack": "puripuly_heart.app.services.managed.managed_key_delivery_ack",
+        "managed_status_refresh": "puripuly_heart.app.services.managed.managed_status_refresh",
+        "managed_usage": "puripuly_heart.app.services.managed.managed_usage",
     },
 )

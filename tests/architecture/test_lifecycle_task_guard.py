@@ -407,7 +407,9 @@ def test_order41_managed_refresh_scheduling_uses_its_named_owner() -> None:
     controller_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
     )
-    owner_path = REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed_usage.py"
+    owner_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed" / "managed_usage.py"
+    )
     controller_methods = {
         node.name: ast.unparse(node)
         for node in ast.walk(ast.parse(controller_path.read_text(encoding="utf-8")))

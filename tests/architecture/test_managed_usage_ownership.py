@@ -18,7 +18,9 @@ def _imports(path: Path) -> set[str]:
 
 
 def test_managed_usage_owner_is_independent_of_controller_ui_and_settings_shapes() -> None:
-    owner_path = REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed_usage.py"
+    owner_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed" / "managed_usage.py"
+    )
 
     imports = _imports(owner_path)
 

@@ -27,19 +27,6 @@ from puripuly_heart.app.ports.settings_repository import (
     SettingsCommitRequest,
     SettingsRepositoryPort,
 )
-from puripuly_heart.app.services.managed_auth_claims import (
-    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
-    OPENROUTER_MANAGED_USER_ID_MAX_LENGTH,
-    OPENROUTER_MANAGED_USER_ID_SECRET,
-    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
-    ManagedAuthClaimGuard,
-)
-from puripuly_heart.app.services.managed_key_delivery_ack import (
-    ManagedKeyDeliveryAckTokenStoreError,
-    clear_pending_ack_in_settings_values,
-    secret_key_for_ack_source,
-    store_pending_ack_in_settings_values,
-)
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_TRANSACTION,
@@ -52,6 +39,20 @@ from puripuly_heart.core.messages import (
     ErrorDiagnostics,
     TransactionResult,
     UserMessageRef,
+)
+
+from .managed_auth_claims import (
+    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+    OPENROUTER_MANAGED_USER_ID_MAX_LENGTH,
+    OPENROUTER_MANAGED_USER_ID_SECRET,
+    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
+    ManagedAuthClaimGuard,
+)
+from .managed_key_delivery_ack import (
+    ManagedKeyDeliveryAckTokenStoreError,
+    clear_pending_ack_in_settings_values,
+    secret_key_for_ack_source,
+    store_pending_ack_in_settings_values,
 )
 
 _SETTINGS_SENSITIVE_KEY_FRAGMENTS = (
