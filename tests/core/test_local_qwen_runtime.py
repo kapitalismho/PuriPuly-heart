@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-MODULE_NAME = "puripuly_heart.core.local_qwen_runtime"
+MODULE_NAME = "puripuly_heart.core.local_asr.local_qwen_runtime"
 
 
 def _load_runtime_module():

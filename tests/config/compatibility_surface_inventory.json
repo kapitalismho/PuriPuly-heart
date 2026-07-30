@@ -56,7 +56,7 @@
       "source_of_truth_refs": [
         "src/puripuly_heart/config/settings_vnext/schema.py::PersistedOperationalState",
         "tests/config/settings_migration_fixtures.py::CURRENT_OPERATIONAL_STATE_DESTINATIONS",
-        "src/puripuly_heart/core/local_stt_assets.py::LOCAL_STT_INSTALLED_MANIFEST_FILENAME"
+        "src/puripuly_heart/core/local_asr/local_stt_assets.py::LOCAL_STT_INSTALLED_MANIFEST_FILENAME"
       ],
       "fixture_or_guard_refs": [
         "tests/config/test_settings_migration_fixtures.py::test_vnext_schema_persisted_leaves_are_classified_from_current_settings",
@@ -1182,8 +1182,8 @@
         "puripuly_heart.core.error_messages",
         "puripuly_heart.core.gpu_worker",
         "puripuly_heart.core.lifecycle",
-        "puripuly_heart.core.local_asr_provider_runtime",
-        "puripuly_heart.core.local_asr_provisioning",
+        "puripuly_heart.core.local_asr.local_asr_provider_runtime",
+        "puripuly_heart.core.local_asr.local_asr_provisioning",
         "puripuly_heart.core.observability",
         "puripuly_heart.core.openrouter.openrouter_metadata",
         "puripuly_heart.core.telemetry"
@@ -1194,8 +1194,8 @@
       "surface": "Local STT download port and Hugging Face Xet adapter modules",
       "classification": "internal_local_stt_download_boundary",
       "modules": [
-        "puripuly_heart.core.local_stt_download_port",
-        "puripuly_heart.core.local_stt_huggingface_xet_adapter"
+        "puripuly_heart.core.local_asr.local_stt_download_port",
+        "puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter"
       ],
       "rationale": "These modules define the internal Local STT download port and its subprocess-backed Hugging Face Xet adapter. Their explicit exports are stable production wiring contracts, but they are not external package compatibility facades."
     },
@@ -1374,6 +1374,14 @@
         "puripuly_heart.core.openrouter"
       ],
       "rationale": "Domain-aligned grouping package that re-exports the moved OpenRouter credential, PKCE, handoff, and managed release modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.core.local_asr domain grouping package",
+      "classification": "internal_domain_grouping_package",
+      "modules": [
+        "puripuly_heart.core.local_asr"
+      ],
+      "rationale": "Domain-aligned grouping package that re-exports the moved local ASR/STT contract, asset, catalog, download, and installer modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "broker source modules",

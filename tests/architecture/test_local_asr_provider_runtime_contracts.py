@@ -66,7 +66,7 @@ def test_gpu_worker_contract_has_core_owner_and_app_compatibility_reexport() -> 
 
 
 def test_provider_runtime_contract_and_owner_do_not_import_ui_hub_or_app_layers() -> None:
-    contract_file = SOURCE_ROOT / "core" / "local_asr_provider_runtime.py"
+    contract_file = SOURCE_ROOT / "core" / "local_asr" / "local_asr_provider_runtime.py"
     owner_file = SOURCE_ROOT / "core" / "runtime" / "local_asr_provider_runtime.py"
 
     for source_file in (contract_file, owner_file):

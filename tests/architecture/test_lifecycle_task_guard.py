@@ -23,7 +23,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
     {
         ("src/puripuly_heart/core/llm/fallback_racing.py", ASYNCIO_CREATE_TASK): 1,
         (
-            "src/puripuly_heart/core/local_stt_runtime_installer.py",
+            "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
             ASYNCIO_CREATE_TASK,
         ): 1,
         ("src/puripuly_heart/core/stt/controller.py", ASYNCIO_CREATE_TASK): 6,
@@ -96,7 +96,7 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         ASYNCIO_CREATE_TASK,
     ): "fallback racing owns short-lived contender tasks and cancels losers within the provider call boundary",
     (
-        "src/puripuly_heart/core/local_stt_runtime_installer.py",
+        "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
         ASYNCIO_CREATE_TASK,
     ): "legacy installer download task remains deferred to the local STT download runtime owner cutover",
     (
@@ -364,7 +364,7 @@ def test_order37_named_owner_allowlist_retires_controller_bounds_task_debt() -> 
 
 def test_order38_named_owner_allowlist_preserves_installer_legacy_task_debt() -> None:
     assert (
-        "src/puripuly_heart/core/local_stt_runtime_installer.py",
+        "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
         ASYNCIO_CREATE_TASK,
     ) in LEGACY_TASK_CREATION_ALLOWLIST
     assert (

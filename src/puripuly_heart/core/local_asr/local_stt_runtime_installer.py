@@ -16,7 +16,7 @@ from uuid import uuid4
 
 import httpx
 
-from puripuly_heart.core.local_stt_assets import (
+from .local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LOCAL_STT_MODEL_ID,
     InstalledLocalSTTManifest,
@@ -28,7 +28,7 @@ from puripuly_heart.core.local_stt_assets import (
     load_local_stt_asset_manifest,
     validate_local_stt_install,
 )
-from puripuly_heart.core.local_stt_download_port import (
+from .local_stt_download_port import (
     HuggingFaceDownloadPort,
     HuggingFaceDownloadRequest,
     LocalSTTDownloadPortCancelled,

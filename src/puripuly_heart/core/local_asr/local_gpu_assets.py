@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from puripuly_heart.core.local_stt_assets import (
+from .local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LocalSTTAssetManifest,
     LocalSTTInstallState,

@@ -16,5 +16,16 @@ _install_moved_module_aliases(
         "openrouter_handoff": "puripuly_heart.core.openrouter.openrouter_handoff",
         "openrouter_metadata": "puripuly_heart.core.openrouter.openrouter_metadata",
         "openrouter_pkce": "puripuly_heart.core.openrouter.openrouter_pkce",
+        "local_asr_provider_runtime": "puripuly_heart.core.local_asr.local_asr_provider_runtime",
+        "local_asr_provisioning": "puripuly_heart.core.local_asr.local_asr_provisioning",
+        "local_gpu_assets": "puripuly_heart.core.local_asr.local_gpu_assets",
+        "local_qwen_runtime": "puripuly_heart.core.local_asr.local_qwen_runtime",
+        "local_stt_assets": "puripuly_heart.core.local_asr.local_stt_assets",
+        "local_stt_catalog": "puripuly_heart.core.local_asr.local_stt_catalog",
+        "local_stt_download_port": "puripuly_heart.core.local_asr.local_stt_download_port",
+        "local_stt_huggingface_xet_adapter": (
+            "puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter"
+        ),
+        "local_stt_runtime_installer": "puripuly_heart.core.local_asr.local_stt_runtime_installer",
     },
 )

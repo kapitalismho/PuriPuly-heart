@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from puripuly_heart.core.local_stt_download_port import (
+from .local_stt_download_port import (
     HuggingFaceDownloadProgress,
     HuggingFaceDownloadRequest,
     HuggingFaceProgressCallback,
