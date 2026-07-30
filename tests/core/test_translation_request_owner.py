@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field, replace
 from uuid import uuid4
 
@@ -160,6 +161,21 @@ def process_request(
         detected_language=detected_language,
         config_snapshot=fixture.configuration.snapshot(),
     )
+
+
+def test_clear_context_clears_both_channels_and_emits_established_diagnostic(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fixture = build_owner()
+    fixture.self_runtime.remember_context("self context", timestamp=fixture.clock.now())
+    fixture.peer_runtime.remember_context("peer context", timestamp=fixture.clock.now())
+
+    with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.hub"):
+        fixture.owner.clear_context()
+
+    assert fixture.self_runtime.translation_history == []
+    assert fixture.peer_runtime.translation_history == []
+    assert "[Hub] Context history cleared" in caplog.messages
 
 
 def test_prepare_uses_detected_language_and_integrated_peer_context() -> None:

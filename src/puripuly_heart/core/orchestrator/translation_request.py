@@ -28,6 +28,7 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     ContextApplicationDiagnostic,
     ContextModeDiagnostic,
     LatencyStageDiagnostic,
+    RuntimeDiagnostic,
     TranslationFailureDiagnostic,
     TranslationLatencyDiagnosticsOwner,
     TranslationSkipDiagnostic,
@@ -196,6 +197,7 @@ class TranslationRequestOwner:
     def clear_context(self) -> None:
         self.self_runtime.clear_context()
         self.peer_runtime.clear_context()
+        self.diagnostics.emit(RuntimeDiagnostic(message="[Hub] Context history cleared"))
 
     @property
     def provider_available(self) -> bool:

@@ -225,6 +225,32 @@ MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S = 3.0
 MANUAL_SUBMIT_TYPING_TIMEOUT_S = 10.0
 
 
+def _require_self_capture_owner(
+    pipeline: RuntimePipelineHandle,
+    capture_factory: CaptureOwnerFactory,
+) -> SelfCaptureSessionOwner:
+    owner = pipeline.self_capture
+    if owner is not None:
+        return owner
+    self_translation_channel = pipeline.self_translation_channel
+    local_asr_runtime = pipeline.local_asr_runtime
+    audio_gate = pipeline.vrc_mic_audio_gate
+    if self_translation_channel is None:
+        raise RuntimeError("Self translation channel owner is unavailable")
+    if local_asr_runtime is None:
+        raise RuntimeError("Local ASR runtime owner is unavailable")
+    if audio_gate is None:
+        raise RuntimeError("VRChat microphone audio gate is unavailable")
+    owner = capture_factory.compose_self(
+        self_translation_channel,
+        local_asr_runtime,
+        self_translation_channel,
+        audio_gate,
+    )
+    pipeline.self_capture = owner
+    return owner
+
+
 @dataclass(frozen=True, slots=True)
 class _LocalASRProductionCompositionAccess:
     config_path: Path
@@ -1383,16 +1409,7 @@ def compose_application_runtime(
     )
 
     def self_capture_owner() -> SelfCaptureSessionOwner:
-        owner = pipeline.self_capture
-        if owner is None:
-            owner = capture_factory.compose_self(
-                cast(object, pipeline.hub),
-                pipeline.local_asr_runtime,
-                cast(object, pipeline.hub),
-                cast(object, pipeline.vrc_mic_audio_gate),
-            )
-            pipeline.self_capture = owner
-        return owner
+        return _require_self_capture_owner(pipeline, capture_factory)
 
     def require_managed_account() -> ManagedAccountComponents:
         if managed_account is None:

@@ -116,10 +116,11 @@ def test_hub_has_no_self_translation_algorithms_state_or_runtime_reference() -> 
 
 
 def test_production_self_consumers_do_not_route_through_hub() -> None:
+    application_runtime_path = SOURCE_ROOT / "composition" / "application_runtime.py"
     paths = (
         SOURCE_ROOT / "app" / "adapters" / "ui_runtime.py",
         SOURCE_ROOT / "app" / "services" / "settings_runtime_effects.py",
-        SOURCE_ROOT / "composition" / "application_runtime.py",
+        application_runtime_path,
     )
     forbidden = (
         "pipeline.hub.submit_text",
@@ -133,6 +134,8 @@ def test_production_self_consumers_do_not_route_through_hub() -> None:
         source = path.read_text(encoding="utf-8")
         for residue in forbidden:
             assert residue not in source, f"{path.relative_to(REPO_ROOT)}: {residue}"
+    application_runtime_source = application_runtime_path.read_text(encoding="utf-8")
+    assert "cast(object, pipeline.hub)" not in application_runtime_source
 
 
 def test_durable_callbacks_dispatch_self_and_peer_to_distinct_owners() -> None:
