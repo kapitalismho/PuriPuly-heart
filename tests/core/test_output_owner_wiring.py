@@ -73,7 +73,7 @@ async def test_client_hub_routes_manual_peer_and_system_output_through_one_owner
     await hub.start()
     manual_id = await hub.submit_text("manual self text", source="You")
     peer_id = await hub.handle_peer_transcript_final_for_test("peer-only text")
-    hub.enqueue_peer_translation_disclosure("Peer translation is on")
+    hub.output_projection.publish_system_disclosure("Peer translation is on")
 
     assert hub.output_runtime.overlay_sink is overlay
     assert [message.utterance_id for message in chatbox.messages[:1]] == [manual_id]
@@ -116,15 +116,15 @@ async def test_client_hub_overlay_replacement_updates_only_owner_destination() -
 
     assert hub.output_runtime.overlay_sink is first
     assert [event.utterance_id for event in first.events] == [first_id, first_id]
-    await hub.replace_overlay_sink(second)
+    await hub.output_projection.replace_overlay_sink(second)
     second_id = await hub.submit_text("second", source="You")
     second_event = hub.overlay_event_adapter.utterance_closed(
         utterance_id=second_id,
         channel="self",
         is_final=True,
     )
-    await hub._emit_overlay_event(second_event)
-    await hub._emit_overlay_event(second_event)
+    await hub.output_projection.publish_overlay_event(second_event)
+    await hub.output_projection.publish_overlay_event(second_event)
 
     assert hub.output_runtime.overlay_sink is second
     assert len(first.events) == 2
@@ -152,9 +152,9 @@ async def test_client_hub_overlay_replacement_awaits_old_delivery_before_new_rou
     )
 
     await hub.start()
-    old_publication = asyncio.create_task(hub._emit_overlay_event(old_event))
+    old_publication = asyncio.create_task(hub.output_projection.publish_overlay_event(old_event))
     await asyncio.wait_for(old.started.wait(), timeout=0.5)
-    await hub.replace_overlay_sink(replacement)
+    await hub.output_projection.replace_overlay_sink(replacement)
     await old_publication
     new_id = await hub.submit_text("new destination", source="You")
 

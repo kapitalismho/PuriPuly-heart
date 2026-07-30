@@ -159,6 +159,9 @@ class NullOverlaySink:
     async def emit(self, event: OverlayEventUnion) -> None:
         _ = event
 
+    def active_self_overlay_metadata(self) -> None:
+        return None
+
 
 @dataclass(slots=True)
 class OverlayEventAdapter:

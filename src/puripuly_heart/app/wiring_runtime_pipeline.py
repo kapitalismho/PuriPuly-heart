@@ -51,6 +51,10 @@ from puripuly_heart.core.orchestrator.hub_callbacks import (
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
     TranslationLatencyDiagnosticsOwner,
 )
+from puripuly_heart.core.orchestrator.translation_output_projection import (
+    TranslationOutputProjectionOwner,
+    TranslationUiMessageQueue,
+)
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnLifecycleOwner,
 )
@@ -302,6 +306,7 @@ class RuntimePipelineComponents:
     llm_runtime: ProviderRuntimeHandle
     context_resolver: ContextResolver
     translation_diagnostics: TranslationLatencyDiagnosticsOwner
+    translation_output_projection: TranslationOutputProjectionOwner
     stt_sessions: SttSessionStateProjection
     ui_events: asyncio.Queue[UIEvent]
     resource_owner: RuntimePipelineResourceOwner = field(repr=False)
@@ -334,6 +339,10 @@ class RuntimePipelineHandle:
         init=False,
         default=None,
     )
+    translation_output_projection: TranslationOutputProjectionOwner | None = field(
+        init=False,
+        default=None,
+    )
     stt_sessions: SttSessionStateProjection | None = field(init=False, default=None)
     ui_events: asyncio.Queue[UIEvent] | None = field(init=False, default=None)
     self_capture: SelfCaptureSessionOwner | None = field(init=False, default=None)
@@ -354,6 +363,7 @@ class RuntimePipelineHandle:
         self.llm_runtime = components.llm_runtime
         self.context_resolver = components.context_resolver
         self.translation_diagnostics = components.translation_diagnostics
+        self.translation_output_projection = components.translation_output_projection
         self.stt_sessions = components.stt_sessions
         self.ui_events = components.ui_events
         self.self_capture = components.self_capture
@@ -375,6 +385,7 @@ class RuntimePipelineHandle:
             self.llm_runtime = None
             self.context_resolver = None
             self.translation_diagnostics = None
+            self.translation_output_projection = None
             self.stt_sessions = None
             self.ui_events = None
             self.self_capture = None
@@ -664,6 +675,12 @@ async def _compose_runtime_pipeline(
         config_snapshot=translation_runtime_configuration.snapshot,
         runtime_logging=runtime_logging,
     )
+    translation_output_projection = TranslationOutputProjectionOwner(
+        output_runtime=output_runtime,
+        ui_messages=TranslationUiMessageQueue(ui_events),
+        diagnostics=translation_diagnostics,
+        clock=clock,
+    )
     translation_turns = TranslationTurnLifecycleOwner(
         on_child_created=callbacks.child_created,
         on_child_started=callbacks.child_started,
@@ -694,11 +711,8 @@ async def _compose_runtime_pipeline(
     resources.llm_runtime = llm_runtime
     resources.pending_llm = None
     hub = ClientHub(
-        osc=osc,
-        ui_events=ui_events,
         clock=clock,
         translation_runtime_configuration=translation_runtime_configuration,
-        direct_output_runtime=output_runtime,
         direct_self_runtime=self_runtime,
         direct_peer_runtime=peer_runtime,
         direct_translation_turns=translation_turns,
@@ -706,6 +720,7 @@ async def _compose_runtime_pipeline(
         direct_llm_runtime=llm_runtime,
         direct_context_resolver=context_resolver,
         direct_translation_diagnostics=translation_diagnostics,
+        direct_output_projection=translation_output_projection,
     )
     callbacks.bind(hub)
     state = vrc_mic_state or VrcMicState()
@@ -743,6 +758,7 @@ async def _compose_runtime_pipeline(
         llm_runtime=llm_runtime,
         context_resolver=context_resolver,
         translation_diagnostics=translation_diagnostics,
+        translation_output_projection=translation_output_projection,
         stt_sessions=stt_sessions,
         ui_events=ui_events,
         resource_owner=resources,

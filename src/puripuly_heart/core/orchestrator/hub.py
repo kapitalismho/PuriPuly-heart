@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import Callable, Mapping
 from dataclasses import InitVar, dataclass, field, replace
 from typing import Protocol, cast
@@ -37,26 +36,22 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )
 from puripuly_heart.core.orchestrator.context import ContextMode, ContextResolver
-from puripuly_heart.core.orchestrator.ports import (
-    HubChatboxPort,
-    HubOverlayEventFactoryPort,
-    HubOverlaySinkPort,
-)
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
     ContextApplicationDiagnostic,
     ContextModeDiagnostic,
     LatencyInheritanceDiagnostic,
     LatencyStageDiagnostic,
     LatencyTimelineDiagnostic,
-    OverlayEmitDiagnostic,
-    OverlaySinkDurationDiagnostic,
     RuntimeDiagnostic,
-    SelfOverlayDecisionDiagnostic,
     SttEventLoopFailureDiagnostic,
     TranslationFailureDiagnostic,
     TranslationLatencyDiagnosticsOwner,
-    TranslationReadyDiagnostic,
     TranslationSkipDiagnostic,
+)
+from puripuly_heart.core.orchestrator.translation_output_projection import (
+    ActiveSelfProjection,
+    TranslationOutputProjectionOwner,
+    TranslationUiMessage,
 )
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
@@ -67,12 +62,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnProcessResult,
     TranslationTurnRequest,
 )
-from puripuly_heart.core.overlay.sink import OverlayEventUnion
-from puripuly_heart.core.runtime.output import (
-    SELF_SPEECH_TYPING_REASON,
-    OutputPublicationResult,
-    OutputRuntime,
-)
+from puripuly_heart.core.runtime.output import SELF_SPEECH_TYPING_REASON
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.translation_policy import TranslationContextPolicy
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart, VadEvent
@@ -83,7 +73,6 @@ from puripuly_heart.domain.events import (
     STTSessionState,
     STTSessionStateEvent,
     UIErrorPayload,
-    UIEvent,
     UIEventType,
 )
 from puripuly_heart.domain.models import (
@@ -103,7 +92,6 @@ class STTProvider(Protocol):
 _PROMO_INTERVAL_SEC: float = 300.0  # 5 minutes
 _RELAXED_OVERLAP_MIN_CHARS: int = 3
 _BOUNDARY_PUNCT = {".", ",", ";", ":", "!", "?"}
-_SOFT_REUSE_PUNCT = {".", ",", "…", "。", "，", "、"}
 _SELF_RUNTIME_FIELDS = {
     "stt": "stt",
     "_stt_task": "stt_task",
@@ -162,10 +150,7 @@ def _safe_user_message_params(params: Mapping[str, object]) -> dict[str, SafeMes
 
 @dataclass(slots=True)
 class ClientHub:
-    osc: HubChatboxPort
     translation_runtime_configuration: TranslationRuntimeConfigurationOwner
-    ui_events: asyncio.Queue[UIEvent]
-    direct_output_runtime: InitVar[OutputRuntime]
     direct_self_runtime: InitVar[ChannelRuntime]
     direct_peer_runtime: InitVar[ChannelRuntime]
     direct_translation_turns: InitVar[TranslationTurnLifecycleOwner]
@@ -173,7 +158,7 @@ class ClientHub:
     direct_llm_runtime: InitVar[ProviderRuntimeHandle]
     direct_context_resolver: InitVar[ContextResolver]
     direct_translation_diagnostics: InitVar[TranslationLatencyDiagnosticsOwner]
-    overlay_sink: HubOverlaySinkPort | None = None
+    direct_output_projection: InitVar[TranslationOutputProjectionOwner]
     clock: Clock = SystemClock()
     source_language: InitVar[str | None] = None
     target_language: InitVar[str | None] = None
@@ -221,9 +206,8 @@ class ClientHub:
     _peer_translation_parent_ids: set[UUID] = field(default_factory=set)
     context_resolver: ContextResolver = field(init=False)
     active_chatbox_channel: ChannelId = field(init=False, default="self")
-    output_runtime: OutputRuntime = field(init=False)
-    overlay_event_adapter: HubOverlayEventFactoryPort = field(init=False)
     translation_diagnostics: TranslationLatencyDiagnosticsOwner = field(init=False)
+    output_projection: TranslationOutputProjectionOwner = field(init=False)
     _local_asr_provider_runtime: LocalASRProviderRuntimePort | None = field(
         init=False,
         default=None,
@@ -232,7 +216,6 @@ class ClientHub:
 
     def __post_init__(
         self,
-        direct_output_runtime: OutputRuntime,
         direct_self_runtime: ChannelRuntime,
         direct_peer_runtime: ChannelRuntime,
         direct_translation_turns: TranslationTurnLifecycleOwner,
@@ -240,6 +223,7 @@ class ClientHub:
         direct_llm_runtime: ProviderRuntimeHandle,
         direct_context_resolver: ContextResolver,
         direct_translation_diagnostics: TranslationLatencyDiagnosticsOwner,
+        direct_output_projection: TranslationOutputProjectionOwner,
         source_language: str | None,
         target_language: str | None,
         peer_source_language: str | None,
@@ -298,9 +282,6 @@ class ClientHub:
         config_owner = self.translation_runtime_configuration
         if config_overrides:
             config_owner.replace(replace(config_owner.snapshot().value, **config_overrides))
-        self.output_runtime = direct_output_runtime
-        assert self.output_runtime.overlay_event_adapter is not None
-        self.overlay_event_adapter = self.output_runtime.overlay_event_adapter
         self.self_runtime = direct_self_runtime
         self.self_runtime.alias_target = self
         self._sync_self_runtime_aliases()
@@ -311,6 +292,7 @@ class ClientHub:
         self._llm_provider_runtime = direct_llm_runtime
         self.context_resolver = direct_context_resolver
         self.translation_diagnostics = direct_translation_diagnostics
+        self.output_projection = direct_output_projection
         warm_prompt_cache()
         self._sync_self_runtime_aliases()
 
@@ -346,13 +328,9 @@ class ClientHub:
             except AttributeError:
                 resolver = None
             try:
-                overlay_event_adapter = object.__getattribute__(self, "overlay_event_adapter")
+                output_projection = object.__getattribute__(self, "output_projection")
             except AttributeError:
-                overlay_event_adapter = None
-            try:
-                output_runtime = object.__getattribute__(self, "output_runtime")
-            except AttributeError:
-                output_runtime = None
+                output_projection = None
             try:
                 translation_diagnostics = object.__getattribute__(
                     self,
@@ -362,19 +340,10 @@ class ClientHub:
                 translation_diagnostics = None
             if resolver is not None:
                 resolver.clock = value  # type: ignore[assignment]
-            if overlay_event_adapter is not None:
-                overlay_event_adapter.clock = value  # type: ignore[assignment]
-            if output_runtime is not None:
-                output_runtime.clock = value  # type: ignore[assignment]
+            if output_projection is not None:
+                output_projection.set_clock(value)  # type: ignore[arg-type]
             if translation_diagnostics is not None:
                 translation_diagnostics.clock = value  # type: ignore[assignment]
-        if name == "osc":
-            try:
-                output_runtime = object.__getattribute__(self, "output_runtime")
-            except AttributeError:
-                output_runtime = None
-            if output_runtime is not None:
-                output_runtime.chatbox = value  # type: ignore[assignment]
         runtime_field = _SELF_RUNTIME_FIELDS.get(name)
         if runtime_field is None:
             return
@@ -688,7 +657,7 @@ class ClientHub:
         await self.translation_turns.cancel_pending(channel=channel)
         runtime = self._runtime_for_channel(channel)
         if channel == "self":
-            await self.reset_overlay_preview()
+            await self.output_projection.reset_overlay_preview()
         await runtime.reset_runtime_state()
         if channel == "peer":
             self._clear_peer_logical_turn_state()
@@ -799,7 +768,10 @@ class ClientHub:
         # Record start time for E2E latency tracking (from speech end)
         if isinstance(event, SpeechEnd):
             speech_end_at = self.clock.now()
-            self.set_self_chatbox_typing_reason(SELF_SPEECH_TYPING_REASON, True)
+            self.output_projection.set_self_chatbox_typing_reason(
+                SELF_SPEECH_TYPING_REASON,
+                True,
+            )
             self._utterance_start_times[event.utterance_id] = speech_end_at
             self._speech_ended_ids.add(event.utterance_id)
             self._record_latency_stage(
@@ -890,7 +862,7 @@ class ClientHub:
             self._clear_peer_logical_turn_state()
         self._clear_latency_state(channel=channel)
         if channel == "self":
-            await self.reset_overlay_preview()
+            await self.output_projection.reset_overlay_preview()
             self._sync_self_runtime_aliases()
 
     def _runtime_for_utterance(
@@ -955,9 +927,9 @@ class ClientHub:
                 event.channel,
                 event.state.name,
             )
-            await self.ui_events.put(
-                UIEvent(
-                    type=UIEventType.SESSION_STATE_CHANGED,
+            await self.output_projection.publish_ui(
+                TranslationUiMessage(
+                    event_type=UIEventType.SESSION_STATE_CHANGED,
                     payload=event.state,
                     channel=event.channel,
                 )
@@ -967,9 +939,9 @@ class ClientHub:
             return
 
         if isinstance(event, STTErrorEvent):
-            await self.ui_events.put(
-                UIEvent(
-                    type=UIEventType.ERROR,
+            await self.output_projection.publish_ui(
+                TranslationUiMessage(
+                    event_type=UIEventType.ERROR,
                     payload=self._stt_error_event_payload(event),
                     source="Peer" if event.channel == "peer" else "Mic",
                     channel=event.channel,
@@ -1042,35 +1014,9 @@ class ClientHub:
         if self._last_promo_time is not None:
             if now - self._last_promo_time < _PROMO_INTERVAL_SEC:
                 return
-        result = self.output_runtime.publish_system_immediate_chatbox(text="PuriPuly ON!")
+        result = self.output_projection.publish_system_immediate("PuriPuly ON!")
         if result.decision.decision == "published":
             self._last_promo_time = now
-
-    def set_self_chatbox_typing_reason(
-        self,
-        reason: str,
-        active: bool,
-    ) -> OutputPublicationResult:
-        return self.output_runtime.set_self_chatbox_typing_reason(reason, active)
-
-    def clear_self_chatbox_typing_reasons(self) -> OutputPublicationResult:
-        return self.output_runtime.clear_self_chatbox_typing_reasons()
-
-    async def replace_overlay_sink(
-        self,
-        overlay_sink: HubOverlaySinkPort | None,
-        *,
-        expected_current: HubOverlaySinkPort | None = None,
-        require_match: bool = False,
-    ) -> bool:
-        replaced = await self.output_runtime.replace_overlay_sink(
-            overlay_sink,
-            expected_current=expected_current,
-            require_match=require_match,
-        )
-        if replaced:
-            object.__setattr__(self, "overlay_sink", overlay_sink)
-        return replaced
 
     async def _handle_transcript(
         self, transcript: Transcript, *, is_final: bool, source: str | None
@@ -1079,9 +1025,11 @@ class ClientHub:
         bundle = self.get_or_create_bundle(transcript.utterance_id, channel=transcript.channel)
         bundle.with_transcript(transcript)
         self._remember_source(transcript.utterance_id, source, channel=transcript.channel)
-        await self.ui_events.put(
-            UIEvent(
-                type=UIEventType.TRANSCRIPT_FINAL if is_final else UIEventType.TRANSCRIPT_PARTIAL,
+        await self.output_projection.publish_ui(
+            TranslationUiMessage(
+                event_type=(
+                    UIEventType.TRANSCRIPT_FINAL if is_final else UIEventType.TRANSCRIPT_PARTIAL
+                ),
                 utterance_id=transcript.utterance_id,
                 payload=transcript,
                 source=source,
@@ -1089,32 +1037,65 @@ class ClientHub:
         )
         if is_final:
             if runtime.channel == "peer":
-                deny_peer_chatbox_attempt = self.output_runtime.chatbox_is_denied(runtime.channel)
+                deny_peer_chatbox_attempt = self.output_projection.chatbox_is_denied(
+                    runtime.channel
+                )
                 peer_terminal_work_will_follow = self._peer_terminal_work_will_follow(runtime)
                 if self._overlay_translation_will_follow(runtime):
                     await self._ensure_translation(transcript, turn_kind="peer")
-                elif self.output_runtime.has_overlay_destination:
-                    await self._finalize_peer_source_only(
-                        transcript,
+                elif self.output_projection.has_overlay_destination:
+                    configuration = self.translation_runtime_config_snapshot().value
+                    finalized = await self.output_projection.project_peer_source_only(
+                        transcript=transcript,
+                        source_language=self._source_language_for(
+                            runtime,
+                            configuration,
+                        ),
+                        target_language=self._target_language_for(
+                            runtime,
+                            configuration,
+                        ),
                         close_is_final=True,
                         finalize_latency=not peer_terminal_work_will_follow,
                     )
+                    if finalized:
+                        self._clear_runtime_latency_bookkeeping(
+                            channel="peer",
+                            utterance_id=transcript.utterance_id,
+                        )
                     if deny_peer_chatbox_attempt:
-                        await self._publish_peer_chatbox_candidate(transcript.utterance_id)
+                        await self.output_projection.publish_peer_chatbox_denial(
+                            transcript.utterance_id
+                        )
+                        self._clear_runtime_latency_bookkeeping(
+                            channel="peer",
+                            utterance_id=transcript.utterance_id,
+                        )
                 elif deny_peer_chatbox_attempt:
-                    await self._publish_peer_chatbox_candidate(transcript.utterance_id)
+                    await self.output_projection.publish_peer_chatbox_denial(
+                        transcript.utterance_id
+                    )
+                    self._clear_runtime_latency_bookkeeping(
+                        channel="peer",
+                        utterance_id=transcript.utterance_id,
+                    )
                 elif not peer_terminal_work_will_follow:
                     self._finalize_latency_timeline(
                         channel=transcript.channel,
                         utterance_id=transcript.utterance_id,
                     )
                 return
-            await self._emit_final_transcript_to_overlay(transcript)
-            if not self._overlay_translation_will_follow(runtime):
-                await self._emit_overlay_utterance_closed(
-                    utterance_id=transcript.utterance_id,
+            configuration = self.translation_runtime_config_snapshot().value
+            finalized = await self.output_projection.project_self_final_transcript(
+                transcript=transcript,
+                source_language=self._source_language_for(runtime, configuration),
+                target_language=self._target_language_for(runtime, configuration),
+                translation_will_follow=self._overlay_translation_will_follow(runtime),
+            )
+            if finalized:
+                self._clear_runtime_latency_bookkeeping(
                     channel=transcript.channel,
-                    is_final=True,
+                    utterance_id=transcript.utterance_id,
                 )
 
     async def _handle_peer_final_transcript(
@@ -1129,9 +1110,9 @@ class ClientHub:
         bundle = runtime.get_or_create_bundle(transcript.utterance_id)
         bundle.with_transcript(transcript)
         self._remember_source(transcript.utterance_id, source, channel="peer")
-        await self.ui_events.put(
-            UIEvent(
-                type=UIEventType.TRANSCRIPT_FINAL,
+        await self.output_projection.publish_ui(
+            TranslationUiMessage(
+                event_type=UIEventType.TRANSCRIPT_FINAL,
                 utterance_id=transcript.utterance_id,
                 payload=transcript,
                 source=source,
@@ -1227,20 +1208,31 @@ class ClientHub:
         runtime = self._runtime_for_channel(child.channel)
         runtime.translation_tasks.pop(child.utterance_id, None)
         if outcome == "cancelled" and child.channel == "peer":
-            await self._finalize_peer_source_only(
-                child.transcript,
+            configuration = child.config_snapshot.value
+            await self.output_projection.project_peer_source_only(
+                transcript=child.transcript,
+                source_language=self._source_language_for(runtime, configuration),
+                target_language=self._target_language_for(runtime, configuration),
                 close_is_final=False,
                 finalize_latency=True,
-                preserve_parent_speech_end_time=True,
             )
-            await self._publish_peer_chatbox_candidate(child.utterance_id)
+            await self.output_projection.publish_peer_chatbox_denial(child.utterance_id)
+            self._clear_runtime_latency_bookkeeping(
+                channel=child.channel,
+                utterance_id=child.utterance_id,
+            )
         elif outcome == "cancelled":
-            await self._emit_overlay_utterance_closed(
+            finalized = await self.output_projection.close_overlay_utterance(
                 utterance_id=child.utterance_id,
                 channel=child.channel,
                 is_final=False,
-                finalize_latency=not self.output_runtime.chatbox_is_eligible(child.channel),
+                finalize_latency=not self.output_projection.chatbox_is_eligible(child.channel),
             )
+            if finalized:
+                self._clear_runtime_latency_bookkeeping(
+                    channel=child.channel,
+                    utterance_id=child.utterance_id,
+                )
         if child.channel == "peer":
             self._complete_peer_logical_turn(
                 child.utterance_id,
@@ -1255,85 +1247,18 @@ class ClientHub:
     async def _on_peer_final_run_parent_rejected(self, parent_utterance_id: UUID) -> None:
         if parent_utterance_id in self._peer_translation_parent_ids:
             try:
-                await self._publish_peer_chatbox_candidate(parent_utterance_id)
+                await self.output_projection.publish_peer_chatbox_denial(parent_utterance_id)
+                self._clear_runtime_latency_bookkeeping(
+                    channel="peer",
+                    utterance_id=parent_utterance_id,
+                )
             finally:
                 if not self.translation_turns.is_parent_active(parent_utterance_id):
                     self._peer_translation_parent_ids.discard(parent_utterance_id)
 
-    async def _emit_final_transcript_to_overlay(self, transcript: Transcript) -> None:
-        if not self.output_runtime.has_overlay_destination:
-            return
-        source_language, target_language = self._self_overlay_languages_for_utterance(
-            transcript.utterance_id
-        )
-        await self._emit_overlay_event(
-            self.overlay_event_adapter.transcript_final(
-                transcript,
-                source_language=source_language,
-                target_language=target_language,
-            )
-        )
-
-    async def _finalize_peer_source_only(
-        self,
-        transcript: Transcript,
-        *,
-        close_is_final: bool,
-        finalize_latency: bool,
-        preserve_parent_speech_end_time: bool = False,
-    ) -> None:
-        if self.output_runtime.has_overlay_destination:
-            self._record_overlay_emit(
-                event_kind="peer_transcript_final",
-                utterance_id=transcript.utterance_id,
-                channel="peer",
-                secondary_len=len(transcript.text.strip()),
-            )
-            self._record_latency_stage(
-                channel="peer",
-                utterance_id=transcript.utterance_id,
-                stage="peer_overlay_first_emit",
-                overwrite=False,
-            )
-            await self._emit_overlay_event(
-                self.overlay_event_adapter.transcript_final(
-                    transcript,
-                    source_language=self._source_language_for(self.peer_runtime),
-                    target_language=self._target_language_for(self.peer_runtime),
-                )
-            )
-        await self._emit_overlay_utterance_closed(
-            utterance_id=transcript.utterance_id,
-            channel="peer",
-            is_final=close_is_final,
-            finalize_latency=finalize_latency,
-        )
-
-    async def _emit_overlay_utterance_closed(
-        self,
-        *,
-        utterance_id: UUID,
-        channel: ChannelId,
-        is_final: bool,
-        finalize_latency: bool | None = None,
-    ) -> None:
-        if not self.output_runtime.has_overlay_destination:
-            if finalize_latency is True or (finalize_latency is None and channel == "peer"):
-                self._finalize_latency_timeline(channel=channel, utterance_id=utterance_id)
-            return
-        await self._emit_overlay_event(
-            self.overlay_event_adapter.utterance_closed(
-                utterance_id=utterance_id,
-                channel=channel,
-                is_final=is_final,
-            )
-        )
-        if finalize_latency is True or (finalize_latency is None and channel == "peer"):
-            self._finalize_latency_timeline(channel=channel, utterance_id=utterance_id)
-
     def _overlay_translation_will_follow(self, runtime: ChannelRuntime) -> bool:
         return (
-            self.output_runtime.has_overlay_destination
+            self.output_projection.has_overlay_destination
             and self._llm_provider_runtime.provider is not None
             and self._translation_enabled_for_runtime(runtime)
         )
@@ -1344,378 +1269,33 @@ class ClientHub:
         return (
             self._llm_provider_runtime.provider is not None
             and self._translation_enabled_for_runtime(runtime)
-        ) or self.output_runtime.chatbox_is_denied(runtime.channel)
-
-    @staticmethod
-    def _translation_overlay_metadata(translation: Translation) -> dict[str, object]:
-        return {
-            "update_id": translation.update_id,
-            "origin_wall_clock_ms": translation.origin_wall_clock_ms,
-            "session_scope": translation.session_scope,
-            "source_text_hash": translation.source_text_hash,
-            "source_text_len": translation.source_text_len,
-            "logical_turn_key": translation.logical_turn_key,
-        }
-
-    @staticmethod
-    def _language_or_fallback(language: str | None, fallback: str) -> str:
-        if language is not None and language.strip():
-            return language
-        return fallback
-
-    @staticmethod
-    def _metadata_language(metadata: object | None, field_name: str) -> str | None:
-        value = getattr(metadata, field_name, None)
-        if not isinstance(value, str):
-            return None
-        return value
-
-    def _active_self_display_languages_for_utterance(
-        self,
-        utterance_id: UUID,
-    ) -> tuple[str | None, str | None]:
-        metadata = self._current_active_self_metadata()
-        if metadata is None:
-            return None, None
-        if getattr(metadata, "utterance_id", None) != utterance_id:
-            return None, None
-        if getattr(metadata, "occupant_key", None) != f"self:{utterance_id}":
-            return None, None
-        return (
-            self._metadata_language(metadata, "primary_language"),
-            self._metadata_language(metadata, "secondary_language"),
-        )
-
-    def _self_overlay_languages_for_utterance(self, utterance_id: UUID) -> tuple[str, str]:
-        primary_language, secondary_language = self._active_self_display_languages_for_utterance(
-            utterance_id
-        )
-        configuration = self.translation_runtime_config_snapshot().value
-        return (
-            self._language_or_fallback(
-                primary_language,
-                configuration.source_language,
-            ),
-            self._language_or_fallback(
-                secondary_language,
-                configuration.target_language,
-            ),
-        )
-
-    def _current_active_self_metadata(self) -> object | None:
-        provider = getattr(self.overlay_sink, "active_self_overlay_metadata", None)
-        if not callable(provider):
-            return None
-        return provider()
-
-    @staticmethod
-    def _active_self_translation_metadata(metadata: object | None) -> dict[str, object]:
-        if metadata is None:
-            return {
-                "update_id": None,
-                "origin_wall_clock_ms": None,
-                "session_scope": None,
-                "source_text_hash": None,
-                "source_text_len": None,
-                "logical_turn_key": None,
-            }
-        return {
-            "update_id": getattr(metadata, "update_id", None),
-            "origin_wall_clock_ms": getattr(metadata, "origin_wall_clock_ms", None),
-            "session_scope": getattr(metadata, "session_scope", None),
-            "source_text_hash": getattr(metadata, "source_text_hash", None),
-            "source_text_len": getattr(metadata, "source_text_len", None),
-            "logical_turn_key": getattr(metadata, "logical_turn_key", None),
-        }
-
-    def _cached_active_self_secondary_text(self) -> str:
-        metadata = self._current_active_self_metadata()
-        if metadata is None:
-            return ""
-        return str(getattr(metadata, "secondary_text", "") or "")
-
-    def _overlay_secondary_translation_metadata(
-        self,
-        *,
-        buffer: _MergeBuffer,
-        source: str,
-        secondary_text: str,
-    ) -> dict[str, object]:
-        if not secondary_text:
-            return self._active_self_translation_metadata(None)
-        if source == "spec" and isinstance(buffer.spec_translation, Translation):
-            return self._translation_overlay_metadata(buffer.spec_translation)
-        metadata = self._current_active_self_metadata()
-        if (
-            source == "sticky_cache"
-            and metadata is not None
-            and getattr(metadata, "utterance_id", None) == buffer.merge_id
-        ):
-            return self._active_self_translation_metadata(metadata)
-        return self._active_self_translation_metadata(None)
-
-    def _active_self_overlay_languages(
-        self,
-        *,
-        buffer: _MergeBuffer,
-        source: str,
-        secondary_text: str,
-        current_metadata: object | None,
-    ) -> tuple[str, str]:
-        source_language = self._source_language_for(self.self_runtime)
-        target_language = self._target_language_for(self.self_runtime)
-        if source == "spec" and isinstance(buffer.spec_translation, Translation):
-            return (
-                self._language_or_fallback(
-                    buffer.spec_translation.source_language,
-                    source_language,
-                ),
-                self._language_or_fallback(
-                    buffer.spec_translation.target_language,
-                    target_language,
-                ),
-            )
-        metadata_matches_active_self = (
-            current_metadata is not None
-            and getattr(current_metadata, "utterance_id", None) == buffer.merge_id
-            and getattr(current_metadata, "occupant_key", None)
-            == self._active_self_occupant_key(buffer)
-        )
-        if secondary_text and source == "sticky_cache" and metadata_matches_active_self:
-            return (
-                self._language_or_fallback(
-                    self._metadata_language(current_metadata, "primary_language"),
-                    source_language,
-                ),
-                self._language_or_fallback(
-                    self._metadata_language(current_metadata, "secondary_language"),
-                    target_language,
-                ),
-            )
-        if not secondary_text and metadata_matches_active_self:
-            return (
-                self._language_or_fallback(
-                    self._metadata_language(current_metadata, "primary_language"),
-                    source_language,
-                ),
-                target_language,
-            )
-        return source_language, target_language
-
-    def _emit_translation_ready_for_output(
-        self,
-        *,
-        translation: Translation,
-        runtime: ChannelRuntime,
-    ) -> bool:
-        return self.translation_diagnostics.emit_translation_ready(
-            TranslationReadyDiagnostic(
-                channel=runtime.channel,
-                utterance_id=translation.utterance_id,
-                update_id=translation.update_id,
-                origin_wall_clock_ms=translation.origin_wall_clock_ms,
-                session_scope=translation.session_scope,
-                source_text_hash=translation.source_text_hash,
-                source_text_len=translation.source_text_len,
-                logical_turn_key=translation.logical_turn_key,
-                translation_len=len(translation.text),
-            )
-        )
-
-    async def _emit_translation_to_overlay(
-        self,
-        *,
-        translation: Translation,
-        applied_context_mode: ContextMode | None,
-    ) -> None:
-        if not self.output_runtime.has_overlay_destination:
-            return
-        configuration = self.translation_runtime_config_snapshot().value
-
-        self._record_overlay_emit(
-            event_kind="translation_final",
-            utterance_id=translation.utterance_id,
-            channel=translation.channel,
-            secondary_len=len(translation.text.strip()),
-        )
-        await self._emit_overlay_event(
-            self.overlay_event_adapter.translation_final(
-                utterance_id=translation.utterance_id,
-                channel=translation.channel,
-                text=translation.text,
-                source_language=self._language_or_fallback(
-                    translation.source_language,
-                    configuration.source_language,
-                ),
-                target_language=self._language_or_fallback(
-                    translation.target_language,
-                    configuration.target_language,
-                ),
-                applied_context_mode=applied_context_mode,
-                created_at=translation.created_at,
-                **self._translation_overlay_metadata(translation),
-            )
-        )
-
-    async def _emit_peer_translation_to_overlay(
-        self,
-        *,
-        translation: Translation,
-        runtime: ChannelRuntime,
-        applied_context_mode: ContextMode | None,
-    ) -> None:
-        if not self.output_runtime.has_overlay_destination:
-            return
-
-        self._record_overlay_emit(
-            event_kind="translation_final",
-            utterance_id=translation.utterance_id,
-            channel=translation.channel,
-            secondary_len=len(translation.text.strip()),
-        )
-        self._record_latency_stage(
-            channel=runtime.channel,
-            utterance_id=translation.utterance_id,
-            stage="peer_overlay_first_emit",
-            overwrite=False,
-        )
-        await self._emit_overlay_event(
-            self.overlay_event_adapter.translation_final(
-                utterance_id=translation.utterance_id,
-                channel=translation.channel,
-                text=translation.text,
-                source_text=translation.source_text,
-                source_language=self._language_or_fallback(
-                    translation.source_language,
-                    self._source_language_for(runtime),
-                ),
-                target_language=self._language_or_fallback(
-                    translation.target_language,
-                    self._target_language_for(runtime),
-                ),
-                applied_context_mode=applied_context_mode,
-                created_at=translation.created_at,
-                **self._translation_overlay_metadata(translation),
-            )
-        )
-
-    async def _emit_overlay_event(self, event: OverlayEventUnion) -> None:
-        if not self.output_runtime.has_overlay_destination:
-            return
-        detailed_mode = self.translation_diagnostics.detailed_enabled
-        start = time.perf_counter() if detailed_mode else 0.0
-        result = await self.output_runtime.publish_overlay_event(event)
-        if result.decision.reason == "destination_publish_failed":
-            self.translation_diagnostics.record_overlay_sink_failure(
-                result.decision.metadata.get("error_type", "Exception")
-            )
-            return
-        if detailed_mode and result.decision.decision == "published":
-            elapsed_ms = max(0, int((time.perf_counter() - start) * 1000))
-            self.translation_diagnostics.record_overlay_sink_duration(
-                OverlaySinkDurationDiagnostic(
-                    event_type=type(event).__name__,
-                    channel=getattr(event, "channel", None),
-                    utterance_id=getattr(event, "utterance_id", None),
-                    update_id=getattr(event, "update_id", None),
-                    elapsed_ms=elapsed_ms,
-                )
-            )
-
-    async def _emit_self_active_overlay_event(self, event: object) -> None:
-        await self._emit_overlay_event(event)
-
-    def _active_self_secondary_decision(
-        self,
-        buffer: _MergeBuffer,
-    ) -> tuple[str, str, str | None]:
-        translation = buffer.spec_translation
-        active_text = self._merge_text(buffer.parts)
-        if not active_text:
-            return "", "blank", None
-        reuse_mode = None
-        if isinstance(translation, Translation):
-            reuse_mode = self._soft_reuse_mode(buffer.spec_text, active_text)
-            if reuse_mode is not None:
-                return translation.text.strip(), "spec", reuse_mode
-        sticky_secondary = self._cached_active_self_secondary_text().strip()
-        if sticky_secondary:
-            return sticky_secondary, "sticky_cache", reuse_mode
-        return "", "blank", reuse_mode
-
-    def _active_self_occupant_key(self, buffer: _MergeBuffer) -> str:
-        return f"self:{buffer.merge_id}"
+        ) or self.output_projection.chatbox_is_denied(runtime.channel)
 
     async def _sync_overlay_active_self(
         self, buffer: _MergeBuffer | None, *, created_at: float | None = None
     ) -> None:
-        if not self.output_runtime.has_overlay_destination or buffer is None:
+        if buffer is None:
             return
-
         active_text = self._merge_text(buffer.parts)
         if not active_text:
             return
-        secondary_text, source, reuse_mode = self._active_self_secondary_decision(buffer)
-        self._record_active_self_secondary_decision(
-            buffer=buffer,
-            active_text=active_text,
-            secondary_text=secondary_text,
-            source=source,
-            reuse_mode=reuse_mode,
-        )
-        current_metadata = self._current_active_self_metadata()
-        translation_metadata = self._overlay_secondary_translation_metadata(
-            buffer=buffer,
-            source=source,
-            secondary_text=secondary_text,
-        )
-        current_translation_metadata = self._active_self_translation_metadata(current_metadata)
-        occupant_key = self._active_self_occupant_key(buffer)
-        source_language, target_language = self._active_self_overlay_languages(
-            buffer=buffer,
-            source=source,
-            secondary_text=secondary_text,
-            current_metadata=current_metadata,
-        )
-        primary_language = source_language.strip() or None
-        secondary_language = (target_language.strip() or None) if secondary_text.strip() else None
-        if (
-            current_metadata is not None
-            and buffer.merge_id == getattr(current_metadata, "utterance_id", None)
-            and occupant_key == getattr(current_metadata, "occupant_key", None)
-            and active_text == getattr(current_metadata, "text", None)
-            and secondary_text == getattr(current_metadata, "secondary_text", "")
-            and primary_language == getattr(current_metadata, "primary_language", None)
-            and secondary_language == getattr(current_metadata, "secondary_language", None)
-            and translation_metadata == current_translation_metadata
-        ):
-            return
-
-        self._record_overlay_emit(
-            event_kind="active_self",
-            utterance_id=buffer.merge_id,
-            channel="self",
-            secondary_len=len(secondary_text),
-        )
-        await self._emit_self_active_overlay_event(
-            self.overlay_event_adapter.self_active_update(
-                text=active_text,
-                utterance_id=buffer.merge_id,
-                secondary_text=secondary_text,
-                occupant_key=occupant_key,
-                source_language=source_language,
-                target_language=target_language,
+        await self.output_projection.sync_active_self(
+            ActiveSelfProjection(
+                merge_id=buffer.merge_id,
+                active_text=active_text,
+                spec_text=buffer.spec_text,
+                spec_translation=(
+                    buffer.spec_translation
+                    if isinstance(buffer.spec_translation, Translation)
+                    else None
+                ),
+                source_language=self._source_language_for(self.self_runtime),
+                target_language=self._target_language_for(self.self_runtime),
+                resume_pending=buffer.resume_pending,
+                resume_confirmed=buffer.resume_confirmed,
                 created_at=created_at,
-                **translation_metadata,
             )
         )
-
-    async def reset_overlay_preview(self) -> None:
-        if self._current_active_self_metadata() is None:
-            return
-        if not self.output_runtime.has_overlay_destination:
-            return
-        await self._emit_self_active_overlay_event(self.overlay_event_adapter.self_active_clear())
 
     def _merge_text(self, parts: list[str]) -> str:
         merged = ""
@@ -1796,99 +1376,6 @@ class ClientHub:
 
     def _is_boundary_char(self, ch: str) -> bool:
         return ch.isspace() or ch in _BOUNDARY_PUNCT
-
-    def _soft_reuse_mode(self, spec_text: str | None, final_text: str) -> str | None:
-        if spec_text is None:
-            return None
-        if spec_text == final_text:
-            return "exact"
-
-        normalized_spec = self._normalize_soft_reuse_text(spec_text)
-        normalized_final = self._normalize_soft_reuse_text(final_text)
-        if not normalized_spec or not normalized_final:
-            return None
-        if normalized_spec == normalized_final:
-            return "soft_boundary"
-        return None
-
-    def _normalize_soft_reuse_text(self, text: str) -> str:
-        start = 0
-        end = len(text)
-        while start < end and self._is_soft_reuse_boundary_char(text[start]):
-            start += 1
-        while end > start and self._is_soft_reuse_boundary_char(text[end - 1]):
-            end -= 1
-        return text[start:end]
-
-    def _record_active_self_secondary_decision(
-        self,
-        *,
-        buffer: _MergeBuffer,
-        active_text: str,
-        secondary_text: str,
-        source: str,
-        reuse_mode: str | None,
-    ) -> None:
-        spec_translation_len = 0
-        if isinstance(buffer.spec_translation, Translation):
-            spec_translation_len = len(buffer.spec_translation.text.strip())
-        self.translation_diagnostics.record_self_overlay_decision(
-            SelfOverlayDecisionDiagnostic.create(
-                merge_id=buffer.merge_id,
-                source=source,
-                active_text=active_text,
-                secondary_text=secondary_text,
-                spec_text_len=len((buffer.spec_text or "").strip()),
-                spec_translation_len=spec_translation_len,
-                cached_secondary_len=len(self._cached_active_self_secondary_text().strip()),
-                reuse_mode=reuse_mode,
-                resume_pending=buffer.resume_pending,
-                resume_confirmed=buffer.resume_confirmed,
-            )
-        )
-
-    def _should_blank_stale_active_secondary_before_finalizing(
-        self,
-        *,
-        final_text: str,
-        reuse_mode: str | None,
-    ) -> bool:
-        # Presenter promotion preserves active secondary text for the same occupant.
-        # Blank the active row first when speculative reuse is unsafe so stale
-        # secondary text cannot be promoted into the finalized row.
-        metadata = self._current_active_self_metadata()
-        return (
-            reuse_mode is None
-            and self.output_runtime.has_overlay_destination
-            and metadata is not None
-            and getattr(metadata, "text", None) == final_text
-            and str(getattr(metadata, "secondary_text", "") or "").strip() != ""
-        )
-
-    def _record_overlay_emit(
-        self,
-        *,
-        event_kind: str,
-        utterance_id: UUID,
-        channel: ChannelId,
-        secondary_len: int,
-    ) -> None:
-        self.translation_diagnostics.record_overlay_emit(
-            OverlayEmitDiagnostic(
-                event_kind=event_kind,
-                utterance_id=utterance_id,
-                channel=channel,
-                secondary_len=secondary_len,
-                sink_type=(
-                    type(self.output_runtime.overlay_sink).__name__
-                    if self.output_runtime.has_overlay_destination
-                    else None
-                ),
-            )
-        )
-
-    def _is_soft_reuse_boundary_char(self, ch: str) -> bool:
-        return ch.isspace() or ch in _SOFT_REUSE_PUNCT
 
     def _needs_space(self, left: str, right: str) -> bool:
         if not left or not right:
@@ -2352,36 +1839,34 @@ class ClientHub:
 
         final_text = self._merge_text(buffer.parts)
         if not final_text:
-            await self.reset_overlay_preview()
+            await self.output_projection.reset_overlay_preview()
             return
 
         reuse_mode = None
         if buffer.spec_translation is not None:
-            reuse_mode = self._soft_reuse_mode(buffer.spec_text, final_text)
+            reuse_mode = self.output_projection.soft_reuse_mode(
+                buffer.spec_text,
+                final_text,
+            )
 
-        if self._should_blank_stale_active_secondary_before_finalizing(
+        if self.output_projection.should_blank_stale_active_secondary(
             final_text=final_text,
             reuse_mode=reuse_mode,
         ):
-            source_language, target_language = self._self_overlay_languages_for_utterance(
-                buffer.merge_id
-            )
-            self._record_overlay_emit(
-                event_kind="active_self",
-                utterance_id=buffer.merge_id,
-                channel="self",
-                secondary_len=0,
-            )
-            await self._emit_self_active_overlay_event(
-                self.overlay_event_adapter.self_active_update(
-                    text=final_text,
+            configuration = self.translation_runtime_config_snapshot().value
+            source_language, target_language = (
+                self.output_projection.self_overlay_languages_for_utterance(
                     utterance_id=buffer.merge_id,
-                    secondary_text="",
-                    occupant_key=self._active_self_occupant_key(buffer),
-                    source_language=source_language,
-                    target_language=target_language,
-                    created_at=self.clock.now(),
+                    source_language=configuration.source_language,
+                    target_language=configuration.target_language,
                 )
+            )
+            await self.output_projection.blank_active_self(
+                utterance_id=buffer.merge_id,
+                text=final_text,
+                source_language=source_language,
+                target_language=target_language,
+                created_at=self.clock.now(),
             )
 
         if (
@@ -2639,7 +2124,7 @@ class ClientHub:
             await self._commit_merge(buffer, reason=reason)
             return
 
-        if self._soft_reuse_mode(buffer.spec_text, final_text) is None:
+        if self.output_projection.soft_reuse_mode(buffer.spec_text, final_text) is None:
             return
 
         await self._commit_merge(buffer, reason=reason)
@@ -2690,6 +2175,12 @@ class ClientHub:
         if runtime.channel == "peer" and configuration.peer_target_language:
             return configuration.peer_target_language
         return configuration.target_language
+
+    @staticmethod
+    def _language_or_fallback(language: str | None, fallback: str) -> str:
+        if language is not None and language.strip():
+            return language
+        return fallback
 
     def _format_system_prompt(
         self,
@@ -2964,24 +2455,6 @@ class ClientHub:
             wait_for_parent=wait_for_parent,
         )
 
-    async def _cleanup_dropped_translation(
-        self,
-        utterance_id: UUID,
-        text: str,
-        *,
-        runtime: ChannelRuntime,
-    ) -> None:
-        if runtime.channel == "peer":
-            await self._publish_peer_chatbox_candidate(utterance_id)
-            self._complete_peer_logical_turn(utterance_id)
-            return
-        await self._emit_overlay_utterance_closed(
-            utterance_id=utterance_id,
-            channel=runtime.channel,
-            is_final=False,
-            finalize_latency=True,
-        )
-
     async def _build_translation_process_result(
         self,
         *,
@@ -3006,7 +2479,7 @@ class ClientHub:
             self._log_translation_skipped(
                 stage="final",
                 runtime=runtime,
-                publish_chatbox=self.output_runtime.chatbox_is_eligible(runtime.channel),
+                publish_chatbox=self.output_projection.chatbox_is_eligible(runtime.channel),
                 configuration=configuration,
             )
             return TranslationTurnProcessResult(
@@ -3038,9 +2511,9 @@ class ClientHub:
             if outcome == "failed":
                 exc = _UnmappedDetectedLanguage()
                 report = self._log_translation_failure(stage="final", runtime=runtime, exc=exc)
-                await self.ui_events.put(
-                    UIEvent(
-                        type=UIEventType.ERROR,
+                await self.output_projection.publish_ui(
+                    TranslationUiMessage(
+                        event_type=UIEventType.ERROR,
                         utterance_id=utterance_id,
                         payload=report,
                         source=source,
@@ -3135,9 +2608,9 @@ class ClientHub:
             )
         except Exception as exc:
             report = self._log_translation_failure(stage="final", runtime=runtime, exc=exc)
-            await self.ui_events.put(
-                UIEvent(
-                    type=UIEventType.ERROR,
+            await self.output_projection.publish_ui(
+                TranslationUiMessage(
+                    event_type=UIEventType.ERROR,
                     utterance_id=utterance_id,
                     payload=self._translation_error_payload(exc, report),
                     source=source,
@@ -3188,143 +2661,21 @@ class ClientHub:
         submission: TranslationOutputSubmission,
     ) -> None:
         runtime = self._runtime_for_channel(submission.channel)
-        config_snapshot = submission.config_snapshot
-        configuration = config_snapshot.value
         utterance_id = submission.child_utterance_id
-        text = submission.source_text
-        if submission.outcome == "source_only":
-            if runtime.channel == "peer":
-                await self._finalize_peer_source_only(
-                    Transcript(
-                        utterance_id=utterance_id,
-                        text=text,
-                        is_final=True,
-                        created_at=self.clock.now(),
-                        channel="peer",
-                    ),
-                    close_is_final=True,
-                    finalize_latency=True,
-                    preserve_parent_speech_end_time=True,
-                )
-                await self._publish_peer_chatbox_candidate(utterance_id)
-            elif self.output_runtime.chatbox_is_eligible(runtime.channel):
-                await self._publish_chatbox_candidate(
-                    utterance_id,
-                    transcript_text=text,
-                    translation_text=None,
-                    config_snapshot=config_snapshot,
-                )
-            else:
-                self._finalize_latency_timeline(
-                    channel=runtime.channel,
-                    utterance_id=utterance_id,
-                )
-            return
-
-        if submission.outcome == "failed":
-            if submission.failure_code == "stale_provider_completion":
-                await self._cleanup_dropped_translation(utterance_id, text, runtime=runtime)
-                return
-            deny_peer_chatbox_attempt = self.output_runtime.chatbox_is_denied(runtime.channel)
-            fallback_to_chatbox = (
-                configuration.fallback_transcript_only
-                and self.output_runtime.chatbox_is_eligible(runtime.channel)
-            )
-            denied_fallback_to_chatbox = (
-                configuration.fallback_transcript_only and deny_peer_chatbox_attempt
-            )
-            if runtime.channel == "self":
-                await self._emit_overlay_utterance_closed(
-                    utterance_id=utterance_id,
-                    channel=runtime.channel,
-                    is_final=False,
-                    finalize_latency=not fallback_to_chatbox,
-                )
-            elif runtime.channel == "peer":
-                await self._finalize_peer_source_only(
-                    Transcript(
-                        utterance_id=utterance_id,
-                        text=text,
-                        is_final=True,
-                        created_at=self.clock.now(),
-                        channel="peer",
-                    ),
-                    close_is_final=False,
-                    finalize_latency=not denied_fallback_to_chatbox,
-                    preserve_parent_speech_end_time=True,
-                )
-            if fallback_to_chatbox:
-                await self._publish_chatbox_candidate(
-                    utterance_id,
-                    transcript_text=text,
-                    translation_text=None,
-                    config_snapshot=config_snapshot,
-                )
-            elif deny_peer_chatbox_attempt:
-                await self._publish_peer_chatbox_candidate(utterance_id)
-            elif runtime.channel != "peer":
-                self._finalize_latency_timeline(
-                    channel=runtime.channel,
-                    utterance_id=utterance_id,
-                )
-            return
-
         translation = submission.translation
-        if translation is None:
-            raise ValueError("translated submission requires a translation")
-        publish_to_chatbox = self.output_runtime.chatbox_is_eligible(runtime.channel)
-        deny_peer_chatbox_attempt = self.output_runtime.chatbox_is_denied(runtime.channel)
-        bundle = self.get_or_create_bundle(utterance_id, channel=runtime.channel)
-        bundle.with_translation(translation)
-        self._emit_translation_ready_for_output(
-            translation=translation,
-            runtime=runtime,
-        )
-        if runtime.channel == "peer" and self.output_runtime.has_overlay_destination:
-            await self._emit_peer_translation_to_overlay(
-                translation=translation,
-                runtime=runtime,
-                applied_context_mode=submission.applied_context_mode,
-            )
-            await self._emit_overlay_utterance_closed(
-                utterance_id=utterance_id,
-                channel=runtime.channel,
-                is_final=True,
-                finalize_latency=not (publish_to_chatbox or deny_peer_chatbox_attempt),
-            )
-        await self.ui_events.put(
-            UIEvent(
-                type=UIEventType.TRANSLATION_DONE,
-                utterance_id=utterance_id,
-                payload=translation,
-                source=submission.source,
-            )
-        )
-        if runtime.channel == "self":
-            await self._emit_translation_to_overlay(
-                translation=translation,
-                applied_context_mode=submission.applied_context_mode,
-            )
-            await self._emit_overlay_utterance_closed(
-                utterance_id=utterance_id,
-                channel=runtime.channel,
-                is_final=True,
-                finalize_latency=not self.output_runtime.chatbox_is_eligible(runtime.channel),
-            )
-        if publish_to_chatbox:
-            await self._publish_chatbox_candidate(
+        if translation is not None:
+            self.get_or_create_bundle(
                 utterance_id,
-                transcript_text=text,
-                translation_text=translation.text,
-                config_snapshot=config_snapshot,
-            )
-        elif deny_peer_chatbox_attempt:
-            await self._publish_peer_chatbox_candidate(utterance_id)
-        else:
-            self._finalize_latency_timeline(
+                channel=runtime.channel,
+            ).with_translation(translation)
+        receipt = await self.output_projection.project_translation_result(submission)
+        if receipt.clear_runtime_latency_bookkeeping:
+            self._clear_runtime_latency_bookkeeping(
                 channel=runtime.channel,
                 utterance_id=utterance_id,
             )
+        if receipt.complete_peer_logical_turn:
+            self._complete_peer_logical_turn(utterance_id)
 
     async def _translate_and_enqueue(
         self,
@@ -3366,9 +2717,6 @@ class ClientHub:
     ) -> UUID:
         _ = source
         parent_utterance_id = uuid4()
-        before_event_count = 0
-        if hasattr(self.overlay_sink, "events"):
-            before_event_count = len(self.overlay_sink.events)  # type: ignore[attr-defined]
         existing_peer_utterance_ids = set(self.peer_runtime.utterances)
         await self._handle_stt_event(
             STTFinalEvent(
@@ -3387,11 +2735,6 @@ class ClientHub:
             or not self._translation_enabled_for_runtime(self.peer_runtime)
         ):
             await self.translation_turns.wait_for_idle()
-        if hasattr(self.overlay_sink, "events"):
-            new_events = self.overlay_sink.events[before_event_count:]  # type: ignore[attr-defined]
-            for event in new_events:
-                if getattr(event, "type", None) == "peer_active_update":
-                    return event.utterance_id
         for utterance_id, bundle in self.peer_runtime.utterances.items():
             if utterance_id in existing_peer_utterance_ids:
                 continue
@@ -3408,100 +2751,3 @@ class ClientHub:
         )
         await self.translation_turns.wait_for_idle()
         return utterance_id
-
-    async def _publish_chatbox_candidate(
-        self,
-        utterance_id: UUID,
-        *,
-        transcript_text: str,
-        translation_text: str | None,
-        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
-    ) -> OutputPublicationResult:
-        runtime = self._runtime_for_utterance(utterance_id)
-        config_snapshot = config_snapshot or self.translation_runtime_config_snapshot()
-        include_source = config_snapshot.value.chatbox_include_source
-        result = await self.output_runtime.publish_chatbox(
-            publication_id=utterance_id,
-            channel=runtime.channel,
-            transcript_text=transcript_text,
-            translation_text=translation_text,
-            include_source=include_source,
-        )
-
-        if result.decision.decision != "published":
-            self._emit_detailed(
-                "[Hub] OSC enqueue skipped: channel=%s route=%s reason=%s",
-                runtime.channel,
-                result.decision.route,
-                result.decision.reason,
-                fallback_level=logging.INFO,
-            )
-            runtime.utterance_start_times.pop(utterance_id, None)
-            runtime.speech_ended_ids.discard(utterance_id)
-            self._clear_latency_timeline(channel=runtime.channel, utterance_id=utterance_id)
-            return result
-
-        msg = result.message
-        assert msg is not None
-        merged = msg.text
-
-        self._emit_detailed(
-            "[Hub] OSC enqueue preview: channel=%s text_len=%s translation_text_present=%s include_source=%s",
-            runtime.channel,
-            len(merged),
-            translation_text is not None,
-            include_source,
-            fallback_level=logging.INFO,
-        )
-        if runtime.channel == "self":
-            self._record_latency_stage(
-                channel=runtime.channel,
-                utterance_id=utterance_id,
-                stage="self_chatbox_enqueue",
-            )
-
-        runtime.utterance_start_times.pop(utterance_id, None)
-        runtime.speech_ended_ids.discard(utterance_id)
-
-        await self.ui_events.put(
-            UIEvent(
-                type=UIEventType.OSC_SENT,
-                utterance_id=utterance_id,
-                payload=msg,
-                source=self._get_source(utterance_id),
-                channel=runtime.channel,
-            )
-        )
-        self._clear_latency_timeline(channel=runtime.channel, utterance_id=utterance_id)
-        return result
-
-    async def _publish_peer_chatbox_candidate(
-        self,
-        utterance_id: UUID,
-    ) -> OutputPublicationResult:
-        result = await self.output_runtime.publish_chatbox(
-            publication_id=utterance_id,
-            channel="peer",
-            transcript_text="",
-            translation_text=None,
-            include_source=False,
-        )
-        self._emit_detailed(
-            "[Hub] OSC enqueue skipped: channel=%s route=%s reason=%s",
-            "peer",
-            result.decision.route,
-            result.decision.reason,
-            fallback_level=logging.INFO,
-        )
-        self.peer_runtime.utterance_start_times.pop(utterance_id, None)
-        self.peer_runtime.speech_ended_ids.discard(utterance_id)
-        self._clear_latency_timeline(channel="peer", utterance_id=utterance_id)
-        return result
-
-    def enqueue_peer_translation_disclosure(self, text: str) -> None:
-        self._emit_detailed(
-            "[Hub] OSC disclosure enqueue: channel=peer text_len=%s",
-            len(text),
-            fallback_level=logging.INFO,
-        )
-        self.output_runtime.publish_system_disclosure_chatbox(text=text)

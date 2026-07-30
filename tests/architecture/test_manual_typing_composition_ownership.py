@@ -26,8 +26,9 @@ def test_application_manual_typing_owner_is_only_factory_composition() -> None:
     assert "def _begin_manual_submit_typing(" not in source
     assert "def _manual_typing_idle_task(" not in source
     assert source.count("create_manual_typing_owner(") == 1
-    assert 'getattr(hub, "set_self_chatbox_typing_reason", None)' in source
-    assert '"clear_self_chatbox_typing_reasons",' in source
+    assert "return pipeline.translation_output_projection" in source
+    assert 'getattr(hub, "set_self_chatbox_typing_reason", None)' not in source
+    assert '"clear_self_chatbox_typing_reasons",' not in source
     assert 'getattr(runtime, "translation_tasks", None)' in source
     assert "idle_timeout_seconds=MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S" in source
     assert "submit_timeout_seconds=MANUAL_SUBMIT_TYPING_TIMEOUT_S" in source

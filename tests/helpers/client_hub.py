@@ -20,6 +20,10 @@ from puripuly_heart.core.orchestrator.hub_callbacks import (
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
     TranslationLatencyDiagnosticsOwner,
 )
+from puripuly_heart.core.orchestrator.translation_output_projection import (
+    TranslationOutputProjectionOwner,
+    TranslationUiMessageQueue,
+)
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnLifecycleOwner,
 )
@@ -36,6 +40,10 @@ class ClientHubTestHarness:
         "_hub",
         "_llm_runtime",
         "_local_asr_runtime",
+        "_output_runtime",
+        "_output_projection",
+        "_osc",
+        "_ui_events",
         "_stt_sessions",
         "_started",
     )
@@ -46,11 +54,19 @@ class ClientHubTestHarness:
         hub: ClientHub,
         llm_runtime: ProviderRuntimeHandle,
         local_asr_runtime: object,
+        output_runtime: OutputRuntime,
+        output_projection: TranslationOutputProjectionOwner,
+        osc: object,
+        ui_events: asyncio.Queue,
         stt_sessions: SttSessionStateProjection,
     ) -> None:
         object.__setattr__(self, "_hub", hub)
         object.__setattr__(self, "_llm_runtime", llm_runtime)
         object.__setattr__(self, "_local_asr_runtime", local_asr_runtime)
+        object.__setattr__(self, "_output_runtime", output_runtime)
+        object.__setattr__(self, "_output_projection", output_projection)
+        object.__setattr__(self, "_osc", osc)
+        object.__setattr__(self, "_ui_events", ui_events)
         object.__setattr__(self, "_stt_sessions", stt_sessions)
         object.__setattr__(self, "_started", False)
 
@@ -61,6 +77,18 @@ class ClientHubTestHarness:
             return None
         if name == "local_asr_provider_runtime":
             return self._local_asr_runtime
+        if name == "output_runtime":
+            return self._output_runtime
+        if name == "output_projection":
+            return self._output_projection
+        if name == "overlay_event_adapter":
+            return self._output_projection.overlay_event_adapter
+        if name == "overlay_sink":
+            return self._output_projection.overlay_sink
+        if name == "ui_events":
+            return self._ui_events
+        if name == "osc":
+            return self._osc
         if name == "provider_runtime_handles":
             return {"llm": self._llm_runtime}
         if name == "_running":
@@ -86,7 +114,7 @@ class ClientHubTestHarness:
     async def start(self, *, auto_flush_osc: bool = False) -> None:
         if self._started:
             return
-        await self._hub.output_runtime.start(auto_flush_chatbox=auto_flush_osc)
+        await self._output_runtime.start(auto_flush_chatbox=auto_flush_osc)
         await self._hub.translation_turns.open_channel_ingress("self")
         await self._hub.translation_turns.open_channel_ingress("peer")
         await self._hub.translation_turns.start()
@@ -101,7 +129,7 @@ class ClientHubTestHarness:
             lambda: self._hub.translation_turns.close_channel_ingress("self"),
             lambda: self._hub.translation_turns.close_channel_ingress("peer"),
             self._hub.translation_turns.close,
-            self._hub.output_runtime.close,
+            self._output_runtime.close,
         ):
             try:
                 await callback()
@@ -109,7 +137,7 @@ class ClientHubTestHarness:
                 failures.append(exc)
         if was_started:
             for callback in (
-                self._hub.reset_overlay_preview,
+                self._output_projection.reset_overlay_preview,
                 self._hub._reset_stt_runtime_state,
             ):
                 try:
@@ -241,7 +269,7 @@ def compose_client_hub(**values: object) -> ClientHubTestHarness:
     llm = values.pop("llm", None)
     osc = values.pop("osc")
     clock = values.pop("clock", None) or SystemClock()
-    overlay_sink = values.get("overlay_sink")
+    overlay_sink = values.pop("overlay_sink", None)
     overlay_diagnostics = values.pop("overlay_diagnostics", None)
     runtime_logging = values.pop("runtime_logging", None)
     runtime_factory = values.pop("local_asr_provider_runtime_factory", None)
@@ -277,6 +305,13 @@ def compose_client_hub(**values: object) -> ClientHubTestHarness:
         runtime_logging=runtime_logging,
         overlay_diagnostics=overlay_diagnostics,
     )
+    ui_events = asyncio.Queue()
+    translation_output_projection = TranslationOutputProjectionOwner(
+        output_runtime=output_runtime,
+        ui_messages=TranslationUiMessageQueue(ui_events),
+        diagnostics=translation_diagnostics,
+        clock=clock,
+    )
     translation_turns = TranslationTurnLifecycleOwner(
         on_child_created=callbacks.child_created,
         on_child_started=callbacks.child_started,
@@ -302,10 +337,7 @@ def compose_client_hub(**values: object) -> ClientHubTestHarness:
     )
     llm_runtime = ProviderRuntimeHandle(name="llm", provider=llm)
     hub = ClientHub(
-        osc=osc,
         translation_runtime_configuration=config_owner,
-        ui_events=asyncio.Queue(),
-        direct_output_runtime=output_runtime,
         direct_self_runtime=self_runtime,
         direct_peer_runtime=peer_runtime,
         direct_translation_turns=translation_turns,
@@ -313,6 +345,7 @@ def compose_client_hub(**values: object) -> ClientHubTestHarness:
         direct_llm_runtime=llm_runtime,
         direct_context_resolver=context_resolver,
         direct_translation_diagnostics=translation_diagnostics,
+        direct_output_projection=translation_output_projection,
         clock=clock,
         **values,
     )
@@ -321,6 +354,10 @@ def compose_client_hub(**values: object) -> ClientHubTestHarness:
         hub=hub,
         llm_runtime=llm_runtime,
         local_asr_runtime=local_asr_runtime,
+        output_runtime=output_runtime,
+        output_projection=translation_output_projection,
+        osc=osc,
+        ui_events=ui_events,
         stt_sessions=stt_sessions,
     )
 

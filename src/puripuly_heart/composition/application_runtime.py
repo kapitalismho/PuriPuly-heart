@@ -487,7 +487,7 @@ def compose_application_runtime(
                     "overlay_enabled",
                     enabled,
                 ),
-                hub_provider=lambda: pipeline.hub,
+                output_provider=lambda: pipeline.translation_output_projection,
                 diagnostics_provider=lambda: pipeline.translation_diagnostics,
                 peer_snapshot_provider=lambda: require_peer().owner.snapshot(),
                 disable_peer_intent=lambda: require_peer().owner.disable_for_overlay(),
@@ -532,12 +532,12 @@ def compose_application_runtime(
         return runtime.owner.local_stt_requested(runtime.state_for(value))
 
     def enqueue_peer_disclosure() -> None:
-        hub = pipeline.hub
-        if hub is None:
+        output_projection = pipeline.translation_output_projection
+        if output_projection is None:
             return
-        enqueue = getattr(hub, "enqueue_peer_translation_disclosure", None)
-        if callable(enqueue):
-            enqueue(presentation.localize("peer_translation.disclosure"))
+        output_projection.publish_system_disclosure(
+            presentation.localize("peer_translation.disclosure")
+        )
 
     def require_peer() -> PeerApplicationRuntime:
         nonlocal peer
@@ -855,16 +855,7 @@ def compose_application_runtime(
         if manual_typing is None:
 
             def output_provider():
-                hub = pipeline.hub
-                set_reason = getattr(hub, "set_self_chatbox_typing_reason", None)
-                clear_reasons = getattr(
-                    hub,
-                    "clear_self_chatbox_typing_reasons",
-                    None,
-                )
-                if callable(set_reason) and callable(clear_reasons):
-                    return hub
-                return None
+                return pipeline.translation_output_projection
 
             def completion_provider(utterance_id: object) -> object | None:
                 hub = pipeline.hub

@@ -1845,11 +1845,11 @@ class TestSpecCommitPaths:
             low_latency_mode=True,
         )
 
-        assert hub._soft_reuse_mode(" hello ", "hello...") == "soft_boundary"
-        assert hub._soft_reuse_mode("hello", ",hello") == "soft_boundary"
-        assert hub._soft_reuse_mode("안녕", "안녕。") == "soft_boundary"
-        assert hub._soft_reuse_mode("안녕", "안녕，") == "soft_boundary"
-        assert hub._soft_reuse_mode("hello", "hello?") is None
+        assert hub.output_projection.soft_reuse_mode(" hello ", "hello...") == "soft_boundary"
+        assert hub.output_projection.soft_reuse_mode("hello", ",hello") == "soft_boundary"
+        assert hub.output_projection.soft_reuse_mode("안녕", "안녕。") == "soft_boundary"
+        assert hub.output_projection.soft_reuse_mode("안녕", "안녕，") == "soft_boundary"
+        assert hub.output_projection.soft_reuse_mode("hello", "hello?") is None
 
     @pytest.mark.asyncio
     async def test_commit_merge_reuses_spec_translation_when_text_matches(self):

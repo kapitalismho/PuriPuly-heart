@@ -10,6 +10,9 @@ from typing import cast
 from puripuly_heart.app.ports.translation_diagnostics_runtime import (
     TranslationOverlayDiagnosticsPort,
 )
+from puripuly_heart.app.ports.translation_output_projection import (
+    TranslationOutputProjectionPort,
+)
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.overlay_generation_start import (
     OverlayGenerationStartDiagnostic,
@@ -93,7 +96,7 @@ class OverlayApplicationState:
 OverlayStateProvider = Callable[[], OverlayApplicationState]
 OverlayConfigProvider = Callable[[], ResolvedOverlayConfig]
 OverlayIntentSink = Callable[[bool], None]
-OverlayHubProvider = Callable[[], object | None]
+OverlayOutputProvider = Callable[[], TranslationOutputProjectionPort | None]
 OverlayDiagnosticsProvider = Callable[
     [],
     TranslationOverlayDiagnosticsPort | None,
@@ -122,7 +125,7 @@ class OverlayApplicationOwner:
     state_provider: OverlayStateProvider = field(repr=False)
     config_provider: OverlayConfigProvider = field(repr=False)
     overlay_intent_sink: OverlayIntentSink = field(repr=False)
-    hub_provider: OverlayHubProvider = field(repr=False)
+    output_provider: OverlayOutputProvider = field(repr=False)
     diagnostics_provider: OverlayDiagnosticsProvider = field(repr=False)
     peer_snapshot_provider: OverlayPeerSnapshotProvider = field(repr=False)
     disable_peer_intent: OverlayEffect = field(repr=False)
@@ -375,29 +378,33 @@ class OverlayApplicationOwner:
             return self._active_target
         return self.target_for_state()
 
-    async def replace_hub_sink(
+    async def replace_output_sink(
         self,
         overlay_sink: object | None,
         *,
         expected_current: object | None = None,
         require_match: bool = False,
     ) -> bool:
-        hub = self.hub_provider()
-        if hub is None:
+        output = self.output_provider()
+        if output is None:
             return False
-        replace_sink = getattr(hub, "replace_overlay_sink", None)
-        if callable(replace_sink):
-            return bool(
-                await replace_sink(
-                    overlay_sink,
-                    expected_current=expected_current,
-                    require_match=require_match,
-                )
-            )
-        if require_match and getattr(hub, "overlay_sink", None) is not expected_current:
-            return False
-        setattr(hub, "overlay_sink", overlay_sink)
-        return True
+        return await output.replace_overlay_sink(
+            cast(OverlayPresenter | None, overlay_sink),
+            expected_current=cast(OverlayPresenter | None, expected_current),
+            require_match=require_match,
+        )
+
+    async def detach_output_sink(self, expected_current: object | None) -> bool:
+        return await self.replace_output_sink(
+            None,
+            expected_current=expected_current,
+            require_match=True,
+        )
+
+    async def reset_output_preview(self) -> None:
+        output = self.output_provider()
+        if output is not None:
+            await output.reset_overlay_preview()
 
     async def close_stale_start(self, runtime: OverlayRuntimeHandle) -> None:
         presenter = runtime.presenter
@@ -405,7 +412,8 @@ class OverlayApplicationOwner:
         try:
             await runtime.close(
                 preserve_presenter_state=True,
-                hub=self.hub_provider(),
+                overlay_sink_detach=self.detach_output_sink,
+                preview_reset=self.reset_output_preview,
                 diagnostics_detach=self.detach_translation_diagnostics,
                 emit_shutdown=False,
             )
@@ -415,13 +423,19 @@ class OverlayApplicationOwner:
                 logging.WARNING,
                 exc,
             )
-        hub = self.hub_provider()
-        if hub is not None and getattr(hub, "overlay_sink", None) is presenter:
-            await self.replace_hub_sink(
-                None,
-                expected_current=presenter,
-                require_match=True,
-            )
+        output = self.output_provider()
+        if output is not None and output.overlay_sink is presenter:
+            try:
+                await self.replace_output_sink(
+                    None,
+                    expected_current=presenter,
+                    require_match=True,
+                )
+            except Exception as exc:
+                message = "[Overlay] Stale output ingress detach reported failure"
+                detailed_emitted = self.log_detailed(message, logging.WARNING, exc)
+                if not detailed_emitted:
+                    self.log_basic(message, logging.WARNING)
         try:
             self.detach_translation_diagnostics(diagnostics)
         except Exception as exc:
@@ -469,7 +483,7 @@ class OverlayApplicationOwner:
     async def run_start(self, runtime: OverlayRuntimeHandle | None = None) -> None:
         if runtime is None:
             runtime = self._runtime or self.new_runtime()
-        if not self.state_provider().settings_available or self.hub_provider() is None:
+        if not self.state_provider().settings_available or self.output_provider() is None:
             self._active_target = None
             if self.runtime_is_current(runtime):
                 self.on_start_failed("unknown")
@@ -510,7 +524,7 @@ class OverlayApplicationOwner:
                 overlay_instance_id=instance_id,
             ),
             close_stale=self.close_stale_start,
-            replace_sink=self.replace_hub_sink,
+            replace_sink=self.replace_output_sink,
             set_diagnostics=self.attach_translation_diagnostics,
             set_target=self._set_active_target,
             calibration_snapshot=self.calibration_provider,
@@ -724,7 +738,8 @@ class OverlayApplicationOwner:
         try:
             await runtime.close(
                 preserve_presenter_state=preserve_presenter_state,
-                hub=self.hub_provider(),
+                overlay_sink_detach=self.detach_output_sink,
+                preview_reset=self.reset_output_preview,
                 diagnostics_detach=self.detach_translation_diagnostics,
                 emit_shutdown=emit_shutdown,
             )

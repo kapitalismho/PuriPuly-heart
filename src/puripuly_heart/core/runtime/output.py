@@ -5,7 +5,7 @@ import inspect
 from collections import deque
 from collections.abc import Awaitable, Coroutine
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID, uuid4
 
 from puripuly_heart.core.clock import Clock, SystemClock
@@ -65,6 +65,11 @@ class UIEventBridgePort(Protocol):
 
 
 UIEventBridgeAdapter = UIEventBridgePort
+
+
+@runtime_checkable
+class ActiveSelfOverlaySinkPort(Protocol):
+    def active_self_overlay_metadata(self) -> object | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +165,12 @@ class OutputRuntime:
     @property
     def has_active_overlay_deliveries(self) -> bool:
         return bool(self._active_delivery_tasks)
+
+    def active_self_overlay_metadata(self) -> object | None:
+        overlay_sink = self.overlay_sink
+        if not isinstance(overlay_sink, ActiveSelfOverlaySinkPort):
+            return None
+        return overlay_sink.active_self_overlay_metadata()
 
     async def replace_overlay_sink(
         self,

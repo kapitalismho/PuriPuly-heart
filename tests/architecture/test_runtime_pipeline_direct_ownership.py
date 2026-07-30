@@ -35,6 +35,7 @@ def test_pipeline_constructs_direct_durable_owners_and_hub_constructs_none() -> 
     assert pipeline_calls.count("TranslationTurnLifecycleOwner") == 1
     assert pipeline_calls.count("ProviderRuntimeHandle") == 1
     assert pipeline_calls.count("TranslationLatencyDiagnosticsOwner") == 1
+    assert pipeline_calls.count("TranslationOutputProjectionOwner") == 1
     assert {
         "OutputRuntime",
         "ChannelRuntime",
@@ -42,6 +43,7 @@ def test_pipeline_constructs_direct_durable_owners_and_hub_constructs_none() -> 
         "TranslationTurnLifecycleOwner",
         "ProviderRuntimeHandle",
         "TranslationLatencyDiagnosticsOwner",
+        "TranslationOutputProjectionOwner",
     }.isdisjoint(hub_calls)
 
 
@@ -107,6 +109,46 @@ def test_hub_has_no_diagnostics_state_or_algorithm_and_overlay_uses_direct_owner
         overlay_source = path.read_text(encoding="utf-8")
         assert 'setattr(hub, "overlay_diagnostics"' not in overlay_source
         assert 'getattr(hub, "overlay_diagnostics"' not in overlay_source
+
+
+def test_hub_has_no_output_runtime_state_or_projection_algorithm() -> None:
+    tree = ast.parse(HUB_PATH.read_text(encoding="utf-8"))
+    hub = _class(tree, "ClientHub")
+    fields = {
+        node.target.id
+        for node in hub.body
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    }
+    methods = {
+        node.name for node in hub.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+
+    assert {
+        "osc",
+        "ui_events",
+        "output_runtime",
+        "overlay_event_adapter",
+        "overlay_sink",
+    }.isdisjoint(fields)
+    assert {
+        "replace_overlay_sink",
+        "reset_overlay_preview",
+        "_emit_overlay_event",
+        "_emit_final_transcript_to_overlay",
+        "_emit_translation_to_overlay",
+        "_emit_peer_translation_to_overlay",
+        "_publish_chatbox_candidate",
+        "_publish_peer_chatbox_candidate",
+        "_soft_reuse_mode",
+    }.isdisjoint(methods)
+
+    for path in (
+        SOURCE_ROOT / "app" / "services" / "overlay_application.py",
+        SOURCE_ROOT / "composition" / "application_runtime.py",
+    ):
+        source = path.read_text(encoding="utf-8")
+        assert "hub_provider" not in source
+        assert "replace_hub_sink" not in source
 
 
 def test_components_record_is_frozen_and_contains_no_lifecycle_policy() -> None:

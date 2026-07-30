@@ -110,7 +110,6 @@ async def test_start_preserves_presenter_before_new_generation_task() -> None:
     previous.attach_presenter(presenter)
     await previous.close(
         preserve_presenter_state=True,
-        hub=None,
         emit_shutdown=False,
     )
     harness = StartHarness(previous_runtime=previous)

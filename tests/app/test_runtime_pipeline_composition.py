@@ -116,7 +116,9 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
         stt_failure_sink=lambda _message: None,
     )
 
-    assert pipeline.hub.output_runtime is pipeline.output_runtime
+    assert pipeline.translation_output_projection is not None
+    assert pipeline.translation_output_projection.output_runtime is pipeline.output_runtime
+    assert pipeline.hub.output_projection is pipeline.translation_output_projection
     assert pipeline.hub.self_runtime is pipeline.self_runtime
     assert pipeline.hub.peer_runtime is pipeline.peer_runtime
     assert pipeline.hub.translation_turns is pipeline.translation_turns
@@ -342,16 +344,18 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
         stt_failure_sink=lambda _message: None,
     )
     hub = pipeline.hub
+    output_projection = pipeline.translation_output_projection
+    assert output_projection is not None
     await pipeline.start_callbacks.start_output(False)
     await pipeline.start_callbacks.open_self_ingress()
     await pipeline.start_callbacks.open_peer_ingress()
     await pipeline.start_callbacks.start_translation_turns()
     await pipeline.start_callbacks.start_local_asr()
-    await hub.replace_overlay_sink(overlay)
+    await output_projection.replace_overlay_sink(overlay)
 
     self_id = await hub.submit_text("manual self text", source="You")
     peer_id = await hub.handle_peer_transcript_final_for_test("peer presentation text")
-    hub.enqueue_peer_translation_disclosure("system disclosure")
+    output_projection.publish_system_disclosure("system disclosure")
 
     assert [getattr(message, "text") for message in chatbox.messages] == [
         "manual self text",

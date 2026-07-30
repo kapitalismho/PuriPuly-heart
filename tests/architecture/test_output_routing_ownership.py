@@ -21,6 +21,7 @@ def _call_name(node: ast.Call) -> str | None:
 
 def test_output_runtime_is_the_only_production_output_owner_construction() -> None:
     runtime_constructions: list[tuple[str, int]] = []
+    projection_constructions: list[tuple[str, int]] = []
     router_constructions: list[tuple[str, int]] = []
     for source_file in sorted(SOURCE_ROOT.rglob("*.py")):
         tree = ast.parse(source_file.read_text(encoding="utf-8"))
@@ -30,16 +31,21 @@ def test_output_runtime_is_the_only_production_output_owner_construction() -> No
             call_name = _call_name(node)
             if call_name == "OutputRuntime":
                 runtime_constructions.append((_repo_path(source_file), node.lineno))
+            elif call_name == "TranslationOutputProjectionOwner":
+                projection_constructions.append((_repo_path(source_file), node.lineno))
             elif call_name == "OutputRouter":
                 router_constructions.append((_repo_path(source_file), node.lineno))
 
     assert [path for path, _line in runtime_constructions] == [
         "src/puripuly_heart/app/wiring_runtime_pipeline.py"
     ]
+    assert [path for path, _line in projection_constructions] == [
+        "src/puripuly_heart/app/wiring_runtime_pipeline.py"
+    ]
     assert router_constructions == []
 
 
-def test_hub_delegates_output_side_effects_to_output_runtime() -> None:
+def test_output_projection_owner_is_the_only_hub_output_side_effect_boundary() -> None:
     hub_source = (SOURCE_ROOT / "core" / "orchestrator" / "hub.py").read_text(encoding="utf-8")
     composition_source = (SOURCE_ROOT / "composition" / "application_runtime.py").read_text(
         encoding="utf-8"
@@ -48,6 +54,9 @@ def test_hub_delegates_output_side_effects_to_output_runtime() -> None:
         encoding="utf-8"
     )
     output_source = (SOURCE_ROOT / "core" / "runtime" / "output.py").read_text(encoding="utf-8")
+    projection_source = (
+        SOURCE_ROOT / "core" / "orchestrator" / "translation_output_projection.py"
+    ).read_text(encoding="utf-8")
 
     assert "self.overlay_sink.emit(" not in hub_source
     for side_effect in (
@@ -61,19 +70,27 @@ def test_hub_delegates_output_side_effects_to_output_runtime() -> None:
     ):
         assert f"self.osc.{side_effect}(" not in hub_source
         assert f"self.osc.{side_effect}(" not in composition_source
-    assert "self.output_runtime.publish_overlay_event(" in hub_source
-    assert "self.output_runtime.replace_overlay_sink(" in hub_source
-    assert "self.output_runtime.publish_chatbox(" in hub_source
-    assert "self.output_runtime.publish_system_disclosure_chatbox(" in hub_source
-    assert "self.output_runtime.publish_system_immediate_chatbox(" in hub_source
-    assert "self.output_runtime.set_self_chatbox_typing_reason(" in hub_source
-    assert "self.output_runtime.clear_self_chatbox_typing_reasons(" in hub_source
+    assert "OutputRuntime" not in hub_source
+    assert "OverlayEventAdapter" not in hub_source
+    assert "UIEvent(" not in hub_source
+    for output_call in (
+        "publish_overlay_event(",
+        "replace_overlay_sink(",
+        "publish_chatbox(",
+        "publish_system_disclosure_chatbox(",
+        "publish_system_immediate_chatbox(",
+        "set_self_chatbox_typing_reason(",
+        "clear_self_chatbox_typing_reasons(",
+    ):
+        assert f"self.output_runtime.{output_call}" in projection_source
     assert "overlay_sink.emit(" in output_source
     assert "self.chatbox.enqueue(" in output_source
     assert "self.chatbox.send_immediate(" in output_source
     assert "self.chatbox.set_typing_reason(" in output_source
     assert "self.chatbox.clear_typing_reasons(" in output_source
-    assert "await self.replace_hub_sink(" in overlay_source
+    assert "self.output_provider()" in overlay_source
+    assert "await output.replace_overlay_sink(" in overlay_source
+    assert "hub_provider" not in overlay_source
 
 
 def test_flet_composition_uses_owner_without_importing_output_implementation() -> None:

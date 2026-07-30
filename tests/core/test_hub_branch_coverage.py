@@ -16,6 +16,9 @@ from puripuly_heart.core.managed_openrouter_release import (
 )
 from puripuly_heart.core.messages import UserErrorReport
 from puripuly_heart.core.orchestrator.hub import ClientHub, ContextEntry, _MergeBuffer
+from puripuly_heart.core.orchestrator.translation_output_projection import (
+    ChatboxProjection,
+)
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRuntimeLoggingService
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
@@ -295,7 +298,7 @@ def test_peer_translation_disclosure_enqueues_chatbox_notice_without_context_his
     )
     before_history = list(hub._translation_history)
 
-    hub.enqueue_peer_translation_disclosure("Peer translation is on")
+    hub.output_projection.publish_system_disclosure("Peer translation is on")
 
     assert [message.text for message in osc.messages] == ["Peer translation is on"]
     assert osc.messages[0].created_at == 12.0
@@ -713,15 +716,25 @@ async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed
     utterance_id = uuid4()
 
     try:
-        await basic_hub._publish_chatbox_candidate(
-            utterance_id,
-            transcript_text="hello world from transcript",
-            translation_text="hello world translated",
+        await basic_hub.output_projection.publish_chatbox(
+            ChatboxProjection(
+                utterance_id=utterance_id,
+                channel="self",
+                transcript_text="hello world from transcript",
+                translation_text="hello world translated",
+                include_source=True,
+                source=None,
+            )
         )
-        await detailed_hub._publish_chatbox_candidate(
-            utterance_id,
-            transcript_text="hello world from transcript",
-            translation_text="hello world translated",
+        await detailed_hub.output_projection.publish_chatbox(
+            ChatboxProjection(
+                utterance_id=utterance_id,
+                channel="self",
+                transcript_text="hello world from transcript",
+                translation_text="hello world translated",
+                include_source=True,
+                source=None,
+            )
         )
 
         basic_event = await basic_hub.ui_events.get()
@@ -759,10 +772,15 @@ async def test_publish_chatbox_candidate_after_hub_stop_skips_without_user_text(
 
     await hub.start(auto_flush_osc=True)
     await hub.stop()
-    await hub._publish_chatbox_candidate(
-        utterance_id,
-        transcript_text="closed secret transcript",
-        translation_text="closed secret translation",
+    await hub.output_projection.publish_chatbox(
+        ChatboxProjection(
+            utterance_id=utterance_id,
+            channel="self",
+            transcript_text="closed secret transcript",
+            translation_text="closed secret translation",
+            include_source=True,
+            source=None,
+        )
     )
 
     assert osc.messages == []
@@ -786,10 +804,15 @@ async def test_stop_without_start_closes_output_runtime_ingress() -> None:
     utterance_id = uuid4()
 
     await hub.stop()
-    await hub._publish_chatbox_candidate(
-        utterance_id,
-        transcript_text="never started secret transcript",
-        translation_text=None,
+    await hub.output_projection.publish_chatbox(
+        ChatboxProjection(
+            utterance_id=utterance_id,
+            channel="self",
+            transcript_text="never started secret transcript",
+            translation_text=None,
+            include_source=True,
+            source=None,
+        )
     )
 
     assert osc.messages == []
@@ -1163,14 +1186,14 @@ async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
     )
 
     try:
-        await basic_hub._emit_overlay_event(
+        await basic_hub.output_projection.publish_overlay_event(
             basic_hub.overlay_event_adapter.utterance_closed(
                 utterance_id=uuid4(),
                 channel="self",
                 is_final=True,
             )
         )
-        await detailed_hub._emit_overlay_event(
+        await detailed_hub.output_projection.publish_overlay_event(
             detailed_hub.overlay_event_adapter.utterance_closed(
                 utterance_id=uuid4(),
                 channel="self",

@@ -12,6 +12,9 @@ from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.orchestrator import hub as hub_module
 from puripuly_heart.core.orchestrator.hub import ClientHub, _MergeBuffer
+from puripuly_heart.core.orchestrator.translation_output_projection import (
+    TranslationOverlayProjection,
+)
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter
@@ -538,14 +541,17 @@ async def test_hub_same_text_blank_spec_language_update_feeds_final_transcript_l
     )
 
     await hub._sync_overlay_active_self(buffer)
-    await hub._emit_final_transcript_to_overlay(
-        Transcript(
+    await hub.output_projection.project_self_final_transcript(
+        transcript=Transcript(
             utterance_id=merge_id,
             text="こんにちは",
             is_final=True,
             created_at=10.1,
             channel="self",
-        )
+        ),
+        source_language=hub.source_language,
+        target_language=hub.target_language,
+        translation_will_follow=True,
     )
 
     block = presenter.snapshot().blocks[0]
@@ -571,7 +577,7 @@ async def test_hub_self_translation_overlay_uses_translation_languages_not_curre
         target_language="en",
     )
     utterance_id = uuid4()
-    await hub._emit_overlay_event(
+    await hub.output_projection.publish_overlay_event(
         hub.overlay_event_adapter.transcript_final(
             Transcript(
                 utterance_id=utterance_id,
@@ -585,17 +591,21 @@ async def test_hub_self_translation_overlay_uses_translation_languages_not_curre
         )
     )
 
-    await hub._emit_translation_to_overlay(
-        translation=Translation(
-            utterance_id=utterance_id,
-            text="你好",
-            source_text="こんにちは",
+    await hub.output_projection.emit_translation(
+        TranslationOverlayProjection(
+            translation=Translation(
+                utterance_id=utterance_id,
+                text="你好",
+                source_text="こんにちは",
+                source_language="ja",
+                target_language="zh-TW",
+                channel="self",
+                created_at=10.1,
+            ),
             source_language="ja",
             target_language="zh-TW",
-            channel="self",
-            created_at=10.1,
-        ),
-        applied_context_mode=None,
+            applied_context_mode=None,
+        )
     )
 
     block = presenter.snapshot().blocks[0]
@@ -704,18 +714,23 @@ async def test_hub_peer_translation_overlay_uses_translation_languages_not_curre
     )
     utterance_id = uuid4()
 
-    await hub._emit_peer_translation_to_overlay(
-        translation=Translation(
-            utterance_id=utterance_id,
-            text="你好",
+    await hub.output_projection.emit_translation(
+        TranslationOverlayProjection(
+            translation=Translation(
+                utterance_id=utterance_id,
+                text="你好",
+                source_text="こんにちは",
+                source_language="ja",
+                target_language="zh-TW",
+                channel="peer",
+                created_at=10.0,
+            ),
             source_text="こんにちは",
             source_language="ja",
             target_language="zh-TW",
-            channel="peer",
-            created_at=10.0,
-        ),
-        runtime=hub.peer_runtime,
-        applied_context_mode=None,
+            applied_context_mode=None,
+            record_peer_first_emit=True,
+        )
     )
 
     block = presenter.snapshot().blocks[0]
@@ -837,14 +852,17 @@ async def test_hub_self_final_transcript_preserves_active_display_language_metad
     )
     await hub._sync_overlay_active_self(buffer)
 
-    await hub._emit_final_transcript_to_overlay(
-        Transcript(
+    await hub.output_projection.project_self_final_transcript(
+        transcript=Transcript(
             utterance_id=merge_id,
             text="こんにちは",
             is_final=True,
             created_at=10.0,
             channel="self",
-        )
+        ),
+        source_language=hub.source_language,
+        target_language=hub.target_language,
+        translation_will_follow=True,
     )
 
     block = presenter.snapshot().blocks[0]

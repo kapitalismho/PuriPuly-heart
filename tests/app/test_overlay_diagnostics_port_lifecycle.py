@@ -27,7 +27,7 @@ class OverlayDiagnostics:
         _ = event, fields
 
 
-class Hub:
+class OutputProjection:
     def __init__(self, overlay_sink: object | None = None) -> None:
         self.overlay_sink = overlay_sink
         self.reset_overlay_preview_calls = 0
@@ -46,6 +46,18 @@ class Hub:
 
     async def reset_overlay_preview(self) -> None:
         self.reset_overlay_preview_calls += 1
+
+
+class FailingOutputProjection(OutputProjection):
+    async def replace_overlay_sink(
+        self,
+        overlay_sink: object | None,
+        *,
+        expected_current: object | None = None,
+        require_match: bool = False,
+    ) -> bool:
+        _ = overlay_sink, expected_current, require_match
+        raise RuntimeError("output detach failed")
 
 
 class Presenter:
@@ -117,7 +129,7 @@ async def _noop_renderer(
 def make_application(
     diagnostics_port: object,
     *,
-    hub: Hub | None = None,
+    output_projection: OutputProjection | None = None,
     detailed_logs: list[tuple[str, int, Exception | None]] | None = None,
 ) -> OverlayApplicationOwner:
     return OverlayApplicationOwner(
@@ -129,7 +141,7 @@ def make_application(
         ),
         config_provider=lambda: cast(ResolvedOverlayConfig, object()),
         overlay_intent_sink=lambda _enabled: None,
-        hub_provider=lambda: hub,
+        output_provider=lambda: output_projection,
         diagnostics_provider=lambda: cast(object, diagnostics_port),
         peer_snapshot_provider=lambda: cast(object, object()),
         disable_peer_intent=lambda: None,
@@ -186,8 +198,11 @@ async def test_stale_start_cleanup_does_not_detach_current_diagnostics() -> None
     diagnostics_owner = make_diagnostics_owner()
     current = OverlayDiagnostics()
     stale = OverlayDiagnostics()
-    hub = Hub(overlay_sink=object())
-    application = make_application(diagnostics_owner, hub=hub)
+    output_projection = OutputProjection(overlay_sink=object())
+    application = make_application(
+        diagnostics_owner,
+        output_projection=output_projection,
+    )
     application.attach_translation_diagnostics(current)
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     runtime.attach_presenter(Presenter())
@@ -203,10 +218,10 @@ async def test_stale_start_cleanup_contains_diagnostics_detach_failure() -> None
     diagnostics_port = FailingDiagnosticsPort()
     detailed_logs: list[tuple[str, int, Exception | None]] = []
     stale = OverlayDiagnostics()
-    hub = Hub(overlay_sink=object())
+    output_projection = OutputProjection(overlay_sink=object())
     application = make_application(
         diagnostics_port,
-        hub=hub,
+        output_projection=output_projection,
         detailed_logs=detailed_logs,
     )
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
@@ -223,14 +238,41 @@ async def test_stale_start_cleanup_contains_diagnostics_detach_failure() -> None
 
 
 @pytest.mark.asyncio
+async def test_stale_start_cleanup_contains_output_detach_failure() -> None:
+    diagnostics_owner = make_diagnostics_owner()
+    detailed_logs: list[tuple[str, int, Exception | None]] = []
+    presenter = Presenter()
+    output_projection = FailingOutputProjection(overlay_sink=presenter)
+    application = make_application(
+        diagnostics_owner,
+        output_projection=output_projection,
+        detailed_logs=detailed_logs,
+    )
+    runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    runtime.attach_presenter(presenter)
+
+    await application.close_stale_start(runtime)
+
+    assert output_projection.overlay_sink is presenter
+    assert [message for message, _level, _exception in detailed_logs] == [
+        "[Overlay] Stale overlay start cleanup reported failure",
+        "[Overlay] Stale output ingress detach reported failure",
+    ]
+    assert all(isinstance(exception, RuntimeError) for _message, _level, exception in detailed_logs)
+
+
+@pytest.mark.asyncio
 async def test_diagnostics_detach_failure_does_not_block_overlay_resource_teardown() -> None:
     diagnostics_port = FailingDiagnosticsPort()
     presenter = Presenter()
     manager = Manager()
     bridge = Bridge()
     diagnostics = OverlayDiagnostics()
-    hub = Hub(overlay_sink=presenter)
-    application = make_application(diagnostics_port, hub=hub)
+    output_projection = OutputProjection(overlay_sink=presenter)
+    application = make_application(
+        diagnostics_port,
+        output_projection=output_projection,
+    )
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     runtime.attach_presenter(presenter)
     runtime.attach_process_manager(manager)

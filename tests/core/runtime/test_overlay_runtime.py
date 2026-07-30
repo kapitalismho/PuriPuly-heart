@@ -40,12 +40,14 @@ class FakePresenter:
 class IngressObservingPresenter(FakePresenter):
     def __init__(self, events: list[str]) -> None:
         super().__init__(events)
-        self.hub: FakeHub | None = None
+        self.output_projection: FakeOutputProjection | None = None
         self.ingress_detached_at_broadcast: bool | None = None
 
     async def broadcast_shutdown(self) -> None:
         self.broadcast_shutdown_calls += 1
-        self.ingress_detached_at_broadcast = self.hub is not None and self.hub.overlay_sink is None
+        self.ingress_detached_at_broadcast = (
+            self.output_projection is not None and self.output_projection.overlay_sink is None
+        )
         self.events.append("presenter.broadcast_shutdown")
 
 
@@ -87,14 +89,32 @@ class FailingOnceManager(FakeManager):
             raise RuntimeError("manager stop failed")
 
 
-class FakeHub:
+class FakeOutputProjection:
     def __init__(self, presenter: FakePresenter, diagnostics: object) -> None:
         _ = diagnostics
         self.overlay_sink = presenter
         self.reset_overlay_preview_calls = 0
 
+    async def detach_overlay_sink(self, expected_current: object | None) -> bool:
+        if self.overlay_sink is not expected_current:
+            return False
+        self.overlay_sink = None
+        return True
+
     async def reset_overlay_preview(self) -> None:
         self.reset_overlay_preview_calls += 1
+
+
+class FailingOnceOutputProjection(FakeOutputProjection):
+    def __init__(self, presenter: FakePresenter, diagnostics: object) -> None:
+        super().__init__(presenter, diagnostics)
+        self.fail_next_detach = True
+
+    async def detach_overlay_sink(self, expected_current: object | None) -> bool:
+        if self.fail_next_detach:
+            self.fail_next_detach = False
+            raise RuntimeError("output detach failed")
+        return await super().detach_overlay_sink(expected_current)
 
 
 class DiagnosticsDetach:
@@ -194,7 +214,7 @@ async def test_overlay_runtime_handle_rejects_preserved_presenter_detach_before_
     events: list[str] = []
     presenter = FakePresenter(events)
     bridge = FakeBridge(events)
-    hub = FakeHub(presenter, object())
+    output_projection = FakeOutputProjection(presenter, object())
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
     handle.attach_presenter(presenter)
     handle.attach_bridge(bridge)
@@ -212,7 +232,8 @@ async def test_overlay_runtime_handle_rejects_preserved_presenter_detach_before_
     finally:
         await handle.close(
             preserve_presenter_state=True,
-            hub=hub,
+            overlay_sink_detach=output_projection.detach_overlay_sink,
+            preview_reset=output_projection.reset_overlay_preview,
             emit_shutdown=False,
         )
 
@@ -242,7 +263,6 @@ async def test_overlay_runtime_handle_detaches_and_adopts_preserved_presenter_af
 
     await old_runtime.close(
         preserve_presenter_state=True,
-        hub=None,
         emit_shutdown=False,
     )
 
@@ -283,7 +303,7 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
     presenter = FakePresenter(events)
     bridge = FakeBridge(events)
     manager = FakeManager(events)
-    hub = FakeHub(presenter, diagnostics)
+    output_projection = FakeOutputProjection(presenter, diagnostics)
     diagnostics_detach = DiagnosticsDetach()
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
     handle.attach_presenter(presenter)
@@ -299,7 +319,8 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
 
     await handle.close(
         preserve_presenter_state=False,
-        hub=hub,
+        overlay_sink_detach=output_projection.detach_overlay_sink,
+        preview_reset=output_projection.reset_overlay_preview,
         diagnostics_detach=diagnostics_detach,
     )
 
@@ -325,9 +346,9 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
     assert manager.stop_calls == 1
     assert manager.mark_shutdown_requested_calls == 1
     assert bridge.stop_calls == 1
-    assert hub.overlay_sink is None
+    assert output_projection.overlay_sink is None
     assert diagnostics_detach.calls == [diagnostics]
-    assert hub.reset_overlay_preview_calls == 1
+    assert output_projection.reset_overlay_preview_calls == 1
     assert handle.presenter is None
     assert handle.bridge is None
     assert handle.process_manager is None
@@ -338,7 +359,8 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
 
     await handle.close(
         preserve_presenter_state=False,
-        hub=hub,
+        overlay_sink_detach=output_projection.detach_overlay_sink,
+        preview_reset=output_projection.reset_overlay_preview,
         diagnostics_detach=diagnostics_detach,
     )
     assert presenter.broadcast_shutdown_calls == 1
@@ -347,30 +369,63 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
 
 
 @pytest.mark.asyncio
-async def test_overlay_runtime_handle_close_detaches_hub_ingress_before_shutdown_broadcast() -> (
+async def test_overlay_runtime_handle_close_detaches_output_ingress_before_shutdown_broadcast() -> (
     None
 ):
     events: list[str] = []
     diagnostics = object()
     presenter = IngressObservingPresenter(events)
-    hub = FakeHub(presenter, diagnostics)
+    output_projection = FakeOutputProjection(presenter, diagnostics)
     diagnostics_detach = DiagnosticsDetach()
-    presenter.hub = hub
+    presenter.output_projection = output_projection
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
     handle.attach_presenter(presenter)
     handle.attach_diagnostics(diagnostics)
 
     await handle.close(
         preserve_presenter_state=False,
-        hub=hub,
+        overlay_sink_detach=output_projection.detach_overlay_sink,
+        preview_reset=output_projection.reset_overlay_preview,
         diagnostics_detach=diagnostics_detach,
     )
 
     assert presenter.ingress_detached_at_broadcast is True
     assert presenter.broadcast_shutdown_calls == 1
-    assert hub.overlay_sink is None
+    assert output_projection.overlay_sink is None
     assert diagnostics_detach.calls == [diagnostics]
-    assert hub.reset_overlay_preview_calls == 1
+    assert output_projection.reset_overlay_preview_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_overlay_runtime_handle_retains_presenter_for_output_detach_retry() -> None:
+    events: list[str] = []
+    presenter = FakePresenter(events)
+    manager = FakeManager(events)
+    output_projection = FailingOnceOutputProjection(presenter, object())
+    handle = OverlayRuntimeHandle(shutdown_grace_s=0)
+    handle.attach_presenter(presenter)
+    handle.attach_process_manager(manager)
+
+    with pytest.raises(RuntimeError, match="output detach failed"):
+        await handle.close(
+            preserve_presenter_state=False,
+            overlay_sink_detach=output_projection.detach_overlay_sink,
+            preview_reset=output_projection.reset_overlay_preview,
+        )
+
+    assert handle.presenter is presenter
+    assert output_projection.overlay_sink is presenter
+    assert manager.stop_calls == 1
+
+    await handle.close(
+        preserve_presenter_state=False,
+        overlay_sink_detach=output_projection.detach_overlay_sink,
+        preview_reset=output_projection.reset_overlay_preview,
+    )
+
+    assert handle.presenter is None
+    assert output_projection.overlay_sink is None
+    assert output_projection.reset_overlay_preview_calls == 1
 
 
 @pytest.mark.asyncio
@@ -390,7 +445,7 @@ async def test_overlay_runtime_marks_shutdown_before_broadcast_grace_exit_and_st
     handle.attach_presenter(presenter)
     handle.attach_process_manager(manager)
 
-    await handle.close(preserve_presenter_state=True, hub=None)
+    await handle.close(preserve_presenter_state=True)
 
     assert events == [
         "manager.mark_shutdown_requested",
@@ -412,7 +467,7 @@ async def test_overlay_runtime_handle_close_cancels_child_tasks() -> None:
     )
     await asyncio.sleep(0)
 
-    await handle.close(preserve_presenter_state=True, hub=None)
+    await handle.close(preserve_presenter_state=True)
 
     assert child_task.done()
     assert events == ["presenter-expiration.cancelled"]
@@ -428,7 +483,7 @@ async def test_overlay_runtime_handle_close_surfaces_owned_task_cleanup_failures
     presenter = FakePresenter(events)
     bridge = FakeBridge(events)
     manager = FakeManager(events)
-    hub = FakeHub(presenter, object())
+    output_projection = FakeOutputProjection(presenter, object())
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
     handle.attach_presenter(presenter)
     handle.attach_bridge(bridge)
@@ -448,7 +503,11 @@ async def test_overlay_runtime_handle_close_surfaces_owned_task_cleanup_failures
     await asyncio.sleep(0)
 
     with pytest.raises(RuntimeError, match="task cleanup failed"):
-        await handle.close(preserve_presenter_state=False, hub=hub)
+        await handle.close(
+            preserve_presenter_state=False,
+            overlay_sink_detach=output_projection.detach_overlay_sink,
+            preview_reset=output_projection.reset_overlay_preview,
+        )
 
     assert task.done()
     assert events == [
@@ -492,7 +551,7 @@ async def test_overlay_runtime_handle_close_surfaces_owned_task_failures_complet
 
     with pytest.raises(RuntimeError, match="completed task failed"):
         try:
-            await handle.close(preserve_presenter_state=True, hub=None)
+            await handle.close(preserve_presenter_state=True)
         finally:
             if task.done() and not task.cancelled():
                 task.exception()
@@ -510,13 +569,13 @@ async def test_overlay_runtime_handle_close_keeps_failed_resources_for_retry() -
     handle.attach_process_manager(manager)
 
     with pytest.raises(RuntimeError, match="manager stop failed"):
-        await handle.close(preserve_presenter_state=True, hub=None)
+        await handle.close(preserve_presenter_state=True)
 
     assert handle.process_manager is manager
     assert handle.bridge is None
     assert bridge.stop_calls == 1
 
-    await handle.close(preserve_presenter_state=True, hub=None)
+    await handle.close(preserve_presenter_state=True)
 
     assert handle.process_manager is None
     assert manager.stop_calls == 2
@@ -531,7 +590,7 @@ async def test_overlay_runtime_handle_rejects_new_work_after_successful_close(
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
     handle.attach_presenter(FakePresenter(events))
 
-    await handle.close(preserve_presenter_state=preserve_presenter_state, hub=None)
+    await handle.close(preserve_presenter_state=preserve_presenter_state)
 
     child_coroutine = _complete_work("stale-child")
     with pytest.raises(RuntimeError, match="closed to new tasks"):
@@ -558,7 +617,7 @@ async def test_overlay_runtime_handle_allows_work_after_explicit_generation_acti
         shutdown_grace_s=0,
     )
 
-    await handle.close(preserve_presenter_state=False, hub=None)
+    await handle.close(preserve_presenter_state=False)
 
     stale_coroutine = _complete_work("stale")
     with pytest.raises(RuntimeError, match="closed to new tasks"):
@@ -581,7 +640,7 @@ async def test_overlay_runtime_handle_closed_generation_is_not_current_until_rea
     )
     assert handle.is_current_instance_id("overlay-old")
 
-    await handle.close(preserve_presenter_state=False, hub=None)
+    await handle.close(preserve_presenter_state=False)
 
     assert not handle.is_current_instance_id("overlay-old")
 
@@ -596,7 +655,7 @@ async def test_overlay_runtime_handle_attach_after_close_does_not_reopen_without
 ):
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
 
-    await handle.close(preserve_presenter_state=False, hub=None)
+    await handle.close(preserve_presenter_state=False)
 
     handle.attach_diagnostics(object())
     coroutine = _complete_work("attached-without-generation")
