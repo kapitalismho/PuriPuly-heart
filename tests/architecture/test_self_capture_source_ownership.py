@@ -5,10 +5,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
-ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_source.py"
-VAD_ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_vad.py"
+ADAPTER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture" / "self_capture_source.py"
+)
+VAD_ADAPTER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture" / "self_capture_vad.py"
+)
 AUDIO_LOOP_ADAPTER_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_audio_loop.py"
+    ROOT
+    / "src"
+    / "puripuly_heart"
+    / "app"
+    / "adapters"
+    / "self_capture"
+    / "self_capture_audio_loop.py"
 )
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
 

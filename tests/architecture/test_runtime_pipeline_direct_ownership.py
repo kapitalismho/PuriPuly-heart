@@ -180,8 +180,8 @@ def test_cut_over_consumers_do_not_reach_nested_channel_owners() -> None:
     paths = (
         SOURCE_ROOT / "app" / "adapters" / "application_runtime_shutdown.py",
         SOURCE_ROOT / "app" / "adapters" / "peer_application_state.py",
-        SOURCE_ROOT / "app" / "adapters" / "peer_capture_provider.py",
-        SOURCE_ROOT / "app" / "adapters" / "self_capture_provider.py",
+        SOURCE_ROOT / "app" / "adapters" / "peer_capture" / "peer_capture_provider.py",
+        SOURCE_ROOT / "app" / "adapters" / "self_capture" / "self_capture_provider.py",
         SOURCE_ROOT / "app" / "services" / "settings_runtime_effects.py",
         SOURCE_ROOT / "app" / "wiring_local_asr_application.py",
         SOURCE_ROOT / "app" / "wiring_managed_account.py",

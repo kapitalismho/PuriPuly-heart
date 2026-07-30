@@ -263,17 +263,17 @@
       ]
     },
     {
-      "module": "puripuly_heart.app.adapters.peer_capture_provider",
+      "module": "puripuly_heart.app.adapters.peer_capture.peer_capture_provider",
       "source_rule": "__all__",
-      "source_of_truth_refs": ["src/puripuly_heart/app/adapters/peer_capture_provider.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/app/adapters/peer_capture/peer_capture_provider.py"],
       "runtime_all_matches_exports": true,
       "facade_contract": null,
       "exports": [{"name": "PeerCaptureProviderAdapter", "kind": "attribute"}]
     },
     {
-      "module": "puripuly_heart.app.adapters.self_capture_provider",
+      "module": "puripuly_heart.app.adapters.self_capture.self_capture_provider",
       "source_rule": "__all__",
-      "source_of_truth_refs": ["src/puripuly_heart/app/adapters/self_capture_provider.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/app/adapters/self_capture/self_capture_provider.py"],
       "runtime_all_matches_exports": true,
       "facade_contract": null,
       "exports": [{"name": "SelfCaptureProviderAdapter", "kind": "attribute"}]
@@ -1013,7 +1013,7 @@
         "puripuly_heart.app.adapters.gpu_worker_process",
         "puripuly_heart.app.adapters.local_asr_application",
         "puripuly_heart.app.adapters.peer_application_state",
-        "puripuly_heart.app.adapters.peer_capture_inventory"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_inventory"
       ],
       "rationale": "ProviderVerifierAdapter is an app adapter implementation of the provider-verifier port; the adapter class is importable for wiring/tests but is not an external public compatibility facade."
     },
@@ -1029,7 +1029,7 @@
       "surface": "puripuly_heart.app.adapters Self capture admission adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.self_capture_admission"
+        "puripuly_heart.app.adapters.self_capture.self_capture_admission"
       ],
       "rationale": "SelfCaptureAdmissionAdapter implements the internal Self capture admission port with explicit state and effect DTOs through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1037,7 +1037,7 @@
       "surface": "puripuly_heart.app.adapters Self capture source adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.self_capture_source"
+        "puripuly_heart.app.adapters.self_capture.self_capture_source"
       ],
       "rationale": "SelfCaptureSourceAdapter implements the internal Self capture source-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1045,7 +1045,7 @@
       "surface": "puripuly_heart.app.adapters Self capture VAD adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.self_capture_vad"
+        "puripuly_heart.app.adapters.self_capture.self_capture_vad"
       ],
       "rationale": "SelfCaptureVadAdapter implements the internal Self capture VAD-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1053,7 +1053,7 @@
       "surface": "puripuly_heart.app.adapters Self capture audio loop adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.self_capture_audio_loop"
+        "puripuly_heart.app.adapters.self_capture.self_capture_audio_loop"
       ],
       "rationale": "SelfCaptureAudioLoopAdapter implements the internal Self capture audio-loop contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1061,7 +1061,7 @@
       "surface": "puripuly_heart.app.adapters Self capture VAD sink adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.self_capture_vad_sink"
+        "puripuly_heart.app.adapters.self_capture.self_capture_vad_sink"
       ],
       "rationale": "SelfCaptureVadSinkAdapter implements the internal Self capture VAD-event sink boundary through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1069,7 +1069,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture source adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_source"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_source"
       ],
       "rationale": "PeerCaptureSourceAdapter implements the internal Peer capture source-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1077,7 +1077,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture target resolver adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_target_resolver"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_target_resolver"
       ],
       "rationale": "PeerCaptureTargetResolverAdapter implements the internal Peer capture target-resolver port through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1085,7 +1085,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture VAD adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_vad"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_vad"
       ],
       "rationale": "PeerCaptureVadAdapter implements the internal Peer capture VAD-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1093,7 +1093,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture audio loop adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_audio_loop"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_audio_loop"
       ],
       "rationale": "PeerCaptureAudioLoopAdapter implements the internal Peer capture audio-loop contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1101,7 +1101,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture admission adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_admission"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_admission"
       ],
       "rationale": "PeerCaptureAdmissionAdapter implements the internal Peer capture admission port through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1109,7 +1109,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture VAD sink adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_vad_sink"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_vad_sink"
       ],
       "rationale": "PeerCaptureVadSinkAdapter implements the internal Peer capture VAD-event sink boundary through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1382,6 +1382,22 @@
         "puripuly_heart.core.local_asr"
       ],
       "rationale": "Domain-aligned grouping package that re-exports the moved local ASR/STT contract, asset, catalog, download, and installer modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters.peer_capture domain grouping package",
+      "classification": "internal_domain_grouping_package",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture"
+      ],
+      "rationale": "Domain-aligned grouping package that re-exports the moved peer capture adapter modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters.self_capture domain grouping package",
+      "classification": "internal_domain_grouping_package",
+      "modules": [
+        "puripuly_heart.app.adapters.self_capture"
+      ],
+      "rationale": "Domain-aligned grouping package that re-exports the moved self capture adapter modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "broker source modules",

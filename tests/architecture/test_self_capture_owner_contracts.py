@@ -20,10 +20,22 @@ RUNTIME_COMPOSITION_PATH = (
 )
 LEGACY_OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_audio.py"
 VAD_SINK_ADAPTER_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_vad_sink.py"
+    ROOT
+    / "src"
+    / "puripuly_heart"
+    / "app"
+    / "adapters"
+    / "self_capture"
+    / "self_capture_vad_sink.py"
 )
 ADMISSION_ADAPTER_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture_admission.py"
+    ROOT
+    / "src"
+    / "puripuly_heart"
+    / "app"
+    / "adapters"
+    / "self_capture"
+    / "self_capture_admission.py"
 )
 
 
