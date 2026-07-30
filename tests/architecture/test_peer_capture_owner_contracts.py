@@ -16,7 +16,9 @@ from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "peer_channel.py"
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
+CAPTURE_WIRING_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_capture_runtime.py"
+)
 SOURCE_ADAPTER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture" / "peer_capture_source.py"
 )

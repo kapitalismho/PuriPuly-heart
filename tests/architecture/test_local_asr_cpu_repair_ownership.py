@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = ROOT / "src" / "puripuly_heart"
 COMPOSITION_PATH = SOURCE_ROOT / "composition" / "application_runtime.py"
 OWNER_PATH = SOURCE_ROOT / "app" / "services" / "local_asr" / "local_asr_cpu_repair.py"
-WIRING_PATH = SOURCE_ROOT / "app" / "wiring_local_asr_application.py"
+WIRING_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_local_asr_application.py"
 
 
 def test_cpu_repair_owner_is_constructed_only_by_application_composition() -> None:
@@ -23,7 +23,7 @@ def test_cpu_repair_owner_is_constructed_only_by_application_composition() -> No
             ):
                 constructions.append(source_file.relative_to(ROOT).as_posix())
 
-    assert constructions == ["src/puripuly_heart/app/wiring_composition.py"]
+    assert constructions == ["src/puripuly_heart/app/wiring/wiring_composition.py"]
 
 
 def test_local_asr_application_wiring_owns_cpu_repair_composition() -> None:

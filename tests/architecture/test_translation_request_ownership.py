@@ -5,7 +5,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
-PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py"
+PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py"
 PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
 OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "translation_request.py"
 

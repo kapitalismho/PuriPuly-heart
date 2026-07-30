@@ -8,8 +8,6 @@ from puripuly_heart.app.services.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
     resolve_local_asr_selection,
 )
-from puripuly_heart.app.wiring_llm_factory import _qwen_api_key_for_resolved_credential
-from puripuly_heart.app.wiring_secrets_factory import require_secret
 from puripuly_heart.config.capture_target_resolution import (
     resolve_desktop_audio_capture_target,
 )
@@ -72,6 +70,9 @@ from puripuly_heart.core.stt.custom_vocab import (
     get_effective_local_qwen_hotwords,
 )
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
+
+from .wiring_llm_factory import _qwen_api_key_for_resolved_credential
+from .wiring_secrets_factory import require_secret
 
 
 def build_custom_vocabulary_runtime_config(

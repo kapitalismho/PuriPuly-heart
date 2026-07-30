@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 
 from puripuly_heart.app import wiring
+from puripuly_heart.app.wiring import root as wiring_root
 from puripuly_heart.config import llm_profiles, runtime_resolution
 from puripuly_heart.config import prompts as prompts_module
 from puripuly_heart.config import resolved as resolved_config
@@ -37,7 +38,7 @@ from puripuly_heart.core import (
     openrouter_credentials,
 )
 from puripuly_heart.core import managed_openrouter_broker_client as broker_client
-from puripuly_heart.core.managed_openrouter_release import (
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterChallengeSuccess,
     ManagedOpenRouterDiscordStartSuccess,
     ManagedOpenRouterFingerprintSalt,
@@ -703,7 +704,7 @@ def _assert_openrouter_byok_env_lookup(
 
 
 def _assert_local_llm_optional_secret_store_only(entry: dict[str, Any]) -> None:
-    llm_factory = importlib.import_module("puripuly_heart.app.wiring_llm_factory")
+    llm_factory = importlib.import_module("puripuly_heart.app.wiring.wiring_llm_factory")
     source = "\n".join(
         (
             inspect.getsource(wiring.create_llm_provider),
@@ -719,7 +720,7 @@ def _assert_local_llm_optional_secret_store_only(entry: dict[str, Any]) -> None:
 
 
 def _assert_qwen_resolved_credential_helper_preserves_legacy_fallbacks() -> None:
-    llm_factory = importlib.import_module("puripuly_heart.app.wiring_llm_factory")
+    llm_factory = importlib.import_module("puripuly_heart.app.wiring.wiring_llm_factory")
     helper_source = inspect.getsource(wiring._qwen_api_key_for_resolved_credential)
     base_llm_source = inspect.getsource(wiring._base_llm_provider_from_resolved_config)
     provider_target_source = inspect.getsource(llm_factory._provider_from_resolved_target)
@@ -926,7 +927,7 @@ def test_secret_store_key_registry_snapshot_matches_current_public_keys() -> Non
     assert managed_identity.MANAGED_DEVICE_PUBLIC_KEY_SECRET == "managed_device_public_key"
     assert managed_identity.MANAGED_IDENTITY_BINDING_SECRET == "managed_identity_binding"
 
-    wiring_source = inspect.getsource(wiring)
+    wiring_source = inspect.getsource(wiring_root)
     for key in WIRING_SECRET_KEYS:
         assert f'"{key}"' in wiring_source
     _assert_qwen_resolved_credential_helper_preserves_legacy_fallbacks()

@@ -8,9 +8,11 @@ UI_APPLICATION_COMPOSITION_PATH = (
     ROOT / "src" / "puripuly_heart" / "composition" / "ui_application.py"
 )
 MANAGED_AUTH_WIRING_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "wiring_managed_auth_factory.py"
+    ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_managed_auth_factory.py"
 )
-MANAGED_ACCOUNT_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_managed_account.py"
+MANAGED_ACCOUNT_WIRING_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_managed_account.py"
+)
 
 
 def test_application_uses_explicit_sync_secret_store_adapter() -> None:

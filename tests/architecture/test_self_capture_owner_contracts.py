@@ -14,7 +14,9 @@ from puripuly_heart.core.self_capture import (
 ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
+CAPTURE_WIRING_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_capture_runtime.py"
+)
 RUNTIME_COMPOSITION_PATH = (
     ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 )

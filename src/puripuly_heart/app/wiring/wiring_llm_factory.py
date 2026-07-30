@@ -13,11 +13,6 @@ from puripuly_heart.app.services.managed_auth_claims import (
     ManagedAuthClaimGuard,
     local_managed_auth_blocking_source,
 )
-from puripuly_heart.app.wiring_managed_auth_factory import (
-    _managed_release_service_for_alias,
-    build_openrouter_credential_runtime_config,
-)
-from puripuly_heart.app.wiring_secrets_factory import require_secret, require_secret_any
 from puripuly_heart.config.llm_profiles import openrouter_alias_for_fields
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_MANAGED,
@@ -80,6 +75,12 @@ from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
+
+from .wiring_managed_auth_factory import (
+    _managed_release_service_for_alias,
+    build_openrouter_credential_runtime_config,
+)
+from .wiring_secrets_factory import require_secret, require_secret_any
 
 MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR = (
     "OpenRouter managed mode requires a managed release service; "

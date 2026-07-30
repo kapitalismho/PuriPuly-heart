@@ -22,10 +22,6 @@ from puripuly_heart.app.services.local_asr_selection import (
     required_local_asr_model_ids,
 )
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
-from puripuly_heart.app.wiring_composition import (
-    create_local_asr_cpu_repair_owner,
-    create_local_asr_readiness_owner,
-)
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
@@ -33,6 +29,11 @@ from puripuly_heart.core.local_asr_provider_runtime import (
 )
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
+
+from .wiring_composition import (
+    create_local_asr_cpu_repair_owner,
+    create_local_asr_readiness_owner,
+)
 
 LocalASRChannel = Literal["self", "peer"]
 

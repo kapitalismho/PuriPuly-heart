@@ -37,10 +37,10 @@ def test_output_runtime_is_the_only_production_output_owner_construction() -> No
                 router_constructions.append((_repo_path(source_file), node.lineno))
 
     assert [path for path, _line in runtime_constructions] == [
-        "src/puripuly_heart/app/wiring_runtime_pipeline.py"
+        "src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py"
     ]
     assert [path for path, _line in projection_constructions] == [
-        "src/puripuly_heart/app/wiring_runtime_pipeline.py"
+        "src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py"
     ]
     assert router_constructions == []
 
@@ -109,7 +109,7 @@ def test_flet_composition_uses_owner_without_importing_output_implementation() -
     ui_composition_source = (SOURCE_ROOT / "composition" / "ui_application.py").read_text(
         encoding="utf-8"
     )
-    pipeline_source = (SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py").read_text(
+    pipeline_source = (SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py").read_text(
         encoding="utf-8"
     )
     imported_modules: set[str] = set()

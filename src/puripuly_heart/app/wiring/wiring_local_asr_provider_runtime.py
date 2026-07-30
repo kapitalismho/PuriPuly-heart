@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import cast
 
 from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
-from puripuly_heart.app.wiring_stt_factory import create_stt_backend_from_resolved_config
 from puripuly_heart.config.settings import STTProviderName
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.local_asr_provider_runtime import (
@@ -30,6 +29,8 @@ from puripuly_heart.core.stt.controller import (
     FinalTranscriptSuppressedNotification,
     ManagedSTTProvider,
 )
+
+from .wiring_stt_factory import create_stt_backend_from_resolved_config
 
 FinalTranscriptSuppressedSink = Callable[[FinalTranscriptSuppressedNotification], object]
 DiagnosticsEnabled = Callable[[], bool]

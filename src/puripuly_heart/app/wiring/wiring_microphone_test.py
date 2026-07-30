@@ -13,7 +13,6 @@ from puripuly_heart.app.services.microphone_test import (
     MicrophoneTestSessionOwner,
     MicrophoneTestSessionRequest,
 )
-from puripuly_heart.app.wiring_composition import create_microphone_test_capture_adapter
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.audio.source import (
     SoundDeviceAudioSource,
@@ -22,6 +21,8 @@ from puripuly_heart.core.audio.source import (
 )
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
+
+from .wiring_composition import create_microphone_test_capture_adapter
 
 logger = logging.getLogger(__name__)
 

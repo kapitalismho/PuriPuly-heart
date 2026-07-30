@@ -8,7 +8,7 @@ SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
 OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "self_translation_channel.py"
 PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
 CALLBACKS_PATH = SOURCE_ROOT / "core" / "orchestrator" / "translation_channel_callbacks.py"
-PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py"
+PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py"
 
 
 def _class(tree: ast.Module, name: str) -> ast.ClassDef:

@@ -14,7 +14,9 @@ SETTINGS_APPLICATION_PATH = (
 OPENROUTER_PKCE_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "services" / "openrouter_pkce_flow.py"
 )
-MANAGED_ACCOUNT_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_managed_account.py"
+MANAGED_ACCOUNT_WIRING_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_managed_account.py"
+)
 
 
 def test_application_composes_settings_patch_repository_owners() -> None:

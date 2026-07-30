@@ -12,72 +12,6 @@ from puripuly_heart.app.adapters.sync_secret_store import (
 )
 from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
-from puripuly_heart.app.wiring_composition import (
-    create_microphone_test_capture_adapter,
-    create_peer_capture_admission_adapter,
-    create_peer_capture_audio_loop_adapter,
-    create_peer_capture_source_adapter,
-    create_peer_capture_target_resolver_adapter,
-    create_peer_capture_vad_adapter,
-    create_peer_capture_vad_sink_adapter,
-    create_provider_verifier,
-    create_self_capture_admission_adapter,
-    create_self_capture_audio_loop_adapter,
-    create_self_capture_source_adapter,
-    create_self_capture_vad_adapter,
-    create_self_capture_vad_sink_adapter,
-)
-from puripuly_heart.app.wiring_llm_factory import (
-    MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
-    _LazyFactoryLLMProvider,
-)
-from puripuly_heart.app.wiring_local_asr_provider_runtime import (
-    LocalASRProviderRuntimeFactory,
-    ManagedSTTProviderFactory,
-)
-from puripuly_heart.app.wiring_managed_auth_factory import (
-    DiscordManagedBrokerClientAdapter,
-    DiscordOAuthAuthAdapter,
-    ManagedIdentityPreflightAdapter,
-    ManagedIdentityStateAdapter,
-    apply_discord_issue_result_to_managed_state,
-    build_managed_identity_state_port,
-    build_openrouter_credential_runtime_config,
-    build_openrouter_release_runtime_config,
-)
-from puripuly_heart.app.wiring_overlay_factory import resolve_overlay_config
-from puripuly_heart.app.wiring_secrets_factory import (
-    SECRETS_PASSPHRASE_ENV,
-    copy_stable_secrets_to_vnext_namespace,
-    create_secret_store,
-    require_secret,
-    require_secret_any,
-)
-from puripuly_heart.app.wiring_stt_factory import (
-    ResolvedPeerSTTConfig,
-    build_custom_vocabulary_runtime_config,
-    build_local_asr_session_options,
-    build_peer_capture_session_config,
-    build_peer_capture_session_config_from_vnext,
-    build_peer_stt_provider_request,
-    build_peer_stt_provider_signature,
-    build_peer_stt_provider_signature_from_vnext,
-    build_peer_stt_runtime_signature,
-    build_self_capture_session_config,
-    build_self_capture_vad_signature,
-    build_self_local_asr_transition_request,
-    build_self_stt_provider_request,
-    build_self_stt_provider_signature,
-    build_self_stt_runtime_signature,
-    create_peer_stt_backend,
-    create_peer_stt_backend_from_resolved_config,
-    create_stt_backend,
-    create_stt_backend_from_resolved_config,
-    resolve_peer_stt_config,
-    resolve_peer_stt_runtime_config,
-    resolve_peer_stt_runtime_config_from_vnext,
-    resolve_self_stt_runtime_config,
-)
 from puripuly_heart.config.runtime_resolution import resolve_llm_config
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
@@ -105,6 +39,73 @@ from puripuly_heart.core.runtime.self_capture import (
 )
 from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
+
+from .wiring_composition import (
+    create_microphone_test_capture_adapter,
+    create_peer_capture_admission_adapter,
+    create_peer_capture_audio_loop_adapter,
+    create_peer_capture_source_adapter,
+    create_peer_capture_target_resolver_adapter,
+    create_peer_capture_vad_adapter,
+    create_peer_capture_vad_sink_adapter,
+    create_provider_verifier,
+    create_self_capture_admission_adapter,
+    create_self_capture_audio_loop_adapter,
+    create_self_capture_source_adapter,
+    create_self_capture_vad_adapter,
+    create_self_capture_vad_sink_adapter,
+)
+from .wiring_llm_factory import (
+    MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR,
+    _LazyFactoryLLMProvider,
+)
+from .wiring_local_asr_provider_runtime import (
+    LocalASRProviderRuntimeFactory,
+    ManagedSTTProviderFactory,
+)
+from .wiring_managed_auth_factory import (
+    DiscordManagedBrokerClientAdapter,
+    DiscordOAuthAuthAdapter,
+    ManagedIdentityPreflightAdapter,
+    ManagedIdentityStateAdapter,
+    apply_discord_issue_result_to_managed_state,
+    build_managed_identity_state_port,
+    build_openrouter_credential_runtime_config,
+    build_openrouter_release_runtime_config,
+)
+from .wiring_overlay_factory import resolve_overlay_config
+from .wiring_secrets_factory import (
+    SECRETS_PASSPHRASE_ENV,
+    copy_stable_secrets_to_vnext_namespace,
+    create_secret_store,
+    require_secret,
+    require_secret_any,
+)
+from .wiring_stt_factory import (
+    ResolvedPeerSTTConfig,
+    build_custom_vocabulary_runtime_config,
+    build_local_asr_session_options,
+    build_peer_capture_session_config,
+    build_peer_capture_session_config_from_vnext,
+    build_peer_stt_provider_request,
+    build_peer_stt_provider_signature,
+    build_peer_stt_provider_signature_from_vnext,
+    build_peer_stt_runtime_signature,
+    build_self_capture_session_config,
+    build_self_capture_vad_signature,
+    build_self_local_asr_transition_request,
+    build_self_stt_provider_request,
+    build_self_stt_provider_signature,
+    build_self_stt_runtime_signature,
+    create_peer_stt_backend,
+    create_peer_stt_backend_from_resolved_config,
+    create_stt_backend,
+    create_stt_backend_from_resolved_config,
+    resolve_peer_stt_config,
+    resolve_peer_stt_runtime_config,
+    resolve_peer_stt_runtime_config_from_vnext,
+    resolve_self_stt_runtime_config,
+)
 
 _WIRING_SECRET_KEYS_FOR_COMPATIBILITY_GUARD = (
     "google_api_key",

@@ -4,7 +4,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
+CAPTURE_WIRING_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_capture_runtime.py"
+)
 ADAPTER_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "self_capture" / "self_capture_source.py"
 )

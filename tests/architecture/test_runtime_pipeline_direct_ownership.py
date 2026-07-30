@@ -5,7 +5,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
-PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py"
+PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py"
 PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
 
 
@@ -183,10 +183,10 @@ def test_cut_over_consumers_do_not_reach_nested_channel_owners() -> None:
         SOURCE_ROOT / "app" / "adapters" / "peer_capture" / "peer_capture_provider.py",
         SOURCE_ROOT / "app" / "adapters" / "self_capture" / "self_capture_provider.py",
         SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
-        SOURCE_ROOT / "app" / "wiring_local_asr_application.py",
-        SOURCE_ROOT / "app" / "wiring_managed_account.py",
-        SOURCE_ROOT / "app" / "wiring_peer_application.py",
-        SOURCE_ROOT / "app" / "wiring_provider_runtime.py",
+        SOURCE_ROOT / "app" / "wiring" / "wiring_local_asr_application.py",
+        SOURCE_ROOT / "app" / "wiring" / "wiring_managed_account.py",
+        SOURCE_ROOT / "app" / "wiring" / "wiring_peer_application.py",
+        SOURCE_ROOT / "app" / "wiring" / "wiring_provider_runtime.py",
         SOURCE_ROOT / "composition" / "application_startup.py",
         SOURCE_ROOT / "composition" / "application_state.py",
         SOURCE_ROOT / "composition" / "local_asr_production_evidence.py",

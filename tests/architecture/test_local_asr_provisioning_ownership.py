@@ -23,7 +23,7 @@ def test_production_constructs_one_local_asr_provisioning_owner_in_composition()
             if isinstance(node, ast.Call) and _call_name(node) == "LocalASRProvisioningOwner":
                 constructions.append(source_file.relative_to(REPO_ROOT).as_posix())
 
-    assert constructions == ["src/puripuly_heart/app/wiring.py"]
+    assert constructions == ["src/puripuly_heart/app/wiring/root.py"]
 
 
 def test_application_owners_delegate_provisioning_without_asset_or_task_ownership() -> None:
@@ -44,9 +44,9 @@ def test_application_owners_delegate_provisioning_without_asset_or_task_ownershi
     selection = (
         SOURCE_ROOT / "app" / "services" / "local_asr" / "local_asr_selection.py"
     ).read_text(encoding="utf-8")
-    application_wiring = (SOURCE_ROOT / "app" / "wiring_local_asr_application.py").read_text(
-        encoding="utf-8"
-    )
+    application_wiring = (
+        SOURCE_ROOT / "app" / "wiring" / "wiring_local_asr_application.py"
+    ).read_text(encoding="utf-8")
     tree = ast.parse(source)
     imports: set[str] = set()
     for node in ast.walk(tree):
@@ -111,7 +111,9 @@ def test_application_owners_delegate_provisioning_without_asset_or_task_ownershi
 
 
 def test_provider_wiring_consumes_only_installed_path_contract() -> None:
-    stt_wiring = (SOURCE_ROOT / "app" / "wiring_stt_factory.py").read_text(encoding="utf-8")
+    stt_wiring = (SOURCE_ROOT / "app" / "wiring" / "wiring_stt_factory.py").read_text(
+        encoding="utf-8"
+    )
     provisioning = (SOURCE_ROOT / "core" / "runtime" / "local_asr_provisioning.py").read_text(
         encoding="utf-8"
     )

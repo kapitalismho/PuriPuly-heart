@@ -8,26 +8,6 @@ from puripuly_heart.app.ports.capture_vad_runtime import (
     SelfCaptureVadEventRuntime,
 )
 from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
-from puripuly_heart.app.wiring import (
-    compose_peer_capture_session_owner,
-    compose_self_capture_session_owner,
-)
-from puripuly_heart.app.wiring_composition import (
-    create_peer_capture_admission_adapter,
-    create_peer_capture_audio_loop_adapter,
-    create_peer_capture_source_adapter,
-    create_peer_capture_target_resolver_adapter,
-    create_peer_capture_vad_adapter,
-    create_peer_capture_vad_sink_adapter,
-    create_self_capture_audio_loop_adapter,
-    create_self_capture_source_adapter,
-    create_self_capture_vad_adapter,
-    create_self_capture_vad_sink_adapter,
-)
-from puripuly_heart.app.wiring_stt_factory import (
-    build_peer_stt_provider_request,
-    build_self_stt_provider_request,
-)
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.audio.diagnostics import AudioFaultProfile, DiagnosticAudioSource
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
@@ -48,6 +28,27 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureDiagnostic,
     SelfCaptureSessionConfig,
     SelfCaptureSessionSnapshot,
+)
+
+from .root import (
+    compose_peer_capture_session_owner,
+    compose_self_capture_session_owner,
+)
+from .wiring_composition import (
+    create_peer_capture_admission_adapter,
+    create_peer_capture_audio_loop_adapter,
+    create_peer_capture_source_adapter,
+    create_peer_capture_target_resolver_adapter,
+    create_peer_capture_vad_adapter,
+    create_peer_capture_vad_sink_adapter,
+    create_self_capture_audio_loop_adapter,
+    create_self_capture_source_adapter,
+    create_self_capture_vad_adapter,
+    create_self_capture_vad_sink_adapter,
+)
+from .wiring_stt_factory import (
+    build_peer_stt_provider_request,
+    build_self_stt_provider_request,
 )
 
 

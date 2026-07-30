@@ -17,19 +17,6 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineStartCallbacks,
 )
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
-from puripuly_heart.app.wiring_llm_factory import create_llm_provider
-from puripuly_heart.app.wiring_managed_account import ManagedOpenRouterReleaseRuntime
-from puripuly_heart.app.wiring_provider_runtime import (
-    project_translation_runtime_settings,
-)
-from puripuly_heart.app.wiring_secrets_factory import create_secret_store
-from puripuly_heart.app.wiring_stt_factory import (
-    build_self_capture_session_config,
-    build_self_stt_provider_request,
-)
-from puripuly_heart.app.wiring_translation_runtime_configuration import (
-    build_translation_runtime_config,
-)
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import Clock
@@ -74,6 +61,20 @@ from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
 from puripuly_heart.domain.events import UIEvent
+
+from .wiring_llm_factory import create_llm_provider
+from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
+from .wiring_provider_runtime import (
+    project_translation_runtime_settings,
+)
+from .wiring_secrets_factory import create_secret_store
+from .wiring_stt_factory import (
+    build_self_capture_session_config,
+    build_self_stt_provider_request,
+)
+from .wiring_translation_runtime_configuration import (
+    build_translation_runtime_config,
+)
 
 
 @dataclass(slots=True)

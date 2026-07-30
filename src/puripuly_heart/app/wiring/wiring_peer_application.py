@@ -22,14 +22,15 @@ from puripuly_heart.app.services.peer_application import (
 from puripuly_heart.app.services.peer_capture_target_application import (
     PeerCaptureTargetApplicationOwner,
 )
-from puripuly_heart.app.wiring import build_peer_capture_session_config
-from puripuly_heart.app.wiring_translation_runtime_configuration import (
-    replace_translation_runtime_effective_flags,
-)
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
+)
+
+from .wiring_stt_factory import build_peer_capture_session_config
+from .wiring_translation_runtime_configuration import (
+    replace_translation_runtime_effective_flags,
 )
 
 

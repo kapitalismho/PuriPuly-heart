@@ -73,7 +73,7 @@ def test_peer_owner_consumes_snapshot_port_without_configuration_mutation() -> N
 
 
 def test_each_application_configuration_mutator_performs_one_owner_transform() -> None:
-    path = SOURCE_ROOT / "app" / "wiring_translation_runtime_configuration.py"
+    path = SOURCE_ROOT / "app" / "wiring" / "wiring_translation_runtime_configuration.py"
     tree = ast.parse(path.read_text(encoding="utf-8"))
     expected = {
         "replace_translation_runtime_settings",
@@ -106,7 +106,7 @@ def test_each_application_configuration_mutator_performs_one_owner_transform() -
 
 
 def test_runtime_pipeline_constructs_and_exposes_one_configuration_owner() -> None:
-    path = SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py"
+    path = SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py"
     source = path.read_text(encoding="utf-8")
 
     assert source.count("TranslationRuntimeConfigurationOwner(") == 1
@@ -125,7 +125,7 @@ def test_configuration_boundary_has_no_ui_dependency() -> None:
 
 
 def test_configuration_mutation_boundary_consumes_only_projected_settings_values() -> None:
-    path = SOURCE_ROOT / "app" / "wiring_translation_runtime_configuration.py"
+    path = SOURCE_ROOT / "app" / "wiring" / "wiring_translation_runtime_configuration.py"
     source = path.read_text(encoding="utf-8")
 
     assert "puripuly_heart.config.settings" not in source

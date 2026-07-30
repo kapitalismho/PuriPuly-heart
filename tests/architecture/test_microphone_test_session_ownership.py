@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_microphone_test.py"
+RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_microphone_test.py"
 
 
 def _method_source(path: Path, class_name: str, method_name: str) -> str:

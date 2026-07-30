@@ -4,10 +4,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from puripuly_heart.app.services.provider_settings import ProviderApplicationOwner
-from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
-from puripuly_heart.app.wiring_provider_runtime import ProviderRuntimeComponents
-from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineLauncher
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
+
+from .wiring_managed_account import ManagedAccountComponents
+from .wiring_provider_runtime import ProviderRuntimeComponents
+from .wiring_runtime_pipeline import RuntimePipelineLauncher
 
 
 @dataclass(frozen=True, slots=True)

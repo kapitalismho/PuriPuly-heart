@@ -463,6 +463,41 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
             imported_layer="migration/serialization",
             reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
         ),
+        *(
+            ImportViolation(
+                rule_id="adapters-avoid-ui-and-migration-internals",
+                importer=f"src/puripuly_heart/app/wiring/{importer_name}",
+                imported="puripuly_heart.config.settings",
+                importer_layer="adapters",
+                imported_layer="migration/serialization",
+                reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
+            )
+            for importer_name in (
+                "wiring_capture_runtime.py",
+                "wiring_composition.py",
+                "wiring_llm_factory.py",
+                "wiring_local_asr_application.py",
+                "wiring_local_asr_provider_runtime.py",
+                "wiring_managed_account.py",
+                "wiring_managed_auth_factory.py",
+                "wiring_microphone_test.py",
+                "wiring_overlay_factory.py",
+                "wiring_peer_application.py",
+                "wiring_provider_runtime.py",
+                "wiring_provider_runtime_policy.py",
+                "wiring_runtime_pipeline.py",
+                "wiring_secrets_factory.py",
+                "wiring_stt_factory.py",
+            )
+        ),
+        ImportViolation(
+            rule_id="adapters-avoid-ui-and-migration-internals",
+            importer="src/puripuly_heart/app/wiring/wiring_stt_factory.py",
+            imported="puripuly_heart.config.settings_vnext.migration",
+            importer_layer="adapters",
+            imported_layer="migration/serialization",
+            reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
+        ),
     }
 )
 
@@ -479,7 +514,7 @@ SETTINGS_COMPATIBILITY_SOURCE_PATHS = frozenset(
 
 SETTINGS_PUBLIC_COMPATIBILITY_FACADE_PATHS = frozenset(
     {
-        "src/puripuly_heart/app/wiring.py",
+        "src/puripuly_heart/app/wiring/root.py",
     }
 )
 
@@ -501,18 +536,18 @@ SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
         "src/puripuly_heart/app/services/provider/provider_settings.py",
         "src/puripuly_heart/app/services/settings/settings_application.py",
         "src/puripuly_heart/app/services/settings/settings_runtime_effects.py",
-        "src/puripuly_heart/app/wiring_llm_factory.py",
-        "src/puripuly_heart/app/wiring_capture_runtime.py",
-        "src/puripuly_heart/app/wiring_local_asr_application.py",
-        "src/puripuly_heart/app/wiring_managed_auth_factory.py",
-        "src/puripuly_heart/app/wiring_managed_account.py",
-        "src/puripuly_heart/app/wiring_microphone_test.py",
-        "src/puripuly_heart/app/wiring_overlay_factory.py",
-        "src/puripuly_heart/app/wiring_peer_application.py",
-        "src/puripuly_heart/app/wiring_provider_runtime.py",
-        "src/puripuly_heart/app/wiring_provider_runtime_policy.py",
-        "src/puripuly_heart/app/wiring_runtime_pipeline.py",
-        "src/puripuly_heart/app/wiring_stt_factory.py",
+        "src/puripuly_heart/app/wiring/wiring_llm_factory.py",
+        "src/puripuly_heart/app/wiring/wiring_capture_runtime.py",
+        "src/puripuly_heart/app/wiring/wiring_local_asr_application.py",
+        "src/puripuly_heart/app/wiring/wiring_managed_auth_factory.py",
+        "src/puripuly_heart/app/wiring/wiring_managed_account.py",
+        "src/puripuly_heart/app/wiring/wiring_microphone_test.py",
+        "src/puripuly_heart/app/wiring/wiring_overlay_factory.py",
+        "src/puripuly_heart/app/wiring/wiring_peer_application.py",
+        "src/puripuly_heart/app/wiring/wiring_provider_runtime.py",
+        "src/puripuly_heart/app/wiring/wiring_provider_runtime_policy.py",
+        "src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py",
+        "src/puripuly_heart/app/wiring/wiring_stt_factory.py",
     }
 )
 
@@ -597,6 +632,12 @@ def _known_allowed_violation_gate6_rationale(violation: ImportViolation) -> str:
         == "src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py"
     ):
         return "managed OpenRouter broker adapter still consumes public settings compatibility values at the adapter boundary"
+    if violation.importer_layer == ADAPTERS and "/app/wiring/" in violation.importer:
+        return (
+            "wiring composition modules retain public settings compatibility imports; grouping the "
+            "wiring package makes the pre-existing debt layer-visible, so it is explicitly recorded "
+            "until the settings compatibility facade is retired"
+        )
     if violation.importer_layer == RUNTIME_OWNERS:
         return "runtime owner currently wraps a concrete adapter while preserving explicit lifecycle ownership; adapter-port extraction remains deferred work"
     if violation.importer_layer == PROVIDERS:

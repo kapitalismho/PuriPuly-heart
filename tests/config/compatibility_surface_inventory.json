@@ -69,7 +69,7 @@
       "classification": "public_compatibility_preserve",
       "source_of_truth_refs": [
         "src/puripuly_heart/core/storage/secrets.py",
-        "src/puripuly_heart/app/wiring.py::create_secret_store",
+        "src/puripuly_heart/app/wiring/root.py::create_secret_store",
         "src/puripuly_heart/core/openrouter/openrouter_credentials.py",
         "src/puripuly_heart/core/managed_identity.py",
         "tests/config/public_compatibility_surfaces_snapshot.json::secret_store"
@@ -102,8 +102,8 @@
       "source_of_truth_refs": [
         "src/puripuly_heart/config/resolved.py",
         "src/puripuly_heart/config/runtime_resolution.py",
-        "src/puripuly_heart/app/wiring.py::create_llm_provider_from_resolved_config",
-        "src/puripuly_heart/app/wiring.py::create_stt_backend_from_resolved_config"
+        "src/puripuly_heart/app/wiring/root.py::create_llm_provider_from_resolved_config",
+        "src/puripuly_heart/app/wiring/root.py::create_stt_backend_from_resolved_config"
       ],
       "fixture_or_guard_refs": [
         "tests/config/test_public_compatibility_surfaces.py::test_provider_runtime_public_config_snapshot_matches_resolved_contracts",
@@ -232,7 +232,7 @@
     {
       "module": "puripuly_heart.app.wiring",
       "source_rule": "approved facade",
-      "source_of_truth_refs": ["src/puripuly_heart/app/wiring.py", "tests/app/test_wiring_providers.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/app/wiring/root.py", "tests/app/test_wiring_providers.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": {
         "preserve_import_path": true,
@@ -1125,16 +1125,16 @@
       "surface": "puripuly_heart.app provider runtime wiring modules",
       "classification": "internal_provider_runtime_wiring",
       "modules": [
-        "puripuly_heart.app.wiring_capture_runtime",
-        "puripuly_heart.app.wiring_local_asr_application",
-        "puripuly_heart.app.wiring_local_asr_provider_runtime",
-        "puripuly_heart.app.wiring_managed_account",
-        "puripuly_heart.app.wiring_microphone_test",
-        "puripuly_heart.app.wiring_peer_application",
-        "puripuly_heart.app.wiring_provider_runtime",
-        "puripuly_heart.app.wiring_provider_runtime_policy",
-        "puripuly_heart.app.wiring_runtime_pipeline",
-        "puripuly_heart.app.wiring_vrc_mic_sync"
+        "puripuly_heart.app.wiring.wiring_capture_runtime",
+        "puripuly_heart.app.wiring.wiring_local_asr_application",
+        "puripuly_heart.app.wiring.wiring_local_asr_provider_runtime",
+        "puripuly_heart.app.wiring.wiring_managed_account",
+        "puripuly_heart.app.wiring.wiring_microphone_test",
+        "puripuly_heart.app.wiring.wiring_peer_application",
+        "puripuly_heart.app.wiring.wiring_provider_runtime",
+        "puripuly_heart.app.wiring.wiring_provider_runtime_policy",
+        "puripuly_heart.app.wiring.wiring_runtime_pipeline",
+        "puripuly_heart.app.wiring.wiring_vrc_mic_sync"
       ],
       "rationale": "The provider runtime wiring module is the internal application composition adapter for the provider-runtime owner and is not an external public compatibility facade."
     },
@@ -1382,6 +1382,14 @@
         "puripuly_heart.core.local_asr"
       ],
       "rationale": "Domain-aligned grouping package that re-exports the moved local ASR/STT contract, asset, catalog, download, and installer modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.wiring.root composition facade module",
+      "classification": "internal_composition_facade_implementation",
+      "modules": [
+        "puripuly_heart.app.wiring.root"
+      ],
+      "rationale": "root holds the preserved composition facade implementation behind the puripuly_heart.app.wiring grouping package, which remains inventoried as the public compatibility facade; the root module itself is internal structure reached through the package."
     },
     {
       "surface": "puripuly_heart.app.adapters.peer_capture domain grouping package",
