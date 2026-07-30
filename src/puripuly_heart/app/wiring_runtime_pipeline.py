@@ -8,18 +8,26 @@ from pathlib import Path
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.app.wiring_llm_factory import create_llm_provider
 from puripuly_heart.app.wiring_managed_account import ManagedOpenRouterReleaseRuntime
+from puripuly_heart.app.wiring_provider_runtime import (
+    project_translation_runtime_settings,
+)
 from puripuly_heart.app.wiring_secrets_factory import create_secret_store
 from puripuly_heart.app.wiring_stt_factory import (
     build_self_capture_session_config,
     build_self_stt_provider_request,
 )
+from puripuly_heart.app.wiring_translation_runtime_configuration import (
+    build_translation_runtime_config,
+)
 from puripuly_heart.config.settings import AppSettings, STTProviderName
-from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactoryPort,
+)
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfigurationOwner,
 )
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
@@ -27,7 +35,6 @@ from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
-from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 
 @dataclass(slots=True)
@@ -101,6 +108,7 @@ class RuntimePipelineComponents:
     vrc_mic_state: VrcMicState
     vrc_mic_audio_gate: VrcMicAudioGate
     prepare_self_provider: bool
+    translation_runtime_configuration: TranslationRuntimeConfigurationOwner
     resources: RuntimePipelineResources = field(repr=False)
 
     async def close(self) -> None:
@@ -116,6 +124,10 @@ class RuntimePipelineHandle:
     )
     sender: VrchatOscUdpSender | None = field(init=False, default=None)
     osc: ChatboxPaginator | None = field(init=False, default=None)
+    translation_runtime_configuration: TranslationRuntimeConfigurationOwner | None = field(
+        init=False,
+        default=None,
+    )
     hub: ClientHub | None = field(init=False, default=None)
     self_capture: SelfCaptureSessionOwner | None = field(init=False, default=None)
     vrc_mic_state: VrcMicState | None = field(init=False, default=None)
@@ -125,6 +137,7 @@ class RuntimePipelineHandle:
         self.current = components
         self.sender = components.sender
         self.osc = components.osc
+        self.translation_runtime_configuration = components.translation_runtime_configuration
         self.hub = components.hub
         self.self_capture = components.self_capture
         self.vrc_mic_state = components.vrc_mic_state
@@ -135,6 +148,7 @@ class RuntimePipelineHandle:
             self.current = None
             self.sender = None
             self.osc = None
+            self.translation_runtime_configuration = None
             self.hub = None
             self.self_capture = None
             self.vrc_mic_state = None
@@ -357,6 +371,15 @@ async def _compose_runtime_pipeline(
         max_chars=settings.osc.chatbox_max_chars,
         runtime_logging=runtime_logging,
     )
+    translation_runtime_configuration = TranslationRuntimeConfigurationOwner(
+        build_translation_runtime_config(
+            project_translation_runtime_settings(settings),
+            fallback_transcript_only=True,
+            translation_enabled=True,
+            peer_translation_enabled=False,
+            integrated_context_enabled=True,
+        )
+    )
     hub = ClientHub(
         stt=None,
         llm=llm,
@@ -365,25 +388,7 @@ async def _compose_runtime_pipeline(
         clock=clock,
         runtime_logging=runtime_logging,
         local_asr_provider_runtime_factory=local_asr_factory(secrets),
-        source_language=settings.languages.source_language,
-        target_language=settings.languages.target_language,
-        peer_source_language=settings.languages.peer_source_language,
-        peer_target_language=settings.languages.peer_target_language,
-        system_prompt=settings.system_prompt,
-        chatbox_include_source=settings.osc.chatbox_include_source,
-        fallback_transcript_only=True,
-        translation_enabled=True,
-        peer_translation_enabled=False,
-        integrated_context_enabled=True,
-        low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
-        low_latency_merge_gap_ms=settings.stt.low_latency_merge_gap_ms,
-        low_latency_spec_retry_max=settings.stt.low_latency_spec_retry_max,
-        hangover_s=(
-            settings.stt.low_latency_vad_hangover_ms / 1000.0
-            if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
-        ),
-        peer_hangover_s=settings.desktop_audio.vad_hangover_ms / 1000.0,
+        translation_runtime_configuration=translation_runtime_configuration,
     )
     resources.hub = hub
     resources.llm = None
@@ -413,6 +418,7 @@ async def _compose_runtime_pipeline(
         vrc_mic_state=state,
         vrc_mic_audio_gate=gate,
         prepare_self_provider=prepare_self_provider,
+        translation_runtime_configuration=translation_runtime_configuration,
         resources=resources,
     )
 

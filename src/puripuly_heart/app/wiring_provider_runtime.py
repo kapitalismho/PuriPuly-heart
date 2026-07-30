@@ -5,6 +5,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from puripuly_heart.app.ports.translation_runtime_configuration import (
+    TranslationRuntimeSettingsValues,
+)
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.app.services.provider_runtime_apply import (
@@ -28,6 +31,9 @@ from puripuly_heart.app.wiring_stt_factory import (
     build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
 )
+from puripuly_heart.app.wiring_translation_runtime_configuration import (
+    replace_translation_runtime_settings,
+)
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -35,6 +41,9 @@ from puripuly_heart.config.settings import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfigurationPort,
+)
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import SelfCaptureSessionSnapshot
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
@@ -42,21 +51,32 @@ from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 class ProviderRuntimeHubPort(Protocol):
     llm: object | None
-    source_language: str
-    target_language: str
-    peer_source_language: str
-    peer_target_language: str
-    system_prompt: str
-    low_latency_mode: bool
-    low_latency_merge_gap_ms: int
-    low_latency_spec_retry_max: int
-    hangover_s: float
-    peer_hangover_s: float
-    chatbox_include_source: bool
 
     def has_stt_provider(self, channel: str) -> bool: ...
 
     async def replace_llm_provider(self, provider: object | None) -> object | None: ...
+
+
+def project_translation_runtime_settings(
+    settings: AppSettings,
+) -> TranslationRuntimeSettingsValues:
+    return TranslationRuntimeSettingsValues(
+        source_language=settings.languages.source_language,
+        target_language=settings.languages.target_language,
+        peer_source_language=settings.languages.peer_source_language,
+        peer_target_language=settings.languages.peer_target_language,
+        system_prompt=settings.system_prompt,
+        chatbox_include_source=settings.osc.chatbox_include_source,
+        hangover_s=(
+            settings.stt.low_latency_vad_hangover_ms / 1000.0
+            if FIXED_TRANSLATION_POLICY.fast_translation_enabled
+            else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
+        ),
+        peer_hangover_s=settings.desktop_audio.vad_hangover_ms / 1000.0,
+        low_latency_mode=FIXED_TRANSLATION_POLICY.fast_translation_enabled,
+        low_latency_merge_gap_ms=settings.stt.low_latency_merge_gap_ms,
+        low_latency_spec_retry_max=settings.stt.low_latency_spec_retry_max,
+    )
 
 
 @dataclass(slots=True)
@@ -130,6 +150,10 @@ class ProviderRuntimeSignatures:
 class ProviderRuntimeEffects:
     settings: SettingsOwner
     hub_provider: Callable[[], ProviderRuntimeHubPort | None]
+    translation_runtime_configuration_provider: Callable[
+        [],
+        TranslationRuntimeConfigurationPort | None,
+    ]
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None]
     self_capture_owner: Callable[[], SelfCaptureSessionOwner]
     peer: Callable[[], PeerApplicationOwner]
@@ -174,25 +198,16 @@ class ProviderRuntimeEffects:
             self.managed_pending_sink(False)
         else:
             self.dashboard_managed_pending_sink(self.managed_pending_provider())
-        hub = self.hub_provider()
-        if hub is None:
+        config_owner = self.translation_runtime_configuration_provider()
+        if config_owner is None:
             return
-        hub.source_language = settings.languages.source_language
-        hub.target_language = settings.languages.target_language
-        hub.peer_source_language = settings.languages.peer_source_language
-        hub.peer_target_language = settings.languages.peer_target_language
-        hub.system_prompt = settings.system_prompt
-        hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
-        hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
-        hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-        hub.hangover_s = (
-            settings.stt.low_latency_vad_hangover_ms / 1000.0
-            if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
+        peer_enabled = self.peer().effective_enabled()
+        replace_translation_runtime_settings(
+            config_owner,
+            project_translation_runtime_settings(settings),
+            peer_translation_enabled=peer_enabled,
+            integrated_context_enabled=peer_enabled,
         )
-        hub.peer_hangover_s = settings.desktop_audio.vad_hangover_ms / 1000.0
-        hub.chatbox_include_source = settings.osc.chatbox_include_source
-        self.sync_effective_flags(settings)
 
     async def refresh_peer(self) -> None:
         await self.refresh_peer_runtime()
@@ -240,6 +255,10 @@ def compose_provider_runtime(
     config_path: Path,
     settings: SettingsOwner,
     hub_provider: Callable[[], ProviderRuntimeHubPort | None],
+    translation_runtime_configuration_provider: Callable[
+        [],
+        TranslationRuntimeConfigurationPort | None,
+    ],
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None],
     self_capture_owner: Callable[[], SelfCaptureSessionOwner],
     peer: Callable[[], PeerApplicationOwner],
@@ -271,6 +290,7 @@ def compose_provider_runtime(
     effects = ProviderRuntimeEffects(
         settings=settings,
         hub_provider=hub_provider,
+        translation_runtime_configuration_provider=(translation_runtime_configuration_provider),
         self_capture_provider=self_capture_provider,
         self_capture_owner=self_capture_owner,
         peer=peer,

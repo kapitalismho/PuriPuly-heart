@@ -1,21 +1,38 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime, ContextEntry
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfig,
+    TranslationRuntimeConfigSnapshotPort,
+    TranslationRuntimeConfigurationOwner,
+)
 
 ContextMode = Literal["local", "integrated"]
+
+
+def _default_config_snapshot_port() -> TranslationRuntimeConfigSnapshotPort:
+    return TranslationRuntimeConfigurationOwner().snapshot
 
 
 @dataclass(slots=True)
 class ContextResolver:
     clock: Clock = SystemClock()
-    local_time_window_s: float = 30.0
-    local_max_entries: int = 3
-    integrated_time_window_s: float = 40.0
-    integrated_max_entries: int = 4
+    config_snapshot: TranslationRuntimeConfigSnapshotPort = field(
+        default_factory=_default_config_snapshot_port,
+        repr=False,
+    )
+
+    def _configuration(
+        self,
+        configuration: TranslationRuntimeConfig | None = None,
+    ) -> TranslationRuntimeConfig:
+        if configuration is not None:
+            return configuration
+        return self.config_snapshot().value
 
     def get_local_entries(
         self,
@@ -23,13 +40,15 @@ class ContextResolver:
         runtime: ChannelRuntime,
         source_language: str,
         target_language: str,
+        configuration: TranslationRuntimeConfig | None = None,
     ) -> list[ContextEntry]:
+        configuration = self._configuration(configuration)
         return runtime.get_valid_context(
             now=self.clock.now(),
             source_language=source_language,
             target_language=target_language,
-            time_window_s=self.local_time_window_s,
-            max_entries=self.local_max_entries,
+            time_window_s=configuration.context_time_window_s,
+            max_entries=configuration.context_max_entries,
         )
 
     def format_local(self, entries: list[ContextEntry]) -> str:
@@ -41,11 +60,13 @@ class ContextResolver:
         runtime: ChannelRuntime,
         source_language: str,
         target_language: str,
+        configuration: TranslationRuntimeConfig | None = None,
     ) -> tuple[str, ContextMode]:
         entries = self.get_local_entries(
             runtime=runtime,
             source_language=source_language,
             target_language=target_language,
+            configuration=configuration,
         )
         return self.format_local(entries), "local"
 
@@ -60,12 +81,15 @@ class ContextResolver:
         target_language: str,
         other_source_language: str | None = None,
         other_target_language: str | None = None,
+        configuration: TranslationRuntimeConfig | None = None,
     ) -> tuple[str, ContextMode]:
+        configuration = self._configuration(configuration)
         if requested_mode != "integrated" or not peer_translation_enabled:
             return self.resolve_local(
                 runtime=runtime,
                 source_language=source_language,
                 target_language=target_language,
+                configuration=configuration,
             )
         integrated_entries = self._get_integrated_entries(
             runtime=runtime,
@@ -74,12 +98,14 @@ class ContextResolver:
             target_language=target_language,
             other_source_language=other_source_language,
             other_target_language=other_target_language,
+            configuration=configuration,
         )
         if not any(channel_runtime.channel == "peer" for channel_runtime, _ in integrated_entries):
             return self.resolve_local(
                 runtime=runtime,
                 source_language=source_language,
                 target_language=target_language,
+                configuration=configuration,
             )
         return self.format_integrated(integrated_entries), "integrated"
 
@@ -106,7 +132,11 @@ class ContextResolver:
         target_language: str,
         other_source_language: str | None = None,
         other_target_language: str | None = None,
+        configuration: TranslationRuntimeConfig | None = None,
     ) -> list[tuple[ChannelRuntime, ContextEntry]]:
+        configuration = self._configuration(configuration)
+        time_window_s = configuration.integrated_context_time_window_s
+        max_entries = configuration.integrated_context_max_entries
         combined: list[tuple[ChannelRuntime, ContextEntry]] = []
         other_source_language = (
             source_language if other_source_language is None else other_source_language
@@ -122,13 +152,13 @@ class ContextResolver:
                 now=self.clock.now(),
                 source_language=entry_source_language,
                 target_language=entry_target_language,
-                time_window_s=self.integrated_time_window_s,
-                max_entries=self.integrated_max_entries,
+                time_window_s=time_window_s,
+                max_entries=max_entries,
             ):
                 combined.append((channel_runtime, entry))
         combined.sort(key=lambda item: item[1].timestamp)
-        if self.integrated_max_entries > 0:
-            return combined[-self.integrated_max_entries :]
+        if max_entries > 0:
+            return combined[-max_entries:]
         return combined
 
     def _relative_age(self, timestamp: float) -> int:

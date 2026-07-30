@@ -4,14 +4,13 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field, replace
 from typing import Protocol, cast
 from uuid import UUID, uuid4
 
 logger = logging.getLogger(__name__)
 
 from puripuly_heart.config.prompts import render_translation_prompt_template, warm_prompt_cache
-from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.error_messages import (
     format_error_report_for_log,
@@ -45,6 +44,11 @@ from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
     ContextEntry,
     _MergeBuffer,
+)
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfig,
+    TranslationRuntimeConfigSnapshot,
+    TranslationRuntimeConfigurationOwner,
 )
 from puripuly_heart.core.orchestrator.context import ContextMode, ContextResolver
 from puripuly_heart.core.orchestrator.ports import (
@@ -131,6 +135,31 @@ _LATENCY_TRACE_ORDER = (
     "peer_overlay_first_render",
 )
 _LATENCY_SUMMARY_OUTPUT_STAGES = {"self_chatbox_enqueue", "peer_overlay_first_emit"}
+_TRANSLATION_RUNTIME_CONFIG_FIELDS = frozenset(
+    {
+        "source_language",
+        "target_language",
+        "peer_source_language",
+        "peer_target_language",
+        "system_prompt",
+        "chatbox_include_source",
+        "fallback_transcript_only",
+        "translation_enabled",
+        "peer_translation_enabled",
+        "integrated_context_enabled",
+        "hangover_s",
+        "peer_hangover_s",
+        "context_time_window_s",
+        "context_max_entries",
+        "integrated_context_time_window_s",
+        "integrated_context_max_entries",
+        "low_latency_mode",
+        "low_latency_merge_gap_ms",
+        "low_latency_spec_retry_max",
+        "low_latency_finalize_wait_ms",
+        "low_latency_awaiting_vad_timeout_s",
+    }
+)
 
 
 @dataclass(slots=True)
@@ -177,32 +206,28 @@ class ClientHub:
     clock: Clock = SystemClock()
     runtime_logging: HubRuntimeLoggingPort | None = None
     local_asr_provider_runtime_factory: LocalASRProviderRuntimeFactoryPort | None = None
-
-    source_language: str = "ko"
-    target_language: str = "en"
-    peer_source_language: str = ""
-    peer_target_language: str = ""
-    system_prompt: str = ""
-    chatbox_include_source: bool = True
-    fallback_transcript_only: bool = False
-    translation_enabled: bool = True
-    peer_translation_enabled: bool = False
-    integrated_context_enabled: bool = False
-    hangover_s: float = (
-        DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
-    )  # Self VAD hangover in seconds for user-facing E2E latency.
-    peer_hangover_s: float = 0.6  # Peer VAD hangover in seconds for user-facing E2E latency.
-
-    # Context memory settings
-    context_time_window_s: float = 30.0  # Only include entries within this time window
-    context_max_entries: int = 3  # Maximum number of context entries to include
-    integrated_context_time_window_s: float = 40.0
-    integrated_context_max_entries: int = 4
-    low_latency_mode: bool = False
-    low_latency_merge_gap_ms: int = 600
-    low_latency_spec_retry_max: int = 1
-    low_latency_finalize_wait_ms: int = 400
-    low_latency_awaiting_vad_timeout_s: float = 3.0  # Timeout for awaiting_vad_end state
+    translation_runtime_configuration: TranslationRuntimeConfigurationOwner | None = None
+    source_language: InitVar[str | None] = None
+    target_language: InitVar[str | None] = None
+    peer_source_language: InitVar[str | None] = None
+    peer_target_language: InitVar[str | None] = None
+    system_prompt: InitVar[str | None] = None
+    chatbox_include_source: InitVar[bool | None] = None
+    fallback_transcript_only: InitVar[bool | None] = None
+    translation_enabled: InitVar[bool | None] = None
+    peer_translation_enabled: InitVar[bool | None] = None
+    integrated_context_enabled: InitVar[bool | None] = None
+    hangover_s: InitVar[float | None] = None
+    peer_hangover_s: InitVar[float | None] = None
+    context_time_window_s: InitVar[float | None] = None
+    context_max_entries: InitVar[int | None] = None
+    integrated_context_time_window_s: InitVar[float | None] = None
+    integrated_context_max_entries: InitVar[int | None] = None
+    low_latency_mode: InitVar[bool | None] = None
+    low_latency_merge_gap_ms: InitVar[int | None] = None
+    low_latency_spec_retry_max: InitVar[int | None] = None
+    low_latency_finalize_wait_ms: InitVar[int | None] = None
+    low_latency_awaiting_vad_timeout_s: InitVar[float | None] = None
 
     ui_events: asyncio.Queue[UIEvent] = field(default_factory=asyncio.Queue)
 
@@ -260,7 +285,75 @@ class ClientHub:
     )
     _llm_provider_runtime: ProviderRuntimeHandle = field(init=False)
 
-    def __post_init__(self) -> None:
+    def __post_init__(
+        self,
+        source_language: str | None,
+        target_language: str | None,
+        peer_source_language: str | None,
+        peer_target_language: str | None,
+        system_prompt: str | None,
+        chatbox_include_source: bool | None,
+        fallback_transcript_only: bool | None,
+        translation_enabled: bool | None,
+        peer_translation_enabled: bool | None,
+        integrated_context_enabled: bool | None,
+        hangover_s: float | None,
+        peer_hangover_s: float | None,
+        context_time_window_s: float | None,
+        context_max_entries: int | None,
+        integrated_context_time_window_s: float | None,
+        integrated_context_max_entries: int | None,
+        low_latency_mode: bool | None,
+        low_latency_merge_gap_ms: int | None,
+        low_latency_spec_retry_max: int | None,
+        low_latency_finalize_wait_ms: int | None,
+        low_latency_awaiting_vad_timeout_s: float | None,
+    ) -> None:
+        config_overrides = {
+            name: value
+            for name, value in (
+                ("source_language", source_language),
+                ("target_language", target_language),
+                ("peer_source_language", peer_source_language),
+                ("peer_target_language", peer_target_language),
+                ("system_prompt", system_prompt),
+                ("chatbox_include_source", chatbox_include_source),
+                ("fallback_transcript_only", fallback_transcript_only),
+                ("translation_enabled", translation_enabled),
+                ("peer_translation_enabled", peer_translation_enabled),
+                ("integrated_context_enabled", integrated_context_enabled),
+                ("hangover_s", hangover_s),
+                ("peer_hangover_s", peer_hangover_s),
+                ("context_time_window_s", context_time_window_s),
+                ("context_max_entries", context_max_entries),
+                (
+                    "integrated_context_time_window_s",
+                    integrated_context_time_window_s,
+                ),
+                ("integrated_context_max_entries", integrated_context_max_entries),
+                ("low_latency_mode", low_latency_mode),
+                ("low_latency_merge_gap_ms", low_latency_merge_gap_ms),
+                ("low_latency_spec_retry_max", low_latency_spec_retry_max),
+                ("low_latency_finalize_wait_ms", low_latency_finalize_wait_ms),
+                (
+                    "low_latency_awaiting_vad_timeout_s",
+                    low_latency_awaiting_vad_timeout_s,
+                ),
+            )
+            if value is not None
+        }
+        config_owner = self.translation_runtime_configuration
+        if config_owner is None:
+            config_owner = TranslationRuntimeConfigurationOwner(
+                replace(TranslationRuntimeConfig(), **config_overrides)
+            )
+            object.__setattr__(
+                self,
+                "translation_runtime_configuration",
+                config_owner,
+            )
+        elif config_overrides:
+            config_owner.replace(replace(config_owner.snapshot().value, **config_overrides))
         runtime_factory = self.local_asr_provider_runtime_factory
         if runtime_factory is None:
             runtime_factory = PrebuiltLocalASRProviderRuntimeFactory(
@@ -298,6 +391,7 @@ class ClientHub:
             on_parent_closed=self._on_peer_final_run_parent_closed,
             on_parent_rejected=self._on_peer_final_run_parent_rejected,
             output=self,
+            config_snapshot=self.translation_runtime_config_snapshot,
         )
         self.peer_final_runs = self.translation_turns
         self._local_asr_provider_runtime = runtime_factory.create(
@@ -322,16 +416,37 @@ class ClientHub:
         )
         self.context_resolver = ContextResolver(
             clock=self.clock,
-            local_time_window_s=self.context_time_window_s,
-            local_max_entries=self.context_max_entries,
-            integrated_time_window_s=self.integrated_context_time_window_s,
-            integrated_max_entries=self.integrated_context_max_entries,
+            config_snapshot=config_owner.snapshot,
         )
         warm_prompt_cache()
         self._sync_provider_runtime_aliases()
         self._sync_self_runtime_aliases()
 
+    def __getattribute__(self, name: str) -> object:
+        if name in _TRANSLATION_RUNTIME_CONFIG_FIELDS:
+            owner = object.__getattribute__(self, "translation_runtime_configuration")
+            if owner is None:
+                raise RuntimeError("translation runtime configuration is unavailable")
+            return getattr(owner.snapshot().value, name)
+        return object.__getattribute__(self, name)
+
     def __setattr__(self, name: str, value: object) -> None:
+        if name == "translation_runtime_configuration":
+            try:
+                current_owner = object.__getattribute__(
+                    self,
+                    "translation_runtime_configuration",
+                )
+            except AttributeError:
+                current_owner = None
+            if current_owner is not None and value is not current_owner:
+                raise RuntimeError("translation runtime configuration owner is fixed")
+        if name in _TRANSLATION_RUNTIME_CONFIG_FIELDS:
+            owner = object.__getattribute__(self, "translation_runtime_configuration")
+            if owner is None:
+                raise RuntimeError("translation runtime configuration is unavailable")
+            owner.transform(lambda current: replace(current, **{name: value}))
+            return
         if name in {"stt", "peer_stt"} and value is not None:
             try:
                 object.__getattribute__(self, "_local_asr_provider_runtime")
@@ -340,13 +455,7 @@ class ClientHub:
             else:
                 raise RuntimeError("concrete STT assignment is disabled")
         object.__setattr__(self, name, value)
-        if name in {
-            "clock",
-            "context_time_window_s",
-            "context_max_entries",
-            "integrated_context_time_window_s",
-            "integrated_context_max_entries",
-        }:
+        if name == "clock":
             try:
                 resolver = object.__getattribute__(self, "context_resolver")
             except AttributeError:
@@ -360,19 +469,10 @@ class ClientHub:
             except AttributeError:
                 output_runtime = None
             if resolver is not None:
-                if name == "clock":
-                    resolver.clock = value  # type: ignore[assignment]
-                elif name == "context_time_window_s":
-                    resolver.local_time_window_s = value  # type: ignore[assignment]
-                elif name == "context_max_entries":
-                    resolver.local_max_entries = value  # type: ignore[assignment]
-                elif name == "integrated_context_time_window_s":
-                    resolver.integrated_time_window_s = value  # type: ignore[assignment]
-                elif name == "integrated_context_max_entries":
-                    resolver.integrated_max_entries = value  # type: ignore[assignment]
-            if name == "clock" and overlay_event_adapter is not None:
+                resolver.clock = value  # type: ignore[assignment]
+            if overlay_event_adapter is not None:
                 overlay_event_adapter.clock = value  # type: ignore[assignment]
-            if name == "clock" and output_runtime is not None:
+            if output_runtime is not None:
                 output_runtime.clock = value  # type: ignore[assignment]
         if name == "osc":
             try:
@@ -395,6 +495,12 @@ class ClientHub:
     @property
     def provider_runtime_handles(self) -> dict[str, ProviderRuntimeHandle]:
         return {"llm": self._llm_provider_runtime}
+
+    def translation_runtime_config_snapshot(self) -> TranslationRuntimeConfigSnapshot:
+        owner = self.translation_runtime_configuration
+        if owner is None:
+            raise RuntimeError("translation runtime configuration is unavailable")
+        return owner.snapshot()
 
     @property
     def local_asr_provider_runtime(self) -> LocalASRProviderRuntimePort | None:
@@ -502,7 +608,10 @@ class ClientHub:
         return max(0, int(round((end_at - start_at) * 1000)))
 
     def _latency_hangover_ms(self, channel: ChannelId) -> int:
-        hangover_s = self.peer_hangover_s if channel == "peer" else self.hangover_s
+        configuration = self.translation_runtime_config_snapshot().value
+        hangover_s = (
+            configuration.peer_hangover_s if channel == "peer" else configuration.hangover_s
+        )
         return max(0, int(round(hangover_s * 1000)))
 
     def _emit_latency_trace_if_ready(
@@ -906,12 +1015,21 @@ class ClientHub:
 
         return provider_label, channel
 
-    def _translation_skip_reason(self, runtime: ChannelRuntime) -> str:
+    def _translation_skip_reason(
+        self,
+        runtime: ChannelRuntime,
+        configuration: TranslationRuntimeConfig | None = None,
+    ) -> str:
+        configuration = (
+            self.translation_runtime_config_snapshot().value
+            if configuration is None
+            else configuration
+        )
         if self.llm is None:
             return "llm unavailable"
-        if not self.translation_enabled:
+        if not configuration.translation_enabled:
             return "translation disabled"
-        if runtime.channel == "peer" and not self.peer_translation_enabled:
+        if runtime.channel == "peer" and not configuration.peer_translation_enabled:
             return "peer translation disabled"
         return "translation disabled"
 
@@ -921,13 +1039,14 @@ class ClientHub:
         stage: str,
         runtime: ChannelRuntime,
         publish_chatbox: bool,
+        configuration: TranslationRuntimeConfig | None = None,
     ) -> None:
         self._emit_detailed(
             "[Hub] Translation skipped (stage=%s, channel=%s, publish_chatbox=%s): %s",
             stage,
             runtime.channel,
             publish_chatbox,
-            self._translation_skip_reason(runtime),
+            self._translation_skip_reason(runtime, configuration),
             fallback_level=logging.INFO,
         )
 
@@ -1187,10 +1306,18 @@ class ClientHub:
 
     def _get_valid_context(self) -> list[ContextEntry]:
         """Get context entries within time window and max entries limit."""
+        configuration = self.translation_runtime_config_snapshot().value
         return self.context_resolver.get_local_entries(
             runtime=self.self_runtime,
-            source_language=self._source_language_for(self.self_runtime),
-            target_language=self._target_language_for(self.self_runtime),
+            source_language=self._source_language_for(
+                self.self_runtime,
+                configuration,
+            ),
+            target_language=self._target_language_for(
+                self.self_runtime,
+                configuration,
+            ),
+            configuration=configuration,
         )
 
     def _format_context_for_llm(self, context: list[ContextEntry]) -> str:
@@ -1202,16 +1329,22 @@ class ClientHub:
         text: str,
         timestamp: float,
         *,
+        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         runtime: ChannelRuntime | None = None,
         source_language: str | None = None,
     ) -> None:
         runtime = runtime or self.self_runtime
+        config_snapshot = config_snapshot or self.translation_runtime_config_snapshot()
+        configuration = config_snapshot.value
         runtime.remember_context(
             text,
             timestamp=timestamp,
-            source_language=source_language or self._source_language_for(runtime),
-            target_language=self._target_language_for(runtime),
-            max_entries=max(self.context_max_entries, self.integrated_context_max_entries),
+            source_language=source_language or self._source_language_for(runtime, configuration),
+            target_language=self._target_language_for(runtime, configuration),
+            max_entries=max(
+                configuration.context_max_entries,
+                configuration.integrated_context_max_entries,
+            ),
         )
 
     def _log_context_mode_change(
@@ -1259,13 +1392,14 @@ class ClientHub:
 
     async def handle_vad_event(self, event: VadEvent) -> None:
         resume_overlay_resync_buffer: _MergeBuffer | None = None
+        low_latency_mode = self.translation_runtime_config_snapshot().value.low_latency_mode
 
         if isinstance(event, SpeechStart):
-            if self.low_latency_mode:
+            if low_latency_mode:
                 self._mark_resume_pending(event)
 
         if isinstance(event, SpeechChunk):
-            if self.low_latency_mode:
+            if low_latency_mode:
                 resume_overlay_resync_buffer = self._maybe_confirm_resume(event)
 
         # Record start time for E2E latency tracking (from speech end)
@@ -1279,9 +1413,9 @@ class ClientHub:
                 utterance_id=event.utterance_id,
                 stage="speech_end",
                 timestamp=speech_end_at,
-                publish_now=not self.low_latency_mode,
+                publish_now=not low_latency_mode,
             )
-            if self.low_latency_mode:
+            if low_latency_mode:
                 self._maybe_update_buffer_end_time(event.utterance_id)
                 self._maybe_start_finalize_wait(event.utterance_id)
                 await self._maybe_clear_resume_on_end(event)
@@ -1343,7 +1477,10 @@ class ClientHub:
         await self._ensure_translation(
             transcript,
             turn_kind="manual",
-            wait_for_parent=self.llm is None or not self.translation_enabled,
+            wait_for_parent=(
+                self.llm is None
+                or not self.translation_runtime_config_snapshot().value.translation_enabled
+            ),
         )
 
         return utterance_id
@@ -1417,6 +1554,7 @@ class ClientHub:
         self._sync_self_runtime_aliases()
 
     async def _handle_stt_event(self, event: object) -> None:
+        low_latency_mode = self.translation_runtime_config_snapshot().value.low_latency_mode
         if isinstance(event, STTSessionStateEvent):
             self._stt_session_states[event.channel] = event.state
             self._emit_basic(
@@ -1451,7 +1589,7 @@ class ClientHub:
             if event.channel == "peer":
                 return
             self._send_stt_connected_notification()
-            if self.low_latency_mode:
+            if low_latency_mode:
                 return
             self._emit_detailed(
                 "[Hub] STT Partial: channel=%s utterance_id=%s text_len=%s",
@@ -1477,7 +1615,7 @@ class ClientHub:
                 return
             if runtime.channel == "self":
                 self._send_stt_connected_notification()
-            if self.low_latency_mode and runtime.channel == "self":
+            if low_latency_mode and runtime.channel == "self":
                 await self._handle_low_latency_final(event.transcript)
                 return
             self._record_latency_stage(
@@ -1630,10 +1768,11 @@ class ClientHub:
         cancellation_requested: Callable[[], bool],
     ) -> TranslationTurnProcessResult:
         runtime = self._runtime_for_channel(child.channel)
+        config_snapshot = child.config_snapshot
         if cancellation_requested():
             raise asyncio.CancelledError
         target_language = (
-            self._target_language_for(runtime)
+            self._target_language_for(runtime, config_snapshot.value)
             if child.target_language == "und"
             else child.target_language
         )
@@ -1641,6 +1780,7 @@ class ClientHub:
             self._remember_context_entry(
                 child.transcript.text,
                 self.clock.now(),
+                config_snapshot=config_snapshot,
                 runtime=runtime,
                 source_language=child.precomputed_translation.source_language,
             )
@@ -1656,6 +1796,7 @@ class ClientHub:
                     source_language=child.detected_language,
                     target_language=target_language,
                     outcome="translated",
+                    config_snapshot=config_snapshot,
                     translation=child.precomputed_translation,
                 ),
             )
@@ -1670,6 +1811,7 @@ class ClientHub:
             context_policy=child.context_policy,
             detected_language=child.detected_language,
             cancellation_requested=cancellation_requested,
+            config_snapshot=config_snapshot,
         )
         if cancellation_requested():
             raise asyncio.CancelledError
@@ -1852,9 +1994,16 @@ class ClientHub:
         primary_language, secondary_language = self._active_self_display_languages_for_utterance(
             utterance_id
         )
+        configuration = self.translation_runtime_config_snapshot().value
         return (
-            self._language_or_fallback(primary_language, self.source_language),
-            self._language_or_fallback(secondary_language, self.target_language),
+            self._language_or_fallback(
+                primary_language,
+                configuration.source_language,
+            ),
+            self._language_or_fallback(
+                secondary_language,
+                configuration.target_language,
+            ),
         )
 
     def _current_active_self_metadata(self) -> object | None:
@@ -2005,6 +2154,7 @@ class ClientHub:
     ) -> None:
         if not self.output_runtime.has_overlay_destination:
             return
+        configuration = self.translation_runtime_config_snapshot().value
 
         self._record_overlay_emit(
             event_kind="translation_final",
@@ -2019,11 +2169,11 @@ class ClientHub:
                 text=translation.text,
                 source_language=self._language_or_fallback(
                     translation.source_language,
-                    self.source_language,
+                    configuration.source_language,
                 ),
                 target_language=self._language_or_fallback(
                     translation.target_language,
-                    self.target_language,
+                    configuration.target_language,
                 ),
                 applied_context_mode=applied_context_mode,
                 created_at=translation.created_at,
@@ -2514,6 +2664,7 @@ class ClientHub:
                 buffer.spec_task,
                 buffer.spec_translation,
                 buffer.spec_text,
+                buffer.spec_config_snapshot,
                 buffer.spec_started_at,
                 buffer.spec_done_at,
             )
@@ -2541,6 +2692,7 @@ class ClientHub:
         buffer.spec_task = None
         buffer.spec_translation = None
         buffer.spec_text = None
+        buffer.spec_config_snapshot = None
         buffer.spec_started_at = None
         buffer.spec_done_at = None
         return True
@@ -2584,16 +2736,19 @@ class ClientHub:
         buffer.awaiting_vad_timeout_task = None
 
     def _start_awaiting_vad_timeout(self, buffer: _MergeBuffer) -> None:
-        if self.low_latency_awaiting_vad_timeout_s <= 0:
+        timeout_s = (
+            self.translation_runtime_config_snapshot().value.low_latency_awaiting_vad_timeout_s
+        )
+        if timeout_s <= 0:
             return
         self._cancel_awaiting_vad_timeout(buffer)
         buffer.awaiting_vad_timeout_task = asyncio.create_task(
-            self._awaiting_vad_timeout(buffer.merge_id)
+            self._awaiting_vad_timeout(buffer.merge_id, timeout_s)
         )
 
-    async def _awaiting_vad_timeout(self, merge_id: UUID) -> None:
+    async def _awaiting_vad_timeout(self, merge_id: UUID, timeout_s: float) -> None:
         try:
-            await asyncio.sleep(self.low_latency_awaiting_vad_timeout_s)
+            await asyncio.sleep(timeout_s)
         except asyncio.CancelledError:
             return
         buffer = self._merge_buffer
@@ -2604,7 +2759,7 @@ class ClientHub:
         self._emit_metric(
             "[Metric] awaiting_vad_timeout id=%s timeout_s=%s",
             str(merge_id)[:8],
-            self.low_latency_awaiting_vad_timeout_s,
+            timeout_s,
         )
         buffer.awaiting_vad_end = False
         buffer.awaiting_vad_utterance_id = None
@@ -2622,13 +2777,21 @@ class ClientHub:
     def _start_resume_end_timeout(self, buffer: _MergeBuffer, utterance_id: UUID) -> None:
         self._cancel_resume_end_timeout(buffer)
         buffer.resume_end_utterance_id = utterance_id
+        timeout_s = (
+            self.translation_runtime_config_snapshot().value.low_latency_awaiting_vad_timeout_s
+        )
         buffer.resume_end_timeout_task = asyncio.create_task(
-            self._resume_end_timeout(buffer.merge_id, utterance_id)
+            self._resume_end_timeout(buffer.merge_id, utterance_id, timeout_s)
         )
 
-    async def _resume_end_timeout(self, merge_id: UUID, utterance_id: UUID) -> None:
+    async def _resume_end_timeout(
+        self,
+        merge_id: UUID,
+        utterance_id: UUID,
+        timeout_s: float,
+    ) -> None:
         try:
-            await asyncio.sleep(self.low_latency_awaiting_vad_timeout_s)
+            await asyncio.sleep(timeout_s)
         except asyncio.CancelledError:
             return
         buffer = self._merge_buffer
@@ -2642,30 +2805,40 @@ class ClientHub:
             "[Metric] resume_end_timeout id=%s vad_id=%s timeout_s=%s",
             str(merge_id)[:8],
             str(utterance_id)[:8],
-            self.low_latency_awaiting_vad_timeout_s,
+            timeout_s,
         )
         self._clear_resume_state(buffer)
         self._cancel_finalize_wait(buffer)
         await self._try_commit_after_spec(buffer, reason="resume_end_timeout", allow_fallback=True)
 
     def _restart_post_end_grace(self, buffer: _MergeBuffer) -> None:
-        if self.low_latency_finalize_wait_ms <= 0:
+        wait_ms = self.translation_runtime_config_snapshot().value.low_latency_finalize_wait_ms
+        if wait_ms <= 0:
             self._cancel_finalize_wait(buffer)
             return
         self._cancel_finalize_wait(buffer)
         buffer.finalize_wait_started_at = self.clock.now()
         buffer.finalize_wait_task = asyncio.create_task(
-            self._finalize_wait_timeout(buffer.merge_id, buffer.finalize_wait_started_at)
+            self._finalize_wait_timeout(
+                buffer.merge_id,
+                buffer.finalize_wait_started_at,
+                wait_ms,
+            )
         )
         self._emit_metric(
             "[Metric] post_end_grace_start id=%s wait_ms=%s",
             str(buffer.merge_id)[:8],
-            self.low_latency_finalize_wait_ms,
+            wait_ms,
         )
 
-    async def _finalize_wait_timeout(self, merge_id: UUID, started_at: float) -> None:
+    async def _finalize_wait_timeout(
+        self,
+        merge_id: UUID,
+        started_at: float,
+        wait_ms: int,
+    ) -> None:
         try:
-            await asyncio.sleep(self.low_latency_finalize_wait_ms / 1000.0)
+            await asyncio.sleep(wait_ms / 1000.0)
         except asyncio.CancelledError:
             return
         buffer = self._merge_buffer
@@ -2678,9 +2851,12 @@ class ClientHub:
         self._emit_metric(
             "[Metric] post_end_grace_timeout id=%s wait_ms=%s",
             str(merge_id)[:8],
-            self.low_latency_finalize_wait_ms,
+            wait_ms,
         )
-        if self.llm is None or not self.translation_enabled:
+        if (
+            self.llm is None
+            or not self.translation_runtime_config_snapshot().value.translation_enabled
+        ):
             await self._commit_merge(buffer, reason="post_end_grace")
             return
         await self._try_commit_after_spec(buffer, reason="post_end_grace", allow_fallback=False)
@@ -2807,7 +2983,10 @@ class ClientHub:
                 str(transcript.utterance_id)[:8],
             )
 
-        if self.llm is None or not self.translation_enabled:
+        if (
+            self.llm is None
+            or not self.translation_runtime_config_snapshot().value.translation_enabled
+        ):
             await self._commit_merge(buffer, reason="final_no_llm")
             return
 
@@ -2914,12 +3093,20 @@ class ClientHub:
             created_at=self.clock.now(),
         )
         await self._handle_transcript(transcript, is_final=True, source="Mic")
+        config_snapshot = (
+            buffer.spec_config_snapshot
+            if reuse_mode is not None
+            and buffer.spec_translation is not None
+            and buffer.spec_config_snapshot is not None
+            else self.translation_runtime_config_snapshot()
+        )
 
-        if self.llm is None or not self.translation_enabled:
+        if self.llm is None or not config_snapshot.value.translation_enabled:
             await self._ensure_translation(
                 transcript,
                 turn_kind="self",
                 wait_for_parent=True,
+                config_snapshot=config_snapshot,
             )
             return
 
@@ -2951,6 +3138,7 @@ class ClientHub:
                     turn_kind="self",
                     precomputed_translation=translation,
                     wait_for_parent=True,
+                    config_snapshot=config_snapshot,
                 )
                 return
 
@@ -2964,10 +3152,12 @@ class ClientHub:
             transcript,
             turn_kind="self",
             wait_for_parent=True,
+            config_snapshot=config_snapshot,
         )
 
     async def _maybe_restart_spec(self, buffer: _MergeBuffer) -> None:
-        if self.llm is None or not self.translation_enabled:
+        config_snapshot = self.translation_runtime_config_snapshot()
+        if self.llm is None or not config_snapshot.value.translation_enabled:
             return
 
         self._clear_spec_state(buffer, reason="spec_retry")
@@ -2978,6 +3168,7 @@ class ClientHub:
 
         buffer.spec_attempts += 1
         buffer.spec_text = merged_text
+        buffer.spec_config_snapshot = config_snapshot
         buffer.spec_started_at = self.clock.now()
         self._emit_metric(
             "[Metric] spec_start id=%s text_len=%s attempt=%s",
@@ -2989,7 +3180,14 @@ class ClientHub:
             self._run_spec_translation(buffer.merge_id, merged_text, buffer.spec_attempts)
         )
 
-    async def _run_spec_translation(self, merge_id: UUID, text: str, attempt: int) -> None:
+    async def _run_spec_translation(
+        self,
+        merge_id: UUID,
+        text: str,
+        attempt: int,
+        *,
+        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
+    ) -> None:
         if self.llm is None:
             return
         buffer = self._merge_buffer
@@ -2997,9 +3195,20 @@ class ClientHub:
             return
         if buffer.spec_text != text or buffer.spec_attempts != attempt:
             return
+        config_snapshot = (
+            config_snapshot
+            or buffer.spec_config_snapshot
+            or self.translation_runtime_config_snapshot()
+        )
+        buffer.spec_config_snapshot = config_snapshot
         self._record_spec_latency_stage(buffer, stage="llm_request_start")
         try:
-            translation = await self._translate_text(merge_id, text, record_latency=False)
+            translation = await self._translate_text(
+                merge_id,
+                text,
+                record_latency=False,
+                config_snapshot=config_snapshot,
+            )
         except asyncio.CancelledError:
             return
         except _StaleProviderCompletion:
@@ -3131,27 +3340,52 @@ class ClientHub:
         other_runtime = self.peer_runtime if runtime is self.self_runtime else self.self_runtime
         return other_runtime.get_source(utterance_id)
 
-    def _source_language_for(self, runtime: ChannelRuntime) -> str:
-        if runtime.channel == "peer" and self.peer_source_language:
-            return self.peer_source_language
-        return self.source_language
+    def _source_language_for(
+        self,
+        runtime: ChannelRuntime,
+        configuration: TranslationRuntimeConfig | None = None,
+    ) -> str:
+        configuration = (
+            self.translation_runtime_config_snapshot().value
+            if configuration is None
+            else configuration
+        )
+        if runtime.channel == "peer" and configuration.peer_source_language:
+            return configuration.peer_source_language
+        return configuration.source_language
 
-    def _target_language_for(self, runtime: ChannelRuntime) -> str:
-        if runtime.channel == "peer" and self.peer_target_language:
-            return self.peer_target_language
-        return self.target_language
+    def _target_language_for(
+        self,
+        runtime: ChannelRuntime,
+        configuration: TranslationRuntimeConfig | None = None,
+    ) -> str:
+        configuration = (
+            self.translation_runtime_config_snapshot().value
+            if configuration is None
+            else configuration
+        )
+        if runtime.channel == "peer" and configuration.peer_target_language:
+            return configuration.peer_target_language
+        return configuration.target_language
 
     def _format_system_prompt(
         self,
         runtime: ChannelRuntime | None = None,
         *,
         source_name: str | None = None,
+        configuration: TranslationRuntimeConfig | None = None,
     ) -> str:
         runtime = runtime or self.self_runtime
+        configuration = (
+            self.translation_runtime_config_snapshot().value
+            if configuration is None
+            else configuration
+        )
         return render_translation_prompt_template(
-            self.system_prompt,
-            source_name=source_name or get_llm_language_name(self._source_language_for(runtime)),
-            target_name=get_llm_language_name(self._target_language_for(runtime)),
+            configuration.system_prompt,
+            source_name=source_name
+            or get_llm_language_name(self._source_language_for(runtime, configuration)),
+            target_name=get_llm_language_name(self._target_language_for(runtime, configuration)),
         )
 
     def _detected_language_for_llm(
@@ -3167,22 +3401,32 @@ class ClientHub:
         runtime: ChannelRuntime,
         *,
         detected_language: str | None = None,
+        configuration: TranslationRuntimeConfig | None = None,
     ) -> tuple[str, str] | None:
         detected = self._detected_language_for_llm(detected_language)
         if detected_language is not None:
             if detected is None:
                 return None
             return detected.code, detected.name
-        source_language = self._source_language_for(runtime)
+        source_language = self._source_language_for(runtime, configuration)
         return source_language, get_llm_language_name(source_language)
 
     def _other_runtime(self, runtime: ChannelRuntime) -> ChannelRuntime:
         return self.peer_runtime if runtime is self.self_runtime else self.self_runtime
 
-    def _translation_enabled_for_runtime(self, runtime: ChannelRuntime) -> bool:
+    def _translation_enabled_for_runtime(
+        self,
+        runtime: ChannelRuntime,
+        configuration: TranslationRuntimeConfig | None = None,
+    ) -> bool:
+        configuration = (
+            self.translation_runtime_config_snapshot().value
+            if configuration is None
+            else configuration
+        )
         if runtime.channel == "peer":
-            return self.translation_enabled and self.peer_translation_enabled
-        return self.translation_enabled
+            return configuration.translation_enabled and configuration.peer_translation_enabled
+        return configuration.translation_enabled
 
     def _capture_llm_provider_request(self) -> tuple[LLMProvider, int] | None:
         provider, generation = self._llm_provider_runtime.current_provider_generation()
@@ -3208,12 +3452,14 @@ class ClientHub:
         runtime: ChannelRuntime | None = None,
         detected_language: str | None = None,
         context_policy: TranslationContextPolicy = "integrated_preferred",
+        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> tuple[str, str, float]:
         formatted_prompt, context_str, now, _ = self._prepare_llm_request_with_mode(
             text,
             runtime=runtime,
             detected_language=detected_language,
             context_policy=context_policy,
+            config_snapshot=config_snapshot,
         )
         return formatted_prompt, context_str, now
 
@@ -3224,12 +3470,16 @@ class ClientHub:
         runtime: ChannelRuntime | None = None,
         detected_language: str | None = None,
         context_policy: TranslationContextPolicy = "integrated_preferred",
+        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> tuple[str, str, float, ContextMode]:
         _ = text
         runtime = runtime or self.self_runtime
+        config_snapshot = config_snapshot or self.translation_runtime_config_snapshot()
+        configuration = config_snapshot.value
         request_source = self._request_source_language(
             runtime,
             detected_language=detected_language,
+            configuration=configuration,
         )
         if request_source is None:
             raise _UnmappedDetectedLanguage
@@ -3243,15 +3493,26 @@ class ClientHub:
             runtime=runtime,
             other_runtime=other_runtime,
             requested_mode=requested_mode,
-            peer_translation_enabled=self.peer_translation_enabled,
+            peer_translation_enabled=configuration.peer_translation_enabled,
             source_language=source_language,
-            target_language=self._target_language_for(runtime),
-            other_source_language=self._source_language_for(other_runtime),
-            other_target_language=self._target_language_for(other_runtime),
+            target_language=self._target_language_for(runtime, configuration),
+            other_source_language=self._source_language_for(
+                other_runtime,
+                configuration,
+            ),
+            other_target_language=self._target_language_for(
+                other_runtime,
+                configuration,
+            ),
+            configuration=configuration,
         )
         self._log_context_mode_change(runtime=runtime, applied_mode=applied_mode)
         self._log_context_application(text=text, runtime=runtime, context=context_str)
-        formatted_prompt = self._format_system_prompt(runtime, source_name=source_name)
+        formatted_prompt = self._format_system_prompt(
+            runtime,
+            source_name=source_name,
+            configuration=configuration,
+        )
         return formatted_prompt, context_str, now, applied_mode
 
     def _normalize_translation(
@@ -3293,7 +3554,10 @@ class ClientHub:
         runtime: ChannelRuntime | None = None,
         record_latency: bool = True,
         detected_language: str | None = None,
+        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> Translation:
+        config_snapshot = config_snapshot or self.translation_runtime_config_snapshot()
+        configuration = config_snapshot.value
         llm_request = self._capture_llm_provider_request()
         if llm_request is None:
             raise RuntimeError("LLM is not configured")
@@ -3304,6 +3568,7 @@ class ClientHub:
             text,
             runtime=runtime,
             detected_language=detected_language,
+            config_snapshot=config_snapshot,
         )
         if record_latency:
             self._record_latency_stage(
@@ -3314,11 +3579,12 @@ class ClientHub:
         request_source = self._request_source_language(
             runtime,
             detected_language=detected_language,
+            configuration=configuration,
         )
         if request_source is None:
             raise _UnmappedDetectedLanguage
         request_source_language, _ = request_source
-        request_target_language = self._target_language_for(runtime)
+        request_target_language = self._target_language_for(runtime, configuration)
         try:
             translation = await llm.translate(
                 utterance_id=utterance_id,
@@ -3353,8 +3619,10 @@ class ClientHub:
         turn_kind: TranslationTurnKind | None = None,
         precomputed_translation: Translation | None = None,
         wait_for_parent: bool = False,
+        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> None:
         runtime = self._runtime_for_channel(transcript.channel)
+        config_snapshot = config_snapshot or self.translation_runtime_config_snapshot()
         resolved_kind = turn_kind or ("peer" if runtime.channel == "peer" else "self")
         if runtime.channel == "peer":
             self._peer_translation_parent_ids.add(transcript.utterance_id)
@@ -3366,8 +3634,9 @@ class ClientHub:
                 transcript=transcript,
                 source=source,
                 turn_kind=resolved_kind,
-                target_languages=(self._target_language_for(runtime),),
+                target_languages=(self._target_language_for(runtime, config_snapshot.value),),
                 precomputed_translation=precomputed_translation,
+                config_snapshot=config_snapshot,
             ),
             wait_for_parent=wait_for_parent,
         )
@@ -3403,13 +3672,19 @@ class ClientHub:
         context_policy: TranslationContextPolicy,
         detected_language: str | None = None,
         cancellation_requested: Callable[[], bool] | None = None,
+        config_snapshot: TranslationRuntimeConfigSnapshot,
     ) -> TranslationTurnProcessResult:
+        configuration = config_snapshot.value
         llm_request = self._capture_llm_provider_request()
-        if llm_request is None or not self._translation_enabled_for_runtime(runtime):
+        if llm_request is None or not self._translation_enabled_for_runtime(
+            runtime,
+            configuration,
+        ):
             self._log_translation_skipped(
                 stage="final",
                 runtime=runtime,
                 publish_chatbox=self.output_runtime.chatbox_is_eligible(runtime.channel),
+                configuration=configuration,
             )
             return TranslationTurnProcessResult(
                 "source_only",
@@ -3423,6 +3698,7 @@ class ClientHub:
                     source_language=detected_language,
                     target_language=target_language,
                     outcome="source_only",
+                    config_snapshot=config_snapshot,
                     failure_code="translation_unavailable",
                 ),
             )
@@ -3430,6 +3706,7 @@ class ClientHub:
         request_source = self._request_source_language(
             runtime,
             detected_language=detected_language,
+            configuration=configuration,
         )
         if request_source is None:
             outcome: TranslationTurnOutcome = (
@@ -3460,6 +3737,7 @@ class ClientHub:
                     source_language=detected_language,
                     target_language=target_language,
                     outcome=outcome,
+                    config_snapshot=config_snapshot,
                     failure_code="unsupported_source_language",
                 ),
             )
@@ -3472,10 +3750,12 @@ class ClientHub:
                 runtime=runtime,
                 detected_language=detected_language,
                 context_policy=context_policy,
+                config_snapshot=config_snapshot,
             )
             self._remember_context_entry(
                 text,
                 now,
+                config_snapshot=config_snapshot,
                 runtime=runtime,
                 source_language=request_source_language,
             )
@@ -3526,6 +3806,7 @@ class ClientHub:
                     source_language=request_source_language,
                     target_language=target_language,
                     outcome="failed",
+                    config_snapshot=config_snapshot,
                     failure_code="stale_provider_completion",
                 ),
             )
@@ -3553,6 +3834,7 @@ class ClientHub:
                     source_language=request_source_language,
                     target_language=target_language,
                     outcome="failed",
+                    config_snapshot=config_snapshot,
                     failure_code="provider_error",
                 ),
             )
@@ -3569,6 +3851,7 @@ class ClientHub:
                 source_language=request_source_language,
                 target_language=target_language,
                 outcome="translated",
+                config_snapshot=config_snapshot,
                 translation=translation,
                 applied_context_mode=applied_mode,
             ),
@@ -3582,6 +3865,8 @@ class ClientHub:
         submission: TranslationOutputSubmission,
     ) -> None:
         runtime = self._runtime_for_channel(submission.channel)
+        config_snapshot = submission.config_snapshot
+        configuration = config_snapshot.value
         utterance_id = submission.child_utterance_id
         text = submission.source_text
         if submission.outcome == "source_only":
@@ -3604,6 +3889,7 @@ class ClientHub:
                     utterance_id,
                     transcript_text=text,
                     translation_text=None,
+                    config_snapshot=config_snapshot,
                 )
             else:
                 self._finalize_latency_timeline(
@@ -3618,10 +3904,12 @@ class ClientHub:
                 return
             deny_peer_chatbox_attempt = self.output_runtime.chatbox_is_denied(runtime.channel)
             fallback_to_chatbox = (
-                self.fallback_transcript_only
+                configuration.fallback_transcript_only
                 and self.output_runtime.chatbox_is_eligible(runtime.channel)
             )
-            denied_fallback_to_chatbox = self.fallback_transcript_only and deny_peer_chatbox_attempt
+            denied_fallback_to_chatbox = (
+                configuration.fallback_transcript_only and deny_peer_chatbox_attempt
+            )
             if runtime.channel == "self":
                 await self._emit_overlay_utterance_closed(
                     utterance_id=utterance_id,
@@ -3647,6 +3935,7 @@ class ClientHub:
                     utterance_id,
                     transcript_text=text,
                     translation_text=None,
+                    config_snapshot=config_snapshot,
                 )
             elif deny_peer_chatbox_attempt:
                 await self._publish_peer_chatbox_candidate(utterance_id)
@@ -3704,6 +3993,7 @@ class ClientHub:
                 utterance_id,
                 transcript_text=text,
                 translation_text=translation.text,
+                config_snapshot=config_snapshot,
             )
         elif deny_peer_chatbox_attempt:
             await self._publish_peer_chatbox_candidate(utterance_id)
@@ -3723,6 +4013,7 @@ class ClientHub:
         cancellation_requested: Callable[[], bool] | None = None,
     ) -> None:
         runtime = runtime or self.self_runtime
+        config_snapshot = self.translation_runtime_config_snapshot()
         source = self._get_source(utterance_id, channel=runtime.channel)
         if source is None:
             source = "Peer" if runtime.channel == "peer" else "Mic"
@@ -3733,10 +4024,14 @@ class ClientHub:
             text=text,
             runtime=runtime,
             source=source,
-            target_language=self._target_language_for(runtime),
+            target_language=self._target_language_for(
+                runtime,
+                config_snapshot.value,
+            ),
             context_policy=self.translation_turns.policy.context_policy,
             detected_language=detected_language,
             cancellation_requested=cancellation_requested,
+            config_snapshot=config_snapshot,
         )
         if result.output is not None:
             await self.submit_translation_output(result.output)
@@ -3794,14 +4089,17 @@ class ClientHub:
         *,
         transcript_text: str,
         translation_text: str | None,
+        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> OutputPublicationResult:
         runtime = self._runtime_for_utterance(utterance_id)
+        config_snapshot = config_snapshot or self.translation_runtime_config_snapshot()
+        include_source = config_snapshot.value.chatbox_include_source
         result = await self.output_runtime.publish_chatbox(
             publication_id=utterance_id,
             channel=runtime.channel,
             transcript_text=transcript_text,
             translation_text=translation_text,
-            include_source=self.chatbox_include_source,
+            include_source=include_source,
         )
 
         if result.decision.decision != "published":
@@ -3826,7 +4124,7 @@ class ClientHub:
             runtime.channel,
             len(merged),
             translation_text is not None,
-            self.chatbox_include_source,
+            include_source,
             fallback_level=logging.INFO,
         )
         if runtime.channel == "self":

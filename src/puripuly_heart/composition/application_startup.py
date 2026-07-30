@@ -22,6 +22,9 @@ from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
 )
+from puripuly_heart.app.wiring_translation_runtime_configuration import (
+    replace_translation_runtime_enabled,
+)
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.runtime_logging import SessionLoggingMode
 
@@ -151,7 +154,10 @@ class ApplicationStartupAdapter:
         self.presentation.set_dashboard_translation_needs_key(translation_needs_key)
         self.presentation.set_dashboard_translation_enabled(False)
         self.presentation.set_dashboard_stt_enabled(False)
-        hub.translation_enabled = False
+        config_owner = self.pipeline.translation_runtime_configuration
+        if config_owner is None:
+            raise RuntimeError("Application pipeline did not provide translation configuration")
+        replace_translation_runtime_enabled(config_owner, False)
         await hub.start(auto_flush_osc=True)
 
     async def start_application_events(self) -> None:

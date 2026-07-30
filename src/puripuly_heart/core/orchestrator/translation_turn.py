@@ -8,6 +8,11 @@ from typing import Literal, Protocol
 from uuid import UUID, uuid5
 
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfig,
+    TranslationRuntimeConfigSnapshot,
+    TranslationRuntimeConfigSnapshotPort,
+)
 from puripuly_heart.core.translation_policy import (
     TranslationContextPolicy,
     TranslationRuntimePolicy,
@@ -20,12 +25,20 @@ TranslationTurnKind = Literal["manual", "self", "peer"]
 TranslationTurnOutcome = Literal["translated", "source_only", "cancelled", "failed"]
 
 
+def _default_config_snapshot() -> TranslationRuntimeConfigSnapshot:
+    return TranslationRuntimeConfigSnapshot(
+        revision=0,
+        value=TranslationRuntimeConfig(),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class TranslationTurnRequest:
     transcript: Transcript
     source: str
     turn_kind: TranslationTurnKind
     target_languages: tuple[str, ...]
+    config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
 
     def __post_init__(self) -> None:
@@ -67,6 +80,7 @@ class TranslationTurnChild:
     source: str
     turn_kind: TranslationTurnKind
     context_policy: TranslationContextPolicy
+    config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
 
     @property
@@ -85,6 +99,7 @@ class TranslationOutputSubmission:
     source_language: str | None
     target_language: str
     outcome: TranslationTurnOutcome
+    config_snapshot: TranslationRuntimeConfigSnapshot
     translation: Translation | None = None
     applied_context_mode: Literal["local", "integrated"] | None = None
     failure_code: str | None = None
@@ -152,6 +167,7 @@ class TranslationTurnLifecycleOwner:
     on_parent_closed: ParentClosed
     on_parent_rejected: ParentRejected
     output: TranslationOutputSubmissionPort | None = None
+    config_snapshot: TranslationRuntimeConfigSnapshotPort = _default_config_snapshot
     policy: TranslationRuntimePolicy = field(default_factory=TranslationRuntimePolicy)
     _parents: dict[UUID, _TranslationTurnParent] = field(default_factory=dict)
     _closed_parent_ids: set[UUID] = field(default_factory=set)
@@ -279,6 +295,7 @@ class TranslationTurnLifecycleOwner:
                 source=source,
                 turn_kind=resolved_kind,
                 target_languages=target_languages,
+                config_snapshot=self.config_snapshot(),
             )
         )
 
@@ -389,6 +406,7 @@ class TranslationTurnLifecycleOwner:
                     turn_kind=request.turn_kind,
                     context_policy=self.policy.context_policy,
                     precomputed_translation=request.precomputed_translation,
+                    config_snapshot=request.config_snapshot,
                 )
             )
         return tuple(children)

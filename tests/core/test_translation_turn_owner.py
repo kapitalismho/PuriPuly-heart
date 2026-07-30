@@ -7,6 +7,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfig,
+    TranslationRuntimeConfigSnapshot,
+)
 from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
@@ -50,6 +54,10 @@ def _request(
         source="Peer" if channel == "peer" else "You",
         turn_kind=turn_kind,
         target_languages=targets,
+        config_snapshot=TranslationRuntimeConfigSnapshot(
+            revision=0,
+            value=TranslationRuntimeConfig(),
+        ),
     )
 
 
@@ -468,6 +476,7 @@ async def test_owner_submits_typed_output_before_terminal_callback() -> None:
             source_language="en",
             target_language=child.target_language,
             outcome="translated",
+            config_snapshot=child.config_snapshot,
             translation=translation,
             applied_context_mode="local",
         )
@@ -511,6 +520,7 @@ async def test_output_adapter_failure_terminalizes_child_and_closes_parent() -> 
                 source_language="en",
                 target_language=child.target_language,
                 outcome="translated",
+                config_snapshot=child.config_snapshot,
                 translation=translation,
             ),
         )

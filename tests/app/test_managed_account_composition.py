@@ -42,6 +42,10 @@ from puripuly_heart.core.managed_openrouter_release import (
     UnavailableManagedOpenRouterReleaseClient,
 )
 from puripuly_heart.core.openrouter_credentials import OPENROUTER_BYOK_API_KEY_SECRET
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfig,
+    TranslationRuntimeConfigurationOwner,
+)
 
 
 class SecretStore:
@@ -126,10 +130,12 @@ async def test_release_runtime_awaits_replacement_and_shutdown(tmp_path) -> None
 async def test_translation_runtime_access_owns_rebuild_state_and_context() -> None:
     class Runtime:
         llm = None
-        translation_enabled = False
 
         def __init__(self) -> None:
             self.clear_calls = 0
+            self.translation_runtime_configuration = TranslationRuntimeConfigurationOwner(
+                TranslationRuntimeConfig(translation_enabled=False)
+            )
 
         def clear_context(self) -> None:
             self.clear_calls += 1
@@ -144,6 +150,9 @@ async def test_translation_runtime_access_owns_rebuild_state_and_context() -> No
 
     access = ManagedTranslationRuntimeAccess(
         runtime_provider=lambda: current,
+        translation_runtime_configuration_provider=(
+            lambda: current.translation_runtime_configuration
+        ),
         rebuild_llm=rebuild,
     )
 
@@ -180,6 +189,7 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
     )
     runtime = ManagedTranslationRuntimeAccess(
         runtime_provider=lambda: None,
+        translation_runtime_configuration_provider=lambda: None,
         rebuild_llm=lambda: pytest.fail("runtime rebuild must not run"),
     )
     results = SettingsTransactionResultOwner()

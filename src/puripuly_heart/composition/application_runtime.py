@@ -501,6 +501,9 @@ def compose_application_runtime(
                 settings_owner=settings,
                 canonical_settings=canonical_settings,
                 hub_provider=lambda: pipeline.hub,
+                translation_runtime_configuration_provider=(
+                    lambda: pipeline.translation_runtime_configuration
+                ),
                 overlay_provider=require_overlay,
                 ingress_frozen=lambda: ingress.frozen,
                 persist_manual_fallback=lambda: (
@@ -1010,20 +1013,13 @@ def compose_application_runtime(
             return copy.deepcopy(pending_settings)
         merged = copy.deepcopy(value)
         _copy_provider_prompt_apply_fields(pending_settings, merged)
-        hub = pipeline.hub
-        if hub is not None:
-            merged.languages.source_language = hub.source_language
-            merged.languages.target_language = hub.target_language
-            merged.languages.peer_source_language = getattr(
-                hub,
-                "peer_source_language",
-                merged.languages.peer_source_language,
-            )
-            merged.languages.peer_target_language = getattr(
-                hub,
-                "peer_target_language",
-                merged.languages.peer_target_language,
-            )
+        config_owner = pipeline.translation_runtime_configuration
+        if config_owner is not None:
+            configuration = config_owner.snapshot().value
+            merged.languages.source_language = configuration.source_language
+            merged.languages.target_language = configuration.target_language
+            merged.languages.peer_source_language = configuration.peer_source_language
+            merged.languages.peer_target_language = configuration.peer_target_language
         if (
             merged.provider.peer_stt
             not in {
@@ -1393,6 +1389,9 @@ def compose_application_runtime(
         config_path=config_path,
         settings=settings,
         hub_provider=lambda: pipeline.hub,
+        translation_runtime_configuration_provider=(
+            lambda: pipeline.translation_runtime_configuration
+        ),
         self_capture_provider=lambda: pipeline.self_capture,
         self_capture_owner=self_capture_owner,
         peer=lambda: require_peer().owner,
@@ -1448,6 +1447,9 @@ def compose_application_runtime(
         results=require_settings_application().results,
         runtime=ManagedTranslationRuntimeAccess(
             runtime_provider=lambda: pipeline.hub,
+            translation_runtime_configuration_provider=(
+                lambda: pipeline.translation_runtime_configuration
+            ),
             rebuild_llm=provider_runtime.llm_rebuild.rebuild,
         ),
         ingress_provider=lambda: ingress.frozen,

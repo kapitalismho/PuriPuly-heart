@@ -15,6 +15,9 @@ from puripuly_heart.app.wiring_runtime_pipeline import (
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import SystemClock
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfigurationOwner,
+)
 from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
     PrebuiltLocalASRProviderRuntimeFactory,
@@ -45,7 +48,9 @@ async def test_pipeline_composition_preserves_runtime_configuration_and_gate(
 
     def create_hub(*_args: object, **kwargs: object) -> object:
         captured.update(kwargs)
-        return SimpleNamespace()
+        return SimpleNamespace(
+            translation_runtime_configuration=kwargs["translation_runtime_configuration"]
+        )
 
     def create_osc(*_args: object, **kwargs: object) -> object:
         osc_kwargs.update(kwargs)
@@ -80,9 +85,12 @@ async def test_pipeline_composition_preserves_runtime_configuration_and_gate(
         stt_failure_sink=lambda _message: None,
     )
 
-    assert captured["chatbox_include_source"] is False
-    assert captured["peer_source_language"] == "ja"
-    assert captured["peer_target_language"] == "en"
+    config_owner = captured["translation_runtime_configuration"]
+    config = config_owner.snapshot().value
+    assert config.chatbox_include_source is False
+    assert config.peer_source_language == "ja"
+    assert config.peer_target_language == "en"
+    assert pipeline.translation_runtime_configuration is config_owner
     assert llm_kwargs["runtime_logging"] is runtime_logging
     assert osc_kwargs["runtime_logging"] is runtime_logging
     assert pipeline.vrc_mic_audio_gate is gate
@@ -124,6 +132,7 @@ async def test_pipeline_launcher_replaces_owned_runtime_in_order(
         vrc_mic_state=VrcMicState(),
         vrc_mic_audio_gate=VrcMicAudioGate(state=VrcMicState()),
         prepare_self_provider=True,
+        translation_runtime_configuration=TranslationRuntimeConfigurationOwner(),
         resources=RuntimePipelineResources(),
     )
 
@@ -459,6 +468,7 @@ async def test_pipeline_launcher_retains_failed_cleanup_for_retry(
             vrc_mic_state=VrcMicState(),
             vrc_mic_audio_gate=VrcMicAudioGate(state=VrcMicState()),
             prepare_self_provider=True,
+            translation_runtime_configuration=TranslationRuntimeConfigurationOwner(),
             resources=resources,
         )
 

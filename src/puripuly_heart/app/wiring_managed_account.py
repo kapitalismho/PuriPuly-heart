@@ -35,6 +35,9 @@ from puripuly_heart.app.wiring_managed_auth_factory import (
     build_openrouter_release_runtime_config,
 )
 from puripuly_heart.app.wiring_secrets_factory import create_secret_store
+from puripuly_heart.app.wiring_translation_runtime_configuration import (
+    replace_translation_runtime_enabled,
+)
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -53,6 +56,9 @@ from puripuly_heart.core.managed_openrouter_release import (
 from puripuly_heart.core.openrouter_credentials import resolve_openrouter_credentials
 from puripuly_heart.core.openrouter_handoff import should_auto_show_founder_letter
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEClient
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfigurationPort,
+)
 from puripuly_heart.core.telemetry import TranslationSuccessTelemetryClientPort
 
 logger = logging.getLogger(__name__)
@@ -67,7 +73,6 @@ _MANAGED_CONNECTIONS = frozenset(
 
 class ManagedTranslationRuntimePort(Protocol):
     llm: object | None
-    translation_enabled: bool
 
     def clear_context(self) -> None: ...
 
@@ -75,6 +80,10 @@ class ManagedTranslationRuntimePort(Protocol):
 @dataclass(slots=True)
 class ManagedTranslationRuntimeAccess:
     runtime_provider: Callable[[], ManagedTranslationRuntimePort | None]
+    translation_runtime_configuration_provider: Callable[
+        [],
+        TranslationRuntimeConfigurationPort | None,
+    ]
     rebuild_llm: Callable[[], Awaitable[object]]
 
     def presence(self) -> tuple[bool, bool]:
@@ -83,9 +92,13 @@ class ManagedTranslationRuntimeAccess:
 
     def snapshot(self) -> tuple[bool, bool, object | None]:
         runtime = self.runtime_provider()
+        config_owner = self.translation_runtime_configuration_provider()
+        translation_enabled = (
+            config_owner.snapshot().value.translation_enabled if config_owner is not None else False
+        )
         return (
             runtime is not None,
-            runtime.translation_enabled if runtime is not None else False,
+            translation_enabled,
             runtime.llm if runtime is not None else None,
         )
 
@@ -98,9 +111,9 @@ class ManagedTranslationRuntimeAccess:
         return runtime.llm is not None
 
     def set_enabled(self, enabled: bool) -> None:
-        runtime = self.runtime_provider()
-        if runtime is not None:
-            runtime.translation_enabled = bool(enabled)
+        config_owner = self.translation_runtime_configuration_provider()
+        if config_owner is not None:
+            replace_translation_runtime_enabled(config_owner, enabled)
 
     def clear_context(self) -> None:
         runtime = self.runtime_provider()

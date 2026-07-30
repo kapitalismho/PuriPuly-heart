@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfigSnapshot
 from puripuly_heart.domain.models import ChannelId, UtteranceBundle
 
 _RUNTIME_TO_HUB_ALIAS_FIELDS = {
@@ -47,6 +48,7 @@ class _MergeBuffer:
     spec_task: asyncio.Task[None] | None = None
     spec_text: str | None = None
     spec_translation: object | None = None
+    spec_config_snapshot: TranslationRuntimeConfigSnapshot | None = None
     spec_attempts: int = 0
     spec_started_at: float | None = None
     spec_done_at: float | None = None

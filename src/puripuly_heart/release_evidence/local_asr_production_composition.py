@@ -19,6 +19,9 @@ import numpy as np
 from puripuly_heart.app.ports.local_asr_production_evidence import (
     LocalASRProductionEvidenceFactoryPort,
 )
+from puripuly_heart.app.wiring_translation_runtime_configuration import (
+    replace_translation_runtime_enabled,
+)
 from puripuly_heart.composition.local_asr_production_evidence import (
     compose_local_asr_production_evidence,
 )
@@ -211,7 +214,10 @@ async def _execute(
         hub = application.hub
         owner = application.owner
         await hub.replace_llm_provider(None)
-        hub.translation_enabled = False
+        config_owner = hub.translation_runtime_configuration
+        if config_owner is None:
+            raise RuntimeError("production evidence translation configuration is unavailable")
+        replace_translation_runtime_enabled(config_owner, False)
         if hub.llm is not None:
             raise RuntimeError("production evidence did not disable the external LLM provider")
         report["composition"] = {

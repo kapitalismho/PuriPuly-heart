@@ -23,7 +23,13 @@ from puripuly_heart.app.services.peer_capture_target_application import (
     PeerCaptureTargetApplicationOwner,
 )
 from puripuly_heart.app.wiring import build_peer_capture_session_config
+from puripuly_heart.app.wiring_translation_runtime_configuration import (
+    replace_translation_runtime_effective_flags,
+)
 from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfigurationPort,
+)
 from puripuly_heart.core.orchestrator.hub import ClientHub
 
 
@@ -41,6 +47,10 @@ def compose_peer_application(
     settings_owner: SettingsOwner,
     canonical_settings: Callable[[AppSettings], object],
     hub_provider: Callable[[], ClientHub | None],
+    translation_runtime_configuration_provider: Callable[
+        [],
+        TranslationRuntimeConfigurationPort | None,
+    ],
     overlay_provider: Callable[[], OverlayApplicationOwner],
     ingress_frozen: Callable[[], bool],
     persist_manual_fallback: Callable[[], bool],
@@ -86,11 +96,14 @@ def compose_peer_application(
         peer_translation_enabled: bool,
         integrated_context_enabled: bool,
     ) -> None:
-        hub = hub_provider()
-        if hub is None:
+        owner = translation_runtime_configuration_provider()
+        if owner is None:
             return
-        hub.peer_translation_enabled = peer_translation_enabled
-        hub.integrated_context_enabled = integrated_context_enabled
+        replace_translation_runtime_effective_flags(
+            owner,
+            peer_translation_enabled=peer_translation_enabled,
+            integrated_context_enabled=integrated_context_enabled,
+        )
 
     owner = PeerApplicationOwner(
         state_provider=state.state,

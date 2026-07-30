@@ -30,22 +30,29 @@ from puripuly_heart.app.services.settings_projection import SettingsProjectionOw
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
-from puripuly_heart.app.wiring_provider_runtime import ProviderRuntimeSignatures
+from puripuly_heart.app.wiring_provider_runtime import (
+    ProviderRuntimeSignatures,
+    project_translation_runtime_settings,
+)
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.app.wiring_stt_factory import (
     build_peer_stt_runtime_signature,
     build_self_capture_vad_signature,
     build_self_stt_runtime_signature,
 )
+from puripuly_heart.app.wiring_translation_runtime_configuration import (
+    replace_translation_runtime_settings,
+)
 from puripuly_heart.config.settings import (
     OVERLAY_TARGET_DESKTOP,
     AppSettings,
     LLMProviderName,
 )
-from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfigChange,
+)
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
-from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 
 @dataclass(slots=True)
@@ -194,10 +201,24 @@ class SettingsRuntimeEffectsAdapter:
         previous_self_signature = self._runtime_signatures.last_self_runtime
         previous_peer_signature = peer.last_runtime_signature
         hub = self._pipeline.hub
-        previous_source_language = hub.source_language if hub else None
-        previous_target_language = hub.target_language if hub else None
-        previous_peer_source_language = getattr(hub, "peer_source_language", None) if hub else None
-        previous_peer_target_language = getattr(hub, "peer_target_language", None) if hub else None
+        config_owner = self._pipeline.translation_runtime_configuration
+        previous_configuration = config_owner.snapshot().value if config_owner is not None else None
+        previous_source_language = (
+            previous_configuration.source_language if previous_configuration is not None else None
+        )
+        previous_target_language = (
+            previous_configuration.target_language if previous_configuration is not None else None
+        )
+        previous_peer_source_language = (
+            previous_configuration.peer_source_language
+            if previous_configuration is not None
+            else None
+        )
+        previous_peer_target_language = (
+            previous_configuration.peer_target_language
+            if previous_configuration is not None
+            else None
+        )
         previous_peer_source_mode = (
             previous_settings.languages.peer_source_mode if previous_settings is not None else None
         )
@@ -311,24 +332,17 @@ class SettingsRuntimeEffectsAdapter:
         restored_settings = copy.deepcopy(settings)
         self._settings.current = restored_settings
         self._calibration.sync_from_settings(restored_settings)
-        hub = self._pipeline.hub
-        if hub is not None:
-            hub.source_language = restored_settings.languages.source_language
-            hub.target_language = restored_settings.languages.target_language
-            hub.peer_source_language = restored_settings.languages.peer_source_language
-            hub.peer_target_language = restored_settings.languages.peer_target_language
-            hub.system_prompt = restored_settings.system_prompt
-            hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            hub.low_latency_merge_gap_ms = restored_settings.stt.low_latency_merge_gap_ms
-            hub.low_latency_spec_retry_max = restored_settings.stt.low_latency_spec_retry_max
-            hub.hangover_s = (
-                restored_settings.stt.low_latency_vad_hangover_ms / 1000.0
-                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-                else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
+        config_owner = self._pipeline.translation_runtime_configuration
+        if config_owner is not None:
+            peer_enabled = self._peer.owner.effective_enabled(
+                self._peer.state_for(restored_settings)
             )
-            hub.peer_hangover_s = restored_settings.desktop_audio.vad_hangover_ms / 1000.0
-            hub.chatbox_include_source = restored_settings.osc.chatbox_include_source
-            self._sync_effective_hub_flags(restored_settings)
+            replace_translation_runtime_settings(
+                config_owner,
+                project_translation_runtime_settings(restored_settings),
+                peer_translation_enabled=peer_enabled,
+                integrated_context_enabled=peer_enabled,
+            )
         self._sync_signatures(restored_settings)
 
     def sync_signatures(self, settings: AppSettings) -> None:
@@ -373,30 +387,24 @@ class SettingsRuntimeEffectsAdapter:
         self._clear_local_pending()
 
         hub = self._pipeline.hub
-        if hub is not None:
-            hub.source_language = settings.languages.source_language
-            hub.target_language = settings.languages.target_language
-            hub.peer_source_language = settings.languages.peer_source_language
-            hub.peer_target_language = settings.languages.peer_target_language
-            hub.system_prompt = settings.system_prompt
-            hub.low_latency_mode = FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            hub.low_latency_merge_gap_ms = settings.stt.low_latency_merge_gap_ms
-            hub.low_latency_spec_retry_max = settings.stt.low_latency_spec_retry_max
-            hub.hangover_s = (
-                settings.stt.low_latency_vad_hangover_ms / 1000.0
-                if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-                else DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
+        config_owner = self._pipeline.translation_runtime_configuration
+        config_change: TranslationRuntimeConfigChange | None = None
+        if config_owner is not None:
+            peer_enabled = self._peer.owner.effective_enabled(self._peer.state_for(settings))
+            config_change = replace_translation_runtime_settings(
+                config_owner,
+                project_translation_runtime_settings(settings),
+                peer_translation_enabled=peer_enabled,
+                integrated_context_enabled=peer_enabled,
             )
-            hub.peer_hangover_s = settings.desktop_audio.vad_hangover_ms / 1000.0
-            hub.chatbox_include_source = settings.osc.chatbox_include_source
-            self._sync_effective_hub_flags(settings)
 
-            if transition.source_language_changed or transition.target_language_changed:
+        if hub is not None:
+            if config_change is not None and config_change.self_language_changed:
                 await self._clear_language_runtime_state(
                     "self",
                     strict_runtime_errors=strict_runtime_errors,
                 )
-            if transition.effective_peer_source_changed or transition.effective_peer_target_changed:
+            if config_change is not None and config_change.peer_language_changed:
                 await self._clear_language_runtime_state(
                     "peer",
                     strict_runtime_errors=strict_runtime_errors,
