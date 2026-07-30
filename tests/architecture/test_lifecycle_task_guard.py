@@ -349,7 +349,7 @@ def test_order37_named_owner_allowlist_retires_controller_bounds_task_debt() -> 
         RUN_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
     assert (
-        "src/puripuly_heart/core/managed_openrouter_release.py",
+        "src/puripuly_heart/core/openrouter/managed_openrouter_release.py",
         ASYNCIO_CREATE_TASK,
     ) not in LEGACY_TASK_CREATION_ALLOWLIST
     assert (

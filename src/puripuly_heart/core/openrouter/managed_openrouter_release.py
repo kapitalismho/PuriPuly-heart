@@ -37,17 +37,18 @@ from puripuly_heart.core.managed_identity import (
     load_existing_managed_identity_bundle,
     regenerate_managed_identity_bundle,
 )
-from puripuly_heart.core.openrouter_credentials import (
+from puripuly_heart.core.runtime.oauth import OAuthRuntime
+from puripuly_heart.core.storage.secrets import SecretStore
+from puripuly_heart.domain.models import Translation
+
+from .openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
     OpenRouterCredentialRuntimeConfig,
     best_effort_store_managed_openrouter_user_identifier,
     clear_temporary_managed_release_state,
     resolve_openrouter_credentials,
 )
-from puripuly_heart.core.openrouter_handoff import store_managed_entitlement_snapshot
-from puripuly_heart.core.runtime.oauth import OAuthRuntime
-from puripuly_heart.core.storage.secrets import SecretStore
-from puripuly_heart.domain.models import Translation
+from .openrouter_handoff import store_managed_entitlement_snapshot
 
 MANAGED_OPENROUTER_TRIAL_BUDGET_USD = 0.07
 DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET = "openrouter_managed_delivery_ack_token"

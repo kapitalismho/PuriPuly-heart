@@ -258,7 +258,7 @@ LAYER_RULES = (
         prefixes=(
             "puripuly_heart.app.adapters",
             "puripuly_heart.app.wiring",
-            "puripuly_heart.core.managed_openrouter_broker_client",
+            "puripuly_heart.core.openrouter.managed_openrouter_broker_client",
             "puripuly_heart.core.osc",
             "puripuly_heart.core.runtime_logging",
             "puripuly_heart.core.storage",
@@ -345,7 +345,7 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
     {
         ImportViolation(
             rule_id="adapters-avoid-ui-and-migration-internals",
-            importer="src/puripuly_heart/core/managed_openrouter_broker_client.py",
+            importer="src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py",
             imported="puripuly_heart.config.settings",
             importer_layer="adapters",
             imported_layer="migration/serialization",
@@ -592,7 +592,10 @@ KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementVio
 
 
 def _known_allowed_violation_gate6_rationale(violation: ImportViolation) -> str:
-    if violation.importer == "src/puripuly_heart/core/managed_openrouter_broker_client.py":
+    if (
+        violation.importer
+        == "src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py"
+    ):
         return "managed OpenRouter broker adapter still consumes public settings compatibility values at the adapter boundary"
     if violation.importer_layer == RUNTIME_OWNERS:
         return "runtime owner currently wraps a concrete adapter while preserving explicit lifecycle ownership; adapter-port extraction remains deferred work"

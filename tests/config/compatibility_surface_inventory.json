@@ -70,7 +70,7 @@
       "source_of_truth_refs": [
         "src/puripuly_heart/core/storage/secrets.py",
         "src/puripuly_heart/app/wiring.py::create_secret_store",
-        "src/puripuly_heart/core/openrouter_credentials.py",
+        "src/puripuly_heart/core/openrouter/openrouter_credentials.py",
         "src/puripuly_heart/core/managed_identity.py",
         "tests/config/public_compatibility_surfaces_snapshot.json::secret_store"
       ],
@@ -131,7 +131,7 @@
     "broker_v1": {
       "classification": "public_compatibility_preserve",
       "source_of_truth_refs": [
-        "src/puripuly_heart/core/managed_openrouter_broker_client.py",
+        "src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py",
         "src/puripuly_heart/core/managed_identity.py::DISCORD_OPENROUTER_ISSUE_PATH",
         "broker/src",
         "tests/config/public_compatibility_surfaces_snapshot.json::broker_v1"
@@ -520,9 +520,9 @@
       ]
     },
     {
-      "module": "puripuly_heart.core.openrouter_credentials",
+      "module": "puripuly_heart.core.openrouter.openrouter_credentials",
       "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/core/openrouter_credentials.py", "tests/core/test_openrouter_credentials.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/core/openrouter/openrouter_credentials.py", "tests/core/test_openrouter_credentials.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [
@@ -570,9 +570,9 @@
       ]
     },
     {
-      "module": "puripuly_heart.core.managed_openrouter_broker_client",
+      "module": "puripuly_heart.core.openrouter.managed_openrouter_broker_client",
       "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/core/managed_openrouter_broker_client.py", "tests/core/test_managed_openrouter_broker_client.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py", "tests/core/test_managed_openrouter_broker_client.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [
@@ -584,9 +584,9 @@
       ]
     },
     {
-      "module": "puripuly_heart.core.managed_openrouter_release",
+      "module": "puripuly_heart.core.openrouter.managed_openrouter_release",
       "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/core/managed_openrouter_release.py", "tests/core/test_managed_openrouter_release.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/core/openrouter/managed_openrouter_release.py", "tests/core/test_managed_openrouter_release.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [
@@ -1001,7 +1001,7 @@
       "classification": "private_internal_or_test_compatibility",
       "examples": [
         "puripuly_heart.app.wiring._LazyFactoryLLMProvider",
-        "puripuly_heart.core.managed_openrouter_release._resolve_managed_issue_model"
+        "puripuly_heart.core.openrouter.managed_openrouter_release._resolve_managed_issue_model"
       ],
       "rationale": "Underscore-prefixed symbols remain private/internal despite existing tests; later gates may migrate tests to canonical public contracts before removal."
     },
@@ -1185,7 +1185,7 @@
         "puripuly_heart.core.local_asr_provider_runtime",
         "puripuly_heart.core.local_asr_provisioning",
         "puripuly_heart.core.observability",
-        "puripuly_heart.core.openrouter_metadata",
+        "puripuly_heart.core.openrouter.openrouter_metadata",
         "puripuly_heart.core.telemetry"
       ],
       "rationale": "These modules expose internal core contracts for lifecycle, diagnostics, safe error/message shaping, telemetry ports/services, and OpenRouter metadata. They are not external public compatibility facades."
@@ -1366,6 +1366,14 @@
         "puripuly_heart.core.discord"
       ],
       "rationale": "Domain-aligned grouping package that re-exports the moved Discord OAuth modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.core.openrouter domain grouping package",
+      "classification": "internal_domain_grouping_package",
+      "modules": [
+        "puripuly_heart.core.openrouter"
+      ],
+      "rationale": "Domain-aligned grouping package that re-exports the moved OpenRouter credential, PKCE, handoff, and managed release modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "broker source modules",

@@ -18,7 +18,8 @@ from puripuly_heart.app.ports.broker_client import (
 )
 from puripuly_heart.config.settings import normalize_owned_referral_id
 from puripuly_heart.core import messages
-from puripuly_heart.core.managed_openrouter_release import (
+
+from .managed_openrouter_release import (
     ManagedOpenRouterChallengeSuccess,
     ManagedOpenRouterDiscordStartSuccess,
     ManagedOpenRouterFingerprintSalt,
@@ -29,7 +30,7 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterVerifySuccess,
     TalkTogetherPassStatus,
 )
-from puripuly_heart.core.openrouter_credentials import (
+from .openrouter_credentials import (
     normalize_managed_openrouter_user_identifier,
 )
 
