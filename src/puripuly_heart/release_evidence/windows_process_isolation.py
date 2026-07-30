@@ -30,6 +30,7 @@ from puripuly_heart.config.process_capture_platform import (
     get_process_capture_platform_availability,
 )
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget
+from puripuly_heart.core.peer_capture import PeerCaptureFailureReason
 
 EVIDENCE_SCHEMA = "puripuly-heart/windows-process-isolation/v1"
 SAMPLE_RATE_HZ = 48000
@@ -157,7 +158,7 @@ def lifecycle_passes(
     except ValueError:
         return False
     return (
-        warning_reason == "process_target_exited"
+        warning_reason == PeerCaptureFailureReason.PROCESS_TARGET_EXITED.value
         and event_indexes == tuple(sorted(event_indexes))
         and loop_task_done_at_warning
         and list(process_source_pids) == [first_pid, retry_pid]
@@ -372,6 +373,15 @@ def classify_fixture_failure(exc: Exception) -> str:
         if code.endswith("_startup_timeout") or code.endswith("_startup_failed"):
             return "emitter_startup_failed"
     return "fixture_execution_failed"
+
+
+def latest_peer_failure_reason(diagnostics: Sequence[object]) -> str | None:
+    for diagnostic in reversed(diagnostics):
+        reason = getattr(diagnostic, "reason", None)
+        value = getattr(reason, "value", None)
+        if isinstance(value, str):
+            return value
+    return None
 
 
 def write_evidence(path: Path, evidence: dict[str, object]) -> None:
@@ -593,7 +603,6 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
     from puripuly_heart.core.peer_capture import (
         PeerCaptureAdmission,
         PeerCaptureAdmissionStatus,
-        PeerCaptureFailureReason,
         PeerCaptureLanguageFacts,
         PeerCaptureProviderMutation,
         PeerCaptureProviderMutationStatus,
@@ -797,8 +806,10 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
     initial_loop_task = None
 
     def diagnostic_sink(diagnostic) -> None:  # noqa: ANN001
-        events.append("typed_warning")
         diagnostics.append(diagnostic)
+        if diagnostic.reason is None:
+            return
+        events.append("typed_warning")
         loop_task_at_warning.append(initial_loop_task is not None and initial_loop_task.done())
 
     runtime = PeerCaptureSessionOwner(
@@ -915,12 +926,12 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
         )
         retried = await invoke_gui_process_retry(gui_action)
         await asyncio.sleep(0.1)
+        terminal_warning_reason = latest_peer_failure_reason(diagnostics)
         lifecycle_passed_result = lifecycle_passes(
             events=events,
             warning_reason=(
-                diagnostics[-1].reason.value
-                if diagnostics
-                and diagnostics[-1].reason is PeerCaptureFailureReason.PROCESS_TARGET_EXITED
+                terminal_warning_reason
+                if terminal_warning_reason == PeerCaptureFailureReason.PROCESS_TARGET_EXITED.value
                 else None
             ),
             loop_task_done_at_warning=bool(loop_task_at_warning and loop_task_at_warning[-1]),
@@ -1016,7 +1027,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
                 },
             },
             "lifecycle": {
-                "typed_warning": diagnostics[-1].reason.value if diagnostics else None,
+                "typed_warning": terminal_warning_reason,
                 "warning_after_provider_source_task_teardown": lifecycle_passed_result,
                 "provider_close_before_warning": provider_close_before_warning,
                 "source_close_before_warning": source_close_before_warning,
