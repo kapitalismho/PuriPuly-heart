@@ -121,6 +121,7 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
     assert pipeline.hub.peer_runtime is pipeline.peer_runtime
     assert pipeline.hub.translation_turns is pipeline.translation_turns
     assert pipeline.hub.context_resolver is pipeline.context_resolver
+    assert pipeline.hub.translation_diagnostics is pipeline.translation_diagnostics
     assert pipeline.hub._local_asr_provider_runtime is pipeline.local_asr_runtime
     assert pipeline.hub._llm_provider_runtime is pipeline.llm_runtime
     assert pipeline.resource_owner.output_runtime is pipeline.output_runtime
@@ -213,6 +214,7 @@ async def test_pipeline_composition_preserves_runtime_configuration_and_gate(
     assert config.chatbox_include_source is False
     assert config.peer_source_language == "ja"
     assert config.peer_target_language == "en"
+    assert pipeline.translation_diagnostics.runtime_logging is runtime_logging
     assert llm_kwargs["runtime_logging"] is runtime_logging
     assert osc_kwargs["runtime_logging"] is runtime_logging
     assert pipeline.vrc_mic_audio_gate is gate

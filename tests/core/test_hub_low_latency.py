@@ -451,7 +451,10 @@ async def test_replaced_llm_provider_late_final_cleans_peer_runtime_without_outp
     assert utterance_id not in hub._peer_turn_parent_ids
     assert parent_utterance_id not in hub._peer_parent_turn_ids
     assert parent_utterance_id not in hub._peer_parent_speech_end_times
-    assert ("peer", utterance_id) not in hub._latency_timelines
+    assert (
+        "peer",
+        utterance_id,
+    ) not in hub.translation_diagnostics.snapshot().timeline_keys
 
     await hub.stop()
 

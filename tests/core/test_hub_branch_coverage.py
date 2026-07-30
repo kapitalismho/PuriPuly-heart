@@ -454,8 +454,9 @@ async def test_clear_language_runtime_state_self_preserves_stt_task_and_clears_o
         assert hub.self_runtime.speech_ended_ids == set()
         assert hub.self_runtime.translation_history == [ContextEntry("history", "ko", "en", 1.0)]
         assert overlay_sink.active_self_overlay_metadata() is None
-        assert ("self", self_id) not in hub._latency_timelines
-        assert ("peer", peer_id) in hub._latency_timelines
+        timeline_keys = hub.translation_diagnostics.snapshot().timeline_keys
+        assert ("self", self_id) not in timeline_keys
+        assert ("peer", peer_id) in timeline_keys
         assert translation_task.cancelled() is True
         assert standalone_translation_task.cancelled() is True
         assert spec_task.cancelled() is True

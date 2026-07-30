@@ -8,15 +8,8 @@ from dataclasses import InitVar, dataclass, field, replace
 from typing import Protocol, cast
 from uuid import UUID, uuid4
 
-logger = logging.getLogger(__name__)
-
 from puripuly_heart.config.prompts import render_translation_prompt_template, warm_prompt_cache
 from puripuly_heart.core.clock import Clock, SystemClock
-from puripuly_heart.core.error_messages import (
-    format_error_report_for_log,
-    provider_failure_report,
-    stt_failure_report,
-)
 from puripuly_heart.core.language import (
     DetectedLanguageForLLM,
     get_llm_language_name,
@@ -48,13 +41,22 @@ from puripuly_heart.core.orchestrator.ports import (
     HubChatboxPort,
     HubOverlayEventFactoryPort,
     HubOverlaySinkPort,
-    HubRuntimeLoggingPort,
-    format_basic_latency_summary,
-    format_detailed_latency_breakdown,
-    format_detailed_latency_trace,
-    format_latency_cause_metric,
-    format_translation_ready_for_output,
-    runtime_logging_mode_is_detailed,
+)
+from puripuly_heart.core.orchestrator.translation_diagnostics import (
+    ContextApplicationDiagnostic,
+    ContextModeDiagnostic,
+    LatencyInheritanceDiagnostic,
+    LatencyStageDiagnostic,
+    LatencyTimelineDiagnostic,
+    OverlayEmitDiagnostic,
+    OverlaySinkDurationDiagnostic,
+    RuntimeDiagnostic,
+    SelfOverlayDecisionDiagnostic,
+    SttEventLoopFailureDiagnostic,
+    TranslationFailureDiagnostic,
+    TranslationLatencyDiagnosticsOwner,
+    TranslationReadyDiagnostic,
+    TranslationSkipDiagnostic,
 )
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
@@ -65,7 +67,6 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnProcessResult,
     TranslationTurnRequest,
 )
-from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.sink import OverlayEventUnion
 from puripuly_heart.core.runtime.output import (
     SELF_SPEECH_TYPING_REASON,
@@ -114,17 +115,6 @@ _SELF_RUNTIME_FIELDS = {
     "_speech_ended_ids": "speech_ended_ids",
     "_merge_buffer": "merge_buffer",
 }
-_LATENCY_TRACE_ORDER = (
-    "speech_end",
-    "stt_final",
-    "llm_request_start",
-    "llm_first_chunk",
-    "llm_done",
-    "self_chatbox_enqueue",
-    "peer_overlay_first_emit",
-    "peer_overlay_first_render",
-)
-_LATENCY_SUMMARY_OUTPUT_STAGES = {"self_chatbox_enqueue", "peer_overlay_first_emit"}
 _TRANSLATION_RUNTIME_CONFIG_FIELDS = frozenset(
     {
         "source_language",
@@ -152,27 +142,12 @@ _TRANSLATION_RUNTIME_CONFIG_FIELDS = frozenset(
 )
 
 
-@dataclass(slots=True)
-class _LatencyTimeline:
-    channel: ChannelId
-    stage_times: dict[str, float] = field(default_factory=dict)
-    emitted_trace_points: set[str] = field(default_factory=set)
-    basic_summary_emitted: bool = False
-    latency_cause_emitted: bool = False
-
-
 class _StaleProviderCompletion(Exception):
     """Internal signal for provider calls completed by a replaced provider handle."""
 
 
 class _UnmappedDetectedLanguage(Exception):
     pass
-
-
-def _safe_log_arg(value: object) -> object:
-    if isinstance(value, BaseException):
-        return type(value).__name__
-    return value
 
 
 def _safe_user_message_params(params: Mapping[str, object]) -> dict[str, SafeMessageParam]:
@@ -197,10 +172,9 @@ class ClientHub:
     direct_local_asr_runtime: InitVar[LocalASRProviderRuntimePort]
     direct_llm_runtime: InitVar[ProviderRuntimeHandle]
     direct_context_resolver: InitVar[ContextResolver]
+    direct_translation_diagnostics: InitVar[TranslationLatencyDiagnosticsOwner]
     overlay_sink: HubOverlaySinkPort | None = None
-    overlay_diagnostics: OverlayDiagnosticsRecorder | None = None
     clock: Clock = SystemClock()
-    runtime_logging: HubRuntimeLoggingPort | None = None
     source_language: InitVar[str | None] = None
     target_language: InitVar[str | None] = None
     peer_source_language: InitVar[str | None] = None
@@ -249,23 +223,7 @@ class ClientHub:
     active_chatbox_channel: ChannelId = field(init=False, default="self")
     output_runtime: OutputRuntime = field(init=False)
     overlay_event_adapter: HubOverlayEventFactoryPort = field(init=False)
-    _last_logged_context_modes: dict[ChannelId, ContextMode | None] = field(
-        init=False,
-        default_factory=lambda: {"self": None, "peer": None},
-    )
-    last_error_source: str | None = None
-    _last_overlay_secondary_runtime_signature: tuple[object, ...] | None = field(
-        init=False,
-        default=None,
-    )
-    _last_overlay_secondary_diagnostics_signature: tuple[object, ...] | None = field(
-        init=False,
-        default=None,
-    )
-    _latency_timelines: dict[tuple[ChannelId, UUID], _LatencyTimeline] = field(
-        init=False,
-        default_factory=dict,
-    )
+    translation_diagnostics: TranslationLatencyDiagnosticsOwner = field(init=False)
     _local_asr_provider_runtime: LocalASRProviderRuntimePort | None = field(
         init=False,
         default=None,
@@ -281,6 +239,7 @@ class ClientHub:
         direct_local_asr_runtime: LocalASRProviderRuntimePort,
         direct_llm_runtime: ProviderRuntimeHandle,
         direct_context_resolver: ContextResolver,
+        direct_translation_diagnostics: TranslationLatencyDiagnosticsOwner,
         source_language: str | None,
         target_language: str | None,
         peer_source_language: str | None,
@@ -351,6 +310,7 @@ class ClientHub:
         self._local_asr_provider_runtime = direct_local_asr_runtime
         self._llm_provider_runtime = direct_llm_runtime
         self.context_resolver = direct_context_resolver
+        self.translation_diagnostics = direct_translation_diagnostics
         warm_prompt_cache()
         self._sync_self_runtime_aliases()
 
@@ -393,12 +353,21 @@ class ClientHub:
                 output_runtime = object.__getattribute__(self, "output_runtime")
             except AttributeError:
                 output_runtime = None
+            try:
+                translation_diagnostics = object.__getattribute__(
+                    self,
+                    "translation_diagnostics",
+                )
+            except AttributeError:
+                translation_diagnostics = None
             if resolver is not None:
                 resolver.clock = value  # type: ignore[assignment]
             if overlay_event_adapter is not None:
                 overlay_event_adapter.clock = value  # type: ignore[assignment]
             if output_runtime is not None:
                 output_runtime.clock = value  # type: ignore[assignment]
+            if translation_diagnostics is not None:
+                translation_diagnostics.clock = value  # type: ignore[assignment]
         if name == "osc":
             try:
                 output_runtime = object.__getattribute__(self, "output_runtime")
@@ -431,10 +400,6 @@ class ClientHub:
         self._speech_ended_ids = self.self_runtime.speech_ended_ids
         self._merge_buffer = self.self_runtime.merge_buffer
 
-    @staticmethod
-    def _format_log_message(message: str, *args: object) -> str:
-        return message % args if args else message
-
     def _emit_basic(
         self,
         message: str,
@@ -442,11 +407,14 @@ class ClientHub:
         level: int = logging.INFO,
         fallback_level: int | None = None,
     ) -> None:
-        formatted = self._format_log_message(message, *args)
-        if self.runtime_logging is not None:
-            self.runtime_logging.emit_basic(formatted, level=level)
-            return
-        logger.log(level if fallback_level is None else fallback_level, formatted)
+        self.translation_diagnostics.emit(
+            RuntimeDiagnostic(
+                message=message,
+                args=args,
+                level=level,
+                fallback_level=fallback_level,
+            )
+        )
 
     def _emit_detailed(
         self,
@@ -455,190 +423,18 @@ class ClientHub:
         level: int = logging.INFO,
         fallback_level: int | None = None,
     ) -> bool:
-        if self.runtime_logging is not None:
-            return self.runtime_logging.emit_detailed_lazy(
-                lambda: self._format_log_message(message, *args),
+        return self.translation_diagnostics.emit(
+            RuntimeDiagnostic(
+                message=message,
+                args=args,
                 level=level,
+                fallback_level=fallback_level,
+                detailed=True,
             )
-        _ = fallback_level
-        return False
+        )
 
     def _emit_metric(self, message: str, *args: object) -> None:
-        self._emit_detailed(message, *args, fallback_level=logging.DEBUG)
-
-    @staticmethod
-    def _latency_key(channel: ChannelId, utterance_id: UUID) -> tuple[ChannelId, UUID]:
-        return channel, utterance_id
-
-    def _get_latency_timeline(
-        self,
-        *,
-        channel: ChannelId,
-        utterance_id: UUID,
-        create: bool = False,
-    ) -> _LatencyTimeline | None:
-        key = self._latency_key(channel, utterance_id)
-        timeline = self._latency_timelines.get(key)
-        if timeline is None and create:
-            timeline = _LatencyTimeline(channel=channel)
-            self._latency_timelines[key] = timeline
-        return timeline
-
-    @staticmethod
-    def _elapsed_latency_ms(start_at: float | None, end_at: float | None) -> int | None:
-        if start_at is None or end_at is None:
-            return None
-        return max(0, int(round((end_at - start_at) * 1000)))
-
-    def _latency_hangover_ms(self, channel: ChannelId) -> int:
-        configuration = self.translation_runtime_config_snapshot().value
-        hangover_s = (
-            configuration.peer_hangover_s if channel == "peer" else configuration.hangover_s
-        )
-        return max(0, int(round(hangover_s * 1000)))
-
-    def _emit_latency_trace_if_ready(
-        self,
-        *,
-        channel: ChannelId,
-        utterance_id: UUID,
-        stage: str,
-    ) -> None:
-        timeline = self._get_latency_timeline(channel=channel, utterance_id=utterance_id)
-        if timeline is None or stage in timeline.emitted_trace_points:
-            return
-        speech_end_at = timeline.stage_times.get("speech_end")
-        stage_at = timeline.stage_times.get(stage)
-        elapsed_ms = self._elapsed_latency_ms(speech_end_at, stage_at)
-        if elapsed_ms is None:
-            return
-        emitted = self._emit_detailed(
-            format_detailed_latency_trace(
-                channel=channel,
-                utterance_id=str(utterance_id)[:8],
-                stage=stage,
-                elapsed_ms=elapsed_ms,
-            )
-        )
-        if emitted:
-            timeline.emitted_trace_points.add(stage)
-
-    def _emit_latency_summary_if_ready(
-        self,
-        *,
-        channel: ChannelId,
-        utterance_id: UUID,
-        final_output_stage: str,
-    ) -> None:
-        timeline = self._get_latency_timeline(channel=channel, utterance_id=utterance_id)
-        if timeline is None or timeline.basic_summary_emitted:
-            return
-        speech_end_at = timeline.stage_times.get("speech_end")
-        final_output_at = timeline.stage_times.get(final_output_stage)
-        measured_speech_end_to_final_output_ms = self._elapsed_latency_ms(
-            speech_end_at, final_output_at
-        )
-        if measured_speech_end_to_final_output_ms is None:
-            return
-        e2e_ms = measured_speech_end_to_final_output_ms + self._latency_hangover_ms(channel)
-
-        stt_final_at = timeline.stage_times.get("stt_final")
-        speech_end_to_stt_final_ms = self._elapsed_latency_ms(speech_end_at, stt_final_at)
-        stt_reference_at = None
-        if speech_end_at is not None and stt_final_at is not None:
-            stt_reference_at = max(speech_end_at, stt_final_at)
-        stt_final_to_final_output_ms = self._elapsed_latency_ms(stt_reference_at, final_output_at)
-
-        self._emit_basic(
-            format_basic_latency_summary(
-                channel=channel,
-                e2e_ms=e2e_ms,
-            )
-        )
-        self._emit_detailed(
-            format_detailed_latency_breakdown(
-                channel=channel,
-                e2e_ms=e2e_ms,
-                speech_end_to_stt_final_ms=speech_end_to_stt_final_ms,
-                stt_final_to_final_output_ms=stt_final_to_final_output_ms,
-            )
-        )
-        self._emit_latency_cause_if_ready(
-            channel=channel,
-            utterance_id=utterance_id,
-            final_output_stage=final_output_stage,
-        )
-        timeline.basic_summary_emitted = True
-
-    def _emit_latency_cause_if_ready(
-        self,
-        *,
-        channel: ChannelId,
-        utterance_id: UUID,
-        final_output_stage: str,
-    ) -> None:
-        timeline = self._get_latency_timeline(channel=channel, utterance_id=utterance_id)
-        if timeline is None or timeline.latency_cause_emitted:
-            return
-        speech_end_at = timeline.stage_times.get("speech_end")
-        stt_final_at = timeline.stage_times.get("stt_final")
-        llm_request_start_at = timeline.stage_times.get("llm_request_start")
-        llm_first_chunk_at = timeline.stage_times.get("llm_first_chunk")
-        llm_done_at = timeline.stage_times.get("llm_done")
-        final_output_at = timeline.stage_times.get(final_output_stage)
-
-        stage_durations_ms = {
-            "speech_end_to_stt_final": self._elapsed_latency_ms(speech_end_at, stt_final_at),
-            "stt_final_to_llm_request_start": self._elapsed_latency_ms(
-                stt_final_at,
-                llm_request_start_at,
-            ),
-            "llm_request_to_first_chunk": self._elapsed_latency_ms(
-                llm_request_start_at,
-                llm_first_chunk_at,
-            ),
-            "llm_request_to_llm_done": self._elapsed_latency_ms(
-                llm_request_start_at,
-                llm_done_at,
-            ),
-            "stt_final_to_final_output": (
-                self._elapsed_latency_ms(
-                    stt_final_at,
-                    final_output_at,
-                )
-                if llm_request_start_at is None
-                else None
-            ),
-        }
-        message = format_latency_cause_metric(
-            channel=channel,
-            provider="llm" if llm_request_start_at is not None else "stt",
-            utterance_id=str(utterance_id)[:8],
-            stage_durations_ms=stage_durations_ms,
-        )
-        if message is None:
-            return
-        if self._emit_detailed(message, fallback_level=logging.DEBUG):
-            timeline.latency_cause_emitted = True
-
-    def _emit_latency_contract_if_ready(
-        self,
-        *,
-        channel: ChannelId,
-        utterance_id: UUID,
-    ) -> None:
-        for trace_stage in _LATENCY_TRACE_ORDER:
-            self._emit_latency_trace_if_ready(
-                channel=channel,
-                utterance_id=utterance_id,
-                stage=trace_stage,
-            )
-        for output_stage in _LATENCY_SUMMARY_OUTPUT_STAGES:
-            self._emit_latency_summary_if_ready(
-                channel=channel,
-                utterance_id=utterance_id,
-                final_output_stage=output_stage,
-            )
+        self.translation_diagnostics.emit_metric(message, *args)
 
     def _record_latency_stage(
         self,
@@ -650,20 +446,15 @@ class ClientHub:
         overwrite: bool = True,
         publish_now: bool = True,
     ) -> None:
-        timeline = self._get_latency_timeline(
-            channel=channel, utterance_id=utterance_id, create=True
-        )
-        assert timeline is not None
-        if not overwrite and stage in timeline.stage_times:
-            return
-        timeline.stage_times[stage] = self.clock.now() if timestamp is None else timestamp
-
-        if not publish_now:
-            return
-
-        self._emit_latency_contract_if_ready(
-            channel=channel,
-            utterance_id=utterance_id,
+        self.translation_diagnostics.record_latency_stage(
+            LatencyStageDiagnostic(
+                channel=channel,
+                utterance_id=utterance_id,
+                stage=stage,
+                timestamp=timestamp,
+                overwrite=overwrite,
+                publish_now=publish_now,
+            )
         )
 
     def _inherit_latency_for_output(
@@ -673,43 +464,19 @@ class ClientHub:
         output_utterance_id: UUID,
         source_utterance_ids: list[UUID],
     ) -> None:
-        output_timeline = self._get_latency_timeline(
-            channel=channel,
-            utterance_id=output_utterance_id,
-            create=True,
-        )
-        assert output_timeline is not None
-        for source_utterance_id in source_utterance_ids:
-            source_timeline = self._get_latency_timeline(
+        self.translation_diagnostics.inherit_latency(
+            LatencyInheritanceDiagnostic(
                 channel=channel,
-                utterance_id=source_utterance_id,
+                output_utterance_id=output_utterance_id,
+                source_utterance_ids=tuple(source_utterance_ids),
             )
-            if source_timeline is None:
-                continue
-            for stage in ("speech_end", "stt_final"):
-                source_time = source_timeline.stage_times.get(stage)
-                if source_time is None:
-                    continue
-                existing_time = output_timeline.stage_times.get(stage)
-                if existing_time is None:
-                    output_timeline.stage_times[stage] = source_time
-                else:
-                    output_timeline.stage_times[stage] = max(existing_time, source_time)
-        self._emit_latency_contract_if_ready(
-            channel=channel,
-            utterance_id=output_utterance_id,
         )
 
     def _clear_latency_timeline(self, *, channel: ChannelId, utterance_id: UUID) -> None:
-        self._latency_timelines.pop(self._latency_key(channel, utterance_id), None)
+        self.translation_diagnostics.clear_latency_timeline(channel, utterance_id)
 
     def _clear_latency_state(self, *, channel: ChannelId | None = None) -> None:
-        if channel is None:
-            self._latency_timelines.clear()
-            return
-        keys_to_remove = [key for key in self._latency_timelines if key[0] == channel]
-        for key in keys_to_remove:
-            self._latency_timelines.pop(key, None)
+        self.translation_diagnostics.clear_latency_state(channel)
 
     def _clear_runtime_latency_bookkeeping(self, *, channel: ChannelId, utterance_id: UUID) -> None:
         runtime = self._runtime_for_channel(channel)
@@ -834,11 +601,14 @@ class ClientHub:
         *args: object,
         level: int = logging.ERROR,
     ) -> None:
-        formatted = self._format_log_message(message, *(_safe_log_arg(arg) for arg in args))
-        if self.runtime_logging is not None:
-            self.runtime_logging.emit_basic(formatted, level=level)
-            return
-        logger.log(level, formatted)
+        self.translation_diagnostics.emit(
+            RuntimeDiagnostic(
+                message=message,
+                args=args,
+                level=level,
+                safe_exceptions=True,
+            )
+        )
 
     def _emit_stt_event_loop_failure(
         self,
@@ -847,74 +617,13 @@ class ClientHub:
         provider: STTProvider | None = None,
         channel: ChannelId = "self",
     ) -> None:
-        if self.runtime_logging is None:
-            self._emit_exception_summary(
-                "[Hub] STT event loop crashed: %s",
-                exc,
-                level=logging.ERROR,
+        self.translation_diagnostics.record_stt_event_loop_failure(
+            SttEventLoopFailureDiagnostic(
+                exception=exc,
+                provider=provider,
+                default_channel=channel,
             )
-            return
-
-        provider_label, channel_label = self._stt_failure_context(
-            provider,
-            default_channel=channel,
         )
-        report = stt_failure_report(
-            exc,
-            provider=provider_label,
-            operation="event_loop",
-            channel=channel_label,
-        )
-        self.runtime_logging.emit_basic(
-            self._format_log_message(
-                "[Hub] STT event loop crashed: %s",
-                format_error_report_for_log(report),
-            ),
-            level=logging.ERROR,
-        )
-
-    @staticmethod
-    def _stt_failure_context(
-        provider: STTProvider | None,
-        *,
-        default_channel: ChannelId,
-    ) -> tuple[str, ChannelId]:
-        provider_label = "stt"
-        channel = default_channel
-
-        if provider is None:
-            return provider_label, channel
-
-        provider_name = getattr(provider, "stt_provider_name", None)
-        provider_name_value = getattr(provider_name, "value", None)
-        if isinstance(provider_name_value, str) and provider_name_value.strip():
-            provider_label = provider_name_value
-        elif isinstance(provider_name, str) and provider_name.strip():
-            provider_label = provider_name
-
-        provider_channel = getattr(provider, "channel", None)
-        if provider_channel in ("self", "peer"):
-            channel = cast(ChannelId, provider_channel)
-
-        return provider_label, channel
-
-    def _translation_skip_reason(
-        self,
-        runtime: ChannelRuntime,
-        configuration: TranslationRuntimeConfig | None = None,
-    ) -> str:
-        configuration = (
-            self.translation_runtime_config_snapshot().value
-            if configuration is None
-            else configuration
-        )
-        if self._llm_provider_runtime.provider is None:
-            return "llm unavailable"
-        if not configuration.translation_enabled:
-            return "translation disabled"
-        if runtime.channel == "peer" and not configuration.peer_translation_enabled:
-            return "peer translation disabled"
-        return "translation disabled"
 
     def _log_translation_skipped(
         self,
@@ -924,13 +633,19 @@ class ClientHub:
         publish_chatbox: bool,
         configuration: TranslationRuntimeConfig | None = None,
     ) -> None:
-        self._emit_detailed(
-            "[Hub] Translation skipped (stage=%s, channel=%s, publish_chatbox=%s): %s",
-            stage,
-            runtime.channel,
-            publish_chatbox,
-            self._translation_skip_reason(runtime, configuration),
-            fallback_level=logging.INFO,
+        resolved_configuration = (
+            self.translation_runtime_config_snapshot().value
+            if configuration is None
+            else configuration
+        )
+        self.translation_diagnostics.record_translation_skip(
+            TranslationSkipDiagnostic(
+                stage=stage,
+                channel=runtime.channel,
+                publish_chatbox=publish_chatbox,
+                llm_available=self._llm_provider_runtime.provider is not None,
+                configuration=resolved_configuration,
+            )
         )
 
     def _log_translation_failure(
@@ -941,21 +656,14 @@ class ClientHub:
         exc: Exception,
         detailed: bool = False,
     ) -> UserErrorReport:
-        emit = self._emit_detailed if detailed else self._emit_basic
-        report = provider_failure_report(
-            exc,
-            provider="llm",
-            operation="translate",
+        return self.translation_diagnostics.record_translation_failure(
+            TranslationFailureDiagnostic(
+                stage=stage,
+                channel=runtime.channel,
+                exception=exc,
+                detailed=detailed,
+            )
         )
-        emit(
-            "[Hub] Translation failed (stage=%s, channel=%s): %s",
-            stage,
-            runtime.channel,
-            format_error_report_for_log(report),
-            level=logging.ERROR,
-            fallback_level=logging.ERROR,
-        )
-        return report
 
     @staticmethod
     def _translation_error_payload(exc: Exception, report: UserErrorReport) -> UserErrorReport:
@@ -1053,11 +761,12 @@ class ClientHub:
         runtime: ChannelRuntime,
         applied_mode: ContextMode,
     ) -> None:
-        last_mode = self._last_logged_context_modes.get(runtime.channel)
-        if last_mode == applied_mode:
-            return
-        self._last_logged_context_modes[runtime.channel] = applied_mode
-        self._emit_basic("[Hub] Context mode: channel=%s mode=%s", runtime.channel, applied_mode)
+        self.translation_diagnostics.record_context_mode(
+            ContextModeDiagnostic(
+                channel=runtime.channel,
+                applied_mode=applied_mode,
+            )
+        )
 
     def _log_context_application(
         self,
@@ -1066,28 +775,13 @@ class ClientHub:
         runtime: ChannelRuntime,
         context: str,
     ) -> None:
-        context_lines = context.splitlines() if context else []
-        applied_mode = self._last_logged_context_modes.get(runtime.channel)
-        if runtime.channel == "peer" and applied_mode in (None, "local"):
-            peer_entries = len(context_lines)
-            self_entries = 0
-        else:
-            peer_entries = sum(
-                1
-                for line in context_lines
-                if line.startswith("- [peer,") or line.startswith("- [others,")
+        self.translation_diagnostics.record_context_application(
+            ContextApplicationDiagnostic(
+                channel=runtime.channel,
+                request_chars=len(text),
+                context_lines=tuple(context.splitlines()) if context else (),
+                context_chars=len(context),
             )
-            self_entries = len(context_lines) - peer_entries
-        self._emit_basic(
-            "[Hub] Context apply: channel=%s mode=%s request_chars=%s "
-            "entries=%s self_entries=%s peer_entries=%s context_chars=%s",
-            runtime.channel,
-            applied_mode,
-            len(text),
-            len(context_lines),
-            self_entries,
-            peer_entries,
-            len(context),
         )
 
     async def handle_vad_event(self, event: VadEvent) -> None:
@@ -1808,32 +1502,16 @@ class ClientHub:
             )
         return source_language, target_language
 
-    def _translation_ready_elapsed_ms(
-        self,
-        *,
-        channel: ChannelId,
-        utterance_id: UUID,
-    ) -> int | None:
-        timeline = self._get_latency_timeline(channel=channel, utterance_id=utterance_id)
-        if timeline is None:
-            return None
-        ready_at = timeline.stage_times.get("llm_done")
-        if ready_at is None:
-            return None
-        return self._elapsed_latency_ms(timeline.stage_times.get("speech_end"), ready_at)
-
     def _emit_translation_ready_for_output(
         self,
         *,
         translation: Translation,
         runtime: ChannelRuntime,
     ) -> bool:
-        if self.runtime_logging is None:
-            return False
-        return self.runtime_logging.emit_detailed_lazy(
-            lambda: format_translation_ready_for_output(
+        return self.translation_diagnostics.emit_translation_ready(
+            TranslationReadyDiagnostic(
                 channel=runtime.channel,
-                utterance_id=str(translation.utterance_id),
+                utterance_id=translation.utterance_id,
                 update_id=translation.update_id,
                 origin_wall_clock_ms=translation.origin_wall_clock_ms,
                 session_scope=translation.session_scope,
@@ -1841,10 +1519,6 @@ class ClientHub:
                 source_text_len=translation.source_text_len,
                 logical_turn_key=translation.logical_turn_key,
                 translation_len=len(translation.text),
-                elapsed_ms=self._translation_ready_elapsed_ms(
-                    channel=runtime.channel,
-                    utterance_id=translation.utterance_id,
-                ),
             )
         )
 
@@ -1928,33 +1602,23 @@ class ClientHub:
     async def _emit_overlay_event(self, event: OverlayEventUnion) -> None:
         if not self.output_runtime.has_overlay_destination:
             return
-        detailed_mode = self.runtime_logging is not None and runtime_logging_mode_is_detailed(
-            self.runtime_logging.mode
-        )
+        detailed_mode = self.translation_diagnostics.detailed_enabled
         start = time.perf_counter() if detailed_mode else 0.0
         result = await self.output_runtime.publish_overlay_event(event)
         if result.decision.reason == "destination_publish_failed":
-            self.last_error_source = "overlay_sink"
-            self._emit_basic(
-                "[Hub] Overlay sink emit failed: %s",
-                result.decision.metadata.get("error_type", "Exception"),
-                level=logging.ERROR,
+            self.translation_diagnostics.record_overlay_sink_failure(
+                result.decision.metadata.get("error_type", "Exception")
             )
             return
         if detailed_mode and result.decision.decision == "published":
             elapsed_ms = max(0, int((time.perf_counter() - start) * 1000))
-            event_type = type(event).__name__
-            channel = getattr(event, "channel", None)
-            utterance_id = getattr(event, "utterance_id", None)
-            update_id = getattr(event, "update_id", None)
-            self.runtime_logging.emit_detailed_lazy(
-                lambda: (
-                    "[Detailed][Hub] overlay_sink_emit_duration "
-                    f"event_type={event_type} "
-                    f"channel={channel} "
-                    f"utterance_id={utterance_id} "
-                    f"update_id={update_id} "
-                    f"elapsed_ms={elapsed_ms}"
+            self.translation_diagnostics.record_overlay_sink_duration(
+                OverlaySinkDurationDiagnostic(
+                    event_type=type(event).__name__,
+                    channel=getattr(event, "channel", None),
+                    utterance_id=getattr(event, "utterance_id", None),
+                    update_id=getattr(event, "update_id", None),
+                    elapsed_ms=elapsed_ms,
                 )
             )
 
@@ -2165,76 +1829,23 @@ class ClientHub:
         source: str,
         reuse_mode: str | None,
     ) -> None:
-        signature = (
-            buffer.merge_id,
-            active_text,
-            secondary_text,
-            source,
-            reuse_mode,
-            buffer.resume_pending,
-            buffer.resume_confirmed,
-        )
-        self._maybe_emit_active_self_secondary_runtime_log(
-            buffer=buffer,
-            active_text=active_text,
-            secondary_text=secondary_text,
-            source=source,
-            reuse_mode=reuse_mode,
-            signature=signature,
-        )
-        if self.overlay_diagnostics is None:
-            return
-        if signature == self._last_overlay_secondary_diagnostics_signature:
-            return
-        self._last_overlay_secondary_diagnostics_signature = signature
         spec_translation_len = 0
         if isinstance(buffer.spec_translation, Translation):
             spec_translation_len = len(buffer.spec_translation.text.strip())
-        self.overlay_diagnostics.record_hub(
-            "active_self_secondary",
-            merge_id=str(buffer.merge_id),
-            source=source,
-            active_text_len=len(active_text),
-            secondary_len=len(secondary_text),
-            spec_text_len=len((buffer.spec_text or "").strip()),
-            spec_translation_len=spec_translation_len,
-            cached_secondary_len=len(self._cached_active_self_secondary_text().strip()),
-            reuse_mode=reuse_mode,
-            resume_pending=buffer.resume_pending,
-            resume_confirmed=buffer.resume_confirmed,
+        self.translation_diagnostics.record_self_overlay_decision(
+            SelfOverlayDecisionDiagnostic.create(
+                merge_id=buffer.merge_id,
+                source=source,
+                active_text=active_text,
+                secondary_text=secondary_text,
+                spec_text_len=len((buffer.spec_text or "").strip()),
+                spec_translation_len=spec_translation_len,
+                cached_secondary_len=len(self._cached_active_self_secondary_text().strip()),
+                reuse_mode=reuse_mode,
+                resume_pending=buffer.resume_pending,
+                resume_confirmed=buffer.resume_confirmed,
+            )
         )
-
-    def _maybe_emit_active_self_secondary_runtime_log(
-        self,
-        *,
-        buffer: _MergeBuffer,
-        active_text: str,
-        secondary_text: str,
-        source: str,
-        reuse_mode: str | None,
-        signature: tuple[object, ...],
-    ) -> None:
-        if signature == self._last_overlay_secondary_runtime_signature:
-            return
-        spec_translation_len = 0
-        if isinstance(buffer.spec_translation, Translation):
-            spec_translation_len = len(buffer.spec_translation.text.strip())
-        emitted = self._emit_detailed(
-            "[Hub] active_self_secondary merge_id=%s source=%s active_len=%s secondary_len=%s spec_text_len=%s spec_translation_len=%s cached_secondary_len=%s reuse_mode=%s resume_pending=%s resume_confirmed=%s",
-            str(buffer.merge_id)[:8],
-            source,
-            len(active_text),
-            len(secondary_text),
-            len((buffer.spec_text or "").strip()),
-            spec_translation_len,
-            len(self._cached_active_self_secondary_text().strip()),
-            reuse_mode,
-            buffer.resume_pending,
-            buffer.resume_confirmed,
-            fallback_level=logging.INFO,
-        )
-        if emitted:
-            self._last_overlay_secondary_runtime_signature = signature
 
     def _should_blank_stale_active_secondary_before_finalizing(
         self,
@@ -2262,19 +1873,18 @@ class ClientHub:
         channel: ChannelId,
         secondary_len: int,
     ) -> None:
-        if self.overlay_diagnostics is None:
-            return
-        self.overlay_diagnostics.record_hub(
-            "overlay_emit",
-            event_kind=event_kind,
-            utterance_id=str(utterance_id),
-            channel=channel,
-            secondary_len=secondary_len,
-            sink_type=(
-                type(self.output_runtime.overlay_sink).__name__
-                if self.output_runtime.has_overlay_destination
-                else None
-            ),
+        self.translation_diagnostics.record_overlay_emit(
+            OverlayEmitDiagnostic(
+                event_kind=event_kind,
+                utterance_id=utterance_id,
+                channel=channel,
+                secondary_len=secondary_len,
+                sink_type=(
+                    type(self.output_runtime.overlay_sink).__name__
+                    if self.output_runtime.has_overlay_destination
+                    else None
+                ),
+            )
         )
 
     def _is_soft_reuse_boundary_char(self, ch: str) -> bool:
@@ -2357,7 +1967,12 @@ class ClientHub:
                 publish_now=False,
             )
         self._clear_spec_latency_state(buffer)
-        self._emit_latency_contract_if_ready(channel="self", utterance_id=buffer.merge_id)
+        self.translation_diagnostics.publish_latency(
+            LatencyTimelineDiagnostic(
+                channel="self",
+                utterance_id=buffer.merge_id,
+            )
+        )
 
     def _clear_spec_state(self, buffer: _MergeBuffer, *, reason: str) -> bool:
         had_spec_state = any(

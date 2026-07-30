@@ -89,12 +89,20 @@ class FailingOnceManager(FakeManager):
 
 class FakeHub:
     def __init__(self, presenter: FakePresenter, diagnostics: object) -> None:
+        _ = diagnostics
         self.overlay_sink = presenter
-        self.overlay_diagnostics = diagnostics
         self.reset_overlay_preview_calls = 0
 
     async def reset_overlay_preview(self) -> None:
         self.reset_overlay_preview_calls += 1
+
+
+class DiagnosticsDetach:
+    def __init__(self) -> None:
+        self.calls: list[object | None] = []
+
+    def __call__(self, expected_current: object | None) -> None:
+        self.calls.append(expected_current)
 
 
 async def _blocked_until_cancel(label: str, events: list[str]) -> None:
@@ -276,10 +284,12 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
     bridge = FakeBridge(events)
     manager = FakeManager(events)
     hub = FakeHub(presenter, diagnostics)
+    diagnostics_detach = DiagnosticsDetach()
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
     handle.attach_presenter(presenter)
     handle.attach_bridge(bridge)
     handle.attach_process_manager(manager)
+    handle.attach_diagnostics(diagnostics)
     handle.attach_renderer_events(asyncio.Queue())
 
     start_task = handle.create_start_task(_blocked_until_cancel("start", events))
@@ -287,7 +297,11 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
     renderer_task = handle.create_renderer_event_task(_blocked_until_cancel("renderer", events))
     await asyncio.sleep(0)
 
-    await handle.close(preserve_presenter_state=False, hub=hub)
+    await handle.close(
+        preserve_presenter_state=False,
+        hub=hub,
+        diagnostics_detach=diagnostics_detach,
+    )
 
     assert start_task.done()
     assert monitor_task.done()
@@ -312,7 +326,7 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
     assert manager.mark_shutdown_requested_calls == 1
     assert bridge.stop_calls == 1
     assert hub.overlay_sink is None
-    assert hub.overlay_diagnostics is None
+    assert diagnostics_detach.calls == [diagnostics]
     assert hub.reset_overlay_preview_calls == 1
     assert handle.presenter is None
     assert handle.bridge is None
@@ -322,7 +336,11 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
     assert handle.monitor_task is None
     assert handle.renderer_event_task is None
 
-    await handle.close(preserve_presenter_state=False, hub=hub)
+    await handle.close(
+        preserve_presenter_state=False,
+        hub=hub,
+        diagnostics_detach=diagnostics_detach,
+    )
     assert presenter.broadcast_shutdown_calls == 1
     assert manager.stop_calls == 1
     assert bridge.stop_calls == 1
@@ -336,16 +354,22 @@ async def test_overlay_runtime_handle_close_detaches_hub_ingress_before_shutdown
     diagnostics = object()
     presenter = IngressObservingPresenter(events)
     hub = FakeHub(presenter, diagnostics)
+    diagnostics_detach = DiagnosticsDetach()
     presenter.hub = hub
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
     handle.attach_presenter(presenter)
+    handle.attach_diagnostics(diagnostics)
 
-    await handle.close(preserve_presenter_state=False, hub=hub)
+    await handle.close(
+        preserve_presenter_state=False,
+        hub=hub,
+        diagnostics_detach=diagnostics_detach,
+    )
 
     assert presenter.ingress_detached_at_broadcast is True
     assert presenter.broadcast_shutdown_calls == 1
     assert hub.overlay_sink is None
-    assert hub.overlay_diagnostics is None
+    assert diagnostics_detach.calls == [diagnostics]
     assert hub.reset_overlay_preview_calls == 1
 
 

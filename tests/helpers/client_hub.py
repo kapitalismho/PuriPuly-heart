@@ -17,6 +17,9 @@ from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.orchestrator.hub_callbacks import (
     ClientHubDurableOwnerCallbacks,
 )
+from puripuly_heart.core.orchestrator.translation_diagnostics import (
+    TranslationLatencyDiagnosticsOwner,
+)
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnLifecycleOwner,
 )
@@ -239,6 +242,8 @@ def compose_client_hub(**values: object) -> ClientHubTestHarness:
     osc = values.pop("osc")
     clock = values.pop("clock", None) or SystemClock()
     overlay_sink = values.get("overlay_sink")
+    overlay_diagnostics = values.pop("overlay_diagnostics", None)
+    runtime_logging = values.pop("runtime_logging", None)
     runtime_factory = values.pop("local_asr_provider_runtime_factory", None)
     config_owner = values.pop("translation_runtime_configuration", None)
     config_fields = TranslationRuntimeConfig.__dataclass_fields__
@@ -265,6 +270,12 @@ def compose_client_hub(**values: object) -> ClientHubTestHarness:
     context_resolver = ContextResolver(
         clock=clock,
         config_snapshot=config_owner.snapshot,
+    )
+    translation_diagnostics = TranslationLatencyDiagnosticsOwner(
+        clock=clock,
+        config_snapshot=config_owner.snapshot,
+        runtime_logging=runtime_logging,
+        overlay_diagnostics=overlay_diagnostics,
     )
     translation_turns = TranslationTurnLifecycleOwner(
         on_child_created=callbacks.child_created,
@@ -301,6 +312,7 @@ def compose_client_hub(**values: object) -> ClientHubTestHarness:
         direct_local_asr_runtime=local_asr_runtime,
         direct_llm_runtime=llm_runtime,
         direct_context_resolver=context_resolver,
+        direct_translation_diagnostics=translation_diagnostics,
         clock=clock,
         **values,
     )

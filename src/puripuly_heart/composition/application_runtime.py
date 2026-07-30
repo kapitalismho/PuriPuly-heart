@@ -488,6 +488,7 @@ def compose_application_runtime(
                     enabled,
                 ),
                 hub_provider=lambda: pipeline.hub,
+                diagnostics_provider=lambda: pipeline.translation_diagnostics,
                 peer_snapshot_provider=lambda: require_peer().owner.snapshot(),
                 disable_peer_intent=lambda: require_peer().owner.disable_for_overlay(),
                 sync_peer_effective=lambda: require_peer().owner.sync_effective_flags(),

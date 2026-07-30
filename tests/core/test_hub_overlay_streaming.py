@@ -1116,7 +1116,7 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
         assert parent_vad_id_set.isdisjoint(hub.peer_runtime.utterances)
         assert hub.peer_runtime.utterance_start_times == {}
         assert hub.peer_runtime.speech_ended_ids == set()
-        assert hub._latency_timelines == {}
+        assert not hub.translation_diagnostics.snapshot().timeline_keys
         assert hub._peer_parent_turn_ids == {}
         assert hub._peer_turn_parent_ids == {}
         assert hub._peer_completed_turn_ids == set()
@@ -1455,7 +1455,7 @@ async def test_peer_overlay_success_clears_latency_timeline() -> None:
     )
     await asyncio.gather(*hub.peer_runtime.translation_tasks.values(), return_exceptions=True)
 
-    assert hub._latency_timelines == {}
+    assert not hub.translation_diagnostics.snapshot().timeline_keys
     assert hub.peer_runtime.utterance_start_times == {}
     assert hub.peer_runtime.speech_ended_ids == set()
     assert hub._peer_turn_parent_ids == {}
@@ -1504,7 +1504,7 @@ async def test_peer_overlay_translation_denies_chatbox_and_cleans_bookkeeping() 
     assert decision.reason == "peer_chatbox_denied"
     assert "안녕" not in repr(decision)
     assert "hello" not in repr(decision)
-    assert hub._latency_timelines == {}
+    assert not hub.translation_diagnostics.snapshot().timeline_keys
     assert hub.peer_runtime.utterance_start_times == {}
     assert hub.peer_runtime.speech_ended_ids == set()
     assert hub._peer_turn_parent_ids == {}
@@ -1540,7 +1540,7 @@ async def test_peer_overlay_failure_clears_latency_timeline() -> None:
     )
     await asyncio.gather(*hub.peer_runtime.translation_tasks.values(), return_exceptions=True)
 
-    assert hub._latency_timelines == {}
+    assert not hub.translation_diagnostics.snapshot().timeline_keys
     assert hub.peer_runtime.utterance_start_times == {}
     assert hub.peer_runtime.speech_ended_ids == set()
 
@@ -1569,7 +1569,7 @@ async def test_peer_no_chatbox_terminal_path_clears_latency_bookkeeping() -> Non
         )
     )
 
-    assert hub._latency_timelines == {}
+    assert not hub.translation_diagnostics.snapshot().timeline_keys
     assert hub.peer_runtime.utterance_start_times == {}
     assert hub.peer_runtime.speech_ended_ids == set()
 
@@ -1611,7 +1611,7 @@ async def test_late_peer_speech_end_after_completed_turn_does_not_resurrect_book
     assert peer_turn_id not in hub._peer_turn_parent_ids
     assert hub.peer_runtime.utterance_start_times == {}
     assert hub.peer_runtime.speech_ended_ids == set()
-    assert hub._latency_timelines == {}
+    assert not hub.translation_diagnostics.snapshot().timeline_keys
 
 
 @pytest.mark.asyncio
@@ -1756,14 +1756,17 @@ async def test_peer_no_overlay_translation_path_keeps_latency_bookkeeping_until_
     assert peer_turn_id != utterance_id
     assert peer_turn_id in hub.peer_runtime.utterance_start_times
     assert peer_turn_id in hub.peer_runtime.speech_ended_ids
-    assert ("peer", peer_turn_id) in hub._latency_timelines
+    assert (
+        "peer",
+        peer_turn_id,
+    ) in hub.translation_diagnostics.snapshot().timeline_keys
     assert llm.calls == ["안녕"]
 
     assert llm.release is not None
     llm.release.set_result(None)
     await asyncio.gather(*hub.peer_runtime.translation_tasks.values(), return_exceptions=True)
 
-    assert hub._latency_timelines == {}
+    assert not hub.translation_diagnostics.snapshot().timeline_keys
     assert hub.peer_runtime.utterance_start_times == {}
     assert hub.peer_runtime.speech_ended_ids == set()
 
@@ -2244,7 +2247,7 @@ async def test_peer_overlay_emit_failures_still_emit_translation_done_and_deny_c
     assert decision.reason == "peer_chatbox_denied"
     assert "안녕" not in repr(decision)
     assert "hello" not in repr(decision)
-    assert hub.last_error_source == "overlay_sink"
+    assert hub.translation_diagnostics.snapshot().last_error_source == "overlay_sink"
     assert hub.ui_events.empty()
 
 
@@ -2263,7 +2266,7 @@ async def test_overlay_sink_failures_do_not_break_chatbox_or_translation_complet
     await asyncio.gather(*hub.self_runtime.translation_tasks.values(), return_exceptions=True)
 
     assert osc.messages[0].text == "self text (hello)"
-    assert hub.last_error_source == "overlay_sink"
+    assert hub.translation_diagnostics.snapshot().last_error_source == "overlay_sink"
 
 
 @pytest.mark.asyncio
@@ -2505,7 +2508,10 @@ async def test_peer_translation_cancellation_closes_line_as_incomplete() -> None
 
     utterance_id = await hub.handle_peer_transcript_final_for_test(text="안녕")
     await asyncio.wait_for(llm.started.wait(), timeout=0.5)
-    assert ("peer", utterance_id) in hub._latency_timelines
+    assert (
+        "peer",
+        utterance_id,
+    ) in hub.translation_diagnostics.snapshot().timeline_keys
     await hub.peer_runtime.reset_runtime_state()
     await hub.peer_final_runs.wait_for_idle()
 
@@ -2516,7 +2522,7 @@ async def test_peer_translation_cancellation_closes_line_as_incomplete() -> None
     assert sink.events[-1].channel == "peer"
     assert sink.events[-1].utterance_id == utterance_id
     assert sink.events[-1].is_final is False
-    assert hub._latency_timelines == {}
+    assert not hub.translation_diagnostics.snapshot().timeline_keys
 
 
 @pytest.mark.asyncio
@@ -3049,8 +3055,8 @@ async def test_self_overlay_secondary_decision_logs_only_to_detailed_runtime_log
     )
 
     try:
-        assert basic_hub.overlay_diagnostics is None
-        assert detailed_hub.overlay_diagnostics is None
+        assert basic_hub.translation_diagnostics.overlay_diagnostics is None
+        assert detailed_hub.translation_diagnostics.overlay_diagnostics is None
 
         await basic_hub._sync_overlay_active_self(basic_buffer, created_at=basic_hub.clock.now())
         await detailed_hub._sync_overlay_active_self(
@@ -3273,5 +3279,5 @@ async def test_low_latency_self_active_update_failures_do_not_break_hub() -> Non
         )
     )
 
-    assert hub.last_error_source == "overlay_sink"
+    assert hub.translation_diagnostics.snapshot().last_error_source == "overlay_sink"
     assert hub.ui_events.empty()

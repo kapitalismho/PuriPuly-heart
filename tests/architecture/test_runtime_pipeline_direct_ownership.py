@@ -34,12 +34,14 @@ def test_pipeline_constructs_direct_durable_owners_and_hub_constructs_none() -> 
     assert pipeline_calls.count("ContextResolver") == 1
     assert pipeline_calls.count("TranslationTurnLifecycleOwner") == 1
     assert pipeline_calls.count("ProviderRuntimeHandle") == 1
+    assert pipeline_calls.count("TranslationLatencyDiagnosticsOwner") == 1
     assert {
         "OutputRuntime",
         "ChannelRuntime",
         "ContextResolver",
         "TranslationTurnLifecycleOwner",
         "ProviderRuntimeHandle",
+        "TranslationLatencyDiagnosticsOwner",
     }.isdisjoint(hub_calls)
 
 
@@ -64,6 +66,47 @@ def test_hub_has_no_composite_lifecycle_or_provider_alias_surface() -> None:
         "replace_llm_provider",
     }.isdisjoint(methods)
     assert {"stt", "peer_stt", "llm"}.isdisjoint(fields)
+
+
+def test_hub_has_no_diagnostics_state_or_algorithm_and_overlay_uses_direct_owner() -> None:
+    tree = ast.parse(HUB_PATH.read_text(encoding="utf-8"))
+    hub = _class(tree, "ClientHub")
+    fields = {
+        node.target.id
+        for node in hub.body
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    }
+    forbidden_fields = {
+        "runtime_logging",
+        "overlay_diagnostics",
+        "last_error_source",
+        "_last_logged_context_modes",
+        "_last_overlay_secondary_runtime_signature",
+        "_last_overlay_secondary_diagnostics_signature",
+        "_latency_timelines",
+    }
+    forbidden_source = (
+        "self.runtime_logging",
+        "self.overlay_diagnostics",
+        "self.last_error_source",
+        "self._latency_timelines",
+    )
+
+    assert forbidden_fields.isdisjoint(fields)
+    methods = {
+        node.name for node in hub.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+    assert {"_stt_failure_context", "_translation_skip_reason"}.isdisjoint(methods)
+    source = HUB_PATH.read_text(encoding="utf-8")
+    assert all(residue not in source for residue in forbidden_source)
+
+    for path in (
+        SOURCE_ROOT / "app" / "services" / "overlay_application.py",
+        SOURCE_ROOT / "core" / "runtime" / "overlay.py",
+    ):
+        overlay_source = path.read_text(encoding="utf-8")
+        assert 'setattr(hub, "overlay_diagnostics"' not in overlay_source
+        assert 'getattr(hub, "overlay_diagnostics"' not in overlay_source
 
 
 def test_components_record_is_frozen_and_contains_no_lifecycle_policy() -> None:

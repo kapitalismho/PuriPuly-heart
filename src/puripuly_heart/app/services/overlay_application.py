@@ -7,6 +7,9 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import cast
 
+from puripuly_heart.app.ports.translation_diagnostics_runtime import (
+    TranslationOverlayDiagnosticsPort,
+)
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.overlay_generation_start import (
     OverlayGenerationStartDiagnostic,
@@ -29,6 +32,7 @@ from puripuly_heart.config.resolved import (
 )
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.overlay.bridge import OverlayBridge
+from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.process import (
     DefaultOverlayProcessRunner,
@@ -90,6 +94,10 @@ OverlayStateProvider = Callable[[], OverlayApplicationState]
 OverlayConfigProvider = Callable[[], ResolvedOverlayConfig]
 OverlayIntentSink = Callable[[bool], None]
 OverlayHubProvider = Callable[[], object | None]
+OverlayDiagnosticsProvider = Callable[
+    [],
+    TranslationOverlayDiagnosticsPort | None,
+]
 OverlayPeerSnapshotProvider = Callable[[], PeerApplicationSnapshot]
 OverlayEffect = Callable[[], None]
 OverlayAsyncEffect = Callable[[], Awaitable[None]]
@@ -115,6 +123,7 @@ class OverlayApplicationOwner:
     config_provider: OverlayConfigProvider = field(repr=False)
     overlay_intent_sink: OverlayIntentSink = field(repr=False)
     hub_provider: OverlayHubProvider = field(repr=False)
+    diagnostics_provider: OverlayDiagnosticsProvider = field(repr=False)
     peer_snapshot_provider: OverlayPeerSnapshotProvider = field(repr=False)
     disable_peer_intent: OverlayEffect = field(repr=False)
     sync_peer_effective: OverlayEffect = field(repr=False)
@@ -397,6 +406,7 @@ class OverlayApplicationOwner:
             await runtime.close(
                 preserve_presenter_state=True,
                 hub=self.hub_provider(),
+                diagnostics_detach=self.detach_translation_diagnostics,
                 emit_shutdown=False,
             )
         except Exception as exc:
@@ -406,16 +416,19 @@ class OverlayApplicationOwner:
                 exc,
             )
         hub = self.hub_provider()
-        if hub is None:
-            return
-        if getattr(hub, "overlay_sink", None) is presenter:
+        if hub is not None and getattr(hub, "overlay_sink", None) is presenter:
             await self.replace_hub_sink(
                 None,
                 expected_current=presenter,
                 require_match=True,
             )
-        if getattr(hub, "overlay_diagnostics", None) is diagnostics:
-            setattr(hub, "overlay_diagnostics", None)
+        try:
+            self.detach_translation_diagnostics(diagnostics)
+        except Exception as exc:
+            message = "[Overlay] Stale diagnostics detach reported failure"
+            detailed_emitted = self.log_detailed(message, logging.WARNING, exc)
+            if not detailed_emitted:
+                self.log_basic(message, logging.WARNING)
 
     async def begin_start(self) -> None:
         if self._ingress_stopped:
@@ -498,7 +511,7 @@ class OverlayApplicationOwner:
             ),
             close_stale=self.close_stale_start,
             replace_sink=self.replace_hub_sink,
-            set_diagnostics=self._set_hub_diagnostics,
+            set_diagnostics=self.attach_translation_diagnostics,
             set_target=self._set_active_target,
             calibration_snapshot=self.calibration_provider,
             logging_mode=self.logging_mode_provider,
@@ -528,10 +541,23 @@ class OverlayApplicationOwner:
             ),
         )
 
-    def _set_hub_diagnostics(self, diagnostics: object) -> None:
-        hub = self.hub_provider()
-        if hub is not None:
-            setattr(hub, "overlay_diagnostics", diagnostics)
+    def attach_translation_diagnostics(self, diagnostics: object) -> None:
+        owner = self.diagnostics_provider()
+        if owner is not None:
+            owner.replace_overlay_diagnostics(cast(OverlayDiagnosticsRecorder, diagnostics))
+
+    def detach_translation_diagnostics(self, expected_current: object | None) -> bool:
+        owner = self.diagnostics_provider()
+        if owner is None:
+            return False
+        return owner.replace_overlay_diagnostics(
+            None,
+            expected_current=cast(
+                OverlayDiagnosticsRecorder | None,
+                expected_current,
+            ),
+            require_match=True,
+        )
 
     def _set_active_target(self, target: str) -> None:
         self._active_target = target
@@ -699,6 +725,7 @@ class OverlayApplicationOwner:
             await runtime.close(
                 preserve_presenter_state=preserve_presenter_state,
                 hub=self.hub_provider(),
+                diagnostics_detach=self.detach_translation_diagnostics,
                 emit_shutdown=emit_shutdown,
             )
         except Exception as exc:

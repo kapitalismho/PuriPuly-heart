@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from typing import Any, TypeVar
 
 _TaskResultT = TypeVar("_TaskResultT")
@@ -256,6 +256,7 @@ class OverlayRuntimeHandle:
         *,
         preserve_presenter_state: bool,
         hub: object | None,
+        diagnostics_detach: Callable[[object | None], object] | None = None,
         emit_shutdown: bool = True,
     ) -> None:
         if self._close_completed and not self._has_resources():
@@ -284,6 +285,7 @@ class OverlayRuntimeHandle:
                     hub,
                     failures,
                     hub_ingress_detached=hub_ingress_detached,
+                    diagnostics_detach=diagnostics_detach,
                 )
                 await self._stop_process_manager(failures)
                 await self._stop_bridge(failures)
@@ -467,6 +469,7 @@ class OverlayRuntimeHandle:
         failures: list[Exception],
         *,
         hub_ingress_detached: bool,
+        diagnostics_detach: Callable[[object | None], object] | None,
     ) -> None:
         presenter = self._presenter
         if presenter is None:
@@ -506,10 +509,13 @@ class OverlayRuntimeHandle:
         should_clear_hub_state = hub_sink_is_presenter or (
             hub_ingress_detached and hub_sink is None
         )
+        if not preserve_presenter_state and diagnostics_detach is not None:
+            try:
+                diagnostics_detach(self._diagnostics)
+            except Exception as exc:
+                failures.append(exc)
         if hub is not None and should_clear_hub_state:
             if not preserve_presenter_state:
-                if hasattr(hub, "overlay_diagnostics"):
-                    setattr(hub, "overlay_diagnostics", None)
                 await self._attempt(failures, getattr(hub, "reset_overlay_preview", None))
 
         if preserve_presenter_state:
