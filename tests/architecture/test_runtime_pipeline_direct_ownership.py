@@ -193,6 +193,9 @@ def test_cut_over_consumers_do_not_reach_nested_hub_owners() -> None:
         "hub.llm",
         "hub.local_asr_provider_runtime",
         "hub.provider_runtime_handles",
+        "hub.overlay_sink",
+        "getattr(hub, 'overlay_sink'",
+        'getattr(hub, "overlay_sink"',
         "stop_hub_owned_runtimes",
     )
 

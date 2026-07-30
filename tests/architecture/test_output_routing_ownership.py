@@ -53,6 +53,9 @@ def test_output_projection_owner_is_the_only_hub_output_side_effect_boundary() -
     overlay_source = (SOURCE_ROOT / "app" / "services" / "overlay_application.py").read_text(
         encoding="utf-8"
     )
+    settings_source = (SOURCE_ROOT / "app" / "services" / "settings_runtime_effects.py").read_text(
+        encoding="utf-8"
+    )
     output_source = (SOURCE_ROOT / "core" / "runtime" / "output.py").read_text(encoding="utf-8")
     projection_source = (
         SOURCE_ROOT / "core" / "orchestrator" / "translation_output_projection.py"
@@ -91,6 +94,10 @@ def test_output_projection_owner_is_the_only_hub_output_side_effect_boundary() -
     assert "self.output_provider()" in overlay_source
     assert "await output.replace_overlay_sink(" in overlay_source
     assert "hub_provider" not in overlay_source
+    assert "self._pipeline.translation_output_projection" in settings_source
+    assert "output_projection.overlay_sink is presenter" in settings_source
+    assert "hub.overlay_sink" not in settings_source
+    assert "getattr(hub, 'overlay_sink'" not in settings_source
 
 
 def test_flet_composition_uses_owner_without_importing_output_implementation() -> None:

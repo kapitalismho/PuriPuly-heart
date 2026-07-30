@@ -200,7 +200,7 @@ class SettingsRuntimeEffectsAdapter:
         )
         previous_self_signature = self._runtime_signatures.last_self_runtime
         previous_peer_signature = peer.last_runtime_signature
-        hub = self._pipeline.hub
+        output_projection = self._pipeline.translation_output_projection
         config_owner = self._pipeline.translation_runtime_configuration
         previous_configuration = config_owner.snapshot().value if config_owner is not None else None
         previous_source_language = (
@@ -288,7 +288,7 @@ class SettingsRuntimeEffectsAdapter:
                 f"presenter_attached={presenter is not None} "
                 f"bridge_attached={bridge is not None} "
                 "overlay_sink_matches_presenter="
-                f"{hub is not None and presenter is not None and getattr(hub, 'overlay_sink', None) is presenter}"
+                f"{output_projection is not None and presenter is not None and output_projection.overlay_sink is presenter}"
             )
         return SettingsRuntimeTransition(
             settings=next_settings,
