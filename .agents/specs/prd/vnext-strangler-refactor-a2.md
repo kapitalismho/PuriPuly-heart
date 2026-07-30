@@ -6,6 +6,7 @@ baseline_ref: dev@3fb5ce83e4840ef1fd49f2b5480952a09af66527
 integration_target: dev
 document_review_verdict: ready
 blocking_open_decisions: 0
+owner_amendment: GOAL-G19 manual terminal evidence override approved 2026-07-31
 ---
 
 # Outcome
@@ -396,3 +397,5 @@ None.
 # Completion Rule
 
 Every acceptance criterion must be directly proven in its required environment and evidence class. Automated tests, static architecture checks, screenshots, provenance records, or sub-issue completion alone cannot replace required Windows production-composition, comparative visual and interaction, provider, audio, overlay, installer, temporal, or manual evidence. PRD review and Goal completion remain separate from merge, push, deployment, release, and worktree cleanup approval.
+
+For GOAL-G19 only, the product owner's 2026-07-31 direct statement that all owner-operated checks work, followed by the explicit instruction to approve and move past the remaining manual-artifact gap under the `start-goal` owner-priority rule, satisfies the missing exact-candidate Peer and packaged owner-operated manual observation slots. This narrow evidence exception accepts the owner's firsthand product judgment despite the absent Peer/package machine-readable artifacts and does not generalize to another Goal. It does not waive the existing automated, source, package, configured-provider, physical GPU, UI, installer, privacy, architecture, rollback, or lifecycle evidence; the Self/Peer/System separation and unconditional Peer chatbox-denial invariants; fresh independent terminal implementation review; or the separation of Goal completion from merge, push, deployment, release, and cleanup approval.
