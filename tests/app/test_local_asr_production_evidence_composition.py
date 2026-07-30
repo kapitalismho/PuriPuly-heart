@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import puripuly_heart.composition.application_runtime as application_runtime_module
 import puripuly_heart.composition.local_asr_production_evidence as composition_module
 from puripuly_heart.config.settings import AppSettings
 
@@ -21,6 +22,47 @@ class FakeSelfVad:
 
 class FakePeerVad:
     pass
+
+
+def test_production_composition_access_reads_runtime_components(
+    monkeypatch,
+) -> None:
+    owner = FakeOwner()
+    llm_runtime = FakeLlmRuntime()
+    translation_runtime_configuration = object()
+    self_vad = FakeSelfVad()
+    peer_vad = FakePeerVad()
+    channel_reset = object()
+    start_callbacks = object()
+    components = SimpleNamespace(
+        local_asr_runtime=owner,
+        llm_runtime=llm_runtime,
+        translation_runtime_configuration=translation_runtime_configuration,
+        self_translation_channel=self_vad,
+        peer_translation_channel=peer_vad,
+        channel_reset=channel_reset,
+        start_callbacks=start_callbacks,
+    )
+    monkeypatch.setattr(
+        application_runtime_module,
+        "LocalASRProviderRuntimeOwner",
+        FakeOwner,
+    )
+    access = application_runtime_module._LocalASRProductionCompositionAccess(
+        config_path=Path("settings.json"),
+        settings_loader=object,
+        runtime_initializer=lambda _value: _record_async([], None),
+        components_provider=lambda: components,
+        gpu_retry=lambda: _record_async([], None),
+    )
+
+    assert access.owner is owner
+    assert access.llm_runtime is llm_runtime
+    assert access.translation_runtime_configuration is translation_runtime_configuration
+    assert access.self_vad is self_vad
+    assert access.peer_vad is peer_vad
+    assert access.channel_reset is channel_reset
+    assert access.start_callbacks is start_callbacks
 
 
 @pytest.mark.asyncio

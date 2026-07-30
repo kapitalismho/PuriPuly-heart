@@ -274,34 +274,34 @@ class _LocalASRProductionCompositionAccess:
 
     @property
     def owner(self) -> LocalASRProviderRuntimeOwner:
-        owner = self._components().local_asr_runtime
+        owner = self._components.local_asr_runtime
         if not isinstance(owner, LocalASRProviderRuntimeOwner):
             raise RuntimeError("production application did not compose the canonical owner")
         return owner
 
     @property
     def llm_runtime(self) -> ProviderRuntimeHandle:
-        return self._components().llm_runtime
+        return self._components.llm_runtime
 
     @property
     def translation_runtime_configuration(self) -> TranslationRuntimeConfigurationOwner:
-        return self._components().translation_runtime_configuration
+        return self._components.translation_runtime_configuration
 
     @property
     def self_vad(self) -> SelfCaptureVadEventRuntime:
-        return self._components().self_translation_channel
+        return self._components.self_translation_channel
 
     @property
     def peer_vad(self) -> PeerCaptureVadEventRuntime:
-        return self._components().peer_translation_channel
+        return self._components.peer_translation_channel
 
     @property
     def channel_reset(self) -> ProviderChannelResetPort:
-        return self._components().channel_reset
+        return self._components.channel_reset
 
     @property
     def start_callbacks(self) -> RuntimePipelineStartCallbacks:
-        return self._components().start_callbacks
+        return self._components.start_callbacks
 
     async def retry_gpu_activation(self) -> None:
         await self.gpu_retry()
