@@ -246,16 +246,6 @@ class RaisingOverlaySink:
 
 
 @dataclass(slots=True)
-class RaisingEventSTT:
-    error: Exception = field(default_factory=lambda: RuntimeError("loop boom"))
-
-    async def events(self):
-        if False:
-            yield None
-        raise self.error
-
-
-@dataclass(slots=True)
 class _RuntimeLogSinks:
     stream_handler: logging.Handler
     file_handler: logging.Handler
@@ -1108,16 +1098,16 @@ async def test_handle_stt_event_preserves_runtime_logged_flag_from_stt_errors() 
 
 
 @pytest.mark.asyncio
-async def test_run_stt_event_loop_without_runtime_logging_uses_safe_exception_metadata(
+async def test_peer_stt_event_loop_failure_without_runtime_logging_is_safe(
     caplog,
 ) -> None:
     hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
 
-    with (
-        pytest.raises(RuntimeError, match="loop boom"),
-        caplog.at_level(logging.ERROR, logger="puripuly_heart.core.orchestrator.hub"),
-    ):
-        await hub._run_stt_event_loop(RaisingEventSTT())
+    with caplog.at_level(logging.ERROR, logger="puripuly_heart.core.orchestrator.hub"):
+        await hub._handle_stt_event_loop_exception(
+            RuntimeError("loop boom"),
+            channel="peer",
+        )
 
     assert "[Hub] STT event loop crashed: RuntimeError" in caplog.messages
     assert "loop boom" not in "\n".join(caplog.messages)
@@ -1125,7 +1115,7 @@ async def test_run_stt_event_loop_without_runtime_logging_uses_safe_exception_me
 
 
 @pytest.mark.asyncio
-async def test_run_stt_event_loop_with_runtime_logging_uses_safe_stt_report() -> None:
+async def test_peer_stt_event_loop_failure_with_runtime_logging_is_safe() -> None:
     raw_detail = "stt event loop socket failed token=hub-stt-secret-123"
     runtime_logging, log_stream = _make_runtime_logging_capture()
     runtime_logging.set_mode(SessionLoggingMode.DETAILED)
@@ -1138,8 +1128,10 @@ async def test_run_stt_event_loop_with_runtime_logging_uses_safe_stt_report() ->
     )
 
     try:
-        with pytest.raises(ConnectionError):
-            await hub._run_stt_event_loop(RaisingEventSTT(ConnectionError(raw_detail)))
+        await hub._handle_stt_event_loop_exception(
+            ConnectionError(raw_detail),
+            channel="peer",
+        )
 
         runtime_log = "\n".join(_runtime_log_messages(log_stream))
         assert "[Hub] STT event loop crashed: category=network code=stt.network" in runtime_log

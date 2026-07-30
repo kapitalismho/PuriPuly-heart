@@ -45,8 +45,10 @@ def test_output_runtime_is_the_only_production_output_owner_construction() -> No
     assert router_constructions == []
 
 
-def test_output_projection_owner_is_the_only_hub_output_side_effect_boundary() -> None:
-    hub_source = (SOURCE_ROOT / "core" / "orchestrator" / "hub.py").read_text(encoding="utf-8")
+def test_output_projection_owner_is_the_only_channel_output_side_effect_boundary() -> None:
+    channel_source = (
+        SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
+    ).read_text(encoding="utf-8")
     composition_source = (SOURCE_ROOT / "composition" / "application_runtime.py").read_text(
         encoding="utf-8"
     )
@@ -61,7 +63,7 @@ def test_output_projection_owner_is_the_only_hub_output_side_effect_boundary() -
         SOURCE_ROOT / "core" / "orchestrator" / "translation_output_projection.py"
     ).read_text(encoding="utf-8")
 
-    assert "self.overlay_sink.emit(" not in hub_source
+    assert "self.overlay_sink.emit(" not in channel_source
     for side_effect in (
         "enqueue",
         "send_immediate",
@@ -71,11 +73,11 @@ def test_output_projection_owner_is_the_only_hub_output_side_effect_boundary() -
         "process_due",
         "drop_pending",
     ):
-        assert f"self.osc.{side_effect}(" not in hub_source
+        assert f"self.osc.{side_effect}(" not in channel_source
         assert f"self.osc.{side_effect}(" not in composition_source
-    assert "OutputRuntime" not in hub_source
-    assert "OverlayEventAdapter" not in hub_source
-    assert "UIEvent(" not in hub_source
+    assert "OutputRuntime" not in channel_source
+    assert "OverlayEventAdapter" not in channel_source
+    assert "UIEvent(" not in channel_source
     for output_call in (
         "publish_overlay_event(",
         "replace_overlay_sink(",
@@ -137,7 +139,8 @@ def test_flet_composition_uses_owner_without_importing_output_implementation() -
     ):
         assert composition_source.count(extracted_construction) == 1
     assert "compose_runtime_pipeline(" in pipeline_source
-    assert "ClientHub(" in pipeline_source
+    assert "PeerTranslationChannelOwner(" in pipeline_source
+    assert "ClientHub" not in pipeline_source
     assert "compose_application_runtime(" in ui_composition_source
     assert "compose_managed_account(" in composition_source
     assert "compose_provider_runtime(" in composition_source

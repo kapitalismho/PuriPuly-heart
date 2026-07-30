@@ -7,20 +7,22 @@ from pathlib import Path
 
 from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfig
 from puripuly_heart.core.orchestrator.context import ContextResolver
-from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.orchestrator.peer_translation_channel import (
+    PeerTranslationChannelOwner,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = ROOT / "src" / "puripuly_heart"
 CONFIG_FIELD_NAMES = {field.name for field in fields(TranslationRuntimeConfig)}
 
 
-def test_hub_and_context_resolver_do_not_store_translation_configuration_fields() -> None:
-    assert not {field.name for field in fields(ClientHub)} & CONFIG_FIELD_NAMES
+def test_channel_owners_and_context_resolver_do_not_store_configuration_fields() -> None:
+    assert not {field.name for field in fields(PeerTranslationChannelOwner)} & CONFIG_FIELD_NAMES
     assert not {field.name for field in fields(ContextResolver)} & CONFIG_FIELD_NAMES
 
 
-def test_hub_algorithms_read_explicit_configuration_snapshots() -> None:
-    path = SOURCE_ROOT / "core" / "orchestrator" / "hub.py"
+def test_peer_algorithms_read_explicit_configuration_snapshots() -> None:
+    path = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
     tree = ast.parse(path.read_text(encoding="utf-8"))
     direct_reads = [
         (node.lineno, node.attr)
@@ -34,7 +36,7 @@ def test_hub_algorithms_read_explicit_configuration_snapshots() -> None:
     assert direct_reads == []
 
 
-def test_production_code_does_not_mutate_translation_configuration_through_hub_aliases() -> None:
+def test_production_code_does_not_mutate_configuration_through_channel_aliases() -> None:
     assignment = re.compile(rf"\b(?:hub|runtime)\.({'|'.join(sorted(CONFIG_FIELD_NAMES))})\s*=")
     matches = []
     for path in SOURCE_ROOT.rglob("*.py"):
@@ -48,26 +50,26 @@ def test_production_code_does_not_mutate_translation_configuration_through_hub_a
     assert matches == []
 
 
-def test_hub_compatibility_assignment_uses_one_owner_transform() -> None:
-    path = SOURCE_ROOT / "core" / "orchestrator" / "hub.py"
+def test_peer_owner_consumes_snapshot_port_without_configuration_mutation() -> None:
+    path = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    hub_class = next(
-        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "ClientHub"
-    )
-    setter = next(
+    owner = next(
         node
-        for node in hub_class.body
-        if isinstance(node, ast.FunctionDef) and node.name == "__setattr__"
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "PeerTranslationChannelOwner"
     )
-    operations = [
-        child.func.attr
-        for child in ast.walk(setter)
-        if isinstance(child, ast.Call)
-        and isinstance(child.func, ast.Attribute)
-        and child.func.attr in {"snapshot", "replace", "transform"}
-    ]
+    methods = {
+        node.name for node in owner.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+    fields = {
+        node.target.id
+        for node in owner.body
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    }
 
-    assert operations == ["transform"]
+    assert "config_snapshot" in fields
+    assert "translation_runtime_configuration" not in fields
+    assert {"__getattribute__", "__setattr__"}.isdisjoint(methods)
 
 
 def test_each_application_configuration_mutator_performs_one_owner_transform() -> None:

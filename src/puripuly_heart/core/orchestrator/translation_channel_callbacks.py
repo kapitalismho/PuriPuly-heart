@@ -4,7 +4,9 @@ import asyncio
 from collections.abc import Callable
 from uuid import UUID
 
-from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.orchestrator.peer_translation_channel import (
+    PeerTranslationChannelOwner,
+)
 from puripuly_heart.core.orchestrator.self_translation_channel import (
     SelfTranslationChannelOwner,
 )
@@ -17,12 +19,12 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
 
 
-class ClientHubDurableOwnerCallbacks:
+class TranslationChannelOwnerCallbacks:
     __slots__ = ("_peer", "_self", "_stt_sessions")
 
     def __init__(self, stt_sessions: SttSessionStateProjection) -> None:
         self._self: SelfTranslationChannelOwner | None = None
-        self._peer: ClientHub | None = None
+        self._peer: PeerTranslationChannelOwner | None = None
         self._stt_sessions = stt_sessions
 
     def bind_self(self, owner: SelfTranslationChannelOwner) -> None:
@@ -30,7 +32,7 @@ class ClientHubDurableOwnerCallbacks:
             raise RuntimeError("Self durable owner callbacks are already bound")
         self._self = owner
 
-    def bind_peer(self, owner: ClientHub) -> None:
+    def bind_peer(self, owner: PeerTranslationChannelOwner) -> None:
         if self._peer is not None and self._peer is not owner:
             raise RuntimeError("Peer durable owner callbacks are already bound")
         self._peer = owner
@@ -41,26 +43,26 @@ class ClientHubDurableOwnerCallbacks:
 
     async def peer_event_handler(self, event: object) -> None:
         self._stt_sessions.record(event)
-        await self._require_peer()._handle_stt_event(event)
+        await self._require_peer().handle_stt_event(event)
 
     async def retired_event_handler(self, event: object) -> None:
         self._stt_sessions.record(event)
         if getattr(event, "channel", None) == "self":
             await self._require_self().handle_retired_stt_event(event)
             return
-        await self._require_peer()._handle_retired_stt_event(event)
+        await self._require_peer().handle_retired_stt_event(event)
 
     async def self_exception_handler(self, exc: Exception) -> None:
         await self._require_self().handle_stt_event_loop_exception(exc)
 
     async def peer_exception_handler(self, exc: Exception) -> None:
-        await self._require_peer()._handle_stt_event_loop_exception(exc, channel="peer")
+        await self._require_peer().handle_stt_event_loop_exception(exc, channel="peer")
 
     async def child_created(self, child: TranslationTurnChild) -> None:
         if child.channel == "self":
             await self._require_self().on_child_created(child)
             return
-        await self._require_peer()._on_peer_final_run_child_created(child)
+        await self._require_peer().on_child_created(child)
 
     async def child_started(
         self,
@@ -70,7 +72,7 @@ class ClientHubDurableOwnerCallbacks:
         if child.channel == "self":
             await self._require_self().on_child_started(child, task)
             return
-        await self._require_peer()._on_peer_final_run_child_started(child, task)
+        await self._require_peer().on_child_started(child, task)
 
     async def process_child(
         self,
@@ -82,7 +84,7 @@ class ClientHubDurableOwnerCallbacks:
                 child,
                 cancellation_requested,
             )
-        return await self._require_peer()._process_peer_final_run_child(
+        return await self._require_peer().process_child(
             child,
             cancellation_requested,
         )
@@ -95,13 +97,13 @@ class ClientHubDurableOwnerCallbacks:
         if child.channel == "self":
             await self._require_self().on_child_terminal(child, outcome)
             return
-        await self._require_peer()._on_peer_final_run_child_terminal(child, outcome)
+        await self._require_peer().on_child_terminal(child, outcome)
 
     async def parent_closed(self, parent_utterance_id: UUID) -> None:
-        await self._require_peer()._on_peer_final_run_parent_closed(parent_utterance_id)
+        await self._require_peer().on_parent_closed(parent_utterance_id)
 
     async def parent_rejected(self, parent_utterance_id: UUID) -> None:
-        await self._require_peer()._on_peer_final_run_parent_rejected(parent_utterance_id)
+        await self._require_peer().on_parent_rejected(parent_utterance_id)
 
     async def submit_translation_output(self, submission: TranslationOutputSubmission) -> None:
         if submission.channel == "self":
@@ -114,10 +116,10 @@ class ClientHubDurableOwnerCallbacks:
             raise RuntimeError("Self durable owner callbacks are not bound")
         return self._self
 
-    def _require_peer(self) -> ClientHub:
+    def _require_peer(self) -> PeerTranslationChannelOwner:
         if self._peer is None:
             raise RuntimeError("Peer durable owner callbacks are not bound")
         return self._peer
 
 
-__all__ = ["ClientHubDurableOwnerCallbacks"]
+__all__ = ["TranslationChannelOwnerCallbacks"]

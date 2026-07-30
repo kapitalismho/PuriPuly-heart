@@ -393,7 +393,6 @@ class SettingsRuntimeEffectsAdapter:
         )
         self._clear_local_pending()
 
-        hub = self._pipeline.hub
         config_owner = self._pipeline.translation_runtime_configuration
         config_change: TranslationRuntimeConfigChange | None = None
         if config_owner is not None:
@@ -405,17 +404,16 @@ class SettingsRuntimeEffectsAdapter:
                 integrated_context_enabled=peer_enabled,
             )
 
-        if hub is not None:
-            if config_change is not None and config_change.self_language_changed:
-                await self._clear_language_runtime_state(
-                    "self",
-                    strict_runtime_errors=strict_runtime_errors,
-                )
-            if config_change is not None and config_change.peer_language_changed:
-                await self._clear_language_runtime_state(
-                    "peer",
-                    strict_runtime_errors=strict_runtime_errors,
-                )
+        if config_change is not None and config_change.self_language_changed:
+            await self._clear_language_runtime_state(
+                "self",
+                strict_runtime_errors=strict_runtime_errors,
+            )
+        if config_change is not None and config_change.peer_language_changed:
+            await self._clear_language_runtime_state(
+                "peer",
+                strict_runtime_errors=strict_runtime_errors,
+            )
 
         presenter = self._overlay.current_presenter()
         if presenter is not None:
@@ -464,9 +462,9 @@ class SettingsRuntimeEffectsAdapter:
                 f"next_overlay_enabled={settings.ui.overlay_enabled}"
             )
 
-        if should_refresh_peer and hub is not None:
+        if should_refresh_peer and self._pipeline.peer_translation_channel is not None:
             await self._peer.owner.refresh_runtime()
-            self._sync_effective_hub_flags(settings)
+            self._sync_effective_translation_flags(settings)
 
         if should_restart_stt:
             smooth_local = bool(
@@ -505,7 +503,11 @@ class SettingsRuntimeEffectsAdapter:
         *,
         strict_runtime_errors: bool,
     ) -> None:
-        owner = self._pipeline.self_translation_channel if channel == "self" else self._pipeline.hub
+        owner = (
+            self._pipeline.self_translation_channel
+            if channel == "self"
+            else self._pipeline.peer_translation_channel
+        )
         if owner is None:
             return
         try:
@@ -539,7 +541,7 @@ class SettingsRuntimeEffectsAdapter:
         )
         self._state.microphone_audio_signature = self._microphone.audio_signature(settings)
 
-    def _sync_effective_hub_flags(self, settings: AppSettings) -> None:
+    def _sync_effective_translation_flags(self, settings: AppSettings) -> None:
         self._peer.owner.sync_effective_flags(self._peer.state_for(settings))
 
     @staticmethod

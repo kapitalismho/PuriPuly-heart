@@ -7,7 +7,9 @@ import numpy as np
 
 from puripuly_heart.core.audio.format import AudioFrameF32
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.orchestrator.peer_translation_channel import (
+    PeerTranslationChannelOwner,
+)
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
@@ -159,7 +161,7 @@ async def test_run_audio_vad_loop_applies_audio_gate_before_forwarding_to_sink()
 
 
 class _PeerOnlySink:
-    def __init__(self, hub: ClientHub) -> None:
+    def __init__(self, hub: PeerTranslationChannelOwner) -> None:
         self._hub = hub
 
     async def handle_vad_event(self, event) -> None:  # noqa: ANN001

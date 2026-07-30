@@ -6,8 +6,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
 OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "self_translation_channel.py"
-HUB_PATH = SOURCE_ROOT / "core" / "orchestrator" / "hub.py"
-CALLBACKS_PATH = SOURCE_ROOT / "core" / "orchestrator" / "hub_callbacks.py"
+PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
+CALLBACKS_PATH = SOURCE_ROOT / "core" / "orchestrator" / "translation_channel_callbacks.py"
 PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py"
 
 
@@ -42,7 +42,7 @@ def test_pipeline_constructs_and_exposes_one_direct_self_translation_owner() -> 
 
     assert calls.count("SelfTranslationChannelOwner") == 1
     assert "callbacks.bind_self(self_translation_channel)" in source
-    assert "callbacks.bind_peer(hub)" in source
+    assert "callbacks.bind_peer(peer_translation_channel)" in source
     assert "self_translation_channel=self_translation_channel" in source
     assert (
         "self_translation_channel,\n        local_asr_runtime,\n        self_translation_channel,"
@@ -79,12 +79,12 @@ def test_self_translation_owner_has_explicit_ingress_lifecycle_and_dependencies(
     assert {"llm", "stt", "peer_stt", "output_runtime"}.isdisjoint(fields)
 
 
-def test_hub_has_no_self_translation_algorithms_state_or_runtime_reference() -> None:
-    source = HUB_PATH.read_text(encoding="utf-8")
+def test_peer_owner_has_no_self_translation_algorithms_state_or_runtime_reference() -> None:
+    source = PEER_OWNER_PATH.read_text(encoding="utf-8")
     tree = ast.parse(source)
-    hub = _class(tree, "ClientHub")
-    methods = _methods(hub)
-    fields = _fields(hub)
+    owner = _class(tree, "PeerTranslationChannelOwner")
+    methods = _methods(owner)
+    fields = _fields(owner)
 
     assert {
         "handle_vad_event",
@@ -136,14 +136,15 @@ def test_production_self_consumers_do_not_route_through_hub() -> None:
             assert residue not in source, f"{path.relative_to(REPO_ROOT)}: {residue}"
     application_runtime_source = application_runtime_path.read_text(encoding="utf-8")
     assert "cast(object, pipeline.hub)" not in application_runtime_source
+    assert "pipeline.hub" not in application_runtime_source
 
 
 def test_durable_callbacks_dispatch_self_and_peer_to_distinct_owners() -> None:
     source = CALLBACKS_PATH.read_text(encoding="utf-8")
 
     assert "self._require_self().handle_stt_event(event)" in source
-    assert "self._require_peer()._handle_stt_event(event)" in source
+    assert "self._require_peer().handle_stt_event(event)" in source
     assert "self._require_self().process_child(" in source
-    assert "self._require_peer()._process_peer_final_run_child(" in source
+    assert "self._require_peer().process_child(" in source
     assert "self._require_self().submit_translation_output(submission)" in source
     assert "self._require_peer().submit_translation_output(submission)" in source

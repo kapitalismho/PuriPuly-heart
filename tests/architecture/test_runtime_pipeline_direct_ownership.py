@@ -6,7 +6,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
 PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py"
-HUB_PATH = SOURCE_ROOT / "core" / "orchestrator" / "hub.py"
+PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
 
 
 def _call_name(node: ast.Call) -> str | None:
@@ -21,13 +21,15 @@ def _class(tree: ast.Module, name: str) -> ast.ClassDef:
     return next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == name)
 
 
-def test_pipeline_constructs_direct_durable_owners_and_hub_constructs_none() -> None:
+def test_pipeline_constructs_direct_durable_owners_and_peer_owner_constructs_none() -> None:
     pipeline_tree = ast.parse(PIPELINE_PATH.read_text(encoding="utf-8"))
-    hub_tree = ast.parse(HUB_PATH.read_text(encoding="utf-8"))
+    peer_owner_tree = ast.parse(PEER_OWNER_PATH.read_text(encoding="utf-8"))
     pipeline_calls = [
         _call_name(node) for node in ast.walk(pipeline_tree) if isinstance(node, ast.Call)
     ]
-    hub_calls = {_call_name(node) for node in ast.walk(hub_tree) if isinstance(node, ast.Call)}
+    peer_owner_calls = {
+        _call_name(node) for node in ast.walk(peer_owner_tree) if isinstance(node, ast.Call)
+    }
 
     assert pipeline_calls.count("OutputRuntime") == 1
     assert pipeline_calls.count("ChannelRuntime") == 2
@@ -37,6 +39,7 @@ def test_pipeline_constructs_direct_durable_owners_and_hub_constructs_none() -> 
     assert pipeline_calls.count("TranslationLatencyDiagnosticsOwner") == 1
     assert pipeline_calls.count("TranslationOutputProjectionOwner") == 1
     assert pipeline_calls.count("TranslationRequestOwner") == 1
+    assert pipeline_calls.count("PeerTranslationChannelOwner") == 1
     assert {
         "OutputRuntime",
         "ChannelRuntime",
@@ -46,18 +49,18 @@ def test_pipeline_constructs_direct_durable_owners_and_hub_constructs_none() -> 
         "TranslationLatencyDiagnosticsOwner",
         "TranslationOutputProjectionOwner",
         "TranslationRequestOwner",
-    }.isdisjoint(hub_calls)
+    }.isdisjoint(peer_owner_calls)
 
 
-def test_hub_has_no_composite_lifecycle_or_provider_alias_surface() -> None:
-    tree = ast.parse(HUB_PATH.read_text(encoding="utf-8"))
-    hub = _class(tree, "ClientHub")
+def test_peer_owner_has_no_composite_lifecycle_or_provider_alias_surface() -> None:
+    tree = ast.parse(PEER_OWNER_PATH.read_text(encoding="utf-8"))
+    owner = _class(tree, "PeerTranslationChannelOwner")
     methods = {
-        node.name for node in hub.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        node.name for node in owner.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     }
     fields = {
         node.target.id
-        for node in hub.body
+        for node in owner.body
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
     }
 
@@ -72,12 +75,12 @@ def test_hub_has_no_composite_lifecycle_or_provider_alias_surface() -> None:
     assert {"stt", "peer_stt", "llm"}.isdisjoint(fields)
 
 
-def test_hub_has_no_diagnostics_state_or_algorithm_and_overlay_uses_direct_owner() -> None:
-    tree = ast.parse(HUB_PATH.read_text(encoding="utf-8"))
-    hub = _class(tree, "ClientHub")
+def test_peer_owner_has_no_diagnostics_state_or_algorithm_and_overlay_uses_direct_owner() -> None:
+    tree = ast.parse(PEER_OWNER_PATH.read_text(encoding="utf-8"))
+    owner = _class(tree, "PeerTranslationChannelOwner")
     fields = {
         node.target.id
-        for node in hub.body
+        for node in owner.body
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
     }
     forbidden_fields = {
@@ -98,10 +101,10 @@ def test_hub_has_no_diagnostics_state_or_algorithm_and_overlay_uses_direct_owner
 
     assert forbidden_fields.isdisjoint(fields)
     methods = {
-        node.name for node in hub.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        node.name for node in owner.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     }
     assert {"_stt_failure_context", "_translation_skip_reason"}.isdisjoint(methods)
-    source = HUB_PATH.read_text(encoding="utf-8")
+    source = PEER_OWNER_PATH.read_text(encoding="utf-8")
     assert all(residue not in source for residue in forbidden_source)
 
     for path in (
@@ -113,16 +116,16 @@ def test_hub_has_no_diagnostics_state_or_algorithm_and_overlay_uses_direct_owner
         assert 'getattr(hub, "overlay_diagnostics"' not in overlay_source
 
 
-def test_hub_has_no_output_runtime_state_or_projection_algorithm() -> None:
-    tree = ast.parse(HUB_PATH.read_text(encoding="utf-8"))
-    hub = _class(tree, "ClientHub")
+def test_peer_owner_has_no_output_runtime_state_or_projection_algorithm() -> None:
+    tree = ast.parse(PEER_OWNER_PATH.read_text(encoding="utf-8"))
+    owner = _class(tree, "PeerTranslationChannelOwner")
     fields = {
         node.target.id
-        for node in hub.body
+        for node in owner.body
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
     }
     methods = {
-        node.name for node in hub.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        node.name for node in owner.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     }
 
     assert {
@@ -173,7 +176,7 @@ def test_components_record_is_frozen_and_contains_no_lifecycle_policy() -> None:
     )
 
 
-def test_cut_over_consumers_do_not_reach_nested_hub_owners() -> None:
+def test_cut_over_consumers_do_not_reach_nested_channel_owners() -> None:
     paths = (
         SOURCE_ROOT / "app" / "adapters" / "application_runtime_shutdown.py",
         SOURCE_ROOT / "app" / "adapters" / "peer_application_state.py",
@@ -199,9 +202,13 @@ def test_cut_over_consumers_do_not_reach_nested_hub_owners() -> None:
         "getattr(hub, 'overlay_sink'",
         'getattr(hub, "overlay_sink"',
         "stop_hub_owned_runtimes",
+        "pipeline.hub",
     )
 
     for path in paths:
         source = path.read_text(encoding="utf-8")
         for residue in forbidden:
             assert residue not in source, f"{path.relative_to(REPO_ROOT)}: {residue}"
+
+    assert not (SOURCE_ROOT / "core" / "orchestrator" / "hub.py").exists()
+    assert not (SOURCE_ROOT / "core" / "orchestrator" / "hub_callbacks.py").exists()

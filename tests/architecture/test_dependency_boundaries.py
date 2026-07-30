@@ -1392,7 +1392,7 @@ def test_application_composition_has_no_concrete_osc_import_violations() -> None
     assert (
         ImportViolation(
             rule_id=orchestrator_rule.rule_id,
-            importer="src/puripuly_heart/core/orchestrator/hub.py",
+            importer="src/puripuly_heart/core/orchestrator/peer_translation_channel.py",
             imported="puripuly_heart.core.osc.chatbox_paginator",
             importer_layer=ORCHESTRATOR,
             imported_layer=ADAPTERS,
@@ -1606,7 +1606,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "def _apply_desktop_size_preset_persistence_adjustment(",
             "def _broadcast_desktop_runtime_control_payloads(",
         ),
-        "src/puripuly_heart/core/orchestrator/hub.py": (
+        "src/puripuly_heart/core/orchestrator/peer_translation_channel.py": (
             "_osc_flush_task",
             "def _run_osc_flush_loop",
         ),

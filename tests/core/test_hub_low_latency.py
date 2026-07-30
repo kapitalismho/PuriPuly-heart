@@ -10,6 +10,9 @@ import numpy as np
 import pytest
 
 from puripuly_heart.core.orchestrator.channel_runtime import _MergeBuffer
+from puripuly_heart.core.orchestrator.peer_translation_channel import (
+    PeerTranslationChannelOwner,
+)
 from puripuly_heart.core.orchestrator.ports import compute_latency_dominant_stage
 from puripuly_heart.core.orchestrator.self_translation_channel import (
     SelfTranslationChannelOwner,
@@ -320,7 +323,7 @@ async def test_hub_exposes_named_provider_runtime_handles_and_shutdown_policies(
 
     await hub.start(auto_flush_osc=False)
     assert hub._stt_task is None
-    assert hub._peer_stt_task is None
+    assert "_peer_stt_task" not in PeerTranslationChannelOwner.__dataclass_fields__
 
     await hub.stop()
     await hub.stop()

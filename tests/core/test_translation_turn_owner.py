@@ -11,7 +11,9 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
 )
-from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.orchestrator.peer_translation_channel import (
+    PeerTranslationChannelOwner,
+)
 from puripuly_heart.core.orchestrator.self_translation_channel import (
     SelfTranslationChannelOwner,
 )
@@ -109,18 +111,18 @@ def test_policy_rejects_retired_fast_translation_off_choice() -> None:
         TranslationRuntimePolicy(fast_translation_enabled=False)
 
 
-def test_client_hub_uses_one_injected_generic_translation_owner() -> None:
+def test_channel_owners_use_one_injected_generic_translation_owner() -> None:
     hub = compose_client_hub(stt=None, llm=None, osc=object())
-    hub_source = inspect.getsource(inspect.getmodule(ClientHub))
+    hub_source = inspect.getsource(inspect.getmodule(PeerTranslationChannelOwner))
     self_source = inspect.getsource(inspect.getmodule(SelfTranslationChannelOwner))
     assert hub.translation_turns is hub.peer_final_runs
-    assert type(hub.translation_turns.output).__name__ == "ClientHubDurableOwnerCallbacks"
+    assert type(hub.translation_turns.output).__name__ == ("TranslationChannelOwnerCallbacks")
     assert hub.translation_turns.lifecycle_owner_snapshot()["owner"] == (
         "TranslationTurnLifecycleOwner"
     )
     assert "PeerFinalRunsLifecycleOwner" not in hub_source
     assert "TranslationTurnLifecycleOwner(" not in hub_source
-    assert hub_source.count('self.translation_turns.cancel_pending(channel="peer")') == 2
+    assert hub_source.count('self.translation_turns.cancel_pending(channel="peer")') == 3
     assert self_source.count('self.translation_turns.cancel_pending(channel="self")') == 2
     assert "self.translation_turns.cancel_pending()" not in hub_source
 

@@ -6,7 +6,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
 PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py"
-HUB_PATH = SOURCE_ROOT / "core" / "orchestrator" / "hub.py"
+PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
 OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "translation_request.py"
 
 
@@ -31,22 +31,22 @@ def test_production_composes_one_translation_request_owner() -> None:
     assert "provider_runtime=llm_runtime" in source
     assert "context_resolver=context_resolver" in source
     assert "presentation=translation_output_projection" in source
-    assert "direct_translation_requests=translation_requests" in source
+    assert "translation_requests=translation_requests" in source
     assert "translation_requests=translation_requests" in source
 
 
-def test_hub_contains_no_translation_request_algorithm_or_provider_reference() -> None:
-    tree = ast.parse(HUB_PATH.read_text(encoding="utf-8"))
-    hub = _class(tree, "ClientHub")
+def test_peer_owner_contains_no_translation_request_algorithm_or_provider_reference() -> None:
+    tree = ast.parse(PEER_OWNER_PATH.read_text(encoding="utf-8"))
+    owner = _class(tree, "PeerTranslationChannelOwner")
     methods = {
-        node.name for node in hub.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        node.name for node in owner.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     }
     fields = {
         node.target.id
-        for node in hub.body
+        for node in owner.body
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
     }
-    source = HUB_PATH.read_text(encoding="utf-8")
+    source = PEER_OWNER_PATH.read_text(encoding="utf-8")
 
     assert {
         "_format_system_prompt",

@@ -13,7 +13,9 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigCategory,
     TranslationRuntimeConfigurationOwner,
 )
-from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.orchestrator.peer_translation_channel import (
+    PeerTranslationChannelOwner,
+)
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnLifecycleOwner,
     TranslationTurnProcessResult,
@@ -134,11 +136,12 @@ def test_owner_snapshots_never_expose_mixed_concurrent_values() -> None:
     assert set(observed) <= {("ko", "en", "first"), ("ja", "fr", "second")}
 
 
-def test_client_hub_has_no_mutable_translation_configuration_fields() -> None:
-    hub_fields = {field.name for field in fields(ClientHub)}
+def test_peer_owner_has_no_mutable_translation_configuration_fields() -> None:
+    owner_fields = {field.name for field in fields(PeerTranslationChannelOwner)}
 
-    assert not hub_fields & _CONFIG_FIELD_NAMES
-    assert "translation_runtime_configuration" in hub_fields
+    assert not owner_fields & _CONFIG_FIELD_NAMES
+    assert "config_snapshot" in owner_fields
+    assert "translation_runtime_configuration" not in owner_fields
 
 
 def test_client_hub_compatibility_access_delegates_to_the_owner() -> None:

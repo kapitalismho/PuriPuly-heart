@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -14,11 +15,15 @@ from puripuly_heart.app.wiring_runtime_pipeline import (
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import SystemClock
-from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.orchestrator.peer_translation_channel import (
+    PeerTranslationChannelOwner,
+)
 from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
     PrebuiltLocalASRProviderRuntimeFactory,
 )
+from puripuly_heart.domain.events import STTFinalEvent
+from puripuly_heart.domain.models import Transcript
 
 
 class ManagedRelease:
@@ -118,19 +123,23 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
 
     assert pipeline.translation_output_projection is not None
     assert pipeline.translation_output_projection.output_runtime is pipeline.output_runtime
-    assert pipeline.hub.output_projection is pipeline.translation_output_projection
+    assert (
+        pipeline.peer_translation_channel.output_projection
+        is pipeline.translation_output_projection
+    )
     assert pipeline.self_translation_channel.runtime is pipeline.self_runtime
-    assert pipeline.hub.peer_runtime is pipeline.peer_runtime
-    assert pipeline.hub.translation_turns is pipeline.translation_turns
+    assert pipeline.peer_translation_channel.runtime is pipeline.peer_runtime
+    assert pipeline.peer_translation_channel.translation_turns is pipeline.translation_turns
     assert pipeline.translation_requests.context_resolver is pipeline.context_resolver
-    assert pipeline.hub.translation_diagnostics is pipeline.translation_diagnostics
-    assert pipeline.hub._local_asr_provider_runtime is pipeline.local_asr_runtime
+    assert pipeline.peer_translation_channel.diagnostics is pipeline.translation_diagnostics
+    assert pipeline.peer_translation_channel.local_asr_runtime is pipeline.local_asr_runtime
     assert pipeline.translation_requests.provider_runtime is pipeline.llm_runtime
-    assert pipeline.hub.translation_requests is pipeline.translation_requests
-    assert not hasattr(pipeline.hub, "_llm_provider_runtime")
+    assert pipeline.peer_translation_channel.translation_requests is pipeline.translation_requests
+    assert not hasattr(pipeline.peer_translation_channel, "_llm_provider_runtime")
     assert pipeline.resource_owner.output_runtime is pipeline.output_runtime
     assert pipeline.resource_owner.local_asr_runtime is pipeline.local_asr_runtime
     assert pipeline.resource_owner.self_translation_channel is pipeline.self_translation_channel
+    assert pipeline.resource_owner.peer_translation_channel is pipeline.peer_translation_channel
     assert captured["self"] == (
         pipeline.self_translation_channel,
         pipeline.local_asr_runtime,
@@ -138,15 +147,15 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
         pipeline.vrc_mic_audio_gate,
     )
     assert captured["peer"] == (
-        pipeline.hub,
+        pipeline.peer_translation_channel,
         pipeline.local_asr_runtime,
-        pipeline.hub,
+        pipeline.peer_translation_channel,
     )
-    assert "llm" not in ClientHub.__dataclass_fields__
-    assert "stt" not in ClientHub.__dataclass_fields__
-    assert "peer_stt" not in ClientHub.__dataclass_fields__
-    assert not hasattr(ClientHub, "start")
-    assert not hasattr(ClientHub, "stop")
+    assert "llm" not in PeerTranslationChannelOwner.__dataclass_fields__
+    assert "stt" not in PeerTranslationChannelOwner.__dataclass_fields__
+    assert "peer_stt" not in PeerTranslationChannelOwner.__dataclass_fields__
+    assert not hasattr(PeerTranslationChannelOwner, "start")
+    assert not hasattr(PeerTranslationChannelOwner, "stop")
     assert not pipeline.translation_turns.channel_ingress_open("self")
     assert not pipeline.translation_turns.channel_ingress_open("peer")
     await pipeline.start_callbacks.start_output(False)
@@ -346,7 +355,7 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
         receiver_active=False,
         stt_failure_sink=lambda _message: None,
     )
-    hub = pipeline.hub
+    peer_owner = pipeline.peer_translation_channel
     output_projection = pipeline.translation_output_projection
     assert output_projection is not None
     await pipeline.start_callbacks.start_output(False)
@@ -360,7 +369,28 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
         "manual self text",
         source="You",
     )
-    peer_id = await hub.handle_peer_transcript_final_for_test("peer presentation text")
+    parent_id = uuid4()
+    existing_peer_ids = set(peer_owner.runtime.utterances)
+    await peer_owner.handle_stt_event(
+        STTFinalEvent(
+            utterance_id=parent_id,
+            transcript=Transcript(
+                utterance_id=parent_id,
+                text="peer presentation text",
+                is_final=True,
+                created_at=peer_owner.clock.now(),
+                channel="peer",
+            ),
+        )
+    )
+    await peer_owner.translation_turns.wait_for_idle()
+    peer_id = next(
+        utterance_id
+        for utterance_id, bundle in peer_owner.runtime.utterances.items()
+        if utterance_id not in existing_peer_ids
+        and bundle.final is not None
+        and bundle.final.text == "peer presentation text"
+    )
     output_projection.publish_system_disclosure("system disclosure")
 
     assert [getattr(message, "text") for message in chatbox.messages] == [
@@ -434,6 +464,18 @@ class RecordingSelfChannel(RecordingAsyncOwner):
         self.events.append("close_self_owner")
 
 
+class RecordingPeerChannel(RecordingAsyncOwner):
+    def __init__(self, runtime: RecordingAsyncOwner, events: list[str]) -> None:
+        super().__init__("peer_channel", events)
+        self.runtime = runtime
+
+    async def open_ingress(self) -> None:
+        self.events.append("open_peer_owner")
+
+    async def close_ingress(self) -> None:
+        self.events.append("close_peer_owner")
+
+
 class RecordingOutput(RecordingAsyncOwner):
     async def start(self, *, auto_flush_chatbox: bool) -> None:
         self.events.append(f"start_output_{auto_flush_chatbox}")
@@ -448,12 +490,14 @@ class RecordingLocalAsr(RecordingAsyncOwner):
 async def test_resource_owner_uses_one_named_start_and_close_inventory() -> None:
     events: list[str] = []
     self_runtime = RecordingAsyncOwner("self_runtime", events)
+    peer_runtime = RecordingAsyncOwner("peer_runtime", events)
     resources = RuntimePipelineResourceOwner(
         sender=RecordingSender(events),
         output_runtime=RecordingOutput("output", events),
         self_runtime=self_runtime,
-        peer_runtime=RecordingAsyncOwner("peer_channel", events),
+        peer_runtime=peer_runtime,
         self_translation_channel=RecordingSelfChannel(self_runtime, events),
+        peer_translation_channel=RecordingPeerChannel(peer_runtime, events),
         translation_turns=RecordingTurns("turns", events),
         local_asr_runtime=RecordingLocalAsr("local_asr", events),
         llm_runtime=RecordingAsyncOwner("llm", events),
@@ -470,6 +514,7 @@ async def test_resource_owner_uses_one_named_start_and_close_inventory() -> None
         "start_output_True",
         "open_self_owner",
         "open_self",
+        "open_peer_owner",
         "open_peer",
         "start_turns",
         "start_local_asr",
@@ -482,6 +527,7 @@ async def test_resource_owner_uses_one_named_start_and_close_inventory() -> None
         "peer_capture",
         "close_self_owner",
         "close_self",
+        "close_peer_owner",
         "close_peer",
         "turns",
         "output",
@@ -494,19 +540,21 @@ async def test_resource_owner_uses_one_named_start_and_close_inventory() -> None
     assert not resources.has_resources
 
 
-@pytest.mark.parametrize("acquired_count", range(1, 11))
+@pytest.mark.parametrize("acquired_count", range(1, 12))
 @pytest.mark.asyncio
 async def test_resource_owner_rolls_back_every_partial_acquisition_boundary(
     acquired_count: int,
 ) -> None:
     events: list[str] = []
     self_runtime = RecordingAsyncOwner("self_runtime", events)
+    peer_runtime = RecordingAsyncOwner("peer_runtime", events)
     acquisition_order = (
         ("sender", RecordingSender(events)),
         ("output_runtime", RecordingOutput("output", events)),
         ("self_runtime", self_runtime),
-        ("peer_runtime", RecordingAsyncOwner("peer_channel", events)),
+        ("peer_runtime", peer_runtime),
         ("self_translation_channel", RecordingSelfChannel(self_runtime, events)),
+        ("peer_translation_channel", RecordingPeerChannel(peer_runtime, events)),
         ("translation_turns", RecordingTurns("turns", events)),
         ("local_asr_runtime", RecordingLocalAsr("local_asr", events)),
         ("llm_runtime", RecordingAsyncOwner("llm", events)),
@@ -521,6 +569,7 @@ async def test_resource_owner_rolls_back_every_partial_acquisition_boundary(
 
     acquired = {name for name, _owner in acquisition_order[:acquired_count]}
     self_event = "self_channel" if "self_translation_channel" in acquired else "self_runtime"
+    peer_event = "peer_channel" if "peer_translation_channel" in acquired else "peer_runtime"
     expected = [
         event
         for field_name, event in (
@@ -529,7 +578,14 @@ async def test_resource_owner_rolls_back_every_partial_acquisition_boundary(
             ("translation_turns", "turns"),
             ("output_runtime", "output"),
             ("self_runtime", self_event),
-            ("peer_runtime", "peer_channel"),
+            (
+                (
+                    "peer_translation_channel"
+                    if "peer_translation_channel" in acquired
+                    else "peer_runtime"
+                ),
+                peer_event,
+            ),
             ("local_asr_runtime", "local_asr"),
             ("llm_runtime", "llm"),
             ("sender", "sender"),
@@ -583,7 +639,7 @@ async def test_resource_owner_continues_after_failure_and_retries_only_retained_
     assert not resources.has_resources
 
 
-@pytest.mark.parametrize("failure_stage", ("sender", "hub"))
+@pytest.mark.parametrize("failure_stage", ("sender", "peer_owner"))
 @pytest.mark.asyncio
 async def test_pipeline_composition_closes_pending_llm_on_early_failure(
     monkeypatch: pytest.MonkeyPatch,
@@ -600,8 +656,8 @@ async def test_pipeline_composition_closes_pending_llm_on_early_failure(
             raise RuntimeError("sender construction failed")
         return RecordingSender(events)
 
-    def create_hub(*_args: object, **_kwargs: object) -> object:
-        raise RuntimeError("hub construction failed")
+    def create_peer_owner(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("peer_owner construction failed")
 
     monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
     monkeypatch.setattr(runtime_pipeline_module, "create_llm_provider", lambda *_a, **_k: Llm())
@@ -611,7 +667,11 @@ async def test_pipeline_composition_closes_pending_llm_on_early_failure(
         "ChatboxPaginator",
         lambda *_a, **_k: RecordingChatbox(),
     )
-    monkeypatch.setattr(runtime_pipeline_module, "ClientHub", create_hub)
+    monkeypatch.setattr(
+        runtime_pipeline_module,
+        "PeerTranslationChannelOwner",
+        create_peer_owner,
+    )
 
     with pytest.raises(RuntimeError, match=f"{failure_stage} construction failed"):
         await compose_runtime_pipeline(

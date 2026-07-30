@@ -293,7 +293,7 @@ class _LocalASRProductionCompositionAccess:
 
     @property
     def peer_vad(self) -> PeerCaptureVadEventRuntime:
-        return self._components().hub
+        return self._components().peer_translation_channel
 
     @property
     def channel_reset(self) -> ProviderChannelResetPort:

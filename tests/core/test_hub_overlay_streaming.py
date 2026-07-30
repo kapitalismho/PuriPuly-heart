@@ -10,9 +10,10 @@ import pytest
 from puripuly_heart.core import messages
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.llm.provider import LLMProvider
-from puripuly_heart.core.orchestrator import hub as hub_module
 from puripuly_heart.core.orchestrator.channel_runtime import _MergeBuffer
-from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.orchestrator.peer_translation_channel import (
+    PeerTranslationChannelOwner,
+)
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     TranslationOverlayProjection,
 )
@@ -51,7 +52,9 @@ _HUB_ACTIVE_SELF_MIRROR_FIELDS = {
 
 
 def test_hub_does_not_declare_active_self_overlay_mirror_fields() -> None:
-    assert _HUB_ACTIVE_SELF_MIRROR_FIELDS.isdisjoint(ClientHub.__dataclass_fields__)
+    assert _HUB_ACTIVE_SELF_MIRROR_FIELDS.isdisjoint(
+        PeerTranslationChannelOwner.__dataclass_fields__
+    )
 
 
 @dataclass(slots=True)
@@ -277,7 +280,7 @@ class ReleasableTranslateLLMProvider(LLMProvider):
         if self.release is None:
             self.release = asyncio.get_running_loop().create_future()
         await self.release
-        return hub_module.Translation(
+        return Translation(
             utterance_id=utterance_id,
             text=self.response_text,
             source_language=self.response_source_language,
@@ -308,7 +311,7 @@ class ClockedTranslateLLMProvider(LLMProvider):
             raise AssertionError("no translate response configured")
         delay_s, response_text = self.responses.pop(0)
         self.clock.advance(delay_s)
-        return hub_module.Translation(utterance_id=utterance_id, text=response_text)
+        return Translation(utterance_id=utterance_id, text=response_text)
 
     async def close(self) -> None:
         return
@@ -335,7 +338,7 @@ class SequencedTranslateLLMProvider(LLMProvider):
         await asyncio.sleep(self.delay_s)
         if not self.responses:
             raise AssertionError("no translate response configured")
-        return hub_module.Translation(utterance_id=utterance_id, text=self.responses.pop(0))
+        return Translation(utterance_id=utterance_id, text=self.responses.pop(0))
 
     async def close(self) -> None:
         return
@@ -362,7 +365,7 @@ class RecordingSequencedTranslateLLMProvider(LLMProvider):
         await asyncio.sleep(self.delay_s)
         if not self.responses:
             raise AssertionError("no translate response configured")
-        return hub_module.Translation(utterance_id=utterance_id, text=self.responses.pop(0))
+        return Translation(utterance_id=utterance_id, text=self.responses.pop(0))
 
     async def close(self) -> None:
         return
@@ -396,7 +399,7 @@ class GatedRecordingTranslateLLMProvider(LLMProvider):
         await self.release
         if response_index >= len(self.responses):
             raise AssertionError("no translate response configured")
-        return hub_module.Translation(
+        return Translation(
             utterance_id=utterance_id,
             text=self.responses[response_index],
         )
@@ -2664,10 +2667,7 @@ async def test_self_translation_cancellation_closes_overlay_line_as_incomplete()
 
 
 @pytest.mark.asyncio
-async def test_low_latency_self_partial_no_longer_emits_overlay_event(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(hub_module, "_SELF_PREVIEW_COALESCE_MS", 10, raising=False)
+async def test_low_latency_self_partial_no_longer_emits_overlay_event() -> None:
     sink = RecordingOverlaySink()
     hub = compose_client_hub(
         stt=None,

@@ -119,12 +119,12 @@ def test_application_composition_has_no_provider_runtime_lifecycle_algorithm() -
     assert "ManagedSTTProvider(" not in source
 
 
-def test_hub_has_one_local_asr_owner_port_and_no_concrete_stt_handle_lifecycle() -> None:
-    hub_file = SOURCE_ROOT / "core" / "orchestrator" / "hub.py"
-    source = hub_file.read_text(encoding="utf-8")
-    function_names = _defined_function_names(hub_file)
+def test_peer_owner_has_one_local_asr_port_and_no_concrete_stt_lifecycle() -> None:
+    owner_file = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
+    source = owner_file.read_text(encoding="utf-8")
+    function_names = _defined_function_names(owner_file)
 
-    assert source.count("_local_asr_provider_runtime") > 0
+    assert source.count("local_asr_runtime") > 0
     for retired_name in (
         "_self_stt_provider_runtime",
         "_peer_stt_provider_runtime",
