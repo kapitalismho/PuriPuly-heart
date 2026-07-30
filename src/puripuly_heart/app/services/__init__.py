@@ -18,5 +18,14 @@ _install_moved_module_aliases(
         ),
         "local_asr_readiness": "puripuly_heart.app.services.local_asr.local_asr_readiness",
         "local_asr_selection": "puripuly_heart.app.services.local_asr.local_asr_selection",
+        "overlay_application": "puripuly_heart.app.services.overlay.overlay_application",
+        "overlay_calibration": "puripuly_heart.app.services.overlay.overlay_calibration",
+        "overlay_calibration_application": (
+            "puripuly_heart.app.services.overlay.overlay_calibration_application"
+        ),
+        "overlay_generation_start": "puripuly_heart.app.services.overlay.overlay_generation_start",
+        "overlay_session_transition": (
+            "puripuly_heart.app.services.overlay.overlay_session_transition"
+        ),
     },
 )

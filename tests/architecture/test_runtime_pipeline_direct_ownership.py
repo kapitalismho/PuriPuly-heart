@@ -108,7 +108,7 @@ def test_peer_owner_has_no_diagnostics_state_or_algorithm_and_overlay_uses_direc
     assert all(residue not in source for residue in forbidden_source)
 
     for path in (
-        SOURCE_ROOT / "app" / "services" / "overlay_application.py",
+        SOURCE_ROOT / "app" / "services" / "overlay" / "overlay_application.py",
         SOURCE_ROOT / "core" / "runtime" / "overlay.py",
     ):
         overlay_source = path.read_text(encoding="utf-8")
@@ -148,7 +148,7 @@ def test_peer_owner_has_no_output_runtime_state_or_projection_algorithm() -> Non
     }.isdisjoint(methods)
 
     for path in (
-        SOURCE_ROOT / "app" / "services" / "overlay_application.py",
+        SOURCE_ROOT / "app" / "services" / "overlay" / "overlay_application.py",
         SOURCE_ROOT / "composition" / "application_runtime.py",
     ):
         source = path.read_text(encoding="utf-8")

@@ -5,10 +5,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
-from puripuly_heart.app.services.overlay_calibration import OverlayCalibrationOwner
 from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
+
+from .overlay_application import OverlayApplicationOwner
+from .overlay_calibration import OverlayCalibrationOwner
 
 
 @dataclass(slots=True)

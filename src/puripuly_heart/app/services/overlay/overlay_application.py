@@ -14,18 +14,6 @@ from puripuly_heart.app.ports.translation_output_projection import (
     TranslationOutputProjectionPort,
 )
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
-from puripuly_heart.app.services.overlay_generation_start import (
-    OverlayGenerationStartDiagnostic,
-    OverlayGenerationStartEffects,
-    OverlayGenerationStartOwner,
-    OverlayGenerationStartRequest,
-)
-from puripuly_heart.app.services.overlay_session_transition import (
-    OverlaySessionShutdownExecution,
-    OverlaySessionStartExecution,
-    OverlaySessionTransitionDiagnostic,
-    OverlaySessionTransitionOwner,
-)
 from puripuly_heart.app.services.peer_application import PeerApplicationSnapshot
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.resolved import (
@@ -46,6 +34,19 @@ from puripuly_heart.core.overlay.process import (
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.core.runtime.overlay_session_fallback import (
     OverlaySessionFallbackOwner,
+)
+
+from .overlay_generation_start import (
+    OverlayGenerationStartDiagnostic,
+    OverlayGenerationStartEffects,
+    OverlayGenerationStartOwner,
+    OverlayGenerationStartRequest,
+)
+from .overlay_session_transition import (
+    OverlaySessionShutdownExecution,
+    OverlaySessionStartExecution,
+    OverlaySessionTransitionDiagnostic,
+    OverlaySessionTransitionOwner,
 )
 
 OVERLAY_STARTUP_TIMEOUT_MS = 3000
