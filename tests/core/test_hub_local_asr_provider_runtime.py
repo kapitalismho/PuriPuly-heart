@@ -15,11 +15,11 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeGpuSnapshot,
     ProviderRuntimeMutationResult,
 )
-from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
 from puripuly_heart.core.vad.gating import SpeechEnd
+from tests.helpers.client_hub import compose_client_hub
 
 
 @dataclass
@@ -172,7 +172,7 @@ def _request() -> ProviderRuntimeBuildRequest:
 
 async def test_hub_delegates_self_provider_execution_and_close_to_one_owner() -> None:
     factory = FakeOwnedRuntimeFactory()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=FakeOscQueue(messages=[]),
@@ -198,7 +198,7 @@ async def test_hub_delegates_self_provider_execution_and_close_to_one_owner() ->
 
 async def test_hub_prebuilt_compatibility_uses_the_canonical_owner() -> None:
     provider = PrebuiltProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=provider,
         llm=None,
         osc=FakeOscQueue(messages=[]),

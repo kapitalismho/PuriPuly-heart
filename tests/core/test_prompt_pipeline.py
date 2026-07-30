@@ -7,8 +7,8 @@ import pytest
 
 from puripuly_heart.config.prompts import _reset_prompt_cache_for_tests
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.domain.models import Translation
+from tests.helpers.client_hub import compose_client_hub
 
 
 @dataclass
@@ -69,7 +69,7 @@ class FakeLLMProvider:
 @pytest.mark.asyncio
 async def test_hub_substitutes_language_placeholders() -> None:
     fake_llm = FakeLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -91,7 +91,7 @@ async def test_hub_substitutes_language_placeholders() -> None:
 @pytest.mark.asyncio
 async def test_hub_renders_dynamic_prompt_placeholders() -> None:
     fake_llm = FakeLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -112,7 +112,7 @@ async def test_hub_renders_dynamic_prompt_placeholders() -> None:
 
 
 def test_hub_renders_peer_runtime_dynamic_prompt_placeholders() -> None:
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=FakeLLMProvider(),
         osc=FakeOscQueue(),
@@ -141,7 +141,7 @@ def test_hub_renders_peer_runtime_dynamic_prompt_placeholders() -> None:
 async def test_detected_peer_language_drives_prompt_context_and_request() -> None:
     fake_llm = FakeLLMProvider()
     clock = FakeClock()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -174,7 +174,7 @@ async def test_detected_peer_language_drives_prompt_context_and_request() -> Non
 @pytest.mark.asyncio
 async def test_sequential_detected_peer_runs_reuse_normalized_language_context() -> None:
     fake_llm = FakeLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -206,7 +206,7 @@ async def test_sequential_detected_peer_runs_reuse_normalized_language_context()
 @pytest.mark.asyncio
 async def test_unmapped_detected_peer_language_uses_source_only_path() -> None:
     fake_llm = FakeLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -230,7 +230,7 @@ async def test_unmapped_detected_peer_language_uses_source_only_path() -> None:
 @pytest.mark.asyncio
 async def test_hub_renders_custom_prompt_without_dynamic_placeholders() -> None:
     fake_llm = FakeLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),
@@ -249,7 +249,7 @@ async def test_hub_renders_custom_prompt_without_dynamic_placeholders() -> None:
 async def test_hub_request_does_not_read_prompt_files_after_warmup(monkeypatch) -> None:
     _reset_prompt_cache_for_tests()
     fake_llm = FakeLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=fake_llm,
         osc=FakeOscQueue(),

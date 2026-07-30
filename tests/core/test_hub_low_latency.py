@@ -25,6 +25,7 @@ from tests.core.test_hub_branch_coverage import (
     _make_runtime_logging_capture,
     _runtime_log_messages,
 )
+from tests.helpers.client_hub import compose_client_hub
 
 # ── Mock classes ──────────────────────────────────────────────────────────────
 
@@ -303,7 +304,7 @@ async def test_hub_exposes_named_provider_runtime_handles_and_shutdown_policies(
     stt = QueueingSTTProvider(channel="self")
     peer_stt = QueueingSTTProvider(channel="peer")
     llm = ClosingLLMProvider(response_text="translated", delay_s=0.0)
-    hub = ClientHub(stt=stt, peer_stt=peer_stt, llm=llm, osc=FakeOscQueue())
+    hub = compose_client_hub(stt=stt, peer_stt=peer_stt, llm=llm, osc=FakeOscQueue())
 
     handles = getattr(hub, "provider_runtime_handles", None)
 
@@ -339,7 +340,7 @@ async def test_stop_attempts_all_provider_closes_and_retries_failed_handles() ->
         close_label="peer provider",
     )
     llm = ClosingLLMProvider(response_text="translated", delay_s=0.0)
-    hub = ClientHub(stt=self_stt, peer_stt=peer_stt, llm=llm, osc=FakeOscQueue())
+    hub = compose_client_hub(stt=self_stt, peer_stt=peer_stt, llm=llm, osc=FakeOscQueue())
 
     await hub.start(auto_flush_osc=False)
 
@@ -374,7 +375,7 @@ async def test_replaced_peer_provider_late_final_cannot_mutate_or_enqueue_chatbo
     old_peer = QueueingSTTProvider(channel="peer")
     new_peer = QueueingSTTProvider(channel="peer")
     osc = FakeOscQueue()
-    hub = ClientHub(stt=None, peer_stt=old_peer, llm=None, osc=osc)
+    hub = compose_client_hub(stt=None, peer_stt=old_peer, llm=None, osc=osc)
     hub.active_chatbox_channel = "peer"
 
     assert getattr(hub, "provider_runtime_handles", None) is not None
@@ -408,7 +409,7 @@ async def test_replaced_llm_provider_late_final_cleans_peer_runtime_without_outp
     new_llm = FakeLLMProvider(response_text="current translation", delay_s=0.0)
     osc = FakeOscQueue()
     overlay_sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=old_llm,
         osc=osc,
@@ -461,7 +462,7 @@ async def test_replaced_llm_provider_late_spec_completion_cannot_update_low_late
     new_llm = FakeLLMProvider(response_text="current translation", delay_s=0.0)
     osc = FakeOscQueue()
     overlay_sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=old_llm,
         osc=osc,
@@ -511,7 +512,7 @@ async def test_replaced_llm_provider_late_spec_completion_falls_back_without_han
     osc = FakeOscQueue()
     overlay_sink = RecordingOverlaySink()
     clock = FakeClock(initial_time=10.0)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=old_llm,
         osc=osc,
@@ -572,7 +573,7 @@ async def test_replaced_llm_provider_late_spec_completion_falls_back_without_han
 @pytest.mark.asyncio
 async def test_self_stt_toggle_off_keeps_event_ingress_for_later_reenable_events() -> None:
     stt = PersistentQueueingSTTProvider(channel="self")
-    hub = ClientHub(stt=stt, peer_stt=None, llm=None, osc=FakeOscQueue())
+    hub = compose_client_hub(stt=stt, peer_stt=None, llm=None, osc=FakeOscQueue())
 
     await hub.start(auto_flush_osc=False)
     try:
@@ -601,7 +602,7 @@ class TestSpeechEndedTracking:
     @pytest.mark.asyncio
     async def test_low_latency_state_stays_on_self_runtime_only(self):
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -648,7 +649,7 @@ class TestRuntimeLatencyLogging:
             delay_s=0.0,
         )
         overlay_sink = RecordingOverlaySink()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=llm,
             osc=FakeOscQueue(),
@@ -684,7 +685,7 @@ class TestRuntimeLatencyLogging:
     async def test_basic_latency_summary_includes_self_hangover_without_stage(self):
         runtime_logging, log_stream = _make_runtime_logging_capture()
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -730,7 +731,7 @@ class TestRuntimeLatencyLogging:
 
         basic_clock = FakeClock(initial_time=10.0)
         detailed_clock = FakeClock(initial_time=20.0)
-        basic_hub = ClientHub(
+        basic_hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -739,7 +740,7 @@ class TestRuntimeLatencyLogging:
             low_latency_finalize_wait_ms=0,
             runtime_logging=basic_runtime_logging,
         )
-        detailed_hub = ClientHub(
+        detailed_hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -814,7 +815,7 @@ class TestRuntimeLatencyLogging:
 
         basic_clock = FakeClock(initial_time=10.0)
         detailed_clock = FakeClock(initial_time=20.0)
-        basic_hub = ClientHub(
+        basic_hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -823,7 +824,7 @@ class TestRuntimeLatencyLogging:
             low_latency_finalize_wait_ms=0,
             runtime_logging=basic_runtime_logging,
         )
-        detailed_hub = ClientHub(
+        detailed_hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -882,7 +883,7 @@ class TestRuntimeLatencyLogging:
         runtime_logging, log_stream = _make_runtime_logging_capture()
         runtime_logging.set_mode(SessionLoggingMode.DETAILED)
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=ClockedTranslateLLMProvider(
                 clock=clock,
@@ -930,7 +931,7 @@ class TestRuntimeLatencyLogging:
     ):
         runtime_logging, log_stream = _make_runtime_logging_capture()
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -976,7 +977,7 @@ class TestRuntimeLatencyLogging:
 
         basic_overlay_sink = RecordingOverlaySink()
         detailed_overlay_sink = RecordingOverlaySink()
-        basic_hub = ClientHub(
+        basic_hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(response_text="translated body", delay_s=0.0),
             osc=FakeOscQueue(),
@@ -985,7 +986,7 @@ class TestRuntimeLatencyLogging:
             low_latency_mode=True,
             low_latency_finalize_wait_ms=0,
         )
-        detailed_hub = ClientHub(
+        detailed_hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(response_text="translated body", delay_s=0.0),
             osc=FakeOscQueue(),
@@ -1051,7 +1052,7 @@ class TestRuntimeLatencyLogging:
         clock = FakeClock(initial_time=10.0)
         llm = FakeLLMProvider(response_text="translated", delay_s=0.0)
         osc = FakeOscQueue()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=llm,
             osc=osc,
@@ -1100,7 +1101,7 @@ class TestRuntimeLatencyLogging:
         clock = FakeClock(initial_time=10.0)
         osc = FakeOscQueue()
         overlay_sink = RecordingOverlaySink()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=osc,
@@ -1162,7 +1163,7 @@ class TestRuntimeLatencyLogging:
             responses=[(0.10, "spec translated"), (0.30, "final translated")],
         )
         osc = FakeOscQueue()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=llm,
             osc=osc,
@@ -1242,7 +1243,7 @@ class TestRuntimeLatencyLogging:
             responses=[(0.10, "spec translated")],
         )
         osc = FakeOscQueue()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=llm,
             osc=osc,
@@ -1308,7 +1309,7 @@ class TestRuntimeLatencyLogging:
     async def test_speech_end_before_stt_final_uses_post_end_phase(self):
         """SpeechEnd가 먼저 오면 phase=post_end로 처리되어야 함."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -1348,7 +1349,7 @@ class TestRuntimeLatencyLogging:
     async def test_stt_final_before_speech_end_waits_for_vad_end(self):
         """STT Final이 먼저 오면 awaiting_vad_end=True가 되어야 함."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -1383,7 +1384,7 @@ class TestRuntimeLatencyLogging:
     async def test_speech_ended_ids_cleaned_on_commit(self):
         """커밋 시 _speech_ended_ids가 정리되어야 함."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,  # LLM 없이 직접 커밋
             osc=FakeOscQueue(),
@@ -1417,7 +1418,7 @@ class TestAwaitingVadEndTimeout:
     async def test_awaiting_vad_end_timeout_clears_state(self):
         """타임아웃 후 awaiting_vad_end가 클리어되어야 함."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -1451,7 +1452,7 @@ class TestAwaitingVadEndTimeout:
     async def test_timeout_cancelled_when_speech_end_arrives(self):
         """SpeechEnd가 오면 타임아웃이 취소되어야 함."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -1489,7 +1490,7 @@ class TestLowLatencyCommitBlocking:
         """정상 발화는 지연 없이 커밋되어야 함 (regression)."""
         clock = FakeClock(initial_time=10.0)
         osc = FakeOscQueue()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,  # 번역 없이 직접 커밋
             osc=osc,
@@ -1532,7 +1533,7 @@ class TestLowLatencyCommitBlocking:
         4. _utterance_start_times.get() = None이지만 SpeechEnd가 이미 왔으므로 post_end 처리
         """
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -1574,12 +1575,12 @@ class TestLowLatencyMergeOverlap:
     """Test relaxed overlap merge behavior."""
 
     def test_relaxed_overlap_strips_boundary_punct(self):
-        hub = ClientHub(stt=None, llm=None, osc=FakeOscQueue())
+        hub = compose_client_hub(stt=None, llm=None, osc=FakeOscQueue())
         merged = hub._merge_with_overlap("같으면서.", "같으면서도 안.")
         assert merged == "같으면서도 안."
 
     def test_relaxed_overlap_min_length(self):
-        hub = ClientHub(stt=None, llm=None, osc=FakeOscQueue())
+        hub = compose_client_hub(stt=None, llm=None, osc=FakeOscQueue())
         merged = hub._merge_with_overlap("가다.", "가다고")
         assert merged == "가다.가다고"
 
@@ -1592,7 +1593,7 @@ class TestResumeEndTimeout:
         """resume_confirmed 상태에서 STT Final 안 오면 타임아웃 후 커밋."""
         clock = FakeClock(initial_time=10.0)
         osc = FakeOscQueue()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,  # 번역 없이 직접 커밋
             osc=osc,
@@ -1646,7 +1647,7 @@ class TestResumeEndTimeout:
     async def test_resume_end_timeout_cancelled_when_stt_final_arrives(self):
         """STT Final이 오면 타임아웃 취소."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -1696,7 +1697,7 @@ class TestResumeEndTimeout:
     async def test_new_resume_cancels_previous_timeout(self):
         """새 resume 시작 시 이전 타임아웃 취소."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -1747,7 +1748,7 @@ class TestResumeEndTimeout:
     async def test_timeout_only_triggers_for_matched_utterance_id(self):
         """타임아웃은 정확히 매칭되는 utterance_id에서만 트리거."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -1791,7 +1792,7 @@ class TestResumeEndTimeout:
     async def test_resume_confirmed_without_stt_keeps_active_secondary_in_same_call(self):
         clock = FakeClock(initial_time=10.0)
         overlay_sink = RecordingOverlaySink()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -1833,7 +1834,7 @@ class TestResumeEndTimeout:
 
 class TestSpecCommitPaths:
     def test_soft_reuse_mode_accepts_only_safe_boundary_changes(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -1852,7 +1853,7 @@ class TestSpecCommitPaths:
         clock = FakeClock(initial_time=10.0)
         osc = FakeOscQueue()
         overlay_sink = RecordingOverlaySink()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=osc,
@@ -1897,7 +1898,7 @@ class TestSpecCommitPaths:
         clock = FakeClock(initial_time=10.0)
         osc = FakeOscQueue()
         overlay_sink = RecordingOverlaySink()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(response_text="nuevo", delay_s=0.0),
             osc=osc,
@@ -1948,7 +1949,7 @@ class TestSpecCommitPaths:
     ):
         clock = FakeClock(initial_time=10.0)
         overlay_sink = RecordingOverlaySink()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(response_text="nuevo", delay_s=0.0),
             osc=FakeOscQueue(),
@@ -1997,7 +1998,7 @@ class TestSpecCommitPaths:
         clock = FakeClock(initial_time=10.0)
         diagnostics = RecordingOverlayDiagnostics()
         overlay_sink = RecordingOverlaySink()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -2030,7 +2031,7 @@ class TestSpecCommitPaths:
     async def test_sync_self_active_overlay_dedupes_only_within_same_logical_turn(self):
         clock = FakeClock(initial_time=10.0)
         overlay_sink = RecordingOverlaySink()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -2068,7 +2069,7 @@ class TestSpecCommitPaths:
     async def test_sync_self_active_overlay_re_emits_same_preview_when_update_id_changes(self):
         clock = FakeClock(initial_time=10.0)
         overlay_sink = RecordingOverlaySink()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -2127,7 +2128,7 @@ class TestSpecCommitPaths:
         clock = FakeClock(initial_time=10.0)
         diagnostics = RecordingOverlayDiagnostics()
         overlay_sink = RecordingOverlaySink()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(response_text="nuevo", delay_s=0.0),
             osc=FakeOscQueue(),
@@ -2174,7 +2175,7 @@ class TestSpecCommitPaths:
         clock = FakeClock(initial_time=10.0)
         llm = FakeLLMProvider()
         osc = FakeOscQueue()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=llm,
             osc=osc,
@@ -2207,7 +2208,7 @@ class TestSpecCommitPaths:
         clock = FakeClock(initial_time=10.0)
         llm = FakeLLMProvider()
         osc = FakeOscQueue()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=llm,
             osc=osc,
@@ -2239,7 +2240,7 @@ class TestSpecCommitPaths:
     async def test_try_commit_after_spec_allows_soft_boundary_match(
         self, monkeypatch: pytest.MonkeyPatch
     ):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -2268,7 +2269,7 @@ class TestSpecCommitPaths:
     async def test_try_commit_after_spec_skips_when_spec_text_differs(
         self, monkeypatch: pytest.MonkeyPatch
     ):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -2297,7 +2298,7 @@ class TestSpecCommitPaths:
     async def test_try_commit_after_spec_skips_when_only_excluded_punctuation_differs(
         self, monkeypatch: pytest.MonkeyPatch
     ):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -2327,7 +2328,7 @@ class TestSpecCommitPaths:
         clock = FakeClock(initial_time=10.0)
         llm = FakeLLMProvider(response_text="nuevo")
         osc = FakeOscQueue()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=llm,
             osc=osc,
@@ -2358,7 +2359,7 @@ class TestSpecCommitPaths:
 
     @pytest.mark.asyncio
     async def test_commit_merge_blocks_while_resume_or_waiting_states(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),

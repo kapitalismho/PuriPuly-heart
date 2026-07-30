@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from tests.helpers.client_hub import compose_client_hub
 from tests.integration.helpers import (
     WARMUP_DELAY_S,
     MockOscSender,
@@ -37,7 +38,6 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
     from puripuly_heart.config.prompts import load_prompt_for_provider
     from puripuly_heart.core.language import get_llm_language_name
     from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
-    from puripuly_heart.core.orchestrator.hub import ClientHub
     from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
     from puripuly_heart.core.stt.controller import ManagedSTTProvider
     from puripuly_heart.domain.events import UIEventType
@@ -95,7 +95,7 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
     system_prompt = system_prompt.replace("${sourceName}", get_llm_language_name(source_lang))
     system_prompt = system_prompt.replace("${targetName}", get_llm_language_name(target_lang))
 
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=stt,
         llm=llm,
         osc=osc,

@@ -107,6 +107,12 @@ def compose_application_runtime_shutdown_callbacks(
         ),
         application_shutdown_callback(
             phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+            owner_name="PeerCaptureSessionOwner",
+            callback_name="close",
+            callback=runtime.close_peer_capture_owner,
+        ),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
             owner_name="ApplicationRuntimeLoggingOwner",
             callback_name="close_background_tasks",
             callback=runtime.close_runtime_logging_background_tasks,
@@ -137,9 +143,51 @@ def compose_application_runtime_shutdown_callbacks(
         ),
         application_shutdown_callback(
             phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
-            owner_name="ClientHub",
-            callback_name="stop_owned_runtimes",
-            callback=runtime.stop_hub_owned_runtimes,
+            owner_name="SelfTranslationIngress",
+            callback_name="close",
+            callback=runtime.close_self_translation_ingress,
+        ),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+            owner_name="PeerTranslationIngress",
+            callback_name="close",
+            callback=runtime.close_peer_translation_ingress,
+        ),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+            owner_name="TranslationTurnLifecycleOwner",
+            callback_name="close",
+            callback=runtime.close_translation_turns,
+        ),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+            owner_name="OutputRuntime",
+            callback_name="close",
+            callback=runtime.close_output_runtime,
+        ),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+            owner_name="SelfChannelRuntime",
+            callback_name="close",
+            callback=runtime.close_self_channel_runtime,
+        ),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+            owner_name="PeerChannelRuntime",
+            callback_name="close",
+            callback=runtime.close_peer_channel_runtime,
+        ),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+            owner_name="LocalASRProviderRuntimeOwner",
+            callback_name="close",
+            callback=runtime.close_local_asr_runtime,
+        ),
+        application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
+            owner_name="ProviderRuntimeHandle:llm",
+            callback_name="close",
+            callback=runtime.close_llm_runtime,
         ),
         application_shutdown_callback(
             phase=SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,

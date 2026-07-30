@@ -82,8 +82,32 @@ class RecordingShutdownRuntime(ApplicationRuntimeShutdownStub):
     async def close_runtime_pipeline_launcher(self) -> None:
         self.events.append("pipeline")
 
-    async def stop_hub_owned_runtimes(self) -> None:
-        self.events.append("hub")
+    async def close_peer_capture_owner(self) -> None:
+        self.events.append("peer-close")
+
+    async def close_self_translation_ingress(self) -> None:
+        self.events.append("self-translation-ingress")
+
+    async def close_peer_translation_ingress(self) -> None:
+        self.events.append("peer-translation-ingress")
+
+    async def close_translation_turns(self) -> None:
+        self.events.append("translation-turns")
+
+    async def close_output_runtime(self) -> None:
+        self.events.append("output")
+
+    async def close_self_channel_runtime(self) -> None:
+        self.events.append("self-channel")
+
+    async def close_peer_channel_runtime(self) -> None:
+        self.events.append("peer-channel")
+
+    async def close_local_asr_runtime(self) -> None:
+        self.events.append("local-asr-runtime")
+
+    async def close_llm_runtime(self) -> None:
+        self.events.append("llm-runtime")
 
     def close_vrchat_sender(self) -> None:
         self.events.append("vrchat-sender")
@@ -189,12 +213,20 @@ async def test_runtime_shutdown_graph_preserves_order_and_logging_last_after_fai
         "local-asr",
         "microphone-test",
         "self-close",
+        "peer-close",
         "logging-background",
         "managed-auth",
         "translation-enable",
         "managed-usage",
         "pipeline",
-        "hub",
+        "self-translation-ingress",
+        "peer-translation-ingress",
+        "translation-turns",
+        "output",
+        "self-channel",
+        "peer-channel",
+        "local-asr-runtime",
+        "llm-runtime",
         "vrchat-sender",
         "managed-release",
         "final:1",

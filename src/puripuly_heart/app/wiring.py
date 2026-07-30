@@ -10,6 +10,7 @@ from puripuly_heart.app.adapters.sync_secret_store import (
     SyncSecretStore,
     SyncSecretStoreAdapter,
 )
+from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
 from puripuly_heart.app.wiring_composition import (
     create_microphone_test_capture_adapter,
@@ -78,11 +79,11 @@ from puripuly_heart.app.wiring_stt_factory import (
     resolve_self_stt_runtime_config,
 )
 from puripuly_heart.config.runtime_resolution import resolve_llm_config
+from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
 )
 from puripuly_heart.core.openrouter_credentials import load_managed_openrouter_user_identifier
-from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
     PeerCaptureTargetResolverPort,
@@ -120,7 +121,8 @@ _WIRING_SECRET_KEYS_FOR_COMPATIBILITY_GUARD = (
 
 def compose_self_capture_session_owner(
     *,
-    hub: ClientHub | None,
+    provider_runtime: LocalASRProviderRuntimePort | None,
+    channel_reset: ProviderChannelResetPort | None,
     admission: SelfCaptureAdmissionPort,
     provider_request_factory: SelfCaptureProviderRequestFactory,
     source_factory: SelfCaptureSourceFactory,
@@ -133,7 +135,7 @@ def compose_self_capture_session_owner(
 ) -> SelfCaptureSessionOwner:
     return SelfCaptureSessionOwner(
         admission=admission,
-        provider=SelfCaptureProviderAdapter(hub),
+        provider=SelfCaptureProviderAdapter(provider_runtime, channel_reset),
         provider_request_factory=provider_request_factory,
         source_factory=source_factory,
         vad_factory=vad_factory,
@@ -147,7 +149,8 @@ def compose_self_capture_session_owner(
 
 def compose_peer_capture_session_owner(
     *,
-    hub: ClientHub | None,
+    provider_runtime: LocalASRProviderRuntimePort | None,
+    channel_reset: ProviderChannelResetPort | None,
     admission: PeerCaptureAdmissionPort,
     target_resolver: PeerCaptureTargetResolverPort,
     clock,
@@ -163,7 +166,7 @@ def compose_peer_capture_session_owner(
     return PeerCaptureSessionOwner(
         admission=admission,
         target_resolver=target_resolver,
-        provider=PeerCaptureProviderAdapter(hub),
+        provider=PeerCaptureProviderAdapter(provider_runtime, channel_reset),
         clock=clock,
         provider_request_factory=provider_request_factory,
         source_factory=source_factory,

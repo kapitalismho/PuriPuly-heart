@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from puripuly_heart.app.ports.capture_vad_runtime import (
+    PeerCaptureVadEventRuntime,
+    SelfCaptureVadEventRuntime,
+)
+from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
+from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
+    RuntimePipelineCloseCallbacks,
+    RuntimePipelineStartCallbacks,
+)
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.app.wiring_llm_factory import create_llm_provider
 from puripuly_heart.app.wiring_managed_account import ManagedOpenRouterReleaseRuntime
@@ -24,76 +35,247 @@ from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.local_asr_provider_runtime import (
+    LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimeFactoryPort,
+    LocalASRProviderRuntimePort,
 )
+from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )
+from puripuly_heart.core.orchestrator.context import ContextResolver
 from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.orchestrator.hub_callbacks import (
+    ClientHubDurableOwnerCallbacks,
+)
+from puripuly_heart.core.orchestrator.translation_turn import (
+    TranslationTurnLifecycleOwner,
+)
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
+from puripuly_heart.core.runtime.output import OutputRuntime
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
+from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
+from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
+from puripuly_heart.domain.events import UIEvent
 
 
 @dataclass(slots=True)
-class RuntimePipelineResources:
-    llm: LLMProvider | None = None
+class RuntimePipelineResourceOwner:
+    pending_llm: LLMProvider | None = None
     sender: VrchatOscUdpSender | None = None
-    hub: ClientHub | None = None
+    output_runtime: OutputRuntime | None = None
+    self_runtime: ChannelRuntime | None = None
+    peer_runtime: ChannelRuntime | None = None
+    translation_turns: TranslationTurnLifecycleOwner | None = None
+    local_asr_runtime: LocalASRProviderRuntimePort | None = None
+    llm_runtime: ProviderRuntimeHandle | None = None
     self_capture: SelfCaptureSessionOwner | None = None
     peer_capture: PeerCaptureSessionOwner | None = None
+    self_ingress_open: bool = False
+    peer_ingress_open: bool = False
+    start_callbacks: RuntimePipelineStartCallbacks = field(init=False)
+    close_callbacks: RuntimePipelineCloseCallbacks = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.start_callbacks = RuntimePipelineStartCallbacks(
+            start_output=self.start_output,
+            open_self_ingress=self.open_self_ingress,
+            open_peer_ingress=self.open_peer_ingress,
+            start_translation_turns=self.start_translation_turns,
+            start_local_asr=self.start_local_asr,
+        )
+        self.close_callbacks = RuntimePipelineCloseCallbacks(
+            close_self_capture=self.close_self_capture,
+            close_peer_capture=self.close_peer_capture,
+            close_self_ingress=self.close_self_ingress,
+            close_peer_ingress=self.close_peer_ingress,
+            close_translation_turns=self.close_translation_turns,
+            close_output=self.close_output,
+            close_self_channel=self.close_self_channel,
+            close_peer_channel=self.close_peer_channel,
+            close_local_asr=self.close_local_asr,
+            close_llm=self.close_llm,
+            close_sender=self.close_sender,
+        )
 
     @property
     def has_resources(self) -> bool:
-        return any(
-            resource is not None
-            for resource in (
-                self.llm,
-                self.sender,
-                self.hub,
-                self.self_capture,
-                self.peer_capture,
+        return (
+            any(
+                resource is not None
+                for resource in (
+                    self.pending_llm,
+                    self.sender,
+                    self.output_runtime,
+                    self.self_runtime,
+                    self.peer_runtime,
+                    self.translation_turns,
+                    self.local_asr_runtime,
+                    self.llm_runtime,
+                    self.self_capture,
+                    self.peer_capture,
+                )
             )
+            or self.self_ingress_open
+            or self.peer_ingress_open
         )
+
+    async def start_output(self, auto_flush_chatbox: bool) -> None:
+        runtime = self.output_runtime
+        if runtime is None:
+            raise RuntimeError("runtime pipeline output owner is unavailable")
+        await runtime.start(auto_flush_chatbox=auto_flush_chatbox)
+
+    async def open_self_ingress(self) -> None:
+        owner = self.translation_turns
+        if owner is None:
+            raise RuntimeError("runtime pipeline translation-turn owner is unavailable")
+        await owner.open_channel_ingress("self")
+        self.self_ingress_open = True
+
+    async def open_peer_ingress(self) -> None:
+        owner = self.translation_turns
+        if owner is None:
+            raise RuntimeError("runtime pipeline translation-turn owner is unavailable")
+        await owner.open_channel_ingress("peer")
+        self.peer_ingress_open = True
+
+    async def start_translation_turns(self) -> None:
+        owner = self.translation_turns
+        if owner is None:
+            raise RuntimeError("runtime pipeline translation-turn owner is unavailable")
+        await owner.start()
+
+    async def start_local_asr(self) -> None:
+        owner = self.local_asr_runtime
+        if owner is None:
+            raise RuntimeError("runtime pipeline Local ASR owner is unavailable")
+        await owner.start()
+
+    async def close_self_capture(self) -> None:
+        owner = self.self_capture
+        if owner is None:
+            return
+        await owner.close()
+        if self.self_capture is owner:
+            self.self_capture = None
+
+    async def close_peer_capture(self) -> None:
+        owner = self.peer_capture
+        if owner is None:
+            return
+        await owner.close()
+        if self.peer_capture is owner:
+            self.peer_capture = None
+
+    async def close_self_ingress(self) -> None:
+        if not self.self_ingress_open:
+            return
+        owner = self.translation_turns
+        if owner is None:
+            self.self_ingress_open = False
+            return
+        await owner.close_channel_ingress("self")
+        self.self_ingress_open = False
+
+    async def close_peer_ingress(self) -> None:
+        if not self.peer_ingress_open:
+            return
+        owner = self.translation_turns
+        if owner is None:
+            self.peer_ingress_open = False
+            return
+        await owner.close_channel_ingress("peer")
+        self.peer_ingress_open = False
+
+    async def close_translation_turns(self) -> None:
+        owner = self.translation_turns
+        if owner is None:
+            return
+        await owner.close()
+        if self.translation_turns is owner:
+            self.translation_turns = None
+
+    async def close_output(self) -> None:
+        owner = self.output_runtime
+        if owner is None:
+            return
+        await owner.close()
+        if self.output_runtime is owner:
+            self.output_runtime = None
+
+    async def close_self_channel(self) -> None:
+        owner = self.self_runtime
+        if owner is None:
+            return
+        await owner.reset_runtime_state()
+        if self.self_runtime is owner:
+            self.self_runtime = None
+
+    async def close_peer_channel(self) -> None:
+        owner = self.peer_runtime
+        if owner is None:
+            return
+        await owner.reset_runtime_state()
+        if self.peer_runtime is owner:
+            self.peer_runtime = None
+
+    async def close_local_asr(self) -> None:
+        owner = self.local_asr_runtime
+        if owner is None:
+            return
+        await owner.close()
+        if self.local_asr_runtime is owner:
+            self.local_asr_runtime = None
+
+    async def close_llm(self) -> None:
+        owner = self.llm_runtime
+        if owner is not None:
+            await owner.close()
+            if self.llm_runtime is owner:
+                self.llm_runtime = None
+            self.pending_llm = None
+            return
+        provider = self.pending_llm
+        if provider is None:
+            return
+        await provider.close()
+        if self.pending_llm is provider:
+            self.pending_llm = None
+
+    def close_sender(self) -> None:
+        owner = self.sender
+        if owner is None:
+            return
+        owner.close()
+        if self.sender is owner:
+            self.sender = None
 
     async def close(self) -> None:
         failures: list[BaseException] = []
-        for name in ("self_capture", "peer_capture"):
-            resource = getattr(self, name)
-            if resource is None:
-                continue
+        callbacks = self.close_callbacks
+        for callback in (
+            callbacks.close_self_capture,
+            callbacks.close_peer_capture,
+            callbacks.close_self_ingress,
+            callbacks.close_peer_ingress,
+            callbacks.close_translation_turns,
+            callbacks.close_output,
+            callbacks.close_self_channel,
+            callbacks.close_peer_channel,
+            callbacks.close_local_asr,
+            callbacks.close_llm,
+            callbacks.close_sender,
+        ):
             try:
-                await resource.close()
+                result = callback()
+                if inspect.isawaitable(result):
+                    await result
             except BaseException as exc:
                 failures.append(exc)
-            else:
-                setattr(self, name, None)
-        hub = self.hub
-        if hub is not None:
-            try:
-                await hub.stop()
-            except BaseException as exc:
-                failures.append(exc)
-            else:
-                self.hub = None
-        llm = self.llm
-        if llm is not None:
-            try:
-                await llm.close()
-            except BaseException as exc:
-                failures.append(exc)
-            else:
-                self.llm = None
-        sender = self.sender
-        if sender is not None:
-            try:
-                sender.close()
-            except BaseException as exc:
-                failures.append(exc)
-            else:
-                self.sender = None
         if failures:
             raise BaseExceptionGroup("runtime pipeline cleanup failed", failures)
 
@@ -109,10 +291,18 @@ class RuntimePipelineComponents:
     vrc_mic_audio_gate: VrcMicAudioGate
     prepare_self_provider: bool
     translation_runtime_configuration: TranslationRuntimeConfigurationOwner
-    resources: RuntimePipelineResources = field(repr=False)
-
-    async def close(self) -> None:
-        await self.resources.close()
+    output_runtime: OutputRuntime
+    self_runtime: ChannelRuntime
+    peer_runtime: ChannelRuntime
+    translation_turns: TranslationTurnLifecycleOwner
+    local_asr_runtime: LocalASRProviderRuntimePort
+    llm_runtime: ProviderRuntimeHandle
+    context_resolver: ContextResolver
+    stt_sessions: SttSessionStateProjection
+    ui_events: asyncio.Queue[UIEvent]
+    resource_owner: RuntimePipelineResourceOwner = field(repr=False)
+    start_callbacks: RuntimePipelineStartCallbacks
+    close_callbacks: RuntimePipelineCloseCallbacks
 
 
 @dataclass(slots=True)
@@ -129,6 +319,15 @@ class RuntimePipelineHandle:
         default=None,
     )
     hub: ClientHub | None = field(init=False, default=None)
+    output_runtime: OutputRuntime | None = field(init=False, default=None)
+    self_runtime: ChannelRuntime | None = field(init=False, default=None)
+    peer_runtime: ChannelRuntime | None = field(init=False, default=None)
+    translation_turns: TranslationTurnLifecycleOwner | None = field(init=False, default=None)
+    local_asr_runtime: LocalASRProviderRuntimePort | None = field(init=False, default=None)
+    llm_runtime: ProviderRuntimeHandle | None = field(init=False, default=None)
+    context_resolver: ContextResolver | None = field(init=False, default=None)
+    stt_sessions: SttSessionStateProjection | None = field(init=False, default=None)
+    ui_events: asyncio.Queue[UIEvent] | None = field(init=False, default=None)
     self_capture: SelfCaptureSessionOwner | None = field(init=False, default=None)
     vrc_mic_state: VrcMicState | None = field(init=False, default=None)
     vrc_mic_audio_gate: VrcMicAudioGate | None = field(init=False, default=None)
@@ -139,6 +338,15 @@ class RuntimePipelineHandle:
         self.osc = components.osc
         self.translation_runtime_configuration = components.translation_runtime_configuration
         self.hub = components.hub
+        self.output_runtime = components.output_runtime
+        self.self_runtime = components.self_runtime
+        self.peer_runtime = components.peer_runtime
+        self.translation_turns = components.translation_turns
+        self.local_asr_runtime = components.local_asr_runtime
+        self.llm_runtime = components.llm_runtime
+        self.context_resolver = components.context_resolver
+        self.stt_sessions = components.stt_sessions
+        self.ui_events = components.ui_events
         self.self_capture = components.self_capture
         self.vrc_mic_state = components.vrc_mic_state
         self.vrc_mic_audio_gate = components.vrc_mic_audio_gate
@@ -150,6 +358,15 @@ class RuntimePipelineHandle:
             self.osc = None
             self.translation_runtime_configuration = None
             self.hub = None
+            self.output_runtime = None
+            self.self_runtime = None
+            self.peer_runtime = None
+            self.translation_turns = None
+            self.local_asr_runtime = None
+            self.llm_runtime = None
+            self.context_resolver = None
+            self.stt_sessions = None
+            self.ui_events = None
             self.self_capture = None
             self.vrc_mic_state = None
             self.vrc_mic_audio_gate = None
@@ -167,17 +384,29 @@ class RuntimePipelineLauncher:
         LocalASRProviderRuntimeFactoryPort,
     ]
     self_capture_factory: Callable[
-        [ClientHub, VrcMicAudioGate],
+        [
+            SelfCaptureVadEventRuntime,
+            LocalASRProviderRuntimePort,
+            ProviderChannelResetPort,
+            VrcMicAudioGate,
+        ],
         SelfCaptureSessionOwner,
     ]
-    peer_capture_factory: Callable[[ClientHub], PeerCaptureSessionOwner]
+    peer_capture_factory: Callable[
+        [
+            PeerCaptureVadEventRuntime,
+            LocalASRProviderRuntimePort,
+            ProviderChannelResetPort,
+        ],
+        PeerCaptureSessionOwner,
+    ]
     previous_self_capture: Callable[[], SelfCaptureSessionOwner | None]
     component_sink: Callable[[RuntimePipelineComponents], None]
     peer_application: Callable[[], PeerApplicationOwner]
     configure_vrc_mic: Callable[..., Awaitable[None]]
     stt_failure_sink: Callable[[str], None]
     cleanup_failure_sink: Callable[[str, BaseException], None]
-    failed_resources: RuntimePipelineResources | None = field(
+    failed_resources: RuntimePipelineResourceOwner | None = field(
         init=False,
         default=None,
         repr=False,
@@ -210,7 +439,7 @@ class RuntimePipelineLauncher:
         receiver_active: bool,
     ) -> RuntimePipelineComponents:
         await self.retry_failed_cleanup()
-        resources = RuntimePipelineResources()
+        resources = RuntimePipelineResourceOwner()
         try:
             pipeline = await compose_runtime_pipeline(
                 settings=settings,
@@ -273,18 +502,30 @@ async def compose_runtime_pipeline(
         LocalASRProviderRuntimeFactoryPort,
     ],
     self_capture_factory: Callable[
-        [ClientHub, VrcMicAudioGate],
+        [
+            SelfCaptureVadEventRuntime,
+            LocalASRProviderRuntimePort,
+            ProviderChannelResetPort,
+            VrcMicAudioGate,
+        ],
         SelfCaptureSessionOwner,
     ],
-    peer_capture_factory: Callable[[ClientHub], PeerCaptureSessionOwner],
+    peer_capture_factory: Callable[
+        [
+            PeerCaptureVadEventRuntime,
+            LocalASRProviderRuntimePort,
+            ProviderChannelResetPort,
+        ],
+        PeerCaptureSessionOwner,
+    ],
     vrc_mic_state: VrcMicState | None,
     vrc_mic_audio_gate: VrcMicAudioGate | None,
     receiver_active: bool,
     stt_failure_sink: Callable[[str], None],
-    resources: RuntimePipelineResources | None = None,
+    resources: RuntimePipelineResourceOwner | None = None,
 ) -> RuntimePipelineComponents:
     owned_resources = resources is None
-    pipeline_resources = resources or RuntimePipelineResources()
+    pipeline_resources = resources or RuntimePipelineResourceOwner()
     try:
         return await _compose_runtime_pipeline(
             settings=settings,
@@ -325,15 +566,27 @@ async def _compose_runtime_pipeline(
     managed_delegate_ready: Callable[[], None],
     local_asr_factory: Callable[[object], LocalASRProviderRuntimeFactoryPort],
     self_capture_factory: Callable[
-        [ClientHub, VrcMicAudioGate],
+        [
+            SelfCaptureVadEventRuntime,
+            LocalASRProviderRuntimePort,
+            ProviderChannelResetPort,
+            VrcMicAudioGate,
+        ],
         SelfCaptureSessionOwner,
     ],
-    peer_capture_factory: Callable[[ClientHub], PeerCaptureSessionOwner],
+    peer_capture_factory: Callable[
+        [
+            PeerCaptureVadEventRuntime,
+            LocalASRProviderRuntimePort,
+            ProviderChannelResetPort,
+        ],
+        PeerCaptureSessionOwner,
+    ],
     vrc_mic_state: VrcMicState | None,
     vrc_mic_audio_gate: VrcMicAudioGate | None,
     receiver_active: bool,
     stt_failure_sink: Callable[[str], None],
-    resources: RuntimePipelineResources,
+    resources: RuntimePipelineResourceOwner,
 ) -> RuntimePipelineComponents:
     secrets = create_secret_store(settings.secrets, config_path=config_path)
     await managed_release.rebuild(secrets=secrets)
@@ -347,7 +600,7 @@ async def _compose_runtime_pipeline(
             managed_delegate_ready=managed_delegate_ready,
             runtime_logging=runtime_logging,
         )
-        resources.llm = llm
+        resources.pending_llm = llm
 
     prepare_self_provider = settings.provider.stt != STTProviderName.LOCAL_QWEN_GPU
     if prepare_self_provider:
@@ -380,18 +633,66 @@ async def _compose_runtime_pipeline(
             integrated_context_enabled=True,
         )
     )
+    ui_events: asyncio.Queue[UIEvent] = asyncio.Queue()
+    stt_sessions = SttSessionStateProjection()
+    callbacks = ClientHubDurableOwnerCallbacks(stt_sessions)
+    output_runtime = OutputRuntime(
+        chatbox=osc,
+        clock=clock,
+    )
+    resources.output_runtime = output_runtime
+    self_runtime = ChannelRuntime(channel="self")
+    resources.self_runtime = self_runtime
+    peer_runtime = ChannelRuntime(channel="peer")
+    resources.peer_runtime = peer_runtime
+    context_resolver = ContextResolver(
+        clock=clock,
+        config_snapshot=translation_runtime_configuration.snapshot,
+    )
+    translation_turns = TranslationTurnLifecycleOwner(
+        on_child_created=callbacks.child_created,
+        on_child_started=callbacks.child_started,
+        process_child=callbacks.process_child,
+        on_child_terminal=callbacks.child_terminal,
+        on_parent_closed=callbacks.parent_closed,
+        on_parent_rejected=callbacks.parent_rejected,
+        output=callbacks,
+        config_snapshot=translation_runtime_configuration.snapshot,
+    )
+    resources.translation_turns = translation_turns
+    await translation_turns.close_channel_ingress("self")
+    await translation_turns.close_channel_ingress("peer")
+    local_asr_runtime = local_asr_factory(secrets).create(
+        LocalASRProviderRuntimeCallbacks(
+            self_event_handler=callbacks.self_event_handler,
+            peer_event_handler=callbacks.peer_event_handler,
+            retired_event_handler=callbacks.retired_event_handler,
+            self_exception_handler=callbacks.self_exception_handler,
+            peer_exception_handler=callbacks.peer_exception_handler,
+        )
+    )
+    resources.local_asr_runtime = local_asr_runtime
+    llm_runtime = ProviderRuntimeHandle(
+        name="llm",
+        provider=llm,
+    )
+    resources.llm_runtime = llm_runtime
+    resources.pending_llm = None
     hub = ClientHub(
-        stt=None,
-        llm=llm,
         osc=osc,
-        peer_stt=None,
+        ui_events=ui_events,
         clock=clock,
         runtime_logging=runtime_logging,
-        local_asr_provider_runtime_factory=local_asr_factory(secrets),
         translation_runtime_configuration=translation_runtime_configuration,
+        direct_output_runtime=output_runtime,
+        direct_self_runtime=self_runtime,
+        direct_peer_runtime=peer_runtime,
+        direct_translation_turns=translation_turns,
+        direct_local_asr_runtime=local_asr_runtime,
+        direct_llm_runtime=llm_runtime,
+        direct_context_resolver=context_resolver,
     )
-    resources.hub = hub
-    resources.llm = None
+    callbacks.bind(hub)
     state = vrc_mic_state or VrcMicState()
     gate = vrc_mic_audio_gate
     if gate is None:
@@ -405,9 +706,9 @@ async def _compose_runtime_pipeline(
     gate.set_receiver_active(receiver_active)
     gate.reset()
 
-    self_capture = self_capture_factory(hub, gate)
+    self_capture = self_capture_factory(hub, local_asr_runtime, hub, gate)
     resources.self_capture = self_capture
-    peer_capture = peer_capture_factory(hub)
+    peer_capture = peer_capture_factory(hub, local_asr_runtime, hub)
     resources.peer_capture = peer_capture
     return RuntimePipelineComponents(
         sender=sender,
@@ -419,7 +720,18 @@ async def _compose_runtime_pipeline(
         vrc_mic_audio_gate=gate,
         prepare_self_provider=prepare_self_provider,
         translation_runtime_configuration=translation_runtime_configuration,
-        resources=resources,
+        output_runtime=output_runtime,
+        self_runtime=self_runtime,
+        peer_runtime=peer_runtime,
+        translation_turns=translation_turns,
+        local_asr_runtime=local_asr_runtime,
+        llm_runtime=llm_runtime,
+        context_resolver=context_resolver,
+        stt_sessions=stt_sessions,
+        ui_events=ui_events,
+        resource_owner=resources,
+        start_callbacks=resources.start_callbacks,
+        close_callbacks=resources.close_callbacks,
     )
 
 
@@ -427,6 +739,6 @@ __all__ = [
     "RuntimePipelineComponents",
     "RuntimePipelineHandle",
     "RuntimePipelineLauncher",
-    "RuntimePipelineResources",
+    "RuntimePipelineResourceOwner",
     "compose_runtime_pipeline",
 ]

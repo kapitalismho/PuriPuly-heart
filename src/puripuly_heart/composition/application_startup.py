@@ -122,15 +122,19 @@ class ApplicationStartupAdapter:
             receiver_active=self.receiver_active(),
         )
         self.sync_local_asr_notice()
-        hub = self.pipeline.hub
-        if hub is None:
-            raise RuntimeError("Application pipeline did not provide a ClientHub")
+        components = self.pipeline.current
+        if components is None:
+            raise RuntimeError("Application pipeline did not provide runtime components")
+        local_asr_runtime = components.local_asr_runtime
+        llm_runtime = components.llm_runtime
         stt_provider = settings.provider.stt.value
         if self.stt_requires_secret(settings.provider.stt):
             stt_key_map = {"qwen_asr": self.alibaba_verified_key()}
             stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
             stt_verified = getattr(settings.api_key_verified, stt_verified_key, False)
-            stt_needs_key = (not hub.has_stt_provider("self")) or (not stt_verified)
+            stt_needs_key = (
+                local_asr_runtime.snapshot.channel_for("self").provider_id is None
+            ) or (not stt_verified)
         else:
             stt_needs_key = False
         self.presentation.set_dashboard_stt_needs_key(stt_needs_key)
@@ -147,7 +151,7 @@ class ApplicationStartupAdapter:
             translation_needs_key = (
                 False
                 if self.managed_translation_available()
-                else (hub.llm is None) or (not llm_verified)
+                else (llm_runtime.provider is None) or (not llm_verified)
             )
         else:
             translation_needs_key = False
@@ -158,7 +162,12 @@ class ApplicationStartupAdapter:
         if config_owner is None:
             raise RuntimeError("Application pipeline did not provide translation configuration")
         replace_translation_runtime_enabled(config_owner, False)
-        await hub.start(auto_flush_osc=True)
+        callbacks = components.start_callbacks
+        await callbacks.start_output(True)
+        await callbacks.open_self_ingress()
+        await callbacks.open_peer_ingress()
+        await callbacks.start_translation_turns()
+        await callbacks.start_local_asr()
 
     async def start_application_events(self) -> None:
         bridge = self.create_event_bridge(self.runtime_logging)

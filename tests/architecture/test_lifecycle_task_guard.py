@@ -441,7 +441,8 @@ def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:
 
     composition_wait = controller_methods["wait_for_event_bridge"]
     assert "_ui_background_scope" not in composition_wait
-    assert "hub.output_runtime.wait_for_ui_event_bridge_started" in composition_wait
+    assert "output_runtime.wait_for_ui_event_bridge_started" in composition_wait
+    assert "hub.output_runtime.wait_for_ui_event_bridge_started" not in composition_wait
     assert (
         "_ui_event_bridge_started_wait_task" in output_methods["wait_for_ui_event_bridge_started"]
     )

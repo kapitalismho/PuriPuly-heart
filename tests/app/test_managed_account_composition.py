@@ -129,7 +129,7 @@ async def test_release_runtime_awaits_replacement_and_shutdown(tmp_path) -> None
 @pytest.mark.asyncio
 async def test_translation_runtime_access_owns_rebuild_state_and_context() -> None:
     class Runtime:
-        llm = None
+        provider = None
 
         def __init__(self) -> None:
             self.clear_calls = 0
@@ -145,11 +145,12 @@ async def test_translation_runtime_access_owns_rebuild_state_and_context() -> No
 
     async def rebuild() -> bool:
         rebuilds.append("rebuild")
-        current.llm = object()
+        current.provider = object()
         return True
 
     access = ManagedTranslationRuntimeAccess(
-        runtime_provider=lambda: current,
+        llm_runtime_provider=lambda: current,
+        context_provider=lambda: current,
         translation_runtime_configuration_provider=(
             lambda: current.translation_runtime_configuration
         ),
@@ -162,7 +163,7 @@ async def test_translation_runtime_access_owns_rebuild_state_and_context() -> No
     access.clear_context()
 
     assert rebuilds == ["rebuild"]
-    assert access.snapshot() == (True, True, current.llm)
+    assert access.snapshot() == (True, True, current.provider)
     assert current.clear_calls == 1
 
 
@@ -188,7 +189,8 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
         create_store,
     )
     runtime = ManagedTranslationRuntimeAccess(
-        runtime_provider=lambda: None,
+        llm_runtime_provider=lambda: None,
+        context_provider=lambda: None,
         translation_runtime_configuration_provider=lambda: None,
         rebuild_llm=lambda: pytest.fail("runtime rebuild must not run"),
     )

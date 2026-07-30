@@ -7,12 +7,12 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
+from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import RecordingOscQueue, samples
 
 
@@ -140,7 +140,7 @@ async def test_peer_desktop_transcripts_are_routed_to_peer_runtime_and_never_sen
     None
 ):
     osc = RecordingOscQueue()
-    hub = ClientHub(stt=None, llm=None, osc=osc, clock=FakeClock(_now=10.0))
+    hub = compose_client_hub(stt=None, llm=None, osc=osc, clock=FakeClock(_now=10.0))
 
     utterance_id = await hub.handle_peer_transcript_final_for_test(
         text="peer line",
@@ -159,7 +159,9 @@ async def test_peer_desktop_transcripts_are_routed_to_peer_runtime_and_never_sen
 
 @pytest.mark.asyncio
 async def test_peer_final_runs_owner_creates_ordered_children_for_language_runs() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock(_now=10.0))
+    hub = compose_client_hub(
+        stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock(_now=10.0)
+    )
     parent_utterance_id = uuid4()
     runs = (
         FinalLanguageRun(text="日本語", language="ja"),
@@ -189,7 +191,9 @@ async def test_peer_final_runs_owner_creates_ordered_children_for_language_runs(
 
 @pytest.mark.asyncio
 async def test_peer_final_event_preserves_language_runs_at_the_current_consumer_boundary() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock(_now=10.0))
+    hub = compose_client_hub(
+        stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock(_now=10.0)
+    )
     parent_utterance_id = uuid4()
     runs = (FinalLanguageRun(text="中文", language="zh"),)
     transcript = Transcript(
@@ -211,7 +215,7 @@ async def test_peer_final_event_preserves_language_runs_at_the_current_consumer_
 @pytest.mark.asyncio
 async def test_integrated_context_always_includes_peer_entries() -> None:
     clock = FakeClock(_now=112.0)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -250,7 +254,7 @@ async def test_integrated_context_always_includes_peer_entries() -> None:
 
 def test_integrated_context_includes_opposite_direction_peer_entries() -> None:
     clock = FakeClock(_now=112.0)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -283,7 +287,7 @@ def test_integrated_context_includes_opposite_direction_peer_entries() -> None:
 @pytest.mark.asyncio
 async def test_peer_translation_respects_master_translation_toggle() -> None:
     llm = FakeLLM()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -319,7 +323,7 @@ async def test_peer_transcripts_stay_peer_routed_across_runtime_swap_without_dup
         drain_timeout_s=0.05,
         finalize_grace_s=0.0,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         peer_stt=old_peer,
         llm=None,

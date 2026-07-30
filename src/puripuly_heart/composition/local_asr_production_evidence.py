@@ -4,10 +4,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 
+from puripuly_heart.app.ports.capture_vad_runtime import (
+    PeerCaptureVadEventRuntime,
+    SelfCaptureVadEventRuntime,
+)
 from puripuly_heart.app.ports.local_asr_production_evidence import (
     LocalASRProductionCompositionAccessPort,
     LocalASRProductionEvidencePort,
 )
+from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.wiring_local_asr_provider_runtime import (
@@ -22,10 +27,13 @@ from puripuly_heart.composition.application_runtime import (
     compose_application_runtime,
 )
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
-from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfigurationOwner,
+)
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
+from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
@@ -43,33 +51,51 @@ class _ApplicationLocalASRProductionEvidence:
 
     async def initialize(self, settings: object) -> None:
         await self.access.initialize(settings)
-        self._validated_hub_and_owner()
-
-    def _validated_hub_and_owner(
-        self,
-    ) -> tuple[ClientHub, LocalASRProviderRuntimeOwner]:
-        hub = self.access.hub
-        if not isinstance(
-            hub.local_asr_provider_runtime,
-            LocalASRProviderRuntimeOwner,
-        ):
-            raise RuntimeError("production application did not compose the canonical owner")
-        return hub, hub.local_asr_provider_runtime
-
-    @property
-    def hub(self) -> ClientHub:
-        return self._validated_hub_and_owner()[0]
+        _ = self.owner
 
     @property
     def owner(self) -> LocalASRProviderRuntimeOwner:
-        return self._validated_hub_and_owner()[1]
+        owner = self.access.owner
+        if not isinstance(owner, LocalASRProviderRuntimeOwner):
+            raise RuntimeError("production application did not compose the canonical owner")
+        return owner
+
+    @property
+    def llm_runtime(self) -> ProviderRuntimeHandle:
+        return self.access.llm_runtime
+
+    @property
+    def translation_runtime_configuration(self) -> TranslationRuntimeConfigurationOwner:
+        return self.access.translation_runtime_configuration
+
+    @property
+    def self_vad(self) -> SelfCaptureVadEventRuntime:
+        return self.access.self_vad
+
+    @property
+    def peer_vad(self) -> PeerCaptureVadEventRuntime:
+        return self.access.peer_vad
+
+    @property
+    def channel_reset(self) -> ProviderChannelResetPort:
+        return self.access.channel_reset
+
+    async def start_runtime(self) -> None:
+        callbacks = self.access.start_callbacks
+        await callbacks.start_output(False)
+        await callbacks.open_self_ingress()
+        await callbacks.open_peer_ingress()
+        await callbacks.start_translation_turns()
+        await callbacks.start_local_asr()
 
     def composition_facts(self) -> dict[str, object]:
         return {
             "application": type(self.application).__name__,
-            "hub": type(self.hub).__name__,
             "factory": LocalASRProviderRuntimeFactory.__name__,
             "owner": type(self.owner).__name__,
+            "llm_owner": type(self.llm_runtime).__name__,
+            "self_vad": type(self.self_vad).__name__,
+            "peer_vad": type(self.peer_vad).__name__,
         }
 
     def build_self_provider_request(

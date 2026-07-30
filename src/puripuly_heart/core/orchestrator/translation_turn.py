@@ -203,6 +203,9 @@ class TranslationTurnLifecycleOwner:
             or child.parent_utterance_id in self._cancelling_parent_ids
         )
 
+    def channel_ingress_open(self, channel: ChannelId) -> bool:
+        return self._accepting and not self._closed and channel not in self._blocked_channels
+
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
             "owner": "TranslationTurnLifecycleOwner",
@@ -222,6 +225,16 @@ class TranslationTurnLifecycleOwner:
     async def start(self) -> None:
         if self._closed:
             raise RuntimeError("TranslationTurnLifecycleOwner is closed")
+
+    async def open_channel_ingress(self, channel: ChannelId) -> None:
+        if self._closed:
+            raise RuntimeError("TranslationTurnLifecycleOwner is closed")
+        self._blocked_channels.discard(channel)
+
+    async def close_channel_ingress(self, channel: ChannelId) -> None:
+        self._blocked_channels.add(channel)
+        await self._cancel_channel(channel)
+        self._blocked_channels.add(channel)
 
     async def submit(
         self,

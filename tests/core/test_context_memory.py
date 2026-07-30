@@ -12,11 +12,11 @@ import pytest
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
 from puripuly_heart.core.orchestrator.context import ContextResolver
 from puripuly_heart.core.orchestrator.hub import (
-    ClientHub,
     ContextEntry,
 )
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import Transcript, Translation
+from tests.helpers.client_hub import compose_client_hub
 
 # ── Mock classes ──────────────────────────────────────────────────────────────
 
@@ -94,7 +94,7 @@ class TestContextFiltering:
     def test_context_filters_by_time_window(self):
         """Context entries older than time_window_s should be excluded."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -119,7 +119,7 @@ class TestContextFiltering:
     def test_context_filters_by_max_entries(self):
         """Only the most recent max_entries should be considered."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -144,7 +144,7 @@ class TestContextFiltering:
     def test_context_filters_by_language_pair(self):
         """Only entries with the current language pair should be included."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -165,7 +165,7 @@ class TestContextFiltering:
     def test_context_filters_short_entries(self):
         """Entries shorter than 2 characters should be excluded."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -185,7 +185,7 @@ class TestContextFiltering:
 
     def test_context_cleared_on_clear_context(self):
         """clear_context() should empty the history."""
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -202,7 +202,7 @@ class TestContextFiltering:
     def test_old_entries_removed_when_full(self):
         """When max_entries is exceeded, oldest should be removed."""
         clock = FakeClock(initial_time=10.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -228,7 +228,7 @@ class TestContextFiltering:
         assert hub._translation_history[0].text == "e2"  # e1 removed
 
     def test_context_resolver_tracks_updated_hub_settings_after_init(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -258,7 +258,7 @@ class TestContextPassedToLLM:
         """LLM should receive formatted context string."""
         clock = FakeClock(initial_time=10.0)
         fake_llm = FakeLLMProvider()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=fake_llm,
             osc=FakeOscQueue(),
@@ -285,7 +285,7 @@ class TestContextPassedToLLM:
         """LLM should receive empty context when no history."""
         clock = FakeClock(initial_time=10.0)
         fake_llm = FakeLLMProvider()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=fake_llm,
             osc=FakeOscQueue(),
@@ -305,7 +305,7 @@ class TestContextPassedToLLM:
         """LLM should receive empty context when all entries are expired."""
         clock = FakeClock(initial_time=100.0)  # Far in the future
         fake_llm = FakeLLMProvider()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=fake_llm,
             osc=FakeOscQueue(),
@@ -330,7 +330,7 @@ class TestContextFormatting:
 
     def test_format_context_empty(self):
         """Empty context list should return empty string."""
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -342,7 +342,7 @@ class TestContextFormatting:
 
     def test_format_context_single_entry(self):
         """Single entry should be formatted correctly."""
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -358,7 +358,7 @@ class TestContextFormatting:
 
     def test_format_context_multiple_entries(self):
         """Multiple entries should all be included."""
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -377,7 +377,7 @@ class TestContextFormatting:
 
 class TestContextInternalPaths:
     def test_context_resolver_formats_local_with_relative_age_only(self):
-        runtime = ClientHub(
+        runtime = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -396,7 +396,7 @@ class TestContextInternalPaths:
         assert context == '- [self, 12s ago] "hello there"'
 
     def test_client_hub_uses_local_context_when_peer_translation_is_off(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -419,13 +419,13 @@ class TestContextInternalPaths:
         assert context == '- [self, 12s ago] "self only"'
 
     def test_context_resolver_formats_integrated_with_channel_prefix_and_relative_age(self):
-        self_runtime = ClientHub(
+        self_runtime = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
             clock=FakeClock(initial_time=112.0),
         ).self_runtime
-        peer_runtime = ClientHub(
+        peer_runtime = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -451,13 +451,13 @@ class TestContextInternalPaths:
         assert context == ('- [self, 12s ago] "I am ready"\n- [peer, 7s ago] "hello from peer"')
 
     def test_context_resolver_always_uses_integrated_when_peer_enabled(self):
-        self_runtime = ClientHub(
+        self_runtime = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
             clock=FakeClock(initial_time=112.0),
         ).self_runtime
-        peer_runtime = ClientHub(
+        peer_runtime = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -506,7 +506,7 @@ class TestContextInternalPaths:
         assert context == '- [self, 12s ago] "safe local line"'
 
     def test_integrated_context_uses_40_second_window_before_entry_budget(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -547,7 +547,7 @@ class TestContextInternalPaths:
         )
 
     def test_integrated_context_uses_latest_4_combined_entries_after_timestamp_merge(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -639,7 +639,7 @@ class TestContextInternalPaths:
 
     def test_prepare_llm_request_formats_prompt_and_context(self):
         clock = FakeClock(initial_time=20.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -662,7 +662,7 @@ class TestContextLogging:
     def test_prepare_llm_request_without_runtime_logging_includes_redacted_context_summary(
         self, caplog: pytest.LogCaptureFixture
     ):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -682,7 +682,7 @@ class TestContextLogging:
         self, caplog: pytest.LogCaptureFixture
     ):
         clock = FakeClock(initial_time=20.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -712,7 +712,7 @@ class TestContextLogging:
         self, caplog: pytest.LogCaptureFixture
     ):
         clock = FakeClock(initial_time=20.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -743,7 +743,7 @@ class TestContextLogging:
         self, caplog: pytest.LogCaptureFixture
     ):
         clock = FakeClock(initial_time=20.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -786,7 +786,7 @@ class TestContextLogging:
         self, caplog: pytest.LogCaptureFixture
     ):
         clock = FakeClock(initial_time=20.0)
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -823,7 +823,7 @@ class TestContextLogging:
 
     @pytest.mark.asyncio
     async def test_submit_text_without_llm_enqueues_transcript_only(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=None,
             osc=FakeOscQueue(),
@@ -842,7 +842,7 @@ class TestContextLogging:
 
     @pytest.mark.asyncio
     async def test_ensure_translation_deduplicates_same_utterance(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -862,7 +862,7 @@ class TestContextLogging:
         started = asyncio.Event()
         release = asyncio.Event()
         call_count = 0
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -909,7 +909,7 @@ class TestContextLogging:
 
     @pytest.mark.asyncio
     async def test_closed_translation_owner_rejection_clears_peer_parent_marker(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -933,7 +933,7 @@ class TestContextLogging:
 
     @pytest.mark.asyncio
     async def test_non_accepting_translation_owner_rejection_clears_peer_parent_marker(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -959,7 +959,7 @@ class TestContextLogging:
 
     @pytest.mark.asyncio
     async def test_blocked_peer_rejection_clears_peer_parent_marker(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(),
             osc=FakeOscQueue(),
@@ -985,7 +985,7 @@ class TestContextLogging:
 
     @pytest.mark.asyncio
     async def test_submit_text_translation_success_updates_bundle_and_events(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(response_text="OK"),
             osc=FakeOscQueue(),
@@ -1007,7 +1007,7 @@ class TestContextLogging:
 
     @pytest.mark.asyncio
     async def test_peer_translation_stays_off_chatbox_on_success(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(response_text="OK"),
             osc=FakeOscQueue(),
@@ -1042,7 +1042,7 @@ class TestContextLogging:
 
     @pytest.mark.asyncio
     async def test_peer_translation_error_fallback_does_not_publish_chatbox(self):
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=FakeLLMProvider(response_text="OK"),
             osc=FakeOscQueue(),

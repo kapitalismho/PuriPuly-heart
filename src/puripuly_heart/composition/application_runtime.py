@@ -23,10 +23,18 @@ from puripuly_heart.app.adapters.ui_runtime import (
     UiProviderRuntimeAdapter,
     UiSettingsRuntimeAdapter,
 )
+from puripuly_heart.app.ports.capture_vad_runtime import (
+    PeerCaptureVadEventRuntime,
+    SelfCaptureVadEventRuntime,
+)
 from puripuly_heart.app.ports.local_asr_production_evidence import (
     LocalASRProductionCompositionAccessPort,
 )
+from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
+from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
+    RuntimePipelineStartCallbacks,
+)
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
@@ -192,8 +200,14 @@ from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningSnapshot,
 )
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
-from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfigurationOwner,
+)
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
+from puripuly_heart.core.runtime.local_asr_provider_runtime import (
+    LocalASRProviderRuntimeOwner,
+)
+from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.vrchat_osc_presence import (
     VrchatOscPresenceProbeOwner,
@@ -216,7 +230,7 @@ class _LocalASRProductionCompositionAccess:
     config_path: Path
     settings_loader: Callable[[], object]
     runtime_initializer: Callable[[object], Awaitable[None]]
-    hub_provider: Callable[[], ClientHub | None]
+    components_provider: Callable[[], RuntimePipelineComponents | None]
     gpu_retry: Callable[[], Awaitable[None]]
 
     def load_compatibility_settings(self) -> object:
@@ -226,11 +240,42 @@ class _LocalASRProductionCompositionAccess:
         await self.runtime_initializer(settings)
 
     @property
-    def hub(self) -> ClientHub:
-        hub = self.hub_provider()
-        if hub is None:
-            raise RuntimeError("production application did not compose ClientHub")
-        return hub
+    def _components(self) -> RuntimePipelineComponents:
+        components = self.components_provider()
+        if components is None:
+            raise RuntimeError("production application did not compose runtime components")
+        return components
+
+    @property
+    def owner(self) -> LocalASRProviderRuntimeOwner:
+        owner = self._components().local_asr_runtime
+        if not isinstance(owner, LocalASRProviderRuntimeOwner):
+            raise RuntimeError("production application did not compose the canonical owner")
+        return owner
+
+    @property
+    def llm_runtime(self) -> ProviderRuntimeHandle:
+        return self._components().llm_runtime
+
+    @property
+    def translation_runtime_configuration(self) -> TranslationRuntimeConfigurationOwner:
+        return self._components().translation_runtime_configuration
+
+    @property
+    def self_vad(self) -> SelfCaptureVadEventRuntime:
+        return self._components().hub
+
+    @property
+    def peer_vad(self) -> PeerCaptureVadEventRuntime:
+        return self._components().hub
+
+    @property
+    def channel_reset(self) -> ProviderChannelResetPort:
+        return self._components().hub
+
+    @property
+    def start_callbacks(self) -> RuntimePipelineStartCallbacks:
+        return self._components().start_callbacks
 
     async def retry_gpu_activation(self) -> None:
         await self.gpu_retry()
@@ -500,7 +545,7 @@ def compose_application_runtime(
                 settings_provider=current_settings,
                 settings_owner=settings,
                 canonical_settings=canonical_settings,
-                hub_provider=lambda: pipeline.hub,
+                runtime_provider=lambda: pipeline.local_asr_runtime,
                 translation_runtime_configuration_provider=(
                     lambda: pipeline.translation_runtime_configuration
                 ),
@@ -547,9 +592,8 @@ def compose_application_runtime(
             device_id=value.stt.gpu_device_id if value is not None else "auto",
         )
 
-    def hub_local_asr_runtime() -> LocalASRProviderRuntimePort | None:
-        hub = pipeline.hub
-        return getattr(hub, "local_asr_provider_runtime", None) if hub is not None else None
+    def local_asr_runtime() -> LocalASRProviderRuntimePort | None:
+        return pipeline.local_asr_runtime
 
     def on_gpu_install_diagnostic(
         diagnostic: LocalASRGpuProvisioningDiagnostic,
@@ -577,7 +621,7 @@ def compose_application_runtime(
         if gpu is None:
 
             def runtime_provider() -> LocalASRProviderRuntimePort:
-                runtime = hub_local_asr_runtime()
+                runtime = local_asr_runtime()
                 if runtime is None:
                     raise RuntimeError("local ASR provider runtime is unavailable")
                 return runtime
@@ -677,7 +721,7 @@ def compose_application_runtime(
         if local_asr is None:
             local_asr = compose_local_asr_application(
                 settings_provider=current_settings,
-                hub_provider=lambda: pipeline.hub,
+                runtime_provider=lambda: pipeline.local_asr_runtime,
                 self_capture_provider=lambda: pipeline.self_capture,
                 peer_provider=lambda: require_peer().owner,
                 peer_requested=peer_local_stt_requested,
@@ -1291,7 +1335,7 @@ def compose_application_runtime(
         nonlocal gpu_recovery
         if gpu_recovery is None:
             gpu_recovery = create_gpu_provider_recovery_application_owner(
-                runtime_provider=hub_local_asr_runtime,
+                runtime_provider=local_asr_runtime,
                 pending_provider=lambda: require_gpu().snapshot.pending_channels,
                 pending_clear=require_gpu().complete_manual_recovery,
                 failure_sink=lambda reason: require_gpu().set_ui_state(
@@ -1348,6 +1392,8 @@ def compose_application_runtime(
         if owner is None:
             owner = capture_factory.compose_self(
                 cast(object, pipeline.hub),
+                pipeline.local_asr_runtime,
+                cast(object, pipeline.hub),
                 cast(object, pipeline.vrc_mic_audio_gate),
             )
             pipeline.self_capture = owner
@@ -1388,7 +1434,8 @@ def compose_application_runtime(
     provider_runtime: ProviderRuntimeComponents = compose_provider_runtime(
         config_path=config_path,
         settings=settings,
-        hub_provider=lambda: pipeline.hub,
+        llm_runtime_provider=lambda: pipeline.llm_runtime,
+        local_asr_runtime_provider=lambda: pipeline.local_asr_runtime,
         translation_runtime_configuration_provider=(
             lambda: pipeline.translation_runtime_configuration
         ),
@@ -1446,7 +1493,8 @@ def compose_application_runtime(
         verifier=require_provider_verifier(),
         results=require_settings_application().results,
         runtime=ManagedTranslationRuntimeAccess(
-            runtime_provider=lambda: pipeline.hub,
+            llm_runtime_provider=lambda: pipeline.llm_runtime,
+            context_provider=lambda: pipeline.hub,
             translation_runtime_configuration_provider=(
                 lambda: pipeline.translation_runtime_configuration
             ),
@@ -1547,39 +1595,39 @@ def compose_application_runtime(
 
     def managed_translation_available() -> bool:
         value = current_settings()
-        hub = pipeline.hub
+        llm_runtime = pipeline.llm_runtime
         return bool(
             value is not None
             and value.provider.llm == LLMProviderName.OPENROUTER
             and value.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-            and hub is not None
-            and hub.llm is not None
+            and llm_runtime is not None
+            and llm_runtime.provider is not None
         )
 
     def create_event_bridge(
         active_runtime_logging: object,
     ) -> UIEventBridgePort:
-        hub = pipeline.hub
-        if hub is None:
+        event_queue = pipeline.ui_events
+        if event_queue is None:
             raise RuntimeError("UI Event Bridge owner is unavailable")
         return presentation.create_ui_event_bridge(
-            event_queue=hub.ui_events,
+            event_queue=event_queue,
             runtime_logging=active_runtime_logging,
         )
 
     def start_event_bridge(bridge: UIEventBridgePort) -> None:
         nonlocal event_bridge, bridge_task
-        hub = pipeline.hub
-        if hub is None:
+        output_runtime = pipeline.output_runtime
+        if output_runtime is None:
             raise RuntimeError("UI Event Bridge owner is unavailable")
         event_bridge = bridge
-        bridge_task = hub.output_runtime.start_ui_event_bridge(bridge)
+        bridge_task = output_runtime.start_ui_event_bridge(bridge)
 
     async def wait_for_event_bridge() -> None:
-        hub = pipeline.hub
-        if hub is None:
+        output_runtime = pipeline.output_runtime
+        if output_runtime is None:
             raise RuntimeError("UI Event Bridge owner is unavailable")
-        await hub.output_runtime.wait_for_ui_event_bridge_started()
+        await output_runtime.wait_for_ui_event_bridge_started()
 
     startup = compose_application_startup(
         ApplicationStartupAdapter(
@@ -1752,7 +1800,7 @@ def compose_application_runtime(
                     allow_stable_settings_import=allow_stable_settings_import,
                 ),
                 runtime_initializer=initialize_local_asr_evidence,
-                hub_provider=lambda: pipeline.hub,
+                components_provider=lambda: pipeline.current,
                 gpu_retry=retry_gpu_activation,
             )
         )

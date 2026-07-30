@@ -27,10 +27,10 @@ from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_effective_flags,
 )
 from puripuly_heart.config.settings import AppSettings
+from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
-from puripuly_heart.core.orchestrator.hub import ClientHub
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,7 +46,7 @@ def compose_peer_application(
     settings_provider: Callable[[], AppSettings | None],
     settings_owner: SettingsOwner,
     canonical_settings: Callable[[AppSettings], object],
-    hub_provider: Callable[[], ClientHub | None],
+    runtime_provider: Callable[[], LocalASRProviderRuntimePort | None],
     translation_runtime_configuration_provider: Callable[
         [],
         TranslationRuntimeConfigurationPort | None,
@@ -81,7 +81,7 @@ def compose_peer_application(
 
     state = PeerApplicationStateAdapter(
         settings_provider=lambda: application_settings(settings_provider()),
-        hub_provider=hub_provider,
+        runtime_provider=runtime_provider,
         overlay_owner_provider=overlay_provider,
         ingress_frozen_provider=ingress_frozen,
     )

@@ -3,6 +3,11 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from puripuly_heart.app.ports.capture_vad_runtime import (
+    PeerCaptureVadEventRuntime,
+    SelfCaptureVadEventRuntime,
+)
+from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
 from puripuly_heart.app.wiring import (
     compose_peer_capture_session_owner,
     compose_self_capture_session_owner,
@@ -28,8 +33,10 @@ from puripuly_heart.core.audio.diagnostics import AudioFaultProfile, DiagnosticA
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.audio.source import AudioSource
 from puripuly_heart.core.clock import Clock
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
-from puripuly_heart.core.orchestrator.hub import ClientHub
+from puripuly_heart.core.local_asr_provider_runtime import (
+    LocalASRProviderRuntimePort,
+    ProviderRuntimeBuildRequest,
+)
 from puripuly_heart.core.peer_capture import (
     PeerCaptureDiagnostic,
     PeerCaptureSessionSnapshot,
@@ -114,11 +121,14 @@ class CaptureOwnerFactory:
 
     def compose_self(
         self,
-        hub: ClientHub | None,
+        vad_runtime: SelfCaptureVadEventRuntime | None,
+        provider_runtime: LocalASRProviderRuntimePort | None,
+        channel_reset: ProviderChannelResetPort | None,
         audio_gate: VrcMicAudioGate | None,
     ) -> SelfCaptureSessionOwner:
         return compose_self_capture_session_owner(
-            hub=hub,
+            provider_runtime=provider_runtime,
+            channel_reset=channel_reset,
             admission=self.self_admission,
             provider_request_factory=self.self_provider_request,
             source_factory=create_self_capture_source_adapter(
@@ -134,18 +144,24 @@ class CaptureOwnerFactory:
                 log_detailed=self.log_detailed,
                 is_detailed_enabled=self.detailed_enabled,
             ),
-            vad_sink=create_self_capture_vad_sink_adapter(runtime_provider=lambda: hub),
+            vad_sink=create_self_capture_vad_sink_adapter(runtime_provider=lambda: vad_runtime),
             state_changed=self.self_state_sink,
             diagnostic_sink=self.self_diagnostic_sink,
             audio_gate_reset=audio_gate.reset if audio_gate is not None else None,
         )
 
-    def compose_peer(self, hub: ClientHub) -> PeerCaptureSessionOwner:
+    def compose_peer(
+        self,
+        vad_runtime: PeerCaptureVadEventRuntime,
+        provider_runtime: LocalASRProviderRuntimePort,
+        channel_reset: ProviderChannelResetPort,
+    ) -> PeerCaptureSessionOwner:
         return compose_peer_capture_session_owner(
-            hub=hub,
+            provider_runtime=provider_runtime,
+            channel_reset=channel_reset,
             admission=create_peer_capture_admission_adapter(
                 runtime_available=lambda: (
-                    self.settings_provider() is not None and hub is not None
+                    self.settings_provider() is not None and vad_runtime is not None
                 ),
                 ensure_local_ready=lambda: self.ensure_peer_local_ready(None),
             ),
@@ -169,7 +185,7 @@ class CaptureOwnerFactory:
                 log_detailed=self.log_detailed,
                 is_detailed_enabled=self.detailed_enabled,
             ),
-            vad_sink=create_peer_capture_vad_sink_adapter(runtime_provider=lambda: hub),
+            vad_sink=create_peer_capture_vad_sink_adapter(runtime_provider=lambda: vad_runtime),
             state_changed=self.peer_state_sink,
             diagnostic_sink=self.peer_diagnostic_sink,
             local_asr_diagnostic_sink=self.local_asr_diagnostic_sink,

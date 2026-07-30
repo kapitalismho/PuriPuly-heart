@@ -11,9 +11,16 @@ class FakeOwner:
     pass
 
 
-class FakeHub:
-    def __init__(self, owner: object) -> None:
-        self.local_asr_provider_runtime = owner
+class FakeLlmRuntime:
+    pass
+
+
+class FakeSelfVad:
+    pass
+
+
+class FakePeerVad:
+    pass
 
 
 @pytest.mark.asyncio
@@ -23,6 +30,16 @@ async def test_composition_delegates_the_evidence_specific_access_contract(
     events: list[object] = []
     settings = AppSettings()
     owner = FakeOwner()
+    start_callbacks = SimpleNamespace(
+        start_output=lambda auto_flush: _record_async(
+            events,
+            ("start-output", auto_flush),
+        ),
+        open_self_ingress=lambda: _record_async(events, "open-self"),
+        open_peer_ingress=lambda: _record_async(events, "open-peer"),
+        start_translation_turns=lambda: _record_async(events, "start-turns"),
+        start_local_asr=lambda: _record_async(events, "start-local-asr"),
+    )
     access = SimpleNamespace(
         config_path=Path("settings.json"),
         load_compatibility_settings=lambda: (
@@ -32,7 +49,13 @@ async def test_composition_delegates_the_evidence_specific_access_contract(
             events,
             ("initialize", value),
         ),
-        hub=FakeHub(owner),
+        owner=owner,
+        llm_runtime=FakeLlmRuntime(),
+        translation_runtime_configuration=object(),
+        self_vad=FakeSelfVad(),
+        peer_vad=FakePeerVad(),
+        channel_reset=object(),
+        start_callbacks=start_callbacks,
         retry_gpu_activation=lambda: _record_async(events, "retry"),
     )
 
@@ -84,14 +107,16 @@ async def test_composition_delegates_the_evidence_specific_access_contract(
 
     assert evidence.load_compatibility_settings() is settings
     await evidence.initialize(settings)
-    assert evidence.hub.local_asr_provider_runtime is owner
     assert evidence.owner is owner
     assert evidence.composition_facts() == {
         "application": "FakeApplication",
-        "hub": "FakeHub",
         "factory": "LocalASRProviderRuntimeFactory",
         "owner": "FakeOwner",
+        "llm_owner": "FakeLlmRuntime",
+        "self_vad": "FakeSelfVad",
+        "peer_vad": "FakePeerVad",
     }
+    await evidence.start_runtime()
     assert evidence.build_self_provider_request(settings, warmup=True) == (
         "self-request",
         True,
@@ -108,6 +133,11 @@ async def test_composition_delegates_the_evidence_specific_access_contract(
     assert events == [
         ("load", Path("settings.json")),
         ("initialize", settings),
+        ("start-output", False),
+        "open-self",
+        "open-peer",
+        "start-turns",
+        "start-local-asr",
         ("self-request", settings, True),
         ("peer-config", settings),
         ("peer-request", "peer-config", settings.stt.gpu_device_id, False),
@@ -124,7 +154,7 @@ async def test_initialize_preserves_canonical_owner_failure_contract(
         config_path=Path("settings.json"),
         load_compatibility_settings=lambda: object(),
         initialize=lambda _value: _record_async([], None),
-        hub=FakeHub(object()),
+        owner=object(),
         retry_gpu_activation=lambda: _record_async([], None),
     )
 

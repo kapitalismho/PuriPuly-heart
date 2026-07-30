@@ -15,6 +15,7 @@ from puripuly_heart.core.vad.gating import VadGating
 from puripuly_heart.domain.events import STTSessionState
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from tests.helpers.audio import FakeAudioSource, make_frames
+from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import FakeSender, SpeechAwareFakeBackend, SpeechAwareFakeSession
 from tests.helpers.vad import SequenceVadEngine
 
@@ -25,7 +26,7 @@ async def test_audio_vad_loop_pipeline_smoke():
     osc = ChatboxPaginator(sender=sender, clock=clock)
 
     stt = ManagedSTTProvider(backend=SpeechAwareFakeBackend(), sample_rate_hz=16000, clock=clock)
-    hub = ClientHub(stt=stt, llm=None, osc=osc, clock=clock, fallback_transcript_only=True)
+    hub = compose_client_hub(stt=stt, llm=None, osc=osc, clock=clock, fallback_transcript_only=True)
     await hub.start(auto_flush_osc=False)
 
     probs = [0.0, 0.0, 0.9, 0.9, 0.0, 0.0, 0.0]
@@ -188,7 +189,7 @@ async def test_peer_pipeline_drops_short_candidate_before_opening_stt_session():
         channel="peer",
         clock=clock,
     )
-    hub = ClientHub(stt=None, peer_stt=peer_stt, llm=None, osc=osc, clock=clock)
+    hub = compose_client_hub(stt=None, peer_stt=peer_stt, llm=None, osc=osc, clock=clock)
     await hub.start(auto_flush_osc=False)
 
     probs = [0.0, 0.9, 0.9, 0.0]
@@ -232,7 +233,7 @@ async def test_peer_pipeline_commits_after_candidate_reaches_minimum_length():
         channel="peer",
         clock=clock,
     )
-    hub = ClientHub(stt=None, peer_stt=peer_stt, llm=None, osc=osc, clock=clock)
+    hub = compose_client_hub(stt=None, peer_stt=peer_stt, llm=None, osc=osc, clock=clock)
     await hub.start(auto_flush_osc=False)
 
     probs = [0.0, 0.0, 0.9, 0.9, 0.9, 0.0, 0.0, 0.0]

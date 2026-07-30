@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -128,11 +129,11 @@ class ApplicationRuntimeShutdownAdapter:
             await runtime.close()
 
     async def close_self_capture_owner(self) -> None:
-        owner = self.pipeline.self_capture
-        if owner is None:
+        components = self.pipeline.current
+        if components is None:
             return
-        await owner.close()
-        if self.pipeline.self_capture is owner:
+        await self._invoke_pipeline_close(components.close_callbacks.close_self_capture)
+        if components.resource_owner.self_capture is None:
             self.pipeline.self_capture = None
 
     async def close_runtime_logging_background_tasks(self) -> None:
@@ -150,22 +151,83 @@ class ApplicationRuntimeShutdownAdapter:
     async def close_runtime_pipeline_launcher(self) -> None:
         await self.pipeline_launcher.close()
 
-    async def stop_hub_owned_runtimes(self) -> None:
-        hub = self.pipeline.hub
-        if hub is None:
+    async def close_peer_capture_owner(self) -> None:
+        components = self.pipeline.current
+        if components is None:
             return
-        await hub.stop()
-        if self.pipeline.hub is hub:
-            self.pipeline.hub = None
+        await self._invoke_pipeline_close(components.close_callbacks.close_peer_capture)
+
+    async def close_self_translation_ingress(self) -> None:
+        components = self.pipeline.current
+        if components is not None:
+            await self._invoke_pipeline_close(components.close_callbacks.close_self_ingress)
+
+    async def close_peer_translation_ingress(self) -> None:
+        components = self.pipeline.current
+        if components is not None:
+            await self._invoke_pipeline_close(components.close_callbacks.close_peer_ingress)
+
+    async def close_translation_turns(self) -> None:
+        components = self.pipeline.current
+        if components is None:
+            return
+        await self._invoke_pipeline_close(components.close_callbacks.close_translation_turns)
+        if components.resource_owner.translation_turns is None:
+            self.pipeline.translation_turns = None
+
+    async def close_output_runtime(self) -> None:
+        components = self.pipeline.current
+        if components is None:
+            return
+        await self._invoke_pipeline_close(components.close_callbacks.close_output)
+        if components.resource_owner.output_runtime is None:
+            self.pipeline.output_runtime = None
             self.clear_ui_event_runtime()
 
+    async def close_self_channel_runtime(self) -> None:
+        components = self.pipeline.current
+        if components is None:
+            return
+        await self._invoke_pipeline_close(components.close_callbacks.close_self_channel)
+        if components.resource_owner.self_runtime is None:
+            self.pipeline.self_runtime = None
+
+    async def close_peer_channel_runtime(self) -> None:
+        components = self.pipeline.current
+        if components is None:
+            return
+        await self._invoke_pipeline_close(components.close_callbacks.close_peer_channel)
+        if components.resource_owner.peer_runtime is None:
+            self.pipeline.peer_runtime = None
+
+    async def close_local_asr_runtime(self) -> None:
+        components = self.pipeline.current
+        if components is None:
+            return
+        await self._invoke_pipeline_close(components.close_callbacks.close_local_asr)
+        if components.resource_owner.local_asr_runtime is None:
+            self.pipeline.local_asr_runtime = None
+
+    async def close_llm_runtime(self) -> None:
+        components = self.pipeline.current
+        if components is None:
+            return
+        await self._invoke_pipeline_close(components.close_callbacks.close_llm)
+        if components.resource_owner.llm_runtime is None:
+            self.pipeline.llm_runtime = None
+
     def close_vrchat_sender(self) -> None:
-        sender = self.pipeline.sender
-        if sender is not None:
-            sender.close()
-            if self.pipeline.sender is sender:
-                self.pipeline.sender = None
-        self.pipeline.osc = None
+        components = self.pipeline.current
+        if components is None:
+            return
+        result = components.close_callbacks.close_sender()
+        if inspect.isawaitable(result):
+            raise RuntimeError("VRChat sender close callback must be synchronous")
+        if components.resource_owner.sender is None:
+            self.pipeline.sender = None
+            self.pipeline.osc = None
+        if not components.resource_owner.has_resources:
+            self.pipeline.clear(components)
 
     async def close_managed_openrouter_release_service(self) -> None:
         await self.managed.release.close()
@@ -184,3 +246,11 @@ class ApplicationRuntimeShutdownAdapter:
         diagnostic: ApplicationShutdownDiagnostic,
     ) -> None:
         self.runtime_logging.emit_shutdown_diagnostic(diagnostic)
+
+    @staticmethod
+    async def _invoke_pipeline_close(
+        callback: Callable[[], Awaitable[None] | None],
+    ) -> None:
+        result = callback()
+        if inspect.isawaitable(result):
+            await result

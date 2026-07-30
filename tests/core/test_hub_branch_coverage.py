@@ -29,6 +29,7 @@ from puripuly_heart.domain.events import (
     UIEventType,
 )
 from puripuly_heart.domain.models import Transcript, Translation
+from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import RecordingOscQueue
 
 
@@ -285,7 +286,7 @@ def _runtime_log_messages(stream: io.StringIO) -> list[str]:
 
 def test_peer_translation_disclosure_enqueues_chatbox_notice_without_context_history() -> None:
     osc = RecordingOscQueue()
-    hub = ClientHub(stt=None, llm=None, osc=osc, clock=FakeClock(12.0))
+    hub = compose_client_hub(stt=None, llm=None, osc=osc, clock=FakeClock(12.0))
     hub.self_runtime.remember_context(
         "existing context",
         timestamp=10.0,
@@ -303,7 +304,7 @@ def test_peer_translation_disclosure_enqueues_chatbox_notice_without_context_his
 
 @pytest.mark.asyncio
 async def test_hub_drops_stale_partial_and_keeps_final_order() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
     buffer = _MergeBuffer(merge_id=uuid4())
     utterance_id = uuid4()
 
@@ -332,7 +333,7 @@ async def test_hub_drops_stale_partial_and_keeps_final_order() -> None:
 async def test_stop_cancels_pending_tasks_and_closes_providers() -> None:
     stt = StubSTT()
     llm = StubLLM()
-    hub = ClientHub(stt=stt, llm=llm, osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=stt, llm=llm, osc=RecordingOscQueue(), clock=FakeClock())
     hub._running = True
 
     hub._translation_tasks[uuid4()] = asyncio.create_task(asyncio.sleep(60.0))
@@ -354,7 +355,7 @@ async def test_stop_cancels_pending_tasks_and_closes_providers() -> None:
 @pytest.mark.asyncio
 async def test_start_is_idempotent_and_creates_background_tasks() -> None:
     stt = StubSTT()
-    hub = ClientHub(stt=stt, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=stt, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock())
 
     await hub.start(auto_flush_osc=True)
     stt_task = hub._stt_task
@@ -378,7 +379,7 @@ async def test_clear_language_runtime_state_self_preserves_stt_task_and_clears_o
             secondary_text="secondary",
         )
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -472,7 +473,7 @@ async def test_clear_language_runtime_state_self_preserves_stt_task_and_clears_o
 @pytest.mark.asyncio
 async def test_language_change_updates_next_self_translation_request_target() -> None:
     llm = RecordingLanguageLLM()
-    hub = ClientHub(stt=None, llm=llm, osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=None, llm=llm, osc=RecordingOscQueue(), clock=FakeClock())
 
     await hub._translate_text(uuid4(), "hello")
     hub.target_language = "ja"
@@ -498,7 +499,7 @@ async def test_language_change_updates_next_self_translation_request_target() ->
 def test_send_stt_connected_notification_respects_eligibility_and_interval() -> None:
     clock = FakeClock()
     osc = RecordingOscQueue(immediate_result=True)
-    hub = ClientHub(stt=None, llm=None, osc=osc, clock=clock)
+    hub = compose_client_hub(stt=None, llm=None, osc=osc, clock=clock)
 
     hub._send_stt_connected_notification()
     assert osc.immediate_messages == []
@@ -520,7 +521,7 @@ def test_send_stt_connected_notification_respects_eligibility_and_interval() -> 
 
 
 def test_send_stt_connected_notification_does_not_update_time_on_failed_send() -> None:
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(immediate_result=False),
@@ -537,14 +538,14 @@ def test_prepare_llm_request_routes_context_logs_by_runtime_visibility() -> None
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
     detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
 
-    basic_hub = ClientHub(
+    basic_hub = compose_client_hub(
         stt=None,
         llm=StubLLM(),
         osc=RecordingOscQueue(),
         clock=FakeClock(_now=10.0),
         runtime_logging=basic_runtime_logging,
     )
-    detailed_hub = ClientHub(
+    detailed_hub = compose_client_hub(
         stt=None,
         llm=StubLLM(),
         osc=RecordingOscQueue(),
@@ -585,7 +586,7 @@ def test_prepare_llm_request_routes_context_logs_by_runtime_visibility() -> None
 @pytest.mark.asyncio
 async def test_handle_stt_event_logs_basic_channel_state_breadcrumb() -> None:
     runtime_logging, log_stream = _make_runtime_logging_capture()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -616,7 +617,7 @@ async def test_retired_stt_ingress_forwards_only_final_events(
         handled.append(event)
 
     monkeypatch.setattr(ClientHub, "_handle_stt_event", record_event)
-    hub = ClientHub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
     utterance_id = uuid4()
     transcript = Transcript(
         utterance_id=utterance_id,
@@ -648,7 +649,7 @@ async def test_handle_stt_partial_runtime_log_uses_metadata_without_transcript_t
     runtime_logging.set_mode(SessionLoggingMode.DETAILED)
     utterance_id = uuid4()
     raw_partial = "raw partial transcript should not enter runtime logs"
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -694,14 +695,14 @@ async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
     detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
 
-    basic_hub = ClientHub(
+    basic_hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
         clock=FakeClock(),
         runtime_logging=basic_runtime_logging,
     )
-    detailed_hub = ClientHub(
+    detailed_hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -747,7 +748,7 @@ async def test_publish_chatbox_candidate_emits_metadata_preview_only_in_detailed
 @pytest.mark.asyncio
 async def test_publish_chatbox_candidate_after_hub_stop_skips_without_user_text() -> None:
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=osc,
@@ -775,7 +776,7 @@ async def test_publish_chatbox_candidate_after_hub_stop_skips_without_user_text(
 @pytest.mark.asyncio
 async def test_stop_without_start_closes_output_runtime_ingress() -> None:
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=osc,
@@ -799,7 +800,7 @@ async def test_stop_without_start_closes_output_runtime_ingress() -> None:
 
 @pytest.mark.asyncio
 async def test_restart_after_output_runtime_closed_failure_keeps_hub_not_running() -> None:
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -827,7 +828,7 @@ async def test_restart_after_failed_output_runtime_close_keeps_hub_not_running()
                 self.fail_next_drop = False
                 raise RuntimeError("drop pending failed")
 
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=DropPendingFailsOnceOsc(),
@@ -848,7 +849,7 @@ async def test_restart_after_failed_output_runtime_close_keeps_hub_not_running()
 async def test_handle_stt_event_routes_non_low_latency_events() -> None:
     runtime_logging, log_stream = _make_runtime_logging_capture()
     runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -888,7 +889,7 @@ async def test_handle_stt_event_routes_non_low_latency_events() -> None:
 
 @pytest.mark.asyncio
 async def test_handle_stt_event_ignores_partial_in_low_latency_mode() -> None:
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -907,7 +908,7 @@ async def test_handle_stt_event_ignores_partial_in_low_latency_mode() -> None:
 async def test_translate_and_enqueue_emits_error_and_fallback_transcript() -> None:
     llm = StubLLM(should_fail=True)
     runtime_logging, log_stream = _make_runtime_logging_capture()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -936,7 +937,7 @@ async def test_translate_and_enqueue_emits_error_and_fallback_transcript() -> No
 @pytest.mark.asyncio
 async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
     runtime_logging, log_stream = _make_runtime_logging_capture()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=ManagedAuthFailingLLM(
             diagnostics=ManagedOpenRouterReleaseDiagnostics(
@@ -988,7 +989,7 @@ async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
 async def test_try_commit_after_spec_respects_allow_fallback_flag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    hub = ClientHub(stt=None, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=None, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock())
     buffer = _MergeBuffer(merge_id=uuid4(), parts=["text"])
     hub._merge_buffer = buffer
     called: list[str] = []
@@ -1010,7 +1011,7 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
     detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
 
-    basic_hub = ClientHub(
+    basic_hub = compose_client_hub(
         stt=None,
         llm=StubLLM(should_fail=True),
         osc=RecordingOscQueue(),
@@ -1018,7 +1019,7 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
         runtime_logging=basic_runtime_logging,
         low_latency_mode=True,
     )
-    detailed_hub = ClientHub(
+    detailed_hub = compose_client_hub(
         stt=None,
         llm=StubLLM(should_fail=True),
         osc=RecordingOscQueue(),
@@ -1057,7 +1058,7 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
 
 @pytest.mark.asyncio
 async def test_handle_stt_event_preserves_runtime_logged_flag_from_stt_errors() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
 
     await hub._handle_stt_event(
         STTErrorEvent(message="session failed", channel="peer", runtime_log_handled=True)
@@ -1073,7 +1074,7 @@ async def test_handle_stt_event_preserves_runtime_logged_flag_from_stt_errors() 
 async def test_run_stt_event_loop_without_runtime_logging_uses_safe_exception_metadata(
     caplog,
 ) -> None:
-    hub = ClientHub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
 
     with (
         pytest.raises(RuntimeError, match="loop boom"),
@@ -1091,7 +1092,7 @@ async def test_run_stt_event_loop_with_runtime_logging_uses_safe_stt_report() ->
     raw_detail = "stt event loop socket failed token=hub-stt-secret-123"
     runtime_logging, log_stream = _make_runtime_logging_capture()
     runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1117,7 +1118,7 @@ async def test_handle_stt_event_loop_exception_with_runtime_logging_uses_safe_st
     raw_detail = "stt owner task socket failed token=hub-stt-secret-456"
     runtime_logging, log_stream = _make_runtime_logging_capture()
     runtime_logging.set_mode(SessionLoggingMode.DETAILED)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1143,7 +1144,7 @@ async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
     detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
     detailed_runtime_logging.set_mode(SessionLoggingMode.DETAILED)
 
-    basic_hub = ClientHub(
+    basic_hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1151,7 +1152,7 @@ async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
         clock=FakeClock(),
         runtime_logging=basic_runtime_logging,
     )
-    detailed_hub = ClientHub(
+    detailed_hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1198,7 +1199,7 @@ async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
 async def test_maybe_restart_spec_replaces_previous_task_and_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    hub = ClientHub(stt=None, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=None, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock())
     buffer = _MergeBuffer(merge_id=uuid4(), parts=["final text"])
     hub._merge_buffer = buffer
     old_task = asyncio.create_task(asyncio.sleep(60.0))
@@ -1224,7 +1225,9 @@ async def test_maybe_restart_spec_replaces_previous_task_and_state(
 async def test_handle_vad_event_speech_end_tracks_timing_and_forwards_to_stt() -> None:
     stt = StubSTT()
     clock = FakeClock(_now=10.0)
-    hub = ClientHub(stt=stt, llm=None, osc=RecordingOscQueue(), clock=clock, low_latency_mode=True)
+    hub = compose_client_hub(
+        stt=stt, llm=None, osc=RecordingOscQueue(), clock=clock, low_latency_mode=True
+    )
     utterance_id = uuid4()
 
     await hub.handle_vad_event(SpeechEnd(utterance_id))
@@ -1240,7 +1243,7 @@ async def test_handle_vad_event_forwards_resume_confirming_chunk_before_overlay_
     stt = StubSTT()
     sink = BlockingOverlaySink()
     clock = FakeClock(_now=10.0)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=stt,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1287,7 +1290,7 @@ async def test_handle_vad_event_forwards_resume_confirming_chunk_before_overlay_
 
 @pytest.mark.asyncio
 async def test_submit_text_validates_input_and_enqueues_without_llm() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
 
     with pytest.raises(ValueError, match="text must be non-empty"):
         await hub.submit_text("   ")
@@ -1302,7 +1305,7 @@ async def test_submit_text_validates_input_and_enqueues_without_llm() -> None:
 @pytest.mark.asyncio
 async def test_submit_text_clipboard_source_uses_manual_fallback_without_llm() -> None:
     osc = RecordingOscQueue()
-    hub = ClientHub(stt=None, llm=None, osc=osc, clock=FakeClock())
+    hub = compose_client_hub(stt=None, llm=None, osc=osc, clock=FakeClock())
     hub.translation_enabled = False
 
     utterance_id = await hub.submit_text("clipboard fallback", source="Clipboard")
@@ -1315,7 +1318,7 @@ async def test_submit_text_clipboard_source_uses_manual_fallback_without_llm() -
 
 
 def test_merge_helpers_cover_overlap_and_spacing_paths() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
+    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock())
 
     assert hub._merge_with_overlap("same text", "text done") == "same text done"
     assert hub._merge_with_overlap("go", "home") == "go home"

@@ -22,6 +22,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 from puripuly_heart.core.translation_policy import TranslationRuntimePolicy
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
+from tests.helpers.client_hub import compose_client_hub
 
 
 class RecordingOutput:
@@ -105,18 +106,17 @@ def test_policy_rejects_retired_fast_translation_off_choice() -> None:
         TranslationRuntimePolicy(fast_translation_enabled=False)
 
 
-def test_production_hub_composes_one_generic_translation_owner() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=object())
+def test_client_hub_uses_one_injected_generic_translation_owner() -> None:
+    hub = compose_client_hub(stt=None, llm=None, osc=object())
     hub_source = inspect.getsource(inspect.getmodule(ClientHub))
     assert hub.translation_turns is hub.peer_final_runs
-    assert hub.translation_turns.output is hub
+    assert type(hub.translation_turns.output).__name__ == "ClientHubDurableOwnerCallbacks"
     assert hub.translation_turns.lifecycle_owner_snapshot()["owner"] == (
         "TranslationTurnLifecycleOwner"
     )
     assert "PeerFinalRunsLifecycleOwner" not in hub_source
-    assert hub_source.count('self.translation_turns.cancel_pending(channel="peer")') == 2
-    assert hub_source.count('self.translation_turns.cancel_pending(channel="self")') == 2
-    assert hub_source.count("self.translation_turns.cancel_pending(channel=channel)") == 1
+    assert "TranslationTurnLifecycleOwner(" not in hub_source
+    assert hub_source.count("self.translation_turns.cancel_pending(channel=channel)") == 2
     assert "self.translation_turns.cancel_pending()" not in hub_source
 
     source_root = Path(__file__).resolve().parents[2] / "src" / "puripuly_heart"
@@ -141,7 +141,7 @@ async def test_production_manual_self_and_peer_finals_enter_the_generic_owner() 
             recorded.append((request, wait_for_parent))
             return (request.transcript.utterance_id,)
 
-    hub = ClientHub(stt=None, llm=None, osc=object())
+    hub = compose_client_hub(stt=None, llm=None, osc=object())
     hub.translation_turns = RecordingOwner()
 
     await hub.submit_text("manual")

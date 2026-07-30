@@ -349,18 +349,25 @@ class SettingsRuntimeEffectsAdapter:
         self._sync_signatures(settings)
 
     def state(self, settings: AppSettings) -> SettingsRuntimeState:
-        hub = self._pipeline.hub
+        local_asr_runtime = self._pipeline.local_asr_runtime
+        llm_runtime = self._pipeline.llm_runtime
         self_capture = self._self_capture()
         return SettingsRuntimeState(
-            runtime_available=hub is not None,
+            runtime_available=(local_asr_runtime is not None and llm_runtime is not None),
             self_stt_desired=bool(
                 self_capture is not None and self_capture.snapshot.desired_active
             ),
-            self_stt_available=hub is not None and hub.has_stt_provider("self"),
+            self_stt_available=(
+                local_asr_runtime is not None
+                and local_asr_runtime.snapshot.channel_for("self").provider_id is not None
+            ),
             peer_stt_desired=self._peer.owner.desired_active(self._peer.state_for(settings)),
-            peer_stt_available=hub is not None and hub.has_stt_provider("peer"),
+            peer_stt_available=(
+                local_asr_runtime is not None
+                and local_asr_runtime.snapshot.channel_for("peer").provider_id is not None
+            ),
             qwen_llm_desired=settings.provider.llm == LLMProviderName.QWEN,
-            llm_available=hub is not None and hub.llm is not None,
+            llm_available=llm_runtime is not None and llm_runtime.provider is not None,
         )
 
     async def apply_after_persist(

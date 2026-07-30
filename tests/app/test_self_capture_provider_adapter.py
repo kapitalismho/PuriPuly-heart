@@ -47,59 +47,59 @@ def _snapshot(
     )
 
 
-class RecordingHub:
+class RecordingRuntime:
     def __init__(self) -> None:
-        self.local_asr_provider_runtime = SimpleNamespace(snapshot=_snapshot())
+        self.snapshot = _snapshot()
         self.calls: list[tuple[object, ...]] = []
         self.replace_result = SimpleNamespace(status="applied", failure_type=None)
         self.handoff_result = SimpleNamespace(status="failed", failure_type="provider_error")
 
-    async def replace_stt_provider_request(self, request, **kwargs):
+    async def reset_provider_channel(self, channel):
+        self.calls.append(("reset", channel))
+
+    async def replace_provider(self, request, **kwargs):
         self.calls.append(("replace", request, kwargs))
         return self.replace_result
 
-    async def handoff_stt_provider_request(self, request, **kwargs):
+    async def handoff_provider(self, request, **kwargs):
         self.calls.append(("handoff", request, kwargs))
         return self.handoff_result
 
-    async def cancel_stt_provider_request_handoff(self):
-        self.calls.append(("cancel",))
+    async def cancel_handoff(self, channel):
+        self.calls.append(("cancel", channel))
         return True
 
-    async def resume_self_stt_after_toggle_on(self):
-        self.calls.append(("resume",))
+    async def start_channel(self, channel):
+        self.calls.append(("start", channel))
 
-    async def warmup_stt_channel(self, channel):
+    async def warmup_channel(self, channel):
         self.calls.append(("warmup", channel))
 
-    async def reconfigure_stt_channel(self, channel, options):
+    async def reconfigure_channel(self, channel, options):
         self.calls.append(("reconfigure", channel, options))
 
-    async def abort_self_stt_for_toggle_off(self):
-        self.calls.append(("abort",))
-
-    async def drain_self_stt_for_toggle_off(self, **kwargs):
-        self.calls.append(("drain", kwargs))
+    async def release_channel(self, channel, **kwargs):
+        self.calls.append(("release", channel, kwargs))
 
 
 def test_readiness_requires_exact_self_provider_with_resources() -> None:
-    hub = RecordingHub()
-    adapter = SelfCaptureProviderAdapter(cast(object, hub))
+    runtime = RecordingRuntime()
+    adapter = SelfCaptureProviderAdapter(cast(object, runtime), runtime)
     config = _config()
 
     assert adapter.is_ready(config) is True
 
-    hub.local_asr_provider_runtime.snapshot = _snapshot(provider_id="soniox")
+    runtime.snapshot = _snapshot(provider_id="soniox")
     assert adapter.is_ready(config) is False
 
-    hub.local_asr_provider_runtime.snapshot = _snapshot(has_resources=False)
+    runtime.snapshot = _snapshot(has_resources=False)
     assert adapter.is_ready(config) is False
 
 
 @pytest.mark.asyncio
 async def test_mutations_forward_terminal_failure_owner_and_map_results() -> None:
-    hub = RecordingHub()
-    adapter = SelfCaptureProviderAdapter(cast(object, hub))
+    runtime = RecordingRuntime()
+    adapter = SelfCaptureProviderAdapter(cast(object, runtime), runtime)
     request = _request()
 
     async def terminal_failure(exc: Exception) -> None:
@@ -119,7 +119,8 @@ async def test_mutations_forward_terminal_failure_owner_and_map_results() -> Non
     assert replaced.status is SelfCaptureProviderMutationStatus.APPLIED
     assert handed_off.status is SelfCaptureProviderMutationStatus.FAILED
     assert handed_off.reason == "provider_error"
-    assert hub.calls == [
+    assert runtime.calls == [
+        ("reset", "self"),
         (
             "replace",
             request,
@@ -135,11 +136,11 @@ async def test_mutations_forward_terminal_failure_owner_and_map_results() -> Non
 
 @pytest.mark.asyncio
 async def test_start_ingress_validates_provider_and_gpu_activation() -> None:
-    hub = RecordingHub()
-    adapter = SelfCaptureProviderAdapter(cast(object, hub))
+    runtime = RecordingRuntime()
+    adapter = SelfCaptureProviderAdapter(cast(object, runtime), runtime)
     gpu_config = _config(provider_id="local_qwen_gpu", local_gpu=True)
     adapter.is_ready(gpu_config)
-    hub.local_asr_provider_runtime.snapshot = _snapshot(
+    runtime.snapshot = _snapshot(
         provider_id="local_qwen_gpu",
         gpu_phase="ready",
         active_channels=frozenset({"self"}),
@@ -147,13 +148,13 @@ async def test_start_ingress_validates_provider_and_gpu_activation() -> None:
 
     await adapter.start_ingress()
 
-    assert hub.calls == [("resume",)]
+    assert runtime.calls == [("start", "self")]
 
-    hub.local_asr_provider_runtime.snapshot = _snapshot(provider_id="deepgram")
+    runtime.snapshot = _snapshot(provider_id="deepgram")
     with pytest.raises(RuntimeError, match="ingress did not become ready"):
         await adapter.start_ingress()
 
-    hub.local_asr_provider_runtime.snapshot = _snapshot(
+    runtime.snapshot = _snapshot(
         provider_id="local_qwen_gpu",
         gpu_phase="ready",
         active_channels=frozenset(),
@@ -164,14 +165,23 @@ async def test_start_ingress_validates_provider_and_gpu_activation() -> None:
 
 @pytest.mark.asyncio
 async def test_release_routes_only_self_and_accepts_pre_hub_cancellation() -> None:
-    hub = RecordingHub()
-    adapter = SelfCaptureProviderAdapter(cast(object, hub))
+    runtime = RecordingRuntime()
+    adapter = SelfCaptureProviderAdapter(cast(object, runtime), runtime)
 
     await adapter.release(mode="drain", release_backend_after=2.5)
     await adapter.release(mode="abort")
-    await SelfCaptureProviderAdapter(None).release(mode="abort")
+    await SelfCaptureProviderAdapter(None, None).release(mode="abort")
 
-    assert hub.calls == [
-        ("drain", {"release_backend_after": 2.5}),
-        ("abort",),
+    assert runtime.calls == [
+        (
+            "release",
+            "self",
+            {"mode": "drain", "release_backend_after": 2.5},
+        ),
+        ("reset", "self"),
+        (
+            "release",
+            "self",
+            {"mode": "abort", "release_backend_after": None},
+        ),
     ]

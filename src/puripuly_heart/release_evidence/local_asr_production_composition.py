@@ -115,7 +115,7 @@ async def _wait_final(events: list[object], start: int) -> object:
 
 async def _send_utterance(
     *,
-    hub,
+    application,
     channel: str,
     samples: np.ndarray,
     events: list[object],
@@ -129,11 +129,11 @@ async def _send_utterance(
     )
     speech_end = SpeechEnd(utterance_id=utterance_id)
     if channel == "self":
-        await hub.handle_vad_event(speech_start)
-        await hub.handle_vad_event(speech_end)
+        await application.self_vad.handle_vad_event(speech_start)
+        await application.self_vad.handle_vad_event(speech_end)
     else:
-        await hub.handle_peer_vad_event(speech_start)
-        await hub.handle_peer_vad_event(speech_end)
+        await application.peer_vad.handle_peer_vad_event(speech_start)
+        await application.peer_vad.handle_peer_vad_event(speech_end)
     return await _wait_final(events, start)
 
 
@@ -211,14 +211,11 @@ async def _execute(
     owner: LocalASRProviderRuntimeOwner | None = None
     try:
         await application.initialize(settings)
-        hub = application.hub
         owner = application.owner
-        await hub.replace_llm_provider(None)
-        config_owner = hub.translation_runtime_configuration
-        if config_owner is None:
-            raise RuntimeError("production evidence translation configuration is unavailable")
+        await application.llm_runtime.replace_provider(None, start=False)
+        config_owner = application.translation_runtime_configuration
         replace_translation_runtime_enabled(config_owner, False)
-        if hub.llm is not None:
+        if application.llm_runtime.provider is not None:
             raise RuntimeError("production evidence did not disable the external LLM provider")
         report["composition"] = {
             **application.composition_facts(),
@@ -226,7 +223,7 @@ async def _execute(
             "secrets_backend": settings.secrets.backend.value,
         }
         _attach_event_evidence(owner, self_events, peer_events, retired_events)
-        await hub.start()
+        await application.start_runtime()
         discovery = await owner.discover_gpu(force=True)
         report["discovery"] = [dataclasses.asdict(item) for item in discovery.gpu.devices]
         physical = next(
@@ -238,13 +235,15 @@ async def _execute(
         report["selected_device"] = dataclasses.asdict(physical)
 
         self_request = application.build_self_provider_request(settings, warmup=True)
-        self_result = await hub.replace_stt_provider_request(self_request, start=True)
+        await application.channel_reset.reset_provider_channel("self")
+        self_result = await owner.replace_provider(self_request, start=True)
         if self_result.status != "applied":
             raise RuntimeError("production Self GPU activation failed")
         self_pid = owner.snapshot.gpu.worker_pid
 
         peer_request = application.build_peer_provider_request(settings, warmup=True)
-        peer_result = await hub.replace_peer_stt_provider_request(
+        await application.channel_reset.reset_provider_channel("peer")
+        peer_result = await owner.replace_provider(
             peer_request,
             start=True,
             on_terminal_failure=None,
@@ -259,13 +258,13 @@ async def _execute(
         report["shared_residency"] = _snapshot_fact(owner)
 
         self_final = await _send_utterance(
-            hub=hub,
+            application=application,
             channel="self",
             samples=samples,
             events=self_events,
         )
         peer_final = await _send_utterance(
-            hub=hub,
+            application=application,
             channel="peer",
             samples=samples,
             events=peer_events,
@@ -285,15 +284,15 @@ async def _execute(
 
         retired_start = len(retired_events)
         utterance_id = uuid4()
-        await hub.handle_vad_event(
+        await application.self_vad.handle_vad_event(
             SpeechStart(
                 utterance_id=utterance_id,
                 pre_roll=np.empty(0, np.float32),
                 chunk=samples,
             )
         )
-        await hub.handle_vad_event(SpeechEnd(utterance_id=utterance_id))
-        handoff = await hub.handoff_stt_provider_request(
+        await application.self_vad.handle_vad_event(SpeechEnd(utterance_id=utterance_id))
+        handoff = await owner.handoff_provider(
             application.build_self_provider_request(settings, warmup=False),
             start=True,
         )
@@ -301,7 +300,7 @@ async def _execute(
             raise RuntimeError("production Self handoff failed")
         retired_final = await _wait_final(retired_events, retired_start)
         replacement_final = await _send_utterance(
-            hub=hub,
+            application=application,
             channel="self",
             samples=samples,
             events=self_events,
@@ -333,10 +332,11 @@ async def _execute(
         controller_recovered_pid = owner.snapshot.gpu.worker_pid
         if controller_recovered_pid is None or controller_recovered_pid == failed_pid:
             raise RuntimeError("production Controller recovery did not start a fresh worker")
-        await hub.resume_self_stt_after_toggle_on()
+        await owner.start_channel("self")
         peer_reactivation_status = "retained"
         if "peer" not in owner.snapshot.gpu.active_channels:
-            peer_reactivation = await hub.replace_peer_stt_provider_request(
+            await application.channel_reset.reset_provider_channel("peer")
+            peer_reactivation = await owner.replace_provider(
                 peer_request,
                 start=True,
                 on_terminal_failure=None,
@@ -345,12 +345,12 @@ async def _execute(
             if peer_reactivation.status != "applied":
                 raise RuntimeError("production Peer reactivation after recovery failed")
         else:
-            await hub.start_peer_stt_provider_ingress()
+            await owner.start_channel("peer")
         recovered_pid = owner.snapshot.gpu.worker_pid
         if recovered_pid != controller_recovered_pid:
             raise RuntimeError("production Peer reactivation replaced the recovered worker")
         recovered_final = await _send_utterance(
-            hub=hub,
+            application=application,
             channel="peer",
             samples=samples,
             events=peer_events,
@@ -370,11 +370,13 @@ async def _execute(
             "recovered_snapshot": _snapshot_fact(owner),
         }
 
-        await hub.abort_self_stt_for_toggle_off()
+        await application.channel_reset.reset_provider_channel("self")
+        await owner.release_channel("self", mode="abort")
         after_self = _snapshot_fact(owner)
         if owner.snapshot.gpu.active_channels != frozenset({"peer"}):
             raise RuntimeError("production Self release did not retain Peer")
-        await hub.abort_peer_stt_for_toggle_off()
+        await application.channel_reset.reset_provider_channel("peer")
+        await owner.release_channel("peer", mode="abort")
         after_peer = _snapshot_fact(owner)
         if owner.snapshot.gpu.active_channels or owner.snapshot.gpu.worker_pid is not None:
             raise RuntimeError("production final channel release left GPU resources")

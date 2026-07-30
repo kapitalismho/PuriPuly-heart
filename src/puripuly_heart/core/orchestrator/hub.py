@@ -23,14 +23,7 @@ from puripuly_heart.core.language import (
     map_detected_language_for_llm,
 )
 from puripuly_heart.core.llm.provider import LLMProvider
-from puripuly_heart.core.local_asr_provider_runtime import (
-    LocalASRProviderRuntimeCallbacks,
-    LocalASRProviderRuntimeFactoryPort,
-    LocalASRProviderRuntimePort,
-    ProviderRuntimeBuildRequest,
-    ProviderRuntimeChannel,
-    ProviderRuntimeMutationResult,
-)
+from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterUserFacingError,
 )
@@ -78,9 +71,6 @@ from puripuly_heart.core.runtime.output import (
     SELF_SPEECH_TYPING_REASON,
     OutputPublicationResult,
     OutputRuntime,
-)
-from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
-    PrebuiltLocalASRProviderRuntimeFactory,
 )
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.translation_policy import TranslationContextPolicy
@@ -197,16 +187,20 @@ def _safe_user_message_params(params: Mapping[str, object]) -> dict[str, SafeMes
 
 @dataclass(slots=True)
 class ClientHub:
-    stt: STTProvider | None
-    llm: LLMProvider | None
     osc: HubChatboxPort
-    peer_stt: STTProvider | None = None
+    translation_runtime_configuration: TranslationRuntimeConfigurationOwner
+    ui_events: asyncio.Queue[UIEvent]
+    direct_output_runtime: InitVar[OutputRuntime]
+    direct_self_runtime: InitVar[ChannelRuntime]
+    direct_peer_runtime: InitVar[ChannelRuntime]
+    direct_translation_turns: InitVar[TranslationTurnLifecycleOwner]
+    direct_local_asr_runtime: InitVar[LocalASRProviderRuntimePort]
+    direct_llm_runtime: InitVar[ProviderRuntimeHandle]
+    direct_context_resolver: InitVar[ContextResolver]
     overlay_sink: HubOverlaySinkPort | None = None
     overlay_diagnostics: OverlayDiagnosticsRecorder | None = None
     clock: Clock = SystemClock()
     runtime_logging: HubRuntimeLoggingPort | None = None
-    local_asr_provider_runtime_factory: LocalASRProviderRuntimeFactoryPort | None = None
-    translation_runtime_configuration: TranslationRuntimeConfigurationOwner | None = None
     source_language: InitVar[str | None] = None
     target_language: InitVar[str | None] = None
     peer_source_language: InitVar[str | None] = None
@@ -229,8 +223,6 @@ class ClientHub:
     low_latency_finalize_wait_ms: InitVar[int | None] = None
     low_latency_awaiting_vad_timeout_s: InitVar[float | None] = None
 
-    ui_events: asyncio.Queue[UIEvent] = field(default_factory=asyncio.Queue)
-
     _utterances: dict[UUID, UtteranceBundle] = field(default_factory=dict)
     _translation_tasks: dict[UUID, asyncio.Task[None]] = field(default_factory=dict)
     _utterance_sources: dict[UUID, str] = field(default_factory=dict)
@@ -241,7 +233,6 @@ class ClientHub:
     _speech_ended_ids: set[UUID] = field(default_factory=set)  # Track SpeechEnd arrivals
     _stt_task: asyncio.Task[None] | None = None
     _peer_stt_task: asyncio.Task[None] | None = None
-    _running: bool = False
     _last_promo_time: float | None = None
     _promo_eligible: bool = False
     _merge_buffer: _MergeBuffer | None = None
@@ -259,10 +250,6 @@ class ClientHub:
     output_runtime: OutputRuntime = field(init=False)
     overlay_event_adapter: HubOverlayEventFactoryPort = field(init=False)
     _last_logged_context_modes: dict[ChannelId, ContextMode | None] = field(
-        init=False,
-        default_factory=lambda: {"self": None, "peer": None},
-    )
-    _stt_session_states: dict[ChannelId, STTSessionState | None] = field(
         init=False,
         default_factory=lambda: {"self": None, "peer": None},
     )
@@ -287,6 +274,13 @@ class ClientHub:
 
     def __post_init__(
         self,
+        direct_output_runtime: OutputRuntime,
+        direct_self_runtime: ChannelRuntime,
+        direct_peer_runtime: ChannelRuntime,
+        direct_translation_turns: TranslationTurnLifecycleOwner,
+        direct_local_asr_runtime: LocalASRProviderRuntimePort,
+        direct_llm_runtime: ProviderRuntimeHandle,
+        direct_context_resolver: ContextResolver,
         source_language: str | None,
         target_language: str | None,
         peer_source_language: str | None,
@@ -343,83 +337,21 @@ class ClientHub:
             if value is not None
         }
         config_owner = self.translation_runtime_configuration
-        if config_owner is None:
-            config_owner = TranslationRuntimeConfigurationOwner(
-                replace(TranslationRuntimeConfig(), **config_overrides)
-            )
-            object.__setattr__(
-                self,
-                "translation_runtime_configuration",
-                config_owner,
-            )
-        elif config_overrides:
+        if config_overrides:
             config_owner.replace(replace(config_owner.snapshot().value, **config_overrides))
-        runtime_factory = self.local_asr_provider_runtime_factory
-        if runtime_factory is None:
-            runtime_factory = PrebuiltLocalASRProviderRuntimeFactory(
-                self_provider=self.stt,
-                peer_provider=self.peer_stt,
-            )
-        object.__setattr__(self, "stt", None)
-        object.__setattr__(self, "peer_stt", None)
-        self.output_runtime = OutputRuntime(
-            chatbox=self.osc,
-            clock=self.clock,
-            overlay_sink=self.overlay_sink,
-        )
+        self.output_runtime = direct_output_runtime
         assert self.output_runtime.overlay_event_adapter is not None
         self.overlay_event_adapter = self.output_runtime.overlay_event_adapter
-        self.self_runtime = ChannelRuntime(
-            channel="self",
-            stt=self.stt,
-            stt_task=self._stt_task,
-            utterances=self._utterances,
-            translation_tasks=self._translation_tasks,
-            utterance_sources=self._utterance_sources,
-            utterance_start_times=self._utterance_start_times,
-            translation_history=self._translation_history,
-            speech_ended_ids=self._speech_ended_ids,
-            merge_buffer=self._merge_buffer,
-            alias_target=self,
-        )
-        self.peer_runtime = ChannelRuntime(channel="peer", stt=self.peer_stt)
-        self.translation_turns = TranslationTurnLifecycleOwner(
-            on_child_created=self._on_peer_final_run_child_created,
-            on_child_started=self._on_peer_final_run_child_started,
-            process_child=self._process_peer_final_run_child,
-            on_child_terminal=self._on_peer_final_run_child_terminal,
-            on_parent_closed=self._on_peer_final_run_parent_closed,
-            on_parent_rejected=self._on_peer_final_run_parent_rejected,
-            output=self,
-            config_snapshot=self.translation_runtime_config_snapshot,
-        )
+        self.self_runtime = direct_self_runtime
+        self.self_runtime.alias_target = self
+        self._sync_self_runtime_aliases()
+        self.peer_runtime = direct_peer_runtime
+        self.translation_turns = direct_translation_turns
         self.peer_final_runs = self.translation_turns
-        self._local_asr_provider_runtime = runtime_factory.create(
-            LocalASRProviderRuntimeCallbacks(
-                self_event_handler=self._handle_stt_event,
-                peer_event_handler=self._handle_stt_event,
-                retired_event_handler=self._handle_retired_stt_event,
-                self_exception_handler=lambda exc: self._handle_stt_event_loop_exception(
-                    exc,
-                    channel="self",
-                ),
-                peer_exception_handler=lambda exc: self._handle_stt_event_loop_exception(
-                    exc,
-                    channel="peer",
-                ),
-            )
-        )
-        self._llm_provider_runtime = ProviderRuntimeHandle(
-            name="llm",
-            provider=self.llm,
-            state_changed=self._sync_provider_runtime_aliases,
-        )
-        self.context_resolver = ContextResolver(
-            clock=self.clock,
-            config_snapshot=config_owner.snapshot,
-        )
+        self._local_asr_provider_runtime = direct_local_asr_runtime
+        self._llm_provider_runtime = direct_llm_runtime
+        self.context_resolver = direct_context_resolver
         warm_prompt_cache()
-        self._sync_provider_runtime_aliases()
         self._sync_self_runtime_aliases()
 
     def __getattribute__(self, name: str) -> object:
@@ -447,13 +379,6 @@ class ClientHub:
                 raise RuntimeError("translation runtime configuration is unavailable")
             owner.transform(lambda current: replace(current, **{name: value}))
             return
-        if name in {"stt", "peer_stt"} and value is not None:
-            try:
-                object.__getattribute__(self, "_local_asr_provider_runtime")
-            except AttributeError:
-                pass
-            else:
-                raise RuntimeError("concrete STT assignment is disabled")
         object.__setattr__(self, name, value)
         if name == "clock":
             try:
@@ -481,8 +406,6 @@ class ClientHub:
                 output_runtime = None
             if output_runtime is not None:
                 output_runtime.chatbox = value  # type: ignore[assignment]
-        if name == "llm":
-            self._attach_provider_assignment(name, value)
         runtime_field = _SELF_RUNTIME_FIELDS.get(name)
         if runtime_field is None:
             return
@@ -492,51 +415,11 @@ class ClientHub:
             return
         object.__setattr__(runtime, runtime_field, value)
 
-    @property
-    def provider_runtime_handles(self) -> dict[str, ProviderRuntimeHandle]:
-        return {"llm": self._llm_provider_runtime}
-
     def translation_runtime_config_snapshot(self) -> TranslationRuntimeConfigSnapshot:
         owner = self.translation_runtime_configuration
         if owner is None:
             raise RuntimeError("translation runtime configuration is unavailable")
         return owner.snapshot()
-
-    @property
-    def local_asr_provider_runtime(self) -> LocalASRProviderRuntimePort | None:
-        return self._local_asr_provider_runtime
-
-    def has_stt_provider(self, channel: ProviderRuntimeChannel) -> bool:
-        return (
-            self._require_local_asr_provider_runtime().snapshot.channel_for(channel).provider_id
-            is not None
-        )
-
-    def stt_session_state(self, channel: ChannelId = "self") -> STTSessionState | None:
-        return self._stt_session_states[channel]
-
-    def _attach_provider_assignment(self, name: str, value: object) -> None:
-        if name != "llm":
-            return
-        try:
-            handle = object.__getattribute__(self, "_llm_provider_runtime")
-        except AttributeError:
-            return
-        if handle.provider is not value:
-            handle.attach_provider_reference(value)
-
-    def _sync_provider_runtime_aliases(self, _handle: ProviderRuntimeHandle | None = None) -> None:
-        object.__setattr__(self, "stt", None)
-        object.__setattr__(self, "peer_stt", None)
-        object.__setattr__(self, "llm", self._llm_provider_runtime.provider)
-        object.__setattr__(self, "_stt_task", None)
-        object.__setattr__(self, "_peer_stt_task", None)
-        if hasattr(self, "self_runtime"):
-            self.self_runtime.stt = None
-            self.self_runtime.stt_task = None
-        if hasattr(self, "peer_runtime"):
-            self.peer_runtime.stt = None
-            self.peer_runtime.stt_task = None
 
     def _sync_self_runtime_aliases(self) -> None:
         self._stt_task = self.self_runtime.stt_task
@@ -1025,7 +908,7 @@ class ClientHub:
             if configuration is None
             else configuration
         )
-        if self.llm is None:
+        if self._llm_provider_runtime.provider is None:
             return "llm unavailable"
         if not configuration.translation_enabled:
             return "translation disabled"
@@ -1093,200 +976,17 @@ class ClientHub:
             return UserErrorReport(message=event.message, diagnostics=event.diagnostics)
         return event.message
 
-    async def start(self, *, auto_flush_osc: bool = False) -> None:
-        if self._running:
-            return
-        try:
-            await self.output_runtime.start(auto_flush_chatbox=auto_flush_osc)
-        except Exception:
-            self._running = False
-            raise
-        self._running = True
-        await self.translation_turns.start()
-        await self._require_local_asr_provider_runtime().start()
-        self._sync_provider_runtime_aliases()
-
-    async def stop(self) -> None:
-        if (
-            not self._running
-            and not self._provider_runtime_handles_have_resources()
-            and not self.translation_turns.has_resources
-            and not self.output_runtime.has_resources
-            and self.output_runtime.state == "closed"
-        ):
-            return
-        was_running = self._running
-        self._running = False
-        cleanup_failures: list[Exception] = []
-
-        try:
-            await self._stop_stt_event_loop()
-        except Exception as exc:
-            cleanup_failures.append(exc)
-
-        try:
-            await self.translation_turns.close()
-        except Exception as exc:
-            cleanup_failures.append(exc)
-
-        try:
-            await self.output_runtime.close()
-        except Exception as exc:
-            cleanup_failures.append(exc)
-
-        if was_running:
+    async def reset_provider_channel(self, channel: ChannelId) -> None:
+        await self.translation_turns.cancel_pending(channel=channel)
+        runtime = self._runtime_for_channel(channel)
+        if channel == "self":
             await self.reset_overlay_preview()
-            await self._reset_stt_runtime_state()
-
-        try:
-            await self._close_provider_runtime_handles()
-        except Exception as exc:
-            cleanup_failures.append(exc)
-        _raise_output_provider_runtime_close_failures(cleanup_failures)
-
-    async def replace_stt_provider_request(
-        self,
-        request: ProviderRuntimeBuildRequest,
-        *,
-        start: bool | None = None,
-        on_terminal_failure=None,
-    ) -> ProviderRuntimeMutationResult:
-        runtime = self._require_local_asr_provider_runtime()
-        await self.translation_turns.cancel_pending(channel="self")
-        await self.reset_overlay_preview()
-        await self.self_runtime.reset_runtime_state()
-        self._clear_latency_state(channel="self")
-        self._sync_self_runtime_aliases()
-        return await runtime.replace_provider(
-            request,
-            start=self._running if start is None else start,
-            on_terminal_failure=on_terminal_failure,
-        )
-
-    async def handoff_stt_provider_request(
-        self,
-        request: ProviderRuntimeBuildRequest,
-        *,
-        start: bool | None = None,
-        on_terminal_failure=None,
-    ) -> ProviderRuntimeMutationResult:
-        return await self._require_local_asr_provider_runtime().handoff_provider(
-            request,
-            start=self._running if start is None else start,
-            on_terminal_failure=on_terminal_failure,
-        )
-
-    async def cancel_stt_provider_request_handoff(self) -> bool:
-        return await self._require_local_asr_provider_runtime().cancel_handoff("self")
-
-    async def replace_peer_stt_provider_request(
-        self,
-        request: ProviderRuntimeBuildRequest,
-        *,
-        start: bool | None = None,
-        on_terminal_failure=None,
-    ) -> ProviderRuntimeMutationResult:
-        await self.translation_turns.cancel_pending(channel="peer")
-        await self.peer_runtime.reset_runtime_state()
-        self._clear_peer_logical_turn_state()
-        self._clear_latency_state(channel="peer")
-        return await self._require_local_asr_provider_runtime().replace_provider(
-            request,
-            start=self._running if start is None else start,
-            on_terminal_failure=on_terminal_failure,
-        )
-
-    async def handoff_peer_stt_provider_request(
-        self,
-        request: ProviderRuntimeBuildRequest,
-        *,
-        start: bool | None = None,
-        on_terminal_failure=None,
-    ) -> ProviderRuntimeMutationResult:
-        return await self._require_local_asr_provider_runtime().handoff_provider(
-            request,
-            start=self._running if start is None else start,
-            on_terminal_failure=on_terminal_failure,
-        )
-
-    async def cancel_peer_stt_provider_request_handoff(self) -> bool:
-        return await self._require_local_asr_provider_runtime().cancel_handoff("peer")
-
-    async def start_peer_stt_provider_ingress(self) -> None:
-        if not self._running:
-            return
-        await self._require_local_asr_provider_runtime().start_channel("peer")
-
-    async def abort_peer_stt_for_toggle_off(self) -> None:
-        await self.translation_turns.cancel_pending(channel="peer")
-        await self.peer_runtime.reset_runtime_state()
-        self._clear_peer_logical_turn_state()
-        self._clear_latency_state(channel="peer")
-        await self._require_local_asr_provider_runtime().release_channel("peer", mode="abort")
-
-    async def replace_llm_provider(self, llm: LLMProvider | None) -> None:
-        await self._llm_provider_runtime.replace_provider(llm, start=False)
-        self._sync_provider_runtime_aliases()
-
-    async def drain_self_stt_for_toggle_off(
-        self,
-        *,
-        release_backend_after: float | None = None,
-    ) -> None:
-        await self._require_local_asr_provider_runtime().release_channel(
-            "self",
-            mode="drain",
-            release_backend_after=release_backend_after,
-        )
-
-    async def abort_self_stt_for_toggle_off(self) -> None:
-        await self.translation_turns.cancel_pending(channel="self")
-        await self.reset_overlay_preview()
-        await self.self_runtime.reset_runtime_state()
-        self._clear_latency_state(channel="self")
-        self._sync_self_runtime_aliases()
-        await self._require_local_asr_provider_runtime().release_channel("self", mode="abort")
-
-    async def schedule_self_stt_idle_release(self, *, release_backend_after: float) -> None:
-        await self._require_local_asr_provider_runtime().release_channel(
-            "self",
-            mode="drain",
-            release_backend_after=release_backend_after,
-        )
-
-    async def resume_self_stt_after_toggle_on(self) -> None:
-        await self._require_local_asr_provider_runtime().start_channel("self")
-
-    async def warmup_stt_channel(self, channel: ProviderRuntimeChannel) -> None:
-        await self._require_local_asr_provider_runtime().warmup_channel(channel)
-
-    async def reconfigure_stt_channel(
-        self,
-        channel: ProviderRuntimeChannel,
-        options,
-    ) -> None:
-        await self._require_local_asr_provider_runtime().reconfigure_channel(channel, options)
-
-    def _provider_runtime_handles_have_resources(self) -> bool:
-        runtime = self._require_local_asr_provider_runtime()
-        runtime_resources = any(channel.has_resources for channel in runtime.snapshot.channels)
-        return runtime_resources or any(
-            handle.has_resources for handle in self.provider_runtime_handles.values()
-        )
-
-    async def _close_provider_runtime_handles(self) -> None:
-        failures: list[Exception] = []
-        try:
-            await self._require_local_asr_provider_runtime().close()
-        except Exception as exc:
-            failures.append(exc)
-        for handle in self.provider_runtime_handles.values():
-            try:
-                await handle.close()
-            except Exception as exc:
-                failures.append(exc)
-        self._sync_provider_runtime_aliases()
-        _raise_provider_runtime_close_failures(failures)
+        await runtime.reset_runtime_state()
+        if channel == "peer":
+            self._clear_peer_logical_turn_state()
+        self._clear_latency_state(channel=channel)
+        if channel == "self":
+            self._sync_self_runtime_aliases()
 
     def _require_local_asr_provider_runtime(self) -> LocalASRProviderRuntimePort:
         runtime = self._local_asr_provider_runtime
@@ -1478,7 +1178,7 @@ class ClientHub:
             transcript,
             turn_kind="manual",
             wait_for_parent=(
-                self.llm is None
+                self._llm_provider_runtime.provider is None
                 or not self.translation_runtime_config_snapshot().value.translation_enabled
             ),
         )
@@ -1556,7 +1256,6 @@ class ClientHub:
     async def _handle_stt_event(self, event: object) -> None:
         low_latency_mode = self.translation_runtime_config_snapshot().value.low_latency_mode
         if isinstance(event, STTSessionStateEvent):
-            self._stt_session_states[event.channel] = event.state
             self._emit_basic(
                 "[Hub] STT state: channel=%s state=%s",
                 event.channel,
@@ -1609,7 +1308,8 @@ class ClientHub:
                     event.transcript,
                     turn_kind="peer",
                     wait_for_parent=(
-                        self.llm is None or not self._translation_enabled_for_runtime(runtime)
+                        self._llm_provider_runtime.provider is None
+                        or not self._translation_enabled_for_runtime(runtime)
                     ),
                 )
                 return
@@ -1628,7 +1328,8 @@ class ClientHub:
                 event.transcript,
                 turn_kind="self",
                 wait_for_parent=(
-                    self.llm is None or not self._translation_enabled_for_runtime(runtime)
+                    self._llm_provider_runtime.provider is None
+                    or not self._translation_enabled_for_runtime(runtime)
                 ),
             )
             return
@@ -1939,16 +1640,17 @@ class ClientHub:
     def _overlay_translation_will_follow(self, runtime: ChannelRuntime) -> bool:
         return (
             self.output_runtime.has_overlay_destination
-            and self.llm is not None
+            and self._llm_provider_runtime.provider is not None
             and self._translation_enabled_for_runtime(runtime)
         )
 
     def _peer_terminal_work_will_follow(self, runtime: ChannelRuntime) -> bool:
         if runtime.channel != "peer":
             return False
-        return (self.llm is not None and self._translation_enabled_for_runtime(runtime)) or (
-            self.output_runtime.chatbox_is_denied(runtime.channel)
-        )
+        return (
+            self._llm_provider_runtime.provider is not None
+            and self._translation_enabled_for_runtime(runtime)
+        ) or self.output_runtime.chatbox_is_denied(runtime.channel)
 
     @staticmethod
     def _translation_overlay_metadata(translation: Translation) -> dict[str, object]:
@@ -2854,7 +2556,7 @@ class ClientHub:
             wait_ms,
         )
         if (
-            self.llm is None
+            self._llm_provider_runtime.provider is None
             or not self.translation_runtime_config_snapshot().value.translation_enabled
         ):
             await self._commit_merge(buffer, reason="post_end_grace")
@@ -2984,7 +2686,7 @@ class ClientHub:
             )
 
         if (
-            self.llm is None
+            self._llm_provider_runtime.provider is None
             or not self.translation_runtime_config_snapshot().value.translation_enabled
         ):
             await self._commit_merge(buffer, reason="final_no_llm")
@@ -3101,7 +2803,10 @@ class ClientHub:
             else self.translation_runtime_config_snapshot()
         )
 
-        if self.llm is None or not config_snapshot.value.translation_enabled:
+        if (
+            self._llm_provider_runtime.provider is None
+            or not config_snapshot.value.translation_enabled
+        ):
             await self._ensure_translation(
                 transcript,
                 turn_kind="self",
@@ -3157,7 +2862,10 @@ class ClientHub:
 
     async def _maybe_restart_spec(self, buffer: _MergeBuffer) -> None:
         config_snapshot = self.translation_runtime_config_snapshot()
-        if self.llm is None or not config_snapshot.value.translation_enabled:
+        if (
+            self._llm_provider_runtime.provider is None
+            or not config_snapshot.value.translation_enabled
+        ):
             return
 
         self._clear_spec_state(buffer, reason="spec_retry")
@@ -3188,7 +2896,7 @@ class ClientHub:
         *,
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
     ) -> None:
-        if self.llm is None:
+        if self._llm_provider_runtime.provider is None:
             return
         buffer = self._merge_buffer
         if buffer is None or buffer.merge_id != merge_id:
@@ -4059,7 +3767,10 @@ class ClientHub:
                 ),
             )
         )
-        if self.llm is None or not self._translation_enabled_for_runtime(self.peer_runtime):
+        if (
+            self._llm_provider_runtime.provider is None
+            or not self._translation_enabled_for_runtime(self.peer_runtime)
+        ):
             await self.translation_turns.wait_for_idle()
         if hasattr(self.overlay_sink, "events"):
             new_events = self.overlay_sink.events[before_event_count:]  # type: ignore[attr-defined]
@@ -4179,19 +3890,3 @@ class ClientHub:
             fallback_level=logging.INFO,
         )
         self.output_runtime.publish_system_disclosure_chatbox(text=text)
-
-
-def _raise_provider_runtime_close_failures(failures: list[Exception]) -> None:
-    if not failures:
-        return
-    if len(failures) == 1:
-        raise failures[0]
-    raise ExceptionGroup("ClientHub provider close failed", failures)
-
-
-def _raise_output_provider_runtime_close_failures(failures: list[Exception]) -> None:
-    if not failures:
-        return
-    if len(failures) == 1:
-        raise failures[0]
-    raise ExceptionGroup("ClientHub output/provider close failed", failures)

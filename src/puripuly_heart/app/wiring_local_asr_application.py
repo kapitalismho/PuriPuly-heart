@@ -28,10 +28,10 @@ from puripuly_heart.app.wiring_composition import (
 )
 from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.core.local_asr_provider_runtime import (
+    LocalASRProviderRuntimePort,
     ProviderRuntimeChannelSnapshot,
 )
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
-from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 
 LocalASRChannel = Literal["self", "peer"]
@@ -92,7 +92,7 @@ class LocalASRApplicationRuntime:
 def compose_local_asr_application(
     *,
     settings_provider: Callable[[], AppSettings | None],
-    hub_provider: Callable[[], ClientHub | None],
+    runtime_provider: Callable[[], LocalASRProviderRuntimePort | None],
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None],
     peer_provider: Callable[[], PeerApplicationOwner],
     peer_requested: Callable[[AppSettings | None], bool],
@@ -128,25 +128,22 @@ def compose_local_asr_application(
         )
 
     def self_provider_available() -> bool:
-        hub = hub_provider()
-        return hub is not None and hub.has_stt_provider("self")
+        runtime = runtime_provider()
+        return runtime is not None and runtime.snapshot.channel_for("self").provider_id is not None
 
     def self_channel_provider() -> ProviderRuntimeChannelSnapshot | None:
-        hub = hub_provider()
-        runtime = hub.local_asr_provider_runtime if hub is not None else None
+        runtime = runtime_provider()
         return runtime.snapshot.channel_for("self") if runtime is not None else None
 
     async def probe_self_provider() -> None:
-        hub = hub_provider()
-        if hub is None or not hub.has_stt_provider("self"):
+        runtime = runtime_provider()
+        if runtime is None or runtime.snapshot.channel_for("self").provider_id is None:
             raise RuntimeError("self STT provider is unavailable")
-        if hub.local_asr_provider_runtime is None:
-            raise RuntimeError("local ASR provider runtime is unavailable")
-        await hub.warmup_stt_channel("self")
+        await runtime.warmup_channel("self")
 
     state = LocalASRApplicationStateAdapter(
         settings_provider=application_settings,
-        runtime_available=lambda: hub_provider() is not None,
+        runtime_available=lambda: runtime_provider() is not None,
         self_capture_provider=self_capture_provider,
         peer=peer_provider,
         gpu_state_provider=gpu_state_provider,

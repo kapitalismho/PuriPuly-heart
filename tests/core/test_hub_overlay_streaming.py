@@ -28,6 +28,7 @@ from tests.core.test_hub_branch_coverage import (
     _make_runtime_logging_capture,
     _runtime_log_messages,
 )
+from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import RecordingOscQueue
 
 _HUB_ACTIVE_SELF_MIRROR_FIELDS = {
@@ -402,7 +403,7 @@ class GatedRecordingTranslateLLMProvider(LLMProvider):
 @pytest.mark.asyncio
 async def test_hub_emits_self_and_peer_finals_to_overlay_sink() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(stt=None, llm=None, osc=RecordingOscQueue(), overlay_sink=sink)
+    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), overlay_sink=sink)
 
     await hub.submit_text("self text", source="You")
     await hub.handle_peer_transcript_final_for_test(text="peer text")
@@ -424,7 +425,7 @@ async def test_hub_active_self_overlay_snapshot_uses_spec_translation_languages_
         calibration=OverlayCalibration(),
         peer_presentation_refresh_burst=False,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -462,7 +463,7 @@ async def test_hub_active_self_overlay_snapshot_uses_spec_translation_languages_
 @pytest.mark.asyncio
 async def test_hub_blank_spec_translation_active_update_keeps_spec_language_metadata() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -514,7 +515,7 @@ async def test_hub_same_text_blank_spec_language_update_feeds_final_transcript_l
             created_at=10.0,
         )
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -561,7 +562,7 @@ async def test_hub_self_translation_overlay_uses_translation_languages_not_curre
         calibration=OverlayCalibration(),
         peer_presentation_refresh_burst=False,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -610,7 +611,7 @@ async def test_hub_translate_and_enqueue_overlay_uses_request_language_after_set
 ):
     llm = ReleasableTranslateLLMProvider(response_text="你好")
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -652,7 +653,7 @@ async def test_hub_translate_text_preserves_provider_language_after_settings_cha
         response_source_language="ja",
         response_target_language="zh-TW",
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -691,7 +692,7 @@ async def test_hub_peer_translation_overlay_uses_translation_languages_not_curre
         calibration=OverlayCalibration(),
         peer_presentation_refresh_burst=False,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -743,7 +744,7 @@ async def test_hub_active_self_sticky_secondary_preserves_cached_secondary_langu
             created_at=10.0,
         )
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -784,7 +785,7 @@ async def test_hub_active_self_blank_secondary_preserves_cached_primary_language
             created_at=10.0,
         )
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -812,7 +813,7 @@ async def test_hub_self_final_transcript_preserves_active_display_language_metad
         calibration=OverlayCalibration(),
         peer_presentation_refresh_burst=False,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -876,7 +877,7 @@ async def test_hub_stale_secondary_blanking_preserves_active_primary_language() 
         )
     )
     first_new_snapshot_index = len(bridge.snapshots)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -910,7 +911,7 @@ async def test_hub_peer_overlay_snapshot_uses_peer_specific_source_and_target_la
         calibration=OverlayCalibration(),
         peer_presentation_refresh_burst=False,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["你好"], delay_s=0.0),
         osc=RecordingOscQueue(),
@@ -936,7 +937,7 @@ async def test_hub_peer_overlay_snapshot_uses_peer_specific_source_and_target_la
 async def test_peer_source_only_overlay_emit_records_source_as_secondary_len() -> None:
     diagnostics = RecordingHubDiagnostics()
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -963,7 +964,7 @@ async def test_peer_final_runs_in_one_parent_are_serial_and_close_after_last_chi
         responses=["첫 번째 번역", "두 번째 번역"],
         delay_s=0.05,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -1026,7 +1027,7 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
         responses=["first translation", "second translation"],
         start_target=1,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=osc,
@@ -1129,7 +1130,7 @@ async def test_peer_partial_stt_event_remains_ignored_without_outputs_or_tasks()
     sink = RecordingOverlaySink()
     osc = RecordingOscQueue()
     llm = RecordingSequencedTranslateLLMProvider(responses=["unused"], delay_s=0.0)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=osc,
@@ -1171,7 +1172,7 @@ async def test_identical_inflight_peer_finals_reject_the_second_final() -> None:
         responses=["반복 번역 1"],
         delay_s=0.05,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -1215,7 +1216,7 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
 
     basic_clock = FakeClock(_now=10.0)
     detailed_clock = FakeClock(_now=20.0)
-    basic_hub = ClientHub(
+    basic_hub = compose_client_hub(
         stt=None,
         llm=ClockedTranslateLLMProvider(
             clock=basic_clock,
@@ -1228,7 +1229,7 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
         clock=basic_clock,
         peer_hangover_s=0.95,
     )
-    detailed_hub = ClientHub(
+    detailed_hub = compose_client_hub(
         stt=None,
         llm=ClockedTranslateLLMProvider(
             clock=detailed_clock,
@@ -1341,7 +1342,7 @@ async def test_peer_overlay_first_emit_waits_for_llm_done() -> None:
     clock = FakeClock(_now=100.0)
     llm = ReleasableTranslateLLMProvider(response_text="hello")
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -1386,7 +1387,7 @@ async def test_peer_overlay_first_emit_waits_for_llm_done() -> None:
 async def test_peer_detailed_latency_trace_survives_basic_to_detailed_mode_switch() -> None:
     runtime_logging, log_stream = _make_runtime_logging_capture()
     clock = FakeClock(_now=10.0)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1430,7 +1431,7 @@ async def test_peer_detailed_latency_trace_survives_basic_to_detailed_mode_switc
 @pytest.mark.asyncio
 async def test_peer_overlay_success_clears_latency_timeline() -> None:
     utterance_id = uuid4()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["hello"], delay_s=0.0),
         osc=RecordingOscQueue(),
@@ -1467,7 +1468,7 @@ async def test_peer_overlay_success_clears_latency_timeline() -> None:
 async def test_peer_overlay_translation_denies_chatbox_and_cleans_bookkeeping() -> None:
     utterance_id = uuid4()
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["hello"], delay_s=0.0),
         osc=osc,
@@ -1515,7 +1516,7 @@ async def test_peer_overlay_translation_denies_chatbox_and_cleans_bookkeeping() 
 @pytest.mark.asyncio
 async def test_peer_overlay_failure_clears_latency_timeline() -> None:
     utterance_id = uuid4()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=ImmediateFailingTranslateLLMProvider(error=RuntimeError("boom")),
         osc=RecordingOscQueue(),
@@ -1547,7 +1548,7 @@ async def test_peer_overlay_failure_clears_latency_timeline() -> None:
 @pytest.mark.asyncio
 async def test_peer_no_chatbox_terminal_path_clears_latency_bookkeeping() -> None:
     utterance_id = uuid4()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1576,7 +1577,7 @@ async def test_peer_no_chatbox_terminal_path_clears_latency_bookkeeping() -> Non
 @pytest.mark.asyncio
 async def test_late_peer_speech_end_after_completed_turn_does_not_resurrect_bookkeeping() -> None:
     parent_vad_id = uuid4()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1617,7 +1618,7 @@ async def test_late_peer_speech_end_after_completed_turn_does_not_resurrect_book
 async def test_closed_parent_rejects_late_duplicate_final_without_child_output() -> None:
     parent_vad_id = uuid4()
     llm = ReleasableTranslateLLMProvider(response_text="hello")
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1671,7 +1672,7 @@ async def test_inflight_parent_rejects_duplicate_final_without_second_child_or_o
     parent_utterance_id = uuid4()
     sink = RecordingOverlaySink()
     llm = ReleasableTranslateLLMProvider(response_text="translated")
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -1728,7 +1729,7 @@ async def test_peer_no_overlay_translation_path_keeps_latency_bookkeeping_until_
 ):
     utterance_id = uuid4()
     llm = ReleasableTranslateLLMProvider(response_text="hello")
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -1770,7 +1771,7 @@ async def test_peer_no_overlay_translation_path_keeps_latency_bookkeeping_until_
 @pytest.mark.asyncio
 async def test_peer_without_overlay_sink_succeeds_via_translate() -> None:
     llm = SequencedTranslateLLMProvider(responses=["hello"], delay_s=0.0)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -1794,7 +1795,7 @@ async def test_peer_without_overlay_sink_succeeds_via_translate() -> None:
 async def test_peer_test_helper_returns_new_logical_turn_for_identical_text_without_overlay_sink() -> (
     None
 ):
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1830,7 +1831,7 @@ def test_peer_overlay_first_render_latency_contract_is_explicit() -> None:
 async def test_chatbox_stays_self_final_only_while_overlay_sink_receives_peer_finals() -> None:
     osc = RecordingOscQueue()
     sink = RecordingOverlaySink()
-    hub = ClientHub(stt=None, llm=None, osc=osc, overlay_sink=sink)
+    hub = compose_client_hub(stt=None, llm=None, osc=osc, overlay_sink=sink)
 
     await hub.submit_text("self text", source="You")
     await hub.handle_peer_transcript_final_for_test(text="peer text")
@@ -1843,7 +1844,7 @@ async def test_chatbox_stays_self_final_only_while_overlay_sink_receives_peer_fi
 @pytest.mark.asyncio
 async def test_peer_no_translation_source_only_overlay_close_remains_final() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(stt=None, llm=None, osc=RecordingOscQueue(), overlay_sink=sink)
+    hub = compose_client_hub(stt=None, llm=None, osc=RecordingOscQueue(), overlay_sink=sink)
 
     utterance_id = await hub.handle_peer_transcript_final_for_test(text="안녕")
 
@@ -1858,7 +1859,7 @@ async def test_peer_no_translation_source_only_overlay_close_remains_final() -> 
 @pytest.mark.asyncio
 async def test_peer_translation_disabled_finalizes_source_only_turn() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -1892,7 +1893,7 @@ async def test_peer_translation_disabled_finalizes_source_only_turn() -> None:
 @pytest.mark.asyncio
 async def test_peer_translation_failure_finalizes_source_only_turn_and_emits_error() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=ImmediateFailingTranslateLLMProvider(RuntimeError("llm boom")),
         osc=RecordingOscQueue(),
@@ -1931,7 +1932,7 @@ async def test_peer_translation_failure_finalizes_source_only_turn_and_emits_err
 async def test_translation_provider_failure_uses_message_ref_and_safe_runtime_log() -> None:
     raw_detail = "provider raw detail token=translation-secret-789"
     runtime_logging, log_stream = _make_runtime_logging_capture()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=ImmediateFailingTranslateLLMProvider(RuntimeError(raw_detail)),
         osc=RecordingOscQueue(),
@@ -1963,7 +1964,7 @@ async def test_translation_provider_failure_uses_message_ref_and_safe_runtime_lo
 async def test_legacy_peer_handle_transcript_gates_overlay_until_translation() -> None:
     sink = RecordingOverlaySink()
     llm = ReleasableTranslateLLMProvider(response_text="hello")
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -2002,7 +2003,7 @@ async def test_legacy_peer_handle_transcript_gates_overlay_until_translation() -
 async def test_peer_translation_overlay_waits_for_translation_and_includes_source_text() -> None:
     sink = RecordingOverlaySink()
     llm = ReleasableTranslateLLMProvider(response_text="hello")
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -2046,7 +2047,7 @@ async def test_peer_translation_overlay_waits_for_translation_and_includes_sourc
 @pytest.mark.asyncio
 async def test_peer_translation_emits_final_only_overlay_events() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["hello"], delay_s=0.0),
         osc=RecordingOscQueue(),
@@ -2083,7 +2084,7 @@ async def test_peer_overlay_events_arrive_before_translation_done_and_preserve_p
 
     call_order: list[str] = []
     sink = OrderingOverlaySink(call_order)
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["hello"], delay_s=0.0),
         osc=RecordingOscQueue(),
@@ -2130,7 +2131,7 @@ async def test_peer_overlay_events_arrive_before_translation_done_and_preserve_p
 
 @pytest.mark.asyncio
 async def test_self_osc_sent_channel_uses_utterance_runtime_when_peer_chatbox_active() -> None:
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -2154,7 +2155,7 @@ async def test_self_osc_sent_channel_uses_utterance_runtime_when_peer_chatbox_ac
 @pytest.mark.asyncio
 async def test_self_stt_final_uses_self_chatbox_when_legacy_peer_chatbox_active() -> None:
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=osc,
@@ -2202,7 +2203,7 @@ async def test_peer_overlay_emit_failures_still_emit_translation_done_and_deny_c
     call_order: list[str] = []
     sink = RecordingFailingOverlaySink(call_order)
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["hello"], delay_s=0.0),
         osc=osc,
@@ -2251,7 +2252,7 @@ async def test_peer_overlay_emit_failures_still_emit_translation_done_and_deny_c
 async def test_overlay_sink_failures_do_not_break_chatbox_or_translation_completion() -> None:
     sink = FailingOverlaySink()
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=StubTranslateLLMProvider(text="hello"),
         osc=osc,
@@ -2269,7 +2270,7 @@ async def test_overlay_sink_failures_do_not_break_chatbox_or_translation_complet
 async def test_hub_emits_self_translation_to_overlay_after_translation_completion() -> None:
     sink = RecordingOverlaySink()
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=StubTranslateLLMProvider(text="hello"),
         osc=osc,
@@ -2306,7 +2307,7 @@ async def test_hub_newer_self_row_replaces_older_translated_self_row_without_pro
         clock=clock,
         visible_window_target_blocks=1,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(
             responses=["translated first", "translated second"],
@@ -2337,7 +2338,7 @@ async def test_hub_newer_self_row_replaces_older_translated_self_row_without_pro
 @pytest.mark.asyncio
 async def test_hub_closes_self_overlay_line_after_translation_completion() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=StubTranslateLLMProvider(text="hello"),
         osc=RecordingOscQueue(),
@@ -2359,7 +2360,7 @@ async def test_hub_closes_self_overlay_line_after_translation_completion() -> No
 @pytest.mark.asyncio
 async def test_self_translation_failure_closes_overlay_line_as_incomplete() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=ImmediateFailingTranslateLLMProvider(error=RuntimeError("boom")),
         osc=RecordingOscQueue(),
@@ -2381,7 +2382,7 @@ async def test_self_translation_failure_closes_overlay_line_as_incomplete() -> N
 @pytest.mark.asyncio
 async def test_peer_translation_failure_closes_line_as_incomplete() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=ImmediateFailingTranslateLLMProvider(error=RuntimeError("boom")),
         osc=RecordingOscQueue(),
@@ -2404,7 +2405,7 @@ async def test_peer_translation_failure_closes_line_as_incomplete() -> None:
 async def test_peer_translation_failure_hard_denies_active_peer_chatbox_fallback() -> None:
     sink = RecordingOverlaySink()
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=ImmediateFailingTranslateLLMProvider(error=RuntimeError("boom")),
         osc=osc,
@@ -2440,7 +2441,7 @@ async def test_peer_translation_failure_hard_denies_active_peer_chatbox_fallback
 async def test_peer_translation_failure_hard_denies_active_peer_chatbox_without_fallback() -> None:
     sink = RecordingOverlaySink()
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=ImmediateFailingTranslateLLMProvider(error=RuntimeError("provider raw detail")),
         osc=osc,
@@ -2468,7 +2469,7 @@ async def test_peer_translation_failure_hard_denies_active_peer_chatbox_without_
 @pytest.mark.asyncio
 async def test_legacy_peer_active_chatbox_route_is_hard_denied_without_user_text() -> None:
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=osc,
@@ -2494,7 +2495,7 @@ async def test_legacy_peer_active_chatbox_route_is_hard_denied_without_user_text
 async def test_peer_translation_cancellation_closes_line_as_incomplete() -> None:
     sink = RecordingOverlaySink()
     llm = BlockingTranslateLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -2525,7 +2526,7 @@ async def test_peer_translation_cancellation_hard_denies_active_peer_chatbox_wit
     sink = RecordingOverlaySink()
     osc = RecordingOscQueue()
     llm = BlockingTranslateLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=osc,
@@ -2555,7 +2556,7 @@ async def test_peer_translation_cancellation_hard_denies_active_peer_chatbox_wit
 async def test_peer_final_runs_owner_shutdown_cancels_and_awaits_child() -> None:
     sink = RecordingOverlaySink()
     llm = BlockingTranslateLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -2583,7 +2584,7 @@ async def test_peer_final_runs_cancellation_suppression_cannot_publish_success_o
 ) -> None:
     sink = RecordingOverlaySink()
     llm = CancelSuppressingTranslateLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -2615,7 +2616,7 @@ async def test_peer_final_runs_cancellation_suppression_cannot_publish_success_o
 async def test_self_translation_cancellation_closes_overlay_line_as_incomplete() -> None:
     sink = RecordingOverlaySink()
     llm = BlockingTranslateLLMProvider()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=RecordingOscQueue(),
@@ -2641,7 +2642,7 @@ async def test_low_latency_self_partial_no_longer_emits_overlay_event(
 ) -> None:
     monkeypatch.setattr(hub_module, "_SELF_PREVIEW_COALESCE_MS", 10, raising=False)
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -2664,7 +2665,7 @@ async def test_low_latency_self_partial_no_longer_emits_overlay_event(
 @pytest.mark.asyncio
 async def test_low_latency_self_final_emits_active_update_with_merge_occupant_key() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -2695,7 +2696,7 @@ async def test_low_latency_self_final_emits_active_update_with_merge_occupant_ke
 @pytest.mark.asyncio
 async def test_low_latency_self_active_updates_only_when_merged_text_changes() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -2757,7 +2758,7 @@ async def test_low_latency_self_spec_translation_re_emits_active_update_with_sec
 ):
     sink = RecordingOverlaySink()
     osc = RecordingOscQueue()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["translated live"]),
         osc=osc,
@@ -2803,7 +2804,7 @@ async def test_low_latency_self_active_secondary_stays_sticky_on_soft_reuse_mism
     None
 ):
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["translated one", "translated two"]),
         osc=RecordingOscQueue(),
@@ -2869,7 +2870,7 @@ async def test_low_latency_self_active_secondary_diagnostics_record_blank_sticky
         overlay_instance_id="overlay-test",
         diagnostics_dir=tmp_path,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["translated one", "translated two"]),
         osc=RecordingOscQueue(),
@@ -2923,7 +2924,7 @@ async def test_hub_active_self_metadata_flows_through_presenter_accessor() -> No
         calibration=OverlayCalibration(),
         clock=clock,
     )
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -3003,7 +3004,7 @@ async def test_self_overlay_secondary_decision_logs_only_to_detailed_runtime_log
     # active_self_secondary token even when overlay_diagnostics is absent.
     basic_sink = RecordingOverlaySink()
     detailed_sink = RecordingOverlaySink()
-    basic_hub = ClientHub(
+    basic_hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -3013,7 +3014,7 @@ async def test_self_overlay_secondary_decision_logs_only_to_detailed_runtime_log
         clock=FakeClock(_now=10.0),
         low_latency_mode=True,
     )
-    detailed_hub = ClientHub(
+    detailed_hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -3082,7 +3083,7 @@ async def test_self_overlay_secondary_decision_logs_only_to_detailed_runtime_log
 async def test_self_overlay_secondary_decision_emits_after_basic_to_detailed_mode_switch() -> None:
     runtime_logging, log_stream = _make_runtime_logging_capture()
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -3124,7 +3125,7 @@ async def test_self_overlay_secondary_decision_emits_after_basic_to_detailed_mod
 @pytest.mark.asyncio
 async def test_low_latency_self_active_secondary_stays_sticky_through_resume_continuation() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["translated live", "translated continued"]),
         osc=RecordingOscQueue(),
@@ -3201,7 +3202,7 @@ async def test_low_latency_self_active_secondary_stays_sticky_through_resume_con
 @pytest.mark.asyncio
 async def test_low_latency_merge_commit_reuses_merge_identity_without_emitting_clear() -> None:
     sink = RecordingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),
@@ -3250,7 +3251,7 @@ async def test_low_latency_merge_commit_reuses_merge_identity_without_emitting_c
 @pytest.mark.asyncio
 async def test_low_latency_self_active_update_failures_do_not_break_hub() -> None:
     sink = FailingOverlaySink()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingOscQueue(),

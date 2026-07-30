@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
 
-
-class SelfCaptureVadEventRuntime(Protocol):
-    async def handle_vad_event(self, event: object) -> None: ...
-
-
-SelfCaptureVadEventRuntimeProvider = Callable[[], SelfCaptureVadEventRuntime | None]
+from puripuly_heart.app.ports.capture_vad_runtime import (
+    SelfCaptureVadEventRuntime,
+    SelfCaptureVadEventRuntimeProvider,
+)
 
 
 @dataclass(frozen=True, slots=True)

@@ -71,15 +71,18 @@ _MANAGED_CONNECTIONS = frozenset(
 )
 
 
-class ManagedTranslationRuntimePort(Protocol):
-    llm: object | None
-
+class ManagedTranslationContextPort(Protocol):
     def clear_context(self) -> None: ...
+
+
+class ManagedLlmRuntimePort(Protocol):
+    provider: object | None
 
 
 @dataclass(slots=True)
 class ManagedTranslationRuntimeAccess:
-    runtime_provider: Callable[[], ManagedTranslationRuntimePort | None]
+    llm_runtime_provider: Callable[[], ManagedLlmRuntimePort | None]
+    context_provider: Callable[[], ManagedTranslationContextPort | None]
     translation_runtime_configuration_provider: Callable[
         [],
         TranslationRuntimeConfigurationPort | None,
@@ -87,11 +90,11 @@ class ManagedTranslationRuntimeAccess:
     rebuild_llm: Callable[[], Awaitable[object]]
 
     def presence(self) -> tuple[bool, bool]:
-        runtime = self.runtime_provider()
-        return runtime is not None, runtime is not None and runtime.llm is not None
+        runtime = self.llm_runtime_provider()
+        return runtime is not None, runtime is not None and runtime.provider is not None
 
     def snapshot(self) -> tuple[bool, bool, object | None]:
-        runtime = self.runtime_provider()
+        runtime = self.llm_runtime_provider()
         config_owner = self.translation_runtime_configuration_provider()
         translation_enabled = (
             config_owner.snapshot().value.translation_enabled if config_owner is not None else False
@@ -99,16 +102,16 @@ class ManagedTranslationRuntimeAccess:
         return (
             runtime is not None,
             translation_enabled,
-            runtime.llm if runtime is not None else None,
+            runtime.provider if runtime is not None else None,
         )
 
     async def ensure(self, mode: str) -> bool:
-        runtime = self.runtime_provider()
+        runtime = self.llm_runtime_provider()
         if runtime is None:
             return False
-        if mode == "always" or (mode == "if_missing" and runtime.llm is None):
+        if mode == "always" or (mode == "if_missing" and runtime.provider is None):
             await self.rebuild_llm()
-        return runtime.llm is not None
+        return runtime.provider is not None
 
     def set_enabled(self, enabled: bool) -> None:
         config_owner = self.translation_runtime_configuration_provider()
@@ -116,9 +119,9 @@ class ManagedTranslationRuntimeAccess:
             replace_translation_runtime_enabled(config_owner, enabled)
 
     def clear_context(self) -> None:
-        runtime = self.runtime_provider()
-        if runtime is not None:
-            runtime.clear_context()
+        context = self.context_provider()
+        if context is not None:
+            context.clear_context()
 
 
 @dataclass(slots=True)

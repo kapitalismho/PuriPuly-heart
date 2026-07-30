@@ -11,8 +11,8 @@ from puripuly_heart.core.orchestrator.channel_runtime import (
     ContextEntry,
     _MergeBuffer,
 )
-from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.domain.models import Transcript
+from tests.helpers.client_hub import compose_client_hub
 
 
 @dataclass
@@ -64,7 +64,7 @@ def test_channel_runtime_keeps_merge_and_history_separate_per_channel() -> None:
 
 
 def test_client_hub_owns_fixed_self_and_peer_runtimes_while_self_path_stays_stable() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=FakeOscQueue())
+    hub = compose_client_hub(stt=None, llm=None, osc=FakeOscQueue())
 
     assert hub.self_runtime.channel == "self"
     assert hub.peer_runtime.channel == "peer"
@@ -74,7 +74,7 @@ def test_client_hub_owns_fixed_self_and_peer_runtimes_while_self_path_stays_stab
 
 
 def test_self_runtime_reassignment_updates_hub_aliases() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=FakeOscQueue())
+    hub = compose_client_hub(stt=None, llm=None, osc=FakeOscQueue())
     buffer = _MergeBuffer(merge_id=uuid4())
 
     hub.self_runtime.merge_buffer = buffer
@@ -84,7 +84,7 @@ def test_self_runtime_reassignment_updates_hub_aliases() -> None:
 
 @pytest.mark.asyncio
 async def test_peer_transcript_stays_in_peer_runtime() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=FakeOscQueue())
+    hub = compose_client_hub(stt=None, llm=None, osc=FakeOscQueue())
     transcript = Transcript(utterance_id=uuid4(), text="peer text", is_final=True, channel="peer")
 
     await hub._handle_transcript(transcript, is_final=True, source="Peer")
@@ -231,7 +231,7 @@ async def test_clear_live_translation_state_clears_standalone_translation_latenc
 
 @pytest.mark.asyncio
 async def test_reset_runtime_state_clears_both_channel_runtimes() -> None:
-    hub = ClientHub(stt=None, llm=None, osc=FakeOscQueue())
+    hub = compose_client_hub(stt=None, llm=None, osc=FakeOscQueue())
     self_id = uuid4()
     peer_id = uuid4()
     self_task = asyncio.create_task(asyncio.sleep(60.0))

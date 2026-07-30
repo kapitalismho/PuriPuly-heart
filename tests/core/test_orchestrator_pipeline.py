@@ -5,11 +5,11 @@ from dataclasses import dataclass, field
 
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
-from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.domain.models import Translation
+from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import FakeSender, SpeechAwareFakeBackend, samples
 
 
@@ -42,7 +42,7 @@ async def test_client_hub_uses_local_context_when_peer_translation_is_off():
     osc = ChatboxPaginator(sender=sender, clock=clock)
     inner = FakeLLM()
     llm = SemaphoreLLMProvider(inner=inner, semaphore=asyncio.Semaphore(1))
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=osc,
@@ -69,7 +69,7 @@ async def test_client_hub_uses_integrated_context_when_enabled_and_safe():
     osc = ChatboxPaginator(sender=sender, clock=clock)
     inner = FakeLLM()
     llm = SemaphoreLLMProvider(inner=inner, semaphore=asyncio.Semaphore(1))
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=osc,
@@ -113,7 +113,7 @@ async def test_orchestrator_e2e_pipeline():
     )
 
     llm = SemaphoreLLMProvider(inner=FakeLLM(), semaphore=asyncio.Semaphore(1))
-    hub = ClientHub(stt=stt, llm=llm, osc=osc, clock=clock)
+    hub = compose_client_hub(stt=stt, llm=llm, osc=osc, clock=clock)
     await hub.start(auto_flush_osc=False)
 
     uid = __import__("uuid").uuid4()
@@ -143,7 +143,7 @@ async def test_stt_connected_sends_promo_message():
         reset_deadline_s=90.0,
     )
     llm = SemaphoreLLMProvider(inner=FakeLLM(), semaphore=asyncio.Semaphore(1))
-    hub = ClientHub(stt=stt, llm=llm, osc=osc, clock=clock)
+    hub = compose_client_hub(stt=stt, llm=llm, osc=osc, clock=clock)
     await hub.start(auto_flush_osc=False)
 
     # 버튼 클릭 시뮬레이션
@@ -170,7 +170,7 @@ async def test_stt_promo_respects_interval():
         reset_deadline_s=90.0,
     )
     llm = SemaphoreLLMProvider(inner=FakeLLM(), semaphore=asyncio.Semaphore(1))
-    hub = ClientHub(stt=stt, llm=llm, osc=osc, clock=clock)
+    hub = compose_client_hub(stt=stt, llm=llm, osc=osc, clock=clock)
     await hub.start(auto_flush_osc=False)
 
     # 첫 번째 버튼 클릭
@@ -216,7 +216,7 @@ async def test_stt_promo_sends_after_interval():
         reset_deadline_s=90.0,
     )
     llm = SemaphoreLLMProvider(inner=FakeLLM(), semaphore=asyncio.Semaphore(1))
-    hub = ClientHub(stt=stt, llm=llm, osc=osc, clock=clock)
+    hub = compose_client_hub(stt=stt, llm=llm, osc=osc, clock=clock)
     await hub.start(auto_flush_osc=False)
 
     # 첫 번째 버튼 클릭
@@ -261,7 +261,7 @@ async def test_stt_promo_skipped_on_session_reset():
         reset_deadline_s=90.0,
     )
     llm = SemaphoreLLMProvider(inner=FakeLLM(), semaphore=asyncio.Semaphore(1))
-    hub = ClientHub(stt=stt, llm=llm, osc=osc, clock=clock)
+    hub = compose_client_hub(stt=stt, llm=llm, osc=osc, clock=clock)
     await hub.start(auto_flush_osc=False)
 
     # 버튼 클릭 없이 STT 연결 (세션 자동 리셋 시뮬레이션)

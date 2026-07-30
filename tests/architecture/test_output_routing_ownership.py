@@ -34,7 +34,7 @@ def test_output_runtime_is_the_only_production_output_owner_construction() -> No
                 router_constructions.append((_repo_path(source_file), node.lineno))
 
     assert [path for path, _line in runtime_constructions] == [
-        "src/puripuly_heart/core/orchestrator/hub.py"
+        "src/puripuly_heart/app/wiring_runtime_pipeline.py"
     ]
     assert router_constructions == []
 
@@ -120,6 +120,7 @@ def test_flet_composition_uses_owner_without_importing_output_implementation() -
     assert "CaptureOwnerFactory(" in composition_source
     assert "RuntimePipelineLauncher(" in composition_source
     assert "RuntimeCompositionComponents(" in composition_source
-    assert "hub.output_runtime.start_ui_event_bridge(" in composition_source
+    assert "output_runtime.start_ui_event_bridge(" in composition_source
+    assert "hub.output_runtime.start_ui_event_bridge(" not in composition_source
     assert "puripuly_heart.core.runtime.output" not in imported_modules
     assert "puripuly_heart.core.output.router" not in imported_modules

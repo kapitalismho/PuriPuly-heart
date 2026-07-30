@@ -73,7 +73,6 @@ def test_application_composition_has_no_legacy_self_capture_lifecycle() -> None:
         "_drain_self_stt_for_toggle_off",
         "_mic_task",
         "_audio_source",
-        "_vad",
         "_last_mic_loop_close_exception",
         "_stt_desired",
         "_stt_activation_generation",
@@ -81,6 +80,7 @@ def test_application_composition_has_no_legacy_self_capture_lifecycle() -> None:
         "_stt_activation_failed",
     ):
         assert retired_name not in source
+    assert "self._vad" not in source
 
 
 def test_controller_composes_self_vad_sink_adapter_without_channel_wrapper() -> None:

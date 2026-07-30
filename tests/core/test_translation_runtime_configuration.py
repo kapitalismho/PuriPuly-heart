@@ -19,6 +19,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnProcessResult,
 )
 from puripuly_heart.domain.models import Transcript, Translation
+from tests.helpers.client_hub import compose_client_hub
 
 _CONFIG_FIELD_NAMES = {field.name for field in fields(TranslationRuntimeConfig)}
 
@@ -142,7 +143,7 @@ def test_client_hub_has_no_mutable_translation_configuration_fields() -> None:
 
 def test_client_hub_compatibility_access_delegates_to_the_owner() -> None:
     owner = TranslationRuntimeConfigurationOwner()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=FakeOsc(),
@@ -165,7 +166,7 @@ def test_client_hub_compatibility_assignment_is_linearizable_with_owner_updates(
             return super().transform(transformer)
 
     owner = CoordinatedOwner()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=FakeOsc(),
@@ -241,7 +242,7 @@ async def test_translation_turn_submit_parent_captures_the_configuration_revisio
 @pytest.mark.asyncio
 async def test_client_hub_captures_configuration_when_the_turn_is_created() -> None:
     owner = TranslationRuntimeConfigurationOwner(TranslationRuntimeConfig(target_language="en"))
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=FakeOsc(),
@@ -314,7 +315,7 @@ async def test_in_flight_turn_keeps_output_policy_and_later_turn_uses_replacemen
     )
     llm = GatedLLM()
     osc = FakeOsc()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=osc,

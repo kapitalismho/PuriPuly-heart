@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
 
 from puripuly_heart.app.ports.translation_runtime_configuration import (
     TranslationRuntimeSettingsValues,
@@ -41,20 +40,14 @@ from puripuly_heart.config.settings import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
+from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
+from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import SelfCaptureSessionSnapshot
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
-
-
-class ProviderRuntimeHubPort(Protocol):
-    llm: object | None
-
-    def has_stt_provider(self, channel: str) -> bool: ...
-
-    async def replace_llm_provider(self, provider: object | None) -> object | None: ...
 
 
 def project_translation_runtime_settings(
@@ -149,7 +142,8 @@ class ProviderRuntimeSignatures:
 @dataclass(slots=True)
 class ProviderRuntimeEffects:
     settings: SettingsOwner
-    hub_provider: Callable[[], ProviderRuntimeHubPort | None]
+    llm_runtime_provider: Callable[[], ProviderRuntimeHandle | None]
+    local_asr_runtime_provider: Callable[[], LocalASRProviderRuntimePort | None]
     translation_runtime_configuration_provider: Callable[
         [],
         TranslationRuntimeConfigurationPort | None,
@@ -174,13 +168,20 @@ class ProviderRuntimeEffects:
     success_sink: Callable[[str], None]
 
     def state(self, settings: object) -> ProviderRuntimeState:
-        hub = self.hub_provider()
+        llm_runtime = self.llm_runtime_provider()
+        local_asr_runtime = self.local_asr_runtime_provider()
         self_owner = self.self_capture_provider()
         return ProviderRuntimeState(
-            runtime_available=hub is not None,
-            llm_available=hub is not None and hub.llm is not None,
-            self_stt_available=hub is not None and hub.has_stt_provider("self"),
-            peer_stt_available=hub is not None and hub.has_stt_provider("peer"),
+            runtime_available=llm_runtime is not None and local_asr_runtime is not None,
+            llm_available=llm_runtime is not None and llm_runtime.provider is not None,
+            self_stt_available=(
+                local_asr_runtime is not None
+                and local_asr_runtime.snapshot.channel_for("self").provider_id is not None
+            ),
+            peer_stt_available=(
+                local_asr_runtime is not None
+                and local_asr_runtime.snapshot.channel_for("peer").provider_id is not None
+            ),
             self_stt_desired=bool(self_owner is not None and self_owner.snapshot.desired_active),
             peer_stt_desired=isinstance(settings, AppSettings) and self.peer_desired(settings),
         )
@@ -225,7 +226,7 @@ class ProviderRuntimeEffects:
 
     async def rebuild_self_stt(self) -> None:
         current = self.settings.current
-        if current is None or self.hub_provider() is None:
+        if current is None or self.local_asr_runtime_provider() is None:
             return
         owner = self.self_capture_owner()
         config = build_self_capture_session_config(current)
@@ -254,7 +255,8 @@ def compose_provider_runtime(
     *,
     config_path: Path,
     settings: SettingsOwner,
-    hub_provider: Callable[[], ProviderRuntimeHubPort | None],
+    llm_runtime_provider: Callable[[], ProviderRuntimeHandle | None],
+    local_asr_runtime_provider: Callable[[], LocalASRProviderRuntimePort | None],
     translation_runtime_configuration_provider: Callable[
         [],
         TranslationRuntimeConfigurationPort | None,
@@ -289,7 +291,8 @@ def compose_provider_runtime(
     signature_state = signatures or ProviderRuntimeSignatures()
     effects = ProviderRuntimeEffects(
         settings=settings,
-        hub_provider=hub_provider,
+        llm_runtime_provider=llm_runtime_provider,
+        local_asr_runtime_provider=local_asr_runtime_provider,
         translation_runtime_configuration_provider=(translation_runtime_configuration_provider),
         self_capture_provider=self_capture_provider,
         self_capture_owner=self_capture_owner,
@@ -313,12 +316,16 @@ def compose_provider_runtime(
 
     def llm_context() -> LlmProviderRebuildContext | None:
         current = settings.current
-        hub = hub_provider()
-        if current is None or hub is None:
+        runtime = llm_runtime_provider()
+        if current is None or runtime is None:
             return None
+
+        async def replace_provider(provider: object | None) -> object | None:
+            return await runtime.replace_provider(provider, start=False)
+
         return LlmProviderRebuildContext(
             settings=current,
-            replace_provider=hub.replace_llm_provider,
+            replace_provider=replace_provider,
             requires_secret=current.provider.llm
             in {
                 LLMProviderName.GEMINI,
@@ -400,7 +407,6 @@ def compose_provider_runtime(
 __all__ = [
     "ProviderRuntimeComponents",
     "ProviderRuntimeEffects",
-    "ProviderRuntimeHubPort",
     "ProviderRuntimeSignatures",
     "compose_provider_runtime",
 ]

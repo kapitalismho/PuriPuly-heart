@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
 
-
-class PeerCaptureVadEventRuntime(Protocol):
-    async def handle_peer_vad_event(self, event: object) -> None: ...
-
-
-PeerCaptureVadEventRuntimeProvider = Callable[[], PeerCaptureVadEventRuntime | None]
+from puripuly_heart.app.ports.capture_vad_runtime import (
+    PeerCaptureVadEventRuntime,
+    PeerCaptureVadEventRuntimeProvider,
+)
 
 
 @dataclass(frozen=True, slots=True)

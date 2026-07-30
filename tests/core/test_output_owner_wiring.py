@@ -6,9 +6,9 @@ from uuid import uuid4
 
 import pytest
 
-from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.overlay.sink import OverlayEventUnion
 from puripuly_heart.domain.models import OSCMessage
+from tests.helpers.client_hub import compose_client_hub
 
 
 @dataclass(slots=True)
@@ -63,7 +63,7 @@ class BlockingOverlay(RecordingOverlay):
 async def test_client_hub_routes_manual_peer_and_system_output_through_one_owner() -> None:
     chatbox = RecordingChatbox()
     overlay = RecordingOverlay()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=chatbox,
@@ -105,7 +105,7 @@ async def test_client_hub_routes_manual_peer_and_system_output_through_one_owner
 async def test_client_hub_overlay_replacement_updates_only_owner_destination() -> None:
     first = RecordingOverlay()
     second = RecordingOverlay()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingChatbox(),
@@ -139,7 +139,7 @@ async def test_client_hub_overlay_replacement_updates_only_owner_destination() -
 async def test_client_hub_overlay_replacement_awaits_old_delivery_before_new_routing() -> None:
     old = BlockingOverlay()
     replacement = RecordingOverlay()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=None,
         osc=RecordingChatbox(),
@@ -177,13 +177,13 @@ async def test_client_hub_overlay_replacement_awaits_old_delivery_before_new_rou
 @pytest.mark.asyncio
 async def test_client_hub_restart_constructs_a_fresh_output_owner() -> None:
     first_chatbox = RecordingChatbox()
-    first = ClientHub(stt=None, llm=None, osc=first_chatbox)
+    first = compose_client_hub(stt=None, llm=None, osc=first_chatbox)
 
     await first.start(auto_flush_osc=True)
     await first.stop()
 
     second_chatbox = RecordingChatbox()
-    second = ClientHub(stt=None, llm=None, osc=second_chatbox)
+    second = compose_client_hub(stt=None, llm=None, osc=second_chatbox)
     await second.start(auto_flush_osc=True)
     publication_id = await second.submit_text("restart output", source="You")
 

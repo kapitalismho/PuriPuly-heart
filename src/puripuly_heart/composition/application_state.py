@@ -32,18 +32,18 @@ class ApplicationUiStateAdapter:
 
     @property
     def translation_enabled(self) -> bool:
-        hub = self.pipeline.hub
-        return hub.translation_enabled if hub is not None else False
+        owner = self.pipeline.translation_runtime_configuration
+        return owner.snapshot().value.translation_enabled if owner is not None else False
 
     @property
     def translation_runtime_ready(self) -> bool | None:
-        hub = self.pipeline.hub
-        return hub.llm is not None if hub is not None else None
+        runtime = self.pipeline.llm_runtime
+        return runtime.provider is not None if runtime is not None else None
 
     @property
     def stt_state(self) -> object | None:
-        hub = self.pipeline.hub
-        return hub.stt_session_state("self") if hub is not None else None
+        projection = self.pipeline.stt_sessions
+        return projection.state("self") if projection is not None else None
 
     @property
     def peer_translation_eula_accepted(self) -> bool | None:

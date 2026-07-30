@@ -9,7 +9,6 @@ import pytest
 
 from puripuly_heart.core.language import map_detected_language_for_llm
 from puripuly_heart.core.llm.provider import LLMProvider
-from puripuly_heart.core.orchestrator.hub import ClientHub
 from puripuly_heart.core.orchestrator.peer_final_runs import (
     PeerFinalRunChild,
     PeerFinalRunsLifecycleOwner,
@@ -20,6 +19,7 @@ from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
 from puripuly_heart.providers.stt.soniox import _SonioxSession
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+from tests.helpers.client_hub import compose_client_hub
 from tests.helpers.fakes import RecordingOscQueue
 
 
@@ -319,7 +319,7 @@ async def _run_simulated_schedule(schedule: _SimulationSchedule) -> _SimulationR
     overlay = _RecordingOverlaySink()
     osc = RecordingOscQueue()
     llm = _DeterministicLLM()
-    hub = ClientHub(
+    hub = compose_client_hub(
         stt=None,
         llm=llm,
         osc=osc,
@@ -466,7 +466,7 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
         overlay = _RecordingOverlaySink(presenter=presenter)
         osc = RecordingOscQueue()
         llm = _DeterministicLLM()
-        hub = ClientHub(
+        hub = compose_client_hub(
             stt=None,
             llm=llm,
             osc=osc,
