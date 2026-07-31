@@ -20,7 +20,7 @@ def _imports(path: Path) -> set[str]:
 def test_translation_enable_owner_and_adapter_do_not_import_ui_or_controller() -> None:
     paths = (
         REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "translation_enable.py",
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "wiring_managed_auth_factory.py",
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_managed_auth_factory.py",
     )
 
     for path in paths:

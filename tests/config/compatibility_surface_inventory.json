@@ -56,7 +56,7 @@
       "source_of_truth_refs": [
         "src/puripuly_heart/config/settings_vnext/schema.py::PersistedOperationalState",
         "tests/config/settings_migration_fixtures.py::CURRENT_OPERATIONAL_STATE_DESTINATIONS",
-        "src/puripuly_heart/core/local_stt_assets.py::LOCAL_STT_INSTALLED_MANIFEST_FILENAME"
+        "src/puripuly_heart/core/local_asr/local_stt_assets.py::LOCAL_STT_INSTALLED_MANIFEST_FILENAME"
       ],
       "fixture_or_guard_refs": [
         "tests/config/test_settings_migration_fixtures.py::test_vnext_schema_persisted_leaves_are_classified_from_current_settings",
@@ -69,8 +69,8 @@
       "classification": "public_compatibility_preserve",
       "source_of_truth_refs": [
         "src/puripuly_heart/core/storage/secrets.py",
-        "src/puripuly_heart/app/wiring.py::create_secret_store",
-        "src/puripuly_heart/core/openrouter_credentials.py",
+        "src/puripuly_heart/app/wiring/root.py::create_secret_store",
+        "src/puripuly_heart/core/openrouter/openrouter_credentials.py",
         "src/puripuly_heart/core/managed_identity.py",
         "tests/config/public_compatibility_surfaces_snapshot.json::secret_store"
       ],
@@ -102,8 +102,8 @@
       "source_of_truth_refs": [
         "src/puripuly_heart/config/resolved.py",
         "src/puripuly_heart/config/runtime_resolution.py",
-        "src/puripuly_heart/app/wiring.py::create_llm_provider_from_resolved_config",
-        "src/puripuly_heart/app/wiring.py::create_stt_backend_from_resolved_config"
+        "src/puripuly_heart/app/wiring/root.py::create_llm_provider_from_resolved_config",
+        "src/puripuly_heart/app/wiring/root.py::create_stt_backend_from_resolved_config"
       ],
       "fixture_or_guard_refs": [
         "tests/config/test_public_compatibility_surfaces.py::test_provider_runtime_public_config_snapshot_matches_resolved_contracts",
@@ -131,7 +131,7 @@
     "broker_v1": {
       "classification": "public_compatibility_preserve",
       "source_of_truth_refs": [
-        "src/puripuly_heart/core/managed_openrouter_broker_client.py",
+        "src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py",
         "src/puripuly_heart/core/managed_identity.py::DISCORD_OPENROUTER_ISSUE_PATH",
         "broker/src",
         "tests/config/public_compatibility_surfaces_snapshot.json::broker_v1"
@@ -232,7 +232,7 @@
     {
       "module": "puripuly_heart.app.wiring",
       "source_rule": "approved facade",
-      "source_of_truth_refs": ["src/puripuly_heart/app/wiring.py", "tests/app/test_wiring_providers.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/app/wiring/root.py", "tests/app/test_wiring_providers.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": {
         "preserve_import_path": true,
@@ -263,17 +263,17 @@
       ]
     },
     {
-      "module": "puripuly_heart.app.adapters.peer_capture_provider",
+      "module": "puripuly_heart.app.adapters.peer_capture.peer_capture_provider",
       "source_rule": "__all__",
-      "source_of_truth_refs": ["src/puripuly_heart/app/adapters/peer_capture_provider.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/app/adapters/peer_capture/peer_capture_provider.py"],
       "runtime_all_matches_exports": true,
       "facade_contract": null,
       "exports": [{"name": "PeerCaptureProviderAdapter", "kind": "attribute"}]
     },
     {
-      "module": "puripuly_heart.app.adapters.self_capture_provider",
+      "module": "puripuly_heart.app.adapters.self_capture.self_capture_provider",
       "source_rule": "__all__",
-      "source_of_truth_refs": ["src/puripuly_heart/app/adapters/self_capture_provider.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/app/adapters/self_capture/self_capture_provider.py"],
       "runtime_all_matches_exports": true,
       "facade_contract": null,
       "exports": [{"name": "SelfCaptureProviderAdapter", "kind": "attribute"}]
@@ -520,9 +520,9 @@
       ]
     },
     {
-      "module": "puripuly_heart.core.openrouter_credentials",
+      "module": "puripuly_heart.core.openrouter.openrouter_credentials",
       "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/core/openrouter_credentials.py", "tests/core/test_openrouter_credentials.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/core/openrouter/openrouter_credentials.py", "tests/core/test_openrouter_credentials.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [
@@ -570,9 +570,9 @@
       ]
     },
     {
-      "module": "puripuly_heart.core.managed_openrouter_broker_client",
+      "module": "puripuly_heart.core.openrouter.managed_openrouter_broker_client",
       "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/core/managed_openrouter_broker_client.py", "tests/core/test_managed_openrouter_broker_client.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py", "tests/core/test_managed_openrouter_broker_client.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [
@@ -584,9 +584,9 @@
       ]
     },
     {
-      "module": "puripuly_heart.core.managed_openrouter_release",
+      "module": "puripuly_heart.core.openrouter.managed_openrouter_release",
       "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/core/managed_openrouter_release.py", "tests/core/test_managed_openrouter_release.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/core/openrouter/managed_openrouter_release.py", "tests/core/test_managed_openrouter_release.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [
@@ -1001,7 +1001,7 @@
       "classification": "private_internal_or_test_compatibility",
       "examples": [
         "puripuly_heart.app.wiring._LazyFactoryLLMProvider",
-        "puripuly_heart.core.managed_openrouter_release._resolve_managed_issue_model"
+        "puripuly_heart.core.openrouter.managed_openrouter_release._resolve_managed_issue_model"
       ],
       "rationale": "Underscore-prefixed symbols remain private/internal despite existing tests; later gates may migrate tests to canonical public contracts before removal."
     },
@@ -1013,7 +1013,7 @@
         "puripuly_heart.app.adapters.gpu_worker_process",
         "puripuly_heart.app.adapters.local_asr_application",
         "puripuly_heart.app.adapters.peer_application_state",
-        "puripuly_heart.app.adapters.peer_capture_inventory"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_inventory"
       ],
       "rationale": "ProviderVerifierAdapter is an app adapter implementation of the provider-verifier port; the adapter class is importable for wiring/tests but is not an external public compatibility facade."
     },
@@ -1029,7 +1029,7 @@
       "surface": "puripuly_heart.app.adapters Self capture admission adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.self_capture_admission"
+        "puripuly_heart.app.adapters.self_capture.self_capture_admission"
       ],
       "rationale": "SelfCaptureAdmissionAdapter implements the internal Self capture admission port with explicit state and effect DTOs through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1037,7 +1037,7 @@
       "surface": "puripuly_heart.app.adapters Self capture source adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.self_capture_source"
+        "puripuly_heart.app.adapters.self_capture.self_capture_source"
       ],
       "rationale": "SelfCaptureSourceAdapter implements the internal Self capture source-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1045,7 +1045,7 @@
       "surface": "puripuly_heart.app.adapters Self capture VAD adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.self_capture_vad"
+        "puripuly_heart.app.adapters.self_capture.self_capture_vad"
       ],
       "rationale": "SelfCaptureVadAdapter implements the internal Self capture VAD-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1053,7 +1053,7 @@
       "surface": "puripuly_heart.app.adapters Self capture audio loop adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.self_capture_audio_loop"
+        "puripuly_heart.app.adapters.self_capture.self_capture_audio_loop"
       ],
       "rationale": "SelfCaptureAudioLoopAdapter implements the internal Self capture audio-loop contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1061,7 +1061,7 @@
       "surface": "puripuly_heart.app.adapters Self capture VAD sink adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.self_capture_vad_sink"
+        "puripuly_heart.app.adapters.self_capture.self_capture_vad_sink"
       ],
       "rationale": "SelfCaptureVadSinkAdapter implements the internal Self capture VAD-event sink boundary through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1069,7 +1069,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture source adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_source"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_source"
       ],
       "rationale": "PeerCaptureSourceAdapter implements the internal Peer capture source-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1077,7 +1077,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture target resolver adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_target_resolver"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_target_resolver"
       ],
       "rationale": "PeerCaptureTargetResolverAdapter implements the internal Peer capture target-resolver port through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1085,7 +1085,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture VAD adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_vad"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_vad"
       ],
       "rationale": "PeerCaptureVadAdapter implements the internal Peer capture VAD-factory contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1093,7 +1093,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture audio loop adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_audio_loop"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_audio_loop"
       ],
       "rationale": "PeerCaptureAudioLoopAdapter implements the internal Peer capture audio-loop contract through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1101,7 +1101,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture admission adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_admission"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_admission"
       ],
       "rationale": "PeerCaptureAdmissionAdapter implements the internal Peer capture admission port through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1109,7 +1109,7 @@
       "surface": "puripuly_heart.app.adapters Peer capture VAD sink adapter",
       "classification": "internal_adapter_implementation_contract",
       "modules": [
-        "puripuly_heart.app.adapters.peer_capture_vad_sink"
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_vad_sink"
       ],
       "rationale": "PeerCaptureVadSinkAdapter implements the internal Peer capture VAD-event sink boundary through application composition; its explicit exports support internal wiring and tests rather than an external public compatibility facade."
     },
@@ -1125,16 +1125,16 @@
       "surface": "puripuly_heart.app provider runtime wiring modules",
       "classification": "internal_provider_runtime_wiring",
       "modules": [
-        "puripuly_heart.app.wiring_capture_runtime",
-        "puripuly_heart.app.wiring_local_asr_application",
-        "puripuly_heart.app.wiring_local_asr_provider_runtime",
-        "puripuly_heart.app.wiring_managed_account",
-        "puripuly_heart.app.wiring_microphone_test",
-        "puripuly_heart.app.wiring_peer_application",
-        "puripuly_heart.app.wiring_provider_runtime",
-        "puripuly_heart.app.wiring_provider_runtime_policy",
-        "puripuly_heart.app.wiring_runtime_pipeline",
-        "puripuly_heart.app.wiring_vrc_mic_sync"
+        "puripuly_heart.app.wiring.wiring_capture_runtime",
+        "puripuly_heart.app.wiring.wiring_local_asr_application",
+        "puripuly_heart.app.wiring.wiring_local_asr_provider_runtime",
+        "puripuly_heart.app.wiring.wiring_managed_account",
+        "puripuly_heart.app.wiring.wiring_microphone_test",
+        "puripuly_heart.app.wiring.wiring_peer_application",
+        "puripuly_heart.app.wiring.wiring_provider_runtime",
+        "puripuly_heart.app.wiring.wiring_provider_runtime_policy",
+        "puripuly_heart.app.wiring.wiring_runtime_pipeline",
+        "puripuly_heart.app.wiring.wiring_vrc_mic_sync"
       ],
       "rationale": "The provider runtime wiring module is the internal application composition adapter for the provider-runtime owner and is not an external public compatibility facade."
     },
@@ -1159,7 +1159,7 @@
       ],
       "examples": [
         "puripuly_heart.app.services.secret_settings_transaction",
-        "puripuly_heart.app.services.settings_mutation",
+        "puripuly_heart.app.services.settings.settings_mutation",
         "puripuly_heart.app.services.managed_connection_auth"
       ],
       "rationale": "Application services are internal use-case boundaries. Their public names are stable execution inputs for later gates, but this inventory does not classify them as external public import compatibility."
@@ -1182,10 +1182,10 @@
         "puripuly_heart.core.error_messages",
         "puripuly_heart.core.gpu_worker",
         "puripuly_heart.core.lifecycle",
-        "puripuly_heart.core.local_asr_provider_runtime",
-        "puripuly_heart.core.local_asr_provisioning",
+        "puripuly_heart.core.local_asr.local_asr_provider_runtime",
+        "puripuly_heart.core.local_asr.local_asr_provisioning",
         "puripuly_heart.core.observability",
-        "puripuly_heart.core.openrouter_metadata",
+        "puripuly_heart.core.openrouter.openrouter_metadata",
         "puripuly_heart.core.telemetry"
       ],
       "rationale": "These modules expose internal core contracts for lifecycle, diagnostics, safe error/message shaping, telemetry ports/services, and OpenRouter metadata. They are not external public compatibility facades."
@@ -1194,8 +1194,8 @@
       "surface": "Local STT download port and Hugging Face Xet adapter modules",
       "classification": "internal_local_stt_download_boundary",
       "modules": [
-        "puripuly_heart.core.local_stt_download_port",
-        "puripuly_heart.core.local_stt_huggingface_xet_adapter"
+        "puripuly_heart.core.local_asr.local_stt_download_port",
+        "puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter"
       ],
       "rationale": "These modules define the internal Local STT download port and its subprocess-backed Hugging Face Xet adapter. Their explicit exports are stable production wiring contracts, but they are not external package compatibility facades."
     },
@@ -1358,6 +1358,54 @@
         "puripuly_heart.core.vad"
       ],
       "rationale": "These non-private modules are classified as implementation support unless an explicit __all__, existing public test import, packaging import, documented entry point, or approved facade appears in public_imports."
+    },
+    {
+      "surface": "puripuly_heart.core.discord domain grouping package",
+      "classification": "internal_domain_grouping_package",
+      "modules": [
+        "puripuly_heart.core.discord"
+      ],
+      "rationale": "Domain-aligned grouping package that re-exports the moved Discord OAuth modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.core.openrouter domain grouping package",
+      "classification": "internal_domain_grouping_package",
+      "modules": [
+        "puripuly_heart.core.openrouter"
+      ],
+      "rationale": "Domain-aligned grouping package that re-exports the moved OpenRouter credential, PKCE, handoff, and managed release modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.core.local_asr domain grouping package",
+      "classification": "internal_domain_grouping_package",
+      "modules": [
+        "puripuly_heart.core.local_asr"
+      ],
+      "rationale": "Domain-aligned grouping package that re-exports the moved local ASR/STT contract, asset, catalog, download, and installer modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.wiring.root composition facade module",
+      "classification": "internal_composition_facade_implementation",
+      "modules": [
+        "puripuly_heart.app.wiring.root"
+      ],
+      "rationale": "root holds the preserved composition facade implementation behind the puripuly_heart.app.wiring grouping package, which remains inventoried as the public compatibility facade; the root module itself is internal structure reached through the package."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters.peer_capture domain grouping package",
+      "classification": "internal_domain_grouping_package",
+      "modules": [
+        "puripuly_heart.app.adapters.peer_capture"
+      ],
+      "rationale": "Domain-aligned grouping package that re-exports the moved peer capture adapter modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+    },
+    {
+      "surface": "puripuly_heart.app.adapters.self_capture domain grouping package",
+      "classification": "internal_domain_grouping_package",
+      "modules": [
+        "puripuly_heart.app.adapters.self_capture"
+      ],
+      "rationale": "Domain-aligned grouping package that re-exports the moved self capture adapter modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "broker source modules",

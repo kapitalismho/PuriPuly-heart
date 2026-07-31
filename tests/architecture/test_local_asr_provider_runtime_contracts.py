@@ -66,7 +66,7 @@ def test_gpu_worker_contract_has_core_owner_and_app_compatibility_reexport() -> 
 
 
 def test_provider_runtime_contract_and_owner_do_not_import_ui_hub_or_app_layers() -> None:
-    contract_file = SOURCE_ROOT / "core" / "local_asr_provider_runtime.py"
+    contract_file = SOURCE_ROOT / "core" / "local_asr" / "local_asr_provider_runtime.py"
     owner_file = SOURCE_ROOT / "core" / "runtime" / "local_asr_provider_runtime.py"
 
     for source_file in (contract_file, owner_file):
@@ -156,8 +156,8 @@ def test_shipped_source_constructs_shared_gpu_runtime_only_in_canonical_factory(
         if count:
             constructor_calls[source_file.relative_to(SOURCE_ROOT).as_posix()] = count
 
-    assert constructor_calls == {"app/wiring_local_asr_provider_runtime.py": 1}
-    wiring_source = (SOURCE_ROOT / "app" / "wiring.py").read_text(encoding="utf-8")
+    assert constructor_calls == {"app/wiring/wiring_local_asr_provider_runtime.py": 1}
+    wiring_source = (SOURCE_ROOT / "app" / "wiring" / "root.py").read_text(encoding="utf-8")
     assert "_create_shared_gpu_asr_runtime" not in wiring_source
 
 

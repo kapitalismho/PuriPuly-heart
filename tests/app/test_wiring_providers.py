@@ -20,7 +20,8 @@ from puripuly_heart.app.wiring import (
     resolve_peer_stt_config,
     resolve_peer_stt_runtime_config_from_vnext,
 )
-from puripuly_heart.app.wiring_stt_factory import (
+from puripuly_heart.app.wiring import root as wiring_root
+from puripuly_heart.app.wiring.wiring_stt_factory import (
     _self_stt_runtime_intent_from_compatibility_settings,
     resolve_peer_stt_runtime_config,
 )
@@ -72,8 +73,8 @@ from puripuly_heart.core.language import (
 )
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
-from puripuly_heart.core.local_stt_assets import default_local_stt_model_dir
-from puripuly_heart.core.managed_openrouter_release import (
+from puripuly_heart.core.local_asr.local_stt_assets import default_local_stt_model_dir
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterLLMProvider,
     ManagedOpenRouterReleaseService,
     _resolve_managed_issue_model,
@@ -569,7 +570,7 @@ def test_create_llm_provider_legacy_facade_uses_runtime_resolution(
         return resolved
 
     monkeypatch.setattr(
-        wiring_module,
+        wiring_root,
         "resolve_llm_config",
         fake_resolve_llm_config,
         raising=False,
@@ -1003,7 +1004,7 @@ def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_use
         return "managed-user-123"
 
     monkeypatch.setattr(
-        wiring_module,
+        wiring_root,
         "load_managed_openrouter_user_identifier",
         fake_load_managed_openrouter_user_identifier,
         raising=False,
@@ -1092,7 +1093,7 @@ def test_create_llm_provider_openrouter_managed_delegate_factory_loads_user_iden
         return current_user_identifier
 
     monkeypatch.setattr(
-        wiring_module,
+        wiring_root,
         "load_managed_openrouter_user_identifier",
         fake_load_managed_openrouter_user_identifier,
         raising=False,
@@ -1191,7 +1192,7 @@ def test_create_llm_provider_openrouter_byok_paths_omit_managed_user_identifier(
         raise AssertionError("managed user identifier should not be loaded for BYOK paths")
 
     monkeypatch.setattr(
-        wiring_module,
+        wiring_root,
         "load_managed_openrouter_user_identifier",
         unexpected_load_managed_openrouter_user_identifier,
         raising=False,
@@ -1342,7 +1343,7 @@ def test_create_llm_provider_openrouter_managed_fallback_delegate_factory_loads_
         return current_user_identifier
 
     monkeypatch.setattr(
-        wiring_module,
+        wiring_root,
         "load_managed_openrouter_user_identifier",
         fake_load_managed_openrouter_user_identifier,
         raising=False,

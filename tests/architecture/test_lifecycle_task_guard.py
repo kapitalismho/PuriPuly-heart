@@ -23,7 +23,7 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
     {
         ("src/puripuly_heart/core/llm/fallback_racing.py", ASYNCIO_CREATE_TASK): 1,
         (
-            "src/puripuly_heart/core/local_stt_runtime_installer.py",
+            "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
             ASYNCIO_CREATE_TASK,
         ): 1,
         ("src/puripuly_heart/core/stt/controller.py", ASYNCIO_CREATE_TASK): 6,
@@ -96,7 +96,7 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         ASYNCIO_CREATE_TASK,
     ): "fallback racing owns short-lived contender tasks and cancels losers within the provider call boundary",
     (
-        "src/puripuly_heart/core/local_stt_runtime_installer.py",
+        "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
         ASYNCIO_CREATE_TASK,
     ): "legacy installer download task remains deferred to the local STT download runtime owner cutover",
     (
@@ -349,7 +349,7 @@ def test_order37_named_owner_allowlist_retires_controller_bounds_task_debt() -> 
         RUN_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
     assert (
-        "src/puripuly_heart/core/managed_openrouter_release.py",
+        "src/puripuly_heart/core/openrouter/managed_openrouter_release.py",
         ASYNCIO_CREATE_TASK,
     ) not in LEGACY_TASK_CREATION_ALLOWLIST
     assert (
@@ -364,7 +364,7 @@ def test_order37_named_owner_allowlist_retires_controller_bounds_task_debt() -> 
 
 def test_order38_named_owner_allowlist_preserves_installer_legacy_task_debt() -> None:
     assert (
-        "src/puripuly_heart/core/local_stt_runtime_installer.py",
+        "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
         ASYNCIO_CREATE_TASK,
     ) in LEGACY_TASK_CREATION_ALLOWLIST
     assert (
@@ -407,7 +407,9 @@ def test_order41_managed_refresh_scheduling_uses_its_named_owner() -> None:
     controller_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
     )
-    owner_path = REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed_usage.py"
+    owner_path = (
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed" / "managed_usage.py"
+    )
     controller_methods = {
         node.name: ast.unparse(node)
         for node in ast.walk(ast.parse(controller_path.read_text(encoding="utf-8")))
@@ -457,7 +459,13 @@ def test_order44_local_asr_owner_retires_controller_background_scope() -> None:
         REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
     )
     cpu_repair_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "local_asr_cpu_repair.py"
+        REPO_ROOT
+        / "src"
+        / "puripuly_heart"
+        / "app"
+        / "services"
+        / "local_asr"
+        / "local_asr_cpu_repair.py"
     )
     provisioning_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "local_asr_provisioning.py"
@@ -478,10 +486,22 @@ def test_application_composition_does_not_retain_dead_shutdown_or_provider_algor
         REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
     )
     provider_settings_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_settings.py"
+        REPO_ROOT
+        / "src"
+        / "puripuly_heart"
+        / "app"
+        / "services"
+        / "provider"
+        / "provider_settings.py"
     )
     provider_runtime_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "provider_runtime_apply.py"
+        REPO_ROOT
+        / "src"
+        / "puripuly_heart"
+        / "app"
+        / "services"
+        / "provider"
+        / "provider_runtime_apply.py"
     )
     startup_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "application_startup.py"

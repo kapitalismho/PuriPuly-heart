@@ -857,7 +857,7 @@ def test_run_local_qwen_runtime_check_rejects_non_windows(monkeypatch, capsys) -
 
 def test_run_local_qwen_runtime_check_reports_bootstrap_failure(monkeypatch, capsys) -> None:
     runtime_check_module = importlib.import_module("puripuly_heart.app.local_qwen_runtime_check")
-    runtime_error = importlib.import_module("puripuly_heart.core.local_qwen_runtime")
+    runtime_error = importlib.import_module("puripuly_heart.core.local_asr.local_qwen_runtime")
 
     monkeypatch.setattr(runtime_check_module, "sys", ModuleType("sys"), raising=False)
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
@@ -885,7 +885,7 @@ def test_run_local_qwen_runtime_check_reports_bootstrap_failure_after_runtime_mo
     runtime_check_module = importlib.reload(
         importlib.import_module("puripuly_heart.app.local_qwen_runtime_check")
     )
-    runtime_module = importlib.import_module("puripuly_heart.core.local_qwen_runtime")
+    runtime_module = importlib.import_module("puripuly_heart.core.local_asr.local_qwen_runtime")
 
     runtime_module = importlib.reload(runtime_module)
 

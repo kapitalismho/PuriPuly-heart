@@ -4,9 +4,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-OWNER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "services" / "overlay_session_transition.py"
+OWNER_PATH = (
+    ROOT
+    / "src"
+    / "puripuly_heart"
+    / "app"
+    / "services"
+    / "overlay"
+    / "overlay_session_transition.py"
+)
 APPLICATION_OWNER_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "services" / "overlay_application.py"
+    ROOT / "src" / "puripuly_heart" / "app" / "services" / "overlay" / "overlay_application.py"
 )
 
 

@@ -16,22 +16,50 @@ from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "peer_channel.py"
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-CAPTURE_WIRING_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_capture_runtime.py"
+CAPTURE_WIRING_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_capture_runtime.py"
+)
 SOURCE_ADAPTER_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_source.py"
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture" / "peer_capture_source.py"
 )
 TARGET_RESOLVER_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_target_resolver.py"
+    ROOT
+    / "src"
+    / "puripuly_heart"
+    / "app"
+    / "adapters"
+    / "peer_capture"
+    / "peer_capture_target_resolver.py"
 )
-VAD_ADAPTER_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_vad.py"
+VAD_ADAPTER_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture" / "peer_capture_vad.py"
+)
 AUDIO_LOOP_ADAPTER_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_audio_loop.py"
+    ROOT
+    / "src"
+    / "puripuly_heart"
+    / "app"
+    / "adapters"
+    / "peer_capture"
+    / "peer_capture_audio_loop.py"
 )
 ADMISSION_ADAPTER_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_admission.py"
+    ROOT
+    / "src"
+    / "puripuly_heart"
+    / "app"
+    / "adapters"
+    / "peer_capture"
+    / "peer_capture_admission.py"
 )
 VAD_SINK_ADAPTER_PATH = (
-    ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "peer_capture_vad_sink.py"
+    ROOT
+    / "src"
+    / "puripuly_heart"
+    / "app"
+    / "adapters"
+    / "peer_capture"
+    / "peer_capture_vad_sink.py"
 )
 
 

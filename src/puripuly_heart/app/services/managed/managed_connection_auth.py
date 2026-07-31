@@ -1,0 +1,809 @@
+from __future__ import annotations
+
+import contextlib
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from types import MappingProxyType
+
+from puripuly_heart.app.ports._settings_values import freeze_settings_values
+from puripuly_heart.app.ports.broker_client import (
+    BrokerClientPort,
+    BrokerIssueRequest,
+    BrokerIssueResult,
+    ManagedKeyDeliveryAckRequest,
+)
+from puripuly_heart.app.ports.discord_auth import (
+    DiscordAuthPort,
+    DiscordAuthRequest,
+    DiscordAuthResult,
+)
+from puripuly_heart.app.ports.managed_identity import (
+    ManagedIdentityPort,
+    ManagedIdentityPreflightRequest,
+    ManagedIdentityPreflightResult,
+)
+from puripuly_heart.app.ports.secret_store import SecretStorePort, SecretWriteResult
+from puripuly_heart.app.ports.settings_repository import (
+    SettingsCommitRequest,
+    SettingsRepositoryPort,
+)
+from puripuly_heart.core.messages import (
+    CONTENT_POLICY_METADATA_ONLY,
+    DIAGNOSTIC_CATEGORY_TRANSACTION,
+    DIAGNOSTIC_VISIBILITY_BASIC,
+    TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
+    TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
+    TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
+    TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+    DiagnosticFieldValue,
+    ErrorDiagnostics,
+    TransactionResult,
+    UserMessageRef,
+)
+
+from .managed_auth_claims import (
+    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+    OPENROUTER_MANAGED_USER_ID_MAX_LENGTH,
+    OPENROUTER_MANAGED_USER_ID_SECRET,
+    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
+    ManagedAuthClaimGuard,
+)
+from .managed_key_delivery_ack import (
+    ManagedKeyDeliveryAckTokenStoreError,
+    clear_pending_ack_in_settings_values,
+    secret_key_for_ack_source,
+    store_pending_ack_in_settings_values,
+)
+
+_SETTINGS_SENSITIVE_KEY_FRAGMENTS = (
+    "api_key",
+    "apikey",
+    "authorization",
+    "bearer",
+    "credential_value",
+    "credentialvalue",
+    "managed_secret_key",
+    "managedsecretkey",
+    "password",
+    "private_key",
+    "privatekey",
+    "raw",
+    "secret",
+    "token",
+)
+
+
+def _freeze_fields(
+    values: Mapping[str, DiagnosticFieldValue],
+) -> Mapping[str, DiagnosticFieldValue]:
+    return MappingProxyType(dict(values))
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedConnectionAuthRequest:
+    local_secret_key: str
+    settings_values: Mapping[str, object] = field(repr=False)
+    expected_settings_revision: str | None
+    reason: str | None
+    correlation_id: str | None
+    broker_metadata: Mapping[str, DiagnosticFieldValue] = field(default_factory=dict, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "settings_values", freeze_settings_values(self.settings_values))
+        object.__setattr__(self, "broker_metadata", _freeze_fields(self.broker_metadata))
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedConnectionAuthService:
+    local_identity: ManagedIdentityPort
+    discord_auth: DiscordAuthPort
+    broker_client: BrokerClientPort
+    secret_store: SecretStorePort
+    settings_repository: SettingsRepositoryPort
+    claim_guard: ManagedAuthClaimGuard | None = None
+
+    async def authorize(self, request: ManagedConnectionAuthRequest) -> TransactionResult:
+        if _caller_settings_values_are_unsafe(request.settings_values):
+            return _unsafe_settings_values_result(request)
+
+        claim_result = await self._preflight_claim_source()
+        if claim_result is not None:
+            return claim_result
+
+        identity_result = await self._preflight_local_identity(request)
+        if isinstance(identity_result, TransactionResult):
+            return identity_result
+
+        discord_result = await self._start_discord_auth(request)
+        if isinstance(discord_result, TransactionResult):
+            return discord_result
+
+        broker_result = await self._issue_managed_connection(
+            request=request,
+            identity_result=identity_result,
+            discord_result=discord_result,
+        )
+        if isinstance(broker_result, TransactionResult):
+            return broker_result
+
+        if not broker_result.managed_secret_key:
+            return _remote_active_local_missing_result(
+                request=request,
+                broker_result=broker_result,
+                operation="set_managed_secret",
+                code="remote_active_managed_secret_missing",
+                phase="local_secret_write",
+                secret_write_succeeded=False,
+                settings_commit_succeeded=False,
+                diagnostics_present=broker_result.diagnostics is not None,
+                message=broker_result.message,
+            )
+
+        if _settings_values_contain_raw_secret(
+            request.settings_values,
+            secret_value=broker_result.managed_secret_key,
+        ):
+            return _remote_active_unsafe_settings_values_result(
+                request=request,
+                broker_result=broker_result,
+                message=broker_result.message,
+            )
+
+        settings_values = request.settings_values
+        commit_result: TransactionResult | None = None
+        if broker_result.delivery_ack is not None:
+            try:
+                settings_values = await store_pending_ack_in_settings_values(
+                    settings_values=request.settings_values,
+                    secret_store=self.secret_store,
+                    metadata=broker_result.delivery_ack,
+                )
+            except ManagedKeyDeliveryAckTokenStoreError:
+                return _remote_active_local_missing_result(
+                    request=request,
+                    broker_result=broker_result,
+                    operation="store_delivery_ack_token",
+                    code="delivery_ack_token_store_failed_before_local_key_write",
+                    phase="delivery_ack_token_store",
+                    secret_write_succeeded=False,
+                    settings_commit_succeeded=False,
+                    diagnostics_present=broker_result.diagnostics is not None,
+                    message=broker_result.message,
+                )
+            commit_result = await self._commit_settings(
+                request=request,
+                broker_result=broker_result,
+                settings_values=settings_values,
+                secret_message=None,
+                secret_diagnostics_present=False,
+            )
+            if commit_result.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
+                return commit_result
+
+        secret_write_result = await self._write_local_managed_secret(
+            request=request,
+            broker_result=broker_result,
+        )
+        if isinstance(secret_write_result, TransactionResult):
+            if broker_result.delivery_ack is not None:
+                with contextlib.suppress(Exception):
+                    await self.secret_store.clear_secret(
+                        secret_key_for_ack_source(broker_result.delivery_ack.source)
+                    )
+            return secret_write_result
+
+        await self._store_managed_user_identifier(
+            identity_result=identity_result,
+            broker_result=broker_result,
+        )
+
+        if broker_result.delivery_ack is None:
+            commit_result = await self._commit_settings(
+                request=request,
+                broker_result=broker_result,
+                settings_values=settings_values,
+                secret_message=secret_write_result.message,
+                secret_diagnostics_present=secret_write_result.diagnostics is not None,
+            )
+            if commit_result.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
+                return commit_result
+        assert commit_result is not None
+
+        if broker_result.delivery_ack is not None:
+            ack_result = await self.broker_client.acknowledge_managed_key_delivery(
+                ManagedKeyDeliveryAckRequest(
+                    delivery_id=broker_result.delivery_ack.delivery_id,
+                    managed_credential_ref=broker_result.delivery_ack.managed_credential_ref,
+                    delivery_ack_token=broker_result.delivery_ack.delivery_ack_token,
+                )
+            )
+            if not ack_result.succeeded:
+                return _delivery_ack_pending_result(
+                    request=request,
+                    broker_result=broker_result,
+                    ack_status=ack_result.status,
+                    diagnostics_present=ack_result.diagnostics is not None,
+                    message=ack_result.message or commit_result.message,
+                )
+            try:
+                clear_result = await self.secret_store.clear_secret(
+                    secret_key_for_ack_source(broker_result.delivery_ack.source)
+                )
+            except Exception:
+                return _delivery_ack_pending_result(
+                    request=request,
+                    broker_result=broker_result,
+                    ack_status="token_clear_failed",
+                    diagnostics_present=False,
+                    message=commit_result.message,
+                )
+            if not clear_result.succeeded:
+                return _delivery_ack_pending_result(
+                    request=request,
+                    broker_result=broker_result,
+                    ack_status="token_clear_failed",
+                    diagnostics_present=clear_result.diagnostics is not None,
+                    message=clear_result.message or commit_result.message,
+                )
+            cleared_values = clear_pending_ack_in_settings_values(settings_values)
+            clear_commit = await self._commit_settings(
+                request=request,
+                broker_result=broker_result,
+                settings_values=cleared_values,
+                secret_message=commit_result.message,
+                secret_diagnostics_present=commit_result.diagnostics is not None,
+            )
+            if clear_commit.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
+                try:
+                    restore_result = await self.secret_store.set_secret(
+                        secret_key_for_ack_source(broker_result.delivery_ack.source),
+                        broker_result.delivery_ack.delivery_ack_token,
+                    )
+                    token_restored = restore_result.succeeded
+                except Exception:
+                    token_restored = False
+                return _delivery_ack_pending_result(
+                    request=request,
+                    broker_result=broker_result,
+                    ack_status=(
+                        "metadata_clear_failed" if token_restored else "token_restore_failed"
+                    ),
+                    diagnostics_present=clear_commit.diagnostics is not None,
+                    message=clear_commit.message or commit_result.message,
+                )
+            commit_result = clear_commit
+
+        claim_persist_result = self._record_successful_claim_after_commit(
+            request=request,
+            broker_result=broker_result,
+            message=commit_result.message,
+        )
+        if claim_persist_result is not None:
+            return claim_persist_result
+        return commit_result
+
+    async def _preflight_claim_source(self) -> TransactionResult | None:
+        if self.claim_guard is None:
+            return None
+        return await self.claim_guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
+
+    async def _preflight_local_identity(
+        self,
+        request: ManagedConnectionAuthRequest,
+    ) -> ManagedIdentityPreflightResult | TransactionResult:
+        try:
+            identity_result = await self.local_identity.preflight_managed_identity(
+                ManagedIdentityPreflightRequest(
+                    local_secret_key=request.local_secret_key,
+                    correlation_id=request.correlation_id,
+                    metadata=request.broker_metadata,
+                )
+            )
+        except Exception:
+            return _pre_issue_failed_result(
+                request=request,
+                operation="preflight_managed_identity",
+                code="local_identity_preflight_exception",
+                phase="local_identity_preflight",
+                message=None,
+                diagnostics_present=False,
+            )
+
+        if not identity_result.succeeded or not identity_result.local_public_key:
+            return _pre_issue_failed_result(
+                request=request,
+                operation="preflight_managed_identity",
+                code="local_identity_preflight_failed",
+                phase="local_identity_preflight",
+                message=identity_result.message,
+                diagnostics_present=identity_result.diagnostics is not None,
+            )
+
+        return identity_result
+
+    async def _start_discord_auth(
+        self,
+        request: ManagedConnectionAuthRequest,
+    ) -> DiscordAuthResult | TransactionResult:
+        try:
+            discord_result = await self.discord_auth.start_discord_auth(
+                DiscordAuthRequest(
+                    correlation_id=request.correlation_id,
+                    metadata=request.broker_metadata,
+                )
+            )
+        except Exception:
+            return _pre_issue_failed_result(
+                request=request,
+                operation="start_discord_auth",
+                code="discord_auth_exception",
+                phase="discord_auth",
+                message=None,
+                diagnostics_present=False,
+            )
+
+        if not discord_result.succeeded or not _discord_auth_issue_material_present(discord_result):
+            return _pre_issue_failed_result(
+                request=request,
+                operation="start_discord_auth",
+                code="discord_auth_failed",
+                phase="discord_auth",
+                message=discord_result.message,
+                diagnostics_present=discord_result.diagnostics is not None,
+            )
+
+        return discord_result
+
+    async def _issue_managed_connection(
+        self,
+        *,
+        request: ManagedConnectionAuthRequest,
+        identity_result: ManagedIdentityPreflightResult,
+        discord_result: DiscordAuthResult,
+    ) -> BrokerIssueResult | TransactionResult:
+        assert identity_result.local_public_key is not None
+        assert _discord_auth_issue_material_present(discord_result)
+        try:
+            broker_result = await self.broker_client.issue_managed_connection(
+                BrokerIssueRequest(
+                    discord_user_id=discord_result.discord_user_id,
+                    local_public_key=identity_result.local_public_key,
+                    local_identity_revision=identity_result.local_identity_revision,
+                    authorization_code=discord_result.authorization_code,
+                    oauth_state=discord_result.oauth_state,
+                    redirect_uri=discord_result.redirect_uri,
+                    issue_nonce=discord_result.issue_nonce,
+                    hardware_hash=discord_result.hardware_hash,
+                    hardware_hash_salt_version=discord_result.hardware_hash_salt_version,
+                    metadata=request.broker_metadata,
+                )
+            )
+        except Exception:
+            return _pre_issue_failed_result(
+                request=request,
+                operation="issue_managed_connection",
+                code="broker_issue_exception",
+                phase="broker_issue",
+                message=None,
+                diagnostics_present=False,
+            )
+
+        if not broker_result.succeeded:
+            return _pre_issue_failed_result(
+                request=request,
+                operation="issue_managed_connection",
+                code="broker_issue_failed",
+                phase="broker_issue",
+                message=broker_result.message,
+                diagnostics_present=broker_result.diagnostics is not None,
+            )
+
+        return broker_result
+
+    async def _write_local_managed_secret(
+        self,
+        *,
+        request: ManagedConnectionAuthRequest,
+        broker_result: BrokerIssueResult,
+    ) -> SecretWriteResult | TransactionResult:
+        assert broker_result.managed_secret_key is not None
+        try:
+            secret_write_result = await self.secret_store.set_secret(
+                request.local_secret_key,
+                broker_result.managed_secret_key,
+            )
+        except Exception:
+            return _remote_active_local_missing_result(
+                request=request,
+                broker_result=broker_result,
+                operation="set_managed_secret",
+                code="remote_active_local_secret_write_failed",
+                phase="local_secret_write",
+                secret_write_succeeded=False,
+                settings_commit_succeeded=False,
+                diagnostics_present=False,
+                message=None,
+            )
+
+        if not secret_write_result.succeeded:
+            return _remote_active_local_missing_result(
+                request=request,
+                broker_result=broker_result,
+                operation="set_managed_secret",
+                code="remote_active_local_secret_write_failed",
+                phase="local_secret_write",
+                secret_write_succeeded=False,
+                settings_commit_succeeded=False,
+                diagnostics_present=secret_write_result.diagnostics is not None,
+                message=secret_write_result.message,
+            )
+
+        return secret_write_result
+
+    async def _commit_settings(
+        self,
+        *,
+        request: ManagedConnectionAuthRequest,
+        broker_result: BrokerIssueResult,
+        settings_values: Mapping[str, object],
+        secret_message: UserMessageRef | None,
+        secret_diagnostics_present: bool,
+    ) -> TransactionResult:
+        try:
+            settings_commit_result = await self.settings_repository.save(
+                SettingsCommitRequest(
+                    values=settings_values,
+                    expected_revision=request.expected_settings_revision,
+                    reason=request.reason,
+                )
+            )
+        except Exception:
+            return _remote_active_local_missing_result(
+                request=request,
+                broker_result=broker_result,
+                operation="commit_settings",
+                code="remote_active_local_settings_commit_failed",
+                phase="local_settings_commit",
+                secret_write_succeeded=True,
+                settings_commit_succeeded=False,
+                diagnostics_present=False,
+                message=secret_message,
+            )
+
+        if not settings_commit_result.succeeded or settings_commit_result.snapshot is None:
+            return _remote_active_local_missing_result(
+                request=request,
+                broker_result=broker_result,
+                operation="commit_settings",
+                code="remote_active_local_settings_commit_failed",
+                phase="local_settings_commit",
+                secret_write_succeeded=True,
+                settings_commit_succeeded=False,
+                diagnostics_present=settings_commit_result.diagnostics is not None,
+                message=settings_commit_result.message or secret_message,
+            )
+
+        return TransactionResult(
+            status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+            message=settings_commit_result.message or secret_message,
+            diagnostics=(
+                settings_commit_result.diagnostics
+                if settings_commit_result.diagnostics is not None
+                else (
+                    _metadata_diagnostics(
+                        operation="commit_settings",
+                        code="settings_commit_succeeded_after_managed_issue",
+                        fields={
+                            "phase": "local_settings_commit",
+                            "secret_write_succeeded": True,
+                            "settings_commit_succeeded": True,
+                            "secret_diagnostics_present": secret_diagnostics_present,
+                        },
+                    )
+                    if secret_diagnostics_present
+                    else None
+                )
+            ),
+        )
+
+    async def _store_managed_user_identifier(
+        self,
+        *,
+        identity_result: ManagedIdentityPreflightResult,
+        broker_result: BrokerIssueResult,
+    ) -> None:
+        user_id = _normalize_managed_user_identifier(broker_result.openrouter_user_id)
+        installation_id = _normalize_optional_text(identity_result.local_identity_revision)
+        if user_id is None or installation_id is None:
+            return
+        try:
+            user_write = await self.secret_store.set_secret(
+                OPENROUTER_MANAGED_USER_ID_SECRET,
+                user_id,
+            )
+            installation_write = await self.secret_store.set_secret(
+                OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
+                installation_id,
+            )
+        except Exception:
+            await self._clear_managed_user_identifier()
+            return
+        if not user_write.succeeded or not installation_write.succeeded:
+            await self._clear_managed_user_identifier()
+
+    async def _clear_managed_user_identifier(self) -> None:
+        for key in (
+            OPENROUTER_MANAGED_USER_ID_SECRET,
+            OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
+        ):
+            try:
+                await self.secret_store.clear_secret(key)
+            except Exception:
+                pass
+
+    def _record_successful_claim_after_commit(
+        self,
+        *,
+        request: ManagedConnectionAuthRequest,
+        broker_result: BrokerIssueResult,
+        message: UserMessageRef | None,
+    ) -> TransactionResult | None:
+        if self.claim_guard is None:
+            return None
+        self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
+        try:
+            self.claim_guard.managed_state.persist()
+        except Exception:
+            return _remote_active_local_missing_result(
+                request=request,
+                broker_result=broker_result,
+                operation="persist_managed_claim_source",
+                code="remote_active_local_claim_persist_failed",
+                phase="local_claim_persist",
+                secret_write_succeeded=True,
+                settings_commit_succeeded=True,
+                diagnostics_present=False,
+                message=message,
+            )
+        return None
+
+
+def _normalized_settings_key(key: str) -> str:
+    return "".join(character.lower() if character.isalnum() else "_" for character in key)
+
+
+def _discord_auth_issue_material_present(result: DiscordAuthResult) -> bool:
+    if result.discord_user_id:
+        return True
+    return bool(
+        result.authorization_code
+        and result.oauth_state
+        and result.redirect_uri
+        and result.issue_nonce
+        and result.hardware_hash
+        and result.hardware_hash_salt_version is not None
+    )
+
+
+def _normalize_optional_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _normalize_managed_user_identifier(value: object) -> str | None:
+    normalized = _normalize_optional_text(value)
+    if normalized is None or len(normalized) > OPENROUTER_MANAGED_USER_ID_MAX_LENGTH:
+        return None
+    return normalized
+
+
+def _settings_key_is_unsafe(key: object) -> bool:
+    if not isinstance(key, str):
+        return True
+    normalized = _normalized_settings_key(key)
+    compacted = normalized.replace("_", "")
+    return any(
+        fragment in normalized or fragment in compacted
+        for fragment in _SETTINGS_SENSITIVE_KEY_FRAGMENTS
+    )
+
+
+def _caller_settings_values_are_unsafe(value: object) -> bool:
+    if isinstance(value, Mapping):
+        return any(
+            _settings_key_is_unsafe(key) or _caller_settings_values_are_unsafe(nested_value)
+            for key, nested_value in value.items()
+        )
+
+    if isinstance(value, list | tuple):
+        return any(_caller_settings_values_are_unsafe(item) for item in value)
+
+    return False
+
+
+def _settings_values_contain_raw_secret(
+    value: object,
+    *,
+    secret_value: str,
+) -> bool:
+    if isinstance(value, Mapping):
+        return any(
+            (isinstance(key, str) and bool(secret_value and secret_value in key))
+            or _settings_values_contain_raw_secret(nested_value, secret_value=secret_value)
+            for key, nested_value in value.items()
+        )
+
+    if isinstance(value, list | tuple):
+        return any(
+            _settings_values_contain_raw_secret(item, secret_value=secret_value) for item in value
+        )
+
+    return isinstance(value, str) and bool(secret_value and secret_value in value)
+
+
+def _pre_issue_failed_result(
+    *,
+    request: ManagedConnectionAuthRequest,
+    operation: str,
+    code: str,
+    phase: str,
+    message: UserMessageRef | None,
+    diagnostics_present: bool,
+) -> TransactionResult:
+    return TransactionResult(
+        status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
+        message=message,
+        diagnostics=_metadata_diagnostics(
+            operation=operation,
+            code=code,
+            fields={
+                "phase": phase,
+                "local_secret_key": request.local_secret_key,
+                "remote_active": False,
+                "diagnostics_present": diagnostics_present,
+            },
+        ),
+    )
+
+
+def _unsafe_settings_values_result(
+    request: ManagedConnectionAuthRequest,
+) -> TransactionResult:
+    return TransactionResult(
+        status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
+        message=None,
+        diagnostics=_metadata_diagnostics(
+            operation="validate_settings_values",
+            code="unsafe_settings_values",
+            fields={
+                "phase": "validate_settings_values",
+                "local_secret_key": request.local_secret_key,
+                "remote_active": False,
+                "settings_values_accepted": False,
+            },
+        ),
+    )
+
+
+def _remote_active_unsafe_settings_values_result(
+    *,
+    request: ManagedConnectionAuthRequest,
+    broker_result: BrokerIssueResult,
+    message: UserMessageRef | None,
+) -> TransactionResult:
+    fields: dict[str, DiagnosticFieldValue] = {
+        "phase": "validate_settings_values_after_broker",
+        "local_secret_key": request.local_secret_key,
+        "remote_active": True,
+        "broker_issue_succeeded": True,
+        "settings_values_accepted": False,
+        "secret_write_succeeded": False,
+        "settings_commit_succeeded": False,
+    }
+    if broker_result.broker_connection_id is not None:
+        fields["broker_connection_id"] = broker_result.broker_connection_id
+    if broker_result.remote_key_revision is not None:
+        fields["remote_key_revision"] = broker_result.remote_key_revision
+    return TransactionResult(
+        status=TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
+        message=message,
+        diagnostics=_metadata_diagnostics(
+            operation="validate_settings_values",
+            code="remote_active_unsafe_settings_values",
+            fields=fields,
+        ),
+    )
+
+
+def _remote_active_local_missing_result(
+    *,
+    request: ManagedConnectionAuthRequest,
+    broker_result: BrokerIssueResult,
+    operation: str,
+    code: str,
+    phase: str,
+    secret_write_succeeded: bool,
+    settings_commit_succeeded: bool,
+    diagnostics_present: bool,
+    message: UserMessageRef | None,
+) -> TransactionResult:
+    fields: dict[str, DiagnosticFieldValue] = {
+        "phase": phase,
+        "local_secret_key": request.local_secret_key,
+        "remote_active": True,
+        "broker_issue_succeeded": True,
+        "secret_write_succeeded": secret_write_succeeded,
+        "settings_commit_succeeded": settings_commit_succeeded,
+        "diagnostics_present": diagnostics_present,
+    }
+    if broker_result.broker_connection_id is not None:
+        fields["broker_connection_id"] = broker_result.broker_connection_id
+    if broker_result.remote_key_revision is not None:
+        fields["remote_key_revision"] = broker_result.remote_key_revision
+    return TransactionResult(
+        status=TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
+        message=message,
+        diagnostics=_metadata_diagnostics(
+            operation=operation,
+            code=code,
+            fields=fields,
+        ),
+    )
+
+
+def _delivery_ack_pending_result(
+    *,
+    request: ManagedConnectionAuthRequest,
+    broker_result: BrokerIssueResult,
+    ack_status: str,
+    diagnostics_present: bool,
+    message: UserMessageRef | None,
+) -> TransactionResult:
+    fields: dict[str, DiagnosticFieldValue] = {
+        "phase": "remote_delivery_ack",
+        "local_secret_key": request.local_secret_key,
+        "remote_active": False,
+        "broker_issue_succeeded": True,
+        "secret_write_succeeded": True,
+        "settings_commit_succeeded": True,
+        "delivery_ack_status": ack_status,
+        "diagnostics_present": diagnostics_present,
+    }
+    if broker_result.managed_credential_ref is not None:
+        fields["managed_credential_ref"] = broker_result.managed_credential_ref
+    return TransactionResult(
+        status=TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
+        message=message,
+        diagnostics=_metadata_diagnostics(
+            operation="acknowledge_managed_key_delivery",
+            code="remote_delivery_ack_pending",
+            fields=fields,
+        ),
+    )
+
+
+def _metadata_diagnostics(
+    *,
+    operation: str,
+    code: str,
+    fields: Mapping[str, DiagnosticFieldValue],
+) -> ErrorDiagnostics:
+    return ErrorDiagnostics(
+        component="managed_connection_auth",
+        operation=operation,
+        code=code,
+        category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+        visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+        content_policy=CONTENT_POLICY_METADATA_ONLY,
+        status_code=None,
+        retry_after_ms=None,
+        fields=fields,
+    )
+
+
+__all__ = [
+    "ManagedConnectionAuthRequest",
+    "ManagedConnectionAuthService",
+]

@@ -220,14 +220,14 @@ LAYER_RULES = (
         layer=APP_COMPOSITION,
         prefixes=(
             "puripuly_heart.app.services.canonical_settings_persistence",
-            "puripuly_heart.app.services.capture_target_settings",
+            "puripuly_heart.app.services.capture.capture_target_settings",
             "puripuly_heart.app.services.github_star_prompt_settings",
             "puripuly_heart.app.services.manual_local_asr_fallback",
             "puripuly_heart.app.services.openrouter_pkce_flow",
-            "puripuly_heart.app.services.peer_capture_target_application",
-            "puripuly_heart.app.services.provider_settings",
-            "puripuly_heart.app.services.settings_application",
-            "puripuly_heart.app.services.settings_runtime_effects",
+            "puripuly_heart.app.services.capture.peer_capture_target_application",
+            "puripuly_heart.app.services.provider.provider_settings",
+            "puripuly_heart.app.services.settings.settings_application",
+            "puripuly_heart.app.services.settings.settings_runtime_effects",
         ),
         forbidden_layers=frozenset(
             {
@@ -258,7 +258,7 @@ LAYER_RULES = (
         prefixes=(
             "puripuly_heart.app.adapters",
             "puripuly_heart.app.wiring",
-            "puripuly_heart.core.managed_openrouter_broker_client",
+            "puripuly_heart.core.openrouter.managed_openrouter_broker_client",
             "puripuly_heart.core.osc",
             "puripuly_heart.core.runtime_logging",
             "puripuly_heart.core.storage",
@@ -345,7 +345,7 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
     {
         ImportViolation(
             rule_id="adapters-avoid-ui-and-migration-internals",
-            importer="src/puripuly_heart/core/managed_openrouter_broker_client.py",
+            importer="src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py",
             imported="puripuly_heart.config.settings",
             importer_layer="adapters",
             imported_layer="migration/serialization",
@@ -463,6 +463,41 @@ KNOWN_ALLOWED_VIOLATIONS: frozenset[ImportViolation] = frozenset(
             imported_layer="migration/serialization",
             reason="UI adapters/renderers may depend on app services, snapshots, i18n, and rendered log entries, not migration internals, provider construction, or concrete resource wiring",
         ),
+        *(
+            ImportViolation(
+                rule_id="adapters-avoid-ui-and-migration-internals",
+                importer=f"src/puripuly_heart/app/wiring/{importer_name}",
+                imported="puripuly_heart.config.settings",
+                importer_layer="adapters",
+                imported_layer="migration/serialization",
+                reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
+            )
+            for importer_name in (
+                "wiring_capture_runtime.py",
+                "wiring_composition.py",
+                "wiring_llm_factory.py",
+                "wiring_local_asr_application.py",
+                "wiring_local_asr_provider_runtime.py",
+                "wiring_managed_account.py",
+                "wiring_managed_auth_factory.py",
+                "wiring_microphone_test.py",
+                "wiring_overlay_factory.py",
+                "wiring_peer_application.py",
+                "wiring_provider_runtime.py",
+                "wiring_provider_runtime_policy.py",
+                "wiring_runtime_pipeline.py",
+                "wiring_secrets_factory.py",
+                "wiring_stt_factory.py",
+            )
+        ),
+        ImportViolation(
+            rule_id="adapters-avoid-ui-and-migration-internals",
+            importer="src/puripuly_heart/app/wiring/wiring_stt_factory.py",
+            imported="puripuly_heart.config.settings_vnext.migration",
+            importer_layer="adapters",
+            imported_layer="migration/serialization",
+            reason="adapters may wrap concrete resources but must not depend on settings migration internals or UI controls unless explicitly UI-owned",
+        ),
     }
 )
 
@@ -479,7 +514,7 @@ SETTINGS_COMPATIBILITY_SOURCE_PATHS = frozenset(
 
 SETTINGS_PUBLIC_COMPATIBILITY_FACADE_PATHS = frozenset(
     {
-        "src/puripuly_heart/app/wiring.py",
+        "src/puripuly_heart/app/wiring/root.py",
     }
 )
 
@@ -487,32 +522,32 @@ SETTINGS_PERSISTENCE_COMPOSITION_PATHS = frozenset(
     {
         "src/puripuly_heart/app/adapters/settings_vnext_canonical_persistence.py",
         "src/puripuly_heart/app/services/canonical_settings_persistence.py",
-        "src/puripuly_heart/app/services/capture_target_settings.py",
+        "src/puripuly_heart/app/services/capture/capture_target_settings.py",
     }
 )
 
 SETTINGS_LEGACY_COMPATIBILITY_ADAPTER_PATHS = frozenset(
     {
-        "src/puripuly_heart/app/services/settings_mutation_legacy.py",
+        "src/puripuly_heart/app/services/settings/settings_mutation_legacy.py",
         "src/puripuly_heart/app/services/github_star_prompt_settings.py",
         "src/puripuly_heart/app/services/manual_local_asr_fallback.py",
         "src/puripuly_heart/app/services/openrouter_pkce_flow.py",
-        "src/puripuly_heart/app/services/peer_capture_target_application.py",
-        "src/puripuly_heart/app/services/provider_settings.py",
-        "src/puripuly_heart/app/services/settings_application.py",
-        "src/puripuly_heart/app/services/settings_runtime_effects.py",
-        "src/puripuly_heart/app/wiring_llm_factory.py",
-        "src/puripuly_heart/app/wiring_capture_runtime.py",
-        "src/puripuly_heart/app/wiring_local_asr_application.py",
-        "src/puripuly_heart/app/wiring_managed_auth_factory.py",
-        "src/puripuly_heart/app/wiring_managed_account.py",
-        "src/puripuly_heart/app/wiring_microphone_test.py",
-        "src/puripuly_heart/app/wiring_overlay_factory.py",
-        "src/puripuly_heart/app/wiring_peer_application.py",
-        "src/puripuly_heart/app/wiring_provider_runtime.py",
-        "src/puripuly_heart/app/wiring_provider_runtime_policy.py",
-        "src/puripuly_heart/app/wiring_runtime_pipeline.py",
-        "src/puripuly_heart/app/wiring_stt_factory.py",
+        "src/puripuly_heart/app/services/capture/peer_capture_target_application.py",
+        "src/puripuly_heart/app/services/provider/provider_settings.py",
+        "src/puripuly_heart/app/services/settings/settings_application.py",
+        "src/puripuly_heart/app/services/settings/settings_runtime_effects.py",
+        "src/puripuly_heart/app/wiring/wiring_llm_factory.py",
+        "src/puripuly_heart/app/wiring/wiring_capture_runtime.py",
+        "src/puripuly_heart/app/wiring/wiring_local_asr_application.py",
+        "src/puripuly_heart/app/wiring/wiring_managed_auth_factory.py",
+        "src/puripuly_heart/app/wiring/wiring_managed_account.py",
+        "src/puripuly_heart/app/wiring/wiring_microphone_test.py",
+        "src/puripuly_heart/app/wiring/wiring_overlay_factory.py",
+        "src/puripuly_heart/app/wiring/wiring_peer_application.py",
+        "src/puripuly_heart/app/wiring/wiring_provider_runtime.py",
+        "src/puripuly_heart/app/wiring/wiring_provider_runtime_policy.py",
+        "src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py",
+        "src/puripuly_heart/app/wiring/wiring_stt_factory.py",
     }
 )
 
@@ -592,8 +627,17 @@ KNOWN_SETTINGS_RUNTIME_CONFINEMENT_DEBT: frozenset[SettingsRuntimeConfinementVio
 
 
 def _known_allowed_violation_gate6_rationale(violation: ImportViolation) -> str:
-    if violation.importer == "src/puripuly_heart/core/managed_openrouter_broker_client.py":
+    if (
+        violation.importer
+        == "src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py"
+    ):
         return "managed OpenRouter broker adapter still consumes public settings compatibility values at the adapter boundary"
+    if violation.importer_layer == ADAPTERS and "/app/wiring/" in violation.importer:
+        return (
+            "wiring composition modules retain public settings compatibility imports; grouping the "
+            "wiring package makes the pre-existing debt layer-visible, so it is explicitly recorded "
+            "until the settings compatibility facade is retired"
+        )
     if violation.importer_layer == RUNTIME_OWNERS:
         return "runtime owner currently wraps a concrete adapter while preserving explicit lifecycle ownership; adapter-port extraction remains deferred work"
     if violation.importer_layer == PROVIDERS:
@@ -1008,9 +1052,10 @@ def _flat_settings_patch_violations(
 
     violations: set[SettingsRuntimeConfinementViolation] = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == (
-            "puripuly_heart.app.services.settings_mutation"
-        ):
+        if isinstance(node, ast.ImportFrom) and node.module in {
+            "puripuly_heart.app.services.settings_mutation",
+            "puripuly_heart.app.services.settings.settings_mutation",
+        }:
             for alias in node.names:
                 if alias.name in FLAT_SETTINGS_PATCH_SYMBOLS:
                     violations.add(
@@ -1241,7 +1286,9 @@ def test_canonical_settings_persistence_composition_uses_only_public_settings_ty
 
 
 def test_capture_target_compatibility_service_delegates_to_settings_owner() -> None:
-    service_path = SOURCE_PACKAGE_ROOT / "app" / "services" / "capture_target_settings.py"
+    service_path = (
+        SOURCE_PACKAGE_ROOT / "app" / "services" / "capture" / "capture_target_settings.py"
+    )
     tree = ast.parse(service_path.read_text(encoding="utf-8"))
     imports = {
         node.module: {alias.name for alias in node.names}
@@ -1599,7 +1646,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
             "def _sync_github_star_prompt_runtime_aliases",
             "_github_star_prompt_launch_task",
         ),
-        "src/puripuly_heart/app/services/settings_runtime_effects.py": (
+        "src/puripuly_heart/app/services/settings/settings_runtime_effects.py": (
             "def _prepare_desktop_runtime_settings_update(",
             "def _sync_overlay_calibration_cache(",
             "def _sync_desktop_overlay_interaction_mode_from_settings(",

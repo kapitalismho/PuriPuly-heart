@@ -19,9 +19,9 @@ def _imports(path: Path) -> set[str]:
 
 def test_managed_auth_owner_and_adapter_do_not_import_ui_or_controller() -> None:
     paths = (
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed_auth.py",
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "wiring_managed_auth_factory.py",
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "wiring_managed_account.py",
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed" / "managed_auth.py",
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_managed_auth_factory.py",
+        REPO_ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_managed_account.py",
     )
 
     for path in paths:

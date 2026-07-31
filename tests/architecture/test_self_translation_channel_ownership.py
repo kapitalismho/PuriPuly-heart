@@ -8,7 +8,7 @@ SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
 OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "self_translation_channel.py"
 PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
 CALLBACKS_PATH = SOURCE_ROOT / "core" / "orchestrator" / "translation_channel_callbacks.py"
-PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py"
+PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py"
 
 
 def _class(tree: ast.Module, name: str) -> ast.ClassDef:
@@ -119,7 +119,7 @@ def test_production_self_consumers_do_not_route_through_hub() -> None:
     application_runtime_path = SOURCE_ROOT / "composition" / "application_runtime.py"
     paths = (
         SOURCE_ROOT / "app" / "adapters" / "ui_runtime.py",
-        SOURCE_ROOT / "app" / "services" / "settings_runtime_effects.py",
+        SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
         application_runtime_path,
     )
     forbidden = (

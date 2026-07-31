@@ -4,7 +4,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSITION_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-PROVIDER_RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring_provider_runtime.py"
+PROVIDER_RUNTIME_PATH = (
+    ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_provider_runtime.py"
+)
 
 
 def test_provider_runtime_owns_gpu_recovery_and_composition_has_no_algorithm() -> None:

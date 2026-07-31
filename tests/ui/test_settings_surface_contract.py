@@ -463,9 +463,9 @@ def _attribute_calls(source: str, owner_names: tuple[str, ...]) -> set[str]:
 def test_settings_projection_is_the_only_full_settings_view_pusher() -> None:
     adapter_source = (SOURCE_ROOT / "ui" / "presentation_adapter.py").read_text(encoding="utf-8")
     app_source = (SOURCE_ROOT / "ui" / "app.py").read_text(encoding="utf-8")
-    projection_source = (SOURCE_ROOT / "app" / "services" / "settings_projection.py").read_text(
-        encoding="utf-8"
-    )
+    projection_source = (
+        SOURCE_ROOT / "app" / "services" / "settings" / "settings_projection.py"
+    ).read_text(encoding="utf-8")
     driver_names = ("view_settings", "settings_view")
 
     adapter_attrs = _attribute_calls(adapter_source, driver_names)

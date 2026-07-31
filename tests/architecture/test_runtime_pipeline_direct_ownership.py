@@ -5,7 +5,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
-PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py"
+PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py"
 PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
 
 
@@ -108,7 +108,7 @@ def test_peer_owner_has_no_diagnostics_state_or_algorithm_and_overlay_uses_direc
     assert all(residue not in source for residue in forbidden_source)
 
     for path in (
-        SOURCE_ROOT / "app" / "services" / "overlay_application.py",
+        SOURCE_ROOT / "app" / "services" / "overlay" / "overlay_application.py",
         SOURCE_ROOT / "core" / "runtime" / "overlay.py",
     ):
         overlay_source = path.read_text(encoding="utf-8")
@@ -148,7 +148,7 @@ def test_peer_owner_has_no_output_runtime_state_or_projection_algorithm() -> Non
     }.isdisjoint(methods)
 
     for path in (
-        SOURCE_ROOT / "app" / "services" / "overlay_application.py",
+        SOURCE_ROOT / "app" / "services" / "overlay" / "overlay_application.py",
         SOURCE_ROOT / "composition" / "application_runtime.py",
     ):
         source = path.read_text(encoding="utf-8")
@@ -180,13 +180,13 @@ def test_cut_over_consumers_do_not_reach_nested_channel_owners() -> None:
     paths = (
         SOURCE_ROOT / "app" / "adapters" / "application_runtime_shutdown.py",
         SOURCE_ROOT / "app" / "adapters" / "peer_application_state.py",
-        SOURCE_ROOT / "app" / "adapters" / "peer_capture_provider.py",
-        SOURCE_ROOT / "app" / "adapters" / "self_capture_provider.py",
-        SOURCE_ROOT / "app" / "services" / "settings_runtime_effects.py",
-        SOURCE_ROOT / "app" / "wiring_local_asr_application.py",
-        SOURCE_ROOT / "app" / "wiring_managed_account.py",
-        SOURCE_ROOT / "app" / "wiring_peer_application.py",
-        SOURCE_ROOT / "app" / "wiring_provider_runtime.py",
+        SOURCE_ROOT / "app" / "adapters" / "peer_capture" / "peer_capture_provider.py",
+        SOURCE_ROOT / "app" / "adapters" / "self_capture" / "self_capture_provider.py",
+        SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
+        SOURCE_ROOT / "app" / "wiring" / "wiring_local_asr_application.py",
+        SOURCE_ROOT / "app" / "wiring" / "wiring_managed_account.py",
+        SOURCE_ROOT / "app" / "wiring" / "wiring_peer_application.py",
+        SOURCE_ROOT / "app" / "wiring" / "wiring_provider_runtime.py",
         SOURCE_ROOT / "composition" / "application_startup.py",
         SOURCE_ROOT / "composition" / "application_state.py",
         SOURCE_ROOT / "composition" / "local_asr_production_evidence.py",

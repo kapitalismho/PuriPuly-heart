@@ -37,10 +37,10 @@ def test_output_runtime_is_the_only_production_output_owner_construction() -> No
                 router_constructions.append((_repo_path(source_file), node.lineno))
 
     assert [path for path, _line in runtime_constructions] == [
-        "src/puripuly_heart/app/wiring_runtime_pipeline.py"
+        "src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py"
     ]
     assert [path for path, _line in projection_constructions] == [
-        "src/puripuly_heart/app/wiring_runtime_pipeline.py"
+        "src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py"
     ]
     assert router_constructions == []
 
@@ -52,12 +52,12 @@ def test_output_projection_owner_is_the_only_channel_output_side_effect_boundary
     composition_source = (SOURCE_ROOT / "composition" / "application_runtime.py").read_text(
         encoding="utf-8"
     )
-    overlay_source = (SOURCE_ROOT / "app" / "services" / "overlay_application.py").read_text(
-        encoding="utf-8"
-    )
-    settings_source = (SOURCE_ROOT / "app" / "services" / "settings_runtime_effects.py").read_text(
-        encoding="utf-8"
-    )
+    overlay_source = (
+        SOURCE_ROOT / "app" / "services" / "overlay" / "overlay_application.py"
+    ).read_text(encoding="utf-8")
+    settings_source = (
+        SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py"
+    ).read_text(encoding="utf-8")
     output_source = (SOURCE_ROOT / "core" / "runtime" / "output.py").read_text(encoding="utf-8")
     projection_source = (
         SOURCE_ROOT / "core" / "orchestrator" / "translation_output_projection.py"
@@ -109,7 +109,7 @@ def test_flet_composition_uses_owner_without_importing_output_implementation() -
     ui_composition_source = (SOURCE_ROOT / "composition" / "ui_application.py").read_text(
         encoding="utf-8"
     )
-    pipeline_source = (SOURCE_ROOT / "app" / "wiring_runtime_pipeline.py").read_text(
+    pipeline_source = (SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py").read_text(
         encoding="utf-8"
     )
     imported_modules: set[str] = set()
