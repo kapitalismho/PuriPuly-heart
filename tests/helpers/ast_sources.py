@@ -65,10 +65,6 @@ def find_constructions(class_name: str, root: Path) -> list[str]:
     for source_file in sorted(root.rglob("*.py")):
         tree = ast.parse(source_file.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == class_name
-            ):
+            if isinstance(node, ast.Call) and call_name(node) == class_name:
                 results.append(source_file.relative_to(root).as_posix())
     return results
