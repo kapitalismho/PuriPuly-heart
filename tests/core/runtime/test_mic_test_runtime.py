@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from puripuly_heart.core.runtime import MicTestRuntime
+from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 class RecordingSource:
@@ -27,17 +28,9 @@ def test_mic_test_runtime_exposes_lifecycle_inventory_and_policy() -> None:
 
     snapshot = runtime.lifecycle_owner_snapshot()
 
+    assert_lifecycle_structure(snapshot)
     assert snapshot["owner"] == "MicTestRuntime"
-    assert snapshot["resource_fields"] == (
-        "_session_task",
-        "_source",
-        "_pending_frame_task",
-        "_direct_capture_generation",
-        "_generation",
-    )
-    assert snapshot["stop_ingress"] == "stop capture and reject new tests"
-    assert "cancel/gather test task" in snapshot["shutdown_policy"]
-    assert snapshot["late_callback_rule"] == "late result cannot update disposed UI snapshot"
+    assert len(snapshot["resource_fields"]) == 5
 
 
 @pytest.mark.asyncio

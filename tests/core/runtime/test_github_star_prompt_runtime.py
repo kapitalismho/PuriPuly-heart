@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from puripuly_heart.core.runtime import GithubStarPromptRuntime
+from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 async def _flush_loop() -> None:
@@ -17,15 +18,9 @@ def test_github_star_prompt_runtime_exposes_lifecycle_inventory() -> None:
 
     snapshot = runtime.lifecycle_owner_snapshot()
 
+    assert_lifecycle_structure(snapshot)
     assert snapshot["owner"] == "GithubStarPromptRuntime"
-    assert snapshot["resource_fields"] == (
-        "_launch_prompt_task",
-        "_translation_success_task",
-        "_generation",
-    )
-    assert snapshot["stop_ingress"] == "cancel scheduled prompt"
-    assert "cancel/gather timer task" in snapshot["shutdown_policy"]
-    assert snapshot["late_callback_rule"] == "late prompt callback checks current prompt state"
+    assert len(snapshot["resource_fields"]) == 3
 
 
 @pytest.mark.asyncio

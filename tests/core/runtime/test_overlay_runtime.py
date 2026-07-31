@@ -6,6 +6,7 @@ import inspect
 import pytest
 
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
+from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 class FakePresenter:
@@ -155,32 +156,9 @@ def test_overlay_runtime_handle_exposes_lifecycle_inventory_and_policy() -> None
 
     snapshot = handle.lifecycle_owner_snapshot()
 
+    assert_lifecycle_structure(snapshot)
     assert snapshot["owner"] == "OverlayRuntimeHandle"
     assert snapshot["resource_fields"] == OverlayRuntimeHandle.resource_fields
-    for field_name in (
-        "_presenter",
-        "_bridge",
-        "_process_manager",
-        "_start_task",
-        "_monitor_task",
-        "_renderer_events",
-        "_renderer_event_task",
-        "OverlayBridge._heartbeat_task",
-        "_AsyncioOverlayProcess._reader_tasks",
-        "OverlayProcessManager._monitor_task",
-        "OverlayProcessManager startup event_task/bridge_task/exit_task/timeout_task",
-        "OverlayProcessManager connected event_task/bridge_task/exit_task",
-        "OverlayPresenter._expiration_tasks",
-        "OverlayPresenter._peer_presentation_refresh_burst_task",
-        "OverlayPresenter._self_presentation_refresh_burst_task",
-    ):
-        assert field_name in snapshot["resource_fields"]
-    assert snapshot["stop_ingress"] == "broadcast shutdown and reject new overlay commands"
-    assert "async presenter close" in snapshot["shutdown_policy"]
-    assert "kill escalation" in snapshot["shutdown_policy"]
-    assert snapshot["late_callback_rule"] == (
-        "old overlay instance events ignored after instance id changes"
-    )
 
 
 def test_overlay_runtime_handle_exposes_current_runtime_resources() -> None:

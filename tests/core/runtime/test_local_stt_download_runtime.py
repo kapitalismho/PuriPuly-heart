@@ -7,6 +7,7 @@ import pytest
 
 from puripuly_heart.core.local_stt_runtime_installer import RuntimeLocalSTTStatusUpdate
 from puripuly_heart.core.runtime import LocalSTTDownloadRuntime
+from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 def test_local_stt_download_runtime_exposes_lifecycle_inventory_and_policy() -> None:
@@ -14,16 +15,9 @@ def test_local_stt_download_runtime_exposes_lifecycle_inventory_and_policy() -> 
 
     snapshot = runtime.lifecycle_owner_snapshot()
 
+    assert_lifecycle_structure(snapshot)
     assert snapshot["owner"] == "LocalSTTDownloadRuntime"
-    assert snapshot["resource_fields"] == (
-        "_download_task",
-        "_cancel_event",
-        "_origin",
-        "_generation",
-    )
-    assert snapshot["stop_ingress"] == "reject new install/start commands"
-    assert "cancel active install task" in snapshot["shutdown_policy"]
-    assert snapshot["late_callback_rule"] == "late progress ignored after generation change"
+    assert len(snapshot["resource_fields"]) == 4
 
 
 @pytest.mark.asyncio

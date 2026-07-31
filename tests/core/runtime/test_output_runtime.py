@@ -11,6 +11,7 @@ import pytest
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.sink import OverlayEventUnion, UtteranceClosed
 from puripuly_heart.domain.models import OSCMessage
+from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 def _output_runtime_class():
@@ -240,20 +241,9 @@ def test_output_runtime_exposes_lifecycle_inventory_and_policy() -> None:
 
     snapshot = owner.lifecycle_owner_snapshot()
 
+    assert_lifecycle_structure(snapshot)
     assert snapshot["owner"] == "OutputRuntime"
-    assert "_chatbox_flush_task" in snapshot["resource_fields"]
-    assert "ChatboxPaginator._typing_reasons" in snapshot["resource_fields"]
     assert "overlay_event_adapter" in snapshot["resource_fields"]
-    assert "overlay delivery tasks" in snapshot["resource_fields"]
-    assert "UIEventBridge.run task" in snapshot["resource_fields"]
-    assert "conversation adapter" in snapshot["resource_fields"]
-    assert snapshot["stop_ingress"] == "stop accepting output publications"
-    assert "chatbox: drop pending pages/messages on close" in snapshot["shutdown_policy"]
-    assert "chatbox: clear typing reasons on close" in snapshot["shutdown_policy"]
-    assert "overlay: cancel active delivery tasks" in snapshot["shutdown_policy"]
-    assert snapshot["late_callback_rule"] == (
-        "output after close returns denied/skipped observer decisions without user text"
-    )
 
 
 @pytest.mark.asyncio

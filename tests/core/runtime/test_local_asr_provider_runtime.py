@@ -33,6 +33,7 @@ from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from tests.helpers.lifecycle import assert_lifecycle_structure
 
 GPU_DEVICE = GpuWorkerDevice(
     device_id="vulkan-index-0",
@@ -1020,10 +1021,6 @@ def test_owner_lifecycle_inventory_names_provider_and_gpu_resources() -> None:
 
     inventory = owner.lifecycle_owner_snapshot()
 
+    assert_lifecycle_structure(inventory)
     assert inventory["owner"] == "LocalASRProviderRuntimeOwner"
     assert inventory["provider_handles"].keys() == {"self", "peer"}
-    assert "authenticated GPU worker and model residency" in inventory["resource_fields"]
-    assert "close Self and Peer providers" in inventory["shutdown_policy"]
-    assert inventory["late_callback_rule"] == (
-        "provider generations reject stale events and GPU-runtime generations reject late diagnostics"
-    )

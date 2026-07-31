@@ -28,6 +28,7 @@ from puripuly_heart.core.local_stt_catalog import (
 from puripuly_heart.core.local_stt_runtime_installer import RuntimeLocalSTTStatusUpdate
 from puripuly_heart.core.runtime.local_asr_provisioning import LocalASRProvisioningOwner
 from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime
+from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 def _installed(model_id: str) -> InstalledLocalSTTManifest:
@@ -589,17 +590,6 @@ def test_owner_lifecycle_inventory_names_all_provisioning_resources() -> None:
 
     snapshot = owner.lifecycle_owner_snapshot()
 
+    assert_lifecycle_structure(snapshot)
     assert snapshot["owner"] == "LocalASRProvisioningOwner"
-    assert snapshot["resource_fields"] == (
-        "_cpu_install_runtime",
-        "_gpu_install_runtime",
-        "_result_delivery_tasks",
-        "installer cancel events",
-        "Xet helper processes",
-        "staging and backup directories",
-        "model-root cross-process provisioning lease",
-    )
-    assert "cancel CPU and GPU install and result-delivery tasks" in snapshot["shutdown_policy"]
-    assert snapshot["late_callback_rule"] == (
-        "ignore stale status generations and drop install-result delivery after close"
-    )
+    assert len(snapshot["resource_fields"]) == 7

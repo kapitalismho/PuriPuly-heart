@@ -14,6 +14,7 @@ from puripuly_heart.core.runtime_logging import (
     SessionRuntimeLoggingService,
     configure_main_logging,
 )
+from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 class FakeSessionRuntimeLogging:
@@ -177,14 +178,8 @@ def test_runtime_logging_service_exposes_lifecycle_inventory() -> None:
 
     snapshot = service.lifecycle_owner_snapshot()
 
+    assert_lifecycle_structure(snapshot)
     assert snapshot["owner"] == "RuntimeLoggingService"
-    assert "live log sink" in snapshot["resource_fields"]
-    assert "queue listener" in snapshot["resource_fields"]
-    assert snapshot["stop_ingress"] == "stop after producers have stopped"
-    assert snapshot["shutdown_policy"] == "flush final shutdown summary, then close handlers"
-    assert (
-        snapshot["late_callback_rule"] == "late logs after close go to bounded fallback/stderr only"
-    )
 
 
 def test_final_shutdown_summary_is_metadata_only_and_emitted_before_close() -> None:

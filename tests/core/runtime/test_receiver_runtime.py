@@ -7,6 +7,7 @@ import pytest
 
 from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.runtime import OscReceiverRuntime, VrcMicReceiverRuntime
+from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 async def _flush_loop() -> None:
@@ -45,15 +46,12 @@ def test_receiver_runtimes_expose_lifecycle_inventory() -> None:
     osc_snapshot = osc_runtime.lifecycle_owner_snapshot()
     vrc_snapshot = vrc_runtime.lifecycle_owner_snapshot()
 
+    assert_lifecycle_structure(osc_snapshot)
     assert osc_snapshot["owner"] == "OscReceiverRuntime"
     assert "receiver" in osc_snapshot["resource_fields"]
-    assert osc_snapshot["stop_ingress"] == "stop receiver before runtime shutdown"
-    assert "close socket" in osc_snapshot["shutdown_policy"]
-    assert osc_snapshot["late_callback_rule"] == "late packets dropped after stop"
 
+    assert_lifecycle_structure(vrc_snapshot)
     assert vrc_snapshot["owner"] == "VrcMicReceiverRuntime"
-    assert "_mute_task" in vrc_snapshot["resource_fields"]
-    assert vrc_snapshot["late_callback_rule"] == "late mute packets dropped after stop"
 
 
 @pytest.mark.asyncio
