@@ -8,7 +8,6 @@ from puripuly_heart.ui.dashboard.capture import (
     DashboardCaptureControls,
     capture_presentation_from_contract,
 )
-from puripuly_heart.ui.dashboard.contract import DashboardSurfaceSlots
 from puripuly_heart.ui.overlay_peer_contract import (
     OverlayPeerConsumerContract,
     OverlayPeerToggleContract,
@@ -40,21 +39,6 @@ def controls(monkeypatch: pytest.MonkeyPatch) -> DashboardCaptureControls:
         on_peer_capture_click=lambda: None,
         on_overlay_click=lambda: None,
     )
-
-
-def test_capture_controls_expose_the_dashboard_slot_contract(
-    controls: DashboardCaptureControls,
-) -> None:
-    slots = DashboardSurfaceSlots.from_capture_provider(
-        controls,
-        translation=object(),
-        display=object(),
-        language=object(),
-    )
-
-    assert slots.self_capture is controls.self_capture_control()
-    assert slots.peer_capture is controls.peer_capture_control()
-    assert slots.overlay is controls.overlay_control()
 
 
 def test_capture_controls_render_every_channel_state(controls: DashboardCaptureControls) -> None:

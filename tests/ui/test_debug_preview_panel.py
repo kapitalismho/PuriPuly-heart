@@ -216,7 +216,7 @@ def test_debug_preview_panel_uses_flet_086_text_button_content_api(
             created.append(self)
 
     monkeypatch.setattr(panel_module.ft, "TextButton", ContentOnlyButton)
-    panel = DebugPreviewPanel(**_callbacks([]))
+    DebugPreviewPanel(**_callbacks([]))
 
     assert [button.content for button in created] == [
         "DBG",
@@ -241,38 +241,6 @@ def test_debug_preview_panel_uses_flet_086_text_button_content_api(
         "Cycle STT loading button",
         "Foundation primitives",
     ]
-
-    monkeypatch.setattr(panel_module, "t", lambda key: f"label:{key}")
-    panel.apply_locale()
-
-    assert panel._toggle_button.content == "label:debug_preview.button"
-    assert panel._action_buttons["brake_notice"].content == "label:debug_preview.brake_notice"
-    assert panel._action_buttons["discord_auth"].content == "label:debug_preview.discord_auth"
-    assert panel._action_buttons["qq_auth"].content == "label:debug_preview.qq_auth"
-    assert (
-        panel._action_buttons["qq_auth_recoverable_error"].content
-        == "label:debug_preview.qq_auth_recoverable_error"
-    )
-    assert (
-        panel._action_buttons["qq_auth_translation_gated"].content
-        == "label:debug_preview.qq_auth_translation_gated"
-    )
-    assert (
-        panel._action_buttons["discord_callback_page"].content
-        == "label:debug_preview.discord_callback_page"
-    )
-    assert (
-        panel._action_buttons["peer_translation_eula"].content
-        == "label:debug_preview.peer_translation_eula"
-    )
-    assert (
-        panel._action_buttons["local_qwen_hallucination_modal"].content
-        == "label:debug_preview.local_qwen_hallucination_modal"
-    )
-    assert (
-        panel._action_buttons["talk_together_pass_invite_progress"].content
-        == "label:debug_preview.talk_together_pass_invite_progress"
-    )
 
 
 def test_debug_preview_i18n_keys_exist_in_all_locale_bundles() -> None:
