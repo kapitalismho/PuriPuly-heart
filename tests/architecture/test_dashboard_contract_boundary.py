@@ -3,11 +3,10 @@ from __future__ import annotations
 import ast
 import pathlib
 
-import puripuly_heart
 from puripuly_heart.ui.dashboard import contract as dashboard_contract
 from puripuly_heart.ui.dashboard import renderer as dashboard_renderer
+from tests.helpers.paths import SOURCE_ROOT
 
-SOURCE_ROOT = pathlib.Path(puripuly_heart.__file__).resolve().parent
 FORBIDDEN_IMPORT_PREFIXES = (
     "puripuly_heart.core",
     "puripuly_heart.runtime",

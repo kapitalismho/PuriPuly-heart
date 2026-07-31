@@ -1,7 +1,8 @@
 import ast
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT
+
 UI_RUNTIME_PATH = REPO_ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "ui_runtime.py"
 OWNER_PATH = REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "peer_application.py"
 DRIVER_PATH = (

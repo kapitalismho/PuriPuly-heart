@@ -3,12 +3,11 @@ from __future__ import annotations
 import ast
 import pathlib
 
-import puripuly_heart
 from puripuly_heart.ui import desktop_overlay as desktop_overlay_module
 from puripuly_heart.ui.desktop_overlay_surface import contract as overlay_contract
 from puripuly_heart.ui.desktop_overlay_surface import renderer as overlay_renderer
+from tests.helpers.paths import SOURCE_ROOT
 
-SOURCE_ROOT = pathlib.Path(puripuly_heart.__file__).resolve().parent
 SURFACE_MODULES = (overlay_contract, overlay_renderer)
 
 FORBIDDEN_IMPORT_PREFIXES = (

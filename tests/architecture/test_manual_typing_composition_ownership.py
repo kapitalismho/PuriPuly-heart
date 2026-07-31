@@ -1,7 +1,8 @@
 import ast
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT
+
 COMPOSITION_PATH = REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 UI_RUNTIME_PATH = REPO_ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "ui_runtime.py"
 

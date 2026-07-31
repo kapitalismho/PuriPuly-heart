@@ -13,7 +13,8 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT as ROOT
+
 POWERSHELL = Path("/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
 SCRIPT_PATH = ROOT / "scripts" / "installer" / "install-local-stt-model.ps1"
 

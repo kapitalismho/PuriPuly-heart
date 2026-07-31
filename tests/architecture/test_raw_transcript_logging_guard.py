@@ -3,7 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT
+
 STT_PROVIDER_ROOT = REPO_ROOT / "src" / "puripuly_heart" / "providers" / "stt"
 
 LOGGER_METHODS = {"debug", "info", "warning", "error", "exception", "critical"}

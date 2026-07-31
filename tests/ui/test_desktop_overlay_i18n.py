@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT
+
 I18N_DIR = REPO_ROOT / "src" / "puripuly_heart" / "data" / "i18n"
 
 EXPECTED_SPEC_LOCALES = {"en", "ko", "ja", "zh-CN"}

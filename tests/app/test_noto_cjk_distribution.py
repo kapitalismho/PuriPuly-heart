@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT as ROOT
 
 NOTO_CJK_FONT_SOURCE_RELATIVE_DIR = Path("src/puripuly_heart/data/fonts")
 NOTO_CJK_PROVENANCE_RELATIVE_DIR = Path("third_party/noto-sans-cjk")

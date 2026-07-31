@@ -5,7 +5,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT
+
 SOURCE_PACKAGE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
 PACKAGE_NAME = "puripuly_heart"
 

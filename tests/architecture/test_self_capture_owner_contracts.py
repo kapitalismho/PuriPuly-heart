@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
@@ -10,8 +9,8 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionConfig,
     SelfCaptureSessionSnapshot,
 )
+from tests.helpers.paths import REPO_ROOT as ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 CAPTURE_WIRING_PATH = (

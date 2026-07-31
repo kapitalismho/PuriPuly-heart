@@ -5,9 +5,7 @@ from pathlib import Path
 
 from puripuly_heart.app.ports import gpu_worker as compatibility_gpu_worker
 from puripuly_heart.core import gpu_worker as owning_gpu_worker
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
+from tests.helpers.paths import SOURCE_ROOT
 
 
 def _imported_modules(source_file: Path) -> set[str]:

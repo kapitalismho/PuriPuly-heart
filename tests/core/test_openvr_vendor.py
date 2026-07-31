@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT as ROOT
+
 MODULE_PATH = ROOT / "src" / "puripuly_heart" / "core" / "overlay" / "openvr_vendor.py"
 PINNED_OPENVR_VENDOR_REF = "ValveSoftware/openvr@v2.15.6"
 PINNED_OPENVR_DLL_URL = (

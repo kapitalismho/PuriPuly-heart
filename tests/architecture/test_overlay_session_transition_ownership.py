@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
+from tests.helpers.paths import REPO_ROOT as ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 OWNER_PATH = (
     ROOT

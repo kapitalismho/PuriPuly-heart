@@ -13,7 +13,6 @@ Verified against both runtimes with mouse-level probes:
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -33,8 +32,8 @@ from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
     get_app_theme,
 )
+from tests.helpers.paths import REPO_ROOT as ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 UI_ROOT = ROOT / "src" / "puripuly_heart" / "ui"
 HOVER_ENTER_PAYLOADS = [True, "true", "True"]
 HOVER_EXIT_PAYLOADS = [False, "false", None]

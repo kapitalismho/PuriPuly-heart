@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.i18n import available_locales, source_label
+from tests.helpers.paths import REPO_ROOT
 from tests.ui.test_desktop_overlay_i18n import (
     DESKTOP_OVERLAY_RECOVERY_I18N_KEYS,
     SHIPPING_DESKTOP_OVERLAY_I18N_KEYS,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 I18N_DIR = REPO_ROOT / "src" / "puripuly_heart" / "data" / "i18n"
 RUNTIME_SOURCE_DIR = REPO_ROOT / "src" / "puripuly_heart"
 

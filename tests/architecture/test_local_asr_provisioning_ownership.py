@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
+from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
 
 
 def _call_name(node: ast.Call) -> str | None:

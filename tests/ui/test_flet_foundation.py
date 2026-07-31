@@ -42,8 +42,8 @@ from puripuly_heart.ui.theme import (
     COLOR_SURFACE,
     COLOR_WARNING,
 )
+from tests.helpers.paths import REPO_ROOT
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 FOUNDATION_ROOT = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "foundation"
 LOCALES = ("en", "ko", "zh-CN", "ja", "ru")
 FOUNDATION_I18N_KEYS = {

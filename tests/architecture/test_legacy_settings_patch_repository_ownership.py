@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
+from tests.helpers.paths import REPO_ROOT as ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 COMPOSITION_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 UI_RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "ui_runtime.py"
 PROVIDER_SETTINGS_PATH = (

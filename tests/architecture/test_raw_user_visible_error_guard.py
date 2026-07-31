@@ -4,8 +4,8 @@ import ast
 from pathlib import Path
 from textwrap import dedent
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SRC_ROOT = REPO_ROOT / "src" / "puripuly_heart"
+from tests.helpers.paths import REPO_ROOT
+from tests.helpers.paths import SOURCE_ROOT as SRC_ROOT
 
 
 def test_new_ui_error_events_do_not_publish_raw_string_payloads() -> None:

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT as ROOT
+
 README_FILES = ["README.md", "README.ko.md", "README.ja.md", "README.zh-CN.md"]
 SPECIAL_THANKS_TEXT = (
     "SUI\\_32C, Nagikokoro, motoka96, \\_Ykol魚, kascr\\_, "

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOT = ROOT / "src" / "puripuly_heart"
+from tests.helpers.paths import REPO_ROOT as ROOT
+from tests.helpers.paths import SOURCE_ROOT
+
 OWNER_COMPOSITION_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_composition.py"
 APPLICATION_COMPOSITION_PATH = SOURCE_ROOT / "composition" / "application_runtime.py"
 BASIC_LOGGING_TEST_PATH = ROOT / "tests" / "ui" / "test_asr_basic_logging.py"

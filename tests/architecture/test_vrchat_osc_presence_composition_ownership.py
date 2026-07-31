@@ -1,6 +1,5 @@
-from pathlib import Path
+from tests.helpers.paths import REPO_ROOT
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER_PATH = REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 
 

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
+from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
+
 OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "self_translation_channel.py"
 PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
 CALLBACKS_PATH = SOURCE_ROOT / "core" / "orchestrator" / "translation_channel_callbacks.py"

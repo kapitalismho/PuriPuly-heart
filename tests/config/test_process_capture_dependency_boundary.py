@@ -4,7 +4,6 @@ import importlib
 import re
 import sys
 import tomllib
-from pathlib import Path
 
 import pytest
 
@@ -13,8 +12,8 @@ from puripuly_heart.config.process_capture_platform import (
     evaluate_process_capture_platform,
     get_process_capture_platform_availability,
 )
+from tests.helpers.paths import REPO_ROOT as ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 PROCESS_CAPTURE_MARKER = (
     "platform_system == 'Windows' and platform_python_implementation == 'CPython' "
     "and python_version == '3.12' and platform_machine == 'AMD64'"

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
+from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
+
 ADAPTER_PATH = SOURCE_ROOT / "ui" / "flet_desktop_runtime.py"
 
 

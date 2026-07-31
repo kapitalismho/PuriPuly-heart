@@ -19,8 +19,7 @@ from puripuly_heart.release_evidence.windows_process_distribution import (
     validate_manual_matrix,
     validate_runtime_report,
 )
-
-ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT as ROOT
 
 
 def _provenance_fixture(tmp_path: Path) -> dict[str, object]:

@@ -10,9 +10,9 @@ from puripuly_heart.core.orchestrator.context import ContextResolver
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
     PeerTranslationChannelOwner,
 )
+from tests.helpers.paths import REPO_ROOT as ROOT
+from tests.helpers.paths import SOURCE_ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOT = ROOT / "src" / "puripuly_heart"
 CONFIG_FIELD_NAMES = {field.name for field in fields(TranslationRuntimeConfig)}
 
 

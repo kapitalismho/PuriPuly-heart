@@ -5,7 +5,6 @@ import pathlib
 
 import flet as ft
 
-import puripuly_heart
 from puripuly_heart.ui.shell import contract as shell_contract
 from puripuly_heart.ui.shell import renderer as shell_renderer
 from puripuly_heart.ui.shell.contract import AppShellSlots
@@ -14,8 +13,8 @@ from puripuly_heart.ui.shell.renderer import (
     APP_SHELL_ROOT_PADDING,
     compose_app_shell,
 )
+from tests.helpers.paths import SOURCE_ROOT
 
-SOURCE_ROOT = pathlib.Path(puripuly_heart.__file__).resolve().parent
 FORBIDDEN_IMPORT_PREFIXES = (
     "puripuly_heart.core",
     "puripuly_heart.runtime",

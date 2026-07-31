@@ -64,8 +64,8 @@ from tests.config.settings_migration_fixtures import (
     maximal_v24_settings_fixture,
     serialized_field_paths,
 )
+from tests.helpers.paths import REPO_ROOT
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_PACKAGE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
 PACKAGE_NAME = "puripuly_heart"
 SNAPSHOT_PATH = Path(__file__).with_name("public_compatibility_surfaces_snapshot.json")

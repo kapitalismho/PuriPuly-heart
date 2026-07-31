@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
+from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
+
 TEST_ROOT = REPO_ROOT / "tests"
 TRANSLATION_CONSUMERS = {
     "core/test_audio_vad_loop.py",

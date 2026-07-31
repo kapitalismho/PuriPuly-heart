@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import ast
-import pathlib
 
 import flet as ft
 import pytest
 
 pytest.importorskip("flet")
 
-import puripuly_heart
 from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 from puripuly_heart.ui.settings.contract import (
     SettingsApiSurfaceSlots,
@@ -30,8 +28,7 @@ from puripuly_heart.ui.settings.renderer import (
     compose_settings_prompt_surface,
 )
 from puripuly_heart.ui.views import settings as settings_view_module
-
-SOURCE_ROOT = pathlib.Path(puripuly_heart.__file__).resolve().parent
+from tests.helpers.paths import SOURCE_ROOT
 
 SETTINGS_ADAPTER_PUSHES = (
     "set_managed_trial_usage_state",

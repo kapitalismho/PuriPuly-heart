@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
@@ -12,8 +11,8 @@ from puripuly_heart.core.peer_capture import (
 )
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
+from tests.helpers.paths import REPO_ROOT as ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "peer_channel.py"
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 CAPTURE_WIRING_PATH = (

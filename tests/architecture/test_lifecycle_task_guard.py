@@ -4,8 +4,7 @@ import ast
 from collections import Counter
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
+from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
 
 ASYNCIO_CREATE_TASK = "asyncio.create_task"
 ASYNCIO_ENSURE_FUTURE = "asyncio.ensure_future"

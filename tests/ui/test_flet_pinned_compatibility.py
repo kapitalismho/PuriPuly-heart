@@ -4,7 +4,6 @@ import re
 import sys
 import tomllib
 from importlib.metadata import version
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -16,8 +15,8 @@ import flet as ft
 from puripuly_heart.ui.components.settings import api_key_field as api_key_field_module
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import DummyPage, attach_dummy_page
+from tests.helpers.paths import REPO_ROOT as ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 FLET_VERSION = "0.86.1"
 
 

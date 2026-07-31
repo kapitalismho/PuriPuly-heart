@@ -3,7 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tests.helpers.paths import REPO_ROOT as ROOT
+
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_microphone_test.py"
 

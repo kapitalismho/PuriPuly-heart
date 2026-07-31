@@ -11,8 +11,8 @@ from puripuly_heart.app.services.ui_application import (
     UiApplicationBoundary,
 )
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.paths import REPO_ROOT
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_PATH = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "app.py"
 APPLICATION_RUNTIME_PATH = (
     REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"

@@ -15,8 +15,8 @@ from puripuly_heart.core.overlay.openvr_vendor import (
     OPENVR_VENDOR_LICENSE_URL,
     OPENVR_VENDOR_REPOSITORY_REF,
 )
+from tests.helpers.paths import REPO_ROOT as ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 PINNED_PYTHON_VERSION = 'PYTHON_VERSION: "3.12.10"'
 PINNED_UV_VERSION = 'UV_VERSION: "0.9.17"'
 PINNED_INNOSETUP_VERSION = 'INNOSETUP_VERSION: "6.6.1"'

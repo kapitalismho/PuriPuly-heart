@@ -1,10 +1,9 @@
 import ast
-from pathlib import Path
 
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.paths import REPO_ROOT
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 DRIVER_PATH = (
     REPO_ROOT
     / "src"
