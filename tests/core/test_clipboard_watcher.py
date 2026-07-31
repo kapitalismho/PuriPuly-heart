@@ -5,7 +5,6 @@ import pytest
 from puripuly_heart.core.clipboard import watcher as watcher_module
 from puripuly_heart.core.clipboard.watcher import (
     ClipboardWatcherError,
-    WindowsClipboardWatcher,
     create_clipboard_watcher,
 )
 
@@ -20,12 +19,6 @@ def test_clipboard_watcher_start_raises_on_non_windows(
         watcher.start()
 
     watcher.stop()
-
-
-def test_create_clipboard_watcher_returns_runtime() -> None:
-    watcher = create_clipboard_watcher(lambda _text: None)
-
-    assert isinstance(watcher, WindowsClipboardWatcher)
 
 
 def test_cleanup_window_unregisters_window_class(

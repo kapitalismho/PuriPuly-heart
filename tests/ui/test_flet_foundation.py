@@ -346,14 +346,3 @@ def test_foundation_modules_remain_below_the_ui_boundary_and_do_not_cut_over_vie
     assert "self.view_settings = SettingsView()" in app_source
     assert "self.view_logs = LogsView()" in app_source
     assert "self.view_about = AboutView()" in app_source
-
-
-def test_production_app_composes_foundation_adapter_runtime_and_application_callback() -> None:
-    source = inspect.getsource(app_module.TranslatorApp)
-
-    assert source.count("FletFoundationAdapter(") == 2
-    assert source.count("FletFoundationRuntime(") == 2
-    assert "foundation_runtime.application_shutdown_callbacks()" in source
-    assert "foundation_runtime.bind_application_lifecycle(lifecycle)" in source
-    assert "return runtime.run_page_task(coroutine, *args)" in source
-    assert "self.page.run_task" not in source

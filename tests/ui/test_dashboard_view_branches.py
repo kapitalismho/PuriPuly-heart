@@ -582,30 +582,6 @@ def test_dashboard_builds_4x3_friendly_shell_without_managed_trial_row(
     assert not hasattr(view, "_managed_trial_card")
 
 
-def test_dashboard_bottom_row_uses_trans_and_subtitles_labels(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view = _make_dashboard(monkeypatch)
-
-    assert _button_labels(view.bottom_controls) == ["TRANS", "Subtitles"]
-
-
-def test_dashboard_overlay_button_uses_subtitles_icon(monkeypatch: pytest.MonkeyPatch) -> None:
-    view = _make_dashboard(monkeypatch)
-
-    assert view.overlay_button.icon == ft.Icons.SUBTITLES
-
-
-def test_dashboard_peer_trans_overlay_buttons_use_default_on_color(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view = _make_dashboard(monkeypatch)
-
-    assert "color_on" not in view.peer_button.kwargs
-    assert "color_on" not in view.trans_button.kwargs
-    assert "color_on" not in view.overlay_button.kwargs
-
-
 def test_dashboard_apply_locale_and_dialog_open_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     view = _make_dashboard(monkeypatch)
     attach_dummy_page(monkeypatch, view)

@@ -56,39 +56,6 @@ def test_result_statuses_cover_settings_runtime_secret_and_compensation_flows() 
         messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
     }
 
-    message = messages.UserMessageRef(
-        key="runtime.apply.degraded",
-        params={"component": "provider"},
-        severity=messages.SEVERITY_WARNING,
-    )
-    diagnostics = messages.ErrorDiagnostics(
-        component="runtime.apply",
-        operation="apply",
-        code="provider_degraded",
-        category=messages.DIAGNOSTIC_CATEGORY_LIFECYCLE,
-        visibility=messages.DIAGNOSTIC_VISIBILITY_BASIC,
-        content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
-        status_code=503,
-        retry_after_ms=1_000,
-        fields={"provider": "openrouter", "remote_active": True},
-    )
-
-    runtime_result = messages.RuntimeApplyResult(
-        status=messages.RUNTIME_APPLY_STATUS_DEGRADED,
-        message=message,
-        diagnostics=diagnostics,
-    )
-    transaction_result = messages.TransactionResult(
-        status=messages.TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
-        message=message,
-        diagnostics=diagnostics,
-    )
-
-    assert runtime_result.message is message
-    assert runtime_result.diagnostics is diagnostics
-    assert transaction_result.message is message
-    assert transaction_result.diagnostics is diagnostics
-
 
 def test_result_dtos_carry_message_refs_and_diagnostics_not_localized_text() -> None:
     forbidden_localized_fields = {

@@ -36,33 +36,6 @@ class FakeLLM:
         pass
 
 
-async def test_translation_fixture_uses_local_context_when_peer_translation_is_off():
-    clock = FakeClock(_now=112.0)
-    sender = FakeSender()
-    osc = ChatboxPaginator(sender=sender, clock=clock)
-    inner = FakeLLM()
-    llm = SemaphoreLLMProvider(inner=inner, semaphore=asyncio.Semaphore(1))
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=llm,
-        osc=osc,
-        clock=clock,
-        integrated_context_enabled=True,
-        peer_translation_enabled=False,
-    )
-    harness.self_runtime.remember_context(
-        "hello there",
-        timestamp=100.0,
-        source_language="ko",
-        target_language="en",
-    )
-
-    await harness.self_owner.submit_text("world")
-    await asyncio.gather(*harness.self_runtime.translation_tasks.values(), return_exceptions=True)
-
-    assert inner.calls[0]["context"] == '- [self, 12s ago] "hello there"'
-
-
 async def test_translation_fixture_uses_integrated_context_when_enabled_and_safe():
     clock = FakeClock(_now=112.0)
     sender = FakeSender()

@@ -336,10 +336,17 @@ def test_qwen_stale_schema_requires_observed_facts_for_pass() -> None:
     report["stages"]["stale_result"] = {
         "status": "passed",
         "classification": "benchmark_generation_gate_observed",
-        "facts": {"submitted": 2, "rejected": 2, "active_generation": 2},
+        "facts": {},
     }
+    with pytest.raises(ValueError, match="no facts"):
+        validate_report(report)
 
-    assert report["stages"]["stale_result"]["facts"]["rejected"] == 2
+    report["stages"]["stale_result"]["facts"] = {
+        "submitted": 2,
+        "rejected": 2,
+        "active_generation": 2,
+    }
+    validate_report(report)
 
 
 def _comparable_report() -> dict[str, object]:

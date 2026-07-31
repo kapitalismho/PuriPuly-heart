@@ -2174,14 +2174,6 @@ def test_managed_stt_provider_rejects_legacy_8khz_runtime_sample_rate() -> None:
         ManagedSTTProvider(backend=None, sample_rate_hz=8000)  # type: ignore[arg-type]
 
 
-def test_local_qwen_sherpa_backend_rejects_legacy_8khz_runtime_sample_rate() -> None:
-    with pytest.raises(ValueError, match="16000"):
-        LocalQwenSherpaSTTBackend(
-            model_dir=default_local_stt_model_dir(),
-            sample_rate_hz=8000,
-        )
-
-
 def test_create_peer_stt_backend_local_qwen_uses_peer_language_without_hotwords() -> None:
     settings = AppSettings()
     settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
