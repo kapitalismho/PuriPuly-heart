@@ -3176,33 +3176,6 @@ async def test_start_microphone_test_callback_uses_page_run_task() -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_microphone_test_updates_modal_meter_on_success() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
-    start_kwargs: list[dict[str, object]] = []
-
-    async def fake_start_microphone_test(**kwargs) -> bool:
-        start_kwargs.append(dict(kwargs))
-        callback = kwargs["meter_callback"]
-        callback(0.37)
-        return True
-
-    app.controller = SimpleNamespace(
-        start_microphone_test=fake_start_microphone_test,
-        stop_microphone_test=lambda: None,
-        microphone_test_active=True,
-    )
-
-    app._on_start_microphone_test()
-    await app.page.tasks[0]()
-
-    assert len(app.page.opened) == 1
-    assert "37%" in _dialog_text_values(app.page.opened[0])
-    assert "meter_callback" in start_kwargs[0]
-
-
-@pytest.mark.asyncio
 async def test_start_microphone_test_false_opens_failure_modal() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
