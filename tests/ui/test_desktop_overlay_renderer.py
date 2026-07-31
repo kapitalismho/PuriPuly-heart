@@ -26,6 +26,24 @@ from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationSnapshot,
 )
 from puripuly_heart.ui import desktop_overlay, desktop_window_zorder, flet_desktop_runtime
+from puripuly_heart.ui.desktop_overlay_surface.contract import (
+    _DESKTOP_CAPTION_AMBIENT_SHADOW_BLUR,
+    _DESKTOP_CAPTION_AMBIENT_SHADOW_COLOR,
+    _DESKTOP_CAPTION_AMBIENT_SHADOW_OFFSET,
+    _DESKTOP_CAPTION_CONTACT_SHADOW_BLUR,
+    _DESKTOP_CAPTION_CONTACT_SHADOW_COLOR,
+    _DESKTOP_CAPTION_CONTACT_SHADOW_OFFSET,
+    _DESKTOP_CAPTION_GOLD,
+    _DESKTOP_CAPTION_LINE_HEIGHT,
+    _DESKTOP_CAPTION_MAX_VISIBLE_LINES,
+    _DESKTOP_CAPTION_MAX_VISIBLE_SLOTS,
+    _DESKTOP_CAPTION_MIN_DYNAMIC_CARD_WIDTH,
+    _DESKTOP_CAPTION_PRIMARY_REGION_ALIGNMENT_Y,
+    _DESKTOP_CAPTION_SIZE_PRESETS,
+    _DESKTOP_CAPTION_TEXT_STACK_ALIGNMENT_Y,
+    _DESKTOP_CAPTION_WHITE,
+    _DESKTOP_PREVIEW_BACKGROUND_ALPHA_PRESETS,
+)
 from puripuly_heart.ui.fonts import assets_dir
 
 
@@ -86,33 +104,35 @@ def test_desktop_overlay_snapshot_mapping_table_documents_current_block_contract
     }
 
     assert rows[("blocks[]", "active_self/self", "primary")].role == "active_self_source"
-    assert rows[("blocks[]", "active_self/self", "primary")].color == "#FFFFFF"
+    assert rows[("blocks[]", "active_self/self", "primary")].color == _DESKTOP_CAPTION_WHITE
     assert rows[("blocks[]", "active_self/self", "secondary")].role == "active_self_translation"
-    assert rows[("blocks[]", "active_self/self", "secondary")].color == "#FFFFFF"
+    assert rows[("blocks[]", "active_self/self", "secondary")].color == _DESKTOP_CAPTION_WHITE
     assert rows[("blocks[]", "active_self/self", "secondary")].truncation.startswith("max 1 line")
     active_peer_row = rows[("blocks[]", "active_peer/peer", "primary")]
     assert active_peer_row.role == "active_peer_source"
     assert active_peer_row.promoted is True
-    assert active_peer_row.color == "#FFD700"
+    assert active_peer_row.color == _DESKTOP_CAPTION_GOLD
     assert rows[("blocks[]", "finalized/peer translated", "primary")].role == ("peer_translation")
-    assert rows[("blocks[]", "finalized/peer translated", "primary")].color == "#FFD700"
-    assert rows[("blocks[]", "finalized/peer translated", "secondary")].color == "#FFD700"
+    assert rows[("blocks[]", "finalized/peer translated", "primary")].color == _DESKTOP_CAPTION_GOLD
+    assert (
+        rows[("blocks[]", "finalized/peer translated", "secondary")].color == _DESKTOP_CAPTION_GOLD
+    )
     assert rows[("blocks[]", "finalized/peer translated", "secondary")].truncation.startswith(
         "max 1 line"
     )
     peer_source_only_row = rows[("blocks[]", "finalized/peer source-only", "primary")]
     assert peer_source_only_row.promoted is True
-    assert peer_source_only_row.color == "#FFD700"
+    assert peer_source_only_row.color == _DESKTOP_CAPTION_GOLD
     assert peer_source_only_row.truncation == (
         "max 2 lines; drops before active and translated primary lines"
     )
     assert rows[("blocks[]", "finalized/self", "secondary")].role == "self_translation"
-    assert rows[("blocks[]", "finalized/self", "secondary")].color == "#FFFFFF"
+    assert rows[("blocks[]", "finalized/self", "secondary")].color == _DESKTOP_CAPTION_WHITE
     assert rows[("blocks[]", "finalized/self", "secondary")].truncation.startswith("max 1 line")
     self_secondary_only_row = rows[("blocks[]", "finalized/self secondary-only", "primary")]
     assert self_secondary_only_row.role == "self_translation"
     assert self_secondary_only_row.promoted is True
-    assert self_secondary_only_row.color == "#FFFFFF"
+    assert self_secondary_only_row.color == _DESKTOP_CAPTION_WHITE
     assert rows[("calibration", "all", "none")].role == "desktop_visual_ignored"
     assert rows[("blocks[]", "none/edit", "none")].role == "edit_no_caption_empty_card"
     assert rows[("blocks[]", "none/edit", "none")].truncation == (
@@ -281,19 +301,19 @@ def test_desktop_overlay_snapshot_mapping_roles_secondary_promotion_and_channel_
     }
     assert line_by_text["I can hear you"].role == "active_self_source"
     assert line_by_text["I can hear you"].slot == "primary"
-    assert line_by_text["I can hear you"].color == "#FFFFFF"
+    assert line_by_text["I can hear you"].color == _DESKTOP_CAPTION_WHITE
     assert line_by_text["들려요"].role == "active_self_translation"
     assert line_by_text["들려요"].slot == "secondary"
-    assert line_by_text["들려요"].color == "#FFFFFF"
+    assert line_by_text["들려요"].color == _DESKTOP_CAPTION_WHITE
     assert line_by_text["typing live source"].role == "active_peer_source"
     assert line_by_text["typing live source"].slot == "primary"
     assert line_by_text["typing live source"].promoted is True
-    assert line_by_text["typing live source"].color == "#FFD700"
+    assert line_by_text["typing live source"].color == _DESKTOP_CAPTION_GOLD
     assert line_by_text["좋아요"].role == "peer_translation"
-    assert line_by_text["좋아요"].color == "#FFD700"
+    assert line_by_text["좋아요"].color == _DESKTOP_CAPTION_GOLD
     assert line_by_text["Sounds good"].role == "peer_source_original"
     assert line_by_text["Sounds good"].slot == "secondary"
-    assert line_by_text["Sounds good"].color == "#FFD700"
+    assert line_by_text["Sounds good"].color == _DESKTOP_CAPTION_GOLD
     for plan in (active_self_plan, peer_translated_plan, active_peer_plan):
         assert sum(line.max_lines for line in plan.lines) <= 3
 
@@ -391,18 +411,18 @@ def test_desktop_overlay_visual_config_uses_preset_tokens_and_no_outline_text() 
         locale="ko",
     )
 
-    assert plan.primary_font_size == 41
-    assert plan.secondary_font_size == 25
+    assert plan.primary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].primary_font_size
+    assert plan.secondary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].secondary_font_size
     assert plan.outline_width == 0
     assert plan.background_color == "#61000000"
-    assert plan.padding_horizontal == 22
-    assert plan.padding_vertical == 10
+    assert plan.padding_horizontal == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].padding_horizontal
+    assert plan.padding_vertical == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].padding_vertical
     assert plan.text_width == 1300
-    assert plan.border_radius == 16
+    assert plan.border_radius == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].border_radius
 
     surface = desktop_overlay.build_desktop_caption_surface(plan)
     assert surface.bgcolor == ft.Colors.TRANSPARENT
-    assert surface.border_radius == 16
+    assert surface.border_radius == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].border_radius
     assert isinstance(surface.content, ft.Stack)
     assert len(surface.content.controls) == 1
     slot_column = surface.content.controls[0]
@@ -410,7 +430,7 @@ def test_desktop_overlay_visual_config_uses_preset_tokens_and_no_outline_text() 
     inner_card = outer_slot.content
     assert outer_slot.bgcolor == ft.Colors.TRANSPARENT
     assert inner_card.bgcolor == "#61000000"
-    assert inner_card.border_radius == 16
+    assert inner_card.border_radius == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].border_radius
     assert inner_card.padding.left == 22
     assert inner_card.padding.top == 10
     text_layer = inner_card.content
@@ -424,10 +444,10 @@ def test_desktop_overlay_visual_config_uses_preset_tokens_and_no_outline_text() 
         for control in _walk_control_tree(inner_card)
     )
     first_text = column.controls[0].content
-    assert first_text.color == "#FFD700"
+    assert first_text.color == _DESKTOP_CAPTION_GOLD
     assert first_text.text_align == ft.TextAlign.CENTER
     assert first_text.overflow == ft.TextOverflow.ELLIPSIS
-    assert first_text.style.height == pytest.approx(1.24)
+    assert first_text.style.height == pytest.approx(_DESKTOP_CAPTION_LINE_HEIGHT)
     assert first_text.style.foreground is None
 
 
@@ -454,7 +474,7 @@ def test_desktop_overlay_locked_slot_uses_dynamic_inner_card_width_for_short_tex
 
     slot = plan.slots[0]
     assert slot.card_width < plan.window_width
-    assert slot.card_width == pytest.approx(320.0)
+    assert slot.card_width == pytest.approx(_DESKTOP_CAPTION_MIN_DYNAMIC_CARD_WIDTH)
     assert slot.card_text_width == pytest.approx(slot.card_width - (plan.padding_horizontal * 2))
 
     surface = desktop_overlay.build_desktop_caption_surface(plan)
@@ -467,7 +487,7 @@ def test_desktop_overlay_locked_slot_uses_dynamic_inner_card_width_for_short_tex
     inner_card = outer_slot.content
     assert inner_card.width == pytest.approx(slot.card_width)
     assert inner_card.bgcolor == "#80000000"
-    assert inner_card.border_radius == 16
+    assert inner_card.border_radius == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].border_radius
     assert inner_card.padding.left == 22
     assert inner_card.padding.top == 10
 
@@ -606,12 +626,12 @@ def test_desktop_overlay_caption_text_uses_layered_shadow_without_stroke() -> No
         assert len(text.style.shadow) == 2
 
         contact_shadow, ambient_shadow = text.style.shadow
-        assert contact_shadow.color == "#C0000000"
-        assert contact_shadow.offset == (0, 1)
-        assert contact_shadow.blur_radius == pytest.approx(1.0)
-        assert ambient_shadow.color == "#66000000"
-        assert ambient_shadow.offset == (0, 0)
-        assert ambient_shadow.blur_radius == pytest.approx(3.0)
+        assert contact_shadow.color == _DESKTOP_CAPTION_CONTACT_SHADOW_COLOR
+        assert contact_shadow.offset == _DESKTOP_CAPTION_CONTACT_SHADOW_OFFSET
+        assert contact_shadow.blur_radius == pytest.approx(_DESKTOP_CAPTION_CONTACT_SHADOW_BLUR)
+        assert ambient_shadow.color == _DESKTOP_CAPTION_AMBIENT_SHADOW_COLOR
+        assert ambient_shadow.offset == _DESKTOP_CAPTION_AMBIENT_SHADOW_OFFSET
+        assert ambient_shadow.blur_radius == pytest.approx(_DESKTOP_CAPTION_AMBIENT_SHADOW_BLUR)
 
 
 def test_desktop_overlay_uses_fixed_two_turn_slots_with_secondary_one_line() -> None:
@@ -649,7 +669,7 @@ def test_desktop_overlay_uses_fixed_two_turn_slots_with_secondary_one_line() -> 
         snapshot, window_width=1344, window_height=336
     )
 
-    assert plan.max_visible_slots == 2
+    assert plan.max_visible_slots == _DESKTOP_CAPTION_MAX_VISIBLE_SLOTS
     assert len(plan.slots) == 2
     assert [slot.block_id for slot in plan.slots] == ["self-finalized", "peer-translated"]
     assert [slot.channel for slot in plan.slots] == ["self", "peer"]
@@ -722,7 +742,7 @@ def test_desktop_overlay_slots_reserve_stable_line_regions() -> None:
     second_text_layer = second_inner_card.content
     assert first_inner_card.alignment == ft.Alignment.CENTER
     assert first_text_layer.alignment == ft.Alignment.CENTER
-    assert second_text_layer.alignment.y == pytest.approx(-0.08)
+    assert second_text_layer.alignment.y == pytest.approx(_DESKTOP_CAPTION_TEXT_STACK_ALIGNMENT_Y)
 
     first_column = first_text_layer.content
     (first_primary_region,) = first_column.controls
@@ -732,7 +752,9 @@ def test_desktop_overlay_slots_reserve_stable_line_regions() -> None:
     second_column = second_text_layer.content
     second_primary_region, second_secondary_region = second_column.controls
     assert second_primary_region.height == pytest.approx(expected_primary_height)
-    assert second_primary_region.alignment.y == pytest.approx(-0.5)
+    assert second_primary_region.alignment.y == pytest.approx(
+        _DESKTOP_CAPTION_PRIMARY_REGION_ALIGNMENT_Y
+    )
     assert second_secondary_region.height == pytest.approx(expected_secondary_height)
     assert second_secondary_region.alignment == ft.Alignment.CENTER
     assert second_secondary_region.content.value == "original peer utterance"
@@ -805,10 +827,10 @@ def test_desktop_overlay_secondary_enabled_empty_slots_reserve_secondary_region(
     inner_card = outer_slot.content
     text_layer = inner_card.content
     assert inner_card.alignment == ft.Alignment.CENTER
-    assert text_layer.alignment.y == pytest.approx(-0.08)
+    assert text_layer.alignment.y == pytest.approx(_DESKTOP_CAPTION_TEXT_STACK_ALIGNMENT_Y)
     text_column = text_layer.content
     primary_region, reserved_secondary_region = text_column.controls
-    assert primary_region.alignment.y == pytest.approx(-0.5)
+    assert primary_region.alignment.y == pytest.approx(_DESKTOP_CAPTION_PRIMARY_REGION_ALIGNMENT_Y)
     assert primary_region.content.value == "말하는 중인 원문"
     assert reserved_secondary_region.height == pytest.approx(plan.secondary_region_height)
     assert reserved_secondary_region.alignment == ft.Alignment.CENTER
@@ -887,7 +909,7 @@ def test_desktop_overlay_edit_mode_background_covers_full_window() -> None:
     full_background = surface.content.controls[0]
     assert isinstance(full_background, ft.Container)
     assert full_background.bgcolor == "#80000000"
-    assert full_background.border_radius == 16
+    assert full_background.border_radius == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].border_radius
     assert (
         full_background.left,
         full_background.top,
@@ -965,7 +987,7 @@ def test_desktop_overlay_caps_to_presenter_selected_two_turn_slots_without_repri
         "newer peer original",
     ]
     assert [slot.block_id for slot in plan.slots] == ["old-self", "peer-translated"]
-    assert sum(line.max_lines for line in plan.lines) == 6
+    assert sum(line.max_lines for line in plan.lines) == _DESKTOP_CAPTION_MAX_VISIBLE_LINES
     assert "newest active peer source" not in visible_text
     assert plan.overflow_strategy == (
         "two-turn-slots:presenter-selected-blocks,primary-two-lines,secondary-one-line"
@@ -998,8 +1020,8 @@ def test_desktop_overlay_caption_rendering_preserves_cjk_emoji_and_minimum_secon
         "今日は PuriPuly Heart 좋아요 😊",
         "今日は mixed 원문 😊",
     ]
-    assert plan.primary_font_size == 35
-    assert plan.secondary_font_size == 21
+    assert plan.primary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["small"].primary_font_size
+    assert plan.secondary_font_size == _DESKTOP_CAPTION_SIZE_PRESETS["small"].secondary_font_size
     assert {line.font_family for line in plan.lines} == {"Noto Sans CJK JP"}
 
 
@@ -1618,7 +1640,7 @@ def test_desktop_overlay_preview_fixtures_cover_required_local_qa_cases() -> Non
         "xsmall",
         "tiny",
     )
-    assert tuple(catalog.background_alpha_presets) == (0.35, 0.5, 0.6, 0.8)
+    assert tuple(catalog.background_alpha_presets) == _DESKTOP_PREVIEW_BACKGROUND_ALPHA_PRESETS
     assert tuple(surface.id for surface in catalog.background_surfaces) == (
         "bright",
         "dark",
@@ -2025,8 +2047,8 @@ async def test_desktop_overlay_preview_controls_apply_size_preset_without_outlin
             await asyncio.gather(*app.page.tasks)
 
         assert app.page.window.ignore_mouse_events is False
-        assert app.page.window.width == 1600
-        assert app.page.window.height == 400
+        assert app.page.window.width == _DESKTOP_CAPTION_SIZE_PRESETS["large"].window_width
+        assert app.page.window.height == _DESKTOP_CAPTION_SIZE_PRESETS["large"].window_height
         visible_text = _page_text_values(app.page)
         assert "Preview background" in visible_text
         assert sink.events == []
@@ -2862,8 +2884,8 @@ async def test_desktop_overlay_flet_window_starts_frameless_transparent_moving_e
         assert page.window.title_bar_buttons_hidden is None
         assert page.window.on_event is not None
         assert page.window.start_resizing_calls == 0
-        assert page.window.width == 1344
-        assert page.window.height == 336
+        assert page.window.width == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].window_width
+        assert page.window.height == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].window_height
 
         assert _page_text_values(page) == {"Lock"}
         _assert_no_overlay_local_renderer_text(page)
@@ -2944,12 +2966,12 @@ async def test_desktop_overlay_empty_moving_state_renders_text_only_lock_action(
         assert isinstance(action_text_style.shadow, list)
         assert len(action_text_style.shadow) == 2
         contact_shadow, ambient_shadow = action_text_style.shadow
-        assert contact_shadow.color == "#C0000000"
-        assert contact_shadow.offset == (0, 1)
-        assert contact_shadow.blur_radius == pytest.approx(1.0)
-        assert ambient_shadow.color == "#66000000"
-        assert ambient_shadow.offset == (0, 0)
-        assert ambient_shadow.blur_radius == pytest.approx(3.0)
+        assert contact_shadow.color == _DESKTOP_CAPTION_CONTACT_SHADOW_COLOR
+        assert contact_shadow.offset == _DESKTOP_CAPTION_CONTACT_SHADOW_OFFSET
+        assert contact_shadow.blur_radius == pytest.approx(_DESKTOP_CAPTION_CONTACT_SHADOW_BLUR)
+        assert ambient_shadow.color == _DESKTOP_CAPTION_AMBIENT_SHADOW_COLOR
+        assert ambient_shadow.offset == _DESKTOP_CAPTION_AMBIENT_SHADOW_OFFSET
+        assert ambient_shadow.blur_radius == pytest.approx(_DESKTOP_CAPTION_AMBIENT_SHADOW_BLUR)
         action_padding = action.style.padding
         required_label_width = desktop_overlay._estimated_caption_line_width(
             "고정하기",
