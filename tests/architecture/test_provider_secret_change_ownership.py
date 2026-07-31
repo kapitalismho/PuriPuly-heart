@@ -1,26 +1,13 @@
 from __future__ import annotations
 
-import ast
-
+from tests.helpers.ast_sources import method_source
 from tests.helpers.paths import REPO_ROOT as ROOT
 
 UI_RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "ui_runtime.py"
 
 
 def _adapter_method_source(method_name: str) -> str:
-    source = UI_RUNTIME_PATH.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    adapter = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.ClassDef) and node.name == "UiProviderRuntimeAdapter"
-    )
-    method = next(
-        node
-        for node in adapter.body
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == method_name
-    )
-    return ast.get_source_segment(source, method) or ""
+    return method_source(UI_RUNTIME_PATH, "UiProviderRuntimeAdapter", method_name)
 
 
 def test_ui_delegates_complete_provider_secret_transaction_owner() -> None:

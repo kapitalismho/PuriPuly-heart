@@ -1,26 +1,10 @@
 from __future__ import annotations
 
-import ast
-from pathlib import Path
-
+from tests.helpers.ast_sources import method_source as _method_source
 from tests.helpers.paths import REPO_ROOT as ROOT
 
 CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
 RUNTIME_PATH = ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_microphone_test.py"
-
-
-def _method_source(path: Path, class_name: str, method_name: str) -> str:
-    source = path.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    owner = next(
-        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == class_name
-    )
-    method = next(
-        node
-        for node in owner.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == method_name
-    )
-    return ast.get_source_segment(source, method) or ""
 
 
 def test_microphone_test_runtime_owns_start_and_stop() -> None:

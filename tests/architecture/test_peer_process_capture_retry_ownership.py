@@ -1,6 +1,4 @@
-import ast
-from pathlib import Path
-
+from tests.helpers.ast_sources import method_source as _method_source
 from tests.helpers.paths import REPO_ROOT
 
 UI_RUNTIME_PATH = REPO_ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "ui_runtime.py"
@@ -8,20 +6,6 @@ OWNER_PATH = REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "peer_a
 DRIVER_PATH = (
     REPO_ROOT / "src" / "puripuly_heart" / "release_evidence" / "windows_process_isolation.py"
 )
-
-
-def _method_source(path: Path, class_name: str, method_name: str) -> str:
-    source = path.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    class_node = next(
-        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == class_name
-    )
-    method = next(
-        node
-        for node in class_node.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == method_name
-    )
-    return ast.get_source_segment(source, method)
 
 
 def test_ui_retry_is_only_an_owner_delegate() -> None:
