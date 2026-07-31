@@ -70,5 +70,5 @@ def find_constructions(class_name: str, root: Path) -> list[str]:
                 and isinstance(node.func, ast.Name)
                 and node.func.id == class_name
             ):
-                results.append(str(source_file.relative_to(root)))
+                results.append(source_file.relative_to(root).as_posix())
     return results

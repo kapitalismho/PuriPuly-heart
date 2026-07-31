@@ -1,29 +1,11 @@
 from __future__ import annotations
 
-import ast
-
 from tests.helpers.paths import REPO_ROOT as ROOT
 from tests.helpers.paths import SOURCE_ROOT
 
 OWNER_COMPOSITION_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_composition.py"
 APPLICATION_COMPOSITION_PATH = SOURCE_ROOT / "composition" / "application_runtime.py"
 BASIC_LOGGING_TEST_PATH = ROOT / "tests" / "ui" / "test_asr_basic_logging.py"
-
-
-def test_local_asr_diagnostics_owner_is_constructed_only_by_application_composition() -> None:
-    constructions: list[str] = []
-    for source_file in sorted(SOURCE_ROOT.rglob("*.py")):
-        source = source_file.read_text(encoding="utf-8")
-        tree = ast.parse(source)
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == "LocalASRDiagnosticsOwner"
-            ):
-                constructions.append(source_file.relative_to(ROOT).as_posix())
-
-    assert constructions == ["src/puripuly_heart/app/wiring/wiring_composition.py"]
 
 
 def test_application_composes_local_asr_diagnostics_without_rendering_algorithms() -> None:

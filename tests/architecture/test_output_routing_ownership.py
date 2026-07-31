@@ -1,40 +1,8 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
-from tests.helpers.ast_sources import call_name as _call_name
-from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
-
-
-def _repo_path(path: Path) -> str:
-    return path.relative_to(REPO_ROOT).as_posix()
-
-
-def test_output_runtime_is_the_only_production_output_owner_construction() -> None:
-    runtime_constructions: list[tuple[str, int]] = []
-    projection_constructions: list[tuple[str, int]] = []
-    router_constructions: list[tuple[str, int]] = []
-    for source_file in sorted(SOURCE_ROOT.rglob("*.py")):
-        tree = ast.parse(source_file.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            call_name = _call_name(node)
-            if call_name == "OutputRuntime":
-                runtime_constructions.append((_repo_path(source_file), node.lineno))
-            elif call_name == "TranslationOutputProjectionOwner":
-                projection_constructions.append((_repo_path(source_file), node.lineno))
-            elif call_name == "OutputRouter":
-                router_constructions.append((_repo_path(source_file), node.lineno))
-
-    assert [path for path, _line in runtime_constructions] == [
-        "src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py"
-    ]
-    assert [path for path, _line in projection_constructions] == [
-        "src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py"
-    ]
-    assert router_constructions == []
+from tests.helpers.paths import SOURCE_ROOT
 
 
 def test_output_projection_owner_is_the_only_channel_output_side_effect_boundary() -> None:

@@ -1,31 +1,11 @@
 from __future__ import annotations
 
-import ast
-
 from tests.helpers.ast_sources import method_source_unscoped as _method_source
-from tests.helpers.paths import REPO_ROOT as ROOT
 from tests.helpers.paths import SOURCE_ROOT
 
-COMPOSITION_PATH = SOURCE_ROOT / "composition" / "application_runtime.py"
 UI_RUNTIME_PATH = SOURCE_ROOT / "app" / "adapters" / "ui_runtime.py"
 INTERACTION_PATH = SOURCE_ROOT / "app" / "services" / "gpu_runtime_interaction.py"
 COMPOSITION_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_composition.py"
-
-
-def test_gpu_provisioning_owner_is_constructed_only_by_gpu_interaction_owner() -> None:
-    constructions: list[str] = []
-    for source_file in sorted(SOURCE_ROOT.rglob("*.py")):
-        source = source_file.read_text(encoding="utf-8")
-        tree = ast.parse(source)
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == "LocalASRGpuProvisioningOwner"
-            ):
-                constructions.append(source_file.relative_to(ROOT).as_posix())
-
-    assert constructions == ["src/puripuly_heart/app/services/gpu_runtime_interaction.py"]
 
 
 def test_ui_gpu_provisioning_command_delegates_to_composed_interaction_owner() -> None:

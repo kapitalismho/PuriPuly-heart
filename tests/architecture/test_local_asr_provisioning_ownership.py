@@ -2,19 +2,7 @@ from __future__ import annotations
 
 import ast
 
-from tests.helpers.ast_sources import call_name as _call_name
-from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
-
-
-def test_production_constructs_one_local_asr_provisioning_owner_in_composition() -> None:
-    constructions: list[str] = []
-    for source_file in sorted(SOURCE_ROOT.rglob("*.py")):
-        tree = ast.parse(source_file.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call) and _call_name(node) == "LocalASRProvisioningOwner":
-                constructions.append(source_file.relative_to(REPO_ROOT).as_posix())
-
-    assert constructions == ["src/puripuly_heart/app/wiring/root.py"]
+from tests.helpers.paths import SOURCE_ROOT
 
 
 def test_application_owners_delegate_provisioning_without_asset_or_task_ownership() -> None:
