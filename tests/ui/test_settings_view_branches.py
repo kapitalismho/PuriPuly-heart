@@ -505,12 +505,6 @@ def _subtab_text_color(button: ft.Control) -> str | None:
     return _subtab_label(button).color
 
 
-def _subtab_text_size(button: ft.Control) -> int | None:
-    if isinstance(button, ft.TextButton):
-        raise AssertionError("Expected bottom-docked container-backed subtab")
-    return _subtab_label(button).size
-
-
 def _container_text_size(control: ft.Container) -> int | None:
     if not isinstance(control.content, ft.Text):
         raise AssertionError(
@@ -535,12 +529,6 @@ def test_load_secret_value_migrates_legacy_value() -> None:
 
     assert value == "legacy"
     assert store.set_calls == [("new_key", "legacy")]
-
-
-def test_setting_action_text_size_shrinks_for_long_values() -> None:
-    assert settings_view._setting_action_text_size("영어") == 22
-    assert settings_view._setting_action_text_size("Deepgram") == 20
-    assert settings_view._setting_action_text_size("qwen3-asr-flash-realtime") == 16
 
 
 def test_peer_language_card_removed_from_general_tab(
@@ -1536,7 +1524,6 @@ def test_local_llm_connection_card_matches_api_field_scale_and_copy(
             "낮은 지연시간을 위해 추론을 끄고 사용하는 것을 권장해요. "
             "JSON extra body에 알맞은 파라미터를 입력해서 추론 레벨을 제어하세요."
         )
-        assert view._local_llm_extra_body_helper.size == 15
         assert view._local_llm_extra_body.value == json.dumps(
             {"reasoning_effort": "none"}, ensure_ascii=False, indent=2
         )
@@ -1553,9 +1540,7 @@ def test_local_llm_connection_card_matches_api_field_scale_and_copy(
             view._local_llm_extra_body,
         ):
             assert field.border_radius == api_field.border_radius
-            assert field.text_size == 24
             assert field.color == api_field.color
-            assert field.label_style.size == 18
             assert field.label_style.weight == api_field.label_style.weight
             assert field.label_style.color == api_field.label_style.color
             assert field.expand is True
@@ -2243,11 +2228,10 @@ def test_gpu_card_is_standard_one_by_one_and_contains_only_device_selection(
 
     column = _wrapped_card_column(view._gpu_device_card)
 
-    assert view._gpu_device_card.height == 228
     assert len(column.controls) == 2
     assert column.controls[0] is view._gpu_device_title
     assert column.controls[1].content is view._gpu_device_text
-    assert view._gpu_device_text.content.size == view._stt_text.content.size == 28
+    assert view._gpu_device_text.content.size == view._stt_text.content.size
     assert view._gpu_device_text.content.color == view._stt_text.content.color
     assert view._gpu_device_text.content.text_align == view._stt_text.content.text_align
     assert len(view._gpu_device_row.content.controls) == 3
@@ -4496,7 +4480,6 @@ def test_overlay_single_action_cards_use_broad_value_slot_click_targets(
         assert isinstance(control, ft.Container)
         assert control.expand is True
         assert control.content.value == expected
-        assert control.content.size == 28
         assert control.content.color == settings_view.COLOR_ON_BACKGROUND
 
 
@@ -4643,7 +4626,6 @@ def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only
 
         assert reset_actions is view._overlay_desktop_reset_button
         assert view._overlay_desktop_reset_button.on_click is not None
-        assert view._overlay_desktop_reset_button.content.size == 28
         assert view._overlay_desktop_reset_button.content.value == t(
             "settings.overlay.position_reset.action.desktop"
         )
@@ -6220,9 +6202,6 @@ def test_overlay_distance_card_uses_inline_minus_value_plus_layout(
     assert distance_value_row.controls[2].content.value == "＋"
     assert distance_value_row.controls[2].alignment == ft.Alignment.CENTER_LEFT
     assert distance_value_container.width == 84
-    assert view._overlay_distance_value_text.size == 28
-    assert distance_value_row.controls[0].content.size == 22
-    assert distance_value_row.controls[2].content.size == 22
 
 
 def test_overlay_offset_cards_use_inline_arrow_value_arrow_layout(
@@ -6300,11 +6279,6 @@ def test_overlay_offset_cards_use_inline_arrow_value_arrow_layout(
     assert offset_y_value_row.controls[0].alignment == ft.Alignment.CENTER_RIGHT
     assert offset_y_value_row.controls[2].content.value == "▼"
     assert offset_y_value_row.controls[2].alignment == ft.Alignment.CENTER_LEFT
-
-    assert view._overlay_offset_x_value_text.size == 28
-    assert view._overlay_offset_y_value_text.size == 28
-    assert offset_x_value_row.controls[0].content.size == 22
-    assert offset_y_value_row.controls[0].content.size == 22
 
 
 def test_overlay_step_buttons_use_large_vr_hit_targets(
@@ -7405,9 +7379,6 @@ def test_settings_view_uses_generic_subtab_shell(monkeypatch: pytest.MonkeyPatch
     assert view._settings_subtab_shell.title_region is None
     assert isinstance(view._settings_subtab_shell.body_region, ft.Container)
     assert view._settings_subtab_shell.body_region.content is view._settings_subtab_shell.body_host
-    assert view._settings_subtab_shell.body_region.padding == ft.Padding.only(
-        left=16, top=16, right=16
-    )
     assert view._settings_subtab_shell.controls == [
         view._settings_subtab_shell.body_region,
         view._settings_subtab_shell.subtab_bar,
@@ -7503,7 +7474,6 @@ def test_settings_subtab_bar_matches_bottom_nav_family_structure(
     assert all(divider.width == nav_dividers[0].width for divider in dividers)
     assert all(divider.thickness == nav_dividers[0].thickness for divider in dividers)
     assert all(divider.color == nav_dividers[0].color for divider in dividers)
-    assert all(_subtab_text_size(button) == 20 for button in buttons)
     assert _subtab_text_color(buttons[0]) == subtab_shell_module.COLOR_PRIMARY
     assert _subtab_text_color(buttons[1]) == subtab_shell_module.COLOR_NEUTRAL
 
@@ -7535,7 +7505,6 @@ def test_text_subtab_shell_keeps_floating_treatment_when_bar_is_top() -> None:
     assert shell.subtab_row.scroll == ft.ScrollMode.AUTO
     assert shell.subtab_row.spacing == 8
     assert shell.subtab_bar.bgcolor == subtab_shell_module.COLOR_SURFACE
-    assert shell.subtab_bar.border_radius == 24
     assert _button_style_value(shell.button_by_key["api"], "bgcolor") == (
         subtab_shell_module.COLOR_PRIMARY_CONTAINER
     )

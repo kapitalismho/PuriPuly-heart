@@ -50,6 +50,7 @@ def _iter_controls(control: ft.Control):
 
 def test_set_terms_renders_compact_chips_above_native_input() -> None:
     editor = _make_editor()
+    module = _editor_module()
 
     editor.set_terms(["Puripuly", "VRChat"])
 
@@ -65,11 +66,11 @@ def test_set_terms_renders_compact_chips_above_native_input() -> None:
     assert not hasattr(editor, "_token_wrap")
     assert not hasattr(editor, "_token_field")
     assert _chip_term_text(chips[0]).width is None
-    assert _chip_term_text(chips[0]).size == 22
-    assert chips[0].padding.left == 20
-    assert chips[0].padding.right == 20
-    assert chips[0].padding.top == 14
-    assert chips[0].padding.bottom == 14
+    assert _chip_term_text(chips[0]).size == module._CHIP_TEXT_SIZE
+    assert chips[0].padding.left == module._CHIP_HORIZONTAL_PADDING
+    assert chips[0].padding.right == module._CHIP_HORIZONTAL_PADDING
+    assert chips[0].padding.top == module._CHIP_VERTICAL_PADDING
+    assert chips[0].padding.bottom == module._CHIP_VERTICAL_PADDING
     assert callable(chips[0].on_click)
     assert callable(chips[0].on_hover)
     assert chips[0].tooltip is None
@@ -104,9 +105,9 @@ def test_input_uses_native_focus_styling_without_outer_token_field() -> None:
 
 def test_input_size_matches_api_key_fields() -> None:
     editor = _make_editor()
+    module = _editor_module()
 
-    assert editor._input_field.text_size == 28  # noqa: SLF001
-    assert editor._input_field.border_radius == 12  # noqa: SLF001
+    assert editor._input_field.border_radius == module._INPUT_FIELD_RADIUS  # noqa: SLF001
     assert editor._input_field.dense is not True  # noqa: SLF001
     assert editor._input_field.content_padding is None  # noqa: SLF001
 

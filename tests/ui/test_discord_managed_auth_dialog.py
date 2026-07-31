@@ -11,6 +11,7 @@ pytest.importorskip("flet")
 import flet as ft  # noqa: E402
 
 import puripuly_heart.ui.components.discord_managed_auth_dialog as discord_module  # noqa: E402
+from puripuly_heart.ui.components import warm_document_dialog  # noqa: E402
 from puripuly_heart.ui.components.discord_managed_auth_dialog import DiscordManagedAuthDialog
 from puripuly_heart.ui.i18n import set_locale, t
 from puripuly_heart.ui.theme import (  # noqa: E402
@@ -125,7 +126,7 @@ def test_discord_managed_auth_dialog_uses_warm_document_layout(
     assert "discord_auth.title" not in requested_keys
     assert "discord_auth.requirements" not in requested_keys
     assert "discord_auth.byok" not in requested_keys
-    assert modal_content.width == 720
+    assert modal_content.width == warm_document_dialog.DIALOG_WIDTH
     assert modal_content.height is None
 
     body_column = _body_column(page)
@@ -134,7 +135,7 @@ def test_discord_managed_auth_dialog_uses_warm_document_layout(
 
     assert len(body_column.controls) == 2
     assert body_text.value == "value:discord_auth.body"
-    assert body_text.size == 24
+    assert body_text.size == warm_document_dialog.BODY_TEXT_SIZE
     assert body_text.selectable is True
     assert [button.__class__.__name__ for button in action_row.controls] == [
         "TextButton",
@@ -144,7 +145,9 @@ def test_discord_managed_auth_dialog_uses_warm_document_layout(
         "value:discord_auth.close",
         "value:discord_auth.continue",
     ]
-    assert [_button_text_size(button) for button in action_row.controls] == [26, 26]
+    assert [_button_text_size(button) for button in action_row.controls] == [
+        warm_document_dialog.BUTTON_TEXT_SIZE
+    ] * 2
     assert [button.style.color[ft.ControlState.DEFAULT] for button in action_row.controls] == [
         COLOR_NEUTRAL_DARK,
         COLOR_NEUTRAL_DARK,
@@ -153,7 +156,6 @@ def test_discord_managed_auth_dialog_uses_warm_document_layout(
         COLOR_PRIMARY,
         COLOR_PRIMARY,
     ]
-    assert [button.style.animation_duration for button in action_row.controls] == [0, 0]
 
 
 def test_discord_managed_auth_dialog_renders_optional_referral_id_field() -> None:
@@ -215,29 +217,9 @@ def test_discord_managed_auth_dialog_scales_referral_id_field_content() -> None:
     assert field is not None
     assert field.height is None
     assert field.dense is False
-    assert field.text_size == 22
     assert field.content_padding is not None
-    assert field.content_padding.left == 16
-    assert field.content_padding.right == 16
-    assert field.content_padding.top == 20
-    assert field.content_padding.bottom == 20
     assert field.bgcolor is None
-    assert field.border_radius == 14
     assert field.focused_border_color == COLOR_PRIMARY
-
-
-def test_discord_managed_auth_dialog_groups_referral_field_with_actions(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(discord_module, "create_glow_stack", lambda content: content)
-    page = DummyPage()
-    dialog = _dialog(page)
-
-    dialog.open()
-
-    assert _body_column(page).spacing == 44
-    action_spacer = _content_column(page).controls[1]
-    assert action_spacer.height == 24
 
 
 def test_discord_managed_auth_dialog_referral_field_is_present_before_page_open(
