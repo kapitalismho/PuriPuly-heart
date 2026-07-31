@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import importlib
 import inspect
 from dataclasses import dataclass, field
@@ -16,6 +15,7 @@ from puripuly_heart.core.output.models import (
     SelfUtterancePublication,
     SystemDisclosurePublication,
 )
+from tests.helpers.ast_sources import assert_no_forbidden_imports, imported_modules
 
 FORBIDDEN_IMPORT_PREFIXES = (
     "flet",
@@ -30,26 +30,9 @@ FORBIDDEN_IMPORT_PREFIXES = (
 )
 
 
-def _imported_modules(module_file: str) -> set[str]:
-    tree = ast.parse(Path(module_file).read_text(encoding="utf-8"))
-    imported: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imported.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imported.add(node.module)
-    return imported
-
-
 def _assert_no_forbidden_imports(module_name: str) -> None:
     module = importlib.import_module(module_name)
-    imports = _imported_modules(module.__file__ or "")
-    assert not {
-        imported
-        for imported in imports
-        for forbidden in FORBIDDEN_IMPORT_PREFIXES
-        if imported == forbidden or imported.startswith(f"{forbidden}.")
-    }
+    assert_no_forbidden_imports(Path(module.__file__ or ""), FORBIDDEN_IMPORT_PREFIXES)
 
 
 def _output_router_class() -> type[object]:
@@ -170,7 +153,7 @@ def test_router_and_adapters_import_canonical_channel_contract_modules() -> None
     }
 
     for module_file, expected in expected_imports.items():
-        imports = _imported_modules(str(module_file))
+        imports = imported_modules(module_file)
         assert expected <= imports
 
 

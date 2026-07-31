@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import importlib
 from dataclasses import FrozenInstanceError, is_dataclass
 from pathlib import Path
@@ -9,6 +8,7 @@ from typing import Any, get_args
 import pytest
 
 from puripuly_heart.core import messages
+from tests.helpers.ast_sources import imported_modules
 
 FORBIDDEN_IMPORT_PREFIXES = (
     "flet",
@@ -26,19 +26,8 @@ def _validator():
     return importlib.import_module("puripuly_heart.core.diagnostic_validation")
 
 
-def _imported_modules(module_file: str) -> set[str]:
-    tree = ast.parse(Path(module_file).read_text(encoding="utf-8"))
-    imported: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imported.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imported.add(node.module)
-    return imported
-
-
 def _forbidden_imports(module: object) -> set[str]:
-    imports = _imported_modules(getattr(module, "__file__") or "")
+    imports = imported_modules(Path(getattr(module, "__file__") or ""))
     return {
         imported
         for imported in imports

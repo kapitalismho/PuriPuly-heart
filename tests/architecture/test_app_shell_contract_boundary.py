@@ -13,6 +13,7 @@ from puripuly_heart.ui.shell.renderer import (
     APP_SHELL_ROOT_PADDING,
     compose_app_shell,
 )
+from tests.helpers.ast_sources import imported_modules as _imported_modules
 from tests.helpers.paths import SOURCE_ROOT
 
 FORBIDDEN_IMPORT_PREFIXES = (
@@ -25,17 +26,6 @@ FORBIDDEN_IMPORT_PREFIXES = (
 )
 
 SHELL_CONTRACT_MODULES = (shell_contract, shell_renderer)
-
-
-def _imported_modules(path: pathlib.Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    modules: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-            modules.add(node.module)
-    return modules
 
 
 def _slots(*, debug_panel: ft.Control | None = None) -> AppShellSlots:

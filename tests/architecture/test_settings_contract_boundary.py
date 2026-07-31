@@ -5,6 +5,7 @@ import pathlib
 
 from puripuly_heart.ui.settings import contract as settings_contract
 from puripuly_heart.ui.settings import renderer as settings_renderer
+from tests.helpers.ast_sources import imported_modules as _imported_modules
 from tests.helpers.paths import SOURCE_ROOT
 
 FORBIDDEN_IMPORT_PREFIXES = (
@@ -89,17 +90,6 @@ G15_OWNED_VIEW_CALLBACKS = (
     "on_overlay_calibration_apply",
     "on_overlay_calibration_cancel",
 )
-
-
-def _imported_modules(path: pathlib.Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    modules: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-            modules.add(node.module)
-    return modules
 
 
 def _settings_view_attribute_assignments(attribute_owner: str) -> list[str]:

@@ -2,18 +2,11 @@ from __future__ import annotations
 
 import ast
 
+from tests.helpers.ast_sources import call_name as _call_name
 from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
 
 PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py"
 PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
-
-
-def _call_name(node: ast.Call) -> str | None:
-    if isinstance(node.func, ast.Name):
-        return node.func.id
-    if isinstance(node.func, ast.Attribute):
-        return node.func.attr
-    return None
 
 
 def _class(tree: ast.Module, name: str) -> ast.ClassDef:

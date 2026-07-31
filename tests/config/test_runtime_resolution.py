@@ -12,6 +12,8 @@ from typing import Any
 
 import pytest
 
+from tests.helpers.ast_sources import imported_modules
+
 MODULE_NAME = "puripuly_heart.config.runtime_resolution"
 
 ALLOWED_INTERNAL_IMPORTS = frozenset(
@@ -58,17 +60,6 @@ def _load_boundary_guard() -> ModuleType:
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
-
-
-def _imported_modules_from_source(source_path: Path) -> set[str]:
-    tree = ast.parse(source_path.read_text(encoding="utf-8"))
-    imports: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imports.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imports.add(node.module)
-    return imports
 
 
 def _assert_no_file_io_calls(source_path: Path) -> None:
@@ -119,8 +110,8 @@ def test_runtime_resolution_module_is_import_safe_and_dependency_light() -> None
     source_path = Path(runtime_resolution.__file__ or "")
 
     assert source_path.name == "runtime_resolution.py"
-    imported_modules = _imported_modules_from_source(source_path)
-    for imported_module in imported_modules:
+    imported = imported_modules(source_path)
+    for imported_module in imported:
         if imported_module.startswith("puripuly_heart."):
             assert imported_module in ALLOWED_INTERNAL_IMPORTS
         assert not imported_module.startswith(FORBIDDEN_INTERNAL_IMPORT_PREFIXES)

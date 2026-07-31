@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
+from tests.helpers.ast_sources import method_source_unscoped as _method_source
 from tests.helpers.paths import REPO_ROOT as ROOT
 from tests.helpers.paths import SOURCE_ROOT
 
@@ -10,15 +10,6 @@ COMPOSITION_PATH = SOURCE_ROOT / "composition" / "application_runtime.py"
 UI_RUNTIME_PATH = SOURCE_ROOT / "app" / "adapters" / "ui_runtime.py"
 INTERACTION_PATH = SOURCE_ROOT / "app" / "services" / "gpu_runtime_interaction.py"
 COMPOSITION_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_composition.py"
-
-
-def _method_source(path: Path, method_name: str) -> str:
-    source = path.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == method_name:
-            return ast.get_source_segment(source, node) or ""
-    raise AssertionError(f"method not found: {method_name}")
 
 
 def test_gpu_provisioning_owner_is_constructed_only_by_gpu_interaction_owner() -> None:

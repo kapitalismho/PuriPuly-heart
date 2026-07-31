@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import ast
 import pathlib
 
 from puripuly_heart.ui import desktop_overlay as desktop_overlay_module
 from puripuly_heart.ui.desktop_overlay_surface import contract as overlay_contract
 from puripuly_heart.ui.desktop_overlay_surface import renderer as overlay_renderer
+from tests.helpers.ast_sources import imported_modules as _imported_modules
 from tests.helpers.paths import SOURCE_ROOT
 
 SURFACE_MODULES = (overlay_contract, overlay_renderer)
@@ -47,17 +47,6 @@ RUNTIME_OWNED_NAMES = (
     "run_renderer",
     "run_preview",
 )
-
-
-def _imported_modules(path: pathlib.Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    modules: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-            modules.add(node.module)
-    return modules
 
 
 def test_overlay_surface_modules_do_not_import_the_runner_or_views() -> None:

@@ -5,6 +5,7 @@ import pathlib
 
 from puripuly_heart.ui.dashboard import contract as dashboard_contract
 from puripuly_heart.ui.dashboard import renderer as dashboard_renderer
+from tests.helpers.ast_sources import imported_modules as _imported_modules
 from tests.helpers.paths import SOURCE_ROOT
 
 FORBIDDEN_IMPORT_PREFIXES = (
@@ -12,17 +13,6 @@ FORBIDDEN_IMPORT_PREFIXES = (
     "puripuly_heart.runtime",
     "puripuly_heart.app.services",
 )
-
-
-def _imported_modules(path: pathlib.Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    modules: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-            modules.add(node.module)
-    return modules
 
 
 def test_dashboard_contract_and_renderer_stay_above_backend_owners() -> None:

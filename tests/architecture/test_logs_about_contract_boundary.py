@@ -7,6 +7,7 @@ from puripuly_heart.ui.about import contract as about_contract
 from puripuly_heart.ui.about import renderer as about_renderer
 from puripuly_heart.ui.logs import contract as logs_contract
 from puripuly_heart.ui.logs import renderer as logs_renderer
+from tests.helpers.ast_sources import imported_modules as _imported_modules
 from tests.helpers.paths import SOURCE_ROOT
 
 FORBIDDEN_IMPORT_PREFIXES = (
@@ -21,17 +22,6 @@ CONTRACT_MODULES = (logs_contract, logs_renderer, about_contract, about_renderer
 
 LOGS_INTENT_FIELDS = ("runtime_logging_mode_change",)
 LOGS_OWNED_VIEW_CALLBACKS = ("on_mode_change",)
-
-
-def _imported_modules(path: pathlib.Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    modules: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-            modules.add(node.module)
-    return modules
 
 
 def _view_attribute_assignments(attribute_owner: str) -> list[str]:

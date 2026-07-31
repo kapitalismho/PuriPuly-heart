@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 import inspect
-from pathlib import Path
 
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
@@ -11,6 +10,7 @@ from puripuly_heart.app.services.ui_application import (
     UiApplicationBoundary,
 )
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from tests.helpers.ast_sources import imported_modules as _imports
 from tests.helpers.paths import REPO_ROOT
 
 APP_PATH = REPO_ROOT / "src" / "puripuly_heart" / "ui" / "app.py"
@@ -63,16 +63,6 @@ def _contract_members(contract: type[object]) -> set[str]:
         for name, member in contract.__dict__.items()
         if not name.startswith("_") and (inspect.isfunction(member) or isinstance(member, property))
     }
-
-
-def _imports(path: Path) -> set[str]:
-    imports: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if isinstance(node, ast.Import):
-            imports.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imports.add(node.module)
-    return imports
 
 
 def _assert_contract_signatures(contract: type[object], implementation: type[object]) -> None:

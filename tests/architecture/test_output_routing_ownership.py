@@ -3,19 +3,12 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from tests.helpers.ast_sources import call_name as _call_name
 from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
 
 
 def _repo_path(path: Path) -> str:
     return path.relative_to(REPO_ROOT).as_posix()
-
-
-def _call_name(node: ast.Call) -> str | None:
-    if isinstance(node.func, ast.Name):
-        return node.func.id
-    if isinstance(node.func, ast.Attribute):
-        return node.func.attr
-    return None
 
 
 def test_output_runtime_is_the_only_production_output_owner_construction() -> None:

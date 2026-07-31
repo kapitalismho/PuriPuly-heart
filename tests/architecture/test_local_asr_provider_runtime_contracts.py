@@ -5,18 +5,8 @@ from pathlib import Path
 
 from puripuly_heart.app.ports import gpu_worker as compatibility_gpu_worker
 from puripuly_heart.core import gpu_worker as owning_gpu_worker
+from tests.helpers.ast_sources import imported_modules as _imported_modules
 from tests.helpers.paths import SOURCE_ROOT
-
-
-def _imported_modules(source_file: Path) -> set[str]:
-    tree = ast.parse(source_file.read_text(encoding="utf-8"))
-    modules: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module is not None:
-            modules.add(node.module)
-    return modules
 
 
 def _call_names(source_file: Path) -> list[str]:

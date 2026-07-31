@@ -2,15 +2,8 @@ from __future__ import annotations
 
 import ast
 
+from tests.helpers.ast_sources import call_name as _call_name
 from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
-
-
-def _call_name(node: ast.Call) -> str | None:
-    if isinstance(node.func, ast.Name):
-        return node.func.id
-    if isinstance(node.func, ast.Attribute):
-        return node.func.attr
-    return None
 
 
 def test_production_constructs_one_local_asr_provisioning_owner_in_composition() -> None:
