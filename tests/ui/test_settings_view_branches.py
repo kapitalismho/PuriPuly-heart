@@ -66,13 +66,20 @@ class DummySecretStore:
         self.delete_calls.append(key)
 
 
-def _make_settings_view(monkeypatch: pytest.MonkeyPatch, store: DummySecretStore | None = None):
+def _make_settings_view(
+    monkeypatch: pytest.MonkeyPatch,
+    store: DummySecretStore | None = None,
+    settings: AppSettings | None = None,
+):
     monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
     store = store or DummySecretStore()
     monkeypatch.setattr(settings_view, "create_secret_store", lambda *_args, **_kwargs: store)
-    return settings_view.SettingsView(), store
+    view = settings_view.SettingsView()
+    if settings is not None:
+        view._settings = settings
+    return view, store
 
 
 def test_cpu_auto_option_is_disabled_until_all_models_are_available(
@@ -716,8 +723,7 @@ def test_update_api_visibility_tracks_provider_and_region(monkeypatch: pytest.Mo
     settings.provider.llm = LLMProviderName.GEMINI
     settings.qwen.region = QwenRegion.BEIJING
 
-    view, _ = _make_settings_view(monkeypatch)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._qwen_region_btn.visible is True
@@ -741,7 +747,7 @@ def test_update_api_visibility_shows_openrouter_key(monkeypatch: pytest.MonkeyPa
     settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._google_key.visible is False
@@ -756,7 +762,7 @@ def test_update_api_visibility_shows_deepseek_key(monkeypatch: pytest.MonkeyPatc
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.DEEPSEEK
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._google_key.visible is False
@@ -773,7 +779,7 @@ def test_update_api_visibility_hides_openrouter_key_for_managed_trial(
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._openrouter_key.visible is False
@@ -792,7 +798,7 @@ def test_update_api_visibility_shows_managed_key_card_for_managed_fallback(
         TranslationConnection.MANAGED_CHINA,
     )
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._managed_key_card.visible is True
@@ -991,7 +997,7 @@ def test_set_managed_key_state_updates_card_controls_and_api_section_repaint(
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     attach_dummy_page(monkeypatch, view)
     updates: list[str] = []
     mounted_page = object()
@@ -1030,7 +1036,7 @@ def test_set_managed_key_state_hides_card_for_openrouter_connection(
     )
     settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     attach_dummy_page(monkeypatch, view)
 
     view.set_managed_key_state(
@@ -1056,7 +1062,7 @@ def test_set_managed_key_state_keeps_card_visible_for_managed_connection_when_us
     )
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view.set_managed_key_state(
         visible=False,
@@ -1148,7 +1154,7 @@ def test_set_managed_key_state_empty_referral_disables_copy_and_repaints_parent(
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     attach_dummy_page(monkeypatch, view)
     updates: list[str] = []
     mounted_page = object()
@@ -1183,7 +1189,7 @@ def test_set_managed_key_state_shows_talk_together_pass_invite_progress(
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view.set_managed_key_state(
         visible=True,
         remaining_percent=64,
@@ -1277,7 +1283,7 @@ def test_managed_key_invite_progress_survives_managed_china_round_trip_before_se
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view.set_managed_key_state(
         visible=True,
         remaining_percent=64,
@@ -1313,7 +1319,7 @@ def test_set_managed_key_state_can_display_preview_referral_without_remembering(
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view.set_managed_key_state(
         visible=True,
         remaining_percent=100,
@@ -1353,7 +1359,7 @@ def test_set_managed_key_state_shows_invite_progress_placeholder_when_absent(
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view.set_managed_key_state(
         visible=True,
@@ -1387,7 +1393,7 @@ def test_set_managed_key_state_clamps_over_limit_invite_progress(
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view.set_managed_key_state(
         visible=True,
@@ -1409,8 +1415,7 @@ def test_update_api_visibility_keeps_openrouter_cards_visible_for_inactive_fallb
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.GEMINI
 
-    view, _ = _make_settings_view(monkeypatch)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._translation_connection_row.visible is True
@@ -1425,8 +1430,7 @@ def test_update_api_visibility_treats_peer_local_qwen_as_local_provider(
     settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
     settings.provider.llm = LLMProviderName.GEMINI
 
-    view, _ = _make_settings_view(monkeypatch)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._deepgram_key.visible is False
@@ -1449,7 +1453,7 @@ def test_deepseek_connection_selection_controls_api_key_visibility(
     settings.provider.llm = LLMProviderName.GEMINI
     settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
     assert view._managed_trial_usage_bar.visible is True
@@ -1481,7 +1485,7 @@ def test_on_llm_selected_updates_to_local_llms_with_ollama_connection(
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings.provider.llm = LLMProviderName.GEMINI
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._on_llm_selected(TranslationModel.LOCAL_LLM.value)
 
@@ -1501,7 +1505,7 @@ def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._update_api_visibility()
 
@@ -1749,7 +1753,7 @@ def test_local_llm_fields_update_provider_draft(monkeypatch: pytest.MonkeyPatch)
         model=TranslationModel.LOCAL_LLM,
         connection=TranslationConnection.OLLAMA,
     )
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._local_llm_base_url.value = "http://127.0.0.1:11434/v1/"
     view._on_local_llm_base_url_change_end(None)
@@ -1770,7 +1774,7 @@ def test_local_llm_unblurred_fields_commit_when_building_provider_apply_settings
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._local_llm_base_url.value = "http://mac-studio.local:11434/v1"
     view._local_llm_model.value = "gemma3:4b"
     view._local_llm_extra_body.value = '{"think": false}'
@@ -1818,7 +1822,7 @@ def test_local_llm_invalid_base_url_shows_error_without_saving(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._local_llm_base_url.value = "ftp://127.0.0.1:11434/v1"
 
     view._on_local_llm_base_url_change_end(None)
@@ -1835,7 +1839,7 @@ def test_local_llm_empty_model_shows_error_without_saving(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._local_llm_model.value = "   "
 
     view._on_local_llm_model_change_end(None)
@@ -1862,7 +1866,7 @@ def test_local_llm_settings_survive_provider_draft_copy(
         model="llama3.1:8b",
         extra_body={"think": False},
     )
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._local_llm_base_url.value = "http://127.0.0.1:11434/v1"
     view._on_local_llm_base_url_change_end(None)
@@ -1884,7 +1888,7 @@ def test_local_llm_extra_body_invalid_json_does_not_save(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._local_llm_extra_body.value = "{invalid-json"
 
     view._on_local_llm_extra_body_change_end(None)
@@ -1902,7 +1906,7 @@ def test_local_llm_blank_extra_body_uses_current_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._local_llm_extra_body.value = "  "
 
     view._on_local_llm_extra_body_change_end(None)
@@ -1918,7 +1922,7 @@ def test_local_llm_extra_body_rejects_non_standard_json_constants(
     constant: str,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._local_llm_extra_body.value = f'{{"temperature": {constant}}}'
 
     view._on_local_llm_extra_body_change_end(None)
@@ -1936,7 +1940,7 @@ def test_local_llm_extra_body_non_object_json_does_not_save(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._local_llm_extra_body.value = '["not", "an", "object"]'
 
     view._on_local_llm_extra_body_change_end(None)
@@ -1956,7 +1960,7 @@ def test_local_llm_extra_body_non_serializable_value_does_not_save(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._local_llm_extra_body.value = '{"callback": "not actually serializable"}'
     monkeypatch.setattr(settings_view.json, "loads", lambda _raw, **_kwargs: {"callback": object()})
 
@@ -1978,7 +1982,7 @@ def test_local_llm_extra_body_reserved_key_does_not_save(
     key: str,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._local_llm_extra_body.value = json.dumps({key: True})
 
     view._on_local_llm_extra_body_change_end(None)
@@ -1999,7 +2003,7 @@ def test_local_llm_extra_body_sensitive_key_does_not_save(
     key: str,
 ) -> None:
     settings = AppSettings(provider=ProviderSettings(llm=LLMProviderName.LOCAL_LLM))
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._local_llm_extra_body.value = json.dumps({key: "do-not-save"})
 
     view._on_local_llm_extra_body_change_end(None)
@@ -2026,7 +2030,7 @@ def test_official_api_connection_hides_openrouter_key_even_with_saved_fallback(
     settings.openrouter.selected_source = OpenRouterCredentialSource.BYOK
     settings.translation.fallback = TranslationFallbackSettings(enabled=False)
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
     assert view._openrouter_key.visible is True
 
@@ -2446,7 +2450,7 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
     }
     settings.system_prompt = "G"
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view.on_request_openrouter_pkce = lambda _settings: (_ for _ in ()).throw(
         AssertionError("BYOK selection should not launch PKCE immediately")
     )
@@ -2486,7 +2490,7 @@ def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
     }
     settings.system_prompt = "G"
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
 
@@ -2527,7 +2531,7 @@ def test_on_llm_selected_restores_saved_connection_history(
     settings.system_prompts = {"openrouter": "O", "deepseek": "D"}
     settings.system_prompt = "O"
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
 
@@ -2563,7 +2567,7 @@ def test_on_llm_selected_updates_deepseek_v4_pro_with_default_official_connectio
     settings.system_prompts = {"gemini": "G", "openrouter": "O", "deepseek": "D"}
     settings.system_prompt = "G"
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._on_llm_selected(deepseek_v4_pro.value)
 
@@ -2602,7 +2606,7 @@ def test_on_translation_connection_selected_ignores_openrouter_for_deepseek_v4_p
     settings.system_prompts = {"deepseek": "D"}
     settings.system_prompt = "D"
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
 
@@ -2652,7 +2656,7 @@ def test_on_llm_selected_stages_openrouter_byok_alias_without_pkce(
 ) -> None:
     settings = AppSettings()
     settings.system_prompts = {"gemini": "G", "openrouter": "O", "qwen": "Q"}
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view.on_request_openrouter_pkce = lambda _settings: (_ for _ in ()).throw(
         AssertionError("BYOK selection should not launch PKCE immediately")
     )
@@ -2684,7 +2688,7 @@ def test_on_llm_selected_stages_byok_with_default_openrouter_prompt_when_unsaved
     settings.provider.llm = LLMProviderName.GEMINI
     settings.system_prompts = {"gemini": "G", "qwen": "Q"}
     settings.system_prompt = ""
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view.on_request_openrouter_pkce = lambda _settings: (_ for _ in ()).throw(
         AssertionError("BYOK selection should not launch PKCE immediately")
     )
@@ -2717,7 +2721,7 @@ def test_on_llm_selected_updates_managed_openrouter_label_and_source(
     }
     settings.system_prompt = "G"
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._on_llm_selected(TranslationModel.GEMMA4.value)
 
     pending = view.build_provider_apply_settings()
@@ -2745,7 +2749,7 @@ def test_on_llm_selected_openrouter_provider_value_defaults_to_gemma_managed(
     )
     settings.provider.llm = LLMProviderName.GEMINI
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._on_llm_selected(LLMProviderName.OPENROUTER.value)
 
     pending = view.build_provider_apply_settings()
@@ -2773,7 +2777,7 @@ def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
     }
     settings.system_prompt = "G"
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
 
     pending = view.build_provider_apply_settings()
@@ -2835,7 +2839,7 @@ def test_on_llm_selected_stages_byok_without_mutating_managed_identity_snapshot(
     settings.managed_identity.verified_hardware_hash = "hardware-hash"
     settings.managed_identity.verified_hardware_hash_salt_version = 7
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view.on_request_openrouter_pkce = lambda _settings: (_ for _ in ()).throw(
         AssertionError("BYOK selection should not launch PKCE immediately")
     )
@@ -3124,7 +3128,7 @@ def test_update_api_visibility_keeps_openrouter_key_for_openrouter_deepseek_fall
         TranslationConnection.OPENROUTER,
     )
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._google_key.visible is False
@@ -3143,7 +3147,7 @@ def test_update_api_visibility_hides_openrouter_key_for_inactive_byok_fallback(
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.GEMMA4_BYOK
     settings.translation.fallback = TranslationFallbackSettings(enabled=False)
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._google_key.visible is True
@@ -3163,7 +3167,7 @@ def test_update_api_visibility_shows_openrouter_key_for_openrouter_fallback_when
         TranslationConnection.OPENROUTER,
     )
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._google_key.visible is True
@@ -3181,7 +3185,7 @@ def test_update_api_visibility_shows_openrouter_key_for_openrouter_gemma_fallbac
         TranslationConnection.OPENROUTER,
     )
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._google_key.visible is True
@@ -3200,7 +3204,7 @@ def test_update_api_visibility_shows_cerebras_key_for_cerebras_fallback_only(
         TranslationConnection.OFFICIAL_BYOK,
     )
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._google_key.visible is True
@@ -3363,7 +3367,7 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
     settings.provider.llm = LLMProviderName.GEMINI
     settings.system_prompts = {"gemini": "G", "openrouter": "O", "qwen": "Q"}
     settings.system_prompt = "G"
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     requested: list[AppSettings] = []
     view.on_request_openrouter_pkce = requested.append
 
@@ -3680,7 +3684,7 @@ def test_hidden_legacy_deepseek_china_fallback_displays_safe_current_value(
         TranslationConnection.MANAGED_CHINA,
     )
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     assert view._translation_fallback_preset_value(settings.translation.fallback) == "none"
     assert view._get_openrouter_fallback_display_label(settings) == t("settings.fallback.none")
@@ -3693,7 +3697,7 @@ def test_openrouter_fallback_off_does_not_show_active_helper_copy(
     settings.provider.llm = LLMProviderName.OPENROUTER
     settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
@@ -3706,7 +3710,7 @@ def test_openrouter_fallback_off_shows_off_description_when_main_provider_is_ina
     settings.provider.llm = LLMProviderName.GEMINI
     settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
@@ -4020,8 +4024,7 @@ def test_update_api_visibility_keeps_peer_auth_controls_visible_when_peer_disabl
     settings.provider.llm = LLMProviderName.GEMINI
     settings.ui.peer_translation_enabled = False
 
-    view, _ = _make_settings_view(monkeypatch)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._deepgram_key.visible is True
@@ -4037,8 +4040,7 @@ def test_update_api_visibility_keeps_peer_qwen_credentials_visible_when_peer_dis
     settings.provider.peer_stt = STTProviderName.QWEN_ASR
     settings.provider.llm = LLMProviderName.GEMINI
     settings.ui.peer_translation_enabled = False
-    view, _ = _make_settings_view(monkeypatch)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._alibaba_key_beijing.visible is True
@@ -4076,8 +4078,7 @@ def test_update_api_visibility_includes_enabled_peer_provider(
     settings.provider.llm = LLMProviderName.GEMINI
     settings.ui.peer_translation_enabled = True
 
-    view, _ = _make_settings_view(monkeypatch)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._deepgram_key.visible is True
@@ -4093,8 +4094,7 @@ def test_update_api_visibility_uses_shared_qwen_region_for_peer_and_self(
     settings.ui.peer_translation_enabled = True
     settings.qwen.region = QwenRegion.BEIJING
 
-    view, _ = _make_settings_view(monkeypatch)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._alibaba_key_beijing.visible is True
@@ -4111,8 +4111,7 @@ def test_update_api_visibility_shows_shared_qwen_region_for_peer_qwen_only(
     settings.ui.peer_translation_enabled = True
     settings.qwen.region = QwenRegion.BEIJING
 
-    view, _ = _make_settings_view(monkeypatch)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
 
     assert view._soniox_key.visible is True
@@ -4168,8 +4167,7 @@ def test_peer_auto_detection_languages_card_is_visible_only_for_peer_soniox(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettings()
-    view, _ = _make_settings_view(monkeypatch)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._update_api_visibility()
     assert view._peer_auto_languages_card.visible is False
