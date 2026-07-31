@@ -4,6 +4,8 @@ from collections.abc import Callable
 
 import pytest
 
+from tests.helpers.flet_page import DialogTrackingPage as DummyPage
+
 pytest.importorskip("flet")
 
 import flet as ft  # noqa: E402
@@ -24,25 +26,6 @@ def restore_locale_after_test():
         yield
     finally:
         set_locale(previous_locale)
-
-
-class DummyPage:
-    def __init__(self) -> None:
-        self.dialog = None
-        self.opened: list[object] = []
-        self.closed: list[object] = []
-
-    def show_dialog(self, dialog) -> None:
-        self.dialog = dialog
-        self.opened.append(dialog)
-
-    def pop_dialog(self):
-        dialog = self.dialog
-        if dialog is None:
-            return None
-        self.closed.append(dialog)
-        self.dialog = None
-        return dialog
 
 
 class SnapshotOpenPage(DummyPage):

@@ -21,6 +21,25 @@ class DummyPage:
         return dialog
 
 
+class DialogTrackingPage:
+    def __init__(self) -> None:
+        self.dialog: object | None = None
+        self.opened: list[object] = []
+        self.closed: list[object] = []
+
+    def show_dialog(self, dialog: object) -> None:
+        self.dialog = dialog
+        self.opened.append(dialog)
+
+    def pop_dialog(self) -> object | None:
+        dialog = self.dialog
+        if dialog is None:
+            return None
+        self.closed.append(dialog)
+        self.dialog = None
+        return dialog
+
+
 def attach_dummy_page(
     monkeypatch: pytest.MonkeyPatch,
     control: object,

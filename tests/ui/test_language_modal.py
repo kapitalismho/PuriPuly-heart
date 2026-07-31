@@ -4,28 +4,14 @@ from types import SimpleNamespace
 
 import pytest
 
+from tests.helpers.flet_page import DummyPage
+
 pytest.importorskip("flet")
 
 import flet as ft
 
 from puripuly_heart.ui.components import language_modal as modal_module
 from puripuly_heart.ui.components.language_modal import LanguageModal
-
-
-class DummyPage:
-    def __init__(self) -> None:
-        self.opened: list[object] = []
-        self.closed: list[object] = []
-
-    def show_dialog(self, dialog) -> None:
-        self.opened.append(dialog)
-
-    def pop_dialog(self):
-        if not self.opened:
-            return None
-        dialog = self.opened[-1]
-        self.closed.append(dialog)
-        return dialog
 
 
 def test_language_modal_open_builds_dialog_and_recent_grid() -> None:
