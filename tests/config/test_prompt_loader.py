@@ -7,7 +7,6 @@ import pytest
 
 import puripuly_heart.config.prompts as prompts_module
 from puripuly_heart.config.prompts import (
-    _reset_prompt_cache_for_tests,
     build_translation_prompt_variables,
     get_default_prompt,
     get_prompts_dir,
@@ -18,13 +17,6 @@ from puripuly_heart.config.prompts import (
     render_translation_prompt_template,
     warm_prompt_cache,
 )
-
-
-@pytest.fixture(autouse=True)
-def reset_prompt_cache() -> None:
-    _reset_prompt_cache_for_tests()
-    yield
-    _reset_prompt_cache_for_tests()
 
 
 def test_load_prompt_for_llm_providers_uses_shared_translation_prompt() -> None:

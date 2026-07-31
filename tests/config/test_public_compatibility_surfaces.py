@@ -238,13 +238,6 @@ EXPECTED_PROMPT_FALLBACK_ORDER = (
 EXPECTED_ENCRYPTED_FILE_PASSPHRASE = "fixture-passphrase-not-secret"
 
 
-@pytest.fixture(autouse=True)
-def reset_prompt_cache() -> Iterator[None]:
-    prompts_module._reset_prompt_cache_for_tests()
-    yield
-    prompts_module._reset_prompt_cache_for_tests()
-
-
 def _load_snapshot() -> dict[str, Any]:
     return json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
 

@@ -9,7 +9,7 @@ from tests.helpers.flet_page import DialogTrackingPage as DummyPage
 pytest.importorskip("flet")
 
 from puripuly_heart.ui.components.founder_letter_dialog import FounderLetterDialog
-from puripuly_heart.ui.i18n import get_locale, set_locale
+from puripuly_heart.ui.i18n import set_locale
 
 REQUESTED_FOUNDER_LETTER_COPY = (
     "PuriPuly Heart를 사용해줘서 고마워요.\n"
@@ -25,13 +25,6 @@ REQUESTED_FOUNDER_LETTER_COPY = (
     "무슨 일이든 편하게 저한테 연락해주세요.\n\n"
     "그럼 다시 만나길 바랄게요."
 )
-
-
-@pytest.fixture(autouse=True)
-def restore_locale_after_test():
-    previous_locale = get_locale()
-    yield
-    set_locale(previous_locale)
 
 
 def _body_text_value(page: DummyPage) -> str:

@@ -7,16 +7,7 @@ from tests.helpers.flet_page import DialogTrackingPage
 pytest.importorskip("flet")
 
 from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog  # noqa: E402
-from puripuly_heart.ui.i18n import get_locale, set_locale, t  # noqa: E402
-
-
-@pytest.fixture(autouse=True)
-def restore_locale_after_test():
-    previous_locale = get_locale()
-    try:
-        yield
-    finally:
-        set_locale(previous_locale)
+from puripuly_heart.ui.i18n import set_locale, t  # noqa: E402
 
 
 class DummyPage(DialogTrackingPage):

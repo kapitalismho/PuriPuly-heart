@@ -12,20 +12,11 @@ import flet as ft  # noqa: E402
 
 import puripuly_heart.ui.components.discord_managed_auth_dialog as discord_module  # noqa: E402
 from puripuly_heart.ui.components.discord_managed_auth_dialog import DiscordManagedAuthDialog
-from puripuly_heart.ui.i18n import get_locale, set_locale, t
+from puripuly_heart.ui.i18n import set_locale, t
 from puripuly_heart.ui.theme import (  # noqa: E402
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
 )
-
-
-@pytest.fixture(autouse=True)
-def restore_locale_after_test():
-    previous_locale = get_locale()
-    try:
-        yield
-    finally:
-        set_locale(previous_locale)
 
 
 class SnapshotOpenPage(DummyPage):
