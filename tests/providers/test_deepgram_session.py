@@ -211,14 +211,8 @@ async def test_deepgram_session_report_error_is_emitted_once() -> None:
     assert session._events.empty()
 
 
-@pytest.mark.asyncio
-async def test_deepgram_session_run_sync_handles_message_finalize_and_stop(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    session = _make_session(keyterms=["Puripuly", "VRChat"])
-    session._loop = asyncio.get_running_loop()
-    session._connect_started_at = 1.0
-
+@pytest.fixture
+def fake_deepgram_modules(monkeypatch: pytest.MonkeyPatch):
     sent_media: list[bytes] = []
     sent_controls: list[str] = []
     connect_kwargs: dict[str, object] = {}
@@ -290,8 +284,22 @@ async def test_deepgram_session_run_sync_handles_message_finalize_and_stop(
     monkeypatch.setitem(sys.modules, "deepgram.extensions", deepgram_ext)
     monkeypatch.setitem(sys.modules, "deepgram.extensions.types", deepgram_ext_types)
     monkeypatch.setitem(sys.modules, "deepgram.extensions.types.sockets", deepgram_sockets)
-
     monkeypatch.setattr(deepgram_module.threading, "Thread", NoopThread)
+
+    return types.SimpleNamespace(
+        connect_kwargs=connect_kwargs,
+        sent_media=sent_media,
+        sent_controls=sent_controls,
+    )
+
+
+@pytest.mark.asyncio
+async def test_deepgram_session_run_sync_handles_message_finalize_and_stop(
+    fake_deepgram_modules,
+) -> None:
+    session = _make_session(keyterms=["Puripuly", "VRChat"])
+    session._loop = asyncio.get_running_loop()
+    session._connect_started_at = 1.0
 
     session._audio_q.put_nowait(_FINALIZE)
     session._audio_q.put_nowait(_FINALIZE)
@@ -303,11 +311,11 @@ async def test_deepgram_session_run_sync_handles_message_finalize_and_stop(
     first = await session._events.get()
     assert isinstance(first, STTBackendTranscriptEvent)
     assert first.text == "hello world"
-    assert sent_controls == ["Finalize", "Finalize"]
-    assert sent_media == [b"pcm"]
+    assert fake_deepgram_modules.sent_controls == ["Finalize", "Finalize"]
+    assert fake_deepgram_modules.sent_media == [b"pcm"]
     assert session._connected.is_set() is True
-    assert "diarize" not in connect_kwargs
-    assert connect_kwargs["keyterm"] == ["Puripuly", "VRChat"]
+    assert "diarize" not in fake_deepgram_modules.connect_kwargs
+    assert fake_deepgram_modules.connect_kwargs["keyterm"] == ["Puripuly", "VRChat"]
 
     # _run_sync posts termination markers in stop path/finally.
     tail: list[object] = []
@@ -318,155 +326,29 @@ async def test_deepgram_session_run_sync_handles_message_finalize_and_stop(
 
 @pytest.mark.asyncio
 async def test_deepgram_session_run_sync_omits_keyterm_when_empty(
-    monkeypatch: pytest.MonkeyPatch,
+    fake_deepgram_modules,
 ) -> None:
     session = _make_session()
     session._loop = asyncio.get_running_loop()
     session._connect_started_at = 1.0
 
-    connect_kwargs: dict[str, object] = {}
-
-    class FakeEventType:
-        OPEN = "open"
-        MESSAGE = "message"
-        ERROR = "error"
-        CLOSE = "close"
-
-    class FakeControlMessage:
-        def __init__(self, type: str):
-            self.type = type
-
-    class FakeConnection:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def on(self, event_type, callback):
-            if event_type == FakeEventType.OPEN:
-                callback(object())
-
-        def start_listening(self):
-            return None
-
-        def send_control(self, message):
-            _ = message
-
-        def send_media(self, data: bytes):
-            _ = data
-
-    class FakeV1:
-        def connect(self, **kwargs):
-            connect_kwargs.update(kwargs)
-            return FakeConnection()
-
-    class FakeListen:
-        v1 = FakeV1()
-
-    class FakeClient:
-        def __init__(self, api_key: str):
-            _ = api_key
-            self.listen = FakeListen()
-
-    deepgram_pkg = types.ModuleType("deepgram")
-    deepgram_pkg.DeepgramClient = FakeClient
-    deepgram_core = types.ModuleType("deepgram.core")
-    deepgram_events = types.ModuleType("deepgram.core.events")
-    deepgram_events.EventType = FakeEventType
-    deepgram_ext = types.ModuleType("deepgram.extensions")
-    deepgram_ext_types = types.ModuleType("deepgram.extensions.types")
-    deepgram_sockets = types.ModuleType("deepgram.extensions.types.sockets")
-    deepgram_sockets.ListenV1ControlMessage = FakeControlMessage
-
-    monkeypatch.setitem(sys.modules, "deepgram", deepgram_pkg)
-    monkeypatch.setitem(sys.modules, "deepgram.core", deepgram_core)
-    monkeypatch.setitem(sys.modules, "deepgram.core.events", deepgram_events)
-    monkeypatch.setitem(sys.modules, "deepgram.extensions", deepgram_ext)
-    monkeypatch.setitem(sys.modules, "deepgram.extensions.types", deepgram_ext_types)
-    monkeypatch.setitem(sys.modules, "deepgram.extensions.types.sockets", deepgram_sockets)
-    monkeypatch.setattr(deepgram_module.threading, "Thread", NoopThread)
-
     session._audio_q.put_nowait(_STOP)
     session._run_sync()
     await asyncio.sleep(0)
 
-    assert "keyterm" not in connect_kwargs
+    assert "keyterm" not in fake_deepgram_modules.connect_kwargs
 
 
 @pytest.mark.asyncio
 async def test_deepgram_session_run_sync_omits_keyterm_for_unsupported_model(
-    monkeypatch: pytest.MonkeyPatch,
+    fake_deepgram_modules,
 ) -> None:
     session = _make_session(model="nova-2", keyterms=["Puripuly"])
     session._loop = asyncio.get_running_loop()
     session._connect_started_at = 1.0
 
-    connect_kwargs: dict[str, object] = {}
-
-    class FakeEventType:
-        OPEN = "open"
-        MESSAGE = "message"
-        ERROR = "error"
-        CLOSE = "close"
-
-    class FakeControlMessage:
-        def __init__(self, type: str):
-            self.type = type
-
-    class FakeConnection:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def on(self, event_type, callback):
-            if event_type == FakeEventType.OPEN:
-                callback(object())
-
-        def start_listening(self):
-            return None
-
-        def send_control(self, message):
-            _ = message
-
-        def send_media(self, data: bytes):
-            _ = data
-
-    class FakeV1:
-        def connect(self, **kwargs):
-            connect_kwargs.update(kwargs)
-            return FakeConnection()
-
-    class FakeListen:
-        v1 = FakeV1()
-
-    class FakeClient:
-        def __init__(self, api_key: str):
-            _ = api_key
-            self.listen = FakeListen()
-
-    deepgram_pkg = types.ModuleType("deepgram")
-    deepgram_pkg.DeepgramClient = FakeClient
-    deepgram_core = types.ModuleType("deepgram.core")
-    deepgram_events = types.ModuleType("deepgram.core.events")
-    deepgram_events.EventType = FakeEventType
-    deepgram_ext = types.ModuleType("deepgram.extensions")
-    deepgram_ext_types = types.ModuleType("deepgram.extensions.types")
-    deepgram_sockets = types.ModuleType("deepgram.extensions.types.sockets")
-    deepgram_sockets.ListenV1ControlMessage = FakeControlMessage
-
-    monkeypatch.setitem(sys.modules, "deepgram", deepgram_pkg)
-    monkeypatch.setitem(sys.modules, "deepgram.core", deepgram_core)
-    monkeypatch.setitem(sys.modules, "deepgram.core.events", deepgram_events)
-    monkeypatch.setitem(sys.modules, "deepgram.extensions", deepgram_ext)
-    monkeypatch.setitem(sys.modules, "deepgram.extensions.types", deepgram_ext_types)
-    monkeypatch.setitem(sys.modules, "deepgram.extensions.types.sockets", deepgram_sockets)
-    monkeypatch.setattr(deepgram_module.threading, "Thread", NoopThread)
-
     session._audio_q.put_nowait(_STOP)
     session._run_sync()
     await asyncio.sleep(0)
 
-    assert "keyterm" not in connect_kwargs
+    assert "keyterm" not in fake_deepgram_modules.connect_kwargs
