@@ -36,6 +36,34 @@ from puripuly_heart.ui.views.settings import SettingsView
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
+def _make_process_warning_view(
+    *,
+    stt_showing_warning: bool = False,
+    translation_showing_warning: bool = False,
+) -> tuple[DashboardView, list[str]]:
+    view = DashboardView.__new__(DashboardView)
+    view._stt_showing_warning = stt_showing_warning
+    view._translation_showing_warning = translation_showing_warning
+    view._process_capture_warning_active = False
+    view._process_capture_warning_reason = None
+    view._process_capture_warning_locale = None
+    view._process_capture_warning_text = ""
+    view._current_display_text = None
+    view._primary_display_revision = 0
+    view._process_capture_warning_display_revision = None
+    view._overlay_peer_contract = None
+    displays: list[str] = []
+
+    def set_display_text(text: str, **_kwargs: object) -> None:
+        view._primary_display_revision += 1
+        view._current_display_text = text
+        displays.append(text)
+
+    view.set_display_text = set_display_text  # type: ignore[method-assign]
+    view._sync_overlay_peer_buttons = lambda: None  # type: ignore[method-assign]
+    return view, displays
+
+
 def _presentation(
     app: object,
     *,
@@ -598,26 +626,7 @@ def test_settings_capture_target_rebase_updates_all_retained_apply_sources(
 
 
 def test_dashboard_process_warning_clears_on_success_without_touching_other_warnings() -> None:
-    view = DashboardView.__new__(DashboardView)
-    view._stt_showing_warning = False
-    view._translation_showing_warning = False
-    view._process_capture_warning_active = False
-    view._process_capture_warning_reason = None
-    view._process_capture_warning_locale = None
-    view._process_capture_warning_text = ""
-    view._current_display_text = None
-    view._primary_display_revision = 0
-    view._process_capture_warning_display_revision = None
-    view._overlay_peer_contract = None
-    displays: list[str] = []
-
-    def set_display_text(text: str, **_kwargs: object) -> None:
-        view._primary_display_revision += 1
-        view._current_display_text = text
-        displays.append(text)
-
-    view.set_display_text = set_display_text  # type: ignore[method-assign]
-    view._sync_overlay_peer_buttons = lambda: None  # type: ignore[method-assign]
+    view, displays = _make_process_warning_view()
 
     warning = build_overlay_peer_consumer_contract(
         overlay_intent_enabled=True,
@@ -645,26 +654,7 @@ def test_dashboard_process_warning_clears_on_success_without_touching_other_warn
 
 
 def test_dashboard_process_warning_clears_on_peer_disabled() -> None:
-    view = DashboardView.__new__(DashboardView)
-    view._stt_showing_warning = False
-    view._translation_showing_warning = False
-    view._process_capture_warning_active = False
-    view._process_capture_warning_reason = None
-    view._process_capture_warning_locale = None
-    view._process_capture_warning_text = ""
-    view._current_display_text = None
-    view._primary_display_revision = 0
-    view._process_capture_warning_display_revision = None
-    view._overlay_peer_contract = None
-    displays: list[str] = []
-
-    def set_display_text(text: str, **_kwargs: object) -> None:
-        view._primary_display_revision += 1
-        view._current_display_text = text
-        displays.append(text)
-
-    view.set_display_text = set_display_text  # type: ignore[method-assign]
-    view._sync_overlay_peer_buttons = lambda: None  # type: ignore[method-assign]
+    view, displays = _make_process_warning_view()
 
     warning = build_overlay_peer_consumer_contract(
         overlay_intent_enabled=True,
@@ -689,26 +679,7 @@ def test_dashboard_process_warning_clears_on_peer_disabled() -> None:
 
 
 def test_dashboard_process_warning_does_not_clear_stt_warning_content() -> None:
-    view = DashboardView.__new__(DashboardView)
-    view._stt_showing_warning = True
-    view._translation_showing_warning = False
-    view._process_capture_warning_active = False
-    view._process_capture_warning_reason = None
-    view._process_capture_warning_locale = None
-    view._process_capture_warning_text = ""
-    view._current_display_text = None
-    view._primary_display_revision = 0
-    view._process_capture_warning_display_revision = None
-    view._overlay_peer_contract = None
-    displays: list[str] = []
-
-    def set_display_text(text: str, **_kwargs: object) -> None:
-        view._primary_display_revision += 1
-        view._current_display_text = text
-        displays.append(text)
-
-    view.set_display_text = set_display_text  # type: ignore[method-assign]
-    view._sync_overlay_peer_buttons = lambda: None  # type: ignore[method-assign]
+    view, displays = _make_process_warning_view(stt_showing_warning=True)
 
     warning = build_overlay_peer_consumer_contract(
         overlay_intent_enabled=True,
@@ -738,26 +709,7 @@ def test_dashboard_process_warning_does_not_clear_stt_warning_content() -> None:
 def test_dashboard_process_warning_does_not_clear_newer_display_content(
     peer_enabled: bool,
 ) -> None:
-    view = DashboardView.__new__(DashboardView)
-    view._stt_showing_warning = False
-    view._translation_showing_warning = False
-    view._process_capture_warning_active = False
-    view._process_capture_warning_reason = None
-    view._process_capture_warning_locale = None
-    view._process_capture_warning_text = ""
-    view._current_display_text = None
-    view._primary_display_revision = 0
-    view._process_capture_warning_display_revision = None
-    view._overlay_peer_contract = None
-    displays: list[str] = []
-
-    def set_display_text(text: str, **_kwargs: object) -> None:
-        view._primary_display_revision += 1
-        view._current_display_text = text
-        displays.append(text)
-
-    view.set_display_text = set_display_text  # type: ignore[method-assign]
-    view._sync_overlay_peer_buttons = lambda: None  # type: ignore[method-assign]
+    view, displays = _make_process_warning_view()
     warning = build_overlay_peer_consumer_contract(
         overlay_intent_enabled=True,
         overlay_state="connected",
@@ -782,26 +734,7 @@ def test_dashboard_process_warning_does_not_clear_newer_display_content(
 
 
 def test_dashboard_process_warning_does_not_clear_newer_matching_primary_text() -> None:
-    view = DashboardView.__new__(DashboardView)
-    view._stt_showing_warning = False
-    view._translation_showing_warning = False
-    view._process_capture_warning_active = False
-    view._process_capture_warning_reason = None
-    view._process_capture_warning_locale = None
-    view._process_capture_warning_text = ""
-    view._current_display_text = None
-    view._primary_display_revision = 0
-    view._process_capture_warning_display_revision = None
-    view._overlay_peer_contract = None
-    displays: list[str] = []
-
-    def set_display_text(text: str, **_kwargs: object) -> None:
-        view._primary_display_revision += 1
-        view._current_display_text = text
-        displays.append(text)
-
-    view.set_display_text = set_display_text  # type: ignore[method-assign]
-    view._sync_overlay_peer_buttons = lambda: None  # type: ignore[method-assign]
+    view, displays = _make_process_warning_view()
     warning = build_overlay_peer_consumer_contract(
         overlay_intent_enabled=True,
         overlay_state="connected",
