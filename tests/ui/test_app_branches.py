@@ -1494,13 +1494,7 @@ def test_on_runtime_logging_mode_change_updates_controller_and_logs_view() -> No
     assert seen == ["detailed", "view:detailed"]
 
 
-@pytest.mark.asyncio
-async def test_main_gui_routes_update_check_through_app_log_helper(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    page = DummyPage()
-    seen: dict[str, object] = {}
-
+def _make_fake_main_gui_app(seen: dict[str, object]) -> type:
     class FakeController:
         async def start(self) -> None:
             seen["started"] = True
@@ -1547,6 +1541,17 @@ async def test_main_gui_routes_update_check_through_app_log_helper(
 
             seen["after_launch_task"] = asyncio.create_task(run())
 
+    return FakeApp
+
+
+@pytest.mark.asyncio
+async def test_main_gui_routes_update_check_through_app_log_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = DummyPage()
+    seen: dict[str, object] = {}
+    FakeApp = _make_fake_main_gui_app(seen)
+
     async def fake_check_and_notify_update(incoming_page, *, log_detailed=None) -> None:
         seen["check"] = (incoming_page, log_detailed)
 
@@ -1573,51 +1578,7 @@ async def test_main_gui_forwards_debug_ui_preview_flag(
 ) -> None:
     page = DummyPage()
     seen: dict[str, object] = {}
-
-    class FakeController:
-        async def start(self) -> None:
-            seen["started"] = True
-
-    class FakeApp:
-        def __init__(
-            self,
-            incoming_page,
-            *,
-            config_path,
-            application_factory,
-            debug_ui_preview=False,
-            allow_stable_settings_import=False,
-            runtime_logging_sinks=None,
-            vrchat_osc_presence=None,
-        ):
-            seen["init"] = (incoming_page, config_path, debug_ui_preview)
-            self.page = incoming_page
-            _ = (
-                application_factory,
-                allow_stable_settings_import,
-                runtime_logging_sinks,
-                vrchat_osc_presence,
-            )
-            backend = FakeController()
-            self.application = compose_test_ui_application_boundary(backend)
-
-        async def _on_page_lifecycle_end(self, _event=None) -> None:
-            return None
-
-        async def shutdown(self) -> None:
-            await self.application.stop()
-
-        def _log_detailed(self, message: str, *, level: int = app_module.logging.INFO) -> None:
-            _ = (message, level)
-
-        def schedule_after_launch_tasks(self) -> None:
-            async def run() -> None:
-                await app_module._check_and_notify_update(
-                    self.page,
-                    log_detailed=self._log_detailed,
-                )
-
-            seen["after_launch_task"] = asyncio.create_task(run())
+    FakeApp = _make_fake_main_gui_app(seen)
 
     async def fake_check_and_notify_update(incoming_page, *, log_detailed=None) -> None:
         seen["check"] = (incoming_page, log_detailed)
