@@ -401,90 +401,121 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 
 ---
 
+## 架构
+
+参见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+
+---
+
 ## 开发
 
-### 开发环境概览
+### 环境
 
-| 领域 | 推荐环境 |
-|---|---|
-| Python 应用 | Windows |
-| VR 浮层 | Windows |
-| Broker 服务 | Linux / WSL |
+| 领域 | 推荐环境 | 文档 |
+|---|---|---|
+| Python 桌面应用 | Windows | 本节 |
+| Broker 服务 | Linux | [`broker/README.md`](broker/README.md) |
+| 原生 VR 浮层 | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
 
-### Python 应用
+### Python 环境
 
-```bash
+Python 应用需要 Python 3.12 或 3.13。
+
+创建并激活 Windows 环境：
+
+```powershell
 python -m venv .venv
-.venv\Scripts\activate  # Windows
+.venv\Scripts\Activate.ps1
 ```
 
-```bash
-# pip
-pip install -e '.[dev]'
+安装应用和开发依赖：
 
-# 或者 uv
+```powershell
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+也可以使用 `uv`：
+
+```powershell
 uv sync --dev
 ```
 
-```bash
+安装仓库钩子：
+
+```powershell
 pre-commit install
 ```
 
-### 运行 GUI
+在 Linux 或 WSL 中工作时，请使用 `.venv-wsl`（如果可用）。
 
 ```bash
-# 激活虚拟环境后
-python -m puripuly_heart.main run-gui
+UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --dev
+```
 
-# 或通过 uv 运行
+配置了 `direnv` 的仓库可通过以下命令运行：
+
+```bash
+direnv exec . <command>
+```
+
+### 运行应用
+
+运行 Flet 桌面应用：
+
+```powershell
+python -m puripuly_heart.main run-gui
+```
+
+等效的 `uv` 命令：
+
+```powershell
 uv run python -m puripuly_heart.main run-gui
 ```
 
-```bash
-# 可查看隐藏的 UI
+隐藏 UI 状态的开发者预览控件通过以下命令启用：
+
+```powershell
 python -m puripuly_heart.main run-gui --debug-ui-preview
 ```
 
-### 测试与代码检查
+### Python 验证
 
-```bash
-black src tests          # 格式化
-ruff check src tests     # 代码检查
-python -m pytest         # 测试 (建议在虚拟环境中运行)
-```
-
-### VR 浮层
-
-VR 字幕浮层在 `native/overlay/` 的 Rust 项目中构建。
+格式化 Python 源码和测试：
 
 ```powershell
-cargo test --manifest-path native/overlay/Cargo.toml -q
-
-cargo build `
-  --manifest-path native/overlay/Cargo.toml `
-  --locked `
-  --release `
-  --bin PuriPulyHeartOverlay `
-  --target-dir target
-
-New-Item -ItemType Directory -Force -Path build/overlay | Out-Null
-Copy-Item target/release/PuriPulyHeartOverlay.exe build/overlay/PuriPulyHeartOverlay.exe -Force
-Copy-Item third_party/openvr/win64/openvr_api.dll build/overlay/openvr_api.dll -Force
-
-.\build\overlay\PuriPulyHeartOverlay.exe --check-startup-contract
+black src tests
 ```
 
-### Broker 服务
+仅检查格式而不修改文件：
 
-详情请参阅 `broker/README.md`。
-
-```bash
-pnpm install --frozen-lockfile
-pnpm run typecheck
-pnpm exec vitest run
-pnpm --filter @puripuly-heart/broker run verify:config
-pnpm --filter @puripuly-heart/broker run dev
+```powershell
+black --check src tests
 ```
+
+运行代码检查：
+
+```powershell
+ruff check src tests
+```
+
+运行完整的 Python 测试套件：
+
+```powershell
+python -m pytest
+```
+
+开发时运行指定的测试文件或目录：
+
+```powershell
+python -m pytest tests/path/to/test_file.py
+```
+
+### 其他领域
+
+Broker 文档维护于 [`broker/README.md`](broker/README.md)。
+
+原生 VR 浮层文档维护于 [`native/overlay/README.md`](native/overlay/README.md)。
 
 ---
 

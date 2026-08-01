@@ -403,90 +403,121 @@ Authorize 버튼을 눌렀는데도 인증이 안되어 있다면 재시도 하�
 
 ---
 
+## 아키텍처
+
+[`ARCHITECTURE.md`](ARCHITECTURE.md)를 참고하세요.
+
+---
+
 ## 개발
 
-### 개발 환경 요약
+### 환경
 
-| 영역 | 권장 환경 |
-|---|---|
-| Python 앱 | Windows |
-| VR 오버레이 | Windows |
-| Broker 서비스 | Linux / WSL |
+| 영역 | 권장 환경 | 문서 |
+|---|---|---|
+| Python 데스크톱 앱 | Windows | 이 섹션 |
+| Broker 서비스 | Linux | [`broker/README.md`](broker/README.md) |
+| 네이티브 VR 오버레이 | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
 
-### Python 앱
+### Python 환경
 
-```bash
+Python 앱은 Python 3.12 또는 3.13이 필요해요.
+
+Windows 환경을 만들고 활성화하세요:
+
+```powershell
 python -m venv .venv
-.venv\Scripts\activate  # Windows
+.venv\Scripts\Activate.ps1
 ```
 
-```bash
-# pip
-pip install -e '.[dev]'
+앱과 개발 의존성을 설치하세요:
 
-# 또는 uv
+```powershell
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+`uv`를 사용해도 됩니다:
+
+```powershell
 uv sync --dev
 ```
 
-```bash
+저장소 훅을 설치하세요:
+
+```powershell
 pre-commit install
 ```
 
-### GUI 실행
+Linux 또는 WSL에서 작업할 때는 `.venv-wsl`이 있으면 사용하세요.
 
 ```bash
-# 가상환경 활성화 후
-python -m puripuly_heart.main run-gui
+UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --dev
+```
 
-# 또는 uv를 통해 실행
+`direnv`로 구성된 저장소에서는 다음 명령으로 실행할 수 있어요:
+
+```bash
+direnv exec . <command>
+```
+
+### 앱 실행
+
+Flet 데스크톱 앱을 실행하세요:
+
+```powershell
+python -m puripuly_heart.main run-gui
+```
+
+동일한 `uv` 명령은:
+
+```powershell
 uv run python -m puripuly_heart.main run-gui
 ```
 
-```bash
-# 숨겨진 UI 확인 가능
+숨겨진 UI 상태를 위한 개발자 미리보기 컨트롤은 다음으로 활성화해요:
+
+```powershell
 python -m puripuly_heart.main run-gui --debug-ui-preview
 ```
 
-### 테스트와 린트
+### Python 검증
 
-```bash
-black src tests          # 포맷
-ruff check src tests     # 린트
-python -m pytest         # 테스트 (가상환경에서 실행 권장)
-```
-
-### VR 오버레이
-
-VR 자막 오버레이는 `native/overlay/`의 Rust 프로젝트에서 빌드해요.
+Python 소스와 테스트를 포맷하세요:
 
 ```powershell
-cargo test --manifest-path native/overlay/Cargo.toml -q
-
-cargo build `
-  --manifest-path native/overlay/Cargo.toml `
-  --locked `
-  --release `
-  --bin PuriPulyHeartOverlay `
-  --target-dir target
-
-New-Item -ItemType Directory -Force -Path build/overlay | Out-Null
-Copy-Item target/release/PuriPulyHeartOverlay.exe build/overlay/PuriPulyHeartOverlay.exe -Force
-Copy-Item third_party/openvr/win64/openvr_api.dll build/overlay/openvr_api.dll -Force
-
-.\build\overlay\PuriPulyHeartOverlay.exe --check-startup-contract
+black src tests
 ```
 
-### Broker 서비스
+파일을 수정하지 않고 포맷을 확인하려면:
 
-자세한 내용은 `broker/README.md`를 참고하세요.
-
-```bash
-pnpm install --frozen-lockfile
-pnpm run typecheck
-pnpm exec vitest run
-pnpm --filter @puripuly-heart/broker run verify:config
-pnpm --filter @puripuly-heart/broker run dev
+```powershell
+black --check src tests
 ```
+
+린트 검사를 실행하세요:
+
+```powershell
+ruff check src tests
+```
+
+전체 Python 테스트 스위트를 실행하세요:
+
+```powershell
+python -m pytest
+```
+
+개발 중 특정 테스트 파일이나 디렉터리를 실행하려면:
+
+```powershell
+python -m pytest tests/path/to/test_file.py
+```
+
+### 기타 영역
+
+Broker 문서는 [`broker/README.md`](broker/README.md)에서 관리해요.
+
+네이티브 VR 오버레이 문서는 [`native/overlay/README.md`](native/overlay/README.md)에서 관리해요.
 
 ---
 

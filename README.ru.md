@@ -404,90 +404,121 @@ PuriPuly работает лучше всего с облачным STT.
 
 ---
 
+## Архитектура
+
+См. [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+---
+
 ## Разработка
 
-### Обзор окружения
+### Окружения
 
-| Область | Рекомендуемое окружение |
-|---|---|
-| Python-приложение | Windows |
-| VR-оверлей | Windows |
-| Сервис-брокер | Linux / WSL |
+| Область | Рекомендуемое окружение | Документация |
+|---|---|---|
+| Python-приложение для рабочего стола | Windows | Этот раздел |
+| Сервис-брокер | Linux | [`broker/README.md`](broker/README.md) |
+| Нативный VR-оверлей | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
 
-### Python-приложение
+### Python-окружение
 
-```bash
+Python-приложению требуется Python 3.12 или 3.13.
+
+Создайте и активируйте окружение Windows:
+
+```powershell
 python -m venv .venv
-.venv\Scripts\activate  # Windows
+.venv\Scripts\Activate.ps1
 ```
 
-```bash
-# pip
-pip install -e '.[dev]'
+Установите приложение и зависимости для разработки:
 
-# или uv
+```powershell
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+Вместо этого можно использовать `uv`:
+
+```powershell
 uv sync --dev
 ```
 
-```bash
+Установите хуки репозитория:
+
+```powershell
 pre-commit install
 ```
 
-### Запуск GUI
+Для работы в Linux или WSL используйте `.venv-wsl`, если он доступен.
 
 ```bash
-# После активации venv
-python -m puripuly_heart.main run-gui
+UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --dev
+```
 
-# или через uv
+В репозиториях с настроенным `direnv` команды можно запускать так:
+
+```bash
+direnv exec . <command>
+```
+
+### Запуск приложения
+
+Запустите Flet-приложение для рабочего стола:
+
+```powershell
+python -m puripuly_heart.main run-gui
+```
+
+Эквивалентная команда с `uv`:
+
+```powershell
 uv run python -m puripuly_heart.main run-gui
 ```
 
-```bash
-# Показывает скрытые элементы интерфейса
+Элементы предпросмотра для разработчика (скрытые состояния интерфейса) включаются так:
+
+```powershell
 python -m puripuly_heart.main run-gui --debug-ui-preview
 ```
 
-### Тесты и линтинг
+### Проверка Python-кода
 
-```bash
-black src tests          # Форматирование
-ruff check src tests     # Линтинг
-python -m pytest         # Тесты (рекомендуется внутри venv)
-```
-
-### VR-оверлей
-
-VR-оверлей субтитров собирается из Rust-проекта в `native/overlay/`.
+Отформатируйте исходники и тесты Python:
 
 ```powershell
-cargo test --manifest-path native/overlay/Cargo.toml -q
-
-cargo build `
-  --manifest-path native/overlay/Cargo.toml `
-  --locked `
-  --release `
-  --bin PuriPulyHeartOverlay `
-  --target-dir target
-
-New-Item -ItemType Directory -Force -Path build/overlay | Out-Null
-Copy-Item target/release/PuriPulyHeartOverlay.exe build/overlay/PuriPulyHeartOverlay.exe -Force
-Copy-Item third_party/openvr/win64/openvr_api.dll build/overlay/openvr_api.dll -Force
-
-.\build\overlay\PuriPulyHeartOverlay.exe --check-startup-contract
+black src tests
 ```
 
-### Сервис-брокер
+Проверка форматирования без изменения файлов:
 
-Подробности — в `broker/README.md`.
-
-```bash
-pnpm install --frozen-lockfile
-pnpm run typecheck
-pnpm exec vitest run
-pnpm --filter @puripuly-heart/broker run verify:config
-pnpm --filter @puripuly-heart/broker run dev
+```powershell
+black --check src tests
 ```
+
+Запуск проверок линтером:
+
+```powershell
+ruff check src tests
+```
+
+Запуск полного набора тестов Python:
+
+```powershell
+python -m pytest
+```
+
+Запуск конкретного файла или каталога тестов во время разработки:
+
+```powershell
+python -m pytest tests/path/to/test_file.py
+```
+
+### Прочие области
+
+Документация брокера ведётся в [`broker/README.md`](broker/README.md).
+
+Документация нативного VR-оверлея ведётся в [`native/overlay/README.md`](native/overlay/README.md).
 
 ---
 

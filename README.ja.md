@@ -403,90 +403,121 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 
 ---
 
+## アーキテクチャ
+
+[`ARCHITECTURE.md`](ARCHITECTURE.md) を参照してください。
+
+---
+
 ## 開発
 
-### 開発環境のまとめ
+### 環境
 
-| 領域 | 推奨環境 |
-|---|---|
-| Python アプリ | Windows |
-| VR オーバーレイ | Windows |
-| Broker サービス | Linux / WSL |
+| 領域 | 推奨環境 | ドキュメント |
+|---|---|---|
+| Python デスクトップアプリ | Windows | このセクション |
+| Broker サービス | Linux | [`broker/README.md`](broker/README.md) |
+| ネイティブ VR オーバーレイ | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
 
-### Python アプリ
+### Python 環境
 
-```bash
+Python アプリには Python 3.12 または 3.13 が必要です。
+
+Windows 環境を作成して有効化します:
+
+```powershell
 python -m venv .venv
-.venv\Scripts\activate  # Windows
+.venv\Scripts\Activate.ps1
 ```
 
-```bash
-# pip
-pip install -e '.[dev]'
+アプリと開発用依存関係をインストールします:
 
-# または uv
+```powershell
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+`uv` を使っても構いません:
+
+```powershell
 uv sync --dev
 ```
 
-```bash
+リポジトリのフックをインストールします:
+
+```powershell
 pre-commit install
 ```
 
-### GUI 実行
+Linux や WSL で作業する場合は、利用可能なら `.venv-wsl` を使用します。
 
 ```bash
-# 仮想環境を有効化した後
-python -m puripuly_heart.main run-gui
+UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --dev
+```
 
-# または uv で実行
+`direnv` が設定されたリポジトリでは、次のようにコマンドを実行できます:
+
+```bash
+direnv exec . <command>
+```
+
+### アプリの実行
+
+Flet デスクトップアプリを実行します:
+
+```powershell
+python -m puripuly_heart.main run-gui
+```
+
+同等の `uv` コマンド:
+
+```powershell
 uv run python -m puripuly_heart.main run-gui
 ```
 
-```bash
-# 隠れたUIを確認可能
+隠れた UI 状態の開発者プレビュー機能は次で有効になります:
+
+```powershell
 python -m puripuly_heart.main run-gui --debug-ui-preview
 ```
 
-### テストとリント
+### Python の検証
 
-```bash
-black src tests          # フォーマット
-ruff check src tests     # リント
-python -m pytest         # テスト（仮想環境での実行を推奨）
-```
-
-### VR オーバーレイ
-
-VR字幕オーバーレイは `native/overlay/` のRustプロジェクトでビルドします。
+Python ソースとテストをフォーマットします:
 
 ```powershell
-cargo test --manifest-path native/overlay/Cargo.toml -q
-
-cargo build `
-  --manifest-path native/overlay/Cargo.toml `
-  --locked `
-  --release `
-  --bin PuriPulyHeartOverlay `
-  --target-dir target
-
-New-Item -ItemType Directory -Force -Path build/overlay | Out-Null
-Copy-Item target/release/PuriPulyHeartOverlay.exe build/overlay/PuriPulyHeartOverlay.exe -Force
-Copy-Item third_party/openvr/win64/openvr_api.dll build/overlay/openvr_api.dll -Force
-
-.\build\overlay\PuriPulyHeartOverlay.exe --check-startup-contract
+black src tests
 ```
 
-### Broker サービス
+ファイルを変更せずにフォーマットを確認します:
 
-詳しくは `broker/README.md` を参照してください。
-
-```bash
-pnpm install --frozen-lockfile
-pnpm run typecheck
-pnpm exec vitest run
-pnpm --filter @puripuly-heart/broker run verify:config
-pnpm --filter @puripuly-heart/broker run dev
+```powershell
+black --check src tests
 ```
+
+リントチェックを実行します:
+
+```powershell
+ruff check src tests
+```
+
+Python テストスイート全体を実行します:
+
+```powershell
+python -m pytest
+```
+
+開発中に特定のテストファイルやディレクトリを実行する場合:
+
+```powershell
+python -m pytest tests/path/to/test_file.py
+```
+
+### その他の領域
+
+Broker のドキュメントは [`broker/README.md`](broker/README.md) で管理されています。
+
+ネイティブ VR オーバーレイのドキュメントは [`native/overlay/README.md`](native/overlay/README.md) で管理されています。
 
 ---
 
