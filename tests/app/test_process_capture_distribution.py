@@ -122,7 +122,7 @@ def test_runtime_report_requires_native_hash_strict_mode_and_no_fallback(tmp_pat
     report = {
         "schema": "puripuly-heart/process-capture-packaged-smoke/v1",
         "status": "passed",
-        "proctap_version": "1.0.3",
+        "proctap_version": "1.1.1",
         "proctap_module": str(tmp_path / "proctap" / "__init__.py"),
         "runtime_native_module": str(native),
         "runtime_native_sha256": hashlib.sha256(b"native").hexdigest(),

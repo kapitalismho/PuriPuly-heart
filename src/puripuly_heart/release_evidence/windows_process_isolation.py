@@ -598,7 +598,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
     from puripuly_heart.core.audio.process_source import (
         ProcessAudioCaptureSource,
         ProcTapProcessAudioCaptureFactory,
-        verify_proctap_1_0_3_process_specific,
+        verify_proctap_process_specific,
     )
     from puripuly_heart.core.peer_capture import (
         PeerCaptureAdmission,
@@ -732,7 +732,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
 
         def create(self, *, pid: int, on_data) -> ObservedCapture:  # noqa: ANN001
             capture = self.delegate.create(pid=pid, on_data=on_data)
-            native_mode_observations.append(verify_proctap_1_0_3_process_specific(capture))
+            native_mode_observations.append(verify_proctap_process_specific(capture))
             return ObservedCapture(capture)
 
     observed_capture_factory = ObservedCaptureFactory()
@@ -876,7 +876,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
             pid=first_child_pid,
             on_data=on_direct_child_data,
         )
-        direct_native_mode = verify_proctap_1_0_3_process_specific(direct_capture)
+        direct_native_mode = verify_proctap_process_specific(direct_capture)
         direct_child_activation_s = time.monotonic() - fixture_started
         try:
             direct_capture.start()

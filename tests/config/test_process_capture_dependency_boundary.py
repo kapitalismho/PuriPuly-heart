@@ -28,7 +28,7 @@ def test_process_capture_dependencies_use_the_exact_supported_platform_marker() 
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     dependencies = pyproject["project"]["dependencies"]
 
-    assert f"proc-tap==1.0.3; {PROCESS_CAPTURE_MARKER}" in dependencies
+    assert f"proc-tap==1.1.1; {PROCESS_CAPTURE_MARKER}" in dependencies
     assert f"psutil>=5.9; {PROCESS_CAPTURE_MARKER}" in dependencies
 
 
@@ -47,14 +47,14 @@ def test_uv_lock_covers_pinned_proctap_and_windows_process_dependency() -> None:
     )
 
     assert proctap is not None
-    assert proctap.group(1) == "1.0.3"
+    assert proctap.group(1) == "1.1.1"
     assert psutil is not None
     assert tuple(int(part) for part in psutil.group(1).split(".")[:2]) >= (5, 9)
-    assert "proc_tap-1.0.3-cp312-cp312-win_amd64.whl" in uv_lock
+    assert "proc_tap-1.1.1-cp312-cp312-win_amd64.whl" in uv_lock
     assert (
         '{ name = "proc-tap", marker = "'
         f"{PROCESS_CAPTURE_LOCK_MARKER}"
-        '", specifier = "==1.0.3" }'
+        '", specifier = "==1.1.1" }'
     ) in uv_lock
     assert (
         '{ name = "psutil", marker = "' f"{PROCESS_CAPTURE_LOCK_MARKER}" '", specifier = ">=5.9" }'

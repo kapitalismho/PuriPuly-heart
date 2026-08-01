@@ -36,7 +36,7 @@ def test_release_only_smoke_starts_strict_factory_and_hashes_packaged_native(
     source_module = SimpleNamespace(
         __file__=package_file,
         ProcTapProcessAudioCaptureFactory=lambda: SimpleNamespace(create=lambda **_kwargs: capture),
-        verify_proctap_1_0_3_process_specific=lambda _capture: True,
+        verify_proctap_process_specific=lambda _capture: True,
     )
     monkeypatch.setattr(
         smoke.importlib,
@@ -48,7 +48,7 @@ def test_release_only_smoke_starts_strict_factory_and_hashes_packaged_native(
             "proctap._native": SimpleNamespace(__file__=runtime_native),
         }[name],
     )
-    monkeypatch.setattr(smoke.importlib.metadata, "version", lambda _name: "1.0.3")
+    monkeypatch.setattr(smoke.importlib.metadata, "version", lambda _name: "1.1.1")
     monkeypatch.setattr(smoke.sys, "executable", str(helper_file))
     monkeypatch.setattr(smoke.time, "sleep", lambda _seconds: None)
 

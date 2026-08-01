@@ -78,7 +78,7 @@ def run_smoke(*, artifact_root: Path, report_path: Path) -> int:
             pid=os.getpid(),
             on_data=lambda _data, _frames: None,
         )
-        native_process_specific = process_source.verify_proctap_1_0_3_process_specific(capture)
+        native_process_specific = process_source.verify_proctap_process_specific(capture)
         capture.start()
         time.sleep(0.1)
         report = {

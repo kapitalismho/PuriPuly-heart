@@ -1273,17 +1273,17 @@ wheels = [
 
 [[package]]
 name = "proc-tap"
-version = "1.0.3"
+version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "scipy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/aa/67/b620f134a9609e16a9344e58f820a92efbb83a2609324bd2f1ed3b99faa5/proc_tap-1.0.3.tar.gz", hash = "sha256:f6b2c1bcd1cfca2428e6ee26493200c7d79d7ce7ffa442174a09f2787e20dd89", size = 105906, upload-time = "2025-12-09T14:51:24.139Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/69/01/95a17dc39efa23840a1d57ac2cdf8595cf9cf46e9d2320e596b6c043e9e6/proc_tap-1.1.1.tar.gz", hash = "sha256:995e7007d3a231084be1412c57af3af16cff2845a93eabf2cdeb6b23a3e39fe2", size = 133142, upload-time = "2026-07-22T12:36:26.426Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f6/2c/165217a8df09088adc974495ca9e316ebe19f1d8f600197cfd13ad95c9a9/proc_tap-1.0.3-cp312-cp312-win_amd64.whl", hash = "sha256:48ddc19b36db2ee67d78eabe5a49a7f5e445de71011d870e3dd7be064d2f474f", size = 105997, upload-time = "2025-12-09T14:51:18.648Z" },
-    { url = "https://files.pythonhosted.org/packages/23/d5/210cb5c95c2250adddf8a0c79fb2b759e4c84b7e36cd16417c050e2201f1/proc_tap-1.0.3-cp313-cp313-win_amd64.whl", hash = "sha256:88c6246147fc437ca7b59d9042b71881939cd194042bda3a038228ce4979ee39", size = 105991, upload-time = "2025-12-09T14:51:20.227Z" },
-    { url = "https://files.pythonhosted.org/packages/0d/74/c6887c5e4955d4f17a4f649b7b2c310351094d6d25e2a241815d622f84a1/proc_tap-1.0.3-py3-none-any.whl", hash = "sha256:5e8b02863f787a992377b2c0c5e1f3680fac92d608caa79fed3a0de0bb58b72e", size = 85309, upload-time = "2025-12-09T14:51:21.81Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/7c/a58f5f3563303f697cf1fdc44a27c37283431367489cf3139c67df9625fe/proc_tap-1.1.1-cp312-cp312-win_amd64.whl", hash = "sha256:84b69a124859dfdf0a6b00cdb194dfc3ee5ca962a39e873475204253ba10f420", size = 125683, upload-time = "2026-07-22T12:36:17.178Z" },
+    { url = "https://files.pythonhosted.org/packages/25/ab/7abd9baf025eb2e087e68ba90eaf0b6001870493e8e5485ca0057569151e/proc_tap-1.1.1-cp313-cp313-win_amd64.whl", hash = "sha256:330e03d1c9dc2e6e8e785521cba45404dc963a52cb8f197136011b8b54e16542", size = 125679, upload-time = "2026-07-22T12:36:18.48Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/19/9fb53b602aab09bf39e2f5d080b86a0c146f3e71cf6f840af1ea148d2738/proc_tap-1.1.1-py3-none-any.whl", hash = "sha256:124e98f2a3ba6dcb135e7931689182142587fe008fc38c2e8884c8fabbf57c6b", size = 105708, upload-time = "2026-07-22T12:36:21.121Z" },
 ]
 
 [[package]]
@@ -1436,7 +1436,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.0" },
     { name = "onnxruntime", specifier = ">=1.18.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7.0" },
-    { name = "proc-tap", marker = "python_full_version == '3.12.*' and platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32'", specifier = "==1.0.3" },
+    { name = "proc-tap", marker = "python_full_version == '3.12.*' and platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32'", specifier = "==1.1.1" },
     { name = "psutil", marker = "python_full_version == '3.12.*' and platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32'", specifier = ">=5.9" },
     { name = "pyaudiowpatch", marker = "sys_platform == 'win32'" },
     { name = "pyinstaller", marker = "extra == 'build'", specifier = ">=6.0" },

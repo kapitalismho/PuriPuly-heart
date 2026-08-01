@@ -77,7 +77,7 @@ class ProcTapProcessAudioCaptureFactory:
         capture_type = getattr(module, "ProcessAudioCapture")
         capture = capture_type(pid, on_data=on_data)
         try:
-            verify_proctap_1_0_3_process_specific(capture)
+            verify_proctap_process_specific(capture)
         except Exception as exc:
             with contextlib.suppress(Exception):
                 capture.close()
@@ -89,7 +89,7 @@ class ProcTapProcessAudioCaptureFactory:
         return capture
 
 
-def verify_proctap_1_0_3_process_specific(capture: object) -> bool:
+def verify_proctap_process_specific(capture: object) -> bool:
     backend = getattr(capture, "_backend", None)
     native = getattr(backend, "_native", None)
     verifier = getattr(native, "is_process_specific", None)

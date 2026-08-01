@@ -63,7 +63,7 @@ def validate_runtime_report(report: dict[str, object], *, expected_root: Path) -
         raise ValueError("invalid process-capture runtime report schema")
     if (
         report.get("status") != "passed"
-        or report.get("proctap_version") != "1.0.3"
+        or report.get("proctap_version") != "1.1.1"
         or report.get("native_process_specific") is not True
         or report.get("capture_started") is not True
         or report.get("release_only_helper") is not True

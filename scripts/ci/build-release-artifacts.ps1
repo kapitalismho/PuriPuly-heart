@@ -309,7 +309,7 @@ function Invoke-ProcessCaptureRuntimeSmokeCheck {
     }
     $report = Get-Content -Path $ReportPath -Raw -Encoding utf8 | ConvertFrom-Json
     if ($report.status -ne "passed" -or
-        $report.proctap_version -ne "1.0.3" -or
+        $report.proctap_version -ne "1.1.1" -or
         $report.native_process_specific -ne $true -or
         $report.capture_started -ne $true -or
         $report.release_only_helper -ne $true -or
