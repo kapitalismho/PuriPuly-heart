@@ -415,7 +415,7 @@ Authorize 버튼을 눌렀는데도 인증이 안되어 있다면 재시도 하�
 
 | 영역 | 권장 환경 | 문서 |
 |---|---|---|
-| Python 데스크톱 앱 | Windows | 이 섹션 |
+| Python 데스크톱 앱 | Windows | 지금 섹션 |
 | Broker 서비스 | Linux | [`broker/README.md`](broker/README.md) |
 | 네이티브 VR 오버레이 | Windows | [`native/overlay/README.md`](native/overlay/README.md) |
 
