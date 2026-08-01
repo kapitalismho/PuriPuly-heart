@@ -59,6 +59,7 @@ if not gpu_worker_staged_path.exists():
     )
 
 from puripuly_heart.core.local_qwen_runtime import LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
+
 from puripuly_heart.core.overlay.openvr_vendor import collect_vendored_openvr_runtime_binaries
 
 block_cipher = None
@@ -211,6 +212,8 @@ hiddenimports = [
     "numpy._core._multiarray_umath",
     "soxr",
     "sounddevice",
+    "puripuly_heart.core.local_asr",
+    "puripuly_heart.core.local_asr.local_qwen_runtime",
     "puripuly_heart.config.process_capture_platform",
     "puripuly_heart.core.audio.process_source",
 ] + collect_submodules("proctap") + collect_submodules("huggingface_hub")

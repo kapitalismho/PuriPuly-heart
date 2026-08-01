@@ -67,6 +67,7 @@ asyncio_mode = "auto"
 [tool.black]
 line-length = 100
 target-version = ["py312"]
+force-exclude = "build\\.spec"
 
 [tool.ruff]
 line-length = 100
