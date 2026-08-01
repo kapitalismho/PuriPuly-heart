@@ -78,9 +78,18 @@ class ControlledSleeper:
         self.waiters[delay_s].pop(0).set()
 
 
+@dataclass(slots=True)
+class FakeRuntimeLogging:
+    messages: list[str] = field(default_factory=list)
+
+    def emit_basic(self, message: str, **_kwargs: object) -> None:
+        self.messages.append(message)
+
+
 @pytest.mark.asyncio
 async def test_fast_primary_does_not_start_scheduled_attempts() -> None:
     sleeper = ControlledSleeper()
+    runtime_logging = FakeRuntimeLogging()
     primary = FakeProvider("primary", result_text="primary")
     fallback = FakeProvider("fallback", result_text="fallback")
     provider = FallbackRacingLLMProvider(
@@ -89,6 +98,7 @@ async def test_fast_primary_does_not_start_scheduled_attempts() -> None:
             LLMProviderAttempt(fallback, start_after_ms=1300, start_on_primary_error=True),
         ),
         sleeper=sleeper,
+        runtime_logging=runtime_logging,
     )
 
     result = await provider.translate(**_kwargs())
@@ -96,20 +106,31 @@ async def test_fast_primary_does_not_start_scheduled_attempts() -> None:
     assert result.text == "primary"
     assert primary.started.is_set()
     assert not fallback.started.is_set()
+    assert runtime_logging.messages == []
     await provider.close()
 
 
 @pytest.mark.asyncio
 async def test_primary_error_starts_first_fallback_without_waiting_for_delay() -> None:
     sleeper = ControlledSleeper()
+    runtime_logging = FakeRuntimeLogging()
     primary = FakeProvider("primary", error=RuntimeError("primary"))
     fallback = FakeProvider("fallback", result_text="fallback")
     provider = FallbackRacingLLMProvider(
         attempts=(
             LLMProviderAttempt(primary),
-            LLMProviderAttempt(fallback, start_after_ms=1300, start_on_primary_error=True),
+            LLMProviderAttempt(
+                fallback,
+                start_after_ms=1300,
+                start_on_primary_error=True,
+                log_summary=(
+                    "provider=openrouter, model=google/gemma-4-31b-a4b-it, "
+                    "mode=latency, route=gemma4_31b_latency, delay=1300ms"
+                ),
+            ),
         ),
         sleeper=sleeper,
+        runtime_logging=runtime_logging,
     )
 
     result = await provider.translate(**_kwargs())
@@ -117,22 +138,44 @@ async def test_primary_error_starts_first_fallback_without_waiting_for_delay() -
     assert result.text == "fallback"
     assert fallback.started.is_set()
     assert sleeper.calls == [1.3]
+    assert runtime_logging.messages == [
+        "[LLM][Fallback] started, stage=1, provider=openrouter, "
+        "model=google/gemma-4-31b-a4b-it, mode=latency, "
+        "route=gemma4_31b_latency, delay=1300ms"
+    ]
     await provider.close()
 
 
 @pytest.mark.asyncio
 async def test_emergency_attempt_waits_for_schedule_after_earlier_errors() -> None:
     sleeper = ControlledSleeper()
+    runtime_logging = FakeRuntimeLogging()
     primary = FakeProvider("primary", error=RuntimeError("primary"))
     fallback = FakeProvider("fallback", error=RuntimeError("fallback"))
     emergency = FakeProvider("emergency", result_text="emergency")
     provider = FallbackRacingLLMProvider(
         attempts=(
             LLMProviderAttempt(primary),
-            LLMProviderAttempt(fallback, start_after_ms=1300, start_on_primary_error=True),
-            LLMProviderAttempt(emergency, start_after_ms=4500),
+            LLMProviderAttempt(
+                fallback,
+                start_after_ms=1300,
+                start_on_primary_error=True,
+                log_summary=(
+                    "provider=openrouter, model=google/gemma-4-31b-a4b-it, "
+                    "mode=latency, route=gemma4_31b_latency, delay=1300ms"
+                ),
+            ),
+            LLMProviderAttempt(
+                emergency,
+                start_after_ms=4500,
+                log_summary=(
+                    "provider=openrouter, model=google/gemma-4-31b-a4b-it, "
+                    "mode=latency, route=gemma4_31b_cerebras_only, delay=4500ms"
+                ),
+            ),
         ),
         sleeper=sleeper,
+        runtime_logging=runtime_logging,
     )
     task = asyncio.create_task(provider.translate(**_kwargs()))
 
@@ -146,6 +189,14 @@ async def test_emergency_attempt_waits_for_schedule_after_earlier_errors() -> No
 
     assert result.text == "emergency"
     assert emergency.started.is_set()
+    assert runtime_logging.messages == [
+        "[LLM][Fallback] started, stage=1, provider=openrouter, "
+        "model=google/gemma-4-31b-a4b-it, mode=latency, "
+        "route=gemma4_31b_latency, delay=1300ms",
+        "[LLM][Fallback] started, stage=2, provider=openrouter, "
+        "model=google/gemma-4-31b-a4b-it, mode=latency, "
+        "route=gemma4_31b_cerebras_only, delay=4500ms",
+    ]
     await provider.close()
 
 

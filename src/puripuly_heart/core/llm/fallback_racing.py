@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from puripuly_heart.core.llm.provider import LLMProvider
+from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.domain.models import Translation
 
@@ -17,6 +18,7 @@ class LLMProviderAttempt:
     provider: LLMProvider
     start_after_ms: int = 0
     start_on_primary_error: bool = False
+    log_summary: str | None = None
 
     def __post_init__(self) -> None:
         if self.start_after_ms < 0:
@@ -59,6 +61,7 @@ class FallbackRacingLLMProvider(LLMProvider):
     attempts: tuple[LLMProviderAttempt, ...] = ()
     clock: Callable[[], float] = time.monotonic
     sleeper: Callable[[float], Awaitable[None]] | None = None
+    runtime_logging: SessionRuntimeLoggingService | None = None
     _inflight_tasks: set[asyncio.Task[object]] = field(
         init=False,
         default_factory=set,
@@ -129,6 +132,7 @@ class FallbackRacingLLMProvider(LLMProvider):
                 self.attempts[index].provider.translate(**params)
             )
             provider_tasks[index] = task
+            self._emit_attempt_started(index)
 
         await start_attempt(0)
         for index, attempt in enumerate(self.attempts[1:], start=1):
@@ -330,6 +334,16 @@ class FallbackRacingLLMProvider(LLMProvider):
 
     def _elapsed_ms(self, started_at: float) -> int:
         return max(0, int(round((self.clock() - started_at) * 1000)))
+
+    def _emit_attempt_started(self, index: int) -> None:
+        if index == 0 or self.runtime_logging is None:
+            return
+        fields = ["[LLM][Fallback] started", f"stage={index}"]
+        summary = self.attempts[index].log_summary
+        if summary:
+            fields.append(summary)
+        with contextlib.suppress(Exception):
+            self.runtime_logging.emit_basic(", ".join(fields))
 
     @staticmethod
     def _consume_task_result(task: asyncio.Task[object]) -> None:

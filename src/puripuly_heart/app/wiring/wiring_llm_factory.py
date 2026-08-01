@@ -746,6 +746,24 @@ def _base_llm_provider_from_resolved_config(
     )
 
 
+def _fallback_attempt_log_summary(
+    target: ResolvedLLMTarget,
+    *,
+    start_after_ms: int,
+) -> str:
+    fields = [f"provider={target.provider}"]
+    if len(target.models) == 1:
+        fields.append(f"model={target.models[0]}")
+    else:
+        fields.append(f"models=[{','.join(target.models)}]")
+    if target.routing_mode:
+        fields.append(f"mode={target.routing_mode}")
+    if target.provider_routing:
+        fields.append(f"route={target.provider_routing}")
+    fields.append(f"delay={start_after_ms}ms")
+    return ", ".join(fields)
+
+
 def create_llm_provider_from_resolved_config(
     config: ResolvedLLMConfig,
     *,
@@ -797,6 +815,10 @@ def create_llm_provider_from_resolved_config(
                     ),
                     start_after_ms=attempt_plan.start_after_ms,
                     start_on_primary_error=attempt_plan.start_on_primary_error,
+                    log_summary=_fallback_attempt_log_summary(
+                        attempt_plan.target,
+                        start_after_ms=attempt_plan.start_after_ms,
+                    ),
                 )
             )
         base = FallbackRacingLLMProvider(
@@ -805,6 +827,7 @@ def create_llm_provider_from_resolved_config(
             attempts=tuple(attempt_providers),
             fallback_timeout_ms=config.attempts[1].start_after_ms,
             loser_grace_ms=config.loser_grace_ms,
+            runtime_logging=runtime_logging,
         )
     return SemaphoreLLMProvider(
         inner=base,
