@@ -158,10 +158,13 @@ def _build_provider_preferences(
             "only": ["cerebras/fp16"],
             "allow_fallbacks": False,
         }
-    if provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY:
+    if provider_routing in (
+        OpenRouterProviderRouting.DEEPSEEK_ONLY,
+        OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY,
+    ):
         return {
-            "sort": "latency",
-            "only": ["deepseek", "baidu"],
+            "only": ["baidu", "deepseek", "cloudflare"],
+            "sort": {"by": "latency"},
             "allow_fallbacks": True,
         }
     if provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY:
@@ -179,8 +182,8 @@ def _build_provider_preferences(
         }
     if model == "deepseek/deepseek-v4-flash":
         return {
-            "sort": "latency",
-            "only": ["deepseek", "parasail", "Fireworks", "Baidu Qianfan"],
+            "only": ["baidu", "deepseek", "cloudflare"],
+            "sort": {"by": "latency"},
             "allow_fallbacks": True,
         }
     return {

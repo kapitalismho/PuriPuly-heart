@@ -321,8 +321,16 @@ async def test_httpx_openrouter_client_google_gemini_latency_denies_data_collect
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_deepseek_only_routing_uses_deepseek_baidu_order(
+@pytest.mark.parametrize(
+    "provider_routing",
+    [
+        OpenRouterProviderRouting.DEEPSEEK_ONLY,
+        OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY,
+    ],
+)
+async def test_httpx_openrouter_client_deepseek_routing_uses_latency_pool(
     monkeypatch,
+    provider_routing: OpenRouterProviderRouting,
 ) -> None:
     fake_client = FakeAsyncClient()
     monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
@@ -332,7 +340,7 @@ async def test_httpx_openrouter_client_deepseek_only_routing_uses_deepseek_baidu
         model="deepseek/deepseek-v4-flash",
         base_url="https://example",
         routing_mode=OpenRouterRoutingMode.LATENCY,
-        provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY,
+        provider_routing=provider_routing,
     )
     await client.translate(
         text="hello",
@@ -343,8 +351,8 @@ async def test_httpx_openrouter_client_deepseek_only_routing_uses_deepseek_baidu
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "sort": "latency",
-        "only": ["deepseek", "baidu"],
+        "only": ["baidu", "deepseek", "cloudflare"],
+        "sort": {"by": "latency"},
         "allow_fallbacks": True,
     }
 
@@ -370,8 +378,8 @@ async def test_httpx_openrouter_client_deepseek_default_uses_cloudflare_first_ro
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "sort": "latency",
-        "only": ["deepseek", "parasail", "Fireworks", "Baidu Qianfan"],
+        "only": ["baidu", "deepseek", "cloudflare"],
+        "sort": {"by": "latency"},
         "allow_fallbacks": True,
     }
 
