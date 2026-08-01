@@ -8,8 +8,8 @@ import tomllib
 from pathlib import Path
 
 import pytest
-
 from puripuly_heart.core.local_qwen_runtime import LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
+
 from puripuly_heart.core.overlay.openvr_vendor import (
     OPENVR_VENDOR_DLL_URL,
     OPENVR_VENDOR_LICENSE_URL,
