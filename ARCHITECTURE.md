@@ -56,18 +56,18 @@ Broker is a control-plane dependency, not part of the normal utterance data path
 
 | Owner                   | Owns                                                       | Key path                                                                  |
 | ----------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
-| UI application boundary | UI-facing application operations                           | `app/services/ui_[application.py](http://application.py)`                 |
-| Settings owner          | Canonical settings, persistence, projection, rollback      | `app/services/canonical_settings_[persistence.py](http://persistence.py)` |
-| Runtime pipeline        | Active runtime component set                               | `app/wiring_runtime_[pipeline.py](http://pipeline.py)`                    |
-| Self capture owner      | Microphone source and capture lifecycle                    | `core/runtime/self_[capture.py](http://capture.py)`                       |
-| Self translation owner  | Self STT events, turns, state, output projection           | `core/orchestrator/self_translation_[channel.py](http://channel.py)`      |
-| Peer capture owner      | Target, source, VAD, task, provider attachment, generation | `core/runtime/peer_[channel.py](http://channel.py)`                       |
-| Local ASR runtime       | Local recognition channels and backend transitions         | `core/runtime/local_asr_provider_[runtime.py](http://runtime.py)`         |
-| Translation turn owner  | Request lifecycle, cancellation, stale-result rejection    | `core/orchestrator/translation_[turn.py](http://turn.py)`                 |
-| Output runtime          | Routing, delivery tasks, destinations, delivery history    | `core/runtime/[output.py](http://output.py)`                              |
-| Overlay owners          | Overlay selection, process lifecycle, state, calibration   | `app/services/overlay_[application.py](http://application.py)`            |
-| Managed-account runtime | Authentication, entitlement, usage, credential release     | `app/wiring_managed_[account.py](http://account.py)`                      |
-| Shutdown adapter        | Ordered application teardown                               | `app/adapters/application_runtime_[shutdown.py](http://shutdown.py)`      |
+| UI application boundary | UI-facing application operations                           | `app/services/ui_application.py`                 |
+| Settings owner          | Canonical settings, persistence, projection, rollback      | `app/services/canonical_settings_persistence.py` |
+| Runtime pipeline        | Active runtime component set                               | `app/wiring_runtime_pipeline.py`                    |
+| Self capture owner      | Microphone source and capture lifecycle                    | `core/runtime/self_capture.py`                       |
+| Self translation owner  | Self STT events, turns, state, output projection           | `core/orchestrator/self_translation_channel.py`      |
+| Peer capture owner      | Target, source, VAD, task, provider attachment, generation | `core/runtime/peer_channel.py`                       |
+| Local ASR runtime       | Local recognition channels and backend transitions         | `core/runtime/local_asr_provider_runtime.py`         |
+| Translation turn owner  | Request lifecycle, cancellation, stale-result rejection    | `core/orchestrator/translation_turn.py`                 |
+| Output runtime          | Routing, delivery tasks, destinations, delivery history    | `core/runtime/output.py`                              |
+| Overlay owners          | Overlay selection, process lifecycle, state, calibration   | `app/services/overlay_application.py`            |
+| Managed-account runtime | Authentication, entitlement, usage, credential release     | `app/wiring_managed_account.py`                      |
+| Shutdown adapter        | Ordered application teardown                               | `app/adapters/application_runtime_shutdown.py`      |
 
 
 Ownership may span several processing stages. Do not assume one owner per pipeline stage.
@@ -365,13 +365,13 @@ Key paths:
 
 | Concern                                | Path                                                                                    |
 | -------------------------------------- | --------------------------------------------------------------------------------------- |
-| Lifecycle task conventions             | `src/puripuly_heart/core/[lifecycle.py](http://lifecycle.py)`                           |
-| Self event handling                    | `src/puripuly_heart/core/orchestrator/self_translation_[channel.py](http://channel.py)` |
-| Peer capture and generation guards     | `src/puripuly_heart/core/runtime/peer_[channel.py](http://channel.py)`                  |
-| Translation requests and stale results | `src/puripuly_heart/core/orchestrator/translation_[request.py](http://request.py)`      |
-| Output delivery tasks and UI bridge    | `src/puripuly_heart/core/runtime/[output.py](http://output.py)`                         |
-| GPU worker async process protocol      | `src/puripuly_heart/app/adapters/gpu_worker_[process.py](http://process.py)`            |
-| Application shutdown                   | `src/puripuly_heart/app/adapters/application_runtime_[shutdown.py](http://shutdown.py)` |
+| Lifecycle task conventions             | `src/puripuly_heart/core/lifecycle.py`                           |
+| Self event handling                    | `src/puripuly_heart/core/orchestrator/self_translation_channel.py` |
+| Peer capture and generation guards     | `src/puripuly_heart/core/runtime/peer_channel.py`                  |
+| Translation requests and stale results | `src/puripuly_heart/core/orchestrator/translation_request.py`      |
+| Output delivery tasks and UI bridge    | `src/puripuly_heart/core/runtime/output.py`                         |
+| GPU worker async process protocol      | `src/puripuly_heart/app/adapters/gpu_worker_process.py`            |
+| Application shutdown                   | `src/puripuly_heart/app/adapters/application_runtime_shutdown.py` |
 
 
 ## Code Map
@@ -381,10 +381,10 @@ Key paths:
 
 | Path                                                                         | Responsibility          |
 | ---------------------------------------------------------------------------- | ----------------------- |
-| `src/puripuly_heart/[main.py](http://main.py)`                               | Process entry           |
-| `src/puripuly_heart/ui/[app.py](http://app.py)`                              | Flet presentation root  |
-| `src/puripuly_heart/app/ports/ui_[application.py](http://application.py)`    | UI application contract |
-| `src/puripuly_heart/app/services/ui_[application.py](http://application.py)` | Application boundary    |
+| `src/puripuly_heart/main.py`                               | Process entry           |
+| `src/puripuly_heart/ui/app.py`                              | Flet presentation root  |
+| `src/puripuly_heart/app/ports/ui_application.py`    | UI application contract |
+| `src/puripuly_heart/app/services/ui_application.py` | Application boundary    |
 
 
 ### Composition
@@ -392,12 +392,12 @@ Key paths:
 
 | Path                                                                           | Responsibility              |
 | ------------------------------------------------------------------------------ | --------------------------- |
-| `src/puripuly_heart/composition/application_[runtime.py](http://runtime.py)`   | Main composition root       |
-| `src/puripuly_heart/composition/application_[settings.py](http://settings.py)` | Settings startup            |
-| `src/puripuly_heart/composition/application_[startup.py](http://startup.py)`   | Startup ordering            |
-| `src/puripuly_heart/app/wiring_provider_[runtime.py](http://runtime.py)`       | Provider composition        |
-| `src/puripuly_heart/app/wiring_peer_[application.py](http://application.py)`   | Peer composition            |
-| `src/puripuly_heart/app/wiring_managed_[account.py](http://account.py)`        | Managed-account composition |
+| `src/puripuly_heart/composition/application_runtime.py`   | Main composition root       |
+| `src/puripuly_heart/composition/application_settings.py` | Settings startup            |
+| `src/puripuly_heart/composition/application_startup.py`   | Startup ordering            |
+| `src/puripuly_heart/app/wiring_provider_runtime.py`       | Provider composition        |
+| `src/puripuly_heart/app/wiring_peer_application.py`   | Peer composition            |
+| `src/puripuly_heart/app/wiring_managed_account.py`        | Managed-account composition |
 
 
 ### Runtime
@@ -405,13 +405,13 @@ Key paths:
 
 | Path                                                                                    | Responsibility       |
 | --------------------------------------------------------------------------------------- | -------------------- |
-| `src/puripuly_heart/core/runtime/self_[capture.py](http://capture.py)`                  | Self capture         |
-| `src/puripuly_heart/core/runtime/peer_[channel.py](http://channel.py)`                  | Peer capture         |
-| `src/puripuly_heart/core/orchestrator/self_translation_[channel.py](http://channel.py)` | Self translation     |
-| `src/puripuly_heart/core/orchestrator/translation_[turn.py](http://turn.py)`            | Turn lifecycle       |
-| `src/puripuly_heart/core/orchestrator/translation_[request.py](http://request.py)`      | Translation boundary |
-| `src/puripuly_heart/core/runtime/local_asr_provider_[runtime.py](http://runtime.py)`    | Local ASR runtime    |
-| `src/puripuly_heart/core/runtime/[output.py](http://output.py)`                         | Output runtime       |
+| `src/puripuly_heart/core/runtime/self_capture.py`                  | Self capture         |
+| `src/puripuly_heart/core/runtime/peer_channel.py`                  | Peer capture         |
+| `src/puripuly_heart/core/orchestrator/self_translation_channel.py` | Self translation     |
+| `src/puripuly_heart/core/orchestrator/translation_turn.py`            | Turn lifecycle       |
+| `src/puripuly_heart/core/orchestrator/translation_request.py`      | Translation boundary |
+| `src/puripuly_heart/core/runtime/local_asr_provider_runtime.py`    | Local ASR runtime    |
+| `src/puripuly_heart/core/runtime/output.py`                         | Output runtime       |
 
 
 ### Infrastructure
@@ -419,13 +419,13 @@ Key paths:
 
 | Path                                                                         | Responsibility              |
 | ---------------------------------------------------------------------------- | --------------------------- |
-| `src/puripuly_heart/core/storage/[secrets.py](http://secrets.py)`            | Secret stores               |
-| `src/puripuly_heart/core/overlay/[protocol.py](http://protocol.py)`          | Overlay contract            |
-| `src/puripuly_heart/core/overlay/[process.py](http://process.py)`            | Overlay process supervision |
-| `src/puripuly_heart/app/adapters/gpu_worker_[process.py](http://process.py)` | GPU worker adapter          |
-| `src/puripuly_heart/core/gpu_[worker.py](http://worker.py)`                  | GPU worker contracts        |
-| `native/gpu_worker/src/[lib.rs](http://lib.rs)`                              | Native GPU runtime          |
-| `native/overlay/src/[lib.rs](http://lib.rs)`                                 | Native VR overlay           |
+| `src/puripuly_heart/core/storage/secrets.py`            | Secret stores               |
+| `src/puripuly_heart/core/overlay/protocol.py`          | Overlay contract            |
+| `src/puripuly_heart/core/overlay/process.py`            | Overlay process supervision |
+| `src/puripuly_heart/app/adapters/gpu_worker_process.py` | GPU worker adapter          |
+| `src/puripuly_heart/core/gpu_worker.py`                  | GPU worker contracts        |
+| `native/gpu_worker/src/lib.rs`                              | Native GPU runtime          |
+| `native/overlay/src/lib.rs`                                 | Native VR overlay           |
 | `broker/src/app.ts`                                                          | Broker routes               |
 
 
@@ -434,11 +434,11 @@ Key paths:
 
 | Path                                                                       | Enforces                     |
 | -------------------------------------------------------------------------- | ---------------------------- |
-| `tests/architecture/test_dependency_[boundaries.py](http://boundaries.py)` | Dependency direction         |
-| `tests/architecture/test_lifecycle_task_[guard.py](http://guard.py)`       | Task ownership               |
+| `tests/architecture/test_dependency_boundaries.py` | Dependency direction         |
+| `tests/architecture/test_lifecycle_task_guard.py`       | Task ownership               |
 | `tests/config/compatibility_surface_inventory.json`                        | Compatibility surfaces       |
-| `tests/app/test_gpu_worker_[process.py](http://process.py)`                | GPU process contract         |
-| `tests/core/runtime/test_output_[runtime.py](http://runtime.py)`           | Output ownership and routing |
-| `tests/core/test_peer_channel_[routing.py](http://routing.py)`             | Peer routing                 |
+| `tests/app/test_gpu_worker_process.py`                | GPU process contract         |
+| `tests/core/runtime/test_output_runtime.py`           | Output ownership and routing |
+| `tests/core/test_peer_channel_routing.py`             | Peer routing                 |
 
 

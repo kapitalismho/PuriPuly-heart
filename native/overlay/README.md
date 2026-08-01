@@ -8,8 +8,8 @@ Windows Rust runtime for the VR subtitle overlay.
 - Rust tests: `native/overlay/tests`
 - Python protocol and process integration:
   - `src/puripuly_heart/core/overlay`
-  - `src/puripuly_heart/core/runtime/[overlay.py](http://overlay.py)`
-  - `src/puripuly_heart/ui/desktop_[overlay.py](http://overlay.py)`
+  - `src/puripuly_heart/core/runtime/overlay.py`
+  - `src/puripuly_heart/ui/desktop_overlay.py`
 
 Run commands from the repository root.
 
