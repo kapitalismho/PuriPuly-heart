@@ -124,7 +124,7 @@ def test_pyproject_caps_deepgram_sdk_below_v6() -> None:
 def test_pyproject_includes_sherpa_onnx_dependency() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert "sherpa-onnx>=1.12.36" in pyproject["project"]["dependencies"]
+    assert "sherpa-onnx>=1.13.4" in pyproject["project"]["dependencies"]
 
 
 def test_pyproject_pins_soxr_dependency() -> None:
@@ -153,7 +153,7 @@ def test_uv_lock_pins_sherpa_onnx_version() -> None:
     )
 
     assert match is not None
-    assert match.group(1) == "1.12.36"
+    assert match.group(1) == "1.13.4"
 
 
 def test_uv_lock_pins_soxr_version() -> None:
