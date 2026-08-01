@@ -1,0 +1,151 @@
+{
+  "source_dataset": "pipecat-ai/smart-turn-data-v3.2-test",
+  "sample_offset": 0,
+  "sample_records": 16,
+  "model_sha256": "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f",
+  "source_api": "https://datasets-server.huggingface.co/rows?dataset=pipecat-ai%2Fsmart-turn-data-v3.2-test&config=default&split=train&offset=0&length=16",
+  "scoring": {
+    "sample_rate_hz": 16000,
+    "silence_probes_ms": [224, 416, 608],
+    "threshold": 0.5,
+    "hard_end_ms": 800,
+    "audio_policy": "append each probe silence to the complete sample audio before model inference"
+  },
+  "records": [
+    {
+      "id": "0000945c-2d2c-442a-b677-42ddd81f56ca",
+      "endpoint_bool": true,
+      "scores": {"224": 0.9865230321884155, "416": 0.9848582744598389, "608": 0.9228270053863525},
+      "inference_ms": {"224": 86.6102, "416": 95.8402, "608": 80.0739}
+    },
+    {
+      "id": "0000e086-fffb-4cde-818b-f4963bd68adc",
+      "endpoint_bool": true,
+      "scores": {"224": 0.9729918241500854, "416": 0.9685282111167908, "608": 0.9793655872344971},
+      "inference_ms": {"224": 80.2449, "416": 80.4781, "608": 80.3473}
+    },
+    {
+      "id": "00012542-ae14-4107-894b-bdc20df6f84e",
+      "endpoint_bool": false,
+      "scores": {"224": 0.005280256271362305, "416": 0.005710512399673462, "608": 0.005710512399673462},
+      "inference_ms": {"224": 80.2313, "416": 79.7678, "608": 79.3313}
+    },
+    {
+      "id": "00082f3f-8cc8-4a4b-9184-3230b3227cff",
+      "endpoint_bool": false,
+      "scores": {"224": 0.009129524230957031, "416": 0.009870380163192749, "608": 0.01199302077293396},
+      "inference_ms": {"224": 79.7319, "416": 83.8072, "608": 83.0494}
+    },
+    {
+      "id": "00087002-ef5b-4621-adb3-ff7f7c90b409",
+      "endpoint_bool": false,
+      "scores": {"224": 0.016362518072128296, "416": 0.007221877574920654, "608": 0.007509768009185791},
+      "inference_ms": {"224": 82.3638, "416": 81.6203, "608": 79.9784}
+    },
+    {
+      "id": "00087e67-1da8-464d-b85a-17c1555e2468",
+      "endpoint_bool": false,
+      "scores": {"224": 0.007509768009185791, "416": 0.006422132253646851, "608": 0.008779913187026978},
+      "inference_ms": {"224": 81.1782, "416": 83.3140, "608": 80.0864}
+    },
+    {
+      "id": "00090ca4-cca2-44a8-8a5f-b679625dfeb6",
+      "endpoint_bool": true,
+      "scores": {"224": 0.9889053702354431, "416": 0.9897372126579285, "608": 0.9897372126579285},
+      "inference_ms": {"224": 80.5092, "416": 80.3291, "608": 80.8193}
+    },
+    {
+      "id": "000b426d-73eb-47d6-b152-c52841896d35",
+      "endpoint_bool": true,
+      "scores": {"224": 0.9870367050170898, "416": 0.9897372126579285, "608": 0.9889053702354431},
+      "inference_ms": {"224": 82.8522, "416": 79.6387, "608": 79.6877}
+    },
+    {
+      "id": "000caa19-eec6-4fb3-81fd-4df344def97d",
+      "endpoint_bool": false,
+      "scores": {"224": 0.006678372621536255, "416": 0.006944864988327026, "608": 0.007221877574920654},
+      "inference_ms": {"224": 80.0518, "416": 80.9085, "608": 79.8380}
+    },
+    {
+      "id": "001088f5-4563-49f2-8323-add438819282",
+      "endpoint_bool": false,
+      "scores": {"224": 0.005710512399673462, "416": 0.005710512399673462, "608": 0.005710512399673462},
+      "inference_ms": {"224": 79.3808, "416": 79.0299, "608": 82.4976}
+    },
+    {
+      "id": "0016920a-93fd-4351-87db-a81abb527cfb",
+      "endpoint_bool": true,
+      "scores": {"224": 0.9897372126579285, "416": 0.9884648323059082, "608": 0.9893293380737305},
+      "inference_ms": {"224": 81.5830, "416": 82.4328, "608": 82.6445}
+    },
+    {
+      "id": "001a01d9-ecdb-4694-8fa1-99df5d6d670e",
+      "endpoint_bool": true,
+      "scores": {"224": 0.9729918241500854, "416": 0.9647200703620911, "608": 0.9557313919067383},
+      "inference_ms": {"224": 79.4175, "416": 80.4738, "608": 79.7146}
+    },
+    {
+      "id": "001a49d0-cbe4-42a4-bf29-0e7fc94e3e53",
+      "endpoint_bool": false,
+      "scores": {"224": 0.006175607442855835, "416": 0.006175607442855835, "608": 0.005938529968261719},
+      "inference_ms": {"224": 80.4111, "416": 80.3441, "608": 79.8128}
+    },
+    {
+      "id": "001e2720-fe7f-468f-8485-7f130de4724c",
+      "endpoint_bool": true,
+      "scores": {"224": 0.32117950916290283, "416": 0.3655349016189575, "608": 0.5877046585083008},
+      "inference_ms": {"224": 80.4005, "416": 80.2772, "608": 81.4764}
+    },
+    {
+      "id": "0021b64b-7817-4cd2-b9d3-05d8f8355fc9",
+      "endpoint_bool": false,
+      "scores": {"224": 0.3655349016189575, "416": 0.834087073802948, "608": 0.9719371795654297},
+      "inference_ms": {"224": 81.2862, "416": 85.0689, "608": 79.1484}
+    },
+    {
+      "id": "0021ff3a-b542-4bd2-b9d3-05d8f8355fc9",
+      "endpoint_bool": false,
+      "scores": {"224": 0.005938529968261719, "416": 0.005938529968261719, "608": 0.006175607442855835},
+      "inference_ms": {"224": 79.6736, "416": 78.8445, "608": 79.7039}
+    }
+  ],
+  "results": {
+    "records": 16,
+    "first_accept_counts": {
+      "224": 6,
+      "416": 1,
+      "608": 1
+    },
+    "hard_boundary_count": 8,
+    "early_accept_count": 8,
+    "early_accept_rate": 0.5,
+    "early_true_count": 7,
+    "early_false_complete_count": 1,
+    "early_precision": 0.875,
+    "early_recall_for_endpoint_records": 1.0,
+    "early_false_complete_rate": 0.1111111111111111,
+    "inference_latency_ms": {
+      "observed_count": 48,
+      "missing_count": 0,
+      "mean": 81.17314999981318,
+      "p50": 80.34570000017993,
+      "p95": 84.6273050061427
+    },
+    "end_to_end_decision_latency_ms": {
+      "available": true,
+      "observed_count": 16,
+      "missing_count": 0,
+      "mean": 589.1101437521211,
+      "p50": 744.7381999975769,
+      "p95": 800.0,
+      "mean_delta_vs_512ms_vad": 77.11014375212108
+    },
+    "decision_ms": {
+      "mean": 548.0,
+      "p50": 704.0,
+      "p95": 800.0,
+      "mean_delta_vs_512ms_vad": 36.0
+    }
+  },
+  "interpretation": "This is a 16-record public-data smoke sample for validating the repeated-probe measurement path. It is not a full-dataset accuracy result or a decision to remove speculative recovery."
+}

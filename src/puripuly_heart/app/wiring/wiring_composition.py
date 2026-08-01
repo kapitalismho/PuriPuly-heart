@@ -104,6 +104,7 @@ from puripuly_heart.core.runtime.vrchat_osc_presence import (
     VrchatOscProbeDiagnosticsSink,
 )
 from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
+from puripuly_heart.core.vad.smart_turn import SmartTurnExperimentConfig
 
 
 def create_microphone_test_capture_adapter(
@@ -360,11 +361,14 @@ def create_self_capture_vad_adapter(
     *,
     log_detailed: Callable[[str], object],
     diagnostics_enabled: Callable[[], bool],
+    smart_turn_config_provider: Callable[[], SmartTurnExperimentConfig] | None = None,
 ) -> SelfCaptureVadFactory:
     from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
     from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
     from puripuly_heart.core.vad.gating import VadGating
     from puripuly_heart.core.vad.silero import SileroVadOnnx
+
+    config_provider = smart_turn_config_provider or SmartTurnExperimentConfig.from_environment
 
     return SelfCaptureVadAdapter(
         model_path_resolver=ensure_silero_vad_onnx,
@@ -372,6 +376,7 @@ def create_self_capture_vad_adapter(
         gating_factory=VadGating,
         log_detailed=log_detailed,
         diagnostics_enabled=diagnostics_enabled,
+        smart_turn_config_provider=config_provider,
     )
 
 
@@ -380,17 +385,27 @@ def create_self_capture_audio_loop_adapter(
     audio_gate_provider: Callable[[], object | None],
     log_detailed: Callable[[str], object],
     is_detailed_enabled: Callable[[], bool],
+    smart_turn_config_provider: Callable[[], SmartTurnExperimentConfig] | None = None,
 ) -> SelfCaptureAudioLoop:
     from puripuly_heart.app.adapters.self_capture_audio_loop import (
         SelfCaptureAudioLoopAdapter,
     )
     from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
+    from puripuly_heart.core.vad.smart_turn import (
+        create_smart_turn_event_sink_factory,
+    )
+
+    config_provider = smart_turn_config_provider or SmartTurnExperimentConfig.from_environment
 
     return SelfCaptureAudioLoopAdapter(
         runner=run_audio_vad_loop,
         audio_gate_provider=audio_gate_provider,
         log_detailed=log_detailed,
         is_detailed_enabled=is_detailed_enabled,
+        smart_turn_config_provider=config_provider,
+        smart_turn_event_sink_factory=create_smart_turn_event_sink_factory(
+            log_detailed=log_detailed,
+        ),
     )
 
 
@@ -434,11 +449,14 @@ def create_peer_capture_vad_adapter(
     *,
     log_detailed: Callable[[str], object],
     diagnostics_enabled: Callable[[], bool],
+    smart_turn_config_provider: Callable[[], SmartTurnExperimentConfig] | None = None,
 ) -> PeerCaptureVadFactory:
     from puripuly_heart.app.adapters.peer_capture_vad import PeerCaptureVadAdapter
     from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
     from puripuly_heart.core.vad.gating import create_peer_vad_gating
     from puripuly_heart.core.vad.silero import SileroVadOnnx
+
+    config_provider = smart_turn_config_provider or SmartTurnExperimentConfig.from_environment
 
     return PeerCaptureVadAdapter(
         model_path_resolver=ensure_silero_vad_onnx,
@@ -446,6 +464,7 @@ def create_peer_capture_vad_adapter(
         gating_factory=create_peer_vad_gating,
         log_detailed=log_detailed,
         diagnostics_enabled=diagnostics_enabled,
+        smart_turn_config_provider=config_provider,
     )
 
 
@@ -453,16 +472,26 @@ def create_peer_capture_audio_loop_adapter(
     *,
     log_detailed: Callable[[str], object],
     is_detailed_enabled: Callable[[], bool],
+    smart_turn_config_provider: Callable[[], SmartTurnExperimentConfig] | None = None,
 ) -> PeerCaptureAudioLoop:
     from puripuly_heart.app.adapters.peer_capture_audio_loop import (
         PeerCaptureAudioLoopAdapter,
     )
     from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
+    from puripuly_heart.core.vad.smart_turn import (
+        create_smart_turn_event_sink_factory,
+    )
+
+    config_provider = smart_turn_config_provider or SmartTurnExperimentConfig.from_environment
 
     return PeerCaptureAudioLoopAdapter(
         runner=run_audio_vad_loop,
         log_detailed=log_detailed,
         is_detailed_enabled=is_detailed_enabled,
+        smart_turn_config_provider=config_provider,
+        smart_turn_event_sink_factory=create_smart_turn_event_sink_factory(
+            log_detailed=log_detailed,
+        ),
     )
 
 

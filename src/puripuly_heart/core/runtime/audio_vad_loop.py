@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import inspect
 from collections.abc import Callable
 
 import numpy as np
@@ -12,9 +13,55 @@ from puripuly_heart.core.audio.source import AudioSource
 from puripuly_heart.core.audio.streaming_resampler import MonoFirstStreamingResampler
 from puripuly_heart.core.vad.gating import VadGating
 from puripuly_heart.core.vad.sink import VadEventSink
+from puripuly_heart.core.vad.smart_turn import (
+    SmartTurnEventSinkFactory,
+    SmartTurnExperimentConfig,
+)
 
 
 async def run_audio_vad_loop(
+    *,
+    source: AudioSource,
+    vad: VadGating,
+    sink: VadEventSink,
+    target_sample_rate_hz: int,
+    audio_gate: VrcMicAudioGate | None = None,
+    channel_label: str = "self",
+    is_detailed_enabled: Callable[[], bool] | None = None,
+    log_detailed: Callable[[str], object] | None = None,
+    smart_turn_config: SmartTurnExperimentConfig | None = None,
+    vad_event_sink_factory: SmartTurnEventSinkFactory | None = None,
+) -> None:
+    event_sink: VadEventSink = sink
+    if smart_turn_config is not None and vad_event_sink_factory is not None:
+        event_sink = vad_event_sink_factory(
+            sink=sink,
+            vad=vad,
+            config=smart_turn_config,
+            channel_label=channel_label,
+            sample_rate_hz=target_sample_rate_hz,
+        )
+    try:
+        await _run_audio_vad_loop(
+            source=source,
+            vad=vad,
+            sink=event_sink,
+            target_sample_rate_hz=target_sample_rate_hz,
+            audio_gate=audio_gate,
+            channel_label=channel_label,
+            is_detailed_enabled=is_detailed_enabled,
+            log_detailed=log_detailed,
+        )
+    finally:
+        if event_sink is not sink:
+            close = getattr(event_sink, "close", None)
+            if callable(close):
+                result = close()
+                if inspect.isawaitable(result):
+                    await result
+
+
+async def _run_audio_vad_loop(
     *,
     source: AudioSource,
     vad: VadGating,

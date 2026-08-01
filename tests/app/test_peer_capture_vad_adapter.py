@@ -9,6 +9,7 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureSessionConfig,
     PeerCaptureTargetIntent,
 )
+from puripuly_heart.core.vad.smart_turn import SmartTurnExperimentConfig
 
 
 def _config() -> PeerCaptureSessionConfig:
@@ -97,3 +98,19 @@ def test_wiring_factory_composes_internal_peer_vad_adapter() -> None:
     assert adapter.model_path_resolver.__name__ == "ensure_silero_vad_onnx"
     assert adapter.engine_factory.__name__ == "SileroVadOnnx"
     assert adapter.gating_factory.__name__ == "create_peer_vad_gating"
+
+
+def test_active_smart_turn_replaces_peer_vad_hangover_with_hard_boundary() -> None:
+    gating_calls: list[dict[str, object]] = []
+    adapter = PeerCaptureVadAdapter(
+        model_path_resolver=lambda: Path("peer-vad.onnx"),
+        engine_factory=lambda **_kwargs: object(),
+        gating_factory=lambda **kwargs: gating_calls.append(dict(kwargs)) or object(),
+        log_detailed=lambda _message: None,
+        diagnostics_enabled=lambda: False,
+        smart_turn_config_provider=lambda: SmartTurnExperimentConfig(stage="active"),
+    )
+
+    adapter(_config())
+
+    assert gating_calls[0]["hangover_ms"] == 800

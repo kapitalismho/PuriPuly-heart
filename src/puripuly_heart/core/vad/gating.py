@@ -33,6 +33,7 @@ class SpeechStart:
 class SpeechChunk:
     utterance_id: UUID
     chunk: np.ndarray
+    is_speech: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,7 +177,13 @@ class VadGating:
             return events
 
         # in speech
-        events.append(SpeechChunk(self._utterance_id, chunk=chunk.copy()))  # type: ignore[arg-type]
+        events.append(
+            SpeechChunk(
+                self._utterance_id,
+                chunk=chunk.copy(),
+                is_speech=prob >= self.speech_threshold,
+            )
+        )  # type: ignore[arg-type]
         self._speech_chunk_count += 1
         self._speech_sample_count += int(chunk.size)
 

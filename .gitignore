@@ -229,6 +229,8 @@ Installer_output/
 refactoring/
 /scripts/*
 !/scripts/bench_*.py
+!/scripts/experiments/
+!/scripts/experiments/benchmark_smart_turn.py
 !/scripts/ci/
 /scripts/ci/*
 !/scripts/ci/build-release-artifacts.ps1

@@ -1,0 +1,48 @@
+{
+  "model": "pipecat-ai/smart-turn-v3/smart-turn-v3.2-cpu.onnx",
+  "model_sha256": "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f",
+  "model_size_bytes": 8679182,
+  "runtime": {
+    "python": "3.12",
+    "numpy": "2.5.1",
+    "onnxruntime": "1.28.0",
+    "cpu_threads": 1,
+    "repeats": 5
+  },
+  "inputs": "synthetic float32 mono arrays at 16000 Hz; results are a runtime smoke benchmark, not an accuracy measurement",
+  "records": [
+    {
+      "audio": "short.npy",
+      "samples": 16000,
+      "duration_ms": 1000.0,
+      "score": 0.9870367050170898,
+      "inference_ms": {
+        "mean": 85.0373799999943,
+        "p50": 79.15010000579059,
+        "p95": 102.93843999970704
+      }
+    },
+    {
+      "audio": "long.npy",
+      "samples": 112000,
+      "duration_ms": 7000.0,
+      "score": 0.9808988571166992,
+      "inference_ms": {
+        "mean": 78.53080000495538,
+        "p50": 78.29320000018924,
+        "p95": 79.27922000817489
+      }
+    },
+    {
+      "audio": "full.npy",
+      "samples": 128000,
+      "duration_ms": 8000.0,
+      "score": 0.9042243957519531,
+      "inference_ms": {
+        "mean": 79.70268000208307,
+        "p50": 78.6870000010822,
+        "p95": 83.28922000073362
+      }
+    }
+  ]
+}

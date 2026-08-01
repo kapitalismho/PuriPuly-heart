@@ -5,6 +5,7 @@ from pathlib import Path
 from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
 from puripuly_heart.app.wiring import create_self_capture_vad_adapter
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
+from puripuly_heart.core.vad.smart_turn import SmartTurnExperimentConfig
 
 
 def _config() -> SelfCaptureSessionConfig:
@@ -89,3 +90,19 @@ def test_wiring_factory_composes_internal_self_vad_adapter() -> None:
     assert adapter.model_path_resolver.__name__ == "ensure_silero_vad_onnx"
     assert adapter.engine_factory.__name__ == "SileroVadOnnx"
     assert adapter.gating_factory.__name__ == "VadGating"
+
+
+def test_active_smart_turn_replaces_self_vad_hangover_with_hard_boundary() -> None:
+    gating_calls: list[dict[str, object]] = []
+    adapter = SelfCaptureVadAdapter(
+        model_path_resolver=lambda: Path("self-vad.onnx"),
+        engine_factory=lambda **_kwargs: object(),
+        gating_factory=lambda **kwargs: gating_calls.append(dict(kwargs)) or object(),
+        log_detailed=lambda _message: None,
+        diagnostics_enabled=lambda: False,
+        smart_turn_config_provider=lambda: SmartTurnExperimentConfig(stage="active"),
+    )
+
+    adapter(_config())
+
+    assert gating_calls[0]["hangover_ms"] == 800

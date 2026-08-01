@@ -29,6 +29,7 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionConfig,
     SelfCaptureSessionSnapshot,
 )
+from puripuly_heart.core.vad.smart_turn import SmartTurnExperimentConfig
 
 from .root import (
     compose_peer_capture_session_owner,
@@ -119,6 +120,9 @@ class CaptureOwnerFactory:
     peer_state_sink: Callable[[PeerCaptureSessionSnapshot], None]
     peer_diagnostic_sink: Callable[[PeerCaptureDiagnostic], None]
     local_asr_diagnostic_sink: Callable[[object], None]
+    smart_turn_config_provider: Callable[[], SmartTurnExperimentConfig] = (
+        SmartTurnExperimentConfig.from_environment
+    )
 
     def compose_self(
         self,
@@ -127,6 +131,7 @@ class CaptureOwnerFactory:
         channel_reset: ProviderChannelResetPort | None,
         audio_gate: VrcMicAudioGate | None,
     ) -> SelfCaptureSessionOwner:
+        smart_turn_config = self.smart_turn_config_provider()
         return compose_self_capture_session_owner(
             provider_runtime=provider_runtime,
             channel_reset=channel_reset,
@@ -139,11 +144,13 @@ class CaptureOwnerFactory:
             vad_factory=create_self_capture_vad_adapter(
                 log_detailed=self.log_detailed,
                 diagnostics_enabled=self.detailed_enabled,
+                smart_turn_config_provider=lambda: smart_turn_config,
             ),
             run_audio_loop=create_self_capture_audio_loop_adapter(
                 audio_gate_provider=lambda: audio_gate,
                 log_detailed=self.log_detailed,
                 is_detailed_enabled=self.detailed_enabled,
+                smart_turn_config_provider=lambda: smart_turn_config,
             ),
             vad_sink=create_self_capture_vad_sink_adapter(runtime_provider=lambda: vad_runtime),
             state_changed=self.self_state_sink,
@@ -157,6 +164,7 @@ class CaptureOwnerFactory:
         provider_runtime: LocalASRProviderRuntimePort,
         channel_reset: ProviderChannelResetPort,
     ) -> PeerCaptureSessionOwner:
+        smart_turn_config = self.smart_turn_config_provider()
         return compose_peer_capture_session_owner(
             provider_runtime=provider_runtime,
             channel_reset=channel_reset,
@@ -181,10 +189,12 @@ class CaptureOwnerFactory:
             vad_factory=create_peer_capture_vad_adapter(
                 log_detailed=self.log_detailed,
                 diagnostics_enabled=self.detailed_enabled,
+                smart_turn_config_provider=lambda: smart_turn_config,
             ),
             run_audio_loop=create_peer_capture_audio_loop_adapter(
                 log_detailed=self.log_detailed,
                 is_detailed_enabled=self.detailed_enabled,
+                smart_turn_config_provider=lambda: smart_turn_config,
             ),
             vad_sink=create_peer_capture_vad_sink_adapter(runtime_provider=lambda: vad_runtime),
             state_changed=self.peer_state_sink,
