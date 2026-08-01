@@ -7,6 +7,7 @@ from dataclasses import asdict, fields, is_dataclass, replace
 from typing import Any, Final
 
 from puripuly_heart.config.settings_vnext.schema import (
+    DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
     VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
     ensure_telemetry_default_allow,
@@ -28,6 +29,12 @@ _PROVIDER_VERIFICATION_FIELDS: Final = (
 )
 _PROVIDER_VERIFICATION_NON_UNKNOWN_STATUSES: Final = frozenset({"verified", "failed", "skipped"})
 _FALLBACK_DISABLED: Final = {"enabled": False}
+_FALLBACK_DEFAULT: Final = {
+    "enabled": True,
+    "model": "gemma4_26b_31b",
+    "connection": "openrouter",
+    "selection_alias": DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
+}
 _TEMPORARY_GENERIC_FALLBACK_ALIASES: Final = {
     "none": {"enabled": False},
     "deepseek_v4_flash_official": {
@@ -48,7 +55,7 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: Final = {
         "connection": "openrouter",
         "selection_alias": "openrouter_gemma4_26b_a4b",
     },
-    "openrouter_gemma4_26b_31b": {
+    DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: {
         "enabled": True,
         "model": "gemma4_26b_31b",
         "connection": "openrouter",
@@ -84,7 +91,7 @@ _FALLBACK_FIELDS_ALIAS: Final = {
     (True, "deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
     (True, "deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
     (True, "gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
-    (True, "gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
+    (True, "gemma4_26b_31b", "openrouter"): DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
     (True, "gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
     (True, "gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
     (True, "gemma4_31b", "managed"): "managed_gemma4_31b",
@@ -297,21 +304,34 @@ def _project_legacy_translation_fallback_fields(data: Mapping[str, Any]) -> Mapp
 
 def _fallback_with_inferred_selection_alias(value: Mapping[object, object]) -> dict[str, object]:
     fallback = copy.deepcopy(dict(value))
+    if not fallback:
+        return dict(_FALLBACK_DEFAULT)
     if "selection_alias" not in fallback:
-        fallback["selection_alias"] = _FALLBACK_FIELDS_ALIAS.get(
-            (
-                bool(fallback.get("enabled", False)),
-                str(fallback.get("model", "deepseek_v4_flash")),
-                str(fallback.get("connection", "official_byok")),
-            ),
-            "none",
+        fields = (
+            bool(fallback.get("enabled", False)),
+            str(fallback.get("model", "deepseek_v4_flash")),
+            str(fallback.get("connection", "official_byok")),
+        )
+        fallback["selection_alias"] = (
+            DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
+            if fields == (False, "deepseek_v4_flash", "official_byok")
+            else _FALLBACK_FIELDS_ALIAS.get(fields, "none")
         )
     return fallback
 
 
 def _fallback_from_temporary_alias(value: str) -> dict[str, object]:
-    fallback = dict(_TEMPORARY_GENERIC_FALLBACK_ALIASES.get(value.strip(), _FALLBACK_DISABLED))
-    fallback.setdefault("selection_alias", "none")
+    alias = value.strip()
+    fallback = dict(
+        _TEMPORARY_GENERIC_FALLBACK_ALIASES.get(
+            alias,
+            _FALLBACK_DEFAULT if not alias else _FALLBACK_DISABLED,
+        )
+    )
+    fallback.setdefault(
+        "selection_alias",
+        DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS if not alias else "none",
+    )
     return fallback
 
 
@@ -320,8 +340,14 @@ def _fallback_from_legacy_openrouter_alias(
     *,
     selected_source: object,
 ) -> dict[str, object]:
-    alias = value.strip() if isinstance(value, str) else ""
-    if alias in ("", "none", "qwen35_flash"):
+    if value is None:
+        return dict(_FALLBACK_DEFAULT)
+    if not isinstance(value, str):
+        return {**_FALLBACK_DISABLED, "selection_alias": "none"}
+    alias = value.strip()
+    if not alias:
+        return dict(_FALLBACK_DEFAULT)
+    if alias in ("none", "qwen35_flash"):
         return {**_FALLBACK_DISABLED, "selection_alias": "none"}
     if alias == "deepseek_v4_flash_china":
         return {

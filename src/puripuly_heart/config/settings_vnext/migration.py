@@ -8,6 +8,7 @@ from typing import Any
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.schema import (
+    DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
     VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
     AudioIntent,
@@ -114,7 +115,7 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
         connection="openrouter",
         selection_alias="openrouter_gemma4_26b_a4b",
     ),
-    "openrouter_gemma4_26b_31b": TranslationFallbackIntent(
+    DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: TranslationFallbackIntent(
         enabled=True,
         model="gemma4_26b_31b",
         connection="openrouter",
@@ -350,7 +351,12 @@ def _fallback_intent_to_dict(intent: TranslationFallbackIntent) -> dict[str, obj
 def _fallback_intent_from_temporary_alias(value: object) -> TranslationFallbackIntent | None:
     if not isinstance(value, str):
         return None
-    return _TEMPORARY_GENERIC_FALLBACK_ALIASES.get(value.strip(), TranslationFallbackIntent())
+    alias = value.strip()
+    if not alias:
+        return TranslationFallbackIntent(
+            selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
+        )
+    return _TEMPORARY_GENERIC_FALLBACK_ALIASES.get(alias, TranslationFallbackIntent())
 
 
 def _fallback_intent_from_legacy_openrouter_alias(
@@ -358,8 +364,18 @@ def _fallback_intent_from_legacy_openrouter_alias(
     *,
     selected_source: object,
 ) -> TranslationFallbackIntent:
-    alias = value.strip() if isinstance(value, str) else ""
-    if alias in ("", "none", "qwen35_flash"):
+    if value is None:
+        return TranslationFallbackIntent(
+            selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
+        )
+    if not isinstance(value, str):
+        return TranslationFallbackIntent()
+    alias = value.strip()
+    if not alias:
+        return TranslationFallbackIntent(
+            selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
+        )
+    if alias in ("none", "qwen35_flash"):
         return TranslationFallbackIntent(enabled=False)
     if alias == "deepseek_v4_flash_china":
         return TranslationFallbackIntent(
@@ -390,8 +406,21 @@ def _fallback_intent_from_legacy_translation_data(
     translation = translation_data if isinstance(translation_data, Mapping) else {}
     fallback = translation.get("fallback")
     if isinstance(fallback, Mapping):
+        if not fallback:
+            return TranslationFallbackIntent(
+                selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
+            )
         model = str(fallback.get("model", "deepseek_v4_flash"))
         connection = str(fallback.get("connection", "official_byok"))
+        if (
+            "selection_alias" not in fallback
+            and not bool(fallback.get("enabled", False))
+            and model == "deepseek_v4_flash"
+            and connection == "official_byok"
+        ):
+            return TranslationFallbackIntent(
+                selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
+            )
         selection_alias = str(
             fallback.get(
                 "selection_alias",

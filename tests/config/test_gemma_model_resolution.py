@@ -160,4 +160,21 @@ def test_vnext_gemma_migration_is_idempotent_after_round_trip() -> None:
     assert once == twice
     assert once["intent"]["translation"]["model"] == "gemma4_26b_31b"
     assert once["settings_version"] == 32
-    assert once["intent"]["translation"]["fallback"]["enabled"] is False
+    assert once["intent"]["translation"]["fallback"] == {
+        "enabled": True,
+        "model": "gemma4_26b_31b",
+        "connection": "openrouter",
+        "selection_alias": "openrouter_gemma4_26b_31b",
+    }
+
+
+def test_missing_vnext_fallback_uses_unified_gemma_default() -> None:
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["translation"].pop("fallback")
+
+    fallback = migration.from_dict(raw).intent.translation.fallback
+
+    assert fallback.enabled is True
+    assert fallback.model == "gemma4_26b_31b"
+    assert fallback.connection == "openrouter"
+    assert fallback.selection_alias == "openrouter_gemma4_26b_31b"

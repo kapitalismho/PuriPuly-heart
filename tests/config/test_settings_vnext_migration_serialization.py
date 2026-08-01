@@ -482,9 +482,9 @@ def test_china_first_run_defaults_project_to_vnext_intent() -> None:
     assert serialized["intent"]["translation"]["openrouter_provider_routing"] == ("deepseek_only")
     assert serialized["intent"]["translation"]["fallback"] == {
         "enabled": True,
-        "model": "gemma4",
+        "model": "gemma4_26b_31b",
         "connection": "openrouter",
-        "selection_alias": "openrouter_gemma4_26b_a4b",
+        "selection_alias": "openrouter_gemma4_26b_31b",
     }
     assert "openrouter_fallback_selection_alias" not in serialized["intent"]["translation"]
 
@@ -504,6 +504,10 @@ def test_china_first_run_defaults_project_to_vnext_intent() -> None:
         (
             "openrouter_gemma4_26b_a4b",
             (True, "gemma4", "openrouter", "openrouter_gemma4_26b_a4b"),
+        ),
+        (
+            "openrouter_gemma4_26b_31b",
+            (True, "gemma4_26b_31b", "openrouter", "openrouter_gemma4_26b_31b"),
         ),
         (
             "cerebras_gemma4_31b",
@@ -617,6 +621,30 @@ def test_current_vnext_missing_fallback_alias_still_infers_compatibility_fields(
     assert loaded.intent.translation.fallback == TranslationFallbackIntent(
         selection_alias="deepseek_v4_flash_china"
     )
+
+
+@pytest.mark.parametrize("loader_name", ["serialization", "migration"])
+def test_missing_fallback_uses_unified_gemma_default(loader_name: str) -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["translation"].pop("fallback")
+
+    loader = serialization.from_dict if loader_name == "serialization" else migration.from_dict
+    fallback = loader(raw).intent.translation.fallback
+
+    assert fallback == TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_31b")
+
+
+def test_legacy_missing_fallback_uses_unified_gemma_default() -> None:
+    migration = _migration()
+    raw = maximal_v24_settings_fixture()
+    raw["translation"].pop("fallback", None)
+    raw["openrouter"].pop("fallback_selection_alias", None)
+
+    fallback = migration.from_dict(raw).intent.translation.fallback
+
+    assert fallback == TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_31b")
 
 
 def test_maximal_v24_fixture_preserves_telemetry_consent_and_identifier() -> None:

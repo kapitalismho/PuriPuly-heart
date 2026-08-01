@@ -254,6 +254,7 @@ def _load_settings_or_default(
     from puripuly_heart.config.settings import detect_system_locale, resolve_first_run_ui_locale
     from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
     from puripuly_heart.config.settings_vnext.schema import (
+        DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
         AppSettingsVNext,
         TranslationFallbackIntent,
     )
@@ -269,12 +270,11 @@ def _load_settings_or_default(
     settings = AppSettingsVNext()
     system_locale = detect_system_locale()
     locale_value = resolve_first_run_ui_locale(system_locale)
-    fallback_alias = (
-        "openrouter_gemma4_26b_a4b" if locale_value == "zh-CN" else "openrouter_deepseek_v4_flash"
-    )
     translation = replace(
         settings.intent.translation,
-        fallback=TranslationFallbackIntent(selection_alias=fallback_alias),
+        fallback=TranslationFallbackIntent(
+            selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
+        ),
     )
     if locale_value == "zh-CN":
         translation = replace(

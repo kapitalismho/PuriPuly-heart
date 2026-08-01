@@ -19,6 +19,7 @@ from puripuly_heart.core.translation_policy import (
 VNEXT_SETTINGS_SCHEMA_VERSION: Final = 32
 
 DEFAULT_OPENROUTER_BROKER_BASE_URL: Final = "https://puripuly-heart-broker.kapitalismho.workers.dev"
+DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: Final = "openrouter_gemma4_26b_31b"
 DEFAULT_CUSTOM_VOCAB_TERMS: Final[Mapping[str, tuple[str, ...]]] = {}
 MANAGED_AUTH_CLAIM_SOURCE_DISCORD: Final = "discord"
 MANAGED_AUTH_CLAIM_SOURCE_QQ: Final = "qq"
@@ -62,7 +63,7 @@ CANONICAL_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
         "deepseek_v4_flash_official",
         "openrouter_deepseek_v4_flash",
         "openrouter_gemma4_26b_a4b",
-        "openrouter_gemma4_26b_31b",
+        DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
         "openrouter_gemma4_31b",
         "managed_gemma4_26b_31b",
         "managed_gemma4_31b",
@@ -75,7 +76,7 @@ _FALLBACK_ALIAS_FIELDS: Final = {
     "deepseek_v4_flash_official": (True, "deepseek_v4_flash", "official_byok"),
     "openrouter_deepseek_v4_flash": (True, "deepseek_v4_flash", "openrouter"),
     "openrouter_gemma4_26b_a4b": (True, "gemma4", "openrouter"),
-    "openrouter_gemma4_26b_31b": (True, "gemma4_26b_31b", "openrouter"),
+    DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: (True, "gemma4_26b_31b", "openrouter"),
     "openrouter_gemma4_31b": (True, "gemma4_31b", "openrouter"),
     "managed_gemma4_26b_31b": (True, "gemma4_26b_31b", "managed"),
     "managed_gemma4_31b": (True, "gemma4_31b", "managed"),
@@ -353,6 +354,10 @@ class TranslationFallbackIntent:
         object.__setattr__(self, "connection", connection)
 
 
+def _default_translation_fallback_intent() -> TranslationFallbackIntent:
+    return TranslationFallbackIntent(selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS)
+
+
 @dataclass(frozen=True, slots=True)
 class TranslationIntent:
     model: str = "gemma4_26b_31b"
@@ -361,7 +366,9 @@ class TranslationIntent:
         default_factory=_default_translation_connection_history
     )
     concurrency_limit: int = 5
-    fallback: TranslationFallbackIntent = field(default_factory=TranslationFallbackIntent)
+    fallback: TranslationFallbackIntent = field(
+        default_factory=_default_translation_fallback_intent
+    )
     openrouter_broker_base_url: str = DEFAULT_OPENROUTER_BROKER_BASE_URL
     openrouter_routing_mode: str = "latency"
     openrouter_model: str = "google/gemma-4-26b-a4b-it"
@@ -1012,6 +1019,7 @@ __all__ = [
     "is_safe_compatibility_extension_key",
     "CANONICAL_TRANSLATION_FALLBACK_ALIASES",
     "COMPAT_TRANSLATION_FALLBACK_ALIASES",
+    "DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS",
     "LanguageIntent",
     "LocalLLMIntent",
     "ManagedConnectionState",

@@ -135,12 +135,12 @@ def test_first_run_settings_preserve_provider_defaults() -> None:
     assert settings.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
     assert settings.translation.connection == TranslationConnection.MANAGED_CHINA
     assert settings.translation.fallback.enabled is True
-    assert settings.translation.fallback.model == TranslationModel.GEMMA4
+    assert settings.translation.fallback.model == TranslationModel.GEMMA4_26B_31B
     assert settings.translation.fallback.connection == TranslationConnection.OPENROUTER
 
 
 @pytest.mark.parametrize("system_locale", ["en_US", "ko_KR", "ja_JP", None])
-def test_first_run_settings_use_openrouter_deepseek_fallback_default(
+def test_first_run_settings_use_openrouter_unified_gemma_fallback_default(
     system_locale: str | None,
 ) -> None:
     settings = _new_first_run_settings(system_locale)
@@ -149,7 +149,7 @@ def test_first_run_settings_use_openrouter_deepseek_fallback_default(
     assert settings.translation.model == TranslationModel.GEMMA4_26B_31B
     assert settings.translation.connection == TranslationConnection.MANAGED
     assert settings.translation.fallback.enabled is True
-    assert settings.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
+    assert settings.translation.fallback.model == TranslationModel.GEMMA4_26B_31B
     assert settings.translation.fallback.connection == TranslationConnection.OPENROUTER
 
 
@@ -203,11 +203,11 @@ def test_main_first_run_uses_detected_system_locale(
     assert loaded.intent.translation.connection == "managed_china"
     assert loaded.intent.translation.openrouter_selection_alias == "deepseek_v4_flash_managed"
     assert loaded.intent.translation.openrouter_provider_routing == "deepseek_only"
-    assert loaded.intent.translation.fallback.selection_alias == "openrouter_gemma4_26b_a4b"
+    assert loaded.intent.translation.fallback.selection_alias == "openrouter_gemma4_26b_31b"
     assert not path.exists()
 
 
-def test_main_first_run_non_china_uses_openrouter_deepseek_fallback_default(
+def test_main_first_run_non_china_uses_openrouter_unified_gemma_fallback_default(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -219,7 +219,7 @@ def test_main_first_run_non_china_uses_openrouter_deepseek_fallback_default(
     assert loaded.intent.ui.locale == "ko"
     assert loaded.intent.translation.model == "gemma4_26b_31b"
     assert loaded.intent.translation.connection == "managed"
-    assert loaded.intent.translation.fallback.selection_alias == "openrouter_deepseek_v4_flash"
+    assert loaded.intent.translation.fallback.selection_alias == "openrouter_gemma4_26b_31b"
     assert not path.exists()
 
 

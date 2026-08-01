@@ -2872,7 +2872,7 @@ def _apply_china_managed_first_run_defaults(settings: AppSettings) -> None:
     )
     settings.translation.fallback = TranslationFallbackSettings(
         enabled=True,
-        model=TranslationModel.GEMMA4,
+        model=TranslationModel.GEMMA4_26B_31B,
         connection=TranslationConnection.OPENROUTER,
     )
 
@@ -2887,7 +2887,7 @@ def new_settings_for_first_run(system_locale: str | None = None) -> AppSettings:
     else:
         settings.translation.fallback = TranslationFallbackSettings(
             enabled=True,
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
+            model=TranslationModel.GEMMA4_26B_31B,
             connection=TranslationConnection.OPENROUTER,
         )
     ensure_prompt_defaults(settings)

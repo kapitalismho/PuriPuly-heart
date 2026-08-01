@@ -73,6 +73,11 @@ DEFAULT_TRANSLATION_FALLBACK_DICT = {
     "model": TranslationModel.DEEPSEEK_V4_FLASH.value,
     "connection": TranslationConnection.OFFICIAL_BYOK.value,
 }
+MIGRATED_DEFAULT_TRANSLATION_FALLBACK_DICT = {
+    "enabled": True,
+    "model": TranslationModel.GEMMA4_26B_31B.value,
+    "connection": TranslationConnection.OPENROUTER.value,
+}
 
 
 def test_settings_roundtrip(tmp_path):
@@ -89,6 +94,11 @@ def test_settings_roundtrip(tmp_path):
     expected.system_prompts = {}
     expected.telemetry.consent = "allow"
     expected.telemetry_state.anonymous_id = loaded.telemetry_state.anonymous_id
+    expected.translation.fallback = TranslationFallbackSettings(
+        enabled=True,
+        model=TranslationModel.GEMMA4_26B_31B,
+        connection=TranslationConnection.OPENROUTER,
+    )
 
     assert loaded.telemetry_state.anonymous_id
     assert loaded == expected
@@ -1934,7 +1944,7 @@ def test_translation_settings_roundtrip_materializes_deepseek_openrouter_byok(tm
         "model": "deepseek_v4_flash",
         "connection": "openrouter",
         "connection_history": {"deepseek_v4_flash": "openrouter"},
-        "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
+        "fallback": MIGRATED_DEFAULT_TRANSLATION_FALLBACK_DICT,
     }
     assert loaded.translation.model == TranslationModel.DEEPSEEK_V4_FLASH
     assert loaded.translation.connection == TranslationConnection.OPENROUTER
