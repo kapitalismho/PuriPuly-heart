@@ -417,7 +417,7 @@
   "provider.gemma4_26b_a4b_it": "Gemma 4 26B A4B",
   "provider.gemma4_26b_a4b_it.description": "",
   "provider.gemma4_26b_31b": "Gemma 4 26B + 31B",
-  "provider.gemma4_26b_31b.description": "추천. 요청마다 사용 가능한 더 빠른 Gemma 모델로 연결해요.",
+  "provider.gemma4_26b_31b.description": "",
   "provider.gemma4_31b_openrouter": "Gemma 4 31B (OpenRouter)",
   "provider.gemma4_31b_openrouter.description": "",
   "provider.qwen35_flash_managed": "Qwen 3.5 Flash (managed)",
