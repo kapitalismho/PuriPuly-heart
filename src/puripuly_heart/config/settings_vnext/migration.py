@@ -91,6 +91,8 @@ _LOCAL_QWEN_PROVIDER = "local_qwen"
 _LOCAL_CPU_AUTO_PROVIDER = "local_cpu_auto"
 _LOCAL_QWEN_CPU_AUTO_MIGRATION_VERSION = 30
 _PEER_SOURCE_AUTO_MIGRATION_VERSION = 31
+_MULTI_MODEL_GEMMA_MIGRATION_VERSION = 32
+_EXPLICIT_LEGACY_GEMMA_FALLBACK_ALIASES = frozenset({"openrouter_gemma4_26b_a4b"})
 
 _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
     "none": TranslationFallbackIntent(enabled=False),
@@ -112,6 +114,30 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
         connection="openrouter",
         selection_alias="openrouter_gemma4_26b_a4b",
     ),
+    "openrouter_gemma4_26b_31b": TranslationFallbackIntent(
+        enabled=True,
+        model="gemma4_26b_31b",
+        connection="openrouter",
+        selection_alias="openrouter_gemma4_26b_31b",
+    ),
+    "openrouter_gemma4_31b": TranslationFallbackIntent(
+        enabled=True,
+        model="gemma4_31b",
+        connection="openrouter",
+        selection_alias="openrouter_gemma4_31b",
+    ),
+    "managed_gemma4_26b_31b": TranslationFallbackIntent(
+        enabled=True,
+        model="gemma4_26b_31b",
+        connection="managed",
+        selection_alias="managed_gemma4_26b_31b",
+    ),
+    "managed_gemma4_31b": TranslationFallbackIntent(
+        enabled=True,
+        model="gemma4_31b",
+        connection="managed",
+        selection_alias="managed_gemma4_31b",
+    ),
     "cerebras_gemma4_31b": TranslationFallbackIntent(
         enabled=True,
         model="gemma4_31b_cerebras",
@@ -124,6 +150,10 @@ _FALLBACK_FIELDS_ALIAS: dict[tuple[bool, str, str], str] = {
     (True, "deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
     (True, "deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
     (True, "gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
+    (True, "gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
+    (True, "gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
+    (True, "gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
+    (True, "gemma4_31b", "managed"): "managed_gemma4_31b",
     (True, "gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
 }
@@ -147,11 +177,14 @@ _LEGACY_RETIRED_COMPATIBILITY_PATHS = frozenset(
 def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_local_qwen = _requires_local_qwen_cpu_auto_migration(data.get("settings_version"))
     migrate_peer_source_auto = _requires_peer_source_auto_migration(data.get("settings_version"))
+    migrate_multi_model_gemma = _requires_multi_model_gemma_migration(data.get("settings_version"))
     prepared = dict(copy.deepcopy(data))
     prepared["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
     intent = prepared.get("intent") if isinstance(prepared.get("intent"), dict) else {}
     translation = intent.get("translation") if isinstance(intent.get("translation"), dict) else {}
     if isinstance(intent, dict) and isinstance(translation, dict):
+        if migrate_multi_model_gemma:
+            _migrate_multi_model_gemma_translation(translation)
         fallback = translation.get("fallback")
         if not isinstance(fallback, Mapping):
             translation["fallback"] = _fallback_intent_to_dict(
@@ -210,6 +243,50 @@ def _requires_peer_source_auto_migration(settings_version: object) -> bool:
     if isinstance(settings_version, str) and settings_version.strip().isdigit():
         return int(settings_version.strip()) < _PEER_SOURCE_AUTO_MIGRATION_VERSION
     return True
+
+
+def _requires_multi_model_gemma_migration(settings_version: object) -> bool:
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < _MULTI_MODEL_GEMMA_MIGRATION_VERSION
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < _MULTI_MODEL_GEMMA_MIGRATION_VERSION
+    return True
+
+
+def _migrate_multi_model_gemma_translation(translation: dict[str, Any]) -> None:
+    connection = translation.get("connection")
+    if connection not in {"managed", "openrouter"}:
+        connection = "managed"
+    migrated_primary_gemma = translation.get("model") == "gemma4"
+    if migrated_primary_gemma:
+        translation["model"] = "gemma4_26b_31b"
+        translation["openrouter_selection_alias"] = (
+            "gemma4_26b_31b_managed" if connection == "managed" else "gemma4_26b_31b_byok"
+        )
+        translation["openrouter_provider_routing"] = "gemma4_26b_31b_latency"
+    history = translation.get("connection_history")
+    if isinstance(history, dict) and "gemma4" in history:
+        history.setdefault("gemma4_26b_31b", history["gemma4"])
+
+    fallback = translation.get("fallback")
+    if not isinstance(fallback, dict):
+        return
+    if fallback.get("model") != "gemma4":
+        return
+    if fallback.get("selection_alias") in _EXPLICIT_LEGACY_GEMMA_FALLBACK_ALIASES:
+        return
+    fallback_connection = fallback.get("connection")
+    if fallback_connection not in {"managed", "openrouter"}:
+        fallback_connection = connection
+    fallback["model"] = "gemma4_26b_31b"
+    fallback["connection"] = fallback_connection
+    fallback["selection_alias"] = (
+        "managed_gemma4_26b_31b"
+        if fallback_connection == "managed"
+        else "openrouter_gemma4_26b_31b"
+    )
 
 
 def _migrate_peer_source_auto_mode(intent: dict[str, Any]) -> None:
@@ -424,8 +501,11 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
         )
     from puripuly_heart.config.settings_vnext.schema import ensure_telemetry_default_allow
 
-    return with_translation_runtime_policy(
-        ensure_telemetry_default_allow(with_telemetry_consent(settings, telemetry_consent))
+    prepared = serialization.to_dict(settings)
+    prepared["settings_version"] = _MULTI_MODEL_GEMMA_MIGRATION_VERSION - 1
+    migrated_settings = serialization.from_dict(_prepare_vnext_migration_dict(prepared))
+    return ensure_telemetry_default_allow(
+        with_telemetry_consent(migrated_settings, telemetry_consent)
     )
 
 

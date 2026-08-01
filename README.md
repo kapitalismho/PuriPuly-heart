@@ -5,7 +5,7 @@
 <h1 align="center">PuriPuly <3</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.3.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.3.3-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -96,13 +96,15 @@ So I built one that can.
 
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **Gemma 4 26B A4B + 31B** | 14,380 | 2,920 | 3,710 | 1,180 |
 | **DeepSeek V4 Flash** | 19,410 | 3,080 | 3,980 | 1,210 |
 
 #### Other Models
 
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 | 2,920 | 3,710 | 1,180 |
+| **Gemma 4 31B (OpenRouter)** | 13,700 | 2,780 | 3,530 | 1,120 |
 | **Gemma 4 31B (Cerebras)** | 920 | 730 | 770 | 540 |
 | **DeepSeek V4 Pro** | 6,400 | 2,330 | 2,810 | 1,070 |
 | **Gemini 3 Flash** | 1,710 | 1,170 | 1,280 | 740 |
@@ -116,13 +118,15 @@ So I built one that can.
 
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
+| **Gemma 4 26B A4B + 31B** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
 | **DeepSeek V4 Flash** | ~$0.00005 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
 
 #### Other Models
 
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
+| **Gemma 4 26B A4B** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0008 |
+| **Gemma 4 31B (OpenRouter)** | ~$0.00007 | ~$0.0003 | ~$0.0003 | ~$0.0009 |
 | **Gemma 4 31B (Cerebras)** | ~$0.0011 | ~$0.0014 | ~$0.0013 | ~$0.0019 |
 | **DeepSeek V4 Pro** | ~$0.0002 | ~$0.0004 | ~$0.0004 | ~$0.0009 |
 | **Gemini 3 Flash** | ~$0.0006 | ~$0.0009 | ~$0.0008 | ~$0.0014 |

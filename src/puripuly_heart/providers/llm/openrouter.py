@@ -133,7 +133,31 @@ def _build_provider_preferences(
     provider_routing: OpenRouterProviderRouting = OpenRouterProviderRouting.DEFAULT,
     *,
     model: str | None = None,
+    models: tuple[str, ...] = (),
 ) -> dict[str, object]:
+    if provider_routing == OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY:
+        return {
+            "only": ["cloudflare", "coreweave/bf16", "open-inference/bf16"],
+            "sort": {"by": "latency", "partition": "none"},
+            "allow_fallbacks": True,
+        }
+    if provider_routing == OpenRouterProviderRouting.GEMMA4_31B_LATENCY:
+        return {
+            "only": ["coreweave/bf16", "open-inference/bf16"],
+            "sort": {"by": "latency"},
+            "allow_fallbacks": True,
+        }
+    if provider_routing == OpenRouterProviderRouting.GEMMA4_26B_LATENCY:
+        return {
+            "only": ["cloudflare", "parasail/bf16"],
+            "sort": {"by": "latency"},
+            "allow_fallbacks": True,
+        }
+    if provider_routing == OpenRouterProviderRouting.GEMMA4_31B_CEREBRAS_ONLY:
+        return {
+            "only": ["cerebras/fp16"],
+            "allow_fallbacks": False,
+        }
     if provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY:
         return {
             "sort": "latency",
@@ -147,7 +171,7 @@ def _build_provider_preferences(
             "allow_fallbacks": True,
             "data_collection": "deny",
         }
-    if model == "google/gemma-4-26b-a4b-it":
+    if model == "google/gemma-4-26b-a4b-it" and len(models) <= 1:
         return {
             "order": ["wafer", "cloudflare", "deepinfra"],
             "only": ["wafer", "cloudflare", "deepinfra"],
@@ -192,6 +216,7 @@ class OpenRouterLLMProvider:
     user_identifier: str | None = None
     base_url: str = "https://openrouter.ai/api/v1"
     model: str = "google/gemma-4-26b-a4b-it"
+    models: tuple[str, ...] = ()
     routing_mode: OpenRouterRoutingMode = OpenRouterRoutingMode.LATENCY
     provider_routing: OpenRouterProviderRouting = OpenRouterProviderRouting.DEFAULT
     max_tokens: int = 100
@@ -199,6 +224,14 @@ class OpenRouterLLMProvider:
     runtime_logging: SessionRuntimeLoggingService | None = None
     client: OpenRouterClient | None = None
     _internal_client: OpenRouterClient | None = field(init=False, default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        models = tuple(self.models) if self.models else (self.model,)
+        if not models or models[0] != self.model or any(not model for model in models):
+            raise ValueError(
+                "models must start with the selected model and contain no empty values"
+            )
+        self.models = models
 
     def _get_client(self) -> OpenRouterClient:
         if self.client is not None:
@@ -208,6 +241,7 @@ class OpenRouterLLMProvider:
                 api_key=self.api_key,
                 user_identifier=self.user_identifier,
                 model=self.model,
+                models=self.models,
                 base_url=self.base_url,
                 routing_mode=self.routing_mode,
                 provider_routing=self.provider_routing,
@@ -287,6 +321,7 @@ class OpenRouterLLMProvider:
 class HttpxOpenRouterClient:
     api_key: str
     model: str
+    models: tuple[str, ...] = ()
     user_identifier: str | None = None
     base_url: str = "https://openrouter.ai/api/v1"
     routing_mode: OpenRouterRoutingMode = OpenRouterRoutingMode.LATENCY
@@ -296,6 +331,14 @@ class HttpxOpenRouterClient:
     runtime_logging: SessionRuntimeLoggingService | None = None
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _client_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
+
+    def __post_init__(self) -> None:
+        models = tuple(self.models) if self.models else (self.model,)
+        if not models or models[0] != self.model or any(not model for model in models):
+            raise ValueError(
+                "models must start with the selected model and contain no empty values"
+            )
+        self.models = models
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         if self._client is not None:
@@ -323,7 +366,6 @@ class HttpxOpenRouterClient:
         user_message = _build_user_message(text=text, context=context)
 
         request_body: dict[str, object] = {
-            "model": self.model,
             "messages": [
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": user_message},
@@ -332,9 +374,14 @@ class HttpxOpenRouterClient:
             "provider": _build_provider_preferences(
                 self.provider_routing,
                 model=self.model,
+                models=self.models,
             ),
             "max_tokens": self.max_tokens,
         }
+        if len(self.models) == 1:
+            request_body["model"] = self.models[0]
+        else:
+            request_body["models"] = list(self.models)
         user_identifier = normalize_managed_openrouter_user_identifier(self.user_identifier)
         if user_identifier is not None:
             request_body["user"] = user_identifier

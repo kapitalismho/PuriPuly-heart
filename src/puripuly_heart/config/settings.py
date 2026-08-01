@@ -17,15 +17,22 @@ from puripuly_heart.config.audio_host_api import (
 from puripuly_heart.config.llm_profiles import (
     OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA,
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B,
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_MODEL_GEMINI_3_FLASH,
     OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
+    OPENROUTER_MODEL_GEMMA_4_31B_IT,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_BYOK,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED,
     OPENROUTER_SELECTION_ALIAS_GEMINI3_FLASH_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMINI31_FLASH_LITE_BYOK,
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK,
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED,
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK,
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED,
     OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK,
@@ -198,6 +205,7 @@ class LocalLLMBackend(str, Enum):
 
 class OpenRouterLLMModel(str, Enum):
     GEMMA_4_26B_A4B_IT = "google/gemma-4-26b-a4b-it"
+    GEMMA_4_31B_IT = OPENROUTER_MODEL_GEMMA_4_31B_IT
     QWEN_35_FLASH_02_23 = "qwen/qwen3.5-flash-02-23"
     DEEPSEEK_V4_FLASH = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
     GEMINI_3_FLASH = OPENROUTER_MODEL_GEMINI_3_FLASH
@@ -212,6 +220,11 @@ class OpenRouterProviderRouting(str, Enum):
     DEFAULT = "default"
     DEEPSEEK_ONLY = "deepseek_only"
     GOOGLE_GEMINI_LATENCY = "google_gemini_latency"
+    GEMMA4_26B_31B_LATENCY = "gemma4_26b_31b_latency"
+    GEMMA4_31B_LATENCY = "gemma4_31b_latency"
+    GEMMA4_26B_LATENCY = "gemma4_26b_latency"
+    DEEPSEEK_V4_FLASH_LATENCY = "deepseek_v4_flash_latency"
+    GEMMA4_31B_CEREBRAS_ONLY = "gemma4_31b_cerebras_only"
 
 
 class OpenRouterCredentialSource(str, Enum):
@@ -221,6 +234,10 @@ class OpenRouterCredentialSource(str, Enum):
 
 
 class OpenRouterSelectionAlias(str, Enum):
+    GEMMA4_26B_31B_MANAGED = OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED
+    GEMMA4_26B_31B_BYOK = OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK
+    GEMMA4_31B_MANAGED = OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED
+    GEMMA4_31B_BYOK = OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK
     GEMMA4_MANAGED = OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED
     GEMMA4_BYOK = OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK
     QWEN35_FLASH_MANAGED = OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED
@@ -236,9 +253,13 @@ class OpenRouterFallbackSelectionAlias(str, Enum):
     QWEN35_FLASH = OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH
     DEEPSEEK_V4_FLASH = OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH
     DEEPSEEK_V4_FLASH_CHINA = OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA
+    GEMMA4_26B_31B = OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B
+    GEMMA4_31B = OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B
 
 
 class TranslationModel(str, Enum):
+    GEMMA4_26B_31B = "gemma4_26b_31b"
+    GEMMA4_31B = "gemma4_31b"
     GEMMA4 = "gemma4"
     DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
     DEEPSEEK_V4_PRO = "deepseek_v4_pro"
@@ -275,7 +296,7 @@ class TranslationFallbackSettings:
 
 @dataclass(slots=True)
 class TranslationSettings:
-    model: TranslationModel = TranslationModel.GEMMA4
+    model: TranslationModel = TranslationModel.GEMMA4_26B_31B
     connection: TranslationConnection = TranslationConnection.MANAGED
     connection_history: dict[str, TranslationConnection] = field(
         default_factory=lambda: _default_translation_connection_history()
@@ -303,6 +324,14 @@ class TranslationSettings:
 
 
 TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnection, ...]] = {
+    TranslationModel.GEMMA4_26B_31B: (
+        TranslationConnection.MANAGED,
+        TranslationConnection.OPENROUTER,
+    ),
+    TranslationModel.GEMMA4_31B: (
+        TranslationConnection.MANAGED,
+        TranslationConnection.OPENROUTER,
+    ),
     TranslationModel.GEMMA4: (
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
@@ -360,7 +389,7 @@ def _default_translation_connection(model: TranslationModel) -> TranslationConne
 
 
 def _default_translation_connection_history() -> dict[str, TranslationConnection]:
-    return {TranslationModel.GEMMA4.value: TranslationConnection.MANAGED}
+    return {TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED}
 
 
 def _parse_translation_model(value: object) -> TranslationModel | None:
@@ -430,7 +459,7 @@ def _normalize_translation_settings(
     fallback: object = None,
     history: object = None,
 ) -> TranslationSettings:
-    normalized_model = model or TranslationModel.GEMMA4
+    normalized_model = model or TranslationModel.GEMMA4_26B_31B
     normalized_history = _parse_translation_connection_history(history)
     if connection not in _supported_translation_connections(normalized_model):
         connection = _default_translation_connection(normalized_model)
@@ -492,10 +521,10 @@ def _translation_settings_to_dict(settings: TranslationSettings) -> dict[str, An
 
 def _default_translation_settings_dict() -> dict[str, Any]:
     return {
-        "model": TranslationModel.GEMMA4.value,
+        "model": TranslationModel.GEMMA4_26B_31B.value,
         "connection": TranslationConnection.MANAGED.value,
         "connection_history": {
-            TranslationModel.GEMMA4.value: TranslationConnection.MANAGED.value,
+            TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
         },
         "fallback": {
             "enabled": False,
@@ -873,6 +902,13 @@ class OpenRouterSettings:
             raise ValueError("invalid openrouter broker base url")
 
 
+def _default_openrouter_settings() -> OpenRouterSettings:
+    return OpenRouterSettings(
+        provider_routing=OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY,
+        selection_alias=OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED,
+    )
+
+
 @dataclass(slots=True)
 class UiSettings:
     locale: str = "en"
@@ -1185,7 +1221,7 @@ class AppSettings:
     peer_qwen_asr_stt: PeerQwenASRSTTSettings = field(default_factory=PeerQwenASRSTTSettings)
     peer_soniox_stt: PeerSonioxSTTSettings = field(default_factory=PeerSonioxSTTSettings)
     gemini: GeminiSettings = field(default_factory=GeminiSettings)
-    openrouter: OpenRouterSettings = field(default_factory=OpenRouterSettings)
+    openrouter: OpenRouterSettings = field(default_factory=_default_openrouter_settings)
     qwen: QwenSettings = field(default_factory=QwenSettings)
     deepseek: DeepSeekSettings = field(default_factory=DeepSeekSettings)
     cerebras: CerebrasSettings = field(default_factory=CerebrasSettings)
@@ -1913,11 +1949,18 @@ def _parse_openrouter_selection_alias_profile(value: object):
 def _derive_openrouter_selection_alias(
     llm_model: OpenRouterLLMModel,
     selected_source: OpenRouterCredentialSource,
+    models: tuple[str, ...] = (),
 ) -> OpenRouterSelectionAlias:
     alias = get_openrouter_selection_alias_for_model_and_source(
         llm_model.value,
         selected_source.value,
     )
+    if models:
+        alias = openrouter_alias_for_fields(
+            model=llm_model.value,
+            source=selected_source.value,
+            models=models,
+        )
     if alias is None:
         alias = (
             OpenRouterSelectionAlias.GEMMA4_MANAGED.value
@@ -1938,6 +1981,7 @@ def _parse_openrouter_selection_alias(
         canonical_alias = openrouter_alias_for_fields(
             model=profile.openrouter_model,
             source=profile.openrouter_source,
+            models=profile.openrouter_models,
         )
         if canonical_alias is not None:
             return OpenRouterSelectionAlias(canonical_alias)
@@ -1982,6 +2026,7 @@ def _resolve_openrouter_runtime_main_selection(
         canonical_selection_alias = _derive_openrouter_selection_alias(
             resolved_llm_model,
             resolved_selected_source,
+            selection_profile.openrouter_models,
         )
         canonical_profile = get_openrouter_llm_profile(canonical_selection_alias.value)
         assert canonical_profile is not None and canonical_profile.openrouter_model is not None
@@ -2173,7 +2218,11 @@ def _resolve_openrouter_main_selection(
             selected_source = raw_selected_source
         if selected_source == OpenRouterCredentialSource.NONE:
             return llm_model, selected_source, None
-        selection_alias = _derive_openrouter_selection_alias(llm_model, selected_source)
+        selection_alias = _derive_openrouter_selection_alias(
+            llm_model,
+            selected_source,
+            selection_profile.openrouter_models,
+        )
         return llm_model, selected_source, selection_alias
 
     llm_model = _parse_openrouter_llm_model(openrouter_data.get("llm_model"))
@@ -2198,11 +2247,26 @@ def _derive_translation_settings_from_runtime_values(
 
     if provider_llm == LLMProviderName.OPENROUTER:
         if openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT:
+            translation_model = (
+                TranslationModel.GEMMA4_26B_31B
+                if openrouter_provider_routing == OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY
+                else TranslationModel.GEMMA4
+            )
             return _normalize_translation_settings(
-                model=TranslationModel.GEMMA4,
+                model=translation_model,
                 connection=_translation_connection_from_openrouter_source(
                     openrouter_selected_source,
-                    model=TranslationModel.GEMMA4,
+                    model=translation_model,
+                    provider_routing=openrouter_provider_routing,
+                ),
+                history=normalized_history,
+            )
+        if openrouter_model == OpenRouterLLMModel.GEMMA_4_31B_IT:
+            return _normalize_translation_settings(
+                model=TranslationModel.GEMMA4_31B,
+                connection=_translation_connection_from_openrouter_source(
+                    openrouter_selected_source,
+                    model=TranslationModel.GEMMA4_31B,
                     provider_routing=openrouter_provider_routing,
                 ),
                 history=normalized_history,
@@ -2330,10 +2394,46 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
     model = settings.translation.model
     connection = settings.translation.connection
 
+    if model == TranslationModel.GEMMA4_26B_31B:
+        settings.provider.llm = LLMProviderName.OPENROUTER
+        settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+        settings.openrouter.provider_routing = OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY
+        settings.openrouter.selected_source = (
+            OpenRouterCredentialSource.MANAGED
+            if connection == TranslationConnection.MANAGED
+            else OpenRouterCredentialSource.BYOK
+        )
+        settings.openrouter.selection_alias = OpenRouterSelectionAlias(
+            (
+                OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED
+                if connection == TranslationConnection.MANAGED
+                else OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK
+            )
+        )
+        return settings
+
+    if model == TranslationModel.GEMMA4_31B:
+        settings.provider.llm = LLMProviderName.OPENROUTER
+        settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_31B_IT
+        settings.openrouter.provider_routing = OpenRouterProviderRouting.GEMMA4_31B_LATENCY
+        settings.openrouter.selected_source = (
+            OpenRouterCredentialSource.MANAGED
+            if connection == TranslationConnection.MANAGED
+            else OpenRouterCredentialSource.BYOK
+        )
+        settings.openrouter.selection_alias = OpenRouterSelectionAlias(
+            (
+                OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED
+                if connection == TranslationConnection.MANAGED
+                else OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK
+            )
+        )
+        return settings
+
     if model == TranslationModel.GEMMA4:
         settings.provider.llm = LLMProviderName.OPENROUTER
         settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
-        settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
+        settings.openrouter.provider_routing = OpenRouterProviderRouting.GEMMA4_26B_LATENCY
         settings.openrouter.selected_source = (
             OpenRouterCredentialSource.MANAGED
             if connection == TranslationConnection.MANAGED
@@ -2462,6 +2562,35 @@ def _apply_materialized_translation_to_data(
         history=translation.connection_history,
     )
 
+    if translation.model in (TranslationModel.GEMMA4_26B_31B, TranslationModel.GEMMA4_31B):
+        selected_source = (
+            OpenRouterCredentialSource.MANAGED
+            if translation.connection == TranslationConnection.MANAGED
+            else OpenRouterCredentialSource.BYOK
+        )
+        if translation.model == TranslationModel.GEMMA4_26B_31B:
+            openrouter_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+            provider_routing = OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY
+            selection_alias = (
+                OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
+                if selected_source == OpenRouterCredentialSource.MANAGED
+                else OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
+            )
+        else:
+            openrouter_model = OpenRouterLLMModel.GEMMA_4_31B_IT
+            provider_routing = OpenRouterProviderRouting.GEMMA4_31B_LATENCY
+            selection_alias = (
+                OpenRouterSelectionAlias.GEMMA4_31B_MANAGED
+                if selected_source == OpenRouterCredentialSource.MANAGED
+                else OpenRouterSelectionAlias.GEMMA4_31B_BYOK
+            )
+        changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.OPENROUTER.value)
+        changed |= _set_mapping_value(openrouter_data, "llm_model", openrouter_model.value)
+        changed |= _set_mapping_value(openrouter_data, "provider_routing", provider_routing.value)
+        changed |= _set_mapping_value(openrouter_data, "selected_source", selected_source.value)
+        changed |= _set_mapping_value(openrouter_data, "selection_alias", selection_alias.value)
+        return changed
+
     if translation.model == TranslationModel.GEMMA4:
         selected_source = (
             OpenRouterCredentialSource.MANAGED
@@ -2481,7 +2610,7 @@ def _apply_materialized_translation_to_data(
         changed |= _set_mapping_value(
             openrouter_data,
             "provider_routing",
-            OpenRouterProviderRouting.DEFAULT.value,
+            OpenRouterProviderRouting.GEMMA4_26B_LATENCY.value,
         )
         changed |= _set_mapping_value(openrouter_data, "selected_source", selected_source.value)
         changed |= _set_mapping_value(openrouter_data, "selection_alias", selection_alias.value)

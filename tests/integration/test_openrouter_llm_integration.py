@@ -152,7 +152,6 @@ async def test_openrouter_fallback_configuration_translation_smoke() -> None:
         primary=primary,
         fallback=fallback,
         fallback_timeout_ms=openrouter_fallback_timeout_ms(),
-        runtime_logging=suppressed_runtime_logger(),
     )
 
     # Default to validating the fallback configuration without starting a concurrent

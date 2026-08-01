@@ -449,6 +449,8 @@ def test_migrate_settings_dict_preserves_custom_soniox_model() -> None:
 
 def test_translation_model_public_member_names_and_values_match_plan() -> None:
     assert tuple((member.name, member.value) for member in TranslationModel) == (
+        ("GEMMA4_26B_31B", "gemma4_26b_31b"),
+        ("GEMMA4_31B", "gemma4_31b"),
         ("GEMMA4", "gemma4"),
         ("DEEPSEEK_V4_FLASH", "deepseek_v4_flash"),
         ("DEEPSEEK_V4_PRO", "deepseek_v4_pro"),
@@ -526,16 +528,16 @@ def test_local_llm_stray_api_key_settings_are_ignored_on_roundtrip() -> None:
 def test_translation_settings_defaults_to_gemma_managed_with_only_gemma_history() -> None:
     settings = TranslationSettings()
 
-    assert settings.model == TranslationModel.GEMMA4
+    assert settings.model == TranslationModel.GEMMA4_26B_31B
     assert settings.connection == TranslationConnection.MANAGED
     assert settings.connection_history == {
-        TranslationModel.GEMMA4.value: TranslationConnection.MANAGED
+        TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED
     }
     assert to_dict(AppSettings())["translation"] == {
-        "model": TranslationModel.GEMMA4.value,
+        "model": TranslationModel.GEMMA4_26B_31B.value,
         "connection": TranslationConnection.MANAGED.value,
         "connection_history": {
-            TranslationModel.GEMMA4.value: TranslationConnection.MANAGED.value,
+            TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
         },
         "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
     }
@@ -983,12 +985,12 @@ def test_to_dict_roundtrips_deepseek_managed_china_provider_routing(tmp_path) ->
 def test_app_settings_defaults_to_managed_openrouter_gemma_without_fallback() -> None:
     settings = AppSettings()
 
-    assert settings.translation.model == TranslationModel.GEMMA4
+    assert settings.translation.model == TranslationModel.GEMMA4_26B_31B
     assert settings.translation.connection == TranslationConnection.MANAGED
     assert settings.provider.llm == LLMProviderName.OPENROUTER
     assert settings.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
     assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
+    assert settings.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
     assert settings.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
     assert settings.translation.fallback == TranslationFallbackSettings()
 
@@ -1109,6 +1111,8 @@ def test_openrouter_fallback_aliases_include_curated_openrouter_models() -> None
         OpenRouterFallbackSelectionAlias.NONE.value,
         deepseek_fallback.value,
         deepseek_china_fallback.value,
+        OpenRouterFallbackSelectionAlias.GEMMA4_26B_31B.value,
+        OpenRouterFallbackSelectionAlias.GEMMA4_31B.value,
     )
     assert OpenRouterFallbackSelectionAlias.QWEN35_FLASH.value not in (
         OPENROUTER_FALLBACK_SELECTION_ALIASES
@@ -2013,17 +2017,20 @@ def test_load_settings_translation_block_wins_over_stale_openrouter_deepseek_fie
     loaded = load_settings(path)
     persisted = legacy_projected_settings_file(path)
 
-    assert loaded.translation.model == TranslationModel.GEMMA4
+    assert loaded.translation.model == TranslationModel.GEMMA4_26B_31B
     assert loaded.translation.connection == TranslationConnection.OPENROUTER
     assert loaded.provider.llm == LLMProviderName.OPENROUTER
     assert loaded.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
     assert loaded.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
-    assert persisted["translation"]["model"] == TranslationModel.GEMMA4.value
+    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
+    assert persisted["translation"]["model"] == TranslationModel.GEMMA4_26B_31B.value
     assert persisted["translation"]["connection"] == TranslationConnection.OPENROUTER.value
     assert persisted["openrouter"]["llm_model"] == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
     assert persisted["openrouter"]["selected_source"] == OpenRouterCredentialSource.BYOK.value
-    assert persisted["openrouter"]["selection_alias"] == OpenRouterSelectionAlias.GEMMA4_BYOK.value
+    assert (
+        persisted["openrouter"]["selection_alias"]
+        == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
+    )
 
 
 def test_load_settings_translation_block_wins_for_gemini_over_stale_openrouter_fields(tmp_path):
@@ -2092,7 +2099,7 @@ def test_from_dict_infers_legacy_gemma_managed_translation_selection() -> None:
 
     loaded = from_dict(data)
 
-    assert loaded.translation.model == TranslationModel.GEMMA4
+    assert loaded.translation.model == TranslationModel.GEMMA4_26B_31B
     assert loaded.translation.connection == TranslationConnection.MANAGED
     assert loaded.openrouter.routing_mode == OpenRouterRoutingMode.LATENCY
 
@@ -2322,13 +2329,13 @@ def test_load_settings_persists_translation_section_for_legacy_file(tmp_path) ->
     persisted = legacy_projected_settings_file(path)
 
     assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
-    assert loaded.translation.model == TranslationModel.GEMMA4
+    assert loaded.translation.model == TranslationModel.GEMMA4_26B_31B
     assert loaded.translation.connection == TranslationConnection.MANAGED
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
-    assert persisted["translation"]["model"] == TranslationModel.GEMMA4.value
+    assert persisted["translation"]["model"] == TranslationModel.GEMMA4_26B_31B.value
     assert persisted["translation"]["connection"] == TranslationConnection.MANAGED.value
     assert (
-        persisted["translation"]["connection_history"][TranslationModel.GEMMA4.value]
+        persisted["translation"]["connection_history"][TranslationModel.GEMMA4_26B_31B.value]
         == TranslationConnection.MANAGED.value
     )
 
@@ -2344,13 +2351,13 @@ def test_load_settings_persists_default_translation_for_malformed_non_dict_secti
     loaded = load_settings(path)
     persisted = legacy_projected_settings_file(path)
 
-    assert loaded.translation.model == TranslationModel.GEMMA4
+    assert loaded.translation.model == TranslationModel.GEMMA4_26B_31B
     assert loaded.translation.connection == TranslationConnection.MANAGED
     assert persisted["translation"] == {
-        "model": TranslationModel.GEMMA4.value,
+        "model": TranslationModel.GEMMA4_26B_31B.value,
         "connection": TranslationConnection.MANAGED.value,
         "connection_history": {
-            TranslationModel.GEMMA4.value: TranslationConnection.MANAGED.value,
+            TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
         },
         "fallback": DEFAULT_TRANSLATION_FALLBACK_DICT,
     }
@@ -2814,11 +2821,12 @@ def test_load_settings_backfills_openrouter_aliases_from_legacy_fields(tmp_path)
     assert loaded.settings_version == SETTINGS_SCHEMA_VERSION
     assert loaded.openrouter.llm_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
     assert loaded.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
+    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
     assert loaded.openrouter.fallback_selection_alias == OpenRouterFallbackSelectionAlias.NONE
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
     assert (
-        persisted["openrouter"]["selection_alias"] == OpenRouterSelectionAlias.GEMMA4_MANAGED.value
+        persisted["openrouter"]["selection_alias"]
+        == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
     )
     assert persisted["openrouter"]["fallback_selection_alias"] == (
         OpenRouterFallbackSelectionAlias.NONE.value
@@ -2842,9 +2850,12 @@ def test_load_settings_backfills_openrouter_selected_source_to_byok_for_legacy_o
     persisted = legacy_projected_settings_file(path)
 
     assert loaded.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
+    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
     assert persisted["openrouter"]["selected_source"] == OpenRouterCredentialSource.BYOK.value
-    assert persisted["openrouter"]["selection_alias"] == OpenRouterSelectionAlias.GEMMA4_BYOK.value
+    assert (
+        persisted["openrouter"]["selection_alias"]
+        == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
+    )
 
 
 def test_load_settings_normalizes_legacy_active_openrouter_none_selected_source_to_byok(
@@ -2864,10 +2875,13 @@ def test_load_settings_normalizes_legacy_active_openrouter_none_selected_source_
     persisted = legacy_projected_settings_file(path)
 
     assert loaded.openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
+    assert loaded.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
     assert persisted["settings_version"] == SETTINGS_SCHEMA_VERSION
     assert persisted["openrouter"]["selected_source"] == OpenRouterCredentialSource.BYOK.value
-    assert persisted["openrouter"]["selection_alias"] == OpenRouterSelectionAlias.GEMMA4_BYOK.value
+    assert (
+        persisted["openrouter"]["selection_alias"]
+        == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
+    )
 
 
 def test_from_dict_defaults_invalid_openrouter_routing_mode_to_latency() -> None:

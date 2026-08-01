@@ -2650,10 +2650,10 @@ def test_on_llm_selected_stages_openrouter_byok_alias_without_pkce(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.model == TranslationModel.GEMMA4
+    assert pending.translation.model == TranslationModel.GEMMA4_26B_31B
     assert pending.translation.connection == TranslationConnection.OPENROUTER
     assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
+    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
     assert pending.openrouter.selected_source == OpenRouterCredentialSource.BYOK
     assert view.has_provider_changes is True
 
@@ -2902,7 +2902,7 @@ def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_g
     assert pending is not None
     assert pending.provider.llm == LLMProviderName.GEMINI
     assert pending.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
+    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
 
     view._on_llm_selected(TranslationModel.QWEN_35_PLUS.value)
     pending = view.build_provider_apply_settings()
@@ -2910,7 +2910,7 @@ def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_g
     assert pending is not None
     assert pending.provider.llm == LLMProviderName.QWEN
     assert pending.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_MANAGED
+    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
 
 
 def test_load_from_settings_shows_translation_connection_label(
@@ -3338,10 +3338,10 @@ def test_on_llm_selected_stages_byok_even_when_legacy_openrouter_key_exists(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.translation.model == TranslationModel.GEMMA4
+    assert pending.translation.model == TranslationModel.GEMMA4_26B_31B
     assert pending.translation.connection == TranslationConnection.OPENROUTER
     assert pending.provider.llm == LLMProviderName.OPENROUTER
-    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
+    assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
 
 
 def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
@@ -3360,7 +3360,7 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
 
     assert requested[0].provider.llm == LLMProviderName.OPENROUTER
     assert requested[0].openrouter.selected_source == OpenRouterCredentialSource.BYOK
-    assert requested[0].openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_BYOK
+    assert requested[0].openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
     assert requested[0].system_prompt == "G"
 
 
@@ -3432,6 +3432,8 @@ def test_openrouter_fallback_modal_lists_curated_openrouter_fallbacks(
         "none",
         "deepseek_v4_flash_official",
         "openrouter_deepseek_v4_flash",
+        "openrouter_gemma4_26b_31b",
+        "openrouter_gemma4_31b",
         "openrouter_gemma4_26b_a4b",
         "cerebras_gemma4_31b",
     ]
@@ -3439,6 +3441,8 @@ def test_openrouter_fallback_modal_lists_curated_openrouter_fallbacks(
         t("settings.fallback.none"),
         t("settings.fallback.deepseek_v4_flash_official"),
         t("settings.fallback.openrouter_deepseek_v4_flash"),
+        t("settings.fallback.openrouter_gemma4_26b_31b"),
+        t("settings.fallback.openrouter_gemma4_31b"),
         t("settings.fallback.openrouter_gemma4_26b_a4b"),
         t("settings.fallback.cerebras_gemma4_31b"),
     ]
@@ -3446,6 +3450,8 @@ def test_openrouter_fallback_modal_lists_curated_openrouter_fallbacks(
         "",
         "",
         "",
+        t("settings.fallback.openrouter_gemma4_26b_31b.description"),
+        t("settings.fallback.openrouter_gemma4_31b.description"),
         "",
         t("settings.fallback.cerebras_gemma4_31b.description"),
     ]
@@ -3502,8 +3508,10 @@ def test_llm_modal_lists_logical_translation_models_once(
     assert captured["show_description"] is True
     assert captured["two_column"] is True
     assert [option.value for option in options] == [
-        TranslationModel.GEMMA4.value,
+        TranslationModel.GEMMA4_26B_31B.value,
         TranslationModel.DEEPSEEK_V4_FLASH.value,
+        TranslationModel.GEMMA4_31B.value,
+        TranslationModel.GEMMA4.value,
         TranslationModel.GEMMA4_31B_CEREBRAS.value,
         TranslationModel.LOCAL_LLM.value,
         TranslationModel.DEEPSEEK_V4_PRO.value,
@@ -3514,6 +3522,8 @@ def test_llm_modal_lists_logical_translation_models_once(
     assert [option.section for option in options] == [
         t("settings.translation_model.section.recommended"),
         t("settings.translation_model.section.recommended"),
+        t("settings.translation_model.section.others"),
+        t("settings.translation_model.section.others"),
         t("settings.translation_model.section.others"),
         t("settings.translation_model.section.others"),
         t("settings.translation_model.section.others"),
@@ -4212,7 +4222,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
         "settings.translation_connection.official_byok",
         "settings.translation_connection.official_byok.description",
         "settings.translation_connection.only_supported",
-        "settings.translation_model.gemma4.description",
+        "settings.translation_model.gemma4_26b_31b.description",
         "settings.translation_model.deepseek_v4_flash.description",
         "settings.translation_model.gemini3_flash.description",
         "settings.translation_model.gemini31_flash_lite.description",
@@ -4253,7 +4263,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
 
     expected_model_descriptions = {
         "en": {
-            "settings.translation_model.gemma4.description": "Good for most situations",
+            "settings.translation_model.gemma4_26b_31b.description": "Good for most situations",
             "settings.translation_model.deepseek_v4_flash.description": "Try this if Gemma 4's speed is unstable",
             "settings.translation_model.gemini3_flash.description": "Translation speed is slow",
             "settings.translation_model.gemini31_flash_lite.description": "",
@@ -4261,7 +4271,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
             "settings.translation_model.local_llm.description": "You can use an OpenAI-compatible API",
         },
         "ko": {
-            "settings.translation_model.gemma4.description": "대부분의 상황에서 좋아요",
+            "settings.translation_model.gemma4_26b_31b.description": "대부분의 상황에서 좋아요",
             "settings.translation_model.deepseek_v4_flash.description": "Gemma 4의 속도가 불안정할 경우 사용해보세요",
             "settings.translation_model.gemini3_flash.description": "번역 속도가 느려요",
             "settings.translation_model.gemini31_flash_lite.description": "",
@@ -4269,7 +4279,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
             "settings.translation_model.local_llm.description": "OpenAI 호환 API를 사용할 수 있어요",
         },
         "zh-CN": {
-            "settings.translation_model.gemma4.description": "适合大多数情况",
+            "settings.translation_model.gemma4_26b_31b.description": "适合大多数情况",
             "settings.translation_model.deepseek_v4_flash.description": "当 Gemma 4 速度不稳定时可以试试",
             "settings.translation_model.gemini3_flash.description": "翻译速度较慢",
             "settings.translation_model.gemini31_flash_lite.description": "",

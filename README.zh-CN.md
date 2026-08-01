@@ -5,7 +5,7 @@
 <h1 align="center">PuriPuly <3</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.3.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.3.3-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -96,13 +96,15 @@
 
 | LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | 14,380 次 | 2,920 次 | 3,710 次 | 1,180 次 |
+| **Gemma 4 26B A4B + 31B** | 14,380 次 | 2,920 次 | 3,710 次 | 1,180 次 |
 | **DeepSeek V4 Flash** | 19,410 次 | 3,080 次 | 3,980 次 | 1,210 次 |
 
 #### 其他模型
 
 | LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
 |---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380 次 | 2,920 次 | 3,710 次 | 1,180 次 |
+| **Gemma 4 31B (OpenRouter)** | 13,700 次 | 2,780 次 | 3,530 次 | 1,120 次 |
 | **Gemma 4 31B (Cerebras)** | 920 次 | 730 次 | 770 次 | 540 次 |
 | **DeepSeek V4 Pro** | 6,400 次 | 2,330 次 | 2,810 次 | 1,070 次 |
 | **Gemini 3 Flash** | 1,710 次 | 1,170 次 | 1,280 次 | 740 次 |
@@ -116,13 +118,15 @@
 
 | LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | ~0.0005 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
+| **Gemma 4 26B A4B + 31B** | ~0.0005 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
 | **DeepSeek V4 Flash** | ~0.0004 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
 
 #### 其他模型
 
 | LLM \ ASR | Qwen ASR (本地) | Qwen ASR (云端) | Soniox | Deepgram |
 |---|---|---|---|---|
+| **Gemma 4 26B A4B** | ~0.0005 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
+| **Gemma 4 31B (OpenRouter)** | ~0.0005 元 | ~0.002 元 | ~0.002 元 | ~0.006 元 |
 | **Gemma 4 31B (Cerebras)** | ~0.008 元 | ~0.010 元 | ~0.009 元 | ~0.013 元 |
 | **DeepSeek V4 Pro** | ~0.001 元 | ~0.003 元 | ~0.003 元 | ~0.007 元 |
 | **Gemini 3 Flash** | ~0.004 元 | ~0.006 元 | ~0.006 元 | ~0.010 元 |

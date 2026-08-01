@@ -882,7 +882,7 @@ def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_deepseek_on
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, FallbackRacingLLMProvider)
     assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
-    assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.DEFAULT
+    assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.GEMMA4_26B_LATENCY
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
 
     fallback_provider = provider.inner.fallback.factory()
@@ -924,8 +924,13 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "or-key")
+    runtime_logging = object()
 
-    provider = create_llm_provider_from_resolved_config(resolved, secrets=secrets)
+    provider = create_llm_provider_from_resolved_config(
+        resolved,
+        secrets=secrets,
+        runtime_logging=runtime_logging,
+    )
 
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, FallbackRacingLLMProvider)
@@ -934,6 +939,11 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert provider.inner.primary.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.DEFAULT
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
+    assert provider.inner.runtime_logging is runtime_logging
+    assert provider.inner.attempts[1].log_summary == (
+        "provider=openrouter, model=deepseek/deepseek-v4-flash, mode=latency, "
+        "route=deepseek_only, delay=1300ms"
+    )
 
     fallback_provider = provider.inner.fallback.factory()
 

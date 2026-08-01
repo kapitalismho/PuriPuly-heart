@@ -48,6 +48,30 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: Final = {
         "connection": "openrouter",
         "selection_alias": "openrouter_gemma4_26b_a4b",
     },
+    "openrouter_gemma4_26b_31b": {
+        "enabled": True,
+        "model": "gemma4_26b_31b",
+        "connection": "openrouter",
+        "selection_alias": "openrouter_gemma4_26b_31b",
+    },
+    "openrouter_gemma4_31b": {
+        "enabled": True,
+        "model": "gemma4_31b",
+        "connection": "openrouter",
+        "selection_alias": "openrouter_gemma4_31b",
+    },
+    "managed_gemma4_26b_31b": {
+        "enabled": True,
+        "model": "gemma4_26b_31b",
+        "connection": "managed",
+        "selection_alias": "managed_gemma4_26b_31b",
+    },
+    "managed_gemma4_31b": {
+        "enabled": True,
+        "model": "gemma4_31b",
+        "connection": "managed",
+        "selection_alias": "managed_gemma4_31b",
+    },
     "cerebras_gemma4_31b": {
         "enabled": True,
         "model": "gemma4_31b_cerebras",
@@ -60,6 +84,10 @@ _FALLBACK_FIELDS_ALIAS: Final = {
     (True, "deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
     (True, "deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
     (True, "gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
+    (True, "gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
+    (True, "gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
+    (True, "gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
+    (True, "gemma4_31b", "managed"): "managed_gemma4_31b",
     (True, "gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
 }
