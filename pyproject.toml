@@ -35,7 +35,7 @@ dependencies = [
   "flet==0.86.1",
   "flet-desktop==0.86.1",
   "httpx>=0.27",
-  "huggingface-hub==1.23.0",
+  "huggingface-hub==1.26.0",
   "hf-xet==1.5.2",
   "soxr==1.1.0",
 ]

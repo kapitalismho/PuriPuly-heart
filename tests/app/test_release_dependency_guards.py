@@ -564,12 +564,38 @@ def test_build_spec_numpy_runtime_guard_narrow() -> None:
     assert 'collect_submodules("numpy")' not in spec
 
 
+def test_build_spec_guards_required_runtime_dependency_imports_and_assets() -> None:
+    spec = (ROOT / "build.spec").read_text(encoding="utf-8")
+
+    for hiddenimport in (
+        '"flet"',
+        '"flet_desktop"',
+        '"sherpa_onnx"',
+        '"sherpa_onnx.lib._sherpa_onnx"',
+        '"sherpa_onnx.offline_recognizer"',
+        '"onnxruntime"',
+        '"proctap"',
+        '"cryptography"',
+        '"sounddevice"',
+        '"soxr"',
+    ):
+        assert hiddenimport in spec
+
+    assert 'collect_data_files("flet_desktop")' in spec
+    assert 'collect_dynamic_libs("sherpa_onnx", destdir="sherpa_onnx/lib")' in spec
+    assert "runtime_binaries = collect_dynamic_libs(" in spec
+    assert '"onnxruntime", destdir=LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR.as_posix()' in spec
+    assert 'get_module_file_attribute("proctap._native")' in spec
+    assert 'collect_dynamic_libs("proctap"' in spec
+    assert '"soxr.dll"' in spec
+
+
 def test_huggingface_xet_dependencies_and_windows_packaging_are_pinned_and_guarded() -> None:
     project = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     spec = (ROOT / "build.spec").read_text(encoding="utf-8")
     main = (ROOT / "src" / "puripuly_heart" / "main.py").read_text(encoding="utf-8")
 
-    assert '"huggingface-hub==1.23.0"' in project
+    assert '"huggingface-hub==1.26.0"' in project
     assert '"hf-xet==1.5.2"' in project
     assert 'collect_data_files("huggingface_hub")' in spec
     assert 'collect_submodules("huggingface_hub")' in spec
@@ -578,6 +604,7 @@ def test_huggingface_xet_dependencies_and_windows_packaging_are_pinned_and_guard
     assert '"hf_xet.hf_xet"' in spec
     assert "required_huggingface_hiddenimports" in spec
     assert '"hf-xet-runtime-check"' in main
+    assert 'huggingface_hub.__version__ != "1.26.0"' in main
 
 
 def test_huggingface_xet_apache_notices_cover_pinned_runtime_packages() -> None:
@@ -585,7 +612,7 @@ def test_huggingface_xet_apache_notices_cover_pinned_runtime_packages() -> None:
         encoding="utf-8"
     )
 
-    assert "huggingface-hub 1.23.0: Apache-2.0" in notices
+    assert "huggingface-hub 1.26.0: Apache-2.0" in notices
     assert "hf-xet 1.5.2 and its Windows native extension: Apache-2.0" in notices
     assert "HF_XET_HIGH_PERFORMANCE by default" in notices
 

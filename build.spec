@@ -166,6 +166,7 @@ datas = [
 runtime_binaries = collect_dynamic_libs(
     "onnxruntime", destdir=LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR.as_posix()
 )
+runtime_binaries += collect_dynamic_libs("sherpa_onnx", destdir="sherpa_onnx/lib")
 proctap_native_extension = Path(get_module_file_attribute("proctap._native")).resolve()
 if not proctap_native_extension.is_file() or not proctap_native_extension.name.lower().startswith("_native"):
     raise SystemExit("Pinned ProcTap package did not provide a packageable _native extension")
@@ -194,9 +195,16 @@ hiddenimports = [
     "websockets",
     "flet",
     "flet_desktop",
+    "cryptography",
+    "cryptography.fernet",
+    "cryptography.hazmat.primitives.asymmetric.ed25519",
+    "cryptography.hazmat.primitives.kdf.scrypt",
     "httpx",
     "hf_xet",
     "hf_xet.hf_xet",
+    "sherpa_onnx",
+    "sherpa_onnx.lib._sherpa_onnx",
+    "sherpa_onnx.offline_recognizer",
     "keyring.backends.Windows",
     "onnxruntime",
     # NumPy's C-extension is required before the packaged CLI can even boot.

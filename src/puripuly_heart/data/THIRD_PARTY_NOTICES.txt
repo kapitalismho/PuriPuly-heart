@@ -16,7 +16,7 @@ The technical metadata review performed for the AGPL transition found no obvious
 Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, and GPL-2.0-or-later WITH Bootloader-exception for PyInstaller-built binaries.
 
 Runtime/bundled notice-sensitive components:
-- huggingface-hub 1.23.0: Apache-2.0.
+- huggingface-hub 1.26.0: Apache-2.0.
 - hf-xet 1.5.2 and its Windows native extension: Apache-2.0.
 - soxr / libsoxr: LGPL-2.1-or-later. Windows releases include the LGPL compliance bundle described below. The source-tree license text is `src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt`; installed releases stage it under the soxr compliance bundle.
 - certifi: MPL-2.0.
@@ -49,7 +49,7 @@ For package-managed dependencies, the authoritative license texts are distribute
 
 Hugging Face Hub and Xet download runtime
 Sources: https://github.com/huggingface/huggingface_hub , https://github.com/huggingface/xet-core
-Pinned packages: huggingface-hub 1.23.0 ; hf-xet 1.5.2
+Pinned packages: huggingface-hub 1.26.0 ; hf-xet 1.5.2
 License: Apache-2.0
 Bundled native runtime: hf_xet\hf_xet.pyd on Windows
 
