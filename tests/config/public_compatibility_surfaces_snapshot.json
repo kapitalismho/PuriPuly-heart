@@ -628,7 +628,7 @@
       "MyAppName": "PuriPuly <3",
       "MyAppDirName": "PuriPulyHeart",
       "MyAppGroupName": "PuriPulyHeart",
-      "MyAppVersion": "2.3.2",
+      "MyAppVersion": "2.3.3",
       "MyAppPublisher": "salee",
       "MyAppURL": "https://github.com/kapitalismho/PuriPuly-heart",
       "MyAppExeName": "PuriPulyHeart.exe",
@@ -679,6 +679,10 @@
   },
   "provider_aliases": {
     "openrouter_main_selection_aliases": [
+      "gemma4_26b_31b_managed",
+      "gemma4_26b_31b_byok",
+      "gemma4_31b_managed",
+      "gemma4_31b_byok",
       "gemma4_managed",
       "qwen35_flash_managed",
       "deepseek_v4_flash_managed",
@@ -691,7 +695,9 @@
     "openrouter_fallback_selection_aliases": [
       "none",
       "deepseek_v4_flash",
-      "deepseek_v4_flash_china"
+      "deepseek_v4_flash_china",
+      "gemma4_26b_31b",
+      "gemma4_31b"
     ],
     "legacy_selection_aliases": [
       "openrouter:byok:google/gemma-4-26b-a4b-it",
@@ -729,6 +735,8 @@
     "resolved_llm_config_fields": [
       "primary",
       "fallback",
+      "attempts",
+      "loser_grace_ms",
       "concurrency_limit"
     ],
     "resolved_credential_requirement_fields": [

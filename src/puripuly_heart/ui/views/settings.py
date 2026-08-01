@@ -151,6 +151,8 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.LOCAL_QWEN: "settings.stt.section.cpu_inference",
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
+    TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
+    TranslationModel.GEMMA4_31B: "provider.gemma4_31b_openrouter",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.DEEPSEEK_V4_PRO: "provider.deepseek_v4_pro",
@@ -178,10 +180,12 @@ _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.on
 _TRANSLATION_MODEL_RECOMMENDED_SECTION_KEY = "settings.translation_model.section.recommended"
 _TRANSLATION_MODEL_OTHERS_SECTION_KEY = "settings.translation_model.section.others"
 _RECOMMENDED_TRANSLATION_MODELS = (
-    TranslationModel.GEMMA4,
+    TranslationModel.GEMMA4_26B_31B,
     TranslationModel.DEEPSEEK_V4_FLASH,
 )
 _OTHER_TRANSLATION_MODELS = (
+    TranslationModel.GEMMA4_31B,
+    TranslationModel.GEMMA4,
     TranslationModel.GEMMA4_31B_CEREBRAS,
     TranslationModel.LOCAL_LLM,
     TranslationModel.DEEPSEEK_V4_PRO,
@@ -214,6 +218,24 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str
         "settings.fallback.openrouter_deepseek_v4_flash",
     ),
     (
+        "openrouter_gemma4_26b_31b",
+        TranslationFallbackSettings(
+            enabled=True,
+            model=TranslationModel.GEMMA4_26B_31B,
+            connection=TranslationConnection.OPENROUTER,
+        ),
+        "settings.fallback.openrouter_gemma4_26b_31b",
+    ),
+    (
+        "openrouter_gemma4_31b",
+        TranslationFallbackSettings(
+            enabled=True,
+            model=TranslationModel.GEMMA4_31B,
+            connection=TranslationConnection.OPENROUTER,
+        ),
+        "settings.fallback.openrouter_gemma4_31b",
+    ),
+    (
         "openrouter_gemma4_26b_a4b",
         TranslationFallbackSettings(
             enabled=True,
@@ -239,6 +261,8 @@ _TRANSLATION_FALLBACK_LABEL_KEY_BY_VALUE = {
     value: label_key for value, _fallback, label_key in _TRANSLATION_FALLBACK_PRESETS
 }
 _TRANSLATION_FALLBACK_DESCRIPTION_KEY_BY_VALUE = {
+    "openrouter_gemma4_26b_31b": "settings.fallback.openrouter_gemma4_26b_31b.description",
+    "openrouter_gemma4_31b": "settings.fallback.openrouter_gemma4_31b.description",
     "cerebras_gemma4_31b": "settings.fallback.cerebras_gemma4_31b.description",
 }
 

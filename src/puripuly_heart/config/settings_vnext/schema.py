@@ -16,7 +16,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 31
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 32
 
 DEFAULT_OPENROUTER_BROKER_BASE_URL: Final = "https://puripuly-heart-broker.kapitalismho.workers.dev"
 DEFAULT_CUSTOM_VOCAB_TERMS: Final[Mapping[str, tuple[str, ...]]] = {}
@@ -62,6 +62,10 @@ CANONICAL_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
         "deepseek_v4_flash_official",
         "openrouter_deepseek_v4_flash",
         "openrouter_gemma4_26b_a4b",
+        "openrouter_gemma4_26b_31b",
+        "openrouter_gemma4_31b",
+        "managed_gemma4_26b_31b",
+        "managed_gemma4_31b",
         "cerebras_gemma4_31b",
     }
 )
@@ -71,6 +75,10 @@ _FALLBACK_ALIAS_FIELDS: Final = {
     "deepseek_v4_flash_official": (True, "deepseek_v4_flash", "official_byok"),
     "openrouter_deepseek_v4_flash": (True, "deepseek_v4_flash", "openrouter"),
     "openrouter_gemma4_26b_a4b": (True, "gemma4", "openrouter"),
+    "openrouter_gemma4_26b_31b": (True, "gemma4_26b_31b", "openrouter"),
+    "openrouter_gemma4_31b": (True, "gemma4_31b", "openrouter"),
+    "managed_gemma4_26b_31b": (True, "gemma4_26b_31b", "managed"),
+    "managed_gemma4_31b": (True, "gemma4_31b", "managed"),
     "cerebras_gemma4_31b": (True, "gemma4_31b_cerebras", "official_byok"),
     "deepseek_v4_flash_china": (True, "deepseek_v4_flash", "managed_china"),
 }
@@ -98,7 +106,7 @@ _PROVIDER_VERIFICATION_SECRET_BEARING_KEY_FRAGMENTS: Final = (
 
 
 def _default_translation_connection_history() -> dict[str, str]:
-    return {"gemma4": "managed"}
+    return {"gemma4_26b_31b": "managed"}
 
 
 def _default_local_llm_extra_body() -> dict[str, object]:
@@ -347,7 +355,7 @@ class TranslationFallbackIntent:
 
 @dataclass(frozen=True, slots=True)
 class TranslationIntent:
-    model: str = "gemma4"
+    model: str = "gemma4_26b_31b"
     connection: str = "managed"
     connection_history: dict[str, str] = field(
         default_factory=_default_translation_connection_history
@@ -358,8 +366,8 @@ class TranslationIntent:
     openrouter_routing_mode: str = "latency"
     openrouter_model: str = "google/gemma-4-26b-a4b-it"
     openrouter_selected_source: str = "managed"
-    openrouter_selection_alias: str | None = "gemma4_managed"
-    openrouter_provider_routing: str = "default"
+    openrouter_selection_alias: str | None = "gemma4_26b_31b_managed"
+    openrouter_provider_routing: str = "gemma4_26b_31b_latency"
     gemini: GeminiTranslationIntent = field(default_factory=GeminiTranslationIntent)
     deepseek: DeepSeekTranslationIntent = field(default_factory=DeepSeekTranslationIntent)
     qwen: QwenTranslationIntent = field(default_factory=QwenTranslationIntent)

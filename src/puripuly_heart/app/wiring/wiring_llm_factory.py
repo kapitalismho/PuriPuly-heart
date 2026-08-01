@@ -57,6 +57,7 @@ from puripuly_heart.config.settings import (
     TranslationConnection,
 )
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
+from puripuly_heart.core.llm.fallback_racing import LLMProviderAttempt
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_ENV,
@@ -400,6 +401,7 @@ def _settings_for_resolved_openrouter_fields(
     settings: AppSettings | None,
     *,
     model: str,
+    models: tuple[str, ...] = (),
     service_endpoint: str | None,
     selected_source: OpenRouterCredentialSource,
     provider_routing: OpenRouterProviderRouting,
@@ -418,6 +420,7 @@ def _settings_for_resolved_openrouter_fields(
         alias_value = openrouter_alias_for_fields(
             model=model,
             source=selected_source.value,
+            models=models,
         )
         if alias_value is not None:
             selection_alias = OpenRouterSelectionAlias(alias_value)
@@ -537,6 +540,7 @@ def _openrouter_provider_from_resolved_target(
 ) -> LLMProvider:
     return _openrouter_provider_from_resolved_fields(
         model=target.model,
+        models=target.models,
         credential=target.credential,
         service_endpoint=target.service_endpoint,
         routing_mode_value=target.routing_mode,
@@ -554,6 +558,7 @@ def _openrouter_provider_from_resolved_target(
 def _openrouter_provider_from_resolved_fields(
     *,
     model: str,
+    models: tuple[str, ...] = (),
     credential: ResolvedCredentialRequirement,
     service_endpoint: str | None,
     routing_mode_value: str | None,
@@ -575,6 +580,7 @@ def _openrouter_provider_from_resolved_fields(
     openrouter_settings = _settings_for_resolved_openrouter_fields(
         compatibility_settings,
         model=model,
+        models=models,
         service_endpoint=service_endpoint,
         selected_source=selected_source,
         provider_routing=provider_routing,
@@ -613,6 +619,7 @@ def _openrouter_provider_from_resolved_fields(
                         secrets=secrets,
                     ),
                     model=model,
+                    models=models,
                     routing_mode=routing_mode,
                     provider_routing=provider_routing,
                     runtime_logging=runtime_logging,
@@ -626,6 +633,7 @@ def _openrouter_provider_from_resolved_fields(
                 secrets=secrets,
             ),
             model=model,
+            models=models,
             routing_mode=routing_mode,
             provider_routing=provider_routing,
             runtime_logging=runtime_logging,
@@ -635,6 +643,7 @@ def _openrouter_provider_from_resolved_fields(
     return OpenRouterLLMProvider(
         api_key=api_key,
         model=model,
+        models=models,
         routing_mode=routing_mode,
         provider_routing=provider_routing,
         runtime_logging=runtime_logging,
@@ -756,30 +765,46 @@ def create_llm_provider_from_resolved_config(
         compatibility_settings=compatibility_settings,
         qwen_low_latency_mode=qwen_low_latency_mode,
     )
-    if config.fallback is not None:
+    if len(config.attempts) > 1:
         fallback_managed_release_service = _shared_managed_release_service_for_fallback(
             base,
             managed_release_service,
         )
-        fallback_plan = config.fallback
+        attempt_providers: list[LLMProviderAttempt] = [
+            LLMProviderAttempt(provider=base, start_after_ms=config.attempts[0].start_after_ms)
+        ]
+        for index, attempt_plan in enumerate(config.attempts[1:], start=1):
+            force_managed_wrapper = (
+                attempt_plan.target.provider == PROVIDER_OPENROUTER
+                and attempt_plan.target.credential.source == CREDENTIAL_SOURCE_MANAGED
+            )
+            if index == 1 and config.fallback is not None:
+                force_managed_wrapper = config.fallback.force_managed_wrapper
+            attempt_providers.append(
+                LLMProviderAttempt(
+                    provider=_LazyFactoryLLMProvider(
+                        factory=lambda attempt_plan=attempt_plan, force_managed_wrapper=force_managed_wrapper: _provider_from_resolved_target(
+                            attempt_plan.target,
+                            secrets=secrets,
+                            managed_release_service=fallback_managed_release_service,
+                            managed_delegate_ready=managed_delegate_ready,
+                            runtime_logging=runtime_logging,
+                            compatibility_settings=compatibility_settings,
+                            qwen_low_latency_mode=qwen_low_latency_mode,
+                            force_managed_wrapper=force_managed_wrapper,
+                            include_selection_alias=False,
+                        )
+                    ),
+                    start_after_ms=attempt_plan.start_after_ms,
+                    start_on_primary_error=attempt_plan.start_on_primary_error,
+                )
+            )
         base = FallbackRacingLLMProvider(
             primary=base,
-            fallback=_LazyFactoryLLMProvider(
-                factory=lambda: _provider_from_resolved_target(
-                    fallback_plan.target,
-                    secrets=secrets,
-                    managed_release_service=fallback_managed_release_service,
-                    managed_delegate_ready=managed_delegate_ready,
-                    runtime_logging=runtime_logging,
-                    compatibility_settings=compatibility_settings,
-                    qwen_low_latency_mode=qwen_low_latency_mode,
-                    force_managed_wrapper=fallback_plan.force_managed_wrapper,
-                    include_selection_alias=False,
-                )
-            ),
-            fallback_timeout_ms=fallback_plan.timeout_ms,
-            loser_grace_ms=fallback_plan.loser_grace_ms,
-            runtime_logging=runtime_logging,
+            fallback=attempt_providers[1].provider,
+            attempts=tuple(attempt_providers),
+            fallback_timeout_ms=config.attempts[1].start_after_ms,
+            loser_grace_ms=config.loser_grace_ms,
         )
     return SemaphoreLLMProvider(
         inner=base,

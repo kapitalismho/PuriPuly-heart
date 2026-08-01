@@ -13,6 +13,7 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_MODEL_GEMINI_3_FLASH,
     OPENROUTER_MODEL_GEMINI_31_FLASH_LITE,
     OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+    OPENROUTER_MODEL_GEMMA_4_31B_IT,
     OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
     get_openrouter_llm_profile,
     openrouter_alias_for_fields,
@@ -26,6 +27,7 @@ from puripuly_heart.config.resolved import (
     RUNTIME_CHANNEL_PEER,
     RUNTIME_CHANNEL_SELF,
     ResolvedCredentialRequirement,
+    ResolvedLLMAttemptPlan,
     ResolvedLLMConfig,
     ResolvedLLMFallbackPlan,
     ResolvedLLMTarget,
@@ -35,6 +37,8 @@ from puripuly_heart.config.resolved import (
 )
 
 TRANSLATION_MODEL_GEMMA4: Final = "gemma4"
+TRANSLATION_MODEL_GEMMA4_26B_31B: Final = "gemma4_26b_31b"
+TRANSLATION_MODEL_GEMMA4_31B: Final = "gemma4_31b"
 TRANSLATION_MODEL_DEEPSEEK_V4_FLASH: Final = "deepseek_v4_flash"
 TRANSLATION_MODEL_DEEPSEEK_V4_PRO: Final = "deepseek_v4_pro"
 TRANSLATION_MODEL_GEMINI_3_FLASH: Final = "gemini3_flash"
@@ -44,7 +48,13 @@ TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: Final = "openrouter_qwen35_flash"
 TRANSLATION_MODEL_LOCAL_LLM: Final = "local_llm"
 TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS: Final = "gemma4_31b_cerebras"
 
+_FIRST_HEDGE_DELAY_MS: Final = 1300
+_EMERGENCY_HEDGE_DELAY_MS: Final = 4500
+_LOSER_GRACE_MS: Final = 50
+
 TranslationModelName: TypeAlias = Literal[
+    "gemma4_26b_31b",
+    "gemma4_31b",
     "gemma4",
     "deepseek_v4_flash",
     "deepseek_v4_pro",
@@ -56,6 +66,8 @@ TranslationModelName: TypeAlias = Literal[
     "gemma4_31b_cerebras",
 ]
 TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
+    TRANSLATION_MODEL_GEMMA4_26B_31B,
+    TRANSLATION_MODEL_GEMMA4_31B,
     TRANSLATION_MODEL_GEMMA4,
     TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
     TRANSLATION_MODEL_DEEPSEEK_V4_PRO,
@@ -91,6 +103,14 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
     Mapping[TranslationModelName, tuple[TranslationConnectionName, ...]]
 ] = MappingProxyType(
     {
+        TRANSLATION_MODEL_GEMMA4_26B_31B: (
+            TRANSLATION_CONNECTION_MANAGED,
+            TRANSLATION_CONNECTION_OPENROUTER,
+        ),
+        TRANSLATION_MODEL_GEMMA4_31B: (
+            TRANSLATION_CONNECTION_MANAGED,
+            TRANSLATION_CONNECTION_OPENROUTER,
+        ),
         TRANSLATION_MODEL_GEMMA4: (
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_OPENROUTER,
@@ -227,6 +247,7 @@ SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS: Final = 100
 
 _OPENROUTER_MODELS: Final[tuple[str, ...]] = (
     OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+    OPENROUTER_MODEL_GEMMA_4_31B_IT,
     OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_MODEL_GEMINI_3_FLASH,
@@ -237,6 +258,11 @@ _OPENROUTER_PROVIDER_ROUTINGS: Final[tuple[str, ...]] = (
     "default",
     "deepseek_only",
     "google_gemini_latency",
+    "gemma4_26b_31b_latency",
+    "gemma4_31b_latency",
+    "gemma4_26b_latency",
+    "deepseek_v4_flash_latency",
+    "gemma4_31b_cerebras_only",
 )
 
 
@@ -314,7 +340,7 @@ def _normalize_translation_model(value: object) -> TranslationModelName:
         _normalize_allowed(
             value,
             allowed=TRANSLATION_MODELS,
-            default=TRANSLATION_MODEL_GEMMA4,
+            default=TRANSLATION_MODEL_GEMMA4_26B_31B,
         ),
     )
 
@@ -397,10 +423,14 @@ def _normalize_openrouter_managed_credential_kind(
     )
 
 
-def _canonical_openrouter_alias(model: str, source: OpenRouterSource) -> str | None:
+def _canonical_openrouter_alias(
+    model: str,
+    source: OpenRouterSource,
+    models: tuple[str, ...] = (),
+) -> str | None:
     if source == OPENROUTER_SOURCE_NONE:
         return None
-    return openrouter_alias_for_fields(model=model, source=source)
+    return openrouter_alias_for_fields(model=model, source=source, models=models)
 
 
 def _normalize_openrouter_broker_base_url(value: object) -> str | None:
@@ -478,7 +508,7 @@ def _translation_connection_from_openrouter_source(
 
 @dataclass(frozen=True, slots=True)
 class TranslationRuntimeIntent:
-    model: TranslationModelName = TRANSLATION_MODEL_GEMMA4
+    model: TranslationModelName = TRANSLATION_MODEL_GEMMA4_26B_31B
     connection: TranslationConnectionName = TRANSLATION_CONNECTION_MANAGED
     concurrency_limit: int = 5
 
@@ -529,7 +559,16 @@ class OpenRouterRuntimeIntent:
             self.selected_source,
             default=OPENROUTER_SOURCE_MANAGED,
         )
-        selection_alias = _canonical_openrouter_alias(model, source)
+        selection_profile = (
+            get_openrouter_llm_profile(self.selection_alias)
+            if isinstance(self.selection_alias, str)
+            else None
+        )
+        selection_alias = _canonical_openrouter_alias(
+            model,
+            source,
+            selection_profile.openrouter_models if selection_profile is not None else (),
+        )
         routing_mode = _normalize_allowed(
             self.routing_mode,
             allowed=_OPENROUTER_ROUTING_MODES,
@@ -825,7 +864,11 @@ def normalize_openrouter_runtime_intent(
     return OpenRouterRuntimeIntent(
         model=resolved_model,
         selected_source=resolved_source,
-        selection_alias=_canonical_openrouter_alias(resolved_model, resolved_source),
+        selection_alias=_canonical_openrouter_alias(
+            resolved_model,
+            resolved_source,
+            selection_profile.openrouter_models if selection_profile is not None else (),
+        ),
         routing_mode=_normalize_allowed(
             routing_mode,
             allowed=_OPENROUTER_ROUTING_MODES,
@@ -873,6 +916,29 @@ def derive_translation_runtime_intent_from_compatibility(
     concurrency = _normalize_positive_int(concurrency_limit, default=5)
 
     if provider == PROVIDER_OPENROUTER:
+        if provider_routing == "gemma4_26b_31b_latency":
+            return TranslationRuntimeIntent(
+                model=TRANSLATION_MODEL_GEMMA4_26B_31B,
+                connection=_translation_connection_from_openrouter_source(
+                    openrouter_source,
+                    model=TRANSLATION_MODEL_GEMMA4_26B_31B,
+                    provider_routing=provider_routing,
+                ),
+                concurrency_limit=concurrency,
+            )
+        if (
+            provider_routing == "gemma4_31b_latency"
+            or openrouter_model_value == OPENROUTER_MODEL_GEMMA_4_31B_IT
+        ):
+            return TranslationRuntimeIntent(
+                model=TRANSLATION_MODEL_GEMMA4_31B,
+                connection=_translation_connection_from_openrouter_source(
+                    openrouter_source,
+                    model=TRANSLATION_MODEL_GEMMA4_31B,
+                    provider_routing=provider_routing,
+                ),
+                concurrency_limit=concurrency,
+            )
         if openrouter_model_value == OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT:
             return TranslationRuntimeIntent(
                 model=TRANSLATION_MODEL_GEMMA4,
@@ -1026,6 +1092,7 @@ def _openrouter_managed_credential_kind_for_translation(
 def _resolved_openrouter_target(
     *,
     model: str,
+    models: tuple[str, ...] = (),
     source: OpenRouterSource,
     openrouter: OpenRouterRuntimeIntent,
     provider_routing: str,
@@ -1034,6 +1101,7 @@ def _resolved_openrouter_target(
     return ResolvedLLMTarget(
         provider=PROVIDER_OPENROUTER,
         model=model,
+        models=models,
         credential=_openrouter_credential(
             source,
             managed_credential_kind=managed_credential_kind,
@@ -1155,12 +1223,40 @@ def _resolve_translation_target(
     openrouter: OpenRouterRuntimeIntent,
     direct: DirectProviderRuntimeIntent,
 ) -> ResolvedLLMTarget:
+    if translation.model == TRANSLATION_MODEL_GEMMA4_26B_31B:
+        return _resolved_openrouter_target(
+            model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+            models=(
+                OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+                OPENROUTER_MODEL_GEMMA_4_31B_IT,
+            ),
+            source=_openrouter_source_for_translation(translation.connection, openrouter),
+            openrouter=openrouter,
+            provider_routing="gemma4_26b_31b_latency",
+            managed_credential_kind=_openrouter_managed_credential_kind_for_translation(
+                translation.connection,
+                openrouter,
+            ),
+        )
+
+    if translation.model == TRANSLATION_MODEL_GEMMA4_31B:
+        return _resolved_openrouter_target(
+            model=OPENROUTER_MODEL_GEMMA_4_31B_IT,
+            source=_openrouter_source_for_translation(translation.connection, openrouter),
+            openrouter=openrouter,
+            provider_routing="gemma4_31b_latency",
+            managed_credential_kind=_openrouter_managed_credential_kind_for_translation(
+                translation.connection,
+                openrouter,
+            ),
+        )
+
     if translation.model == TRANSLATION_MODEL_GEMMA4:
         return _resolved_openrouter_target(
             model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
             source=_openrouter_source_for_translation(translation.connection, openrouter),
             openrouter=openrouter,
-            provider_routing="default",
+            provider_routing="gemma4_26b_latency",
             managed_credential_kind=_openrouter_managed_credential_kind_for_translation(
                 translation.connection,
                 openrouter,
@@ -1295,19 +1391,54 @@ def _resolve_translation_target(
     )
 
 
-def _llm_targets_equivalent(left: ResolvedLLMTarget, right: ResolvedLLMTarget) -> bool:
-    return left == right
-
-
 def _fallback_plan_for_target(
     target: ResolvedLLMTarget,
 ) -> ResolvedLLMFallbackPlan:
     return ResolvedLLMFallbackPlan(
         target=target,
+        timeout_ms=_FIRST_HEDGE_DELAY_MS,
         force_managed_wrapper=(
             target.provider == PROVIDER_OPENROUTER
             and target.credential.source == CREDENTIAL_SOURCE_MANAGED
         ),
+        start_on_primary_error=True,
+    )
+
+
+def _emergency_plan_for_primary(
+    translation: TranslationRuntimeIntent,
+    *,
+    primary: ResolvedLLMTarget,
+    openrouter: OpenRouterRuntimeIntent,
+    direct: DirectProviderRuntimeIntent,
+) -> ResolvedLLMAttemptPlan | None:
+    if primary.provider != PROVIDER_OPENROUTER:
+        return None
+    emergency_translation = TranslationRuntimeIntent(
+        model=TRANSLATION_MODEL_GEMMA4_31B,
+        connection=translation.connection,
+        concurrency_limit=translation.concurrency_limit,
+    )
+    emergency_target = _resolve_translation_target(
+        emergency_translation,
+        openrouter=openrouter,
+        direct=direct,
+    )
+    return ResolvedLLMAttemptPlan(
+        target=ResolvedLLMTarget(
+            provider=emergency_target.provider,
+            model=emergency_target.model,
+            models=emergency_target.models,
+            credential=emergency_target.credential,
+            base_url=emergency_target.base_url,
+            service_endpoint=emergency_target.service_endpoint,
+            region=emergency_target.region,
+            routing_mode=emergency_target.routing_mode,
+            provider_routing="gemma4_31b_cerebras_only",
+            provider_options=emergency_target.provider_options,
+        ),
+        start_after_ms=_EMERGENCY_HEDGE_DELAY_MS,
+        start_on_primary_error=False,
     )
 
 
@@ -1317,6 +1448,9 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
     direct = runtime_input.direct
     primary = _resolve_translation_target(translation, openrouter=openrouter, direct=direct)
     fallback_plan: ResolvedLLMFallbackPlan | None = None
+    attempts: list[ResolvedLLMAttemptPlan] = [
+        ResolvedLLMAttemptPlan(target=primary),
+    ]
 
     if runtime_input.translation_fallback.enabled:
         fallback_translation = TranslationRuntimeIntent(
@@ -1329,12 +1463,28 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
             openrouter=openrouter,
             direct=direct,
         )
-        if not _llm_targets_equivalent(primary, fallback_target):
-            fallback_plan = _fallback_plan_for_target(fallback_target)
+        fallback_plan = _fallback_plan_for_target(fallback_target)
+        attempts.append(
+            ResolvedLLMAttemptPlan(
+                target=fallback_target,
+                start_after_ms=fallback_plan.start_after_ms,
+                start_on_primary_error=fallback_plan.start_on_primary_error,
+            )
+        )
+        emergency_plan = _emergency_plan_for_primary(
+            translation,
+            primary=primary,
+            openrouter=openrouter,
+            direct=direct,
+        )
+        if emergency_plan is not None:
+            attempts.append(emergency_plan)
 
     return ResolvedLLMConfig(
         primary=primary,
         fallback=fallback_plan,
+        attempts=tuple(attempts),
+        loser_grace_ms=_LOSER_GRACE_MS,
         concurrency_limit=translation.concurrency_limit,
     )
 
@@ -1422,6 +1572,8 @@ __all__ = [
     "TRANSLATION_MODEL_GEMINI_3_FLASH",
     "TRANSLATION_MODEL_GEMINI_31_FLASH_LITE",
     "TRANSLATION_MODEL_GEMMA4",
+    "TRANSLATION_MODEL_GEMMA4_26B_31B",
+    "TRANSLATION_MODEL_GEMMA4_31B",
     "TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS",
     "TRANSLATION_MODEL_LOCAL_LLM",
     "TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH",

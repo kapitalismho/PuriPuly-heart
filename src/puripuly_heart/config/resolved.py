@@ -154,6 +154,7 @@ class ResolvedCredentialRequirement:
 class ResolvedLLMTarget:
     provider: str
     model: str
+    models: tuple[str, ...] = ()
     credential: ResolvedCredentialRequirement = field(default_factory=_no_credential)
     base_url: str | None = None
     service_endpoint: str | None = None
@@ -163,15 +164,22 @@ class ResolvedLLMTarget:
     provider_options: Mapping[str, ResolvedOptionValue] = field(default_factory=_empty_options)
 
     def __post_init__(self) -> None:
+        models = tuple(self.models) if self.models else (self.model,)
+        if not models or any(not model for model in models):
+            raise ValueError("models must contain non-empty model identifiers")
+        if models[0] != self.model:
+            raise ValueError("model must match the first models entry")
+        object.__setattr__(self, "models", models)
         object.__setattr__(self, "provider_options", _freeze_option_mapping(self.provider_options))
 
 
 @dataclass(frozen=True, slots=True)
 class ResolvedLLMFallbackPlan:
     target: ResolvedLLMTarget
-    timeout_ms: int = 2000
+    timeout_ms: int = 1300
     loser_grace_ms: int = 50
     force_managed_wrapper: bool = False
+    start_on_primary_error: bool = True
 
     def __post_init__(self) -> None:
         if self.timeout_ms < 0:
@@ -179,16 +187,49 @@ class ResolvedLLMFallbackPlan:
         if self.loser_grace_ms < 0:
             raise ValueError("loser_grace_ms must be >= 0")
 
+    @property
+    def start_after_ms(self) -> int:
+        return self.timeout_ms
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedLLMAttemptPlan:
+    target: ResolvedLLMTarget
+    start_after_ms: int = 0
+    start_on_primary_error: bool = False
+
+    def __post_init__(self) -> None:
+        if self.start_after_ms < 0:
+            raise ValueError("start_after_ms must be >= 0")
+
 
 @dataclass(frozen=True, slots=True)
 class ResolvedLLMConfig:
     primary: ResolvedLLMTarget
     fallback: ResolvedLLMFallbackPlan | None = None
+    attempts: tuple[ResolvedLLMAttemptPlan, ...] = ()
+    loser_grace_ms: int = 50
     concurrency_limit: int = 5
 
     def __post_init__(self) -> None:
+        if self.loser_grace_ms < 0:
+            raise ValueError("loser_grace_ms must be >= 0")
         if self.concurrency_limit <= 0:
             raise ValueError("concurrency_limit must be > 0")
+        attempts = tuple(self.attempts)
+        if not attempts:
+            attempts = (ResolvedLLMAttemptPlan(target=self.primary),)
+            if self.fallback is not None:
+                attempts += (
+                    ResolvedLLMAttemptPlan(
+                        target=self.fallback.target,
+                        start_after_ms=self.fallback.timeout_ms,
+                        start_on_primary_error=self.fallback.start_on_primary_error,
+                    ),
+                )
+        if attempts[0].target != self.primary:
+            raise ValueError("the first LLM attempt must be the primary target")
+        object.__setattr__(self, "attempts", attempts)
 
     @property
     def provider(self) -> str:
@@ -448,6 +489,7 @@ __all__ = [
     "ResolvedCredentialRequirement",
     "ResolvedDesktopAudioCaptureTarget",
     "ResolvedFeatureState",
+    "ResolvedLLMAttemptPlan",
     "ResolvedLLMConfig",
     "ResolvedLLMFallbackPlan",
     "ResolvedLLMTarget",

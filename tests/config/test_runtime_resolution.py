@@ -382,7 +382,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "managed",
             "openrouter:managed",
             None,
-            "default",
+            "gemma4_26b_latency",
         ),
         (
             "gemma4",
@@ -393,7 +393,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "secret_store",
             "openrouter:byok",
             None,
-            "default",
+            "gemma4_26b_latency",
         ),
         (
             "gemma4",
@@ -404,7 +404,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "secret_store",
             "openrouter:byok",
             None,
-            "default",
+            "gemma4_26b_latency",
         ),
         (
             "deepseek_v4_flash",
@@ -635,7 +635,7 @@ def test_translation_model_connection_matrix_resolves_llm_config(
             "openrouter:byok",
             "openrouter",
             "google/gemma-4-26b-a4b-it",
-            "default",
+            "gemma4_26b_latency",
         ),
         (
             "cerebras_gemma4_31b",
@@ -748,7 +748,7 @@ def test_openrouter_china_fallback_resolves_deepseek_only_fallback_routing() -> 
     assert config.fallback.force_managed_wrapper is True
 
 
-def test_openrouter_gemma_fallback_resolves_default_fallback_routing() -> None:
+def test_openrouter_gemma_fallback_preserves_duplicate_target_and_adds_emergency() -> None:
     runtime_resolution = _runtime_resolution_module()
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         selection_alias="gemma4_byok",
@@ -768,10 +768,14 @@ def test_openrouter_gemma_fallback_resolves_default_fallback_routing() -> None:
         )
     )
 
-    assert config.fallback is None
+    assert config.fallback is not None
+    assert config.fallback.target.provider_routing == "gemma4_26b_latency"
+    assert len(config.attempts) == 3
+    assert config.attempts[1].target == config.fallback.target
+    assert config.attempts[2].target.provider_routing == "gemma4_31b_cerebras_only"
 
 
-def test_openrouter_deepseek_only_primary_suppresses_fallback_fields() -> None:
+def test_openrouter_deepseek_only_primary_keeps_fallback_and_emergency_schedule() -> None:
     runtime_resolution = _runtime_resolution_module()
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         selection_alias="deepseek_v4_flash_managed",
@@ -795,7 +799,10 @@ def test_openrouter_deepseek_only_primary_suppresses_fallback_fields() -> None:
     assert config.provider == "openrouter"
     assert config.model == "deepseek/deepseek-v4-flash"
     assert config.provider_routing == "deepseek_only"
-    assert config.fallback is None
+    assert config.fallback is not None
+    assert config.fallback.target.provider_routing == "deepseek_only"
+    assert len(config.attempts) == 3
+    assert config.attempts[2].target.provider_routing == "gemma4_31b_cerebras_only"
 
 
 def test_managed_china_resolves_explicit_qq_managed_credential_reference() -> None:
@@ -1079,9 +1086,9 @@ def test_old_openrouter_credential_source_keys_normalize_through_settings_to_res
 
     assert settings.openrouter.selected_source.value == "managed"
     assert settings.openrouter.selection_alias is not None
-    assert settings.openrouter.selection_alias.value == "gemma4_managed"
+    assert settings.openrouter.selection_alias.value == "gemma4_26b_31b_managed"
     assert openrouter_intent.selected_source == "managed"
-    assert openrouter_intent.selection_alias == "gemma4_managed"
+    assert openrouter_intent.selection_alias == "gemma4_26b_31b_managed"
     assert config.provider == "openrouter"
     assert config.model == "google/gemma-4-26b-a4b-it"
     assert config.credential == resolved.ResolvedCredentialRequirement(
@@ -1466,7 +1473,7 @@ def test_missing_openrouter_source_defaults_to_byok_for_openrouter_provider() ->
         reference="openrouter:byok",
     )
     assert config.routing_mode == "latency"
-    assert config.provider_routing == "default"
+    assert config.provider_routing == "gemma4_26b_latency"
     assert config.service_endpoint == "https://broker.fixture.test/v1"
     assert config.fallback is None
     assert config.concurrency_limit == 3

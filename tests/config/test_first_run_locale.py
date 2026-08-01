@@ -146,7 +146,7 @@ def test_first_run_settings_use_openrouter_deepseek_fallback_default(
     settings = _new_first_run_settings(system_locale)
 
     assert settings.provider.llm == LLMProviderName.OPENROUTER
-    assert settings.translation.model == TranslationModel.GEMMA4
+    assert settings.translation.model == TranslationModel.GEMMA4_26B_31B
     assert settings.translation.connection == TranslationConnection.MANAGED
     assert settings.translation.fallback.enabled is True
     assert settings.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
@@ -217,7 +217,7 @@ def test_main_first_run_non_china_uses_openrouter_deepseek_fallback_default(
     loaded = _load_settings_or_default(path)
 
     assert loaded.intent.ui.locale == "ko"
-    assert loaded.intent.translation.model == "gemma4"
+    assert loaded.intent.translation.model == "gemma4_26b_31b"
     assert loaded.intent.translation.connection == "managed"
     assert loaded.intent.translation.fallback.selection_alias == "openrouter_deepseek_v4_flash"
     assert not path.exists()

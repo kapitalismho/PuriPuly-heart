@@ -5,7 +5,7 @@
 <h1 align="center">PuriPuly <3</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.3.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.3.3-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.12-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -95,13 +95,15 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | 14,380회 | 2,920회 | 3,710회 | 1,180회 |
+| **Gemma 4 26B A4B + 31B** | 14,380회 | 2,920회 | 3,710회 | 1,180회 |
 | **DeepSeek V4 Flash** | 19,410회 | 3,080회 | 3,980회 | 1,210회 |
 
 #### 기타 모델
 
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
+| **Gemma 4 26B A4B** | 14,380회 | 2,920회 | 3,710회 | 1,180회 |
+| **Gemma 4 31B (OpenRouter)** | 13,700회 | 2,780회 | 3,530회 | 1,120회 |
 | **Gemma 4 31B (Cerebras)** | 920회 | 730회 | 770회 | 540회 |
 | **DeepSeek V4 Pro** | 6,400회 | 2,330회 | 2,810회 | 1,070회 |
 | **Gemini 3 Flash** | 1,710회 | 1,170회 | 1,280회 | 740회 |
@@ -115,13 +117,15 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
-| **Gemma 4 26B A4B** | ~0.1원 | ~0.5원 | ~0.4원 | ~1.3원 |
+| **Gemma 4 26B A4B + 31B** | ~0.1원 | ~0.5원 | ~0.4원 | ~1.3원 |
 | **DeepSeek V4 Flash** | ~0.08원 | ~0.5원 | ~0.4원 | ~1.2원 |
 
 #### 기타 모델
 
 | LLM \ ASR | Qwen ASR (Local) | Qwen ASR (Cloud) | Soniox | Deepgram |
 |---|---|---|---|---|
+| **Gemma 4 26B A4B** | ~0.1원 | ~0.5원 | ~0.4원 | ~1.3원 |
+| **Gemma 4 31B (OpenRouter)** | ~0.1원 | ~0.5원 | ~0.4원 | ~1.4원 |
 | **Gemma 4 31B (Cerebras)** | ~1.6원 | ~2.0원 | ~1.9원 | ~2.8원 |
 | **DeepSeek V4 Pro** | ~0.2원 | ~0.6원 | ~0.5원 | ~1.4원 |
 | **Gemini 3 Flash** | ~0.9원 | ~1.3원 | ~1.2원 | ~2.0원 |

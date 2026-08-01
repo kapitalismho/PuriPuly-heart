@@ -882,7 +882,7 @@ def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_deepseek_on
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, FallbackRacingLLMProvider)
     assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
-    assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.DEFAULT
+    assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.GEMMA4_26B_LATENCY
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
 
     fallback_provider = provider.inner.fallback.factory()

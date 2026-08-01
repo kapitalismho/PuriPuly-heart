@@ -11,6 +11,7 @@ OPENROUTER_CREDENTIAL_SOURCE_MANAGED = "managed"
 OPENROUTER_CREDENTIAL_SOURCE_BYOK = "byok"
 
 OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT = "google/gemma-4-26b-a4b-it"
+OPENROUTER_MODEL_GEMMA_4_31B_IT = "google/gemma-4-31b-it"
 OPENROUTER_MODEL_QWEN_35_FLASH_02_23 = "qwen/qwen3.5-flash-02-23"
 OPENROUTER_MODEL_DEEPSEEK_V4_FLASH = "deepseek/deepseek-v4-flash"
 OPENROUTER_MODEL_GEMINI_3_FLASH = "google/gemini-3-flash-preview"
@@ -18,6 +19,10 @@ OPENROUTER_MODEL_GEMINI_31_FLASH_LITE = "google/gemini-3.1-flash-lite"
 
 OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED = "gemma4_managed"
 OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK = "gemma4_byok"
+OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED = "gemma4_26b_31b_managed"
+OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK = "gemma4_26b_31b_byok"
+OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED = "gemma4_31b_managed"
+OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK = "gemma4_31b_byok"
 OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED = "qwen35_flash_managed"
 OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_BYOK = "qwen35_flash_byok"
 OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED = "deepseek_v4_flash_managed"
@@ -29,6 +34,8 @@ OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE = "none"
 OPENROUTER_FALLBACK_SELECTION_ALIAS_QWEN35_FLASH = "qwen35_flash"
 OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
 OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA = "deepseek_v4_flash_china"
+OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B = "gemma4_26b_31b"
+OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B = "gemma4_31b"
 
 LEGACY_OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMINI25_FLASH_LITE = "gemini25_flash_lite"
 LEGACY_OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMINI31_FLASH_LITE = "gemini31_flash_lite"
@@ -59,6 +66,7 @@ class LLMSelectionProfile:
     gemini_model: str | None = None
     qwen_model: str | None = None
     openrouter_model: str | None = None
+    openrouter_models: tuple[str, ...] = ()
     openrouter_source: str = OPENROUTER_CREDENTIAL_SOURCE_NONE
 
 
@@ -68,15 +76,59 @@ class OpenRouterFallbackProfile:
     label_key: str
     description_key: str
     openrouter_model: str | None = None
+    openrouter_models: tuple[str, ...] = ()
 
 
 PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED: LLMSelectionProfile(
+        alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED,
+        provider=LLM_PROVIDER_OPENROUTER,
+        label_key="provider.gemma4_26b_31b",
+        description_key="provider.gemma4_26b_31b.description",
+        openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+        openrouter_models=(
+            OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+            OPENROUTER_MODEL_GEMMA_4_31B_IT,
+        ),
+        openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
+    ),
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK: LLMSelectionProfile(
+        alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK,
+        provider=LLM_PROVIDER_OPENROUTER,
+        label_key="provider.gemma4_26b_31b",
+        description_key="provider.gemma4_26b_31b.description",
+        openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+        openrouter_models=(
+            OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+            OPENROUTER_MODEL_GEMMA_4_31B_IT,
+        ),
+        openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
+    ),
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED: LLMSelectionProfile(
+        alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED,
+        provider=LLM_PROVIDER_OPENROUTER,
+        label_key="provider.gemma4_31b_openrouter",
+        description_key="provider.gemma4_31b_openrouter.description",
+        openrouter_model=OPENROUTER_MODEL_GEMMA_4_31B_IT,
+        openrouter_models=(OPENROUTER_MODEL_GEMMA_4_31B_IT,),
+        openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
+    ),
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK: LLMSelectionProfile(
+        alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK,
+        provider=LLM_PROVIDER_OPENROUTER,
+        label_key="provider.gemma4_31b_openrouter",
+        description_key="provider.gemma4_31b_openrouter.description",
+        openrouter_model=OPENROUTER_MODEL_GEMMA_4_31B_IT,
+        openrouter_models=(OPENROUTER_MODEL_GEMMA_4_31B_IT,),
+        openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
+    ),
     OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED: LLMSelectionProfile(
         alias=OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED,
         provider=LLM_PROVIDER_OPENROUTER,
         label_key="provider.gemma4_managed",
         description_key="provider.gemma4_managed.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+        openrouter_models=(OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,),
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     ),
     OPENROUTER_SELECTION_ALIAS_GEMMA4_BYOK: LLMSelectionProfile(
@@ -85,6 +137,7 @@ PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
         label_key="provider.gemma4_26b_a4b_it",
         description_key="provider.gemma4_26b_a4b_it.description",
         openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+        openrouter_models=(OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,),
         openrouter_source=OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     ),
     OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED: LLMSelectionProfile(
@@ -156,6 +209,23 @@ FALLBACK_PROFILE_BY_ALIAS: dict[str, OpenRouterFallbackProfile] = {
         description_key="provider.deepseek_v4_flash_china_fallback.description",
         openrouter_model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     ),
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B: OpenRouterFallbackProfile(
+        alias=OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B,
+        label_key="settings.fallback.openrouter_gemma4_26b_31b",
+        description_key="settings.fallback.openrouter_gemma4_26b_31b.description",
+        openrouter_model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+        openrouter_models=(
+            OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+            OPENROUTER_MODEL_GEMMA_4_31B_IT,
+        ),
+    ),
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B: OpenRouterFallbackProfile(
+        alias=OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B,
+        label_key="settings.fallback.openrouter_gemma4_31b",
+        description_key="settings.fallback.openrouter_gemma4_31b.description",
+        openrouter_model=OPENROUTER_MODEL_GEMMA_4_31B_IT,
+        openrouter_models=(OPENROUTER_MODEL_GEMMA_4_31B_IT,),
+    ),
 }
 
 OPENROUTER_FALLBACK_MODEL_BY_ALIAS: dict[str, str | None] = {
@@ -208,6 +278,10 @@ LEGACY_PROFILE_BY_ALIAS: dict[str, LLMSelectionProfile] = {
 LEGACY_FALLBACK_ALIAS_TO_ALIAS: dict[str, str] = {}
 
 OPENROUTER_MAIN_SELECTION_ALIASES: tuple[str, ...] = (
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED,
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK,
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED,
+    OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK,
     OPENROUTER_SELECTION_ALIAS_GEMMA4_MANAGED,
     OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED,
     OPENROUTER_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_MANAGED,
@@ -222,6 +296,8 @@ OPENROUTER_FALLBACK_SELECTION_ALIASES: tuple[str, ...] = (
     OPENROUTER_FALLBACK_SELECTION_ALIAS_NONE,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA,
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B,
+    OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_31B,
 )
 
 
@@ -261,9 +337,25 @@ def resolve_openrouter_fallback_model(alias: str) -> str | None:
     return fallback_profile_for_alias(alias).openrouter_model
 
 
-def openrouter_alias_for_fields(*, model: str, source: str) -> str | None:
+def openrouter_alias_for_fields(
+    *,
+    model: str,
+    source: str,
+    models: tuple[str, ...] = (),
+) -> str | None:
     if source == OPENROUTER_CREDENTIAL_SOURCE_NONE:
         return None
+    if models == (
+        OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+        OPENROUTER_MODEL_GEMMA_4_31B_IT,
+    ):
+        if source == OPENROUTER_CREDENTIAL_SOURCE_MANAGED:
+            return OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED
+        return OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK
+    if model == OPENROUTER_MODEL_GEMMA_4_31B_IT:
+        if source == OPENROUTER_CREDENTIAL_SOURCE_MANAGED:
+            return OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED
+        return OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK
     if model == OPENROUTER_MODEL_QWEN_35_FLASH_02_23:
         if source == OPENROUTER_CREDENTIAL_SOURCE_MANAGED:
             return OPENROUTER_SELECTION_ALIAS_QWEN35_FLASH_MANAGED
