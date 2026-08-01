@@ -102,6 +102,29 @@ GITHUB_STAR_PROMPT_DELAY_S = 2.5
 GITHUB_STAR_PROMPT_DURATION_MS = 8000
 
 
+async def _prepare_and_show_main_window(page: ft.Page) -> None:
+    try:
+        page.update()
+
+        wait_until_ready = getattr(page.window, "wait_until_ready_to_show", None)
+        if callable(wait_until_ready):
+            ready_result = wait_until_ready()
+            if inspect.isawaitable(ready_result):
+                await ready_result
+
+        center_result = page.window.center()
+        if inspect.isawaitable(center_result):
+            await center_result
+    except Exception:
+        logger.warning(
+            "Failed to center the main window before showing it",
+            exc_info=True,
+        )
+    finally:
+        page.window.visible = True
+        page.update()
+
+
 def _callable_accepts_keyword(callable_obj: object, keyword: str) -> bool:
     try:
         parameters = inspect.signature(callable_obj).parameters
@@ -1929,6 +1952,7 @@ async def main_gui(
     page.on_disconnect = app._on_page_lifecycle_end
     page.on_close = app._on_page_lifecycle_end
     try:
+        await _prepare_and_show_main_window(page)
         await app.application.start()
     except BaseException:
         with contextlib.suppress(BaseException):

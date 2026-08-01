@@ -8,7 +8,7 @@ import logging
 import sys
 from logging.handlers import QueueHandler
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -18,6 +18,8 @@ from puripuly_heart.core.runtime_logging import (
     SessionRuntimeLoggingService,
     configure_main_logging,
 )
+
+FAKE_APP_VIEW = SimpleNamespace(FLET_APP_HIDDEN=object())
 
 
 def test_main_version_prints(capsys) -> None:
@@ -61,11 +63,13 @@ def test_main_run_gui_invokes_flet_run(monkeypatch, tmp_path) -> None:
 
     fake_flet = ModuleType("flet")
 
-    def fake_run(*, main, assets_dir):
+    def fake_run(*, main, assets_dir, view):
         calls["main"] = main
         calls["assets_dir"] = assets_dir
+        calls["view"] = view
 
     fake_flet.run = fake_run
+    fake_flet.AppView = FAKE_APP_VIEW
     monkeypatch.setitem(sys.modules, "flet", fake_flet)
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
@@ -87,6 +91,7 @@ def test_main_run_gui_invokes_flet_run(monkeypatch, tmp_path) -> None:
 
     assert result == 0
     assert calls["assets_dir"] == str(tmp_path)
+    assert calls["view"] is FAKE_APP_VIEW.FLET_APP_HIDDEN
     assert callable(calls["main"])
     asyncio.run(calls["main"](object()))
     assert calls["config_path"] == config_path
@@ -98,11 +103,12 @@ def test_run_gui_logs_actionable_flet_runtime_startup_failure(
 ) -> None:
     fake_flet = ModuleType("flet")
 
-    def fake_run(*, main, assets_dir):
+    def fake_run(*, main, assets_dir, **_kwargs):
         _ = main, assets_dir
         raise FileNotFoundError("bundled Flet archive missing")
 
     fake_flet.run = fake_run
+    fake_flet.AppView = FAKE_APP_VIEW
     monkeypatch.setitem(sys.modules, "flet", fake_flet)
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
     fake_ui_app.main_gui = lambda *_args, **_kwargs: None
@@ -129,11 +135,12 @@ def test_run_gui_logs_actionable_flet_runtime_startup_failure(
 def test_run_gui_logs_actionable_ui_startup_failure(monkeypatch, tmp_path, caplog) -> None:
     fake_flet = ModuleType("flet")
 
-    def fake_run(*, main, assets_dir):
+    def fake_run(*, main, assets_dir, **_kwargs):
         _ = assets_dir
         asyncio.run(main(object()))
 
     fake_flet.run = fake_run
+    fake_flet.AppView = FAKE_APP_VIEW
     monkeypatch.setitem(sys.modules, "flet", fake_flet)
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
 
@@ -172,11 +179,12 @@ def test_run_gui_forwards_main_logging_sinks_when_supported(monkeypatch, tmp_pat
     logging_sinks = object()
     fake_flet = ModuleType("flet")
 
-    def fake_run(*, main, assets_dir):
+    def fake_run(*, main, assets_dir, **_kwargs):
         _ = assets_dir
         asyncio.run(main(object()))
 
     fake_flet.run = fake_run
+    fake_flet.AppView = FAKE_APP_VIEW
     monkeypatch.setitem(sys.modules, "flet", fake_flet)
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
@@ -227,11 +235,12 @@ def test_main_default_invokes_gui(monkeypatch, tmp_path) -> None:
 
     fake_flet = ModuleType("flet")
 
-    def fake_run(*, main, assets_dir):
+    def fake_run(*, main, assets_dir, **_kwargs):
         calls["main"] = main
         calls["assets_dir"] = assets_dir
 
     fake_flet.run = fake_run
+    fake_flet.AppView = FAKE_APP_VIEW
     monkeypatch.setitem(sys.modules, "flet", fake_flet)
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
@@ -264,11 +273,12 @@ def test_main_run_gui_passes_debug_ui_preview_flag(monkeypatch, tmp_path) -> Non
 
     fake_flet = ModuleType("flet")
 
-    def fake_run(*, main, assets_dir):
+    def fake_run(*, main, assets_dir, **_kwargs):
         calls["main"] = main
         calls["assets_dir"] = assets_dir
 
     fake_flet.run = fake_run
+    fake_flet.AppView = FAKE_APP_VIEW
     monkeypatch.setitem(sys.modules, "flet", fake_flet)
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
@@ -299,11 +309,12 @@ def test_run_gui_debug_preview_constructs_vrchat_presence(monkeypatch, tmp_path)
     calls: dict[str, object] = {}
     fake_flet = ModuleType("flet")
 
-    def fake_run(*, main, assets_dir):
+    def fake_run(*, main, assets_dir, **_kwargs):
         _ = assets_dir
         asyncio.run(main(object()))
 
     fake_flet.run = fake_run
+    fake_flet.AppView = FAKE_APP_VIEW
     monkeypatch.setitem(sys.modules, "flet", fake_flet)
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
 
@@ -361,11 +372,12 @@ def test_main_run_gui_force_closes_logging_when_gui_runtime_logging_leaks(
 
     fake_flet = ModuleType("flet")
 
-    def fake_run(*, main, assets_dir):
+    def fake_run(*, main, assets_dir, **_kwargs):
         _ = assets_dir
         asyncio.run(main(object()))
 
     fake_flet.run = fake_run
+    fake_flet.AppView = FAKE_APP_VIEW
     monkeypatch.setitem(sys.modules, "flet", fake_flet)
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")
@@ -399,11 +411,12 @@ def test_main_default_gui_passes_debug_ui_preview_flag(monkeypatch, tmp_path) ->
 
     fake_flet = ModuleType("flet")
 
-    def fake_run(*, main, assets_dir):
+    def fake_run(*, main, assets_dir, **_kwargs):
         calls["main"] = main
         calls["assets_dir"] = assets_dir
 
     fake_flet.run = fake_run
+    fake_flet.AppView = FAKE_APP_VIEW
     monkeypatch.setitem(sys.modules, "flet", fake_flet)
 
     fake_ui_app = ModuleType("puripuly_heart.ui.app")

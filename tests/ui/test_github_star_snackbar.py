@@ -40,6 +40,7 @@ class DummyPage:
         self.closed: list[object] = []
         self.tasks: list[object] = []
         self.updated = 0
+        self.window = SimpleNamespace(visible=False, center=lambda: None)
 
     def show_dialog(self, control) -> None:  # noqa: ANN001
         if hasattr(control, "open"):

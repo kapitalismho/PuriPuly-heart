@@ -207,7 +207,11 @@ def _run_gui(
             raise
 
     try:
-        ft.run(main=_target, assets_dir=str(assets_dir()))
+        ft.run(
+            main=_target,
+            assets_dir=str(assets_dir()),
+            view=ft.AppView.FLET_APP_HIDDEN,
+        )
     except Exception as exc:
         logger.exception(
             "Flet GUI runtime failed: exception_type=%s exception_message=%s",

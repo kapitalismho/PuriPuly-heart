@@ -91,6 +91,7 @@ class DummyPage:
         self.bgcolor = None
         self.padding = None
         self.added: list[object] = []
+        self.visibility_updates: list[bool] = []
         self.window = SimpleNamespace(
             frameless=False,
             resizable=False,
@@ -107,6 +108,7 @@ class DummyPage:
             destroy=destroy_window,
             icon="",
             center_calls=0,
+            visible=False,
             center=lambda: None,
         )
         self.window.center = lambda: setattr(
@@ -135,6 +137,7 @@ class DummyPage:
 
     def update(self) -> None:
         self.updated += 1
+        self.visibility_updates.append(self.window.visible)
 
     def add(self, control) -> None:
         self.added.append(control)
@@ -300,8 +303,10 @@ class ConstructionDummyController:
         self.basic_messages: list[str] = []
         self.detailed_messages: list[str] = []
         self.start_calls = 0
+        self.window_visible_at_start: bool | None = None
 
     async def start(self) -> None:
+        self.window_visible_at_start = self.app._app.page.window.visible
         self.start_calls += 1
 
     def set_runtime_logging_mode(self, mode: str) -> None:
@@ -679,6 +684,10 @@ async def test_main_gui_constructs_the_real_application_and_presentation_boundar
     assert isinstance(translator_app.application, UiApplicationBoundary)
     assert translator_app.application is translator_app._ui_application
     assert controller.start_calls == 1
+    assert controller.window_visible_at_start is True
+    assert page.window.center_calls == 1
+    assert page.window.visible is True
+    assert page.visibility_updates[-2:] == [False, True]
 
 
 @pytest.mark.asyncio
