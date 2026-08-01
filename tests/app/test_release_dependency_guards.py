@@ -21,7 +21,7 @@ PINNED_PYTHON_VERSION = 'PYTHON_VERSION: "3.12.10"'
 PINNED_UV_VERSION = 'UV_VERSION: "0.9.17"'
 PINNED_INNOSETUP_VERSION = 'INNOSETUP_VERSION: "6.6.1"'
 SHARED_SETUP_ACTION = "./.github/actions/setup-uv-environment"
-PINNED_SOXR_SPECIFIER = "soxr==1.0.0"
+PINNED_SOXR_SPECIFIER = "soxr==1.1.0"
 SOXR_RELEASE_INPUTS_SCRIPT = "scripts/ci/prepare-soxr-release-inputs.ps1"
 FLET_RUNTIME_PREPARATION_SCRIPT = "scripts/ci/prepare-flet-runtime.ps1"
 FLET_RUNTIME_VERSION = "0.86.1"
@@ -118,7 +118,7 @@ def _expected_openvr_notice_section() -> str:
 def test_pyproject_caps_deepgram_sdk_below_v6() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert "deepgram-sdk>=5.0.0,<6.0.0" in pyproject["project"]["dependencies"]
+    assert "deepgram-sdk>=5.3.4,<6.0.0" in pyproject["project"]["dependencies"]
 
 
 def test_pyproject_includes_sherpa_onnx_dependency() -> None:
@@ -166,7 +166,7 @@ def test_uv_lock_pins_soxr_version() -> None:
     )
 
     assert match is not None
-    assert match.group(1) == "1.0.0"
+    assert match.group(1) == "1.1.0"
 
 
 def test_uv_lock_includes_python_soxr_build_backend_packages() -> None:
@@ -925,7 +925,7 @@ def test_third_party_notices_cover_soxr_runtime_and_installed_compliance_bundle(
     assert "COPYING.LGPL-2.1.txt" in notices
     assert "third_party\\soxr\\" in notices
     assert "Installed releases include an LGPL compliance bundle under" in notices
-    assert "exact python-soxr 1.0.0 and libsoxr 0.1.3 source archives used to build" in notices
+    assert "exact python-soxr 1.1.0 and libsoxr 0.1.3 source archives used to build" in notices
     assert "{app}" not in notices
 
 

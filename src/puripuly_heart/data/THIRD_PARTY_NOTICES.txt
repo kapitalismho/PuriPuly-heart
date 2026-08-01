@@ -106,14 +106,14 @@ Bundled runtime: soxr.dll
 Installed compliance bundle: third_party\soxr\
 Installed compliance files: COPYING.LGPL-2.1.txt ; PuriPulyHeart-soxr-third-party-source-bundle.zip
 
-Windows release packaging stages a custom system-linked Python-SoXR 1.0.0 extension
+Windows release packaging stages a custom system-linked Python-SoXR 1.1.0 extension
 module together with a matching soxr.dll runtime under soxr/.
 
 Installed releases include an LGPL compliance bundle under third_party\soxr\ in the installed app tree.
 That installed bundle includes COPYING.LGPL-2.1.txt and the
 PuriPulyHeart-soxr-third-party-source-bundle.zip source bundle.
 
-The bundled source bundle exists to provide the exact python-soxr 1.0.0 and libsoxr 0.1.3 source archives used to build the packaged soxr.dll runtime pair,
+The bundled source bundle exists to provide the exact python-soxr 1.1.0 and libsoxr 0.1.3 source archives used to build the packaged soxr.dll runtime pair,
 together with a manifest describing the staged wheel and source inputs.
 
 ----

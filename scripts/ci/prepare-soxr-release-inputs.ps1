@@ -4,11 +4,11 @@ param()
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$PinnedSoxrSpecifier = "soxr==1.0.0"
-$SoxrVersion = "1.0.0"
+$PinnedSoxrSpecifier = "soxr==1.1.0"
+$SoxrVersion = "1.1.0"
 $LibsoxrVersion = "0.1.3"
-$SoxrSdistUrl = "https://files.pythonhosted.org/packages/42/7e/f4b461944662ad75036df65277d6130f9411002bfb79e9df7dff40a31db9/soxr-1.0.0.tar.gz"
-$SoxrSdistSha256 = "e07ee6c1d659bc6957034f4800c60cb8b98de798823e34d2a2bba1caa85a4509"
+$SoxrSdistUrl = "https://files.pythonhosted.org/packages/ed/11/27cebce4a108f77afea7c80545115536b45e3f11ebfb914f638fdd9ba847/soxr-1.1.0.tar.gz"
+$SoxrSdistSha256 = "9f228ae21c78fa9359ca98d8a5e8e91f30639e438e574133dace62c5b5309e44"
 $LibsoxrSourceUrl = "https://sourceforge.net/projects/soxr/files/soxr-0.1.3-Source.tar.xz/download"
 $expectedLibsoxrSourceSha256 = "b111c15fdc8c029989330ff559184198c161100a59312f5dc19ddeb9b5a15889"
 $ReleaseInputsRoot = Join-Path $PWD "build/soxr-release-inputs"
@@ -122,8 +122,8 @@ if ($pyproject -notmatch [regex]::Escape($PinnedSoxrSpecifier)) {
 }
 
 $uvLock = Get-Content -Path (Join-Path $PWD "uv.lock") -Raw -Encoding utf8
-if ($uvLock -notmatch '(?ms)\[\[package\]\]\s+name = "soxr"\s+version = "1\.0\.0"') {
-    throw "uv.lock no longer pins soxr 1.0.0"
+if ($uvLock -notmatch '(?ms)\[\[package\]\]\s+name = "soxr"\s+version = "1\.1\.0"') {
+    throw "uv.lock no longer pins soxr 1.1.0"
 }
 
 $downloadsDir = Join-Path $ReleaseInputsRoot "downloads"
