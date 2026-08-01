@@ -403,90 +403,121 @@ The tier transition may take a moment.
 
 ---
 
+## Architecture
+
+See [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+---
+
 ## Development
 
-### Environment Summary
+### Environments
 
-| Area | Recommended Environment |
-|---|---|
-| Python app | Windows |
-| VR overlay | Windows |
-| Broker service | Linux / WSL |
+| Surface                    | Recommended environment | Documentation                                          |
+| -------------------------- | ----------------------- | ------------------------------------------------------ |
+| Python desktop application | Windows                 | This section                                           |
+| Broker service             | Linux                   | [`broker/README.md`](broker/README.md)                 |
+| Native VR overlay          | Windows                 | [`native/overlay/README.md`](native/overlay/README.md) |
 
-### Python App
+### Python Environment
 
-```bash
+The Python application requires Python 3.12 or 3.13.
+
+Create and activate the Windows environment:
+
+```powershell
 python -m venv .venv
-.venv\Scripts\activate  # Windows
+.venv\Scripts\Activate.ps1
 ```
 
-```bash
-# pip
-pip install -e '.[dev]'
+Install the application and development dependencies:
 
-# or uv
+```powershell
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+`uv` may be used instead:
+
+```powershell
 uv sync --dev
 ```
 
-```bash
+Install the repository hooks:
+
+```powershell
 pre-commit install
 ```
 
-### Running the GUI
+For Linux or WSL work, use `.venv-wsl` when it is available.
 
 ```bash
-# After activating venv
-python -m puripuly_heart.main run-gui
+UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --dev
+```
 
-# or run via uv
+Repositories configured with `direnv` may run commands through:
+
+```bash
+direnv exec . <command>
+```
+
+### Running the Application
+
+Run the Flet desktop application:
+
+```powershell
+python -m puripuly_heart.main run-gui
+```
+
+The equivalent `uv` command is:
+
+```powershell
 uv run python -m puripuly_heart.main run-gui
 ```
 
-```bash
-# Reveals hidden UI for inspection
+Developer preview controls for hidden UI states are enabled with:
+
+```powershell
 python -m puripuly_heart.main run-gui --debug-ui-preview
 ```
 
-### Testing & Linting
+### Python Verification
 
-```bash
-black src tests          # Format
-ruff check src tests     # Lint
-python -m pytest         # Test (recommended within venv)
-```
-
-### VR Overlay
-
-The VR subtitle overlay is built from the Rust project under `native/overlay/`.
+Format the Python sources and tests:
 
 ```powershell
-cargo test --manifest-path native/overlay/Cargo.toml -q
-
-cargo build `
-  --manifest-path native/overlay/Cargo.toml `
-  --locked `
-  --release `
-  --bin PuriPulyHeartOverlay `
-  --target-dir target
-
-New-Item -ItemType Directory -Force -Path build/overlay | Out-Null
-Copy-Item target/release/PuriPulyHeartOverlay.exe build/overlay/PuriPulyHeartOverlay.exe -Force
-Copy-Item third_party/openvr/win64/openvr_api.dll build/overlay/openvr_api.dll -Force
-
-.\build\overlay\PuriPulyHeartOverlay.exe --check-startup-contract
+black src tests
 ```
 
-### Broker Service
+Check formatting without modifying files:
 
-See `broker/README.md` for details.
-
-```bash
-pnpm install --frozen-lockfile
-pnpm run typecheck
-pnpm exec vitest run
-pnpm --filter @puripuly-heart/broker run verify:config
-pnpm --filter @puripuly-heart/broker run dev
+```powershell
+black --check src tests
 ```
+
+Run lint checks:
+
+```powershell
+ruff check src tests
+```
+
+Run the complete Python test suite:
+
+```powershell
+python -m pytest
+```
+
+Run a focused test file or directory during development:
+
+```powershell
+python -m pytest tests/path/to/test_file.py
+```
+
+### Other Surfaces
+
+Broker documentation is maintained in [`broker/README.md`](broker/README.md).
+
+Native VR overlay documentation is maintained in [`native/overlay/README.md`](native/overlay/README.md).
 
 ---
 
