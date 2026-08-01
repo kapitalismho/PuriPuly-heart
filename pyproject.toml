@@ -23,7 +23,7 @@ dependencies = [
   "proc-tap==1.1.1; platform_system == 'Windows' and platform_python_implementation == 'CPython' and python_version == '3.12' and platform_machine == 'AMD64'",
   "psutil>=5.9; platform_system == 'Windows' and platform_python_implementation == 'CPython' and python_version == '3.12' and platform_machine == 'AMD64'",
   "sounddevice==0.5.5",
-  "onnxruntime>=1.18.0",
+  "onnxruntime==1.28.0",
   "google-genai>=2.16.0,<3.0.0",
   "grpcio==1.82.1",
   "dashscope==1.26.4",
