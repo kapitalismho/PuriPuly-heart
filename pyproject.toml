@@ -27,7 +27,7 @@ dependencies = [
   "google-genai>=2.16.0,<3.0.0",
   "grpcio==1.82.1",
   "dashscope==1.26.4",
-  "websockets",
+  "websockets>=16.1.1,<17.0.0",
   "deepgram-sdk>=5.3.4,<6.0.0",
   "sherpa-onnx>=1.13.4",
   "sherpa-onnx-core==1.13.4",

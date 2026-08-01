@@ -6,6 +6,7 @@ import sys
 from types import SimpleNamespace
 
 import pytest
+from websockets.asyncio.server import serve
 
 from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
 from puripuly_heart.providers.stt.soniox import (
@@ -652,6 +653,81 @@ async def test_soniox_session_start_send_recv_and_close(monkeypatch) -> None:
     assert any(json.loads(p).get("type") == "keepalive" for p in payloads)
     assert b"abc" in ws.sent
     assert ws.closed is True
+
+
+@pytest.mark.asyncio
+async def test_soniox_session_local_server_preserves_finalize_and_remote_close() -> None:
+    wire_events: list[object] = []
+    keepalive_seen = asyncio.Event()
+    finalize_seen = asyncio.Event()
+    server_closed = asyncio.Event()
+
+    async def handler(connection) -> None:
+        wire_events.append(json.loads(await connection.recv()))
+        try:
+            while True:
+                message = await connection.recv()
+                if isinstance(message, bytes):
+                    wire_events.append(("audio", len(message)))
+                    continue
+                payload = json.loads(message)
+                wire_events.append(payload)
+                if payload.get("type") == "keepalive":
+                    keepalive_seen.set()
+                if payload.get("type") == "finalize":
+                    finalize_seen.set()
+                    await connection.send(
+                        json.dumps(
+                            {
+                                "tokens": [
+                                    {"text": "hello", "is_final": True, "end_ms": 100},
+                                    {"text": "<fin>", "is_final": True},
+                                ]
+                            }
+                        )
+                    )
+                    await connection.close(code=1000, reason="fake-complete")
+                    return
+        finally:
+            server_closed.set()
+
+    server = await serve(handler, "127.0.0.1", 0, ping_interval=None)
+    host, port = server.sockets[0].getsockname()[:2]
+    session = _SonioxSession(
+        api_key="fake-key",
+        model="fake-model",
+        endpoint=f"ws://{host}:{port}",
+        sample_rate_hz=16000,
+        language_hints=["en"],
+        context_terms=[],
+        keepalive_interval_s=0.01,
+        trailing_silence_ms=0,
+        connect_timeout_s=2,
+    )
+
+    try:
+        await session.start()
+        await asyncio.wait_for(keepalive_seen.wait(), timeout=1)
+        await session.send_audio(b"abc")
+        await session.on_speech_end(trailing_silence_ms=0)
+        event = await asyncio.wait_for(session._events.get(), timeout=1)
+        assert event.text == "hello"
+        await asyncio.wait_for(finalize_seen.wait(), timeout=1)
+        assert session._recv_task is not None
+        await asyncio.wait_for(session._recv_task, timeout=1)
+        assert session._stopped is True
+    finally:
+        await session.close()
+        server.close()
+        await server.wait_closed()
+
+    await asyncio.wait_for(server_closed.wait(), timeout=1)
+    assert wire_events[0]["model"] == "fake-model"
+    assert ("audio", 3) in wire_events
+    assert any(
+        isinstance(event, dict) and event.get("type") == "keepalive" for event in wire_events
+    )
+    assert any(isinstance(event, dict) and event.get("type") == "finalize" for event in wire_events)
 
 
 @pytest.mark.asyncio
