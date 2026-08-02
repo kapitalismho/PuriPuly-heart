@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from enum import StrEnum
 from uuid import UUID
 
 from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfigSnapshot
@@ -25,6 +26,29 @@ class ContextEntry:
         _validate_channel(self.channel)
 
 
+class _SpeculativeAttemptStatus(StrEnum):
+    RUNNING = "running"
+    READY = "ready"
+    FAILED = "failed"
+    STALE = "stale"
+    CANCELLED = "cancelled"
+
+
+@dataclass(slots=True)
+class _SpeculativeAttempt:
+    source_text: str
+    normalized_text: str
+    config_snapshot: TranslationRuntimeConfigSnapshot
+    sequence: int
+    status: _SpeculativeAttemptStatus = _SpeculativeAttemptStatus.RUNNING
+    task: asyncio.Task[None] | None = None
+    result: object | None = None
+    started_at: float | None = None
+    completed_at: float | None = None
+    terminal_action_started: bool = False
+    latency_stage_times: dict[str, float] = field(default_factory=dict)
+
+
 @dataclass(slots=True)
 class _MergeBuffer:
     merge_id: UUID
@@ -33,14 +57,8 @@ class _MergeBuffer:
     start_time: float | None = None
     last_end_time: float | None = None
     last_final_at: float = 0.0
-    spec_task: asyncio.Task[None] | None = None
-    spec_text: str | None = None
-    spec_translation: object | None = None
-    spec_config_snapshot: TranslationRuntimeConfigSnapshot | None = None
-    spec_attempts: int = 0
-    spec_started_at: float | None = None
-    spec_done_at: float | None = None
-    spec_latency_stage_times: dict[str, float] = field(default_factory=dict)
+    speculative_attempt: _SpeculativeAttempt | None = None
+    speculative_sequence: int = 0
     resume_pending: bool = False
     resume_confirmed: bool = False
     resume_utterance_id: UUID | None = None
@@ -152,8 +170,11 @@ class ChannelRuntime:
             return
 
         merge_buffer = self.merge_buffer
+        spec_attempt = merge_buffer.speculative_attempt
+        if spec_attempt is not None:
+            spec_attempt.status = _SpeculativeAttemptStatus.CANCELLED
         merge_tasks = [
-            merge_buffer.spec_task,
+            spec_attempt.task if spec_attempt is not None else None,
             merge_buffer.finalize_wait_task,
             merge_buffer.awaiting_vad_timeout_task,
             merge_buffer.resume_end_timeout_task,

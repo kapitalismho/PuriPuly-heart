@@ -10,9 +10,13 @@ from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
     ContextEntry,
     _MergeBuffer,
+    _SpeculativeAttemptStatus,
 )
 from puripuly_heart.domain.models import Transcript
-from tests.helpers.translation_owners import compose_translation_test_harness
+from tests.helpers.translation_owners import (
+    compose_translation_test_harness,
+    make_speculative_attempt,
+)
 
 
 @dataclass
@@ -142,11 +146,13 @@ async def test_clear_live_translation_state_preserves_history_and_stt_task() -> 
     runtime.merge_buffer = _MergeBuffer(
         merge_id=uuid4(),
         utterance_ids=[merge_id_1, merge_id_2],
-        spec_task=spec_task,
+        speculative_attempt=make_speculative_attempt(task=spec_task),
         finalize_wait_task=finalize_wait_task,
         awaiting_vad_timeout_task=awaiting_vad_timeout_task,
         resume_end_timeout_task=resume_end_timeout_task,
     )
+    speculative_attempt = runtime.merge_buffer.speculative_attempt
+    assert speculative_attempt is not None
 
     try:
         await runtime.clear_live_translation_state()
@@ -177,6 +183,7 @@ async def test_clear_live_translation_state_preserves_history_and_stt_task() -> 
         assert runtime.speech_ended_ids == {preserved_id}
         assert translation_task.cancelled() is True
         assert spec_task.cancelled() is True
+        assert speculative_attempt.status is _SpeculativeAttemptStatus.CANCELLED
         assert finalize_wait_task.cancelled() is True
         assert awaiting_vad_timeout_task.cancelled() is True
         assert resume_end_timeout_task.cancelled() is True

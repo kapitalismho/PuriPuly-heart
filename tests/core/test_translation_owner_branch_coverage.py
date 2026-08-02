@@ -8,14 +8,18 @@ from uuid import UUID, uuid4
 
 import numpy as np
 import pytest
-
-from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterReleaseDiagnostics,
     ManagedOpenRouterUserFacingError,
 )
+
+from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.messages import UserErrorReport
-from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry, _MergeBuffer
+from puripuly_heart.core.orchestrator.channel_runtime import (
+    ContextEntry,
+    _MergeBuffer,
+    _SpeculativeAttemptStatus,
+)
 from puripuly_heart.core.orchestrator.self_translation_channel import (
     SelfTranslationChannelOwner,
 )
@@ -37,7 +41,10 @@ from puripuly_heart.domain.events import (
 )
 from puripuly_heart.domain.models import Transcript, Translation
 from tests.helpers.fakes import RecordingOscQueue
-from tests.helpers.translation_owners import compose_translation_test_harness
+from tests.helpers.translation_owners import (
+    compose_translation_test_harness,
+    make_speculative_attempt,
+)
 
 
 @dataclass(slots=True)
@@ -338,8 +345,10 @@ async def test_stop_cancels_pending_tasks_and_closes_providers() -> None:
     harness.set_started_for_test(True)
 
     harness.self_runtime.translation_tasks[uuid4()] = asyncio.create_task(asyncio.sleep(60.0))
-    buffer = _MergeBuffer(merge_id=uuid4())
-    buffer.spec_task = asyncio.create_task(asyncio.sleep(60.0))
+    buffer = _MergeBuffer(
+        merge_id=uuid4(),
+        speculative_attempt=make_speculative_attempt(task=asyncio.create_task(asyncio.sleep(60.0))),
+    )
     buffer.finalize_wait_task = asyncio.create_task(asyncio.sleep(60.0))
     buffer.awaiting_vad_timeout_task = asyncio.create_task(asyncio.sleep(60.0))
     buffer.resume_end_timeout_task = asyncio.create_task(asyncio.sleep(60.0))
@@ -424,7 +433,7 @@ async def test_clear_language_runtime_state_self_preserves_stt_task_and_clears_o
     harness.self_runtime.merge_buffer = _MergeBuffer(
         merge_id=preview_merge_id,
         utterance_ids=[self_id],
-        spec_task=spec_task,
+        speculative_attempt=make_speculative_attempt(task=spec_task),
         finalize_wait_task=finalize_wait_task,
         awaiting_vad_timeout_task=awaiting_vad_timeout_task,
         resume_end_timeout_task=resume_end_timeout_task,
@@ -1079,10 +1088,14 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
         low_latency_mode=True,
     )
     basic_buffer = _MergeBuffer(
-        merge_id=uuid4(), parts=["hello"], spec_text="hello", spec_attempts=1
+        merge_id=uuid4(),
+        parts=["hello"],
+        speculative_attempt=make_speculative_attempt(source_text="hello", sequence=1),
     )
     detailed_buffer = _MergeBuffer(
-        merge_id=uuid4(), parts=["hello"], spec_text="hello", spec_attempts=1
+        merge_id=uuid4(),
+        parts=["hello"],
+        speculative_attempt=make_speculative_attempt(source_text="hello", sequence=1),
     )
     basic_harness.self_owner.merge_buffer = basic_buffer
     detailed_harness.self_owner.merge_buffer = detailed_buffer
@@ -1092,6 +1105,10 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
         await detailed_harness.self_owner._run_spec_translation(
             detailed_buffer.merge_id, "hello", 1
         )
+        assert basic_buffer.speculative_attempt is not None
+        assert detailed_buffer.speculative_attempt is not None
+        assert basic_buffer.speculative_attempt.status is _SpeculativeAttemptStatus.FAILED
+        assert detailed_buffer.speculative_attempt.status is _SpeculativeAttemptStatus.FAILED
 
         assert not any(
             "[Translation] Translation failed (stage=spec, channel=self): "
@@ -1265,12 +1282,19 @@ async def test_maybe_restart_spec_replaces_previous_task_and_state(
     harness = compose_translation_test_harness(
         stt=None, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock()
     )
-    buffer = _MergeBuffer(merge_id=uuid4(), parts=["final text"])
-    harness.self_owner.merge_buffer = buffer
     old_task = asyncio.create_task(asyncio.sleep(60.0))
-    buffer.spec_task = old_task
-    buffer.spec_text = "old"
-    buffer.spec_translation = Translation(utterance_id=buffer.merge_id, text="old")
+    buffer = _MergeBuffer(
+        merge_id=uuid4(),
+        parts=["final text"],
+        speculative_attempt=make_speculative_attempt(
+            source_text="old",
+            task=old_task,
+            result=Translation(utterance_id=uuid4(), text="old"),
+        ),
+    )
+    harness.self_owner.merge_buffer = buffer
+    assert buffer.speculative_attempt is not None
+    buffer.speculative_attempt.result = Translation(utterance_id=buffer.merge_id, text="old")
     seen: list[tuple[UUID, str, int]] = []
 
     async def fake_run_spec(
@@ -1286,8 +1310,9 @@ async def test_maybe_restart_spec_replaces_previous_task_and_state(
     await asyncio.sleep(0)
 
     assert old_task.done() is True
-    assert buffer.spec_attempts == 1
-    assert buffer.spec_text == "final text"
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.sequence == 1
+    assert buffer.speculative_attempt.source_text == "final text"
     assert seen == [(buffer.merge_id, "final text", 1)]
 
 
@@ -1330,8 +1355,10 @@ async def test_handle_vad_event_forwards_resume_confirming_chunk_before_overlay_
         merge_id=merge_id,
         parts=["hello live"],
         utterance_ids=[first_utterance_id],
-        spec_text="hello live",
-        spec_translation=Translation(utterance_id=merge_id, text="translated live"),
+        speculative_attempt=make_speculative_attempt(
+            source_text="hello live",
+            result=Translation(utterance_id=merge_id, text="translated live"),
+        ),
         resume_pending=True,
         resume_utterance_id=resumed_utterance_id,
         resume_chunk_count=2,

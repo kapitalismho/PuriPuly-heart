@@ -10,7 +10,12 @@ from uuid import UUID, uuid4
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.messages import UserErrorReport, UserMessageRef
-from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime, _MergeBuffer
+from puripuly_heart.core.orchestrator.channel_runtime import (
+    ChannelRuntime,
+    _MergeBuffer,
+    _SpeculativeAttempt,
+    _SpeculativeAttemptStatus,
+)
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
@@ -753,7 +758,9 @@ class SelfTranslationChannelOwner:
         self._cancel_resume_end_timeout(buffer)
 
     def _clear_spec_latency_state(self, buffer: _MergeBuffer) -> None:
-        buffer.spec_latency_stage_times.clear()
+        attempt = buffer.speculative_attempt
+        if attempt is not None:
+            attempt.latency_stage_times.clear()
 
     def _record_spec_latency_stage(
         self,
@@ -762,15 +769,17 @@ class SelfTranslationChannelOwner:
         stage: str,
         timestamp: float | None = None,
     ) -> None:
-        buffer.spec_latency_stage_times[stage] = (
-            self.clock.now() if timestamp is None else timestamp
-        )
+        attempt = buffer.speculative_attempt
+        if attempt is None:
+            return
+        attempt.latency_stage_times[stage] = self.clock.now() if timestamp is None else timestamp
 
     def _promote_spec_latency_to_output(self, buffer: _MergeBuffer) -> None:
-        if not buffer.spec_latency_stage_times:
+        attempt = buffer.speculative_attempt
+        if attempt is None or not attempt.latency_stage_times:
             return
         for stage in ("llm_request_start", "llm_first_chunk", "llm_done"):
-            timestamp = buffer.spec_latency_stage_times.get(stage)
+            timestamp = attempt.latency_stage_times.get(stage)
             if timestamp is None:
                 continue
             self._record_latency_stage(
@@ -783,43 +792,29 @@ class SelfTranslationChannelOwner:
         self._finalize_latency_timeline(buffer.merge_id)
 
     def _clear_spec_state(self, buffer: _MergeBuffer, *, reason: str) -> bool:
-        had_spec_state = any(
-            value is not None
-            for value in (
-                buffer.spec_task,
-                buffer.spec_translation,
-                buffer.spec_text,
-                buffer.spec_config_snapshot,
-                buffer.spec_started_at,
-                buffer.spec_done_at,
-            )
-        ) or bool(buffer.spec_latency_stage_times)
-        if not had_spec_state:
+        attempt = buffer.speculative_attempt
+        if attempt is None:
             return False
+        attempt.status = _SpeculativeAttemptStatus.CANCELLED
         if (
-            buffer.spec_task is not None
-            and not buffer.spec_task.done()
-            and buffer.spec_task is not asyncio.current_task()
+            attempt.task is not None
+            and not attempt.task.done()
+            and attempt.task is not asyncio.current_task()
         ):
-            buffer.spec_task.cancel()
+            attempt.task.cancel()
             self._emit_metric(
                 "[Metric] spec_cancel id=%s reason=%s",
                 str(buffer.merge_id)[:8],
                 reason,
             )
-        elif buffer.spec_translation is not None:
+        elif attempt.result is not None:
             self._emit_metric(
                 "[Metric] spec_cancel id=%s reason=%s",
                 str(buffer.merge_id)[:8],
                 reason,
             )
-        self._clear_spec_latency_state(buffer)
-        buffer.spec_task = None
-        buffer.spec_translation = None
-        buffer.spec_text = None
-        buffer.spec_config_snapshot = None
-        buffer.spec_started_at = None
-        buffer.spec_done_at = None
+        attempt.latency_stage_times.clear()
+        buffer.speculative_attempt = None
         return True
 
     def _maybe_update_buffer_end_time(self, utterance_id: UUID) -> None:
@@ -1125,10 +1120,11 @@ class SelfTranslationChannelOwner:
         await self._maybe_restart_spec(buffer)
 
     async def _commit_merge(self, buffer: _MergeBuffer, *, reason: str) -> None:
+        attempt = buffer.speculative_attempt
         if buffer.resume_pending or buffer.resume_confirmed:
             hold_ms = 0
-            if buffer.spec_done_at is not None:
-                hold_ms = int((self.clock.now() - buffer.spec_done_at) * 1000)
+            if attempt is not None and attempt.completed_at is not None:
+                hold_ms = int((self.clock.now() - attempt.completed_at) * 1000)
             self._emit_metric(
                 "[Metric] commit_blocked id=%s reason=%s hold_ms=%s",
                 str(buffer.merge_id)[:8],
@@ -1171,9 +1167,9 @@ class SelfTranslationChannelOwner:
             return
 
         reuse_mode = None
-        if buffer.spec_translation is not None:
+        if attempt is not None and attempt.result is not None:
             reuse_mode = self.output_projection.soft_reuse_mode(
-                buffer.spec_text,
+                attempt.source_text,
                 final_text,
             )
 
@@ -1198,11 +1194,13 @@ class SelfTranslationChannelOwner:
             )
 
         if (
-            buffer.spec_task is not None
-            and not buffer.spec_task.done()
-            and buffer.spec_task is not asyncio.current_task()
+            attempt is not None
+            and attempt.task is not None
+            and not attempt.task.done()
+            and attempt.task is not asyncio.current_task()
         ):
-            buffer.spec_task.cancel()
+            attempt.status = _SpeculativeAttemptStatus.CANCELLED
+            attempt.task.cancel()
 
         if buffer.last_end_time is not None:
             self.runtime.utterance_start_times[buffer.merge_id] = buffer.last_end_time
@@ -1223,10 +1221,11 @@ class SelfTranslationChannelOwner:
         )
         await self._handle_transcript(transcript, is_final=True, source="Mic")
         config_snapshot = (
-            buffer.spec_config_snapshot
+            attempt.config_snapshot
             if reuse_mode is not None
-            and buffer.spec_translation is not None
-            and buffer.spec_config_snapshot is not None
+            and attempt is not None
+            and attempt.result is not None
+            and attempt.config_snapshot is not None
             else self.config_snapshot()
         )
 
@@ -1256,8 +1255,9 @@ class SelfTranslationChannelOwner:
             reason,
         )
         if reuse_spec:
-            translation = buffer.spec_translation
+            translation = attempt.result if attempt is not None else None
             if isinstance(translation, Translation):
+                attempt.terminal_action_started = True
                 self._promote_spec_latency_to_output(buffer)
                 self._emit_metric(
                     "[Metric] spec_reuse id=%s translation_len=%s after_final=%s",
@@ -1274,7 +1274,7 @@ class SelfTranslationChannelOwner:
                 )
                 return
 
-        if buffer.spec_translation is not None and reuse_mode is None:
+        if attempt is not None and attempt.result is not None and reuse_mode is None:
             self._clear_spec_latency_state(buffer)
             self._emit_metric(
                 "[Metric] spec_cancel id=%s reason=final_mismatch",
@@ -1302,21 +1302,26 @@ class SelfTranslationChannelOwner:
         if not merged_text:
             return
 
-        buffer.spec_attempts += 1
-        buffer.spec_text = merged_text
-        buffer.spec_config_snapshot = config_snapshot
-        buffer.spec_started_at = self.clock.now()
+        buffer.speculative_sequence += 1
+        attempt = _SpeculativeAttempt(
+            source_text=merged_text,
+            normalized_text=merged_text.strip(),
+            config_snapshot=config_snapshot,
+            sequence=buffer.speculative_sequence,
+            started_at=self.clock.now(),
+        )
+        buffer.speculative_attempt = attempt
         self._emit_metric(
             "[Metric] spec_start id=%s text_len=%s attempt=%s",
             str(buffer.merge_id)[:8],
             len(merged_text),
-            buffer.spec_attempts,
+            attempt.sequence,
         )
-        buffer.spec_task = asyncio.create_task(
+        attempt.task = asyncio.create_task(
             self._run_spec_translation(
                 buffer.merge_id,
                 merged_text,
-                buffer.spec_attempts,
+                attempt.sequence,
             )
         )
 
@@ -1333,10 +1338,17 @@ class SelfTranslationChannelOwner:
         buffer = self.merge_buffer
         if buffer is None or buffer.merge_id != merge_id:
             return
-        if buffer.spec_text != text or buffer.spec_attempts != attempt:
+        current_attempt = buffer.speculative_attempt
+        if (
+            current_attempt is None
+            or current_attempt.source_text != text
+            or current_attempt.sequence != attempt
+        ):
             return
-        config_snapshot = config_snapshot or buffer.spec_config_snapshot or self.config_snapshot()
-        buffer.spec_config_snapshot = config_snapshot
+        config_snapshot = (
+            config_snapshot or current_attempt.config_snapshot or self.config_snapshot()
+        )
+        current_attempt.config_snapshot = config_snapshot
         self._record_spec_latency_stage(buffer, stage="llm_request_start")
         try:
             translation = await self.translation_requests.translate(
@@ -1361,10 +1373,16 @@ class SelfTranslationChannelOwner:
             buffer = self.merge_buffer
             if buffer is None or buffer.merge_id != merge_id:
                 return
-            if buffer.spec_text != text or buffer.spec_attempts != attempt:
+            current_attempt = buffer.speculative_attempt
+            if (
+                current_attempt is None
+                or current_attempt.source_text != text
+                or current_attempt.sequence != attempt
+            ):
                 return
             self._clear_spec_latency_state(buffer)
-            buffer.spec_done_at = self.clock.now()
+            current_attempt.status = _SpeculativeAttemptStatus.FAILED
+            current_attempt.completed_at = self.clock.now()
             await self._try_commit_after_spec(
                 buffer,
                 reason="spec_failed",
@@ -1375,16 +1393,22 @@ class SelfTranslationChannelOwner:
         buffer = self.merge_buffer
         if buffer is None or buffer.merge_id != merge_id:
             return
-        if buffer.spec_text != text or buffer.spec_attempts != attempt:
+        current_attempt = buffer.speculative_attempt
+        if (
+            current_attempt is None
+            or current_attempt.source_text != text
+            or current_attempt.sequence != attempt
+        ):
             return
 
         self._record_spec_latency_stage(buffer, stage="llm_done")
-        buffer.spec_translation = translation
-        buffer.spec_done_at = self.clock.now()
-        if buffer.spec_started_at is None:
+        current_attempt.result = translation
+        current_attempt.status = _SpeculativeAttemptStatus.READY
+        current_attempt.completed_at = self.clock.now()
+        if current_attempt.started_at is None:
             latency_ms = 0
         else:
-            latency_ms = int((self.clock.now() - buffer.spec_started_at) * 1000)
+            latency_ms = int((self.clock.now() - current_attempt.started_at) * 1000)
         self._emit_metric(
             "[Metric] spec_done id=%s spec_latency_ms=%s translation_len=%s",
             str(merge_id)[:8],
@@ -1407,11 +1431,17 @@ class SelfTranslationChannelOwner:
         buffer = self.merge_buffer
         if buffer is None or buffer.merge_id != merge_id:
             return
-        if buffer.spec_text != text or buffer.spec_attempts != attempt:
+        current_attempt = buffer.speculative_attempt
+        if (
+            current_attempt is None
+            or current_attempt.source_text != text
+            or current_attempt.sequence != attempt
+        ):
             return
         self._clear_spec_latency_state(buffer)
-        buffer.spec_translation = None
-        buffer.spec_done_at = self.clock.now()
+        current_attempt.result = None
+        current_attempt.status = _SpeculativeAttemptStatus.STALE
+        current_attempt.completed_at = self.clock.now()
         await self._try_commit_after_spec(
             buffer,
             reason="spec_stale",
@@ -1427,10 +1457,11 @@ class SelfTranslationChannelOwner:
     ) -> None:
         if self.merge_buffer is None or self.merge_buffer is not buffer:
             return
+        attempt = buffer.speculative_attempt
         if buffer.resume_pending or buffer.resume_confirmed:
             hold_ms = 0
-            if buffer.spec_done_at is not None:
-                hold_ms = int((self.clock.now() - buffer.spec_done_at) * 1000)
+            if attempt is not None and attempt.completed_at is not None:
+                hold_ms = int((self.clock.now() - attempt.completed_at) * 1000)
             self._emit_metric(
                 "[Metric] commit_blocked id=%s reason=%s hold_ms=%s",
                 str(buffer.merge_id)[:8],
@@ -1463,13 +1494,13 @@ class SelfTranslationChannelOwner:
         if not final_text:
             return
 
-        if buffer.spec_translation is None:
+        if attempt is None or attempt.result is None:
             if not allow_fallback:
                 return
             await self._commit_merge(buffer, reason=reason)
             return
 
-        if self.output_projection.soft_reuse_mode(buffer.spec_text, final_text) is None:
+        if self.output_projection.soft_reuse_mode(attempt.source_text, final_text) is None:
             return
 
         await self._commit_merge(buffer, reason=reason)
@@ -1483,15 +1514,16 @@ class SelfTranslationChannelOwner:
         active_text = self._merge_text(buffer.parts)
         if not active_text:
             return
+        attempt = buffer.speculative_attempt
         configuration = self.config_snapshot().value
         await self.output_projection.sync_active_self(
             ActiveSelfProjection(
                 merge_id=buffer.merge_id,
                 active_text=active_text,
-                spec_text=buffer.spec_text,
+                spec_text=attempt.source_text if attempt is not None else None,
                 spec_translation=(
-                    buffer.spec_translation
-                    if isinstance(buffer.spec_translation, Translation)
+                    attempt.result
+                    if attempt is not None and isinstance(attempt.result, Translation)
                     else None
                 ),
                 source_language=self.translation_requests.source_language_for(

@@ -9,7 +9,10 @@ from uuid import UUID, uuid4
 import numpy as np
 import pytest
 
-from puripuly_heart.core.orchestrator.channel_runtime import _MergeBuffer
+from puripuly_heart.core.orchestrator.channel_runtime import (
+    _MergeBuffer,
+    _SpeculativeAttemptStatus,
+)
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
     PeerTranslationChannelOwner,
 )
@@ -31,7 +34,10 @@ from tests.core.test_translation_owner_branch_coverage import (
     _make_runtime_logging_capture,
     _runtime_log_messages,
 )
-from tests.helpers.translation_owners import compose_translation_test_harness
+from tests.helpers.translation_owners import (
+    compose_translation_test_harness,
+    make_speculative_attempt,
+)
 
 # ── Mock classes ──────────────────────────────────────────────────────────────
 
@@ -492,7 +498,9 @@ async def test_replaced_llm_provider_late_spec_completion_cannot_update_low_late
     )
     buffer = harness.self_owner.merge_buffer
     assert buffer is not None
-    spec_task = buffer.spec_task
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.status is _SpeculativeAttemptStatus.RUNNING
+    spec_task = buffer.speculative_attempt.task
     assert spec_task is not None
     await asyncio.wait_for(old_llm.started.wait(), timeout=1.0)
 
@@ -502,7 +510,8 @@ async def test_replaced_llm_provider_late_spec_completion_cannot_update_low_late
     old_llm.release.set()
     await asyncio.wait_for(spec_task, timeout=1.0)
 
-    assert buffer.spec_translation is None
+    assert buffer.speculative_attempt.result is None
+    assert buffer.speculative_attempt.status is _SpeculativeAttemptStatus.STALE
     assert osc.messages == []
     assert not any(
         getattr(event, "secondary_text", "") == "stale speculative translation"
@@ -545,7 +554,9 @@ async def test_replaced_llm_provider_late_spec_completion_falls_back_without_han
     )
     buffer = harness.self_owner.merge_buffer
     assert buffer is not None
-    spec_task = buffer.spec_task
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.status is _SpeculativeAttemptStatus.RUNNING
+    spec_task = buffer.speculative_attempt.task
     assert spec_task is not None
     await asyncio.wait_for(old_llm.started.wait(), timeout=1.0)
 
@@ -556,8 +567,9 @@ async def test_replaced_llm_provider_late_spec_completion_falls_back_without_han
     await asyncio.wait_for(spec_task, timeout=1.0)
 
     assert harness.self_owner.merge_buffer is None
-    assert buffer.spec_translation is None
-    assert buffer.spec_latency_stage_times == {}
+    assert buffer.speculative_attempt.result is None
+    assert buffer.speculative_attempt.latency_stage_times == {}
+    assert buffer.speculative_attempt.status is _SpeculativeAttemptStatus.STALE
     assert new_llm.calls and new_llm.calls[-1]["text"] == "hello live"
     assert osc.messages
     assert "current fallback translation" in osc.messages[-1].text
@@ -678,9 +690,10 @@ class TestRuntimeLatencyLogging:
             )
             await harness.self_owner._handle_low_latency_final(transcript)
 
+            current_buffer = harness.self_owner.merge_buffer
             spec_task = (
-                harness.self_owner.merge_buffer.spec_task
-                if harness.self_owner.merge_buffer is not None
+                current_buffer.speculative_attempt.task
+                if current_buffer is not None and current_buffer.speculative_attempt is not None
                 else None
             )
             assert spec_task is not None
@@ -922,9 +935,10 @@ class TestRuntimeLatencyLogging:
                     created_at=clock.now(),
                 )
             )
+            current_buffer = harness.self_owner.merge_buffer
             spec_task = (
-                harness.self_owner.merge_buffer.spec_task
-                if harness.self_owner.merge_buffer is not None
+                current_buffer.speculative_attempt.task
+                if current_buffer is not None and current_buffer.speculative_attempt is not None
                 else None
             )
             assert spec_task is not None
@@ -1091,15 +1105,20 @@ class TestRuntimeLatencyLogging:
                 )
             )
 
+            current_buffer = harness.self_owner.merge_buffer
             spec_task = (
-                harness.self_owner.merge_buffer.spec_task
-                if harness.self_owner.merge_buffer is not None
+                current_buffer.speculative_attempt.task
+                if current_buffer is not None and current_buffer.speculative_attempt is not None
                 else None
             )
             assert spec_task is not None
             await asyncio.gather(spec_task, return_exceptions=True)
 
             assert len(llm.calls) == 1
+            assert current_buffer is not None
+            assert current_buffer.speculative_attempt is not None
+            assert current_buffer.speculative_attempt.status is _SpeculativeAttemptStatus.READY
+            assert current_buffer.speculative_attempt.terminal_action_started is True
             output_utterance_id = osc.messages[0].utterance_id
             output_messages = [
                 message
@@ -1199,8 +1218,10 @@ class TestRuntimeLatencyLogging:
             utterance_ids=[source_utterance_id],
             start_time=10.0,
             last_end_time=10.0,
-            spec_text="spec output",
-            spec_attempts=1,
+            speculative_attempt=make_speculative_attempt(
+                source_text="spec output",
+                sequence=1,
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[source_utterance_id] = 10.0
@@ -1280,8 +1301,10 @@ class TestRuntimeLatencyLogging:
             utterance_ids=[source_utterance_id],
             start_time=10.0,
             last_end_time=10.0,
-            spec_text="spec output",
-            spec_attempts=1,
+            speculative_attempt=make_speculative_attempt(
+                source_text="spec output",
+                sequence=1,
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[source_utterance_id] = 10.0
@@ -1849,13 +1872,17 @@ class TestResumeEndTimeout:
             merge_id=merge_id,
             parts=["첫 번째"],
             utterance_ids=[first_utterance_id],
-            spec_text="첫 번째",
-            spec_translation=Translation(utterance_id=merge_id, text="translated live"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="첫 번째",
+                result=Translation(utterance_id=merge_id, text="translated live"),
+            ),
             resume_pending=True,
             resume_utterance_id=resumed_utterance_id,
             resume_chunk_count=2,
         )
         harness.self_owner.merge_buffer = buffer
+        retired_attempt = buffer.speculative_attempt
+        assert retired_attempt is not None
         overlay_sink.active_self_metadata = active_self_metadata_for_buffer(
             buffer,
             text="첫 번째",
@@ -1869,7 +1896,8 @@ class TestResumeEndTimeout:
         )
 
         assert buffer.resume_confirmed is True
-        assert buffer.spec_translation is None
+        assert buffer.speculative_attempt is None
+        assert retired_attempt.status is _SpeculativeAttemptStatus.CANCELLED
         assert overlay_sink.events == []
         metadata = overlay_sink.active_self_overlay_metadata()
         assert metadata is not None
@@ -1913,8 +1941,10 @@ class TestSpecCommitPaths:
             utterance_ids=[uid],
             start_time=clock.now(),
             last_end_time=clock.now(),
-            spec_text="hello",
-            spec_translation=Translation(utterance_id=merge_id, text="hola"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="hello",
+                result=Translation(utterance_id=merge_id, text="hola"),
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[uid] = clock.now()
@@ -1958,14 +1988,17 @@ class TestSpecCommitPaths:
             utterance_ids=[source_utterance_id],
             start_time=clock.now(),
             last_end_time=clock.now(),
-            spec_text="hello live",
-            spec_translation=Translation(utterance_id=merge_id, text="translated live"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="hello live",
+                result=Translation(utterance_id=merge_id, text="translated live"),
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[source_utterance_id] = clock.now()
 
         await harness.self_owner._sync_overlay_active_self(buffer, created_at=clock.now())
-        buffer.spec_text = "goodbye live"
+        assert buffer.speculative_attempt is not None
+        buffer.speculative_attempt.source_text = "goodbye live"
 
         await harness.self_owner._commit_merge(buffer, reason="spec_done")
 
@@ -2009,14 +2042,17 @@ class TestSpecCommitPaths:
             utterance_ids=[source_utterance_id],
             start_time=clock.now(),
             last_end_time=clock.now(),
-            spec_text="hello live",
-            spec_translation=Translation(utterance_id=merge_id, text="translated live"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="hello live",
+                result=Translation(utterance_id=merge_id, text="translated live"),
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[source_utterance_id] = clock.now()
 
         await harness.self_owner._sync_overlay_active_self(buffer, created_at=clock.now())
-        buffer.spec_text = "goodbye live"
+        assert buffer.speculative_attempt is not None
+        buffer.speculative_attempt.source_text = "goodbye live"
         await harness.self_owner._commit_merge(buffer, reason="spec_done")
 
         preview_event = next(
@@ -2057,8 +2093,10 @@ class TestSpecCommitPaths:
             merge_id=merge_id,
             parts=["hello live"],
             utterance_ids=[source_utterance_id],
-            spec_text="hello live",
-            spec_translation=Translation(utterance_id=merge_id, text="translated live"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="hello live",
+                result=Translation(utterance_id=merge_id, text="translated live"),
+            ),
         )
 
         await harness.self_owner._sync_overlay_active_self(buffer, created_at=clock.now())
@@ -2126,22 +2164,25 @@ class TestSpecCommitPaths:
             merge_id=merge_id,
             parts=["same preview"],
             utterance_ids=[uuid4()],
-            spec_text="same preview",
-            spec_translation=Translation(
-                utterance_id=merge_id,
-                text="translated live",
-                update_id="upd-1",
-                origin_wall_clock_ms=111,
-                session_scope="session:self",
-                source_text_hash="hash-111",
-                source_text_len=12,
-                logical_turn_key=f"self:{merge_id}",
+            speculative_attempt=make_speculative_attempt(
+                source_text="same preview",
+                result=Translation(
+                    utterance_id=merge_id,
+                    text="translated live",
+                    update_id="upd-1",
+                    origin_wall_clock_ms=111,
+                    session_scope="session:self",
+                    source_text_hash="hash-111",
+                    source_text_len=12,
+                    logical_turn_key=f"self:{merge_id}",
+                ),
             ),
         )
 
         await harness.self_owner._sync_overlay_active_self(buffer, created_at=clock.now())
 
-        buffer.spec_translation = Translation(
+        assert buffer.speculative_attempt is not None
+        buffer.speculative_attempt.result = Translation(
             utterance_id=merge_id,
             text="translated live",
             update_id="upd-2",
@@ -2189,14 +2230,17 @@ class TestSpecCommitPaths:
             utterance_ids=[source_utterance_id],
             start_time=clock.now(),
             last_end_time=clock.now(),
-            spec_text="hello live",
-            spec_translation=Translation(utterance_id=merge_id, text="translated live"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="hello live",
+                result=Translation(utterance_id=merge_id, text="translated live"),
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[source_utterance_id] = clock.now()
 
         await harness.self_owner._sync_overlay_active_self(buffer, created_at=clock.now())
-        buffer.spec_text = "goodbye live"
+        assert buffer.speculative_attempt is not None
+        buffer.speculative_attempt.source_text = "goodbye live"
         await harness.self_owner._commit_merge(buffer, reason="spec_done")
 
         active_self_emits = [
@@ -2234,8 +2278,10 @@ class TestSpecCommitPaths:
             utterance_ids=[uid],
             start_time=clock.now(),
             last_end_time=clock.now(),
-            spec_text="hello",
-            spec_translation=Translation(utterance_id=merge_id, text="hola"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="hello",
+                result=Translation(utterance_id=merge_id, text="hola"),
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[uid] = clock.now()
@@ -2267,8 +2313,10 @@ class TestSpecCommitPaths:
             utterance_ids=[uid],
             start_time=clock.now(),
             last_end_time=clock.now(),
-            spec_text="안녕",
-            spec_translation=Translation(utterance_id=merge_id, text="你好"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="안녕",
+                result=Translation(utterance_id=merge_id, text="你好"),
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[uid] = clock.now()
@@ -2294,8 +2342,10 @@ class TestSpecCommitPaths:
         buffer = _MergeBuffer(
             merge_id=uuid4(),
             parts=["hello..."],
-            spec_text="hello",
-            spec_translation=Translation(utterance_id=uuid4(), text="translated"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="hello",
+                result=Translation(utterance_id=uuid4(), text="translated"),
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         called: list[str] = []
@@ -2325,8 +2375,10 @@ class TestSpecCommitPaths:
         buffer = _MergeBuffer(
             merge_id=uuid4(),
             parts=["new"],
-            spec_text="old",
-            spec_translation=Translation(utterance_id=uuid4(), text="translated"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="old",
+                result=Translation(utterance_id=uuid4(), text="translated"),
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         called: list[str] = []
@@ -2356,8 +2408,10 @@ class TestSpecCommitPaths:
         buffer = _MergeBuffer(
             merge_id=uuid4(),
             parts=["hello?"],
-            spec_text="hello",
-            spec_translation=Translation(utterance_id=uuid4(), text="translated"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="hello",
+                result=Translation(utterance_id=uuid4(), text="translated"),
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         called: list[str] = []
@@ -2393,8 +2447,10 @@ class TestSpecCommitPaths:
             utterance_ids=[uid],
             start_time=clock.now(),
             last_end_time=clock.now(),
-            spec_text="hello",
-            spec_translation=Translation(utterance_id=merge_id, text="hola"),
+            speculative_attempt=make_speculative_attempt(
+                source_text="hello",
+                result=Translation(utterance_id=merge_id, text="hola"),
+            ),
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[uid] = clock.now()

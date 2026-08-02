@@ -9,7 +9,10 @@ from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry, _Merg
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
 from tests.helpers.fakes import RecordingOscQueue
-from tests.helpers.translation_owners import compose_translation_test_harness
+from tests.helpers.translation_owners import (
+    compose_translation_test_harness,
+    make_speculative_attempt,
+)
 
 
 @pytest.mark.asyncio
@@ -70,7 +73,7 @@ async def test_self_owner_close_cancels_and_awaits_owned_runtime_tasks() -> None
     owner.merge_buffer = _MergeBuffer(
         merge_id=uuid4(),
         utterance_ids=[utterance_id],
-        spec_task=spec_task,
+        speculative_attempt=make_speculative_attempt(task=spec_task),
         finalize_wait_task=finalize_task,
     )
 

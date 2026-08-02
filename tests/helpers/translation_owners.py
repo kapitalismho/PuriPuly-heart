@@ -4,14 +4,20 @@ import asyncio
 from dataclasses import replace
 from uuid import UUID, uuid4
 
-from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimePort,
 )
-from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
+
+from puripuly_heart.core.clock import Clock, SystemClock
+from puripuly_heart.core.orchestrator.channel_runtime import (
+    ChannelRuntime,
+    _SpeculativeAttempt,
+    _SpeculativeAttemptStatus,
+)
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
+    TranslationRuntimeConfigSnapshot,
     TranslationRuntimeConfigurationOwner,
 )
 from puripuly_heart.core.orchestrator.context import ContextResolver
@@ -46,6 +52,41 @@ from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
+
+
+def make_speculative_attempt(
+    *,
+    source_text: str = "",
+    config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
+    sequence: int = 1,
+    task: asyncio.Task[None] | None = None,
+    result: object | None = None,
+    started_at: float | None = None,
+    completed_at: float | None = None,
+    latency_stage_times: dict[str, float] | None = None,
+    status: _SpeculativeAttemptStatus | None = None,
+) -> _SpeculativeAttempt:
+    snapshot = config_snapshot or TranslationRuntimeConfigSnapshot(
+        revision=0,
+        value=TranslationRuntimeConfig(),
+    )
+    return _SpeculativeAttempt(
+        source_text=source_text,
+        normalized_text=source_text.strip(),
+        config_snapshot=snapshot,
+        sequence=sequence,
+        status=status
+        or (
+            _SpeculativeAttemptStatus.READY
+            if result is not None
+            else _SpeculativeAttemptStatus.RUNNING
+        ),
+        task=task,
+        result=result,
+        started_at=started_at,
+        completed_at=completed_at,
+        latency_stage_times=dict(latency_stage_times or {}),
+    )
 
 
 class TranslationOwnersTestHarness:

@@ -35,19 +35,22 @@ from tests.core.test_translation_owner_branch_coverage import (
     _runtime_log_messages,
 )
 from tests.helpers.fakes import RecordingOscQueue
-from tests.helpers.translation_owners import compose_translation_test_harness
+from tests.helpers.translation_owners import (
+    compose_translation_test_harness,
+    make_speculative_attempt,
+)
 
 _TRANSLATION_ACTIVE_SELF_MIRROR_FIELDS = {
-    "_overlay_" "active_self_text",
-    "_overlay_" "active_self_secondary_text",
-    "_overlay_" "active_self_utterance_id",
-    "_overlay_" "active_self_occupant_key",
-    "_overlay_" "active_self_update_id",
-    "_overlay_" "active_self_origin_wall_clock_ms",
-    "_overlay_" "active_self_session_scope",
-    "_overlay_" "active_self_source_text_hash",
-    "_overlay_" "active_self_source_text_len",
-    "_overlay_" "active_self_logical_turn_key",
+    "_overlay_active_self_text",
+    "_overlay_active_self_secondary_text",
+    "_overlay_active_self_utterance_id",
+    "_overlay_active_self_occupant_key",
+    "_overlay_active_self_update_id",
+    "_overlay_active_self_origin_wall_clock_ms",
+    "_overlay_active_self_session_scope",
+    "_overlay_active_self_source_text_hash",
+    "_overlay_active_self_source_text_len",
+    "_overlay_active_self_logical_turn_key",
 }
 
 
@@ -449,13 +452,15 @@ async def test_translation_active_self_overlay_snapshot_uses_spec_translation_la
         merge_id=merge_id,
         parts=["こんにちは"],
         utterance_ids=[source_utterance_id],
-        spec_text="こんにちは",
-        spec_translation=Translation(
-            utterance_id=merge_id,
-            text="hello",
+        speculative_attempt=make_speculative_attempt(
             source_text="こんにちは",
-            source_language="ja",
-            target_language="zh-TW",
+            result=Translation(
+                utterance_id=merge_id,
+                text="hello",
+                source_text="こんにちは",
+                source_language="ja",
+                target_language="zh-TW",
+            ),
         ),
     )
 
@@ -488,13 +493,15 @@ async def test_translation_blank_spec_translation_active_update_keeps_spec_langu
         merge_id=merge_id,
         parts=["こんにちは"],
         utterance_ids=[uuid4()],
-        spec_text="こんにちは",
-        spec_translation=Translation(
-            utterance_id=merge_id,
-            text="   ",
+        speculative_attempt=make_speculative_attempt(
             source_text="こんにちは",
-            source_language="ja",
-            target_language="zh-TW",
+            result=Translation(
+                utterance_id=merge_id,
+                text="   ",
+                source_text="こんにちは",
+                source_language="ja",
+                target_language="zh-TW",
+            ),
         ),
     )
 
@@ -541,13 +548,15 @@ async def test_translation_same_text_blank_spec_language_update_feeds_final_tran
         merge_id=merge_id,
         parts=["こんにちは"],
         utterance_ids=[uuid4()],
-        spec_text="こんにちは",
-        spec_translation=Translation(
-            utterance_id=merge_id,
-            text="   ",
+        speculative_attempt=make_speculative_attempt(
             source_text="こんにちは",
-            source_language="ja",
-            target_language="zh-TW",
+            result=Translation(
+                utterance_id=merge_id,
+                text="   ",
+                source_text="こんにちは",
+                source_language="ja",
+                target_language="zh-TW",
+            ),
         ),
     )
 
@@ -859,13 +868,15 @@ async def test_translation_self_final_transcript_preserves_active_display_langua
         merge_id=merge_id,
         parts=["こんにちは"],
         utterance_ids=[uuid4()],
-        spec_text="こんにちは",
-        spec_translation=Translation(
-            utterance_id=merge_id,
-            text="你好",
+        speculative_attempt=make_speculative_attempt(
             source_text="こんにちは",
-            source_language="ja",
-            target_language="zh-TW",
+            result=Translation(
+                utterance_id=merge_id,
+                text="你好",
+                source_text="こんにちは",
+                source_language="ja",
+                target_language="zh-TW",
+            ),
         ),
     )
     await harness.self_owner._sync_overlay_active_self(buffer)
@@ -2825,8 +2836,9 @@ async def test_low_latency_self_spec_translation_re_emits_active_update_with_sec
     )
     buffer = harness.self_owner.merge_buffer
     assert buffer is not None
-    assert buffer.spec_task is not None
-    await asyncio.gather(buffer.spec_task, return_exceptions=True)
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.task is not None
+    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
 
     assert [event.type for event in sink.events] == [
         "self_active_update",
@@ -2871,8 +2883,9 @@ async def test_low_latency_self_active_secondary_stays_sticky_on_soft_reuse_mism
     )
     buffer = harness.self_owner.merge_buffer
     assert buffer is not None
-    assert buffer.spec_task is not None
-    await asyncio.gather(buffer.spec_task, return_exceptions=True)
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.task is not None
+    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
 
     await harness.dispatch_stt_event(
         STTFinalEvent(
@@ -2885,8 +2898,9 @@ async def test_low_latency_self_active_secondary_stays_sticky_on_soft_reuse_mism
             ),
         )
     )
-    assert buffer.spec_task is not None
-    await asyncio.gather(buffer.spec_task, return_exceptions=True)
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.task is not None
+    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
 
     active_events = [event for event in sink.events if event.type == "self_active_update"]
     assert [event.secondary_text for event in active_events] == [
@@ -2938,8 +2952,9 @@ async def test_low_latency_self_active_secondary_diagnostics_record_blank_sticky
     )
     buffer = harness.self_owner.merge_buffer
     assert buffer is not None
-    assert buffer.spec_task is not None
-    await asyncio.gather(buffer.spec_task, return_exceptions=True)
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.task is not None
+    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
 
     await harness.dispatch_stt_event(
         STTFinalEvent(
@@ -2953,8 +2968,9 @@ async def test_low_latency_self_active_secondary_diagnostics_record_blank_sticky
         )
     )
 
-    assert buffer.spec_task is not None
-    await asyncio.gather(buffer.spec_task, return_exceptions=True)
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.task is not None
+    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
     assert list(diagnostics.translation_events) == []
 
 
@@ -2989,16 +3005,18 @@ async def test_translation_active_self_metadata_flows_through_presenter_accessor
         merge_id=merge_id,
         parts=["hello live"],
         utterance_ids=[uuid4()],
-        spec_text="hello live",
-        spec_translation=Translation(
-            utterance_id=merge_id,
-            text="translated live",
+        speculative_attempt=make_speculative_attempt(
             source_text="hello live",
-            source_language="ko",
-            target_language="en",
-            channel="self",
-            created_at=10.0,
-            **expected_metadata,
+            result=Translation(
+                utterance_id=merge_id,
+                text="translated live",
+                source_text="hello live",
+                source_language="ko",
+                target_language="en",
+                channel="self",
+                created_at=10.0,
+                **expected_metadata,
+            ),
         ),
     )
     harness.self_owner.merge_buffer = buffer
@@ -3195,8 +3213,9 @@ async def test_low_latency_self_active_secondary_stays_sticky_through_resume_con
     )
     buffer = harness.self_owner.merge_buffer
     assert buffer is not None
-    assert buffer.spec_task is not None
-    await asyncio.gather(buffer.spec_task, return_exceptions=True)
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.task is not None
+    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
 
     await harness.self_owner.handle_vad_event(
         SpeechStart(
@@ -3224,8 +3243,9 @@ async def test_low_latency_self_active_secondary_stays_sticky_through_resume_con
             ),
         )
     )
-    assert buffer.spec_task is not None
-    await asyncio.gather(buffer.spec_task, return_exceptions=True)
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.task is not None
+    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
 
     active_events = [event for event in sink.events if event.type == "self_active_update"]
     assert [event.secondary_text for event in active_events] == [
