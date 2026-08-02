@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import logging
 import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
@@ -9,6 +11,10 @@ from pathlib import Path
 import numpy as np
 
 from puripuly_heart.core.audio.format import pcm16le_bytes_to_float32
+from puripuly_heart.core.local_asr.trailing_silence import (
+    LocalASRTrailingSilenceTrim,
+    trim_local_asr_trailing_silence,
+)
 from puripuly_heart.core.runtime.gpu_asr import (
     GpuASRChannel,
     GpuASRDecodeDropped,
@@ -17,6 +23,8 @@ from puripuly_heart.core.runtime.gpu_asr import (
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.stt.backend import STTBackend, STTBackendSession, STTBackendTranscriptEvent
 from puripuly_heart.domain.models import FinalLanguageRun
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -29,6 +37,7 @@ class LocalGpuSTTBackend(STTBackend):
     sample_rate_hz: int = 16_000
     source_mode: str = "manual"
     language_hint: str | None = None
+    diagnostics_enabled: Callable[[], bool] | None = None
     speech_end_clock: Callable[[], float] = field(default_factory=lambda: time.monotonic)
     _closed: bool = field(init=False, default=False, repr=False)
     _active: bool = field(init=False, default=False, repr=False)
@@ -91,16 +100,22 @@ class _LocalGpuSTTSession(STTBackendSession):
             self._buffer.append(samples.copy())
 
     async def on_speech_end(self, *, trailing_silence_ms: int | None = None) -> None:
-        _ = trailing_silence_ms
         if self._closed or self._stopping:
             return
         samples = np.concatenate(self._buffer) if self._buffer else np.empty((0,), dtype=np.float32)
         self._buffer.clear()
-        if not samples.size:
+        trim = trim_local_asr_trailing_silence(
+            samples,
+            sample_rate_hz=self.backend.sample_rate_hz,
+            trailing_silence_ms=trailing_silence_ms,
+        )
+        if self._diagnostics_enabled():
+            self._log_trim_diagnostic(trim)
+        if not trim.samples_f32.size:
             await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
             return
         task = asyncio.create_task(
-            self._transcribe(samples, self.backend.speech_end_clock()),
+            self._transcribe(trim.samples_f32, self.backend.speech_end_clock()),
             name=f"gpu-asr-{self.backend.channel}",
         )
         self._tasks.add(task)
@@ -171,6 +186,31 @@ class _LocalGpuSTTSession(STTBackendSession):
             if isinstance(event, BaseException):
                 raise event
             yield event
+
+    def _diagnostics_enabled(self) -> bool:
+        diagnostics_enabled = self.backend.diagnostics_enabled
+        if diagnostics_enabled is None:
+            return False
+        with contextlib.suppress(Exception):
+            return bool(diagnostics_enabled())
+        return False
+
+    def _log_trim_diagnostic(self, trim: LocalASRTrailingSilenceTrim) -> None:
+        with contextlib.suppress(Exception):
+            reported_seconds = (
+                "none"
+                if trim.reported_trailing_silence_ms is None
+                else f"{max(trim.reported_trailing_silence_ms, 0) / 1000.0:.3f}"
+            )
+            logger.info(
+                "[LocalASR][Trim] channel=%s model=%s backend=Vulkan audio_before_seconds=%.3f reported_trailing_silence_seconds=%s actual_trimmed_seconds=%.3f submitted_audio_seconds=%.3f",
+                self.backend.channel,
+                self.backend.model_id,
+                trim.audio_ms_before / 1000.0,
+                reported_seconds,
+                trim.actual_trimmed_ms / 1000.0,
+                trim.submitted_audio_ms / 1000.0,
+            )
 
 
 __all__ = ["LocalGpuSTTBackend"]
