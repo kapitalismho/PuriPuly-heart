@@ -58,6 +58,7 @@ def make_speculative_attempt(
     *,
     source_text: str = "",
     config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
+    provider_generation: int = 0,
     sequence: int = 1,
     task: asyncio.Task[None] | None = None,
     result: object | None = None,
@@ -74,6 +75,7 @@ def make_speculative_attempt(
         source_text=source_text,
         normalized_text=source_text.strip(),
         config_snapshot=snapshot,
+        provider_generation=provider_generation,
         sequence=sequence,
         status=status
         or (

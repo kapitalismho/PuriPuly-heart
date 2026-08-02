@@ -937,6 +937,7 @@ async def test_translation_stale_secondary_blanking_preserves_active_primary_lan
         parts=["こんにちは"],
         utterance_ids=[uuid4()],
     )
+    harness.self_owner.merge_buffer = buffer
 
     await harness.self_owner._commit_merge(buffer, reason="test_stale_secondary")
 

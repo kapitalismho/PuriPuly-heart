@@ -471,8 +471,8 @@ class TranslationOutputProjectionOwner:
             return None
         if spec_text == final_text:
             return "exact"
-        normalized_spec = self._normalize_soft_reuse_text(spec_text)
-        normalized_final = self._normalize_soft_reuse_text(final_text)
+        normalized_spec = self.normalize_soft_reuse_text(spec_text)
+        normalized_final = self.normalize_soft_reuse_text(final_text)
         if not normalized_spec or not normalized_final:
             return None
         if normalized_spec == normalized_final:
@@ -963,7 +963,7 @@ class TranslationOutputProjectionOwner:
         return configuration.target_language
 
     @staticmethod
-    def _normalize_soft_reuse_text(text: str) -> str:
+    def normalize_soft_reuse_text(text: str) -> str:
         start = 0
         end = len(text)
         while start < end and TranslationOutputProjectionOwner._is_soft_reuse_boundary_char(

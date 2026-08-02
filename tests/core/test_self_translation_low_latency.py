@@ -127,6 +127,30 @@ class BlockingLLMProvider(FakeLLMProvider):
 
 
 @dataclass
+class FailingThenSuccessfulLLMProvider(FakeLLMProvider):
+    async def translate(
+        self,
+        *,
+        utterance_id,
+        text: str,
+        system_prompt: str,
+        source_language: str,
+        target_language: str,
+        context: str = "",
+    ):
+        self.calls.append(
+            {
+                "utterance_id": utterance_id,
+                "text": text,
+                "context": context,
+            }
+        )
+        if len(self.calls) == 1:
+            raise RuntimeError("spec failed")
+        return Translation(utterance_id=utterance_id, text=self.response_text)
+
+
+@dataclass
 class QueueingSTTProvider:
     channel: str = "self"
     closed: bool = False
@@ -589,6 +613,44 @@ async def test_replaced_llm_provider_late_spec_completion_falls_back_without_han
         for event in overlay_sink.events
     )
 
+    await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_ready_spec_result_is_invalidated_by_provider_replacement_during_grace() -> None:
+    old_llm = FakeLLMProvider(response_text="old translation", delay_s=0.0)
+    new_llm = FakeLLMProvider(response_text="new translation", delay_s=0.0)
+    osc = FakeOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=old_llm,
+        osc=osc,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=50,
+    )
+    utterance_id = uuid4()
+    await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+    await harness.self_owner._handle_low_latency_final(
+        Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+    )
+    buffer = harness.self_owner.merge_buffer
+    assert buffer is not None
+    attempt = buffer.speculative_attempt
+    assert attempt is not None
+    assert attempt.task is not None
+    await asyncio.gather(attempt.task, return_exceptions=True)
+    assert attempt.status is _SpeculativeAttemptStatus.READY
+
+    await harness.replace_llm_provider(new_llm)
+    assert attempt.provider_generation != harness.llm_runtime.generation
+    await asyncio.sleep(0.1)
+
+    assert harness.self_owner.merge_buffer is None
+    assert len(old_llm.calls) == 1
+    assert len(new_llm.calls) == 1
+    assert len(osc.messages) == 1
+    assert "new translation" in osc.messages[0].text
+    assert "old translation" not in osc.messages[0].text
     await harness.stop()
 
 
@@ -1305,6 +1367,7 @@ class TestRuntimeLatencyLogging:
                 source_text="spec output",
                 sequence=1,
             ),
+            awaiting_vad_end=True,
         )
         harness.self_owner.merge_buffer = buffer
         harness.self_runtime.utterance_start_times[source_utterance_id] = 10.0
@@ -1327,6 +1390,7 @@ class TestRuntimeLatencyLogging:
 
             await harness.self_owner._run_spec_translation(merge_id, "spec output", 1)
             assert harness.self_owner._clear_spec_state(buffer, reason="spec_retry") is True
+            buffer.awaiting_vad_end = False
             harness.llm_runtime.attach_provider_reference(None)
             harness.replace_configuration(translation_enabled=False)
 
@@ -1904,6 +1968,221 @@ class TestResumeEndTimeout:
         assert metadata.secondary_text == "translated live"
 
 
+class TestSpecFinalReconciliation:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("revised_text", ["hello", "hello..."])
+    async def test_equivalent_final_preserves_running_attempt(self, revised_text: str):
+        llm = BlockingLLMProvider()
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=llm,
+            osc=FakeOscQueue(),
+            low_latency_mode=True,
+        )
+        utterance_id = uuid4()
+
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        )
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        buffer = harness.self_owner.merge_buffer
+        assert buffer is not None
+        attempt = buffer.speculative_attempt
+        assert attempt is not None
+
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text=revised_text, is_final=True)
+        )
+
+        assert buffer.speculative_attempt is attempt
+        assert attempt.sequence == 1
+        assert len(llm.calls) == 1
+
+        llm.release.set()
+        assert attempt.task is not None
+        await asyncio.gather(attempt.task, return_exceptions=True)
+        await harness.stop()
+
+    @pytest.mark.asyncio
+    async def test_material_final_retires_and_restarts_once(self):
+        llm = BlockingLLMProvider()
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=llm,
+            osc=FakeOscQueue(),
+            low_latency_mode=True,
+        )
+        utterance_id = uuid4()
+
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        )
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        buffer = harness.self_owner.merge_buffer
+        assert buffer is not None
+        retired_attempt = buffer.speculative_attempt
+        assert retired_attempt is not None
+
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text="goodbye", is_final=True)
+        )
+        await asyncio.sleep(0)
+
+        current_attempt = buffer.speculative_attempt
+        assert current_attempt is not None
+        assert current_attempt is not retired_attempt
+        assert current_attempt.sequence == 2
+        assert retired_attempt.status is _SpeculativeAttemptStatus.CANCELLED
+        assert len(llm.calls) == 2
+
+        await harness.self_owner._handle_stale_spec_translation(
+            buffer.merge_id,
+            retired_attempt.source_text,
+            retired_attempt.sequence,
+        )
+        assert buffer.speculative_attempt is current_attempt
+        assert current_attempt.status is _SpeculativeAttemptStatus.RUNNING
+
+        llm.release.set()
+        assert current_attempt.task is not None
+        await asyncio.gather(current_attempt.task, return_exceptions=True)
+        await harness.stop()
+
+    @pytest.mark.asyncio
+    async def test_translation_relevant_config_change_restarts_attempt(self):
+        llm = BlockingLLMProvider()
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=llm,
+            osc=FakeOscQueue(),
+            low_latency_mode=True,
+        )
+        utterance_id = uuid4()
+
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        )
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        buffer = harness.self_owner.merge_buffer
+        assert buffer is not None
+        retired_attempt = buffer.speculative_attempt
+        assert retired_attempt is not None
+
+        harness.replace_configuration(system_prompt="new prompt")
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        )
+        await asyncio.sleep(0)
+
+        current_attempt = buffer.speculative_attempt
+        assert current_attempt is not None
+        assert current_attempt is not retired_attempt
+        assert current_attempt.sequence == 2
+        assert retired_attempt.status is _SpeculativeAttemptStatus.CANCELLED
+        assert len(llm.calls) == 2
+
+        llm.release.set()
+        assert current_attempt.task is not None
+        await asyncio.gather(current_attempt.task, return_exceptions=True)
+        await harness.stop()
+
+    @pytest.mark.asyncio
+    async def test_output_only_config_change_preserves_attempt(self):
+        llm = BlockingLLMProvider()
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=llm,
+            osc=FakeOscQueue(),
+            low_latency_mode=True,
+        )
+        utterance_id = uuid4()
+
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        )
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        buffer = harness.self_owner.merge_buffer
+        assert buffer is not None
+        attempt = buffer.speculative_attempt
+        assert attempt is not None
+
+        harness.replace_configuration(chatbox_include_source=False)
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        )
+
+        assert buffer.speculative_attempt is attempt
+        assert attempt.sequence == 1
+        assert len(llm.calls) == 1
+
+        llm.release.set()
+        assert attempt.task is not None
+        await asyncio.gather(attempt.task, return_exceptions=True)
+        await harness.stop()
+
+    @pytest.mark.asyncio
+    async def test_completed_equivalent_result_is_reused(self):
+        llm = FakeLLMProvider(response_text="hola", delay_s=0.0)
+        osc = FakeOscQueue()
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=llm,
+            osc=osc,
+            low_latency_mode=True,
+            low_latency_finalize_wait_ms=0,
+        )
+        utterance_id = uuid4()
+
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        )
+        buffer = harness.self_owner.merge_buffer
+        assert buffer is not None
+        attempt = buffer.speculative_attempt
+        assert attempt is not None
+        assert attempt.task is not None
+        await asyncio.gather(attempt.task, return_exceptions=True)
+        assert attempt.status is _SpeculativeAttemptStatus.READY
+
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text="hello...", is_final=True)
+        )
+        assert buffer.speculative_attempt is attempt
+
+        await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+
+        assert harness.self_owner.merge_buffer is None
+        assert len(llm.calls) == 1
+        assert len(osc.messages) == 1
+        assert "hola" in osc.messages[0].text
+        await harness.stop()
+
+    @pytest.mark.asyncio
+    async def test_failed_attempt_falls_back_once_after_grace(self):
+        llm = FailingThenSuccessfulLLMProvider(response_text="fallback", delay_s=0.0)
+        osc = FakeOscQueue()
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=llm,
+            osc=osc,
+            low_latency_mode=True,
+            low_latency_finalize_wait_ms=10,
+        )
+        utterance_id = uuid4()
+        await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+
+        await harness.self_owner._handle_low_latency_final(
+            Transcript(utterance_id=utterance_id, text="hello", is_final=True)
+        )
+        await asyncio.sleep(0.05)
+
+        assert harness.self_owner.merge_buffer is None
+        assert [call["text"] for call in llm.calls] == ["hello", "hello"]
+        assert len(osc.messages) == 1
+        assert "fallback" in osc.messages[0].text
+        await harness.stop()
+
+
 class TestSpecCommitPaths:
     def test_soft_reuse_mode_accepts_only_safe_boundary_changes(self):
         harness = compose_translation_test_harness(
@@ -2329,7 +2608,7 @@ class TestSpecCommitPaths:
         assert osc.messages[0].text == "안녕。 (你好)"
 
     @pytest.mark.asyncio
-    async def test_try_commit_after_spec_allows_soft_boundary_match(
+    async def test_next_action_evaluator_commits_soft_boundary_match(
         self, monkeypatch: pytest.MonkeyPatch
     ):
         harness = compose_translation_test_harness(
@@ -2356,13 +2635,11 @@ class TestSpecCommitPaths:
 
         monkeypatch.setattr(SelfTranslationChannelOwner, "_commit_merge", fake_commit)
 
-        await harness.self_owner._try_commit_after_spec(
-            buffer, reason="spec_done", allow_fallback=False
-        )
+        await harness.self_owner._evaluate_speculative_next_action(buffer, reason="spec_done")
         assert called == ["spec_done"]
 
     @pytest.mark.asyncio
-    async def test_try_commit_after_spec_skips_when_spec_text_differs(
+    async def test_next_action_evaluator_falls_back_when_spec_text_differs(
         self, monkeypatch: pytest.MonkeyPatch
     ):
         harness = compose_translation_test_harness(
@@ -2389,13 +2666,11 @@ class TestSpecCommitPaths:
 
         monkeypatch.setattr(SelfTranslationChannelOwner, "_commit_merge", fake_commit)
 
-        await harness.self_owner._try_commit_after_spec(
-            buffer, reason="spec_done", allow_fallback=False
-        )
-        assert called == []
+        await harness.self_owner._evaluate_speculative_next_action(buffer, reason="spec_done")
+        assert called == ["spec_done"]
 
     @pytest.mark.asyncio
-    async def test_try_commit_after_spec_skips_when_only_excluded_punctuation_differs(
+    async def test_next_action_evaluator_falls_back_for_excluded_punctuation(
         self, monkeypatch: pytest.MonkeyPatch
     ):
         harness = compose_translation_test_harness(
@@ -2422,10 +2697,8 @@ class TestSpecCommitPaths:
 
         monkeypatch.setattr(SelfTranslationChannelOwner, "_commit_merge", fake_commit)
 
-        await harness.self_owner._try_commit_after_spec(
-            buffer, reason="spec_done", allow_fallback=False
-        )
-        assert called == []
+        await harness.self_owner._evaluate_speculative_next_action(buffer, reason="spec_done")
+        assert called == ["spec_done"]
 
     @pytest.mark.asyncio
     async def test_commit_merge_retranslates_when_only_excluded_punctuation_differs(self):

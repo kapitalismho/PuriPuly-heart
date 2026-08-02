@@ -178,6 +178,12 @@ class SelfTranslationChannelOwner:
                 self._maybe_update_buffer_end_time(event.utterance_id)
                 self._maybe_start_finalize_wait(event.utterance_id)
                 await self._maybe_clear_resume_on_end(event)
+                buffer = self.merge_buffer
+                if buffer is not None:
+                    await self._evaluate_speculative_next_action(
+                        buffer,
+                        reason="speech_end",
+                    )
         await self.local_asr_runtime.handle_vad_event("self", event)
         if isinstance(event, SpeechEnd):
             await self.local_asr_runtime.commit_handoff("self")
@@ -283,6 +289,8 @@ class SelfTranslationChannelOwner:
 
     async def handle_retired_stt_event(self, event: object) -> None:
         if isinstance(event, STTFinalEvent) and event.channel == "self":
+            if self.config_snapshot().value.low_latency_mode:
+                return
             await self.handle_stt_event(event)
 
     async def handle_stt_event_loop_exception(self, exc: Exception) -> None:
@@ -883,6 +891,10 @@ class SelfTranslationChannelOwner:
         buffer.awaiting_vad_utterance_id = None
         buffer.awaiting_vad_timeout_task = None
         self._restart_post_end_grace(buffer)
+        await self._evaluate_speculative_next_action(
+            buffer,
+            reason="awaiting_vad_timeout",
+        )
 
     def _cancel_resume_end_timeout(self, buffer: _MergeBuffer) -> None:
         task = buffer.resume_end_timeout_task
@@ -929,10 +941,9 @@ class SelfTranslationChannelOwner:
         )
         self._clear_resume_state(buffer)
         self._cancel_finalize_wait(buffer)
-        await self._try_commit_after_spec(
+        await self._evaluate_speculative_next_action(
             buffer,
             reason="resume_end_timeout",
-            allow_fallback=True,
         )
 
     def _restart_post_end_grace(self, buffer: _MergeBuffer) -> None:
@@ -977,16 +988,9 @@ class SelfTranslationChannelOwner:
             str(merge_id)[:8],
             wait_ms,
         )
-        if (
-            not self.translation_requests.provider_available
-            or not self.config_snapshot().value.translation_enabled
-        ):
-            await self._commit_merge(buffer, reason="post_end_grace")
-            return
-        await self._try_commit_after_spec(
+        await self._evaluate_speculative_next_action(
             buffer,
             reason="post_end_grace",
-            allow_fallback=False,
         )
 
     def _mark_resume_pending(self, event: SpeechStart) -> None:
@@ -1054,15 +1058,20 @@ class SelfTranslationChannelOwner:
             buffer.resume_chunk_count,
         )
         self._clear_resume_state(buffer)
-        await self._try_commit_after_spec(
+        await self._evaluate_speculative_next_action(
             buffer,
             reason="resume_false_start",
-            allow_fallback=True,
         )
 
     async def _handle_low_latency_final(self, transcript: Transcript) -> None:
         text = transcript.text.strip()
         if not text:
+            return
+        if transcript.utterance_id in self.runtime.low_latency_committed_utterance_ids:
+            self._emit_metric(
+                "[Metric] final_duplicate_ignored vad_id=%s",
+                str(transcript.utterance_id)[:8],
+            )
             return
 
         self._record_latency_stage(
@@ -1110,47 +1119,19 @@ class SelfTranslationChannelOwner:
                 str(transcript.utterance_id)[:8],
             )
 
-        if (
-            not self.translation_requests.provider_available
-            or not self.config_snapshot().value.translation_enabled
-        ):
-            await self._commit_merge(buffer, reason="final_no_llm")
-            return
-
         await self._maybe_restart_spec(buffer)
+        await self._evaluate_speculative_next_action(
+            buffer,
+            reason="final_reconciled",
+        )
 
     async def _commit_merge(self, buffer: _MergeBuffer, *, reason: str) -> None:
+        if self.merge_buffer is not buffer:
+            return
         attempt = buffer.speculative_attempt
-        if buffer.resume_pending or buffer.resume_confirmed:
-            hold_ms = 0
-            if attempt is not None and attempt.completed_at is not None:
-                hold_ms = int((self.clock.now() - attempt.completed_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_blocked id=%s reason=%s hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                reason,
-                hold_ms,
-            )
-            return
-        if buffer.awaiting_vad_end:
-            hold_ms = 0
-            if buffer.finalize_wait_started_at is not None:
-                hold_ms = int((self.clock.now() - buffer.finalize_wait_started_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_blocked id=%s reason=await_vad_end hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                hold_ms,
-            )
-            return
-        if buffer.finalize_wait_task is not None:
-            hold_ms = 0
-            if buffer.finalize_wait_started_at is not None:
-                hold_ms = int((self.clock.now() - buffer.finalize_wait_started_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_deferred id=%s reason=post_end_grace hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                hold_ms,
-            )
+        blocker = self._continuation_blocker(buffer)
+        if blocker is not None:
+            self._emit_continuation_blocker(buffer, blocker=blocker, reason=reason)
             return
         self._cancel_finalize_wait(buffer)
         buffer.awaiting_vad_end = False
@@ -1158,6 +1139,7 @@ class SelfTranslationChannelOwner:
         for utterance_id in buffer.utterance_ids:
             self.runtime.utterance_start_times.pop(utterance_id, None)
             self.runtime.speech_ended_ids.discard(utterance_id)
+            self.runtime.low_latency_committed_utterance_ids.add(utterance_id)
         if self.merge_buffer is buffer:
             self.merge_buffer = None
 
@@ -1166,8 +1148,18 @@ class SelfTranslationChannelOwner:
             await self.output_projection.reset_overlay_preview()
             return
 
+        current_config_snapshot = self.config_snapshot()
         reuse_mode = None
-        if attempt is not None and attempt.result is not None:
+        if (
+            attempt is not None
+            and attempt.status is _SpeculativeAttemptStatus.READY
+            and isinstance(attempt.result, Translation)
+            and attempt.provider_generation == self.translation_requests.provider_generation
+            and self._translation_config_matches(
+                attempt.config_snapshot.value,
+                current_config_snapshot.value,
+            )
+        ):
             reuse_mode = self.output_projection.soft_reuse_mode(
                 attempt.source_text,
                 final_text,
@@ -1222,11 +1214,8 @@ class SelfTranslationChannelOwner:
         await self._handle_transcript(transcript, is_final=True, source="Mic")
         config_snapshot = (
             attempt.config_snapshot
-            if reuse_mode is not None
-            and attempt is not None
-            and attempt.result is not None
-            and attempt.config_snapshot is not None
-            else self.config_snapshot()
+            if reuse_mode is not None and attempt is not None and attempt.result is not None
+            else current_config_snapshot
         )
 
         if (
@@ -1288,6 +1277,36 @@ class SelfTranslationChannelOwner:
             config_snapshot=config_snapshot,
         )
 
+    def _continuation_blocker(self, buffer: _MergeBuffer) -> str | None:
+        if buffer.resume_pending or buffer.resume_confirmed:
+            return "resume"
+        if buffer.awaiting_vad_end:
+            return "await_vad_end"
+        if buffer.finalize_wait_task is not None:
+            return "post_end_grace"
+        return None
+
+    def _emit_continuation_blocker(
+        self,
+        buffer: _MergeBuffer,
+        *,
+        blocker: str,
+        reason: str,
+    ) -> None:
+        attempt = buffer.speculative_attempt
+        hold_ms = 0
+        if blocker == "resume" and attempt is not None and attempt.completed_at is not None:
+            hold_ms = int((self.clock.now() - attempt.completed_at) * 1000)
+        elif buffer.finalize_wait_started_at is not None:
+            hold_ms = int((self.clock.now() - buffer.finalize_wait_started_at) * 1000)
+        self._emit_metric(
+            "[Metric] commit_blocked id=%s blocker=%s reason=%s hold_ms=%s",
+            str(buffer.merge_id)[:8],
+            blocker,
+            reason,
+            hold_ms,
+        )
+
     async def _maybe_restart_spec(self, buffer: _MergeBuffer) -> None:
         config_snapshot = self.config_snapshot()
         if (
@@ -1296,17 +1315,49 @@ class SelfTranslationChannelOwner:
         ):
             return
 
-        self._clear_spec_state(buffer, reason="spec_retry")
-
         merged_text = self._merge_text(buffer.parts)
         if not merged_text:
             return
 
+        attempt = buffer.speculative_attempt
+        if attempt is not None:
+            normalized_text = self.output_projection.normalize_soft_reuse_text(merged_text)
+            if attempt.source_text == merged_text:
+                reuse_mode = "exact"
+            elif attempt.normalized_text and attempt.normalized_text == normalized_text:
+                reuse_mode = "soft_boundary"
+            else:
+                reuse_mode = None
+            config_matches = self._translation_config_matches(
+                attempt.config_snapshot.value,
+                config_snapshot.value,
+            )
+            provider_matches = (
+                attempt.provider_generation == self.translation_requests.provider_generation
+            )
+            if reuse_mode is not None and config_matches and provider_matches:
+                self._emit_metric(
+                    "[Metric] spec_preserve id=%s reason=%s status=%s attempt=%s",
+                    str(buffer.merge_id)[:8],
+                    reuse_mode,
+                    attempt.status.value,
+                    attempt.sequence,
+                )
+                return
+            if not provider_matches:
+                restart_reason = "provider_changed"
+            elif not config_matches:
+                restart_reason = "config_changed"
+            else:
+                restart_reason = "source_changed"
+            self._clear_spec_state(buffer, reason=restart_reason)
+
         buffer.speculative_sequence += 1
         attempt = _SpeculativeAttempt(
             source_text=merged_text,
-            normalized_text=merged_text.strip(),
+            normalized_text=self.output_projection.normalize_soft_reuse_text(merged_text),
             config_snapshot=config_snapshot,
+            provider_generation=self.translation_requests.provider_generation,
             sequence=buffer.speculative_sequence,
             started_at=self.clock.now(),
         )
@@ -1323,6 +1374,39 @@ class SelfTranslationChannelOwner:
                 merged_text,
                 attempt.sequence,
             )
+        )
+
+    @staticmethod
+    def _translation_config_matches(
+        left: TranslationRuntimeConfig,
+        right: TranslationRuntimeConfig,
+    ) -> bool:
+        return (
+            left.source_language,
+            left.target_language,
+            left.peer_source_language,
+            left.peer_target_language,
+            left.system_prompt,
+            left.translation_enabled,
+            left.peer_translation_enabled,
+            left.integrated_context_enabled,
+            left.context_time_window_s,
+            left.context_max_entries,
+            left.integrated_context_time_window_s,
+            left.integrated_context_max_entries,
+        ) == (
+            right.source_language,
+            right.target_language,
+            right.peer_source_language,
+            right.peer_target_language,
+            right.system_prompt,
+            right.translation_enabled,
+            right.peer_translation_enabled,
+            right.integrated_context_enabled,
+            right.context_time_window_s,
+            right.context_max_entries,
+            right.integrated_context_time_window_s,
+            right.integrated_context_max_entries,
         )
 
     async def _run_spec_translation(
@@ -1383,10 +1467,9 @@ class SelfTranslationChannelOwner:
             self._clear_spec_latency_state(buffer)
             current_attempt.status = _SpeculativeAttemptStatus.FAILED
             current_attempt.completed_at = self.clock.now()
-            await self._try_commit_after_spec(
+            await self._evaluate_speculative_next_action(
                 buffer,
                 reason="spec_failed",
-                allow_fallback=True,
             )
             return
 
@@ -1416,10 +1499,9 @@ class SelfTranslationChannelOwner:
             len(translation.text),
         )
         await self._sync_overlay_active_self(buffer, created_at=translation.created_at)
-        await self._try_commit_after_spec(
+        await self._evaluate_speculative_next_action(
             buffer,
             reason="spec_done",
-            allow_fallback=False,
         )
 
     async def _handle_stale_spec_translation(
@@ -1442,67 +1524,82 @@ class SelfTranslationChannelOwner:
         current_attempt.result = None
         current_attempt.status = _SpeculativeAttemptStatus.STALE
         current_attempt.completed_at = self.clock.now()
-        await self._try_commit_after_spec(
+        await self._evaluate_speculative_next_action(
             buffer,
             reason="spec_stale",
-            allow_fallback=True,
         )
 
-    async def _try_commit_after_spec(
+    async def _evaluate_speculative_next_action(
         self,
         buffer: _MergeBuffer,
         *,
         reason: str,
-        allow_fallback: bool,
     ) -> None:
         if self.merge_buffer is None or self.merge_buffer is not buffer:
             return
         attempt = buffer.speculative_attempt
-        if buffer.resume_pending or buffer.resume_confirmed:
-            hold_ms = 0
-            if attempt is not None and attempt.completed_at is not None:
-                hold_ms = int((self.clock.now() - attempt.completed_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_blocked id=%s reason=%s hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                reason,
-                hold_ms,
-            )
-            return
-        if buffer.awaiting_vad_end:
-            hold_ms = 0
-            if buffer.finalize_wait_started_at is not None:
-                hold_ms = int((self.clock.now() - buffer.finalize_wait_started_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_blocked id=%s reason=await_vad_end hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                hold_ms,
-            )
-            return
-        if buffer.finalize_wait_task is not None:
-            hold_ms = 0
-            if buffer.finalize_wait_started_at is not None:
-                hold_ms = int((self.clock.now() - buffer.finalize_wait_started_at) * 1000)
-            self._emit_metric(
-                "[Metric] commit_deferred id=%s reason=post_end_grace hold_ms=%s",
-                str(buffer.merge_id)[:8],
-                hold_ms,
-            )
+        blocker = self._continuation_blocker(buffer)
+        if blocker is not None:
+            self._emit_continuation_blocker(buffer, blocker=blocker, reason=reason)
             return
 
         final_text = self._merge_text(buffer.parts)
         if not final_text:
             return
 
-        if attempt is None or attempt.result is None:
-            if not allow_fallback:
-                return
+        config_snapshot = self.config_snapshot()
+        translation_active = (
+            self.translation_requests.provider_available
+            and config_snapshot.value.translation_enabled
+        )
+        if attempt is None:
             await self._commit_merge(buffer, reason=reason)
             return
 
-        if self.output_projection.soft_reuse_mode(attempt.source_text, final_text) is None:
+        if attempt.terminal_action_started:
+            self._emit_metric(
+                "[Metric] spec_terminal_duplicate_prevented id=%s reason=%s status=%s attempt=%s",
+                str(buffer.merge_id)[:8],
+                reason,
+                attempt.status.value,
+                attempt.sequence,
+            )
             return
 
+        if translation_active and attempt.status is _SpeculativeAttemptStatus.RUNNING:
+            return
+
+        reuse_mode = self.output_projection.soft_reuse_mode(
+            attempt.source_text,
+            final_text,
+        )
+        config_matches = self._translation_config_matches(
+            attempt.config_snapshot.value,
+            config_snapshot.value,
+        )
+        provider_matches = (
+            attempt.provider_generation == self.translation_requests.provider_generation
+        )
+        reuse_ready = (
+            translation_active
+            and attempt.status is _SpeculativeAttemptStatus.READY
+            and isinstance(attempt.result, Translation)
+            and reuse_mode is not None
+            and config_matches
+            and provider_matches
+        )
+        action = "reuse" if reuse_ready else "fallback"
+        if not translation_active:
+            action = "source_only"
+        attempt.terminal_action_started = True
+        self._emit_metric(
+            "[Metric] spec_terminal id=%s action=%s reason=%s status=%s attempt=%s",
+            str(buffer.merge_id)[:8],
+            action,
+            reason,
+            attempt.status.value,
+            attempt.sequence,
+        )
         await self._commit_merge(buffer, reason=reason)
 
     async def _sync_overlay_active_self(

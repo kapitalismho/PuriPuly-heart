@@ -1035,13 +1035,20 @@ async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_try_commit_after_spec_respects_allow_fallback_flag(
+async def test_next_action_evaluator_starts_failed_fallback_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     harness = compose_translation_test_harness(
         stt=None, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock()
     )
-    buffer = _MergeBuffer(merge_id=uuid4(), parts=["text"])
+    buffer = _MergeBuffer(
+        merge_id=uuid4(),
+        parts=["text"],
+        speculative_attempt=make_speculative_attempt(
+            source_text="text",
+            status=_SpeculativeAttemptStatus.FAILED,
+        ),
+    )
     harness.self_owner.merge_buffer = buffer
     called: list[str] = []
 
@@ -1055,14 +1062,12 @@ async def test_try_commit_after_spec_respects_allow_fallback_flag(
 
     monkeypatch.setattr(SelfTranslationChannelOwner, "_commit_merge", fake_commit)
 
-    await harness.self_owner._try_commit_after_spec(
-        buffer, reason="spec_failed", allow_fallback=False
-    )
-    await harness.self_owner._try_commit_after_spec(
-        buffer, reason="spec_failed", allow_fallback=True
-    )
+    await harness.self_owner._evaluate_speculative_next_action(buffer, reason="spec_failed")
+    await harness.self_owner._evaluate_speculative_next_action(buffer, reason="spec_failed")
 
     assert called == ["spec_failed"]
+    assert buffer.speculative_attempt is not None
+    assert buffer.speculative_attempt.terminal_action_started is True
 
 
 @pytest.mark.asyncio
@@ -1311,9 +1316,9 @@ async def test_maybe_restart_spec_replaces_previous_task_and_state(
 
     assert old_task.done() is True
     assert buffer.speculative_attempt is not None
-    assert buffer.speculative_attempt.sequence == 1
+    assert buffer.speculative_attempt.sequence == 2
     assert buffer.speculative_attempt.source_text == "final text"
-    assert seen == [(buffer.merge_id, "final text", 1)]
+    assert seen == [(buffer.merge_id, "final text", 2)]
 
 
 @pytest.mark.asyncio

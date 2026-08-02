@@ -39,6 +39,7 @@ class _SpeculativeAttempt:
     source_text: str
     normalized_text: str
     config_snapshot: TranslationRuntimeConfigSnapshot
+    provider_generation: int
     sequence: int
     status: _SpeculativeAttemptStatus = _SpeculativeAttemptStatus.RUNNING
     task: asyncio.Task[None] | None = None
@@ -72,6 +73,11 @@ class _MergeBuffer:
     resume_end_timeout_task: asyncio.Task[None] | None = None
     resume_end_utterance_id: UUID | None = None
 
+    def __post_init__(self) -> None:
+        attempt = self.speculative_attempt
+        if attempt is not None:
+            self.speculative_sequence = max(self.speculative_sequence, attempt.sequence)
+
 
 @dataclass(slots=True)
 class ChannelRuntime:
@@ -84,6 +90,7 @@ class ChannelRuntime:
     utterance_start_times: dict[UUID, float] = field(default_factory=dict)
     translation_history: list[ContextEntry] = field(default_factory=list)
     speech_ended_ids: set[UUID] = field(default_factory=set)
+    low_latency_committed_utterance_ids: set[UUID] = field(default_factory=set)
     merge_buffer: _MergeBuffer | None = None
 
     def __post_init__(self) -> None:
@@ -201,4 +208,5 @@ class ChannelRuntime:
         self.utterance_start_times.clear()
         self.translation_history.clear()
         self.speech_ended_ids.clear()
+        self.low_latency_committed_utterance_ids.clear()
         self.stt_task = None

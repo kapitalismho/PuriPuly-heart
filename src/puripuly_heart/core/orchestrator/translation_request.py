@@ -68,6 +68,9 @@ class TranslationRequestPort(Protocol):
     @property
     def provider_available(self) -> bool: ...
 
+    @property
+    def provider_generation(self) -> int: ...
+
     def set_clock(self, clock: Clock) -> None: ...
 
     def clear_context(self) -> None: ...
@@ -202,6 +205,10 @@ class TranslationRequestOwner:
     @property
     def provider_available(self) -> bool:
         return self.provider_runtime.provider is not None
+
+    @property
+    def provider_generation(self) -> int:
+        return self.provider_runtime.generation
 
     def runtime_for_channel(self, channel: ChannelId) -> ChannelRuntime:
         return self.peer_runtime if channel == "peer" else self.self_runtime
