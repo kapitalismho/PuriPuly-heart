@@ -8,6 +8,7 @@ from typing import cast
 from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
 from puripuly_heart.config.settings import STTProviderName
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.gpu_worker import GpuWorkerProcessFactoryPort
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimePort,
@@ -17,7 +18,10 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeTerminalFailureSink,
 )
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
-from puripuly_heart.core.runtime.gpu_asr import SharedGpuASRRuntime
+from puripuly_heart.core.runtime.gpu_asr import (
+    GpuASRDiagnosticSink,
+    SharedGpuASRRuntime,
+)
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
     ProviderRuntimeDiagnosticSink,
@@ -35,6 +39,19 @@ from .wiring_stt_factory import create_stt_backend_from_resolved_config
 FinalTranscriptSuppressedSink = Callable[[FinalTranscriptSuppressedNotification], object]
 DiagnosticsEnabled = Callable[[], bool]
 FaultProfileProvider = Callable[[], object]
+
+
+def _create_shared_gpu_asr_runtime(
+    *,
+    process_factory: GpuWorkerProcessFactoryPort,
+    clock: Clock | None = None,
+    diagnostic_sink: GpuASRDiagnosticSink | None = None,
+) -> SharedGpuASRRuntime:
+    return SharedGpuASRRuntime(
+        process_factory=process_factory,
+        clock=clock,
+        diagnostic_sink=diagnostic_sink,
+    )
 
 
 @dataclass(slots=True)
@@ -100,7 +117,7 @@ class LocalASRProviderRuntimeFactory:
     ) -> LocalASRProviderRuntimePort:
         return LocalASRProviderRuntimeOwner(
             provider_factory=self.provider_factory,
-            gpu_runtime_factory=lambda diagnostic_sink: SharedGpuASRRuntime(
+            gpu_runtime_factory=lambda diagnostic_sink: _create_shared_gpu_asr_runtime(
                 process_factory=DefaultGpuWorkerProcessFactory(),
                 clock=self.clock,
                 diagnostic_sink=diagnostic_sink,
