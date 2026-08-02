@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.orchestrator.channel_runtime import (
+    _LOW_LATENCY_COMMITTED_TOMBSTONE_LIMIT,
     ChannelRuntime,
     ContextEntry,
     _MergeBuffer,
@@ -87,6 +88,26 @@ def test_self_runtime_state_is_visible_through_the_self_owner() -> None:
     harness.self_runtime.merge_buffer = buffer
 
     assert harness.self_owner.merge_buffer is buffer
+
+
+def test_low_latency_committed_utterance_tombstones_are_bounded() -> None:
+    runtime = ChannelRuntime(channel="self")
+    utterance_ids = [uuid4() for _ in range(_LOW_LATENCY_COMMITTED_TOMBSTONE_LIMIT + 1)]
+
+    for utterance_id in utterance_ids:
+        runtime.remember_low_latency_committed_utterance(utterance_id)
+
+    assert len(runtime.low_latency_committed_utterance_ids) == (
+        _LOW_LATENCY_COMMITTED_TOMBSTONE_LIMIT
+    )
+    assert utterance_ids[0] not in runtime.low_latency_committed_utterance_ids
+    assert utterance_ids[-1] in runtime.low_latency_committed_utterance_ids
+
+    runtime.remember_low_latency_committed_utterance(utterance_ids[-1])
+
+    assert len(runtime.low_latency_committed_utterance_ids) == (
+        _LOW_LATENCY_COMMITTED_TOMBSTONE_LIMIT
+    )
 
 
 @pytest.mark.asyncio
@@ -262,6 +283,8 @@ async def test_reset_runtime_state_clears_both_channel_runtimes() -> None:
     harness.peer_runtime.utterance_start_times[peer_id] = 2.0
     harness.self_runtime.speech_ended_ids.add(self_id)
     harness.peer_runtime.speech_ended_ids.add(peer_id)
+    harness.self_runtime.remember_low_latency_committed_utterance(self_id)
+    harness.peer_runtime.remember_low_latency_committed_utterance(peer_id)
     harness.self_runtime.merge_buffer = _MergeBuffer(merge_id=uuid4(), utterance_ids=[self_id])
     harness.peer_runtime.merge_buffer = _MergeBuffer(merge_id=uuid4(), utterance_ids=[peer_id])
     harness.self_runtime.translation_history.append(
@@ -296,6 +319,8 @@ async def test_reset_runtime_state_clears_both_channel_runtimes() -> None:
         assert harness.peer_runtime.utterance_start_times == {}
         assert harness.self_runtime.speech_ended_ids == set()
         assert harness.peer_runtime.speech_ended_ids == set()
+        assert harness.self_runtime.low_latency_committed_utterance_ids == {}
+        assert harness.peer_runtime.low_latency_committed_utterance_ids == {}
         assert harness.self_runtime.merge_buffer is None
         assert harness.peer_runtime.merge_buffer is None
         assert harness.self_runtime.translation_history == []

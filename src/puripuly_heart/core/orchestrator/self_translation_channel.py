@@ -1139,7 +1139,7 @@ class SelfTranslationChannelOwner:
         for utterance_id in buffer.utterance_ids:
             self.runtime.utterance_start_times.pop(utterance_id, None)
             self.runtime.speech_ended_ids.discard(utterance_id)
-            self.runtime.low_latency_committed_utterance_ids.add(utterance_id)
+            self.runtime.remember_low_latency_committed_utterance(utterance_id)
         if self.merge_buffer is buffer:
             self.merge_buffer = None
 

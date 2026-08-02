@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import StrEnum
 from uuid import UUID
 
 from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfigSnapshot
 from puripuly_heart.domain.models import ChannelId, UtteranceBundle
+
+_LOW_LATENCY_COMMITTED_TOMBSTONE_LIMIT = 1024
 
 
 def _validate_channel(channel: str) -> None:
@@ -90,7 +93,9 @@ class ChannelRuntime:
     utterance_start_times: dict[UUID, float] = field(default_factory=dict)
     translation_history: list[ContextEntry] = field(default_factory=list)
     speech_ended_ids: set[UUID] = field(default_factory=set)
-    low_latency_committed_utterance_ids: set[UUID] = field(default_factory=set)
+    low_latency_committed_utterance_ids: OrderedDict[UUID, None] = field(
+        default_factory=OrderedDict
+    )
     merge_buffer: _MergeBuffer | None = None
 
     def __post_init__(self) -> None:
@@ -109,6 +114,14 @@ class ChannelRuntime:
 
     def get_source(self, utterance_id: UUID) -> str | None:
         return self.utterance_sources.get(utterance_id)
+
+    def remember_low_latency_committed_utterance(self, utterance_id: UUID) -> None:
+        self.low_latency_committed_utterance_ids.pop(utterance_id, None)
+        self.low_latency_committed_utterance_ids[utterance_id] = None
+        while (
+            len(self.low_latency_committed_utterance_ids) > _LOW_LATENCY_COMMITTED_TOMBSTONE_LIMIT
+        ):
+            self.low_latency_committed_utterance_ids.popitem(last=False)
 
     def clear_context(self) -> None:
         self.translation_history.clear()
