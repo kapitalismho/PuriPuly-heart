@@ -208,7 +208,7 @@ class TranslationRequestOwner:
 
     @property
     def provider_generation(self) -> int:
-        return self.provider_runtime.generation
+        return self.provider_runtime.current_provider_generation()[1]
 
     def runtime_for_channel(self, channel: ChannelId) -> ChannelRuntime:
         return self.peer_runtime if channel == "peer" else self.self_runtime

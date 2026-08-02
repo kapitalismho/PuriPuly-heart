@@ -88,6 +88,23 @@ class FakeLLMProvider:
 
 
 @dataclass
+class ProtocolOnlyProviderRuntime:
+    provider: object | None
+    current_generation: int
+
+    def current_provider_generation(self) -> tuple[object | None, int]:
+        return self.provider, self.current_generation
+
+    def is_current_provider_generation(
+        self,
+        *,
+        provider: object,
+        generation: int,
+    ) -> bool:
+        return provider is self.provider and generation == self.current_generation
+
+
+@dataclass
 class ClosingLLMProvider(FakeLLMProvider):
     close_calls: int = 0
 
@@ -333,6 +350,47 @@ def samples(value: float, n: int = 512) -> np.ndarray:
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_public_low_latency_final_uses_declared_provider_generation_port() -> None:
+    llm = FakeLLMProvider(response_text="translated", delay_s=0.0)
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=llm,
+        osc=FakeOscQueue(),
+        low_latency_mode=True,
+    )
+    provider_runtime = ProtocolOnlyProviderRuntime(
+        provider=llm,
+        current_generation=41,
+    )
+    harness.translation_requests.provider_runtime = provider_runtime
+    assert not hasattr(provider_runtime, "generation")
+    utterance_id = uuid4()
+
+    try:
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id,
+                Transcript(
+                    utterance_id=utterance_id,
+                    text="port contract",
+                    is_final=True,
+                ),
+            )
+        )
+        buffer = harness.self_owner.merge_buffer
+        assert buffer is not None
+        attempt = buffer.speculative_attempt
+        assert attempt is not None
+        assert attempt.provider_generation == 41
+        assert attempt.task is not None
+        await asyncio.gather(attempt.task)
+        assert attempt.status is _SpeculativeAttemptStatus.READY
+        assert len(llm.calls) == 1
+    finally:
+        await harness.stop()
 
 
 @pytest.mark.asyncio
