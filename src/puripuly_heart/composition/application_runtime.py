@@ -1762,7 +1762,6 @@ def compose_application_runtime(
             github_prompt=github_owner,
             telemetry=telemetry_service(),
             after_launch=ApplicationAfterLaunchOwner(
-                schedule_task=presentation.schedule_task,
                 vrchat_presence=require_vrchat_presence(),
                 gpu=gpu_owner,
             ),

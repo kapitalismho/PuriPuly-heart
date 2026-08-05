@@ -18,8 +18,9 @@ class PsutilCurrentUserProcessSnapshots:
     def snapshots(self) -> Iterable[ProcessSnapshot]:
         psutil = _import_psutil()
         current_username = psutil.Process().username()
+        parent_pid_by_pid = _parent_pid_map(psutil)
         snapshots: list[ProcessSnapshot] = []
-        for process in psutil.process_iter(["pid", "ppid", "exe", "username", "create_time"]):
+        for process in psutil.process_iter(["pid", "exe", "username", "create_time"]):
             try:
                 info = process.info
                 executable_path = info.get("exe")
@@ -31,7 +32,11 @@ class PsutilCurrentUserProcessSnapshots:
                 snapshots.append(
                     ProcessSnapshot(
                         pid=int(info["pid"]),
-                        parent_pid=int(info["ppid"]) if info.get("ppid") else None,
+                        parent_pid=(
+                            int(parent_pid_by_pid[info["pid"]])
+                            if parent_pid_by_pid.get(info["pid"])
+                            else None
+                        ),
                         is_current_user=info.get("username") == current_username,
                         executable_path=executable_path,
                         instance_id=instance_id,
@@ -139,3 +144,10 @@ def _import_psutil():  # noqa: ANN201
     import psutil
 
     return psutil
+
+
+def _parent_pid_map(psutil):  # noqa: ANN001, ANN201
+    provider = getattr(getattr(psutil, "_psplatform", None), "ppid_map", None)
+    if callable(provider):
+        return provider()
+    return {process.pid: process.ppid() for process in psutil.process_iter(["pid"])}
