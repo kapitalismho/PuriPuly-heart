@@ -807,8 +807,28 @@ def apply_legacy_app_settings_delta(
     base_settings: object,
     next_settings: object,
 ) -> AppSettingsVNext:
-    converted_base = from_legacy_app_settings(base_settings)
-    converted_next = from_legacy_app_settings(next_settings)
+    canonical_fallback = canonical.intent.translation.fallback
+    canonical_fallback_fields = (
+        canonical_fallback.enabled,
+        canonical_fallback.model,
+        canonical_fallback.connection,
+    )
+    base_fallback_fields = _legacy_translation_fallback_fields(base_settings)
+    base_fallback_intent = (
+        canonical_fallback if base_fallback_fields == canonical_fallback_fields else None
+    )
+    converted_base = from_legacy_app_settings(
+        base_settings,
+        fallback_intent=base_fallback_intent,
+    )
+    converted_next = from_legacy_app_settings(
+        next_settings,
+        fallback_intent=(
+            base_fallback_intent
+            if _legacy_translation_fallback_fields(next_settings) == base_fallback_fields
+            else None
+        ),
+    )
     canonical_data = serialization.to_dict(canonical)
     _apply_changed_mapping_values(
         canonical_data,
@@ -824,6 +844,20 @@ def apply_legacy_app_settings_delta(
         if was_verified and not remains_verified:
             verification_entries[provider] = {"status": "unknown"}
     return serialization.from_dict(canonical_data)
+
+
+def _legacy_translation_fallback_fields(settings: object) -> tuple[bool, str, str] | None:
+    translation = getattr(settings, "translation", None)
+    fallback = getattr(translation, "fallback", None)
+    if fallback is None:
+        return None
+    model = getattr(fallback, "model", None)
+    connection = getattr(fallback, "connection", None)
+    return (
+        bool(getattr(fallback, "enabled", False)),
+        str(getattr(model, "value", model)),
+        str(getattr(connection, "value", connection)),
+    )
 
 
 def _validate_vnext_top_level_shape(data: Mapping[str, Any]) -> None:

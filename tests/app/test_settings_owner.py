@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -11,19 +12,79 @@ from puripuly_heart.config.settings import (
     AppSettings,
     SecretsBackend,
     STTProviderName,
+    TranslationConnection,
+    TranslationFallbackSettings,
+    TranslationModel,
 )
 from puripuly_heart.config.settings import (
     to_dict as legacy_to_dict,
 )
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.facade import save_vnext_settings
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.settings_vnext.schema import (
+    AppSettingsVNext,
+    TranslationFallbackIntent,
+)
 
 
 def _write_json(path: Path, value: dict[str, object]) -> bytes:
     content = json.dumps(value, ensure_ascii=False, indent=2).encode("utf-8")
     path.write_bytes(content)
     return content
+
+
+def test_owner_persists_default_gemma_fallback_selected_from_disabled_state(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "settings.json"
+    canonical = AppSettingsVNext()
+    canonical = replace(
+        canonical,
+        intent=replace(
+            canonical.intent,
+            translation=replace(
+                canonical.intent.translation,
+                fallback=TranslationFallbackIntent(selection_alias="none"),
+            ),
+        ),
+    )
+    _write_json(path, serialization.to_dict(canonical))
+    owner = compose_settings_owner(path)
+    loaded = owner.start()
+    changed = copy.deepcopy(loaded.settings)
+    changed.translation.fallback = TranslationFallbackSettings(
+        enabled=True,
+        model=TranslationModel.GEMMA4_26B_31B,
+        connection=TranslationConnection.OPENROUTER,
+    )
+
+    owner.apply_legacy_delta(loaded.settings, changed)
+    owner.persist()
+
+    reloaded = compose_settings_owner(path).start().settings
+    assert reloaded.translation.fallback == changed.translation.fallback
+
+
+def test_owner_unrelated_delta_preserves_disabled_fallback(tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["translation"]["fallback"] = {
+        "enabled": False,
+        "model": "deepseek_v4_flash",
+        "connection": "official_byok",
+        "selection_alias": "none",
+    }
+    _write_json(path, raw)
+    owner = compose_settings_owner(path)
+    loaded = owner.start()
+    changed = copy.deepcopy(loaded.settings)
+    changed.ui.locale = "ja"
+
+    owner.apply_legacy_delta(loaded.settings, changed)
+    owner.persist()
+
+    reloaded = compose_settings_owner(path).start().settings
+    assert reloaded.translation.fallback.enabled is False
 
 
 def test_owner_normalizes_explicit_false_legacy_policies_after_exact_backup(
