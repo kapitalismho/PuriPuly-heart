@@ -1183,6 +1183,9 @@ class RecordingWindowZOrderPort:
         error: Exception | None = None,
         reveal_result: desktop_window_zorder.WindowRevealResult | None = None,
         reveal_error: Exception | None = None,
+        placement_result: desktop_window_zorder.WindowPlacementResult | None = None,
+        placement_error: Exception | None = None,
+        on_placement: Any | None = None,
     ) -> None:
         self.on_reassert = on_reassert
         self.result = result or desktop_window_zorder.WindowZOrderResult(
@@ -1200,13 +1203,39 @@ class RecordingWindowZOrderPort:
             visible_confirmed=True,
         )
         self.reveal_error = reveal_error
+        self.placement_result = placement_result or desktop_window_zorder.WindowPlacementResult(
+            applied=True,
+            reason="applied",
+            hwnd=4242,
+            title_confirmed=True,
+            bounds_confirmed=True,
+        )
+        self.placement_error = placement_error
+        self.on_placement = on_placement
         self.reveal_titles: list[str] = []
+        self.placement_calls: list[tuple[str, int, int, int, int]] = []
         self.bound_pids: list[int] = []
         self.reassert_calls = 0
         self.close_calls = 0
 
     def bind_process(self, pid: int) -> None:
         self.bound_pids.append(pid)
+
+    async def place_window_before_show(
+        self,
+        expected_title: str,
+        *,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> desktop_window_zorder.WindowPlacementResult:
+        self.placement_calls.append((expected_title, x, y, width, height))
+        if self.on_placement is not None:
+            self.on_placement()
+        if self.placement_error is not None:
+            raise self.placement_error
+        return self.placement_result
 
     async def reveal_window(self, expected_title: str) -> desktop_window_zorder.WindowRevealResult:
         self.reveal_titles.append(expected_title)
@@ -2277,14 +2306,17 @@ def test_desktop_overlay_requires_process_provider_for_custom_runner_and_zorder(
 
 
 @pytest.mark.asyncio
-async def test_desktop_overlay_reveal_uses_platform_window_port_not_flet_visible_alone() -> None:
+async def test_desktop_overlay_places_hidden_window_before_reveal() -> None:
     import flet as real_flet
 
     assert real_flet.Window.__dataclass_fields__["visible"].default is True
 
     app = FakeFletApp()
     assert app.page.window.visible is True
-    port = RecordingWindowZOrderPort()
+    placement_visibility: list[list[bool]] = []
+    port = RecordingWindowZOrderPort(
+        on_placement=lambda: placement_visibility.append(list(app.page.visibility_updates))
+    )
     window = desktop_overlay.FletDesktopRendererWindow(
         app_runner=app.run,
         event_sink=RecordingLifecycleSink().emit,
@@ -2293,6 +2325,18 @@ async def test_desktop_overlay_reveal_uses_platform_window_port_not_flet_visible
         window_z_order_port=port,
         window_process_info_provider=lambda: (4321, None),
     )
+    window.prime_startup_runtime_controls(
+        (
+            {
+                "command": "apply_window_bounds",
+                "x": 320,
+                "y": 720,
+                "width": 1344,
+                "height": 320,
+            },
+        )
+    )
+    assert inspect.iscoroutinefunction(window._handle_page)
 
     try:
         await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
@@ -2301,6 +2345,19 @@ async def test_desktop_overlay_reveal_uses_platform_window_port_not_flet_visible
             await task
 
         assert port.bound_pids == [4321]
+        assert app.page.visibility_updates[:2] == [False, True]
+        assert placement_visibility == [[False]]
+        assert port.placement_calls == [
+            (
+                desktop_overlay.t_for_locale(
+                    "en", "desktop_overlay.window.title", default="PuriPuly Overlay"
+                ),
+                320,
+                720,
+                1344,
+                320,
+            )
+        ]
         assert port.reveal_titles == [
             desktop_overlay.t_for_locale(
                 "en", "desktop_overlay.window.title", default="PuriPuly Overlay"
@@ -2335,6 +2392,7 @@ async def test_desktop_overlay_preview_reveal_does_not_use_platform_window_port(
             await task
 
         assert port.reveal_titles == []
+        assert port.placement_calls == []
     finally:
         await window.close()
 
@@ -2382,7 +2440,7 @@ def monkeypatched_flet_module(fake: object) -> Any:
 
 
 @pytest.mark.asyncio
-async def test_hidden_flet_view_launcher_uses_windows_startup_hide_without_client_hide_on_start(
+async def test_hidden_flet_view_launcher_uses_client_hidden_startup_contract(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import flet_desktop
@@ -2427,19 +2485,14 @@ async def test_hidden_flet_view_launcher_uses_windows_startup_hide_without_clien
         "assets",
     )
     kwargs = created[0]["kwargs"]
+    assert requested_hidden == [True]
+    assert kwargs["env"] == {"FLET_HIDE_WINDOW_ON_START": "true"}
     if os.name == "nt":
-        assert requested_hidden == [False], (
-            "FLET_HIDE_WINDOW_ON_START makes the 0.86.1 client re-hide the window after "
-            "startup, which cancels the platform reveal; SW_HIDE alone must hide it"
-        )
-        assert kwargs["env"] == {}
-        startupinfo = kwargs["startupinfo"]
-        assert startupinfo.dwFlags & subprocess.STARTF_USESHOWWINDOW
-        assert startupinfo.wShowWindow == subprocess.SW_HIDE
         assert kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
+        assert kwargs["creationflags"] & subprocess.BELOW_NORMAL_PRIORITY_CLASS
+        assert "startupinfo" not in kwargs
     else:
-        assert requested_hidden == [True]
-        assert kwargs["env"] == {"FLET_HIDE_WINDOW_ON_START": "true"}
+        assert "creationflags" not in kwargs
         assert "startupinfo" not in kwargs
 
 
@@ -2448,11 +2501,14 @@ async def test_desktop_overlay_reveals_first_window_update_after_chrome_bounds_a
     None
 ):
     app = FakeFletApp()
+    port = RecordingWindowZOrderPort()
     window = desktop_overlay.FletDesktopRendererWindow(
         app_runner=app.run,
         event_sink=RecordingLifecycleSink().emit,
         locale="en",
         bounds_debounce_s=0.01,
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
     )
     window.prime_startup_runtime_controls(
         (
@@ -2471,13 +2527,24 @@ async def test_desktop_overlay_reveals_first_window_update_after_chrome_bounds_a
         await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
 
         assert app.page.window.visible is True
-        assert app.page.visibility_updates == [True]
+        assert app.page.visibility_updates == [False, True]
         assert app.page.window.frameless is True
         assert app.page.window.shadow is False
         assert app.page.window.resizable is False
         assert app.page.window.always_on_top is True
         assert (app.page.window.left, app.page.window.top) == (320, 720)
         assert (app.page.window.width, app.page.window.height) == (1344, 320)
+        assert port.placement_calls == [
+            (
+                desktop_overlay.t_for_locale(
+                    "en", "desktop_overlay.window.title", default="PuriPuly Overlay"
+                ),
+                320,
+                720,
+                1344,
+                320,
+            )
+        ]
         assert app.page.render_snapshots[0] == {
             "ignore_mouse_events": False,
             "texts": {"Lock"},
@@ -4840,7 +4907,7 @@ async def test_desktop_overlay_initial_pass_through_control_does_not_lock_startu
         assert app.page.window.title_bar_buttons_hidden is None
         assert app.page.window.ignore_mouse_events is False
         assert all(snapshot == first_render for snapshot in app.page.render_snapshots)
-        assert app.page.visibility_updates == [True]
+        assert app.page.visibility_updates == [False, True]
 
         await bridge.broadcast_shutdown()
         assert await asyncio.wait_for(run_task, timeout=1.0) == 0
@@ -4895,7 +4962,7 @@ async def test_desktop_overlay_primed_initial_controls_are_not_replayed_after_st
         await _next_bridge_event(bridge, expected_type="overlay_ready")
 
         assert app.page.render_snapshots
-        assert app.page.visibility_updates == [True]
+        assert app.page.visibility_updates == [False, True]
         assert app.page.render_snapshots[0] == {
             "ignore_mouse_events": False,
             "texts": {"Lock"},

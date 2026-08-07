@@ -8,6 +8,7 @@ import math
 import os
 import secrets
 import shutil
+import subprocess
 import sys
 import tempfile
 from collections.abc import Awaitable, Callable, Coroutine
@@ -440,10 +441,16 @@ class DesktopFletOverlayRunner:
         executable_path: Path,
         manifest_path: Path,
     ) -> OverlayManagedProcess:
+        kwargs: dict[str, object] = {}
+        if os.name == "nt":
+            kwargs["creationflags"] = (
+                subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
+            )
         process = await asyncio.create_subprocess_exec(
             *self.build_command(manifest_path, executable_path=executable_path),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            **kwargs,
         )
         return _AsyncioOverlayProcess(process=process, task_factory=self.task_factory)
 

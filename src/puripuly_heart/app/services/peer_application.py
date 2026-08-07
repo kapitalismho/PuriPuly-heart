@@ -182,6 +182,7 @@ class PeerApplicationOwner:
 
     def effective_enabled(self, state: PeerApplicationState | None = None) -> bool:
         current = state or self.state_provider()
+        runtime = self._runtime
         return bool(
             current.settings_available
             and self.activation_requested(
@@ -191,6 +192,8 @@ class PeerApplicationOwner:
             and current.overlay_state == "connected"
             and current.runtime_available
             and current.peer_provider_available
+            and runtime is not None
+            and runtime.snapshot.effective_active
         )
 
     def desired_active(self, state: PeerApplicationState | None = None) -> bool:

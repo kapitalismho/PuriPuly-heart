@@ -12,6 +12,11 @@ from puripuly_heart.config.settings import AppSettings, STTProviderName
 from puripuly_heart.ui.overlay_peer_contract import build_overlay_peer_consumer_contract
 
 
+@dataclass(frozen=True)
+class RuntimeSnapshot:
+    effective_active: bool
+
+
 @dataclass
 class Runtime:
     retry_result: bool = False
@@ -24,6 +29,11 @@ class Runtime:
     close_calls: int = 0
     close_entered: asyncio.Event | None = None
     close_release: asyncio.Event | None = None
+    effective_active: bool = True
+
+    @property
+    def snapshot(self) -> RuntimeSnapshot:
+        return RuntimeSnapshot(effective_active=self.effective_active)
 
     async def apply_policy(
         self,
@@ -346,10 +356,12 @@ def _peer_surface_state(owner: PeerApplicationOwner, *, overlay_state: str) -> s
 
 
 @pytest.mark.asyncio
-async def test_peer_activation_starting_survives_overlay_connect_until_effective() -> None:
-    harness = Harness(overlay_state="off", provider_available=False)
+async def test_peer_activation_starting_survives_overlay_connect_until_capture_effective() -> None:
+    harness = Harness(overlay_state="off", provider_available=True)
     harness.settings.ui.peer_translation_eula_accepted = True
     owner = harness.owner()
+    runtime = Runtime(effective_active=False)
+    owner.bind_runtime(runtime)
 
     await owner.set_enabled(True)
 
@@ -364,7 +376,7 @@ async def test_peer_activation_starting_survives_overlay_connect_until_effective
     assert owner.snapshot().activation_starting is True
     assert _peer_surface_state(owner, overlay_state="connected") == "starting"
 
-    harness.provider_available = True
+    runtime.effective_active = True
     owner.sync_effective_flags()
 
     assert owner.snapshot().effective_enabled is True

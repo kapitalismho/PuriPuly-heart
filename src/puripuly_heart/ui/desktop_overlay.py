@@ -878,7 +878,12 @@ class FletDesktopRendererWindow:
         self._preview_option_buttons.clear()
         self._interaction_mode = _DESKTOP_INTERACTION_MODE_EDIT
         if self._app_task is None or self._app_task.done():
-            self._app_task = asyncio.create_task(self._app_runner(self._handle_page))
+            page_handler = (
+                self._handle_preview_page
+                if self._preview_catalog is not None
+                else self._handle_page
+            )
+            self._app_task = asyncio.create_task(self._app_runner(page_handler))
 
         ready_task = asyncio.create_task(self._page_ready.wait())
         try:
@@ -1065,13 +1070,28 @@ class FletDesktopRendererWindow:
             return
         logger.warning("[DesktopOverlay] Ignoring unsupported desktop runtime control: %r", command)
 
-    def _handle_page(self, page: Any) -> Awaitable[None] | None:
+    async def _handle_page(self, page: Any) -> None:
         if self._closed.is_set():
             self._page_ready.set()
-            return self._close_late_page(page)
+            await self._close_late_page(page)
+            return
         self._page = page
         try:
             self._bind_window_z_order_process()
+            self._configure_base_window(page)
+            self._render_page()
+        except Exception as exc:
+            self._page_start_error = exc
+            self._page_ready.set()
+            raise
+        await self._finish_hidden_window_startup()
+
+    def _handle_preview_page(self, page: Any) -> None:
+        if self._closed.is_set():
+            self._page_ready.set()
+            return
+        self._page = page
+        try:
             self._configure_base_window(page)
             self._render_page()
             self._page_ready.set()
@@ -1079,7 +1099,17 @@ class FletDesktopRendererWindow:
             self._page_start_error = exc
             self._page_ready.set()
             raise
-        return None
+
+    async def _finish_hidden_window_startup(self) -> None:
+        try:
+            await self._place_window_before_show()
+            if not self._closed.is_set():
+                self._show_configured_window()
+        except Exception as exc:
+            self._page_start_error = exc
+            raise
+        finally:
+            self._page_ready.set()
 
     async def _close_late_page(self, page: Any) -> None:
         window = page.window
@@ -1130,6 +1160,8 @@ class FletDesktopRendererWindow:
         window.resizable = False
         window.maximizable = False
         window.bgcolor = ft.Colors.TRANSPARENT
+        if self._preview_catalog is None:
+            window.visible = False
         window.ignore_mouse_events = (
             self._interaction_mode == _DESKTOP_INTERACTION_MODE_PASS_THROUGH
         )
@@ -1190,7 +1222,6 @@ class FletDesktopRendererWindow:
                 root = self._build_preview_root(ft, plan)
                 page.add(root)
                 self._apply_interaction_window_chrome()
-                self._reveal_window_if_supported()
             else:
                 self._apply_preview_surface(ft, plan)
             page.update()
@@ -1247,7 +1278,6 @@ class FletDesktopRendererWindow:
             )
             page.add(self._retained_caption_surface.root)
             self._apply_interaction_window_chrome()
-            self._reveal_window_if_supported()
         else:
             _apply_retained_desktop_caption_plan(
                 ft,
@@ -1265,15 +1295,56 @@ class FletDesktopRendererWindow:
         window = page.window
         window.ignore_mouse_events = locked
 
-    def _reveal_window_if_supported(self) -> None:
+    def _show_configured_window(self) -> None:
         page = self._page
         if page is None:
             return
         window = page.window
-        if hasattr(window, "visible"):
-            window.visible = True
-        if self._preview_catalog is None:
-            self._run_page_task(self._reveal_window_through_platform_port)
+        window.visible = True
+        page.update()
+        self._run_page_task(self._reveal_window_through_platform_port)
+
+    async def _place_window_before_show(self) -> None:
+        bounds = self._startup_window_bounds
+        if bounds is None:
+            self._emit_detailed_log("window_placement reason=startup_bounds_missing applied=False")
+            return
+        title = self._window_title()
+        try:
+            result = await self._window_z_order_port.place_window_before_show(
+                title,
+                x=int(round(float(bounds["x"]))),
+                y=int(round(float(bounds["y"]))),
+                width=int(round(float(bounds["width"]))),
+                height=int(round(float(bounds["height"]))),
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self._emit_detailed_log(
+                f"window_placement reason=port_error exception_type={type(exc).__name__}"
+            )
+            if self._window_z_order_required:
+                logger.warning(
+                    "[DesktopOverlay] Desktop overlay window placement failed: "
+                    "reason=port_error exception_type=%s",
+                    type(exc).__name__,
+                )
+            return
+        self._emit_detailed_log(
+            "window_placement "
+            f"reason={result.reason} applied={result.applied} "
+            f"title_confirmed={result.title_confirmed} "
+            f"bounds_confirmed={result.bounds_confirmed} "
+            f"win32_error={result.win32_error}"
+        )
+        if self._window_z_order_required and not result.applied:
+            logger.warning(
+                "[DesktopOverlay] Desktop overlay window placement failed: "
+                "reason=%s win32_error=%s",
+                result.reason,
+                result.win32_error,
+            )
 
     async def _reveal_window_through_platform_port(self) -> None:
         title = self._window_title()

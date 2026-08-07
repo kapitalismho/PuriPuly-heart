@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from puripuly_heart.ui import desktop_window_zorder
@@ -17,6 +19,8 @@ class FakeWin32WindowApi:
         visible: bool = False,
         hide_after_show: int = 0,
         show_result: tuple[bool, int | None] = (True, None),
+        bounds: tuple[int, int, int, int] = (0, 0, 800, 600),
+        placement_result: tuple[bool, int | None] = (True, None),
     ) -> None:
         self.windows = windows
         self.styles = list(styles)
@@ -27,10 +31,13 @@ class FakeWin32WindowApi:
         self.visible = visible
         self.hide_after_show = hide_after_show
         self.show_result = show_result
+        self.bounds = bounds
+        self.placement_result = placement_result
         self.window_queries: list[int] = []
         self.all_window_queries: list[int] = []
         self.title_queries: list[int] = []
         self.show_calls: list[int] = []
+        self.placement_calls: list[tuple[int, int, int, int, int]] = []
         self.set_calls: list[int] = []
         self.pid = 4321
 
@@ -49,6 +56,22 @@ class FakeWin32WindowApi:
     def window_title(self, hwnd: int) -> str:
         self.title_queries.append(hwnd)
         return self.titles.get(hwnd, "")
+
+    def window_bounds(self, hwnd: int) -> tuple[int, int, int, int] | None:
+        return self.bounds if hwnd in self.windows else None
+
+    def set_window_bounds_no_activate(
+        self,
+        hwnd: int,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> tuple[bool, int | None]:
+        self.placement_calls.append((hwnd, x, y, width, height))
+        if self.placement_result[0]:
+            self.bounds = (x, y, width, height)
+        return self.placement_result
 
     def show_window_no_activate(self, hwnd: int) -> tuple[bool, int | None]:
         self.show_calls.append(hwnd)
@@ -331,6 +354,127 @@ async def test_windows_zorder_port_close_discards_process_binding() -> None:
 
 
 @pytest.mark.asyncio
+async def test_windows_zorder_port_places_hidden_window_at_final_bounds_before_show() -> None:
+    api = FakeWin32WindowApi(
+        titles={101: "PuriPuly Overlay"},
+        visible=False,
+        bounds=(0, 0, 1344, 320),
+    )
+    port = desktop_window_zorder.WindowsWindowZOrderPort(
+        api=api,
+        placement_retain_s=0.0,
+    )
+    port.bind_process(4321)
+
+    result = await port.place_window_before_show(
+        "PuriPuly Overlay",
+        x=320,
+        y=720,
+        width=1344,
+        height=320,
+    )
+
+    assert result == desktop_window_zorder.WindowPlacementResult(
+        applied=True,
+        reason="applied",
+        hwnd=101,
+        title_confirmed=True,
+        bounds_confirmed=True,
+    )
+    assert api.placement_calls == [(101, 320, 720, 1344, 320)]
+    assert api.show_calls == []
+
+
+@pytest.mark.asyncio
+async def test_windows_zorder_port_reapplies_bounds_until_startup_placement_stops() -> None:
+    class AnimatedBoundsApi(FakeWin32WindowApi):
+        def __init__(self) -> None:
+            super().__init__(
+                titles={101: "PuriPuly Overlay"},
+                bounds=(0, 0, 1344, 320),
+            )
+            self.bounds_after_set = [
+                (120, 240, 900, 500),
+                (320, 720, 1344, 320),
+            ]
+
+        def window_bounds(self, hwnd: int) -> tuple[int, int, int, int] | None:
+            if self.placement_calls and self.bounds_after_set:
+                return self.bounds_after_set.pop(0)
+            return super().window_bounds(hwnd)
+
+    api = AnimatedBoundsApi()
+    port = desktop_window_zorder.WindowsWindowZOrderPort(
+        api=api,
+        placement_retain_s=0.0,
+    )
+    port.bind_process(4321)
+
+    result = await port.place_window_before_show(
+        "PuriPuly Overlay",
+        x=320,
+        y=720,
+        width=1344,
+        height=320,
+    )
+
+    assert result.applied is True
+    assert api.placement_calls == [
+        (101, 320, 720, 1344, 320),
+        (101, 320, 720, 1344, 320),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_windows_zorder_port_uses_flet_native_scale_for_final_bounds() -> None:
+    api = FakeWin32WindowApi(
+        titles={101: "PuriPuly Overlay"},
+        bounds=(0, 0, 1680, 400),
+    )
+    port = desktop_window_zorder.WindowsWindowZOrderPort(
+        api=api,
+        placement_retain_s=0.0,
+    )
+    port.bind_process(4321)
+
+    result = await port.place_window_before_show(
+        "PuriPuly Overlay",
+        x=320,
+        y=720,
+        width=1344,
+        height=320,
+    )
+
+    assert result.applied is True
+    assert api.placement_calls == [(101, 400, 900, 1680, 400)]
+
+
+@pytest.mark.asyncio
+async def test_windows_zorder_port_hidden_placement_has_a_bounded_deadline() -> None:
+    api = FakeWin32WindowApi(windows=())
+    port = desktop_window_zorder.WindowsWindowZOrderPort(
+        api=api,
+        timeout_s=0.02,
+        poll_interval_s=0.001,
+    )
+    port.bind_process(4321)
+
+    result = await asyncio.wait_for(
+        port.place_window_before_show(
+            "PuriPuly Overlay",
+            x=320,
+            y=720,
+            width=1344,
+            height=320,
+        ),
+        timeout=0.1,
+    )
+
+    assert result.applied is False
+    assert result.reason == "window_not_found"
+
+
+@pytest.mark.asyncio
 async def test_windows_zorder_port_reveals_hidden_overlay_window_by_title() -> None:
     api = FakeWin32WindowApi(titles={101: "PuriPuly Overlay"}, visible=False)
     port = desktop_window_zorder.WindowsWindowZOrderPort(
@@ -441,6 +585,17 @@ async def test_noop_zorder_port_is_immediate_and_unsupported() -> None:
     assert result.applied is False
     assert result.reason == "unsupported_platform"
 
+    placement = await port.place_window_before_show(
+        "PuriPuly Overlay",
+        x=320,
+        y=720,
+        width=1344,
+        height=320,
+    )
+
+    assert placement.applied is False
+    assert placement.reason == "unsupported_platform"
+
 
 def test_ctypes_win32_api_sets_topmost_without_moving_sizing_or_activating(
     monkeypatch: pytest.MonkeyPatch,
@@ -481,6 +636,40 @@ def test_ctypes_win32_api_sets_topmost_without_moving_sizing_or_activating(
     assert flags == (
         desktop_window_zorder._SWP_NOMOVE
         | desktop_window_zorder._SWP_NOSIZE
+        | desktop_window_zorder._SWP_NOACTIVATE
+        | desktop_window_zorder._SWP_ASYNCWINDOWPOS
+    )
+
+
+def test_ctypes_win32_api_places_window_without_reordering_or_activating(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[object, ...]] = []
+
+    class FakeUser32:
+        def SetWindowPos(self, *args: object) -> int:
+            calls.append(args)
+            return 1
+
+    api = object.__new__(desktop_window_zorder._CtypesWin32WindowApi)
+    api._user32 = FakeUser32()
+    monkeypatch.setattr(
+        desktop_window_zorder.ctypes,
+        "set_last_error",
+        lambda _value: None,
+        raising=False,
+    )
+
+    result = api.set_window_bounds_no_activate(101, 320, 720, 1344, 320)
+
+    assert result == (True, None)
+    assert len(calls) == 1
+    hwnd, insert_after, x, y, width, height, flags = calls[0]
+    assert hwnd == 101
+    assert insert_after.value is None
+    assert (x, y, width, height) == (320, 720, 1344, 320)
+    assert flags == (
+        desktop_window_zorder._SWP_NOZORDER
         | desktop_window_zorder._SWP_NOACTIVATE
         | desktop_window_zorder._SWP_ASYNCWINDOWPOS
     )

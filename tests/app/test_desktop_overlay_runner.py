@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import subprocess
@@ -102,6 +103,35 @@ def test_desktop_runner_command_does_not_resolve_native_overlay_or_openvr_checks
     assert "PuriPulyHeartOverlay.exe" not in " ".join(
         runner.build_command(tmp_path / "overlay-manifest.json")
     )
+
+
+@pytest.mark.asyncio
+async def test_desktop_runner_uses_background_priority_on_windows(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_spawn(*command: str, **kwargs: object) -> object:
+        captured["command"] = command
+        captured.update(kwargs)
+        return type("FakeProcess", (), {"stdout": None, "stderr": None})()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
+    runner = process_module.DesktopFletOverlayRunner(
+        frozen=False,
+        python_executable=tmp_path / "python.exe",
+    )
+
+    await runner.spawn(tmp_path / "python.exe", tmp_path / "overlay-manifest.json")
+
+    if os.name == "nt":
+        creationflags = captured["creationflags"]
+        assert isinstance(creationflags, int)
+        assert creationflags & subprocess.CREATE_NO_WINDOW
+        assert creationflags & subprocess.BELOW_NORMAL_PRIORITY_CLASS
+    else:
+        assert "creationflags" not in captured
 
 
 def test_overlay_manifest_serialization_omits_target_and_desktop_runtime_fields() -> None:

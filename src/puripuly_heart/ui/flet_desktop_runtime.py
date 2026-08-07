@@ -48,14 +48,12 @@ async def open_hidden_view(
 
     require_flet_desktop_hooks(flet_desktop)
     locate_view = getattr(flet_desktop, "__locate_and_unpack_flet_view")
-    args, flet_env, pid_file = locate_view(page_url, assets_dir, hidden and os.name != "nt")
+    args, flet_env, pid_file = locate_view(page_url, assets_dir, hidden)
     kwargs: dict[str, object] = {"env": flet_env}
     if os.name == "nt":
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = subprocess.SW_HIDE
-        kwargs["startupinfo"] = startupinfo
-        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        kwargs["creationflags"] = (
+            subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
+        )
 
     return (
         await asyncio.create_subprocess_exec(args[0], *args[1:], **kwargs),
