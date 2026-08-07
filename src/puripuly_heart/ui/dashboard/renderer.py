@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_background_glow_stack
 from puripuly_heart.ui.dashboard.contract import (
     DashboardSurfaceRegions,
     DashboardSurfaceSlots,
@@ -73,7 +72,7 @@ def compose_dashboard_surface(slots: DashboardSurfaceSlots) -> DashboardSurfaceR
         expand=True,
     )
     return DashboardSurfaceRegions(
-        root=create_background_glow_stack(shell_content),
+        root=shell_content,
         shell_content=shell_content,
         main_surface=main_surface,
         control_region=control_region,

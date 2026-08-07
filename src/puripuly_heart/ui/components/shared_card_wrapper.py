@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import GLOW_CARD, create_glow_stack
 from puripuly_heart.ui.theme import COLOR_SURFACE, get_card_shadow
 
 
@@ -19,15 +18,14 @@ class SharedCardWrapper(ft.Container):
     ) -> None:
         resolved_expand = height is not None if expand is None else expand
         resolved_height = self.DEFAULT_HEIGHT if resolved_expand and height is None else height
-        content_with_glow = create_glow_stack(
-            ft.Container(content=content, expand=resolved_expand, padding=padding),
-            config=GLOW_CARD,
+        content_container = ft.Container(
+            content=content,
+            expand=resolved_expand,
+            padding=padding,
         )
-        content_with_glow.expand = resolved_expand
-        content_with_glow.controls[1].expand = resolved_expand
 
         super().__init__(
-            content=content_with_glow,
+            content=content_container,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
             border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),

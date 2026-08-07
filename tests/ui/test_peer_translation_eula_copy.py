@@ -90,7 +90,6 @@ def test_peer_translation_eula_dialog_renders_single_full_body_key(
             return dialog
 
     monkeypatch.setattr(dialog_module, "t", fake_t)
-    monkeypatch.setattr(dialog_module, "create_glow_stack", lambda content: content)
 
     page = FakePage()
     PeerTranslationEulaDialog(page, on_accept=lambda: None).open()

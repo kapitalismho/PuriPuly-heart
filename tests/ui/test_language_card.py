@@ -75,12 +75,9 @@ def test_language_card_rows_use_top_left_caption_with_centered_pair_layout(
 def test_language_card_uses_more_air_between_self_and_peer_rows() -> None:
     card = _build_language_card()
 
-    assert isinstance(card.content, ft.Stack)
-    content_wrapper = card.content.controls[1]
-    assert isinstance(content_wrapper, ft.Container)
-    inner_container = content_wrapper.content
-    assert isinstance(inner_container, ft.Container)
-    rows_column = inner_container.content
+    content_container = card.content
+    assert isinstance(content_container, ft.Container)
+    rows_column = content_container.content
     assert isinstance(rows_column, ft.Column)
     assert rows_column.spacing == 20
 

@@ -4,7 +4,6 @@ import pytest
 
 ft = pytest.importorskip("flet")
 
-from puripuly_heart.ui.components import power_button as power_button_module
 from puripuly_heart.ui.components.power_button import PowerButton
 from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
@@ -19,7 +18,6 @@ def test_power_button_set_state_transitions_and_renders_icon_and_label_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clicked = {"count": 0}
-    monkeypatch.setattr(power_button_module, "create_glow_stack", lambda content: content)
     btn = PowerButton(
         label="STT", icon="MIC", on_click=lambda: clicked.__setitem__("count", clicked["count"] + 1)
     )

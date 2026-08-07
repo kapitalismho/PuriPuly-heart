@@ -64,7 +64,6 @@ def test_about_view_uses_shared_card_wrapper_defaults(monkeypatch: pytest.Monkey
     assert all(card.height is None for card in full_width_cards)
     assert all(card.expand is False for card in full_width_cards)
     assert all(card.content.expand is False for card in full_width_cards)
-    assert all(card.content.controls[1].expand is False for card in full_width_cards)
 
 
 def test_about_view_link_actions_handle_missing_page_gracefully(

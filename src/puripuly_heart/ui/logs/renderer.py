@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import GLOW_CARD, create_glow_stack
 from puripuly_heart.ui.logs.contract import LogsSurfaceRegions, LogsSurfaceSlots
 from puripuly_heart.ui.theme import COLOR_SURFACE, get_card_shadow
 
@@ -47,10 +46,7 @@ def compose_logs_surface(slots: LogsSurfaceSlots) -> LogsSurfaceRegions:
     )
 
     card = ft.Container(
-        content=create_glow_stack(
-            ft.Container(content=card_content, expand=True),
-            config=GLOW_CARD,
-        ),
+        content=ft.Container(content=card_content, expand=True),
         bgcolor=COLOR_SURFACE,
         border_radius=LOGS_CARD_BORDER_RADIUS,
         border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),

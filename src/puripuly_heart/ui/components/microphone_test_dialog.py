@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.flet_runtime import is_control_mounted
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import get_locale, t
@@ -148,7 +147,7 @@ class MicrophoneTestDialog:
 
         return ft.AlertDialog(
             modal=False,
-            content=create_glow_stack(modal_content),
+            content=modal_content,
             content_padding=0,
             bgcolor=ft.Colors.TRANSPARENT,
             semantics_label=t("settings.microphone_test"),

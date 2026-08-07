@@ -11,7 +11,6 @@ from typing import Callable, Sequence
 import flet as ft
 
 from puripuly_heart.app.ports.ui_models import OptionItem
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
@@ -109,7 +108,7 @@ class SettingsModal:
         # Transparent AlertDialog
         self._dialog = ft.AlertDialog(
             modal=False,
-            content=create_glow_stack(modal_content),
+            content=modal_content,
             content_padding=0,
             bgcolor=ft.Colors.TRANSPARENT,
         )

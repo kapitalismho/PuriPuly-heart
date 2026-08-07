@@ -2,7 +2,6 @@ from typing import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
 from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL_DARK,
@@ -190,21 +189,19 @@ class LanguageCard(ft.Container):
             on_swap_click=on_peer_swap_click,
         )
 
-        content_with_glow = create_glow_stack(
-            ft.Container(
-                content=ft.Column(
-                    [self._self_row, self._peer_row],
-                    spacing=20,
-                    alignment=ft.MainAxisAlignment.CENTER,
-                ),
-                expand=True,
-                alignment=ft.Alignment.CENTER,
-                padding=16,
-            )
+        content_container = ft.Container(
+            content=ft.Column(
+                [self._self_row, self._peer_row],
+                spacing=20,
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            expand=True,
+            alignment=ft.Alignment.CENTER,
+            padding=16,
         )
 
         super().__init__(
-            content=content_with_glow,
+            content=content_container,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
             border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),

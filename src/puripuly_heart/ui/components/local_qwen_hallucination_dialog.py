@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.components.warm_document_dialog import (
     WarmDocumentDialogResult,
     open_warm_document_dialog,
@@ -40,7 +39,6 @@ class LocalQwenHallucinationDialog:
             primary_action=self._on_open_guide,
             secondary_label=t("local_qwen_hallucination.close"),
             secondary_action=self._on_close,
-            glow_factory=create_glow_stack,
         )
         self._dialog = result.dialog
         self._dialog_result = result

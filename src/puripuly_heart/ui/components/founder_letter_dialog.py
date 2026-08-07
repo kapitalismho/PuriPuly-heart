@@ -4,7 +4,6 @@ from typing import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.components.warm_document_dialog import open_warm_document_dialog
 from puripuly_heart.ui.i18n import t
 
@@ -45,7 +44,6 @@ class FounderLetterDialog:
             primary_label=t("openrouter.handoff.readme"),
             primary_action=self._on_readme,
             secondary_label=t("openrouter.handoff.close"),
-            glow_factory=create_glow_stack,
         )
         self._dialog = result.dialog
         self._acknowledge_button = result.primary_button

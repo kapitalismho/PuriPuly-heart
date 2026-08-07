@@ -10,6 +10,8 @@ import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
+
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.settings import (
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
@@ -35,7 +37,6 @@ from puripuly_heart.config.settings import (
     TranslationSettings,
     to_dict,
 )
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.components import subtab_shell as subtab_shell_module
 from puripuly_heart.ui.components.bottom_nav import BottomNavBar
@@ -329,7 +330,7 @@ def _overlay_tab_cards(view: settings_view.SettingsView) -> list[ft.Control]:
 
 
 def _wrapped_card_column(card: ft.Control) -> ft.Control:
-    content = card.content.controls[1].content.content
+    content = card.content.content
     if isinstance(content, ft.Stack):
         for control in content.controls:
             if isinstance(control, ft.TransparentPointer):
@@ -338,7 +339,7 @@ def _wrapped_card_column(card: ft.Control) -> ft.Control:
 
 
 def _wrapped_card_stack(card: ft.Control) -> ft.Stack:
-    content = card.content.controls[1].content.content
+    content = card.content.content
     assert isinstance(content, ft.Stack)
     return content
 
@@ -6316,7 +6317,7 @@ def test_translation_card_no_longer_contains_translation_connection_row(
     view, _ = _make_settings_view(monkeypatch)
 
     translation_card = _api_tab_card(view, t("settings.section.translation"))
-    translation_column = translation_card.content.controls[1].content.content
+    translation_column = translation_card.content.content
 
     assert view._translation_connection_row not in translation_column.controls
 

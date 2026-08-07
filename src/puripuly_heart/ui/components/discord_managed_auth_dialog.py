@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.components.warm_document_dialog import (
     BODY_TEXT_SIZE,
     WarmDocumentDialogAction,
@@ -109,7 +108,6 @@ class DiscordManagedAuthDialog:
                     close_before_action=False,
                 ),
             ],
-            glow_factory=create_glow_stack,
         )
         self._dialog = self._dialog_result.dialog
         self._body_text = self._dialog_result.body_text

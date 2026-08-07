@@ -51,7 +51,6 @@ def _open_founder_letter(monkeypatch: pytest.MonkeyPatch) -> tuple[FakePage, lis
         return f"value:{key}"
 
     monkeypatch.setattr(founder_module, "t", fake_t)
-    monkeypatch.setattr(founder_module, "create_glow_stack", lambda content: content)
 
     page = FakePage()
     FounderLetterDialog(
@@ -70,7 +69,6 @@ def _open_eula(monkeypatch: pytest.MonkeyPatch) -> tuple[FakePage, list[str]]:
         return f"value:{key}"
 
     monkeypatch.setattr(eula_module, "t", fake_t)
-    monkeypatch.setattr(eula_module, "create_glow_stack", lambda content: content)
 
     page = FakePage()
     PeerTranslationEulaDialog(page, on_accept=lambda: None).open()
@@ -220,7 +218,6 @@ def test_warm_document_dialog_supports_three_ordered_actions_with_close_policy()
                 close_before_action=False,
             ),
         ],
-        glow_factory=lambda content: content,
     )
 
     action_row = _content_column(page).controls[-1]
@@ -263,7 +260,6 @@ def test_warm_document_dialog_supports_content_only_text_button_api(
         page,
         body_paragraphs=["Body copy"],
         actions=[WarmDocumentDialogAction(label="Close")],
-        glow_factory=lambda content: content,
     )
 
     assert result.initial_action_buttons[0].content == "Close"
@@ -280,7 +276,6 @@ def test_warm_document_dialog_can_replace_actions_with_shared_style() -> None:
             WarmDocumentDialogAction(label="Left", on_select=lambda: events.append("left")),
             WarmDocumentDialogAction(label="Right", on_select=lambda: events.append("right")),
         ],
-        glow_factory=lambda content: content,
     )
 
     replacement_buttons = result.set_actions(

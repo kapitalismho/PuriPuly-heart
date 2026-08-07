@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
     COLOR_NEUTRAL_DARK,
@@ -91,7 +90,6 @@ def open_warm_document_dialog(
     secondary_label: str | None = None,
     secondary_action: Callable[[], None] | None = None,
     actions: Sequence[WarmDocumentDialogAction] | None = None,
-    glow_factory: Callable[[ft.Control], ft.Control] = create_glow_stack,
 ) -> WarmDocumentDialogResult:
     dialog: ft.AlertDialog | None = None
 
@@ -208,7 +206,7 @@ def open_warm_document_dialog(
 
     dialog = ft.AlertDialog(
         modal=True,
-        content=glow_factory(modal_content),
+        content=modal_content,
         content_padding=0,
         bgcolor=ft.Colors.TRANSPARENT,
     )

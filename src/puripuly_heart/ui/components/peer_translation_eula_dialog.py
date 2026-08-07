@@ -4,7 +4,6 @@ from typing import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.components.warm_document_dialog import (
     open_warm_document_dialog,
     split_body_paragraphs,
@@ -33,6 +32,5 @@ class PeerTranslationEulaDialog:
             primary_action=self._on_accept,
             secondary_label=t("peer_translation_eula.cancel"),
             secondary_action=self._on_cancel,
-            glow_factory=create_glow_stack,
         )
         self._dialog = result.dialog

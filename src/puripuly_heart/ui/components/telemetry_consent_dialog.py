@@ -4,7 +4,6 @@ from typing import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.components.warm_document_dialog import (
     WarmDocumentDialogResult,
     open_warm_document_dialog,
@@ -34,7 +33,6 @@ class TelemetryConsentDialog:
             primary_action=self._on_allow,
             secondary_label=t("telemetry.consent.decline"),
             secondary_action=self._on_decline,
-            glow_factory=create_glow_stack,
         )
         self._dialog = result.dialog
         self._dialog_result = result

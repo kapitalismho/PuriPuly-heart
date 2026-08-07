@@ -2,7 +2,6 @@
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import GLOW_CARD, create_glow_stack
 from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
@@ -41,18 +40,14 @@ class SettingsSection(ft.Container):
             spacing=0,
         )
 
-        # Wrap content in glow stack (About page pattern)
-        content_with_glow = create_glow_stack(
-            ft.Container(
-                content=inner_content,
-                expand=True,
-                padding=24,
-            ),
-            config=GLOW_CARD,
+        content_container = ft.Container(
+            content=inner_content,
+            expand=True,
+            padding=24,
         )
 
         super().__init__(
-            content=content_with_glow,
+            content=content_container,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
             border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),

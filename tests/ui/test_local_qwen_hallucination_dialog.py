@@ -18,7 +18,6 @@ from puripuly_heart.ui.theme import (  # noqa: E402
     COLOR_PRIMARY,
 )
 
-
 LOCAL_QWEN_GUIDANCE_KEYS = {
     "local_qwen_hallucination.body",
     "local_qwen_hallucination.open_guide",
@@ -62,16 +61,8 @@ def _dialog_module():
         pytest.fail(f"production Local Qwen guidance dialog module is missing: {exc}")
 
 
-def _unwrap_glow_content(dialog: ft.AlertDialog):
-    stack = dialog.content
-    assert stack.__class__.__name__ == "Stack"
-    assert len(stack.controls) == 2
-    foreground = stack.controls[1]
-    return foreground.content
-
-
 def _content_column(dialog: ft.AlertDialog):
-    return _unwrap_glow_content(dialog).content
+    return dialog.content.content
 
 
 def _body_column(dialog: ft.AlertDialog):
@@ -141,7 +132,6 @@ def test_local_qwen_guidance_dialog_delegates_to_warm_document_family(
         "__func__",
         None,
     )
-    assert captured["glow_factory"] is dialog_module.create_glow_stack
     assert requested_keys == [
         "local_qwen_hallucination.body",
         "local_qwen_hallucination.open_guide",
@@ -180,7 +170,7 @@ def test_local_qwen_guidance_dialog_renders_large_readable_two_action_modal(
     assert getattr(opened_dialog, "title", None) is None
     assert getattr(opened_dialog, "actions", None) in (None, [])
 
-    modal_content = _unwrap_glow_content(opened_dialog)
+    modal_content = opened_dialog.content
     assert modal_content.width == 720
     assert modal_content.height is None
 

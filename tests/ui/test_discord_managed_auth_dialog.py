@@ -109,7 +109,6 @@ def test_discord_managed_auth_dialog_uses_warm_document_layout(
         return f"value:{key}"
 
     monkeypatch.setattr(discord_module, "t", fake_t)
-    monkeypatch.setattr(discord_module, "create_glow_stack", lambda content: content)
 
     page = DummyPage()
     dialog = DiscordManagedAuthDialog(
@@ -225,7 +224,6 @@ def test_discord_managed_auth_dialog_scales_referral_id_field_content() -> None:
 def test_discord_managed_auth_dialog_referral_field_is_present_before_page_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(discord_module, "create_glow_stack", lambda content: content)
     page = SnapshotOpenPage()
     dialog = _dialog(page)
 

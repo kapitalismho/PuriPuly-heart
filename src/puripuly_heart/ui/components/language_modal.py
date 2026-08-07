@@ -9,7 +9,6 @@ from typing import Callable, Sequence
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.i18n import language_name, t
 from puripuly_heart.ui.theme import (
@@ -110,7 +109,6 @@ class LanguageModal:
 
         content_controls.append(lang_list)
 
-        # Apply glow effect and shadows
         modal_content = ft.Container(
             content=ft.Column(
                 content_controls,
@@ -125,10 +123,10 @@ class LanguageModal:
             shadow=get_card_shadow(),
         )
 
-        # Transparent AlertDialog, content handles the background/shadow/glow
+        # Transparent AlertDialog, content handles the background/shadow
         self._dialog = ft.AlertDialog(
             modal=False,
-            content=create_glow_stack(modal_content),
+            content=modal_content,
             content_padding=0,
             bgcolor=ft.Colors.TRANSPARENT,
         )

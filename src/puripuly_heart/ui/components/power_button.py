@@ -2,7 +2,6 @@ from typing import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
@@ -56,30 +55,21 @@ class PowerButton(ft.Container):
             color=COLOR_SECONDARY,
         )
 
-        # Wrap content in glow stack
-        # Valid even for PowerButton: The background color sits on the Container (self),
-        # and the stack (with transparent glow orb) sits on top of it.
-        # This creates the "Multi-layer" effect where glow overlays the button color.
-        #
-        # layout fix: Wrap column in a container with center alignment so the text stays centered
-        # while the stack expands to fill the button (pushing glow to the corner).
-        content_with_glow = create_glow_stack(
-            ft.Container(
-                content=ft.Column(
-                    [
-                        self._icon_slot,
-                        self._label_control,
-                    ],
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=10,
-                ),
-                alignment=ft.Alignment.CENTER,
-            )
+        content_container = ft.Container(
+            content=ft.Column(
+                [
+                    self._icon_slot,
+                    self._label_control,
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=10,
+            ),
+            alignment=ft.Alignment.CENTER,
         )
 
         super().__init__(
-            content=content_with_glow,
+            content=content_container,
             bgcolor=COLOR_TRANS_TONAL,
             border_radius=16,
             expand=True,

@@ -158,7 +158,7 @@ def test_foundation_card_reuses_accepted_shared_card_geometry() -> None:
     assert foundation.shadow == accepted.shadow
     assert foundation.clip_behavior == accepted.clip_behavior
     assert foundation.width == 400
-    assert foundation.content.controls[1].content.padding == 24
+    assert foundation.content.padding == 24
 
 
 def test_foundation_adapter_consumes_only_application_and_presentation_ports() -> None:
@@ -280,7 +280,7 @@ def test_foundation_preview_surface_is_deterministic_and_static() -> None:
 
     assert first.copy == second.copy
     assert first.preview_card.bgcolor == COLOR_SURFACE
-    row = first.preview_card.content.controls[1].content.content.controls[2]
+    row = first.preview_card.content.content.controls[2]
     assert row.controls[0].content.value == "Ready"
     assert row.controls[1].content == "Sample action"
     assert row.controls[2].content == "Unavailable"

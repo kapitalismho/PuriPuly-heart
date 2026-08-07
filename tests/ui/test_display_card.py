@@ -247,8 +247,7 @@ def test_display_card_primary_and_secondary_wrap_to_two_lines() -> None:
 def test_display_card_input_footer_stays_outside_expanding_display_region() -> None:
     card = DisplayCard(on_submit=lambda _text: None)
 
-    glow_stack = card.content
-    padded_content_layer = glow_stack.controls[1].content
+    padded_content_layer = card.content
     main_content = padded_content_layer.content
     display_region, input_footer = main_content.controls
     divider_container = input_footer.controls[0]

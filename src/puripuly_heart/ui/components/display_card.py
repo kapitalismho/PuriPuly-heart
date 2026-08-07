@@ -4,7 +4,6 @@ from typing import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.components.glow import create_glow_stack
 from puripuly_heart.ui.flet_runtime import (
     is_control_mounted,
     run_control_method,
@@ -191,14 +190,11 @@ class DisplayCard(ft.Container):
             spacing=8,
         )
 
-        # Use the reusable glow stack wrapper
         # The content container handles the internal padding (32)
-        content_with_glow = create_glow_stack(
-            ft.Container(content=main_content, expand=True, padding=32)
-        )
+        content_container = ft.Container(content=main_content, expand=True, padding=32)
 
         super().__init__(
-            content=content_with_glow,
+            content=content_container,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
             border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
