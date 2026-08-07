@@ -3796,6 +3796,9 @@ class SettingsView(ft.Column):
             self._api_keys_column.update()
             self._translation_connection_row.update()
 
+        if self.on_providers_changed is not None:
+            self.on_providers_changed()
+
     def _on_ui_click(self, e) -> None:
         """Open UI language selection modal."""
         if not is_control_mounted(self):

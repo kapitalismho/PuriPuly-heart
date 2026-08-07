@@ -3062,6 +3062,33 @@ def test_on_openrouter_fallback_selected_updates_draft_and_helper_copy(
     assert view._openrouter_fallback_helper_text.value == t("settings.fallback.active_helper")
 
 
+def test_on_openrouter_fallback_selected_requests_immediate_provider_apply(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings()
+    applied: list[AppSettings] = []
+
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    def apply_provider_changes() -> None:
+        pending = view.consume_provider_apply_settings()
+        assert pending is not None
+        applied.append(pending)
+
+    view.on_providers_changed = apply_provider_changes
+
+    view._on_openrouter_fallback_selected("openrouter_deepseek_v4_flash")
+
+    assert len(applied) == 1
+    assert applied[0].translation.fallback == TranslationFallbackSettings(
+        enabled=True,
+        model=TranslationModel.DEEPSEEK_V4_FLASH,
+        connection=TranslationConnection.OPENROUTER,
+    )
+    assert view.has_provider_changes is False
+
+
 def test_on_openrouter_fallback_selected_defaults_invalid_value_to_deepseek(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
