@@ -235,6 +235,8 @@ class PeerApplicationOwner:
     def sync_effective_flags(self, state: PeerApplicationState | None = None) -> None:
         current = state or self.state_provider()
         enabled = self.effective_enabled(current)
+        if enabled:
+            self._activation_starting = False
         self.effective_sink(enabled, enabled)
 
     def record_settings(
@@ -341,7 +343,6 @@ class PeerApplicationOwner:
         if generation != self._activation_generation:
             return
         self.sync_effective_flags()
-        self._activation_starting = False
         if enabled:
             self.disclosure_sink()
         self.presentation_changed()
@@ -351,6 +352,10 @@ class PeerApplicationOwner:
             self.peer_intent_sink(False)
         self._last_intent_enabled = False
         self._last_activation_requested = False
+        self._activation_starting = False
+
+    def cancel_activation_starting(self) -> None:
+        self._activation_starting = False
 
     def invalidate_activation(self) -> None:
         self._activation_generation += 1
@@ -512,6 +517,7 @@ class PeerApplicationOwner:
             )
         if diagnostic.capture_kind == "process":
             self._process_warning_reason = self.warning_reason_for_diagnostic(diagnostic)
+            self._activation_starting = False
             self.presentation_changed()
 
     @staticmethod

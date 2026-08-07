@@ -518,6 +518,7 @@ def compose_application_runtime(
                 peer_snapshot_provider=lambda: require_peer().owner.snapshot(),
                 disable_peer_intent=lambda: require_peer().owner.disable_for_overlay(),
                 sync_peer_effective=lambda: require_peer().owner.sync_effective_flags(),
+                cancel_peer_activation=(lambda: require_peer().owner.cancel_activation_starting()),
                 refresh_peer_dependencies=refresh_overlay_runtime_dependencies,
                 presentation_sink=presentation.refresh_overlay_peer_contract,
                 state_sink=report_overlay_state,

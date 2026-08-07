@@ -131,6 +131,7 @@ class OverlayApplicationOwner:
     peer_snapshot_provider: OverlayPeerSnapshotProvider = field(repr=False)
     disable_peer_intent: OverlayEffect = field(repr=False)
     sync_peer_effective: OverlayEffect = field(repr=False)
+    cancel_peer_activation: OverlayEffect = field(repr=False)
     refresh_peer_dependencies: OverlayAsyncEffect = field(repr=False)
     presentation_sink: OverlayPresentationSink = field(repr=False)
     state_sink: OverlayStateSink = field(repr=False)
@@ -775,6 +776,8 @@ class OverlayApplicationOwner:
         self._state = next_state
         self._log_state_transition(previous, next_state)
         self.sync_peer_effective()
+        if next_state not in {"starting", "connected"}:
+            self.cancel_peer_activation()
 
     def _notify_state(self) -> None:
         self.state_sink(self._state, self._failure_reason)

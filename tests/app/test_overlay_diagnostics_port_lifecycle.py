@@ -4,11 +4,11 @@ import asyncio
 from typing import cast
 
 import pytest
-
 from puripuly_heart.app.services.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
+
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.resolved import ResolvedOverlayConfig
 from puripuly_heart.core.clock import FakeClock
@@ -146,6 +146,7 @@ def make_application(
         peer_snapshot_provider=lambda: cast(object, object()),
         disable_peer_intent=lambda: None,
         sync_peer_effective=lambda: None,
+        cancel_peer_activation=lambda: None,
         refresh_peer_dependencies=_noop_async,
         presentation_sink=lambda _state: None,
         state_sink=lambda _state, _reason: None,

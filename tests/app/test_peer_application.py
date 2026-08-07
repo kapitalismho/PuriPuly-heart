@@ -9,6 +9,7 @@ from puripuly_heart.app.services.peer_application import (
 )
 from puripuly_heart.app.wiring import build_peer_capture_session_config
 from puripuly_heart.config.settings import AppSettings, STTProviderName
+from puripuly_heart.ui.overlay_peer_contract import build_overlay_peer_consumer_contract
 
 
 @dataclass
@@ -327,3 +328,101 @@ async def test_peer_owner_applies_runtime_policy_and_retains_failed_close_debt()
     with pytest.raises(RuntimeError, match="close failed"):
         await owner.close()
     assert owner.runtime is runtime
+
+
+def _peer_surface_state(owner: PeerApplicationOwner, *, overlay_state: str) -> str:
+    snapshot = owner.snapshot()
+    state = owner.state_provider()
+    contract = build_overlay_peer_consumer_contract(
+        overlay_intent_enabled=True,
+        overlay_state=overlay_state,
+        overlay_failure_reason=None,
+        peer_intent_enabled=state.peer_intent_enabled,
+        peer_effective_enabled=snapshot.effective_enabled,
+        peer_warning_reason=snapshot.process_warning_reason,
+        peer_activation_starting=snapshot.activation_starting or snapshot.model_loading,
+    )
+    return contract.peer.state
+
+
+@pytest.mark.asyncio
+async def test_peer_activation_starting_survives_overlay_connect_until_effective() -> None:
+    harness = Harness(overlay_state="off", provider_available=False)
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+
+    await owner.set_enabled(True)
+
+    assert "overlay_start" in harness.events
+    assert owner.snapshot().activation_starting is True
+    assert _peer_surface_state(owner, overlay_state="starting") == "starting"
+
+    harness.overlay_state = "connected"
+    owner.sync_effective_flags()
+
+    assert owner.snapshot().effective_enabled is False
+    assert owner.snapshot().activation_starting is True
+    assert _peer_surface_state(owner, overlay_state="connected") == "starting"
+
+    harness.provider_available = True
+    owner.sync_effective_flags()
+
+    assert owner.snapshot().effective_enabled is True
+    assert owner.snapshot().activation_starting is False
+    assert _peer_surface_state(owner, overlay_state="connected") == "on"
+
+
+@pytest.mark.asyncio
+async def test_peer_activation_starting_cleared_by_terminal_overlay_or_process_warning() -> None:
+    harness = Harness(overlay_state="off", provider_available=False)
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+    await owner.set_enabled(True)
+    assert owner.snapshot().activation_starting is True
+
+    owner.cancel_activation_starting()
+    assert owner.snapshot().activation_starting is False
+    assert _peer_surface_state(owner, overlay_state="failed") == "warning"
+
+    await owner.set_enabled(True)
+    assert owner.snapshot().activation_starting is True
+
+    diagnostic = _process_diagnostic()
+    owner.on_runtime_diagnostic(diagnostic)
+
+    assert owner.snapshot().activation_starting is False
+    assert owner.process_warning_reason is not None
+    assert _peer_surface_state(owner, overlay_state="connected") == "warning"
+
+
+@pytest.mark.asyncio
+async def test_peer_disable_intent_clears_activation_starting() -> None:
+    harness = Harness(overlay_state="off", provider_available=False)
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+    await owner.set_enabled(True)
+    assert owner.snapshot().activation_starting is True
+
+    owner.disable_for_overlay()
+
+    assert owner.snapshot().activation_starting is False
+    assert _peer_surface_state(owner, overlay_state="off") == "off"
+
+
+def _process_diagnostic():
+    from puripuly_heart.core.peer_capture import (
+        PeerCaptureDiagnostic,
+        PeerCaptureDiagnosticEvent,
+        PeerCaptureFailureReason,
+        PeerCaptureSessionState,
+    )
+
+    return PeerCaptureDiagnostic(
+        event=PeerCaptureDiagnosticEvent.FAILURE,
+        generation=1,
+        state=PeerCaptureSessionState.FAULTED,
+        provider_id="local_cpu_auto",
+        capture_kind="process",
+        reason=PeerCaptureFailureReason.PROCESS_TARGET_UNAVAILABLE,
+        detail="no_process",
+    )
