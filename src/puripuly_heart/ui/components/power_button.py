@@ -2,15 +2,16 @@ from typing import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.flet_runtime import update_control_if_mounted
+from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
 from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SURFACE,
     COLOR_TRANS_TONAL,
     COLOR_WARNING,
-    get_card_shadow,
 )
+
+_HOVER_SCALE = 1.02
 
 
 class PowerButton(ft.Container):
@@ -75,8 +76,10 @@ class PowerButton(ft.Container):
             expand=True,
             # alignment=ft.alignment.center,  <-- REMOVED: This was crushing the stack
             on_click=lambda _: self._on_click(),
+            on_hover=self._on_hover,
             animate=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
-            shadow=get_card_shadow(),
+            animate_scale=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+            scale=1.0,
         )
 
     def set_state(
@@ -98,25 +101,28 @@ class PowerButton(ft.Container):
 
         if needs_key:
             self.bgcolor = COLOR_WARNING
-            self.border = None
             self._icon_control.color = ft.Colors.WHITE
             self._label_control.color = ft.Colors.WHITE
         elif is_starting:
             self.bgcolor = COLOR_SURFACE
-            self.border = None
             self._icon_control.color = COLOR_SECONDARY
             self._label_control.color = COLOR_PRIMARY
         elif is_on:
             self.bgcolor = self._color_on
-            self.border = None
             self._icon_control.color = ft.Colors.WHITE
             self._label_control.color = ft.Colors.WHITE
         else:
             self.bgcolor = COLOR_TRANS_TONAL
-            self.border = None
             self._icon_control.color = COLOR_SECONDARY
             self._label_control.color = COLOR_SECONDARY
 
+        self.border = None
+
+        update_control_if_mounted(self)
+
+    def _on_hover(self, event: ft.ControlEvent) -> None:
+        """Lift the button while the pointer is over it."""
+        self.scale = _HOVER_SCALE if (is_hover_active(event) and not self._is_starting) else 1.0
         update_control_if_mounted(self)
 
     def set_label(self, label: str) -> None:
