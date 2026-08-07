@@ -1,0 +1,32 @@
+{
+  "ls_dev": {
+    "disjointness_problems": [],
+    "global_actor_disjointness": [],
+    "manifest_canonical_bytes_ok": true,
+    "manifest_canonical_file_sha256": "e468d6078a82ea2d2d781573bb73bca74f4413ce31f3ac318a75b06acae9fde6",
+    "manifest_id": "ls_dev",
+    "manifest_semantic_hash": "e468d6078a82ea2d2d781573bb73bca74f4413ce31f3ac318a75b06acae9fde6",
+    "problems": [],
+    "valid": true
+  },
+  "ls_held_out_clean": {
+    "disjointness_problems": [],
+    "global_actor_disjointness": [],
+    "manifest_canonical_bytes_ok": true,
+    "manifest_canonical_file_sha256": "51e327dc4543516a4b7c3c256e55d323e68831dc7e34bf8f4b822cc656033701",
+    "manifest_id": "ls_held_out_clean",
+    "manifest_semantic_hash": "51e327dc4543516a4b7c3c256e55d323e68831dc7e34bf8f4b822cc656033701",
+    "problems": [],
+    "valid": true
+  },
+  "ls_held_out_other": {
+    "disjointness_problems": [],
+    "global_actor_disjointness": [],
+    "manifest_canonical_bytes_ok": true,
+    "manifest_canonical_file_sha256": "7f73c0329cb8cc09d8d0cf2c6df58eb783abfbac525334768765400752fbf004",
+    "manifest_id": "ls_held_out_other",
+    "manifest_semantic_hash": "7f73c0329cb8cc09d8d0cf2c6df58eb783abfbac525334768765400752fbf004",
+    "problems": [],
+    "valid": true
+  }
+}

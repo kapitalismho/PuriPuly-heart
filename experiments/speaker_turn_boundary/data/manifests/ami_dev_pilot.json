@@ -1,0 +1,5049 @@
+{
+  "baseline_sha": "adf8cde2b5b166beb95c50a39e8941d2fee3601e",
+  "build": {
+    "ambiguous_rule": "word text containing % marks covering region ambiguous",
+    "annotation": "words.xml manual word-level v1.6.2, per-participant files",
+    "script": "corpus.ami.build_ami_manifest",
+    "single_channel_recipe": "Mix-Headset 16 kHz mono",
+    "speaker_rule": "speaker derived from words filename {meeting}.{letter}.words.xml as {meeting}.Participant{letter}"
+  },
+  "canonical_sample_rate_hz": 16000,
+  "cases": [
+    {
+      "active_speech_samples": 10612960,
+      "case_id": "ami_ES2003a",
+      "condition": {
+        "corpus": "ami",
+        "meeting_id": "ES2003a",
+        "parse_stats": {
+          "skipped_zero_length_words": 349
+        },
+        "partition_meta": {
+          "agents": {
+            "A": "MEE011",
+            "B": "MEE009",
+            "C": "MEE012",
+            "D": "MEE010"
+          },
+          "duration_s": "1124",
+          "k10": "5",
+          "k5": "3",
+          "seen_type": "development",
+          "visibility": "seen"
+        },
+        "recording_condition": "headset_mix_16k_mono",
+        "split_role": "pilot_dev",
+        "stream": "Mix-Headset",
+        "words": 2387
+      },
+      "duration_samples": 18236246,
+      "kind": "real_meeting",
+      "regions": [
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 34080,
+          "speakers": [],
+          "start_sample": 0
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 210880,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 34080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 211840,
+          "speakers": [],
+          "start_sample": 210880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 268960,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 211840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 289440,
+          "speakers": [],
+          "start_sample": 268960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 293440,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 289440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 294880,
+          "speakers": [],
+          "start_sample": 293440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 328960,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 294880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 329280,
+          "speakers": [],
+          "start_sample": 328960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 344320,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 329280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 351520,
+          "speakers": [],
+          "start_sample": 344320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 369440,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 351520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 379200,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 369440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 418560,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 379200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 420800,
+          "speakers": [],
+          "start_sample": 418560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 452160,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 420800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 456000,
+          "speakers": [],
+          "start_sample": 452160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 483040,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 456000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 533280,
+          "speakers": [],
+          "start_sample": 483040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 546880,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 533280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 549440,
+          "speakers": [],
+          "start_sample": 546880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 580800,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 549440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 584320,
+          "speakers": [],
+          "start_sample": 580800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 636000,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 584320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 637440,
+          "speakers": [],
+          "start_sample": 636000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 653760,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 637440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 656160,
+          "speakers": [],
+          "start_sample": 653760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 671200,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 656160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 763040,
+          "speakers": [],
+          "start_sample": 671200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 785440,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 763040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 790080,
+          "speakers": [],
+          "start_sample": 785440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 812320,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 790080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 848320,
+          "speakers": [],
+          "start_sample": 812320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 867840,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 848320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 896960,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 867840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 915360,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 896960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 993920,
+          "speakers": [],
+          "start_sample": 915360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1602880,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 993920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1691040,
+          "speakers": [],
+          "start_sample": 1602880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1832000,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 1691040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1905600,
+          "speakers": [],
+          "start_sample": 1832000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2160000,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 1905600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2210400,
+          "speakers": [],
+          "start_sample": 2160000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2295680,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 2210400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2304960,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 2295680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2367200,
+          "speakers": [],
+          "start_sample": 2304960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2433120,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 2367200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2473760,
+          "speakers": [],
+          "start_sample": 2433120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2542400,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 2473760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2595040,
+          "speakers": [],
+          "start_sample": 2542400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2602560,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 2595040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3396800,
+          "speakers": [],
+          "start_sample": 2602560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3435680,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 3396800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3456480,
+          "speakers": [],
+          "start_sample": 3435680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3474560,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 3456480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3491200,
+          "speakers": [],
+          "start_sample": 3474560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3724640,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 3491200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3753600,
+          "speakers": [],
+          "start_sample": 3724640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3867360,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 3753600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3898880,
+          "speakers": [],
+          "start_sample": 3867360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3915520,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 3898880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3928800,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 3915520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4042400,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 3928800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4094240,
+          "speakers": [],
+          "start_sample": 4042400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4099360,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 4094240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4108320,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 4099360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4126880,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC",
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 4108320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4143360,
+          "speakers": [
+            "ES2003a.ParticipantC",
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 4126880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4144160,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 4143360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4144480,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 4144160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4160320,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 4144480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4184160,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 4160320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4201920,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 4184160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4220480,
+          "speakers": [],
+          "start_sample": 4201920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4221440,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 4220480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4228000,
+          "speakers": [
+            "ES2003a.ParticipantC",
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 4221440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4228960,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 4228000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4256000,
+          "speakers": [],
+          "start_sample": 4228960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4340160,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 4256000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4372160,
+          "speakers": [],
+          "start_sample": 4340160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4384480,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 4372160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4389920,
+          "speakers": [],
+          "start_sample": 4384480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4416640,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 4389920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4552160,
+          "speakers": [],
+          "start_sample": 4416640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4586400,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 4552160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4658080,
+          "speakers": [],
+          "start_sample": 4586400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4661120,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 4658080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4799200,
+          "speakers": [],
+          "start_sample": 4661120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4817280,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 4799200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4820960,
+          "speakers": [],
+          "start_sample": 4817280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4826720,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 4820960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4827040,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 4826720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4852000,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 4827040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4863040,
+          "speakers": [],
+          "start_sample": 4852000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4892160,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 4863040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4932160,
+          "speakers": [],
+          "start_sample": 4892160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5005600,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 4932160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5073280,
+          "speakers": [],
+          "start_sample": 5005600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5100960,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 5073280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6302560,
+          "speakers": [],
+          "start_sample": 5100960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6340640,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 6302560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6366720,
+          "speakers": [],
+          "start_sample": 6340640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6850400,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 6366720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6851680,
+          "speakers": [],
+          "start_sample": 6850400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6892000,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 6851680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6924160,
+          "speakers": [],
+          "start_sample": 6892000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6943840,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 6924160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7027840,
+          "speakers": [],
+          "start_sample": 6943840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7036640,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 7027840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8979680,
+          "speakers": [],
+          "start_sample": 7036640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9566720,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 8979680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9699040,
+          "speakers": [],
+          "start_sample": 9566720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9705920,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 9699040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10504480,
+          "speakers": [],
+          "start_sample": 9705920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10790880,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 10504480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10887360,
+          "speakers": [],
+          "start_sample": 10790880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11237600,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 10887360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11289600,
+          "speakers": [],
+          "start_sample": 11237600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11360000,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 11289600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11372320,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 11360000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11473440,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 11372320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11476160,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 11473440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11501920,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 11476160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11537920,
+          "speakers": [],
+          "start_sample": 11501920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11657440,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 11537920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11692480,
+          "speakers": [],
+          "start_sample": 11657440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11761280,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 11692480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11791520,
+          "speakers": [],
+          "start_sample": 11761280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12641120,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 11791520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12650560,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 12641120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12981760,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 12650560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13003040,
+          "speakers": [],
+          "start_sample": 12981760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13106880,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 13003040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13131040,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 13106880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13133760,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 13131040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13136960,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 13133760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13211200,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 13136960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13215360,
+          "speakers": [],
+          "start_sample": 13211200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13513760,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 13215360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13530400,
+          "speakers": [],
+          "start_sample": 13513760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13658880,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 13530400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13668640,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 13658880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13914720,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 13668640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13934240,
+          "speakers": [],
+          "start_sample": 13914720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13946400,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 13934240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13951040,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 13946400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14005120,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 13951040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14043200,
+          "speakers": [],
+          "start_sample": 14005120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14072320,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 14043200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14075520,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14072320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14306080,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14075520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14311040,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14306080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14453120,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14311040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14458720,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14453120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14477440,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14458720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14503040,
+          "speakers": [],
+          "start_sample": 14477440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14803040,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14503040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14808960,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14803040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14842880,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14808960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14847840,
+          "speakers": [],
+          "start_sample": 14842880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14861120,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 14847840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14867680,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 14861120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14883680,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 14867680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14884000,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 14883680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14887680,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 14884000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14888160,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14887680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14916000,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14888160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14941920,
+          "speakers": [],
+          "start_sample": 14916000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15081280,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 14941920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15111200,
+          "speakers": [],
+          "start_sample": 15081280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15237920,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 15111200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15248480,
+          "speakers": [],
+          "start_sample": 15237920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15251840,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 15248480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15257440,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 15251840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15283840,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 15257440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15288000,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 15283840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15719520,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 15288000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15724800,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 15719520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15743680,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 15724800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15790080,
+          "speakers": [],
+          "start_sample": 15743680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15848000,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 15790080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15859680,
+          "speakers": [],
+          "start_sample": 15848000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15873280,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 15859680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15877920,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 15873280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15895200,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 15877920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15900480,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 15895200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16019200,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 15900480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16037760,
+          "speakers": [],
+          "start_sample": 16019200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16095680,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 16037760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16116000,
+          "speakers": [],
+          "start_sample": 16095680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16140000,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 16116000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16148800,
+          "speakers": [
+            "ES2003a.ParticipantC",
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 16140000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16162560,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 16148800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16165120,
+          "speakers": [
+            "ES2003a.ParticipantC",
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 16162560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16217440,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 16165120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16221440,
+          "speakers": [
+            "ES2003a.ParticipantC",
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 16217440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16248800,
+          "speakers": [
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 16221440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16271360,
+          "speakers": [],
+          "start_sample": 16248800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16418560,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 16271360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16424160,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantD"
+          ],
+          "start_sample": 16418560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16501120,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 16424160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16530880,
+          "speakers": [],
+          "start_sample": 16501120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16603840,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 16530880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 16732480,
+          "speakers": [],
+          "start_sample": 16603840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17063040,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 16732480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17089120,
+          "speakers": [],
+          "start_sample": 17063040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17130880,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 17089120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17159200,
+          "speakers": [],
+          "start_sample": 17130880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17160000,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 17159200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17166240,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 17160000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17192800,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 17166240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17209280,
+          "speakers": [],
+          "start_sample": 17192800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17233440,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 17209280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17299840,
+          "speakers": [
+            "ES2003a.ParticipantA",
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 17233440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17410560,
+          "speakers": [
+            "ES2003a.ParticipantA"
+          ],
+          "start_sample": 17299840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17416480,
+          "speakers": [],
+          "start_sample": 17410560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17475200,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 17416480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17492320,
+          "speakers": [],
+          "start_sample": 17475200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17550720,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 17492320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17604960,
+          "speakers": [],
+          "start_sample": 17550720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17746560,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 17604960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17759840,
+          "speakers": [],
+          "start_sample": 17746560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17767360,
+          "speakers": [
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 17759840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17780480,
+          "speakers": [
+            "ES2003a.ParticipantB",
+            "ES2003a.ParticipantC"
+          ],
+          "start_sample": 17767360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17793920,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 17780480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 17899040,
+          "speakers": [],
+          "start_sample": 17793920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 18027040,
+          "speakers": [
+            "ES2003a.ParticipantB"
+          ],
+          "start_sample": 17899040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 18236246,
+          "speakers": [],
+          "start_sample": 18027040
+        }
+      ],
+      "seed": 0,
+      "sources": [
+        {
+          "cut_end_sample": 18236246,
+          "cut_start_sample": 0,
+          "file_sha256": "41cf861afafc20e70061c6cc82b2cb1c620d630be6d13361da928f04fc00beea",
+          "gain": 1.0,
+          "original_end_sample": 18236246,
+          "original_start_sample": 0,
+          "role": "speaker_0",
+          "session": "ES2003a",
+          "speaker": "ES2003a.ParticipantA",
+          "trimmed_end_sample": 18236246,
+          "trimmed_start_sample": 0,
+          "utterance": "ES2003a"
+        },
+        {
+          "cut_end_sample": 18236246,
+          "cut_start_sample": 0,
+          "file_sha256": "41cf861afafc20e70061c6cc82b2cb1c620d630be6d13361da928f04fc00beea",
+          "gain": 1.0,
+          "original_end_sample": 18236246,
+          "original_start_sample": 0,
+          "role": "speaker_1",
+          "session": "ES2003a",
+          "speaker": "ES2003a.ParticipantB",
+          "trimmed_end_sample": 18236246,
+          "trimmed_start_sample": 0,
+          "utterance": "ES2003a"
+        },
+        {
+          "cut_end_sample": 18236246,
+          "cut_start_sample": 0,
+          "file_sha256": "41cf861afafc20e70061c6cc82b2cb1c620d630be6d13361da928f04fc00beea",
+          "gain": 1.0,
+          "original_end_sample": 18236246,
+          "original_start_sample": 0,
+          "role": "speaker_2",
+          "session": "ES2003a",
+          "speaker": "ES2003a.ParticipantC",
+          "trimmed_end_sample": 18236246,
+          "trimmed_start_sample": 0,
+          "utterance": "ES2003a"
+        },
+        {
+          "cut_end_sample": 18236246,
+          "cut_start_sample": 0,
+          "file_sha256": "41cf861afafc20e70061c6cc82b2cb1c620d630be6d13361da928f04fc00beea",
+          "gain": 1.0,
+          "original_end_sample": 18236246,
+          "original_start_sample": 0,
+          "role": "speaker_3",
+          "session": "ES2003a",
+          "speaker": "ES2003a.ParticipantD",
+          "trimmed_end_sample": 18236246,
+          "trimmed_start_sample": 0,
+          "utterance": "ES2003a"
+        }
+      ],
+      "transforms": [],
+      "wav_relative_path": "ami/audio/ES2003a/ES2003a.Mix-Headset.wav",
+      "wav_sha256": "41cf861afafc20e70061c6cc82b2cb1c620d630be6d13361da928f04fc00beea"
+    },
+    {
+      "active_speech_samples": 12069760,
+      "case_id": "ami_IS1008a",
+      "condition": {
+        "corpus": "ami",
+        "meeting_id": "IS1008a",
+        "parse_stats": {
+          "skipped_zero_length_words": 386
+        },
+        "partition_meta": {
+          "agents": {
+            "A": "MIO086",
+            "B": "FIE038",
+            "C": "FIE073",
+            "D": "MIE085"
+          },
+          "duration_s": "931",
+          "k10": "9",
+          "k5": "5",
+          "seen_type": "development",
+          "visibility": "seen"
+        },
+        "recording_condition": "headset_mix_16k_mono",
+        "split_role": "pilot_dev",
+        "stream": "Mix-Headset",
+        "words": 2890
+      },
+      "duration_samples": 15101333,
+      "kind": "real_meeting",
+      "regions": [
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 548640,
+          "speakers": [],
+          "start_sample": 0
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 556320,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 548640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 620160,
+          "speakers": [],
+          "start_sample": 556320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 649920,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 620160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 786240,
+          "speakers": [],
+          "start_sample": 649920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 825280,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 786240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 849280,
+          "speakers": [],
+          "start_sample": 825280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1004480,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 849280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1019840,
+          "speakers": [],
+          "start_sample": 1004480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1095840,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 1019840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1146720,
+          "speakers": [],
+          "start_sample": 1095840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1172640,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 1146720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1182720,
+          "speakers": [],
+          "start_sample": 1172640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1284000,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 1182720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1373120,
+          "speakers": [],
+          "start_sample": 1284000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1398720,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1373120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1415040,
+          "speakers": [],
+          "start_sample": 1398720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1439520,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 1415040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1446720,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1439520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1450080,
+          "speakers": [],
+          "start_sample": 1446720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1462720,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 1450080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1466080,
+          "speakers": [],
+          "start_sample": 1462720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1468000,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1466080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1492320,
+          "speakers": [],
+          "start_sample": 1468000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1498080,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 1492320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1527360,
+          "speakers": [],
+          "start_sample": 1498080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1544480,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 1527360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1553920,
+          "speakers": [],
+          "start_sample": 1544480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1577600,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1553920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1588480,
+          "speakers": [],
+          "start_sample": 1577600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1605440,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 1588480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1613760,
+          "speakers": [],
+          "start_sample": 1605440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1620960,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1613760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1626400,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1620960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1627040,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1626400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1645440,
+          "speakers": [],
+          "start_sample": 1627040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1650560,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 1645440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1654560,
+          "speakers": [],
+          "start_sample": 1650560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1674240,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 1654560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1679520,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 1674240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1749440,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 1679520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1757440,
+          "speakers": [],
+          "start_sample": 1749440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1772320,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 1757440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1785440,
+          "speakers": [],
+          "start_sample": 1772320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1799840,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 1785440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1850720,
+          "speakers": [],
+          "start_sample": 1799840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1875840,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 1850720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1885760,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1875840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1906240,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1885760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1920960,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1906240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1931200,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 1920960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 1944960,
+          "speakers": [],
+          "start_sample": 1931200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2148320,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 1944960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2161920,
+          "speakers": [],
+          "start_sample": 2148320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2294240,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 2161920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2316800,
+          "speakers": [],
+          "start_sample": 2294240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2418880,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 2316800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2431680,
+          "speakers": [],
+          "start_sample": 2418880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2497440,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 2431680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2499680,
+          "speakers": [],
+          "start_sample": 2497440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2580000,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 2499680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2589920,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 2580000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2604480,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 2589920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2611840,
+          "speakers": [],
+          "start_sample": 2604480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2723680,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 2611840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2754400,
+          "speakers": [],
+          "start_sample": 2723680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2768320,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 2754400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2782880,
+          "speakers": [],
+          "start_sample": 2768320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2852480,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 2782880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2858240,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 2852480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2878400,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 2858240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 2881760,
+          "speakers": [],
+          "start_sample": 2878400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3014720,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 2881760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3020480,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 3014720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3035840,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 3020480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3037760,
+          "speakers": [],
+          "start_sample": 3035840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3069920,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 3037760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3161280,
+          "speakers": [],
+          "start_sample": 3069920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3168960,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 3161280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3208960,
+          "speakers": [],
+          "start_sample": 3168960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3301280,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 3208960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3311360,
+          "speakers": [],
+          "start_sample": 3301280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3333920,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 3311360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3352640,
+          "speakers": [],
+          "start_sample": 3333920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3491840,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 3352640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3499040,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 3491840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3593440,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 3499040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3642400,
+          "speakers": [],
+          "start_sample": 3593440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3701760,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 3642400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3710720,
+          "speakers": [],
+          "start_sample": 3701760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3784480,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 3710720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3812320,
+          "speakers": [],
+          "start_sample": 3784480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3818400,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 3812320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3830560,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 3818400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3870720,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 3830560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 3871840,
+          "speakers": [],
+          "start_sample": 3870720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4060160,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 3871840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4068960,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 4060160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4101280,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 4068960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4129120,
+          "speakers": [],
+          "start_sample": 4101280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4170720,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 4129120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4179040,
+          "speakers": [],
+          "start_sample": 4170720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4179680,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 4179040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4183040,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 4179680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4184000,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 4183040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4185920,
+          "speakers": [
+            "IS1008a.ParticipantB",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 4184000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4300160,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 4185920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4314880,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 4300160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4419840,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 4314880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4450240,
+          "speakers": [],
+          "start_sample": 4419840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4584480,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 4450240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4589600,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 4584480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4679840,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 4589600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4684160,
+          "speakers": [],
+          "start_sample": 4679840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4688960,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 4684160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4692800,
+          "speakers": [],
+          "start_sample": 4688960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4696640,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 4692800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4708480,
+          "speakers": [],
+          "start_sample": 4696640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4797120,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 4708480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4809280,
+          "speakers": [],
+          "start_sample": 4797120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4895840,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 4809280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4920000,
+          "speakers": [],
+          "start_sample": 4895840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4983040,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 4920000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 4988320,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 4983040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5409280,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 4988320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5414240,
+          "speakers": [],
+          "start_sample": 5409280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5532320,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 5414240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5535680,
+          "speakers": [],
+          "start_sample": 5532320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5541600,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 5535680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5544800,
+          "speakers": [],
+          "start_sample": 5541600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5734400,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 5544800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5739360,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 5734400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5817280,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 5739360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5820160,
+          "speakers": [],
+          "start_sample": 5817280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5914400,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 5820160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5915360,
+          "speakers": [],
+          "start_sample": 5914400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5939200,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 5915360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5943680,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 5939200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5943840,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 5943680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 5954880,
+          "speakers": [],
+          "start_sample": 5943840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6012960,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 5954880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6019680,
+          "speakers": [],
+          "start_sample": 6012960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6024480,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 6019680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6040480,
+          "speakers": [],
+          "start_sample": 6024480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6043840,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 6040480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6053760,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 6043840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6179520,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 6053760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6183360,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 6179520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6394720,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 6183360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6442560,
+          "speakers": [],
+          "start_sample": 6394720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6909920,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 6442560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6912480,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 6909920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6983520,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 6912480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 6990080,
+          "speakers": [],
+          "start_sample": 6983520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7142400,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 6990080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7165760,
+          "speakers": [],
+          "start_sample": 7142400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7419360,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 7165760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7429120,
+          "speakers": [],
+          "start_sample": 7419360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7571680,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 7429120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7576320,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 7571680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7604960,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 7576320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7616640,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 7604960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7661280,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 7616640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7668640,
+          "speakers": [],
+          "start_sample": 7661280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7806560,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 7668640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 7813280,
+          "speakers": [],
+          "start_sample": 7806560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8005920,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 7813280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8020640,
+          "speakers": [],
+          "start_sample": 8005920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8032320,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 8020640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8038080,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 8032320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8051520,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 8038080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8067520,
+          "speakers": [],
+          "start_sample": 8051520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8084000,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 8067520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8121120,
+          "speakers": [],
+          "start_sample": 8084000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8265440,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 8121120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8275520,
+          "speakers": [],
+          "start_sample": 8265440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8531360,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 8275520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8536480,
+          "speakers": [],
+          "start_sample": 8531360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8695840,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 8536480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8722560,
+          "speakers": [],
+          "start_sample": 8695840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8779520,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 8722560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8789120,
+          "speakers": [],
+          "start_sample": 8779520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8830080,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 8789120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8834240,
+          "speakers": [],
+          "start_sample": 8830080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9049920,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 8834240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9051200,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 9049920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9072480,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 9051200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9073600,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 9072480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9082560,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 9073600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9089920,
+          "speakers": [],
+          "start_sample": 9082560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9093440,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 9089920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9103040,
+          "speakers": [],
+          "start_sample": 9093440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9292640,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 9103040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9298880,
+          "speakers": [],
+          "start_sample": 9292640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9400800,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 9298880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9405920,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 9400800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9514880,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 9405920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9520640,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 9514880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9603040,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 9520640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9610720,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 9603040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9743840,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 9610720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9754720,
+          "speakers": [],
+          "start_sample": 9743840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9839360,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 9754720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 9842560,
+          "speakers": [],
+          "start_sample": 9839360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10033760,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 9842560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10040480,
+          "speakers": [],
+          "start_sample": 10033760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10090880,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 10040480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10094880,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 10090880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10205760,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 10094880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10210400,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 10205760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10220000,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 10210400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10226560,
+          "speakers": [],
+          "start_sample": 10220000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10360320,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 10226560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10363840,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 10360320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10474560,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 10363840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10480480,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 10474560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10555200,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 10480480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10556800,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 10555200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10574880,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 10556800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10590720,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 10574880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10623680,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 10590720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10636320,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 10623680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10908960,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 10636320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 10914880,
+          "speakers": [],
+          "start_sample": 10908960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11043520,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 10914880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11057280,
+          "speakers": [],
+          "start_sample": 11043520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11130560,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 11057280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11144480,
+          "speakers": [],
+          "start_sample": 11130560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11414880,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 11144480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11441600,
+          "speakers": [],
+          "start_sample": 11414880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11447040,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 11441600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11452640,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 11447040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11649280,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 11452640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11661600,
+          "speakers": [],
+          "start_sample": 11649280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11671040,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 11661600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11676320,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 11671040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11757440,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 11676320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11764320,
+          "speakers": [],
+          "start_sample": 11757440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11774400,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 11764320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11774720,
+          "speakers": [],
+          "start_sample": 11774400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11798560,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 11774720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 11806880,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 11798560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12015680,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 11806880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12018400,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12015680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12019200,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 12018400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12023520,
+          "speakers": [],
+          "start_sample": 12019200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12057280,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12023520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12086880,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12057280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12126880,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12086880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12132480,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12126880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12303360,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12132480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12309440,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12303360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12344160,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12309440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12355520,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12344160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12446080,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 12355520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12449600,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12446080
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12475200,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 12449600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12495200,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12475200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12516000,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12495200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12523680,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12516000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12574400,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12523680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12579840,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12574400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12593440,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12579840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12596000,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12593440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12623520,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12596000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12628320,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12623520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12656480,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12628320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12660320,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12656480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12751680,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12660320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12755200,
+          "speakers": [],
+          "start_sample": 12751680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12882880,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12755200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12885280,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12882880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12888320,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 12885280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12892640,
+          "speakers": [],
+          "start_sample": 12888320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12939520,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 12892640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 12965920,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 12939520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13023520,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 12965920
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13028480,
+          "speakers": [],
+          "start_sample": 13023520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13041760,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13028480
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13047840,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13041760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13053280,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13047840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13090720,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13053280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13123680,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13090720
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13127040,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13123680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13151840,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13127040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13155840,
+          "speakers": [],
+          "start_sample": 13151840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13162240,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13155840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13212000,
+          "speakers": [],
+          "start_sample": 13162240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13247680,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13212000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13335840,
+          "speakers": [],
+          "start_sample": 13247680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13337600,
+          "speakers": [
+            "IS1008a.ParticipantD"
+          ],
+          "start_sample": 13335840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13352160,
+          "speakers": [],
+          "start_sample": 13337600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13432640,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13352160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13438880,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13432640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13451200,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13438880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13465440,
+          "speakers": [],
+          "start_sample": 13451200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13469600,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13465440
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13500960,
+          "speakers": [],
+          "start_sample": 13469600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13636160,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13500960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13639680,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13636160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13753600,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13639680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13755840,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13753600
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13757280,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13755840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13757760,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13757280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13801760,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13757760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13835840,
+          "speakers": [],
+          "start_sample": 13801760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13841280,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13835840
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13850560,
+          "speakers": [],
+          "start_sample": 13841280
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13852160,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13850560
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13858400,
+          "speakers": [],
+          "start_sample": 13852160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13868960,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13858400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13871680,
+          "speakers": [],
+          "start_sample": 13868960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13952640,
+          "speakers": [
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 13871680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13963360,
+          "speakers": [],
+          "start_sample": 13952640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13972320,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13963360
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13995040,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 13972320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 13998240,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 13995040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14008960,
+          "speakers": [],
+          "start_sample": 13998240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14145120,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 14008960
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14148000,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 14145120
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14156320,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 14148000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14188800,
+          "speakers": [],
+          "start_sample": 14156320
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14331040,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 14188800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14345760,
+          "speakers": [],
+          "start_sample": 14331040
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14356800,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 14345760
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14359200,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 14356800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14360160,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 14359200
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14363680,
+          "speakers": [],
+          "start_sample": 14360160
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14370400,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 14363680
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14376640,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantC"
+          ],
+          "start_sample": 14370400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14379520,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 14376640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14388640,
+          "speakers": [
+            "IS1008a.ParticipantA",
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 14379520
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14418880,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 14388640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14424640,
+          "speakers": [],
+          "start_sample": 14418880
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14428800,
+          "speakers": [
+            "IS1008a.ParticipantB"
+          ],
+          "start_sample": 14424640
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14430240,
+          "speakers": [],
+          "start_sample": 14428800
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 14456000,
+          "speakers": [
+            "IS1008a.ParticipantA"
+          ],
+          "start_sample": 14430240
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 15101333,
+          "speakers": [],
+          "start_sample": 14456000
+        }
+      ],
+      "seed": 0,
+      "sources": [
+        {
+          "cut_end_sample": 15101333,
+          "cut_start_sample": 0,
+          "file_sha256": "75ae8796ca2177fa0c77055de2fe2f95325b412dc7152a9b32c76c9884a3d382",
+          "gain": 1.0,
+          "original_end_sample": 15101333,
+          "original_start_sample": 0,
+          "role": "speaker_0",
+          "session": "IS1008a",
+          "speaker": "IS1008a.ParticipantA",
+          "trimmed_end_sample": 15101333,
+          "trimmed_start_sample": 0,
+          "utterance": "IS1008a"
+        },
+        {
+          "cut_end_sample": 15101333,
+          "cut_start_sample": 0,
+          "file_sha256": "75ae8796ca2177fa0c77055de2fe2f95325b412dc7152a9b32c76c9884a3d382",
+          "gain": 1.0,
+          "original_end_sample": 15101333,
+          "original_start_sample": 0,
+          "role": "speaker_1",
+          "session": "IS1008a",
+          "speaker": "IS1008a.ParticipantB",
+          "trimmed_end_sample": 15101333,
+          "trimmed_start_sample": 0,
+          "utterance": "IS1008a"
+        },
+        {
+          "cut_end_sample": 15101333,
+          "cut_start_sample": 0,
+          "file_sha256": "75ae8796ca2177fa0c77055de2fe2f95325b412dc7152a9b32c76c9884a3d382",
+          "gain": 1.0,
+          "original_end_sample": 15101333,
+          "original_start_sample": 0,
+          "role": "speaker_2",
+          "session": "IS1008a",
+          "speaker": "IS1008a.ParticipantC",
+          "trimmed_end_sample": 15101333,
+          "trimmed_start_sample": 0,
+          "utterance": "IS1008a"
+        },
+        {
+          "cut_end_sample": 15101333,
+          "cut_start_sample": 0,
+          "file_sha256": "75ae8796ca2177fa0c77055de2fe2f95325b412dc7152a9b32c76c9884a3d382",
+          "gain": 1.0,
+          "original_end_sample": 15101333,
+          "original_start_sample": 0,
+          "role": "speaker_3",
+          "session": "IS1008a",
+          "speaker": "IS1008a.ParticipantD",
+          "trimmed_end_sample": 15101333,
+          "trimmed_start_sample": 0,
+          "utterance": "IS1008a"
+        }
+      ],
+      "transforms": [],
+      "wav_relative_path": "ami/audio/IS1008a/IS1008a.Mix-Headset.wav",
+      "wav_sha256": "75ae8796ca2177fa0c77055de2fe2f95325b412dc7152a9b32c76c9884a3d382"
+    }
+  ],
+  "corpus": {
+    "annotations_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip",
+    "annotations_version": "1.6.2",
+    "license": "CC BY 4.0",
+    "local_wav_root": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora",
+    "name": "ami",
+    "partition": "scenario_only",
+    "source": "https://groups.inf.ed.ac.uk/ami",
+    "version": "1.6.2"
+  },
+  "disjointness_groups": [
+    "ami_pilot_dev"
+  ],
+  "generator": {
+    "script": "build_phase2_real.py"
+  },
+  "manifest_id": "ami_dev_pilot",
+  "schema_version": "experiments.speaker_turn_boundary.manifest.phase2.v1",
+  "split_role": "pilot_dev"
+}

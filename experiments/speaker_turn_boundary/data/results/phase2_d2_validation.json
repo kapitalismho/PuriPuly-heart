@@ -1,0 +1,86 @@
+{
+  "alimeeting_eval_pilot": {
+    "disjointness_problems": [],
+    "global_actor_disjointness": [],
+    "manifest_canonical_bytes_ok": true,
+    "manifest_canonical_file_sha256": "23fa1519559890dcb8323b558113adc9823ca8f71e779d8aafcd17e6f97de669",
+    "manifest_id": "alimeeting_eval_pilot",
+    "manifest_semantic_hash": "23fa1519559890dcb8323b558113adc9823ca8f71e779d8aafcd17e6f97de669",
+    "problems": [],
+    "valid": true
+  },
+  "ami_dev_pilot": {
+    "disjointness_problems": [],
+    "global_actor_disjointness": [
+      {
+        "disjoint": true,
+        "global_actors_a": [
+          "FIE038",
+          "FIE073",
+          "MEE009",
+          "MEE010",
+          "MEE011",
+          "MEE012",
+          "MIE085",
+          "MIO086"
+        ],
+        "global_actors_b": [
+          "FEE013",
+          "FEE016",
+          "FIE088",
+          "FIO084",
+          "FIO087",
+          "FIO089",
+          "MEE014",
+          "MEO015"
+        ],
+        "manifest_a": "ami_dev_pilot",
+        "manifest_b": "ami_held_out_pilot",
+        "overlap": []
+      }
+    ],
+    "manifest_canonical_bytes_ok": true,
+    "manifest_canonical_file_sha256": "d2e93ef4f6e8a84b0b5384811c921d4bb9166de1b6fe09c1e8eb5b4f833f7faa",
+    "manifest_id": "ami_dev_pilot",
+    "manifest_semantic_hash": "d2e93ef4f6e8a84b0b5384811c921d4bb9166de1b6fe09c1e8eb5b4f833f7faa",
+    "problems": [],
+    "valid": true
+  },
+  "ami_held_out_pilot": {
+    "disjointness_problems": [],
+    "global_actor_disjointness": [
+      {
+        "disjoint": true,
+        "global_actors_a": [
+          "FEE013",
+          "FEE016",
+          "FIE088",
+          "FIO084",
+          "FIO087",
+          "FIO089",
+          "MEE014",
+          "MEO015"
+        ],
+        "global_actors_b": [
+          "FIE038",
+          "FIE073",
+          "MEE009",
+          "MEE010",
+          "MEE011",
+          "MEE012",
+          "MIE085",
+          "MIO086"
+        ],
+        "manifest_a": "ami_held_out_pilot",
+        "manifest_b": "ami_dev_pilot",
+        "overlap": []
+      }
+    ],
+    "manifest_canonical_bytes_ok": true,
+    "manifest_canonical_file_sha256": "ac39518d8899a6e6428ac64cf4d58e868d13707afbed9e8a92b3a7ed71fc8396",
+    "manifest_id": "ami_held_out_pilot",
+    "manifest_semantic_hash": "ac39518d8899a6e6428ac64cf4d58e868d13707afbed9e8a92b3a7ed71fc8396",
+    "problems": [],
+    "valid": true
+  }
+}

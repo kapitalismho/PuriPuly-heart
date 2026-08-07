@@ -1,0 +1,88 @@
+{
+  "disjointness_problems": [],
+  "global_actor_disjointness": [
+    {
+      "disjoint": true,
+      "global_actors_a": [
+        "FIE038",
+        "FIE073",
+        "MEE009",
+        "MEE010",
+        "MEE011",
+        "MEE012",
+        "MIE085",
+        "MIO086"
+      ],
+      "global_actors_b": [],
+      "manifest_a": "mixed_dev_pool",
+      "manifest_b": "ls_held_out_clean",
+      "overlap": []
+    },
+    {
+      "disjoint": true,
+      "global_actors_a": [
+        "FIE038",
+        "FIE073",
+        "MEE009",
+        "MEE010",
+        "MEE011",
+        "MEE012",
+        "MIE085",
+        "MIO086"
+      ],
+      "global_actors_b": [],
+      "manifest_a": "mixed_dev_pool",
+      "manifest_b": "ls_held_out_other",
+      "overlap": []
+    },
+    {
+      "disjoint": true,
+      "global_actors_a": [
+        "FIE038",
+        "FIE073",
+        "MEE009",
+        "MEE010",
+        "MEE011",
+        "MEE012",
+        "MIE085",
+        "MIO086"
+      ],
+      "global_actors_b": [
+        "FEE013",
+        "FEE016",
+        "FIE088",
+        "FIO084",
+        "FIO087",
+        "FIO089",
+        "MEE014",
+        "MEO015"
+      ],
+      "manifest_a": "mixed_dev_pool",
+      "manifest_b": "ami_held_out_pilot",
+      "overlap": []
+    },
+    {
+      "disjoint": true,
+      "global_actors_a": [
+        "FIE038",
+        "FIE073",
+        "MEE009",
+        "MEE010",
+        "MEE011",
+        "MEE012",
+        "MIE085",
+        "MIO086"
+      ],
+      "global_actors_b": [],
+      "manifest_a": "mixed_dev_pool",
+      "manifest_b": "alimeeting_eval_pilot",
+      "overlap": []
+    }
+  ],
+  "manifest_canonical_bytes_ok": true,
+  "manifest_canonical_file_sha256": "8369c51a82777a01814a35bac34301252842492fb12583b5f20733d75d92ca8e",
+  "manifest_id": "mixed_dev_pool",
+  "manifest_semantic_hash": "8369c51a82777a01814a35bac34301252842492fb12583b5f20733d75d92ca8e",
+  "problems": [],
+  "valid": true
+}

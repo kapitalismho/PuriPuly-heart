@@ -1,0 +1,8 @@
+{
+  "canonical_sample_rate_hz": 16000,
+  "cases": [],
+  "condition_note": "game/voice-chat/Opus, different mics/gains, short reactions, no-gap handoff, interruption/overlap",
+  "language_note": "Korean / Japanese / English / mixed",
+  "privacy": "raw audio stays outside Git; only hashes, sample-exact regions, and metadata enter the repo",
+  "schema_version": "experiments.speaker_turn_boundary.puripuly_import.v1"
+}

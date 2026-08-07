@@ -1,0 +1,28 @@
+{
+  "baseline_sha": "adf8cde2b5b166beb95c50a39e8941d2fee3601e",
+  "build": {
+    "script": "corpus.puripuly_like.make_provisional_puripuly_manifest",
+    "status": "provisional_no_audio"
+  },
+  "canonical_sample_rate_hz": 16000,
+  "cases": [],
+  "corpus": {
+    "annotation_note": "No authorized PuriPuly-like audio was available during Phase 2; detector/domain conclusions must remain provisional until the import schema is filled. Fill data/puripuly_import_template.json and rebuild.",
+    "availability": {
+      "authorized_inputs_found": 0,
+      "inputs": [],
+      "meets_20_30_minutes": false,
+      "total_seconds": 0.0
+    },
+    "import_schema": "experiments.speaker_turn_boundary.puripuly_import.v1",
+    "import_template": "corpus/puripuly_like.py:write_puripuly_import_template",
+    "name": "puripuly_like"
+  },
+  "disjointness_groups": [],
+  "generator": {
+    "script": "build_phase2_real.py"
+  },
+  "manifest_id": "puripuly_like_provisional",
+  "schema_version": "experiments.speaker_turn_boundary.manifest.phase2.v1",
+  "split_role": "acceptance_provisional"
+}
