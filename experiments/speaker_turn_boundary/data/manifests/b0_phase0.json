@@ -1,0 +1,108 @@
+{
+  "baseline_sha": "adf8cde2b5b166beb95c50a39e8941d2fee3601e",
+  "canonical_sample_rate_hz": 16000,
+  "cases": [
+    {
+      "case_id": "golden_two_utterance_gap400",
+      "duration_samples": 80000,
+      "regions": [
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8000,
+          "speakers": [],
+          "start_sample": 0
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 40000,
+          "speakers": [
+            "A"
+          ],
+          "start_sample": 8000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 46400,
+          "speakers": [],
+          "start_sample": 40000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 72000,
+          "speakers": [
+            "B"
+          ],
+          "start_sample": 46400
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 80000,
+          "speakers": [],
+          "start_sample": 72000
+        }
+      ],
+      "seed": 7,
+      "wav_relative_path": "generated/golden_two_utterance_gap400.wav",
+      "wav_sha256": "4dfd5a1a3f02e52648fc6871ccd6c25bc2089923bf5189b053ac330f2658b37d"
+    },
+    {
+      "case_id": "golden_single_utterance",
+      "duration_samples": 48000,
+      "regions": [
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8000,
+          "speakers": [],
+          "start_sample": 0
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 40000,
+          "speakers": [
+            "A"
+          ],
+          "start_sample": 8000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 48000,
+          "speakers": [],
+          "start_sample": 40000
+        }
+      ],
+      "seed": 7,
+      "wav_relative_path": "generated/golden_single_utterance.wav",
+      "wav_sha256": "325ff3077f4f63297720163142e4f535c91e2ca324fc6769ce4da750ab70061a"
+    },
+    {
+      "case_id": "golden_silence",
+      "duration_samples": 32000,
+      "regions": [
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 32000,
+          "speakers": [],
+          "start_sample": 0
+        }
+      ],
+      "seed": 7,
+      "wav_relative_path": "generated/golden_silence.wav",
+      "wav_sha256": "20eaebffe1816e0ffa6f7f854f5ef4ea80d5349faaf0ce1fec1b713e7fde58fa"
+    }
+  ],
+  "generator": {
+    "script": "build_synthetic_cases.py",
+    "seed": 7
+  },
+  "manifest_id": "b0_phase0",
+  "schema_version": "experiments.speaker_turn_boundary.manifest.v1"
+}

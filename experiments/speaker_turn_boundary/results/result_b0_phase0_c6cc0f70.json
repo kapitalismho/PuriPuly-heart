@@ -1,0 +1,1631 @@
+{
+  "baseline_sha": "adf8cde2b5b166beb95c50a39e8941d2fee3601e",
+  "coalescing": {
+    "cuts": [],
+    "detections": [],
+    "report": {
+      "coalesced_count": 0,
+      "detector_cut_count": 0,
+      "detector_events_total": 0,
+      "duplicate_count": 0,
+      "stale_detector_events": 0,
+      "total_logical_cuts": 0,
+      "vad_cut_count": 0
+    }
+  },
+  "epochs": [
+    {
+      "audio_epoch": 0,
+      "boundaries": [],
+      "length_samples": 80000,
+      "progress": [
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 512,
+          "safe_boundary_frontier_sample": 0
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 1024,
+          "safe_boundary_frontier_sample": 512
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 1536,
+          "safe_boundary_frontier_sample": 1024
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 2048,
+          "safe_boundary_frontier_sample": 1536
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 2560,
+          "safe_boundary_frontier_sample": 2048
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 3072,
+          "safe_boundary_frontier_sample": 2560
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 3584,
+          "safe_boundary_frontier_sample": 3072
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 4096,
+          "safe_boundary_frontier_sample": 3584
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 4608,
+          "safe_boundary_frontier_sample": 4096
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 5120,
+          "safe_boundary_frontier_sample": 4608
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 5632,
+          "safe_boundary_frontier_sample": 5120
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 6144,
+          "safe_boundary_frontier_sample": 5632
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 6656,
+          "safe_boundary_frontier_sample": 6144
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 7168,
+          "safe_boundary_frontier_sample": 6656
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 7680,
+          "safe_boundary_frontier_sample": 7168
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 8192,
+          "safe_boundary_frontier_sample": 7680
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 8704,
+          "safe_boundary_frontier_sample": 8192
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 9216,
+          "safe_boundary_frontier_sample": 8704
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 9728,
+          "safe_boundary_frontier_sample": 9216
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 10240,
+          "safe_boundary_frontier_sample": 9728
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 10752,
+          "safe_boundary_frontier_sample": 10240
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 11264,
+          "safe_boundary_frontier_sample": 10752
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 11776,
+          "safe_boundary_frontier_sample": 11264
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 12288,
+          "safe_boundary_frontier_sample": 11776
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 12800,
+          "safe_boundary_frontier_sample": 12288
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 13312,
+          "safe_boundary_frontier_sample": 12800
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 13824,
+          "safe_boundary_frontier_sample": 13312
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 14336,
+          "safe_boundary_frontier_sample": 13824
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 14848,
+          "safe_boundary_frontier_sample": 14336
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 15360,
+          "safe_boundary_frontier_sample": 14848
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 15872,
+          "safe_boundary_frontier_sample": 15360
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 16384,
+          "safe_boundary_frontier_sample": 15872
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 16896,
+          "safe_boundary_frontier_sample": 16384
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 17408,
+          "safe_boundary_frontier_sample": 16896
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 17920,
+          "safe_boundary_frontier_sample": 17408
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 18432,
+          "safe_boundary_frontier_sample": 17920
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 18944,
+          "safe_boundary_frontier_sample": 18432
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 19456,
+          "safe_boundary_frontier_sample": 18944
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 19968,
+          "safe_boundary_frontier_sample": 19456
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 20480,
+          "safe_boundary_frontier_sample": 19968
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 20992,
+          "safe_boundary_frontier_sample": 20480
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 21504,
+          "safe_boundary_frontier_sample": 20992
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 22016,
+          "safe_boundary_frontier_sample": 21504
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 22528,
+          "safe_boundary_frontier_sample": 22016
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 23040,
+          "safe_boundary_frontier_sample": 22528
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 23552,
+          "safe_boundary_frontier_sample": 23040
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 24064,
+          "safe_boundary_frontier_sample": 23552
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 24576,
+          "safe_boundary_frontier_sample": 24064
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 25088,
+          "safe_boundary_frontier_sample": 24576
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 25600,
+          "safe_boundary_frontier_sample": 25088
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 26112,
+          "safe_boundary_frontier_sample": 25600
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 26624,
+          "safe_boundary_frontier_sample": 26112
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 27136,
+          "safe_boundary_frontier_sample": 26624
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 27648,
+          "safe_boundary_frontier_sample": 27136
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 28160,
+          "safe_boundary_frontier_sample": 27648
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 28672,
+          "safe_boundary_frontier_sample": 28160
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 29184,
+          "safe_boundary_frontier_sample": 28672
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 29696,
+          "safe_boundary_frontier_sample": 29184
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 30208,
+          "safe_boundary_frontier_sample": 29696
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 30720,
+          "safe_boundary_frontier_sample": 30208
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 31232,
+          "safe_boundary_frontier_sample": 30720
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 31744,
+          "safe_boundary_frontier_sample": 31232
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 32256,
+          "safe_boundary_frontier_sample": 31744
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 32768,
+          "safe_boundary_frontier_sample": 32256
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 33280,
+          "safe_boundary_frontier_sample": 32768
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 33792,
+          "safe_boundary_frontier_sample": 33280
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 34304,
+          "safe_boundary_frontier_sample": 33792
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 34816,
+          "safe_boundary_frontier_sample": 34304
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 35328,
+          "safe_boundary_frontier_sample": 34816
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 35840,
+          "safe_boundary_frontier_sample": 35328
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 36352,
+          "safe_boundary_frontier_sample": 35840
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 36864,
+          "safe_boundary_frontier_sample": 36352
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 37376,
+          "safe_boundary_frontier_sample": 36864
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 37888,
+          "safe_boundary_frontier_sample": 37376
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 38400,
+          "safe_boundary_frontier_sample": 37888
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 38912,
+          "safe_boundary_frontier_sample": 38400
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 39424,
+          "safe_boundary_frontier_sample": 38912
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 39936,
+          "safe_boundary_frontier_sample": 39424
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 40448,
+          "safe_boundary_frontier_sample": 39936
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 40960,
+          "safe_boundary_frontier_sample": 40448
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 41472,
+          "safe_boundary_frontier_sample": 40960
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 41984,
+          "safe_boundary_frontier_sample": 41472
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 42496,
+          "safe_boundary_frontier_sample": 41984
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 43008,
+          "safe_boundary_frontier_sample": 42496
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 43520,
+          "safe_boundary_frontier_sample": 43008
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 44032,
+          "safe_boundary_frontier_sample": 43520
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 44544,
+          "safe_boundary_frontier_sample": 44032
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 45056,
+          "safe_boundary_frontier_sample": 44544
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 45568,
+          "safe_boundary_frontier_sample": 45056
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 46080,
+          "safe_boundary_frontier_sample": 45568
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 46592,
+          "safe_boundary_frontier_sample": 46080
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 47104,
+          "safe_boundary_frontier_sample": 46592
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 47616,
+          "safe_boundary_frontier_sample": 47104
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 48128,
+          "safe_boundary_frontier_sample": 47616
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 48640,
+          "safe_boundary_frontier_sample": 48128
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 49152,
+          "safe_boundary_frontier_sample": 48640
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 49664,
+          "safe_boundary_frontier_sample": 49152
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 50176,
+          "safe_boundary_frontier_sample": 49664
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 50688,
+          "safe_boundary_frontier_sample": 50176
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 51200,
+          "safe_boundary_frontier_sample": 50688
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 51712,
+          "safe_boundary_frontier_sample": 51200
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 52224,
+          "safe_boundary_frontier_sample": 51712
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 52736,
+          "safe_boundary_frontier_sample": 52224
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 53248,
+          "safe_boundary_frontier_sample": 52736
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 53760,
+          "safe_boundary_frontier_sample": 53248
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 54272,
+          "safe_boundary_frontier_sample": 53760
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 54784,
+          "safe_boundary_frontier_sample": 54272
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 55296,
+          "safe_boundary_frontier_sample": 54784
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 55808,
+          "safe_boundary_frontier_sample": 55296
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 56320,
+          "safe_boundary_frontier_sample": 55808
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 56832,
+          "safe_boundary_frontier_sample": 56320
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 57344,
+          "safe_boundary_frontier_sample": 56832
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 57856,
+          "safe_boundary_frontier_sample": 57344
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 58368,
+          "safe_boundary_frontier_sample": 57856
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 58880,
+          "safe_boundary_frontier_sample": 58368
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 59392,
+          "safe_boundary_frontier_sample": 58880
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 59904,
+          "safe_boundary_frontier_sample": 59392
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 60416,
+          "safe_boundary_frontier_sample": 59904
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 60928,
+          "safe_boundary_frontier_sample": 60416
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 61440,
+          "safe_boundary_frontier_sample": 60928
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 61952,
+          "safe_boundary_frontier_sample": 61440
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 62464,
+          "safe_boundary_frontier_sample": 61952
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 62976,
+          "safe_boundary_frontier_sample": 62464
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 63488,
+          "safe_boundary_frontier_sample": 62976
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 64000,
+          "safe_boundary_frontier_sample": 63488
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 64512,
+          "safe_boundary_frontier_sample": 64000
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 65024,
+          "safe_boundary_frontier_sample": 64512
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 65536,
+          "safe_boundary_frontier_sample": 65024
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 66048,
+          "safe_boundary_frontier_sample": 65536
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 66560,
+          "safe_boundary_frontier_sample": 66048
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 67072,
+          "safe_boundary_frontier_sample": 66560
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 67584,
+          "safe_boundary_frontier_sample": 67072
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 68096,
+          "safe_boundary_frontier_sample": 67584
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 68608,
+          "safe_boundary_frontier_sample": 68096
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 69120,
+          "safe_boundary_frontier_sample": 68608
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 69632,
+          "safe_boundary_frontier_sample": 69120
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 70144,
+          "safe_boundary_frontier_sample": 69632
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 70656,
+          "safe_boundary_frontier_sample": 70144
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 71168,
+          "safe_boundary_frontier_sample": 70656
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 71680,
+          "safe_boundary_frontier_sample": 71168
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 72192,
+          "safe_boundary_frontier_sample": 71680
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 72704,
+          "safe_boundary_frontier_sample": 72192
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 73216,
+          "safe_boundary_frontier_sample": 72704
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 73728,
+          "safe_boundary_frontier_sample": 73216
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 74240,
+          "safe_boundary_frontier_sample": 73728
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 74752,
+          "safe_boundary_frontier_sample": 74240
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 75264,
+          "safe_boundary_frontier_sample": 74752
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 75776,
+          "safe_boundary_frontier_sample": 75264
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 76288,
+          "safe_boundary_frontier_sample": 75776
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 76800,
+          "safe_boundary_frontier_sample": 76288
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 77312,
+          "safe_boundary_frontier_sample": 76800
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 77824,
+          "safe_boundary_frontier_sample": 77312
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 78336,
+          "safe_boundary_frontier_sample": 77824
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 78848,
+          "safe_boundary_frontier_sample": 78336
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 79360,
+          "safe_boundary_frontier_sample": 78848
+        },
+        {
+          "audio_epoch": 0,
+          "observed_source_sample": 79872,
+          "safe_boundary_frontier_sample": 79360
+        }
+      ]
+    },
+    {
+      "audio_epoch": 1,
+      "boundaries": [],
+      "length_samples": 48000,
+      "progress": [
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 512,
+          "safe_boundary_frontier_sample": 0
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 1024,
+          "safe_boundary_frontier_sample": 512
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 1536,
+          "safe_boundary_frontier_sample": 1024
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 2048,
+          "safe_boundary_frontier_sample": 1536
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 2560,
+          "safe_boundary_frontier_sample": 2048
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 3072,
+          "safe_boundary_frontier_sample": 2560
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 3584,
+          "safe_boundary_frontier_sample": 3072
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 4096,
+          "safe_boundary_frontier_sample": 3584
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 4608,
+          "safe_boundary_frontier_sample": 4096
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 5120,
+          "safe_boundary_frontier_sample": 4608
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 5632,
+          "safe_boundary_frontier_sample": 5120
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 6144,
+          "safe_boundary_frontier_sample": 5632
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 6656,
+          "safe_boundary_frontier_sample": 6144
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 7168,
+          "safe_boundary_frontier_sample": 6656
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 7680,
+          "safe_boundary_frontier_sample": 7168
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 8192,
+          "safe_boundary_frontier_sample": 7680
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 8704,
+          "safe_boundary_frontier_sample": 8192
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 9216,
+          "safe_boundary_frontier_sample": 8704
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 9728,
+          "safe_boundary_frontier_sample": 9216
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 10240,
+          "safe_boundary_frontier_sample": 9728
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 10752,
+          "safe_boundary_frontier_sample": 10240
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 11264,
+          "safe_boundary_frontier_sample": 10752
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 11776,
+          "safe_boundary_frontier_sample": 11264
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 12288,
+          "safe_boundary_frontier_sample": 11776
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 12800,
+          "safe_boundary_frontier_sample": 12288
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 13312,
+          "safe_boundary_frontier_sample": 12800
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 13824,
+          "safe_boundary_frontier_sample": 13312
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 14336,
+          "safe_boundary_frontier_sample": 13824
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 14848,
+          "safe_boundary_frontier_sample": 14336
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 15360,
+          "safe_boundary_frontier_sample": 14848
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 15872,
+          "safe_boundary_frontier_sample": 15360
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 16384,
+          "safe_boundary_frontier_sample": 15872
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 16896,
+          "safe_boundary_frontier_sample": 16384
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 17408,
+          "safe_boundary_frontier_sample": 16896
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 17920,
+          "safe_boundary_frontier_sample": 17408
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 18432,
+          "safe_boundary_frontier_sample": 17920
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 18944,
+          "safe_boundary_frontier_sample": 18432
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 19456,
+          "safe_boundary_frontier_sample": 18944
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 19968,
+          "safe_boundary_frontier_sample": 19456
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 20480,
+          "safe_boundary_frontier_sample": 19968
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 20992,
+          "safe_boundary_frontier_sample": 20480
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 21504,
+          "safe_boundary_frontier_sample": 20992
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 22016,
+          "safe_boundary_frontier_sample": 21504
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 22528,
+          "safe_boundary_frontier_sample": 22016
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 23040,
+          "safe_boundary_frontier_sample": 22528
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 23552,
+          "safe_boundary_frontier_sample": 23040
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 24064,
+          "safe_boundary_frontier_sample": 23552
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 24576,
+          "safe_boundary_frontier_sample": 24064
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 25088,
+          "safe_boundary_frontier_sample": 24576
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 25600,
+          "safe_boundary_frontier_sample": 25088
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 26112,
+          "safe_boundary_frontier_sample": 25600
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 26624,
+          "safe_boundary_frontier_sample": 26112
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 27136,
+          "safe_boundary_frontier_sample": 26624
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 27648,
+          "safe_boundary_frontier_sample": 27136
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 28160,
+          "safe_boundary_frontier_sample": 27648
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 28672,
+          "safe_boundary_frontier_sample": 28160
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 29184,
+          "safe_boundary_frontier_sample": 28672
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 29696,
+          "safe_boundary_frontier_sample": 29184
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 30208,
+          "safe_boundary_frontier_sample": 29696
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 30720,
+          "safe_boundary_frontier_sample": 30208
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 31232,
+          "safe_boundary_frontier_sample": 30720
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 31744,
+          "safe_boundary_frontier_sample": 31232
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 32256,
+          "safe_boundary_frontier_sample": 31744
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 32768,
+          "safe_boundary_frontier_sample": 32256
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 33280,
+          "safe_boundary_frontier_sample": 32768
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 33792,
+          "safe_boundary_frontier_sample": 33280
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 34304,
+          "safe_boundary_frontier_sample": 33792
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 34816,
+          "safe_boundary_frontier_sample": 34304
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 35328,
+          "safe_boundary_frontier_sample": 34816
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 35840,
+          "safe_boundary_frontier_sample": 35328
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 36352,
+          "safe_boundary_frontier_sample": 35840
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 36864,
+          "safe_boundary_frontier_sample": 36352
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 37376,
+          "safe_boundary_frontier_sample": 36864
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 37888,
+          "safe_boundary_frontier_sample": 37376
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 38400,
+          "safe_boundary_frontier_sample": 37888
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 38912,
+          "safe_boundary_frontier_sample": 38400
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 39424,
+          "safe_boundary_frontier_sample": 38912
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 39936,
+          "safe_boundary_frontier_sample": 39424
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 40448,
+          "safe_boundary_frontier_sample": 39936
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 40960,
+          "safe_boundary_frontier_sample": 40448
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 41472,
+          "safe_boundary_frontier_sample": 40960
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 41984,
+          "safe_boundary_frontier_sample": 41472
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 42496,
+          "safe_boundary_frontier_sample": 41984
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 43008,
+          "safe_boundary_frontier_sample": 42496
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 43520,
+          "safe_boundary_frontier_sample": 43008
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 44032,
+          "safe_boundary_frontier_sample": 43520
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 44544,
+          "safe_boundary_frontier_sample": 44032
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 45056,
+          "safe_boundary_frontier_sample": 44544
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 45568,
+          "safe_boundary_frontier_sample": 45056
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 46080,
+          "safe_boundary_frontier_sample": 45568
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 46592,
+          "safe_boundary_frontier_sample": 46080
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 47104,
+          "safe_boundary_frontier_sample": 46592
+        },
+        {
+          "audio_epoch": 1,
+          "observed_source_sample": 47616,
+          "safe_boundary_frontier_sample": 47104
+        }
+      ]
+    },
+    {
+      "audio_epoch": 2,
+      "boundaries": [],
+      "length_samples": 32000,
+      "progress": [
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 512,
+          "safe_boundary_frontier_sample": 0
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 1024,
+          "safe_boundary_frontier_sample": 512
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 1536,
+          "safe_boundary_frontier_sample": 1024
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 2048,
+          "safe_boundary_frontier_sample": 1536
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 2560,
+          "safe_boundary_frontier_sample": 2048
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 3072,
+          "safe_boundary_frontier_sample": 2560
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 3584,
+          "safe_boundary_frontier_sample": 3072
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 4096,
+          "safe_boundary_frontier_sample": 3584
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 4608,
+          "safe_boundary_frontier_sample": 4096
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 5120,
+          "safe_boundary_frontier_sample": 4608
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 5632,
+          "safe_boundary_frontier_sample": 5120
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 6144,
+          "safe_boundary_frontier_sample": 5632
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 6656,
+          "safe_boundary_frontier_sample": 6144
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 7168,
+          "safe_boundary_frontier_sample": 6656
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 7680,
+          "safe_boundary_frontier_sample": 7168
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 8192,
+          "safe_boundary_frontier_sample": 7680
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 8704,
+          "safe_boundary_frontier_sample": 8192
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 9216,
+          "safe_boundary_frontier_sample": 8704
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 9728,
+          "safe_boundary_frontier_sample": 9216
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 10240,
+          "safe_boundary_frontier_sample": 9728
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 10752,
+          "safe_boundary_frontier_sample": 10240
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 11264,
+          "safe_boundary_frontier_sample": 10752
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 11776,
+          "safe_boundary_frontier_sample": 11264
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 12288,
+          "safe_boundary_frontier_sample": 11776
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 12800,
+          "safe_boundary_frontier_sample": 12288
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 13312,
+          "safe_boundary_frontier_sample": 12800
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 13824,
+          "safe_boundary_frontier_sample": 13312
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 14336,
+          "safe_boundary_frontier_sample": 13824
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 14848,
+          "safe_boundary_frontier_sample": 14336
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 15360,
+          "safe_boundary_frontier_sample": 14848
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 15872,
+          "safe_boundary_frontier_sample": 15360
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 16384,
+          "safe_boundary_frontier_sample": 15872
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 16896,
+          "safe_boundary_frontier_sample": 16384
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 17408,
+          "safe_boundary_frontier_sample": 16896
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 17920,
+          "safe_boundary_frontier_sample": 17408
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 18432,
+          "safe_boundary_frontier_sample": 17920
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 18944,
+          "safe_boundary_frontier_sample": 18432
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 19456,
+          "safe_boundary_frontier_sample": 18944
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 19968,
+          "safe_boundary_frontier_sample": 19456
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 20480,
+          "safe_boundary_frontier_sample": 19968
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 20992,
+          "safe_boundary_frontier_sample": 20480
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 21504,
+          "safe_boundary_frontier_sample": 20992
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 22016,
+          "safe_boundary_frontier_sample": 21504
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 22528,
+          "safe_boundary_frontier_sample": 22016
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 23040,
+          "safe_boundary_frontier_sample": 22528
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 23552,
+          "safe_boundary_frontier_sample": 23040
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 24064,
+          "safe_boundary_frontier_sample": 23552
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 24576,
+          "safe_boundary_frontier_sample": 24064
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 25088,
+          "safe_boundary_frontier_sample": 24576
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 25600,
+          "safe_boundary_frontier_sample": 25088
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 26112,
+          "safe_boundary_frontier_sample": 25600
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 26624,
+          "safe_boundary_frontier_sample": 26112
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 27136,
+          "safe_boundary_frontier_sample": 26624
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 27648,
+          "safe_boundary_frontier_sample": 27136
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 28160,
+          "safe_boundary_frontier_sample": 27648
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 28672,
+          "safe_boundary_frontier_sample": 28160
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 29184,
+          "safe_boundary_frontier_sample": 28672
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 29696,
+          "safe_boundary_frontier_sample": 29184
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 30208,
+          "safe_boundary_frontier_sample": 29696
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 30720,
+          "safe_boundary_frontier_sample": 30208
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 31232,
+          "safe_boundary_frontier_sample": 30720
+        },
+        {
+          "audio_epoch": 2,
+          "observed_source_sample": 31744,
+          "safe_boundary_frontier_sample": 31232
+        }
+      ]
+    }
+  ],
+  "finished_at_utc": "2026-08-07T10:30:48.994254+00:00",
+  "manifest_id": "b0_phase0",
+  "manifest_sha256": "c6938a08f178d359764b5fc59d37fc978a94e3ff54cb37f4f90e45b888c48d3a",
+  "profile_id": "b0-500ms-hangover-500ms-preroll",
+  "result_id": "c6cc0f70-e030-494b-8a8c-c14ab8e7e731",
+  "result_sha256": "c92a7751a9739018f7241f175a0b873f78b246ac4824f8934da023266a77977d",
+  "runtime_metadata": {
+    "b0_vad_hangover_ms": 500,
+    "b0_vad_max_segment_ms": 7000,
+    "b0_vad_pre_roll_ms": 500,
+    "b0_vad_profile": "peer",
+    "b0_vad_speech_threshold": 0.5,
+    "b0_vad_start_commit_chunks": 3,
+    "b0_vad_start_debounce_chunks": 3,
+    "baseline_label": "dev",
+    "baseline_sha": "adf8cde2b5b166beb95c50a39e8941d2fee3601e",
+    "canonical_sample_rate_hz": 16000,
+    "cpu_count": 16,
+    "machine": "AMD64",
+    "onnxruntime_version": "1.28.0",
+    "ort_graph_optimization": "ORT_ENABLE_ALL",
+    "ort_inter_op_threads": 1,
+    "ort_intra_op_threads": 1,
+    "ort_provider": "CPUExecutionProvider",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "platform_release": "11",
+    "platform_version": "10.0.22631",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "python_full": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "python_implementation": "CPython",
+    "python_version": "3.12.10",
+    "ram_total_bytes": 33933414400,
+    "vad_coalesce_window_ms": 500
+  },
+  "schema_version": "experiments.speaker_turn_boundary.result.v1",
+  "seed": 7,
+  "started_at_utc": "2026-08-07T10:30:48.715257+00:00"
+}
