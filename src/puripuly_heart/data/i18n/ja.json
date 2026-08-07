@@ -1,10 +1,10 @@
 {
   "app.title": "PuriPuly <3",
   "desktop_overlay.window.title": "PuriPuly Overlay",
-  "dashboard.stt_label": "STT",
-  "dashboard.peer_label": "PEER",
+  "dashboard.stt_label": "TALK",
+  "dashboard.peer_label": "LISTEN",
   "dashboard.trans_label": "TRANS",
-  "dashboard.overlay_label": "Subtitles",
+  "dashboard.overlay_label": "CAPTIONS",
   "dashboard.ready": "翻訳準備完了...",
   "dashboard.managed_auth_pending": "認証中です...",
   "dashboard.trial.source.managed": "マネージド",

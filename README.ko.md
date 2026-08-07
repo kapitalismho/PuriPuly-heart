@@ -159,10 +159,10 @@ PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습�
 
 1. [다운로드 페이지](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)에서 최신 버전 다운로드
 2. PuriPuly 설치
-3. **STT** 버튼 클릭
+3. **TALK** 버튼 클릭
 4. **TRANS** 버튼 클릭 후 디스코드 인증 
-5. **Subtitles** 버튼을 눌러 VR 자막 켜기 
-6. (선택) **Peer** 버튼을 눌러 상대 음성 번역 켜기
+5. **CAPTIONS** 버튼을 눌러 VR 자막 켜기 
+6. (선택) **LISTEN** 버튼을 눌러 상대 음성 번역 켜기
 
    > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.
 

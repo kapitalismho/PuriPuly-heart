@@ -540,8 +540,8 @@ def test_dashboard_builds_4x3_friendly_shell_without_managed_trial_row(
     assert view.control_grid.spacing == dashboard_module.DASHBOARD_LAYOUT_GAP
     assert view.top_controls.spacing == dashboard_module.DASHBOARD_LAYOUT_GAP
     assert view.bottom_controls.spacing == dashboard_module.DASHBOARD_LAYOUT_GAP
-    assert _button_labels(view.top_controls) == ["STT", "PEER"]
-    assert _button_labels(view.bottom_controls) == ["TRANS", "Subtitles"]
+    assert _button_labels(view.top_controls) == ["TALK", "LISTEN"]
+    assert _button_labels(view.bottom_controls) == ["TRANS", "CAPTIONS"]
     assert view.stt_button.kwargs["icon_size"] == dashboard_module.DASHBOARD_POWER_BUTTON_ICON_SIZE
     assert view.peer_button.kwargs["icon_size"] == dashboard_module.DASHBOARD_POWER_BUTTON_ICON_SIZE
     assert (
@@ -591,10 +591,10 @@ def test_dashboard_apply_locale_and_dialog_open_paths(monkeypatch: pytest.Monkey
 
     assert FakeLanguageModal.opened[0][0] == "ko"
     assert FakeLanguageModal.opened[1][0] == "en"
-    assert view.stt_button.label == "STT"
-    assert view.peer_button.label == "PEER"
+    assert view.stt_button.label == "TALK"
+    assert view.peer_button.label == "LISTEN"
     assert view.trans_button.label == "TRANS"
-    assert view.overlay_button.label == "Subtitles"
+    assert view.overlay_button.label == "CAPTIONS"
     warning_texts = [text for text, _is_error, _font in view.display_card.display_calls]
     assert dashboard_module.t("dashboard.warn_stt_key") in warning_texts
     assert dashboard_module.t("dashboard.warn_llm_key") in warning_texts

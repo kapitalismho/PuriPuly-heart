@@ -159,10 +159,10 @@ PuriPulyを通じて他の外国人の友達と実際に交流している様子
 
 1. [ダウンロードページ](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)から最新バージョンをダウンロード
 2. PuriPulyをインストール
-3. **STT** ボタンをクリック
+3. **TALK** ボタンをクリック
 4. **TRANS** ボタンをクリックしてDiscord認証
-5. **Subtitles** ボタンを押してVR字幕をオン
-6. （任意）**Peer** ボタンを押して相手の音声翻訳をオン
+5. **CAPTIONS** ボタンを押してVR字幕をオン
+6. （任意）**LISTEN** ボタンを押して相手の音声翻訳をオン
 
    > 相手の音声翻訳機能がきちんと動作するには、騒がしくない環境が必要です。VRChatで使う場合は、Earmuff機能を使って環境をコントロールしてください。
 

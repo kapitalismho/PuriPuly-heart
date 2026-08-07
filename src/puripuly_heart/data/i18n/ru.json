@@ -1,10 +1,10 @@
 {
   "app.title": "PuriPuly <3",
   "desktop_overlay.window.title": "PuriPuly Оверлей",
-  "dashboard.stt_label": "STT",
-  "dashboard.peer_label": "PEER",
+  "dashboard.stt_label": "TALK",
+  "dashboard.peer_label": "LISTEN",
   "dashboard.trans_label": "TRANS",
-  "dashboard.overlay_label": "Субтитры",
+  "dashboard.overlay_label": "CAPTIONS",
   "dashboard.ready": "Готов к переводу...",
   "dashboard.managed_auth_pending": "Авторизация...",
   "dashboard.trial.source.managed": "Управляемый",

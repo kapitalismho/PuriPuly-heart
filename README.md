@@ -159,10 +159,10 @@ So I built one that can.
 
 1. Download the latest version from the [Download page](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
 2. Install PuriPuly.
-3. Click the **STT** button.
+3. Click the **TALK** button.
 4. Click the **TRANS** button, then authenticate via Discord.
-5. Click the **Subtitles** button to turn on VR subtitles.
-6. (Optional) Click the **Peer** button to enable translation of the other person's voice.
+5. Click the **CAPTIONS** button to turn on VR subtitles.
+6. (Optional) Click the **LISTEN** button to enable translation of the other person's voice.
 
    > Peer voice translation needs a low-noise space to work properly. When using it in VRChat, use Earmuff to control the environment.
 

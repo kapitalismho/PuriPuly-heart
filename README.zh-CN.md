@@ -160,10 +160,10 @@
 
 1. 从[下载页面](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)下载最新版本
 2. 安装 PuriPuly
-3. 点击 **STT** 按钮
+3. 点击 **TALK** 按钮
 4. 点击 **TRANS** 按钮后通过 Discord 验证
-5. 点击 **Subtitles** 按钮开启 VR 字幕
-6. （可选）点击 **Peer** 按钮开启对方语音翻译
+5. 点击 **CAPTIONS** 按钮开启 VR 字幕
+6. （可选）点击 **LISTEN** 按钮开启对方语音翻译
 
    > 对方语音翻译功能正常工作需要噪音较少的环境。若在 VRChat 中使用，请通过 Earmuff 功能控制环境。
 
