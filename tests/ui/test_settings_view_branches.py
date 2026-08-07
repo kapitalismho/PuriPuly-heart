@@ -6869,13 +6869,13 @@ def test_prompt_tab_hides_prompt_provider_copy_and_old_language_helper_text(
     [
         (
             "ko",
-            "자신이 말한 단어의 인식률을 높일 수 있어요. 현재는 Soniox와 Deepgram만 지원해요.",
+            "현재는 Soniox와 Deepgram만 지원해요.",
         ),
         (
             "en",
-            "You can improve recognition of words you say. Currently, only Soniox and Deepgram support this.",
+            "Currently, only Soniox and Deepgram support this.",
         ),
-        ("zh-CN", "可以提高你自己说出的单词的识别率。目前仅支持 Soniox 和 Deepgram。"),
+        ("zh-CN", "目前仅支持 Soniox 和 Deepgram。"),
     ],
 )
 def test_custom_vocabulary_inline_helper_copy_matches_provider_scope(
@@ -6905,9 +6905,9 @@ def test_custom_vocabulary_inline_helper_copy_matches_provider_scope(
 @pytest.mark.parametrize(
     ("locale", "expected_title"),
     [
-        ("ko", "음성 인식 힌트"),
-        ("en", "Speech Recognition Hints"),
-        ("zh-CN", "语音识别提示"),
+        ("ko", "단어 인식 힌트"),
+        ("en", "Word Recognition Hints"),
+        ("zh-CN", "单词识别提示"),
     ],
 )
 def test_custom_vocabulary_card_title_uses_generic_hint_wording(

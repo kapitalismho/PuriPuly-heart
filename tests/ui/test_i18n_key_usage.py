@@ -86,28 +86,28 @@ CUSTOM_VOCABULARY_EXISTING_I18N_KEYS = (
 )
 EXPECTED_CUSTOM_VOCABULARY_TAG_EDITOR_COPY = {
     "en": {
-        "settings.custom_vocabulary.description": "You can improve recognition of words you say. Currently, only Soniox and Deepgram support this.",
+        "settings.custom_vocabulary.description": "Currently, only Soniox and Deepgram support this.",
         "settings.custom_vocabulary.add_placeholder": "",
         "settings.custom_vocabulary.add_action": "Add",
         "settings.custom_vocabulary.empty": "No hints yet.",
         "settings.custom_vocabulary.remove_hint": "Remove {term}",
     },
     "ko": {
-        "settings.custom_vocabulary.description": "자신이 말한 단어의 인식률을 높일 수 있어요. 현재는 Soniox와 Deepgram만 지원해요.",
+        "settings.custom_vocabulary.description": "현재는 Soniox와 Deepgram만 지원해요.",
         "settings.custom_vocabulary.add_placeholder": "",
         "settings.custom_vocabulary.add_action": "추가",
         "settings.custom_vocabulary.empty": "아직 추가된 힌트가 없어요.",
         "settings.custom_vocabulary.remove_hint": "{term} 삭제",
     },
     "zh-CN": {
-        "settings.custom_vocabulary.description": "可以提高你自己说出的单词的识别率。目前仅支持 Soniox 和 Deepgram。",
+        "settings.custom_vocabulary.description": "目前仅支持 Soniox 和 Deepgram。",
         "settings.custom_vocabulary.add_placeholder": "",
         "settings.custom_vocabulary.add_action": "添加",
         "settings.custom_vocabulary.empty": "还没有添加提示。",
         "settings.custom_vocabulary.remove_hint": "删除 {term}",
     },
     "ja": {
-        "settings.custom_vocabulary.description": "自分が話す単語の認識率を高められます。現在は Soniox と Deepgram のみ対応しています。",
+        "settings.custom_vocabulary.description": "現在は Soniox と Deepgram のみ対応しています。",
         "settings.custom_vocabulary.add_placeholder": "",
         "settings.custom_vocabulary.add_action": "追加",
         "settings.custom_vocabulary.empty": "追加されたヒントはまだありません。",
