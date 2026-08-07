@@ -822,7 +822,6 @@
     ],
     "i18n_parity": [
       "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_share_the_same_keys",
-      "tests/ui/test_i18n_key_usage.py::test_available_locales_use_product_display_order",
       "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_do_not_keep_unused_runtime_keys"
     ],
     "packaging": [
