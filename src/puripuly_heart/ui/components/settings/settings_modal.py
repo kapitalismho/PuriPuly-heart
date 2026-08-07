@@ -14,10 +14,10 @@ from puripuly_heart.app.ports.ui_models import OptionItem
 from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
-    COLOR_NEUTRAL,
     COLOR_NEUTRAL_DARK,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
+    COLOR_SECONDARY,
     COLOR_SURFACE,
 )
 
@@ -84,7 +84,7 @@ class SettingsModal:
                 self._title,
                 size=24,
                 weight=ft.FontWeight.BOLD,
-                color=COLOR_NEUTRAL,
+                color=COLOR_SECONDARY,
             ),
             ft.Container(height=16),
             option_list,
@@ -337,7 +337,7 @@ class SettingsModal:
                 label,
                 size=18,
                 weight=ft.FontWeight.BOLD,
-                color=COLOR_NEUTRAL,
+                color=COLOR_SECONDARY,
             )
         )
         return ft.Container(

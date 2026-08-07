@@ -15,11 +15,11 @@ from puripuly_heart.ui.flet_runtime import (
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_DIVIDER,
-    COLOR_NEUTRAL,
     COLOR_ON_BACKGROUND,
     COLOR_ON_PRIMARY_CONTAINER,
     COLOR_PRIMARY,
     COLOR_PRIMARY_CONTAINER,
+    COLOR_SECONDARY,
     COLOR_SURFACE,
 )
 
@@ -81,7 +81,7 @@ class _BottomDockedTextTab(ft.Container):
             size=20,
             weight=ft.FontWeight.W_600,
             font_family=font_family,
-            color=COLOR_PRIMARY if active else COLOR_NEUTRAL,
+            color=COLOR_PRIMARY if active else COLOR_SECONDARY,
             text_align=ft.TextAlign.CENTER,
             max_lines=1,
             overflow=ft.TextOverflow.ELLIPSIS,
@@ -100,7 +100,7 @@ class _BottomDockedTextTab(ft.Container):
 
     def set_active(self, active: bool) -> None:
         self._active = active
-        self.label.color = COLOR_PRIMARY if active else COLOR_NEUTRAL
+        self.label.color = COLOR_PRIMARY if active else COLOR_SECONDARY
         self._refresh()
 
     def set_font_family(self, font_family: str | None) -> None:
@@ -114,7 +114,7 @@ class _BottomDockedTextTab(ft.Container):
     def _handle_hover(self, e) -> None:
         if self._active:
             return
-        self.label.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_NEUTRAL
+        self.label.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_SECONDARY
         self._refresh()
 
     def _refresh(self) -> None:
@@ -230,7 +230,7 @@ class TextSubtabShell(ft.Column):
 
     def _button_style(self, *, active: bool) -> ft.ButtonStyle:
         if self._is_bottom_docked:
-            default_text = COLOR_PRIMARY if active else COLOR_NEUTRAL
+            default_text = COLOR_PRIMARY if active else COLOR_SECONDARY
             hovered_text = COLOR_PRIMARY
             background = ft.Colors.TRANSPARENT
             shape = ft.RoundedRectangleBorder(radius=0)

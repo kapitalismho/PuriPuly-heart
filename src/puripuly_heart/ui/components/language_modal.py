@@ -13,9 +13,9 @@ from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.i18n import language_name, t
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
-    COLOR_NEUTRAL,
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
+    COLOR_SECONDARY,
     COLOR_SURFACE,
 )
 
@@ -87,7 +87,7 @@ class LanguageModal:
                 t("language_modal.recent"),
                 size=18,
                 weight=ft.FontWeight.BOLD,
-                color=COLOR_NEUTRAL,
+                color=COLOR_SECONDARY,
             )
         )
 
@@ -102,7 +102,7 @@ class LanguageModal:
                 t("language_modal.all_languages"),
                 size=18,
                 weight=ft.FontWeight.BOLD,
-                color=COLOR_NEUTRAL,
+                color=COLOR_SECONDARY,
             )
         )
 

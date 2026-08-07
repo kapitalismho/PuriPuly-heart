@@ -6,8 +6,8 @@ from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_DIVIDER,
-    COLOR_NEUTRAL,
     COLOR_PRIMARY,
+    COLOR_SECONDARY,
 )
 
 
@@ -48,7 +48,7 @@ class BottomNavBar(ft.Container):
         self._icons = []
         for i, icon_name in enumerate(self._tabs):
             is_selected = i == self._selected
-            icon_color = COLOR_PRIMARY if is_selected else COLOR_NEUTRAL
+            icon_color = COLOR_PRIMARY if is_selected else COLOR_SECONDARY
 
             icon = ft.Icon(icon=icon_name, size=30, color=icon_color)
             self._icons.append(icon)
@@ -82,11 +82,11 @@ class BottomNavBar(ft.Container):
         """Handle tab hover."""
         if index != self._selected:
             icon = self._icons[index]
-            icon.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_NEUTRAL
+            icon.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_SECONDARY
             icon.update()
 
     def _update_visuals(self):
         """Update all tab visuals based on selection."""
         for i, icon in enumerate(self._icons):
-            icon.color = COLOR_PRIMARY if i == self._selected else COLOR_NEUTRAL
+            icon.color = COLOR_PRIMARY if i == self._selected else COLOR_SECONDARY
             icon.update()

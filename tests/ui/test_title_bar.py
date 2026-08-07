@@ -7,7 +7,7 @@ import pytest
 pytest.importorskip("flet")
 
 from puripuly_heart.ui.components.title_bar import TitleBar
-from puripuly_heart.ui.theme import COLOR_NEUTRAL, COLOR_NEUTRAL_DARK
+from puripuly_heart.ui.theme import COLOR_NEUTRAL_DARK, COLOR_SECONDARY
 
 
 class DummyWindow:
@@ -41,21 +41,21 @@ def test_title_bar_window_controls_and_hover(monkeypatch: pytest.MonkeyPatch) ->
     assert close_calls == ["close"]
     assert page.updated == 1
 
-    icon = SimpleNamespace(color=COLOR_NEUTRAL, update=lambda: None)
+    icon = SimpleNamespace(color=COLOR_SECONDARY, update=lambda: None)
     bar._on_btn_hover(SimpleNamespace(control=SimpleNamespace(content=icon), data="true"))
     assert icon.color == COLOR_NEUTRAL_DARK
     bar._on_btn_hover(SimpleNamespace(control=SimpleNamespace(content=icon), data="false"))
-    assert icon.color == COLOR_NEUTRAL
+    assert icon.color == COLOR_SECONDARY
 
     close_container = SimpleNamespace(
-        content=SimpleNamespace(color=COLOR_NEUTRAL, update=lambda: None),
+        content=SimpleNamespace(color=COLOR_SECONDARY, update=lambda: None),
         bgcolor=None,
         update=lambda: None,
     )
     bar._on_close_hover(SimpleNamespace(control=close_container, data="true"))
-    assert close_container.content.color != COLOR_NEUTRAL
+    assert close_container.content.color != COLOR_SECONDARY
     bar._on_close_hover(SimpleNamespace(control=close_container, data="false"))
-    assert close_container.content.color == COLOR_NEUTRAL
+    assert close_container.content.color == COLOR_SECONDARY
 
 
 def test_title_bar_set_title_updates_text(monkeypatch: pytest.MonkeyPatch) -> None:

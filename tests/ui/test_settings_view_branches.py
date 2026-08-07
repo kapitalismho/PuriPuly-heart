@@ -7486,17 +7486,17 @@ def test_settings_subtab_bar_matches_bottom_nav_family_structure(
     assert all(divider.thickness == nav_dividers[0].thickness for divider in dividers)
     assert all(divider.color == nav_dividers[0].color for divider in dividers)
     assert _subtab_text_color(buttons[0]) == subtab_shell_module.COLOR_PRIMARY
-    assert _subtab_text_color(buttons[1]) == subtab_shell_module.COLOR_NEUTRAL
+    assert _subtab_text_color(buttons[1]) == subtab_shell_module.COLOR_SECONDARY
 
     buttons[1].on_hover(SimpleNamespace(data="true"))
     assert _subtab_text_color(buttons[1]) == subtab_shell_module.COLOR_PRIMARY
 
     buttons[1].on_hover(SimpleNamespace(data="false"))
-    assert _subtab_text_color(buttons[1]) == subtab_shell_module.COLOR_NEUTRAL
+    assert _subtab_text_color(buttons[1]) == subtab_shell_module.COLOR_SECONDARY
 
     buttons[1].on_click(SimpleNamespace())
     assert shell.active_key == "general"
-    assert _subtab_text_color(buttons[0]) == subtab_shell_module.COLOR_NEUTRAL
+    assert _subtab_text_color(buttons[0]) == subtab_shell_module.COLOR_SECONDARY
     assert _subtab_text_color(buttons[1]) == subtab_shell_module.COLOR_PRIMARY
 
 

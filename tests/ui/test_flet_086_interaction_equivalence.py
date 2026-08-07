@@ -27,9 +27,9 @@ from puripuly_heart.ui.components.settings.prompt_editor import PromptEditor
 from puripuly_heart.ui.components.subtab_shell import TextSubtab, TextSubtabShell
 from puripuly_heart.ui.flet_runtime import FILL_PARENT_WIDTH, is_hover_active
 from puripuly_heart.ui.theme import (
-    COLOR_NEUTRAL,
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
+    COLOR_SECONDARY,
     get_app_theme,
 )
 from tests.helpers.paths import REPO_ROOT as ROOT
@@ -90,7 +90,7 @@ def test_bottom_nav_hover_reacts_to_boolean_payloads(monkeypatch: pytest.MonkeyP
     assert icon.color == COLOR_PRIMARY
 
     nav._on_tab_hover(SimpleNamespace(data=False), 1)
-    assert icon.color == COLOR_NEUTRAL
+    assert icon.color == COLOR_SECONDARY
 
 
 def test_bottom_docked_subtab_hover_reacts_to_boolean_payloads() -> None:
@@ -107,7 +107,7 @@ def test_bottom_docked_subtab_hover_reacts_to_boolean_payloads() -> None:
     assert inactive_tab.label.color == COLOR_PRIMARY
 
     inactive_tab._handle_hover(SimpleNamespace(data=False))
-    assert inactive_tab.label.color == COLOR_NEUTRAL
+    assert inactive_tab.label.color == COLOR_SECONDARY
 
 
 def test_prompt_editor_field_fills_available_width() -> None:

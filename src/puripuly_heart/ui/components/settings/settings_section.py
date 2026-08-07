@@ -5,7 +5,7 @@ import flet as ft
 from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
-    COLOR_NEUTRAL,
+    COLOR_SECONDARY,
     COLOR_SURFACE,
 )
 
@@ -27,7 +27,7 @@ class SettingsSection(ft.Container):
             t(title_key),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
 
         inner_content = ft.Column(

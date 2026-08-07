@@ -19,9 +19,9 @@ from puripuly_heart.ui.i18n import get_locale, source_label, t
 from puripuly_heart.ui.logs.contract import LogsIntents, LogsSurfaceSlots
 from puripuly_heart.ui.logs.renderer import compose_logs_surface
 from puripuly_heart.ui.theme import (
-    COLOR_NEUTRAL,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
+    COLOR_SECONDARY,
 )
 
 MAX_LOG_ENTRIES = 4000
@@ -191,11 +191,11 @@ class LogsView(ft.Column):
         return ft.ButtonStyle(
             color={
                 ft.ControlState.HOVERED: COLOR_PRIMARY,
-                ft.ControlState.DEFAULT: COLOR_NEUTRAL,
+                ft.ControlState.DEFAULT: COLOR_SECONDARY,
             },
             icon_color={
                 ft.ControlState.HOVERED: COLOR_PRIMARY,
-                ft.ControlState.DEFAULT: COLOR_NEUTRAL,
+                ft.ControlState.DEFAULT: COLOR_SECONDARY,
             },
             text_style=ft.TextStyle(
                 size=20,
@@ -214,7 +214,7 @@ class LogsView(ft.Column):
             t("logs.title"),
             size=28,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
 
         # Folder open button (brown, hover -> primary)

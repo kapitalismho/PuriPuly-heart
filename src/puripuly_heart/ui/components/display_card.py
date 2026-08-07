@@ -11,7 +11,6 @@ from puripuly_heart.ui.flet_runtime import (
 )
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
-    COLOR_NEUTRAL,
     COLOR_NEUTRAL_DARK,
     COLOR_SECONDARY,
     COLOR_SURFACE,
@@ -164,7 +163,9 @@ class DisplayCard(ft.Container):
         input_footer = ft.Column(
             [
                 ft.Container(
-                    content=ft.Divider(height=1, color=ft.Colors.with_opacity(0.2, COLOR_NEUTRAL)),
+                    content=ft.Divider(
+                        height=1, color=ft.Colors.with_opacity(0.2, COLOR_SECONDARY)
+                    ),
                     padding=ft.Padding.only(bottom=4),
                 ),
                 ft.Row(

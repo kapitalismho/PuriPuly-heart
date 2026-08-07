@@ -12,11 +12,11 @@ from puripuly_heart.ui.flet_runtime import (
 )
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
-    COLOR_NEUTRAL,
     COLOR_NEUTRAL_DARK,
     COLOR_ON_PRIMARY_CONTAINER,
     COLOR_PRIMARY,
     COLOR_PRIMARY_CONTAINER,
+    COLOR_SECONDARY,
 )
 
 _CHIP_TERM_WIDTH = 220
@@ -51,7 +51,7 @@ class CustomVocabularyTagEditor(ft.Column):
         self._empty_text = ft.Text(
             "",
             size=14,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
             max_lines=2,
             overflow=ft.TextOverflow.ELLIPSIS,
             visible=False,

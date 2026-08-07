@@ -6,8 +6,8 @@ from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mo
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_DIVIDER,
-    COLOR_NEUTRAL,
     COLOR_NEUTRAL_DARK,
+    COLOR_SECONDARY,
 )
 
 
@@ -27,7 +27,7 @@ class TitleBar(ft.Container):
         )
 
         minimize_btn = ft.Container(
-            content=ft.Icon(ft.Icons.REMOVE, size=18, color=COLOR_NEUTRAL),
+            content=ft.Icon(ft.Icons.REMOVE, size=18, color=COLOR_SECONDARY),
             width=40,
             height=40,
             alignment=ft.Alignment.CENTER,
@@ -36,7 +36,7 @@ class TitleBar(ft.Container):
         )
 
         self._maximize_btn = ft.Container(
-            content=ft.Icon(ft.Icons.CROP_SQUARE, size=16, color=COLOR_NEUTRAL),
+            content=ft.Icon(ft.Icons.CROP_SQUARE, size=16, color=COLOR_SECONDARY),
             width=40,
             height=40,
             alignment=ft.Alignment.CENTER,
@@ -44,7 +44,7 @@ class TitleBar(ft.Container):
         )
 
         self._close_btn = ft.Container(
-            content=ft.Icon(ft.Icons.CLOSE, size=18, color=COLOR_NEUTRAL),
+            content=ft.Icon(ft.Icons.CLOSE, size=18, color=COLOR_SECONDARY),
             width=40,
             height=40,
             alignment=ft.Alignment.CENTER,
@@ -97,7 +97,7 @@ class TitleBar(ft.Container):
         if is_hover_active(e):
             icon.color = COLOR_NEUTRAL_DARK
         else:
-            icon.color = COLOR_NEUTRAL
+            icon.color = COLOR_SECONDARY
         icon.update()
 
     def _on_close_hover(self, e):
@@ -108,7 +108,7 @@ class TitleBar(ft.Container):
             icon.color = ft.Colors.WHITE
         else:
             container.bgcolor = ft.Colors.TRANSPARENT
-            icon.color = COLOR_NEUTRAL
+            icon.color = COLOR_SECONDARY
         container.update()
         icon.update()
 

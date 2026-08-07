@@ -13,9 +13,9 @@ from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
-    COLOR_NEUTRAL,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
+    COLOR_SECONDARY,
     COLOR_SURFACE,
 )
 
@@ -84,7 +84,7 @@ class AboutView(ft.Column):
             t("about.version"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         version_text = ft.Container(
             content=ft.Text(
@@ -140,7 +140,7 @@ class AboutView(ft.Column):
                     t("about.developed_by"),
                     size=24,
                     weight=ft.FontWeight.BOLD,
-                    color=COLOR_NEUTRAL,
+                    color=COLOR_SECONDARY,
                 ),
                 ft.Container(height=16),
                 ft.Row(
@@ -184,7 +184,7 @@ class AboutView(ft.Column):
                     t("about.inspired_by"),
                     size=24,
                     weight=ft.FontWeight.BOLD,
-                    color=COLOR_NEUTRAL,
+                    color=COLOR_SECONDARY,
                 ),
                 ft.Container(height=16),
                 ft.Container(
@@ -238,7 +238,7 @@ class AboutView(ft.Column):
                     t("about.special_thanks"),
                     size=24,
                     weight=ft.FontWeight.BOLD,
-                    color=COLOR_NEUTRAL,
+                    color=COLOR_SECONDARY,
                 ),
                 ft.Container(height=16),
                 ft.Container(
@@ -265,7 +265,7 @@ class AboutView(ft.Column):
                     t("about.licenses"),
                     size=24,
                     weight=ft.FontWeight.BOLD,
-                    color=COLOR_NEUTRAL,
+                    color=COLOR_SECONDARY,
                 ),
                 ft.Container(height=16),
                 ft.Container(

@@ -14,9 +14,9 @@ from puripuly_heart.ui.flet_runtime import control_page, update_control_if_mount
 from puripuly_heart.ui.i18n import provider_label, t
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
-    COLOR_NEUTRAL,
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
+    COLOR_SECONDARY,
     COLOR_WARNING,
 )
 
@@ -72,7 +72,7 @@ class ApiKeyField(ft.Row):
         self._current_status = "idle"
         self._status_icon = ft.Icon(
             icon=icons.HELP_OUTLINE_ROUNDED,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
             size=36,
             tooltip=t("api_key.status.idle"),
         )
@@ -124,8 +124,8 @@ class ApiKeyField(ft.Row):
             return
 
         icon_map = {
-            "idle": (icons.HELP_OUTLINE_ROUNDED, COLOR_NEUTRAL, "api_key.status.idle"),
-            "verifying": (icons.HOURGLASS_TOP_ROUNDED, COLOR_NEUTRAL, "api_key.status.verifying"),
+            "idle": (icons.HELP_OUTLINE_ROUNDED, COLOR_SECONDARY, "api_key.status.idle"),
+            "verifying": (icons.HOURGLASS_TOP_ROUNDED, COLOR_SECONDARY, "api_key.status.verifying"),
             "success": (icons.CHECK_CIRCLE_ROUNDED, COLOR_PRIMARY, "api_key.status.success"),
             "error": (icons.WARNING_ROUNDED, COLOR_WARNING, "api_key.status.error"),
         }

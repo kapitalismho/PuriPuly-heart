@@ -100,10 +100,10 @@ from puripuly_heart.ui.settings.renderer import (
 )
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
-    COLOR_NEUTRAL,
     COLOR_NEUTRAL_DARK,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
+    COLOR_SECONDARY,
 )
 
 logger = logging.getLogger(__name__)
@@ -793,7 +793,7 @@ class SettingsView(ft.Column):
         font_family: str,
         *,
         size: int = 20,
-        default_color: str = COLOR_NEUTRAL,
+        default_color: str = COLOR_SECONDARY,
         disabled_color: str | None = None,
     ) -> ft.ButtonStyle:
         """Create a complete ButtonStyle with the specified font."""
@@ -857,7 +857,7 @@ class SettingsView(ft.Column):
         on_click,
         *,
         size: int = 20,
-        default_color: str = COLOR_NEUTRAL,
+        default_color: str = COLOR_SECONDARY,
         disabled_color: str | None = None,
         width: float | int | None = None,
         height: float | int | None = None,
@@ -988,7 +988,7 @@ class SettingsView(ft.Column):
             self._on_stt_click,
         )
         self._stt_title = ft.Text(
-            t("settings.section.stt"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_NEUTRAL
+            t("settings.section.stt"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_SECONDARY
         )
         self._stt_provider_label = ft.Text(
             t("settings.self_stt_provider"), size=16, color=COLOR_ON_BACKGROUND
@@ -1006,7 +1006,7 @@ class SettingsView(ft.Column):
             t("settings.section.translation"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._translation_provider_label = ft.Text(
             t("settings.shared_translation_provider"), size=16, color=COLOR_ON_BACKGROUND
@@ -1023,7 +1023,7 @@ class SettingsView(ft.Column):
             style=ft.ButtonStyle(
                 color={
                     ft.ControlState.HOVERED: COLOR_PRIMARY,
-                    ft.ControlState.DEFAULT: COLOR_NEUTRAL,
+                    ft.ControlState.DEFAULT: COLOR_SECONDARY,
                 },
                 text_style=ft.TextStyle(
                     size=20,
@@ -1061,12 +1061,12 @@ class SettingsView(ft.Column):
             t("settings.peer_auto_languages.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._peer_auto_languages_description = ft.Text(
             t("settings.peer_auto_languages.description"),
             size=16,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._peer_auto_languages_editor = LanguageHintEditor(
             on_add=self._on_peer_auto_languages_add,
@@ -1144,7 +1144,7 @@ class SettingsView(ft.Column):
             t("settings.managed_key.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._managed_key_referral_id_label = ft.Text(
             t("settings.managed_key.referral_id.label"),
@@ -1162,7 +1162,7 @@ class SettingsView(ft.Column):
         self._managed_key_referral_helper_text = ft.Text(
             t("settings.managed_key.referral_id.pending_helper"),
             size=14,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._managed_key_invite_progress_label = ft.Text(
             t("settings.managed_key.invite_progress.label"),
@@ -1254,12 +1254,15 @@ class SettingsView(ft.Column):
         )
 
         self._api_title = ft.Text(
-            t("settings.section.api_keys"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_NEUTRAL
+            t("settings.section.api_keys"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
         )
         self._api_credentials_helper_text = ft.Text(
             t("settings.api_credentials_helper"),
             size=16,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         # Header row with title and region button
         api_header = ft.Row(
@@ -1290,7 +1293,7 @@ class SettingsView(ft.Column):
             self._on_ui_click,
         )
         self._ui_title = ft.Text(
-            t("settings.section.ui"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_NEUTRAL
+            t("settings.section.ui"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_SECONDARY
         )
         ui_card = self._wrap_unit_card(
             title=self._ui_title,
@@ -1306,7 +1309,7 @@ class SettingsView(ft.Column):
             t("settings.chatbox_include_source"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         chatbox_source_card = self._wrap_unit_card(
             title=self._chatbox_source_title,
@@ -1321,7 +1324,7 @@ class SettingsView(ft.Column):
             t("settings.clipboard_auto_translate"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         clipboard_auto_translate_card = self._wrap_unit_card(
             title=self._clipboard_auto_translate_title,
@@ -1336,7 +1339,7 @@ class SettingsView(ft.Column):
             t("settings.telemetry.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._telemetry_consent_card = self._wrap_unit_card(
             title=self._telemetry_consent_title,
@@ -1351,7 +1354,7 @@ class SettingsView(ft.Column):
             t("settings.vrc_mic_intercept"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         vrc_mic_card = self._wrap_unit_card(
             title=self._vrc_mic_title,
@@ -1366,7 +1369,7 @@ class SettingsView(ft.Column):
             t("settings.microphone_test"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         microphone_test_card = self._wrap_unit_card(
             title=self._microphone_test_title,
@@ -1385,7 +1388,7 @@ class SettingsView(ft.Column):
             t("settings.audio_host_api"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._audio_host_api_text = self._build_clickable_text(
             t("settings.default_option"),
@@ -1399,7 +1402,7 @@ class SettingsView(ft.Column):
             t("settings.section.microphone_audio"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         mic_audio_card = self._wrap_unit_card(
             title=self._mic_audio_title,
@@ -1414,7 +1417,7 @@ class SettingsView(ft.Column):
             t("settings.section.loopback_audio"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         loopback_audio_card = self._wrap_unit_card(
             title=self._loopback_audio_title,
@@ -1429,7 +1432,7 @@ class SettingsView(ft.Column):
             t("settings.section.self_vad_sensitivity"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._vad_slider = ft.Slider(
             min=0.0,
@@ -1450,7 +1453,7 @@ class SettingsView(ft.Column):
             t("settings.section.peer_vad_sensitivity"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._peer_vad_slider = ft.Slider(
             min=0.0,
@@ -1507,12 +1510,12 @@ class SettingsView(ft.Column):
             t("settings.section.peer_stt"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._dashboard_language_redirect_text = ft.Text(
             t("settings.dashboard_language_redirect"),
             size=16,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._peer_stt_text = self._build_clickable_text(
             provider_label(STTProviderName.LOCAL_CPU_AUTO.value),
@@ -1532,7 +1535,7 @@ class SettingsView(ft.Column):
             t("settings.gpu_device.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._gpu_device_text = self._build_clickable_text(
             t("settings.gpu_device.auto"),
@@ -1550,7 +1553,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.show_translation"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._overlay_translation_button = self._build_clickable_text(
             t("settings.option.on"),
@@ -1565,7 +1568,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.show_peer_original"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._overlay_peer_original_button = self._build_clickable_text(
             t("settings.option.on"),
@@ -1580,7 +1583,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.caption_location"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._overlay_target_button = self._build_clickable_text(
             self._overlay_target_label_for(OVERLAY_TARGET_STEAMVR),
@@ -1598,7 +1601,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.calibration.anchor"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._overlay_anchor_button = self._build_clickable_text(
             self._overlay_anchor_label_for(self._overlay_calibration.anchor),
@@ -1613,7 +1616,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.calibration.distance"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._overlay_distance_value_text = ft.Text(
             self._format_overlay_calibration_number(self._overlay_calibration.distance),
@@ -1645,7 +1648,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.calibration.offset_x"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._overlay_offset_x_value_text = ft.Text(
             self._format_overlay_calibration_number(self._overlay_calibration.offset_x),
@@ -1677,7 +1680,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.calibration.offset_y"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._overlay_offset_y_value_text = ft.Text(
             self._format_overlay_calibration_number(self._overlay_calibration.offset_y),
@@ -1709,7 +1712,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.calibration.text_scale"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._overlay_text_scale_text = self._build_clickable_text(
             self._overlay_text_scale_label_for(self._overlay_calibration.text_scale),
@@ -1724,7 +1727,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.position_reset.vr.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._overlay_vr_reset_button = self._build_clickable_text(
             t("settings.overlay.position_reset.action.vr"),
@@ -1741,7 +1744,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.position_reset.desktop.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._overlay_desktop_reset_button = self._build_clickable_text(
             t("settings.overlay.position_reset.action.desktop"),
@@ -1759,7 +1762,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.desktop.size.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._desktop_overlay_size_button = self._build_clickable_text(
             self._desktop_overlay_size_label_for("medium"),
@@ -1776,7 +1779,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.desktop.background_alpha.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._desktop_overlay_background_alpha_value_text = ft.Text(
             "40%",
@@ -1812,7 +1815,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.desktop.lock.title"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._desktop_overlay_lock_button = self._build_clickable_text(
             self._desktop_overlay_lock_label_for(False),
@@ -1829,12 +1832,12 @@ class SettingsView(ft.Column):
             t("settings.overlay.status.off"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._desktop_overlay_reason_text = ft.Text(
             "",
             size=15,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
             text_align=ft.TextAlign.CENTER,
             max_lines=2,
             overflow=ft.TextOverflow.ELLIPSIS,
@@ -1843,7 +1846,7 @@ class SettingsView(ft.Column):
         self._desktop_overlay_helper_text = ft.Text(
             "",
             size=14,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
             text_align=ft.TextAlign.CENTER,
             max_lines=2,
             overflow=ft.TextOverflow.ELLIPSIS,
@@ -1917,7 +1920,7 @@ class SettingsView(ft.Column):
             t("settings.translation_connection"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._translation_connection_text = self._build_clickable_text(
             t("settings.translation_connection.managed"),
@@ -1931,7 +1934,7 @@ class SettingsView(ft.Column):
             t("settings.fallback"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._openrouter_fallback_text = self._build_clickable_text(
             t("settings.fallback.none"),
@@ -1940,7 +1943,7 @@ class SettingsView(ft.Column):
         self._openrouter_fallback_helper_text = ft.Text(
             t("settings.fallback.inactive_helper"),
             size=16,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._openrouter_fallback_card = self._wrap_unit_card(
             title=self._openrouter_fallback_title,
@@ -1951,7 +1954,7 @@ class SettingsView(ft.Column):
             t("settings.local_llm.connection"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._local_llm_base_url = ft.TextField(
             label=t("settings.local_llm.base_url"),
@@ -1996,7 +1999,7 @@ class SettingsView(ft.Column):
         self._local_llm_api_key_helper = ft.Text(
             local_llm_api_key_description,
             size=15,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
             visible=bool(local_llm_api_key_description.strip()),
         )
         self._local_llm_extra_body = ft.TextField(
@@ -2019,7 +2022,7 @@ class SettingsView(ft.Column):
         self._local_llm_extra_body_helper = ft.Text(
             t("settings.local_llm.extra_body.description"),
             size=15,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._local_llm_extra_body_error = ft.Text(
             "",
@@ -2054,12 +2057,12 @@ class SettingsView(ft.Column):
             on_commit=self._on_prompt_commit,
         )
         self._persona_title = ft.Text(
-            t("settings.section.persona"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_NEUTRAL
+            t("settings.section.persona"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_SECONDARY
         )
         self._prompt_for_text = ft.Text(
             self._prompt_provider_copy(),
             size=16,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
 
         # Reset button (matches Persona title color, hover -> primary)
@@ -2069,11 +2072,11 @@ class SettingsView(ft.Column):
             style=ft.ButtonStyle(
                 color={
                     ft.ControlState.HOVERED: COLOR_PRIMARY,
-                    ft.ControlState.DEFAULT: COLOR_NEUTRAL,
+                    ft.ControlState.DEFAULT: COLOR_SECONDARY,
                 },
                 icon_color={
                     ft.ControlState.HOVERED: COLOR_PRIMARY,
-                    ft.ControlState.DEFAULT: COLOR_NEUTRAL,
+                    ft.ControlState.DEFAULT: COLOR_SECONDARY,
                 },
                 text_style=ft.TextStyle(
                     size=20,
@@ -2115,12 +2118,12 @@ class SettingsView(ft.Column):
             t("settings.section.custom_vocabulary"),
             size=24,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._custom_vocab_description_text = ft.Text(
             t("settings.custom_vocabulary.description"),
             size=16,
-            color=COLOR_NEUTRAL,
+            color=COLOR_SECONDARY,
         )
         self._custom_vocab_tag_editor = CustomVocabularyTagEditor(
             on_add_terms=self._on_custom_vocabulary_add_terms,
