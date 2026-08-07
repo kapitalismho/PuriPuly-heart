@@ -30,7 +30,6 @@ UI / infrastructure adapters
 application ports and services
             ↓
 core runtime and domain contracts
-
 ```
 
 ## System Boundaries
@@ -84,14 +83,12 @@ microphone
 → publication intents
 → output runtime
 → UI / chatbox / overlays
-
 ```
 
 Primary coordinator:
 
 ```text
 SelfTranslationChannelOwner
-
 ```
 
 ### Manual text
@@ -101,7 +98,6 @@ UI intent
 → final self transcript
 → manual translation turn
 → self publication path
-
 ```
 
 Manual text bypasses capture and STT.
@@ -116,7 +112,6 @@ loopback or process audio
 → publication intents
 → output runtime
 → UI / overlays
-
 ```
 
 Peer output must not reach the VRChat chatbox.
@@ -128,7 +123,6 @@ managed authentication
 → Broker entitlement or credential release
 → provider runtime activation
 → normal translation request path
-
 ```
 
 ## Ports and Adapters
@@ -158,7 +152,6 @@ Primary composition root:
 
 ```text
 src/puripuly_heart/composition/application_runtime.py
-
 ```
 
 Responsibilities:
@@ -359,86 +352,4 @@ Use shutdown code and lifecycle tests for exact ordering.
 - Late or retired work must not mutate current state or publish user-visible output.
 - Blocking model, device, or native work must not block the application event loop; use the established worker, executor, or child-process boundary.
 - Shutdown order is: stop ingress, cancel or drain owned work, close external resources, then clear runtime references.
-
-Key paths:
-
-
-| Concern                                | Path                                                                                    |
-| -------------------------------------- | --------------------------------------------------------------------------------------- |
-| Lifecycle task conventions             | `src/puripuly_heart/core/lifecycle.py`                           |
-| Self event handling                    | `src/puripuly_heart/core/orchestrator/self_translation_channel.py` |
-| Peer capture and generation guards     | `src/puripuly_heart/core/runtime/peer_channel.py`                  |
-| Translation requests and stale results | `src/puripuly_heart/core/orchestrator/translation_request.py`      |
-| Output delivery tasks and UI bridge    | `src/puripuly_heart/core/runtime/output.py`                         |
-| GPU worker async process protocol      | `src/puripuly_heart/app/adapters/gpu_worker_process.py`            |
-| Application shutdown                   | `src/puripuly_heart/app/adapters/application_runtime_shutdown.py` |
-
-
-## Code Map
-
-### Entry and UI
-
-
-| Path                                                                         | Responsibility          |
-| ---------------------------------------------------------------------------- | ----------------------- |
-| `src/puripuly_heart/main.py`                               | Process entry           |
-| `src/puripuly_heart/ui/app.py`                              | Flet presentation root  |
-| `src/puripuly_heart/app/ports/ui_application.py`    | UI application contract |
-| `src/puripuly_heart/app/services/ui_application.py` | Application boundary    |
-
-
-### Composition
-
-
-| Path                                                                           | Responsibility              |
-| ------------------------------------------------------------------------------ | --------------------------- |
-| `src/puripuly_heart/composition/application_runtime.py`   | Main composition root       |
-| `src/puripuly_heart/composition/application_settings.py` | Settings startup            |
-| `src/puripuly_heart/composition/application_startup.py`   | Startup ordering            |
-| `src/puripuly_heart/app/wiring_provider_runtime.py`       | Provider composition        |
-| `src/puripuly_heart/app/wiring_peer_application.py`   | Peer composition            |
-| `src/puripuly_heart/app/wiring_managed_account.py`        | Managed-account composition |
-
-
-### Runtime
-
-
-| Path                                                                                    | Responsibility       |
-| --------------------------------------------------------------------------------------- | -------------------- |
-| `src/puripuly_heart/core/runtime/self_capture.py`                  | Self capture         |
-| `src/puripuly_heart/core/runtime/peer_channel.py`                  | Peer capture         |
-| `src/puripuly_heart/core/orchestrator/self_translation_channel.py` | Self translation     |
-| `src/puripuly_heart/core/orchestrator/translation_turn.py`            | Turn lifecycle       |
-| `src/puripuly_heart/core/orchestrator/translation_request.py`      | Translation boundary |
-| `src/puripuly_heart/core/runtime/local_asr_provider_runtime.py`    | Local ASR runtime    |
-| `src/puripuly_heart/core/runtime/output.py`                         | Output runtime       |
-
-
-### Infrastructure
-
-
-| Path                                                                         | Responsibility              |
-| ---------------------------------------------------------------------------- | --------------------------- |
-| `src/puripuly_heart/core/storage/secrets.py`            | Secret stores               |
-| `src/puripuly_heart/core/overlay/protocol.py`          | Overlay contract            |
-| `src/puripuly_heart/core/overlay/process.py`            | Overlay process supervision |
-| `src/puripuly_heart/app/adapters/gpu_worker_process.py` | GPU worker adapter          |
-| `src/puripuly_heart/core/gpu_worker.py`                  | GPU worker contracts        |
-| `native/gpu_worker/src/lib.rs`                              | Native GPU runtime          |
-| `native/overlay/src/lib.rs`                                 | Native VR overlay           |
-| `broker/src/app.ts`                                                          | Broker routes               |
-
-
-## Architecture Evidence
-
-
-| Path                                                                       | Enforces                     |
-| -------------------------------------------------------------------------- | ---------------------------- |
-| `tests/architecture/test_dependency_boundaries.py` | Dependency direction         |
-| `tests/architecture/test_lifecycle_task_guard.py`       | Task ownership               |
-| `tests/config/compatibility_surface_inventory.json`                        | Compatibility surfaces       |
-| `tests/app/test_gpu_worker_process.py`                | GPU process contract         |
-| `tests/core/runtime/test_output_runtime.py`           | Output ownership and routing |
-| `tests/core/test_peer_channel_routing.py`             | Peer routing                 |
-
 
