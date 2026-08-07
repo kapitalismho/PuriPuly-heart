@@ -69,15 +69,6 @@ from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationSnapshot,
 )
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_AMBIENT_SHADOW_BLUR as _DESKTOP_CAPTION_AMBIENT_SHADOW_BLUR,
-)
-from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_AMBIENT_SHADOW_COLOR as _DESKTOP_CAPTION_AMBIENT_SHADOW_COLOR,
-)
-from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_AMBIENT_SHADOW_OFFSET as _DESKTOP_CAPTION_AMBIENT_SHADOW_OFFSET,
-)
-from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_BACKGROUND_RGB as _DESKTOP_CAPTION_BACKGROUND_RGB,
 )
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
@@ -88,15 +79,6 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
 )
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_CJK_WIDTH_EM as _DESKTOP_CAPTION_CJK_WIDTH_EM,
-)
-from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_CONTACT_SHADOW_BLUR as _DESKTOP_CAPTION_CONTACT_SHADOW_BLUR,
-)
-from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_CONTACT_SHADOW_COLOR as _DESKTOP_CAPTION_CONTACT_SHADOW_COLOR,
-)
-from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_CONTACT_SHADOW_OFFSET as _DESKTOP_CAPTION_CONTACT_SHADOW_OFFSET,
 )
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_DYNAMIC_WIDTH_SAFETY as _DESKTOP_CAPTION_DYNAMIC_WIDTH_SAFETY,
@@ -307,9 +289,6 @@ from puripuly_heart.ui.desktop_overlay_surface.renderer import (
 )
 from puripuly_heart.ui.desktop_overlay_surface.renderer import (
     _caption_slots_for_snapshot as _caption_slots_for_snapshot,
-)
-from puripuly_heart.ui.desktop_overlay_surface.renderer import (
-    _caption_text_shadow as _caption_text_shadow,
 )
 from puripuly_heart.ui.desktop_overlay_surface.renderer import (
     _desktop_caption_char_is_cjk as _desktop_caption_char_is_cjk,

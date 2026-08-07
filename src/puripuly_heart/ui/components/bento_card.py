@@ -13,7 +13,6 @@ class BentoCard(ft.Container):
         padding=20,
         bgcolor=None,
     ):
-        """A reusable Bento Grid Card component for light theme."""
         bg_color = bgcolor if bgcolor else COLOR_SURFACE
 
         super().__init__(
@@ -25,10 +24,4 @@ class BentoCard(ft.Container):
             height=height,
             width=width,
             border=ft.Border.all(1, COLOR_DIVIDER),
-            shadow=ft.BoxShadow(
-                spread_radius=0,
-                blur_radius=8,
-                color=ft.Colors.with_opacity(0.08, ft.Colors.BLACK),
-                offset=ft.Offset(0, 2),
-            ),
         )

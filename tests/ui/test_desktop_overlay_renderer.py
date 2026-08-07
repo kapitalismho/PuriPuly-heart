@@ -27,12 +27,6 @@ from puripuly_heart.core.overlay.protocol import (
 )
 from puripuly_heart.ui import desktop_overlay, desktop_window_zorder, flet_desktop_runtime
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_AMBIENT_SHADOW_BLUR,
-    _DESKTOP_CAPTION_AMBIENT_SHADOW_COLOR,
-    _DESKTOP_CAPTION_AMBIENT_SHADOW_OFFSET,
-    _DESKTOP_CAPTION_CONTACT_SHADOW_BLUR,
-    _DESKTOP_CAPTION_CONTACT_SHADOW_COLOR,
-    _DESKTOP_CAPTION_CONTACT_SHADOW_OFFSET,
     _DESKTOP_CAPTION_GOLD,
     _DESKTOP_CAPTION_LINE_HEIGHT,
     _DESKTOP_CAPTION_MAX_VISIBLE_LINES,
@@ -595,7 +589,7 @@ def test_desktop_overlay_dynamic_inner_card_width_clamps_to_narrow_window() -> N
     assert first_line_region.width == pytest.approx(slot.card_text_width)
 
 
-def test_desktop_overlay_caption_text_uses_layered_shadow_without_stroke() -> None:
+def test_desktop_overlay_caption_text_has_no_shadow_or_stroke() -> None:
     snapshot = OverlayPresentationSnapshot(
         blocks=[
             _block(
@@ -622,16 +616,7 @@ def test_desktop_overlay_caption_text_uses_layered_shadow_without_stroke() -> No
     secondary_text = text_column.controls[1].content
     for text in (primary_text, secondary_text):
         assert text.style.foreground is None
-        assert isinstance(text.style.shadow, list)
-        assert len(text.style.shadow) == 2
-
-        contact_shadow, ambient_shadow = text.style.shadow
-        assert contact_shadow.color == _DESKTOP_CAPTION_CONTACT_SHADOW_COLOR
-        assert contact_shadow.offset == _DESKTOP_CAPTION_CONTACT_SHADOW_OFFSET
-        assert contact_shadow.blur_radius == pytest.approx(_DESKTOP_CAPTION_CONTACT_SHADOW_BLUR)
-        assert ambient_shadow.color == _DESKTOP_CAPTION_AMBIENT_SHADOW_COLOR
-        assert ambient_shadow.offset == _DESKTOP_CAPTION_AMBIENT_SHADOW_OFFSET
-        assert ambient_shadow.blur_radius == pytest.approx(_DESKTOP_CAPTION_AMBIENT_SHADOW_BLUR)
+        assert text.style.shadow is None
 
 
 def test_desktop_overlay_uses_fixed_two_turn_slots_with_secondary_one_line() -> None:
@@ -2963,15 +2948,7 @@ async def test_desktop_overlay_empty_moving_state_renders_text_only_lock_action(
         assert action.style.color[ft.ControlState.FOCUSED] == "#FF6B6B"
         assert action.style.color[ft.ControlState.HOVERED] == "#FF6B6B"
         action_text_style = action.style.text_style
-        assert isinstance(action_text_style.shadow, list)
-        assert len(action_text_style.shadow) == 2
-        contact_shadow, ambient_shadow = action_text_style.shadow
-        assert contact_shadow.color == _DESKTOP_CAPTION_CONTACT_SHADOW_COLOR
-        assert contact_shadow.offset == _DESKTOP_CAPTION_CONTACT_SHADOW_OFFSET
-        assert contact_shadow.blur_radius == pytest.approx(_DESKTOP_CAPTION_CONTACT_SHADOW_BLUR)
-        assert ambient_shadow.color == _DESKTOP_CAPTION_AMBIENT_SHADOW_COLOR
-        assert ambient_shadow.offset == _DESKTOP_CAPTION_AMBIENT_SHADOW_OFFSET
-        assert ambient_shadow.blur_radius == pytest.approx(_DESKTOP_CAPTION_AMBIENT_SHADOW_BLUR)
+        assert action_text_style.shadow is None
         action_padding = action.style.padding
         required_label_width = desktop_overlay._estimated_caption_line_width(
             "고정하기",

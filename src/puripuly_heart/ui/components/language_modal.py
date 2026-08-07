@@ -148,16 +148,6 @@ class LanguageModal:
             text_color = ft.Colors.WHITE if is_current else COLOR_NEUTRAL_DARK
             font_weight = ft.FontWeight.BOLD
 
-            shadow = (
-                None
-                if is_current
-                else ft.BoxShadow(
-                    blur_radius=5,
-                    color=ft.Colors.with_opacity(0.05, ft.Colors.BLACK),
-                    offset=ft.Offset(0, 2),
-                )
-            )
-
             chip = ft.Container(
                 content=ft.Text(
                     self._label_for_code(lang_code),
@@ -175,7 +165,6 @@ class LanguageModal:
                 on_click=lambda e, code=lang_code: self._select(code),
                 on_hover=self._on_chip_hover,
                 animate=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
-                shadow=shadow,
                 width=170,  # Fixed width for 3-column layout (536px available / 3 ~= 178px)
             )
             items.append(chip)
@@ -212,17 +201,6 @@ class LanguageModal:
                 border = None
 
             font_weight = ft.FontWeight.BOLD
-
-            # Shadow for depth
-            shadow = (
-                ft.BoxShadow(
-                    blur_radius=2,
-                    color=ft.Colors.with_opacity(0.05, ft.Colors.BLACK),
-                    offset=ft.Offset(0, 1),
-                )
-                if not is_selected
-                else None
-            )
 
             description = (
                 self._description_for_code(code) if self._description_for_code is not None else ""
@@ -266,7 +244,6 @@ class LanguageModal:
                 on_click=None if is_disabled else lambda e, selected=code: self._select(selected),
                 on_hover=None if is_disabled else self._on_item_hover,
                 animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
-                shadow=shadow,
                 height=110,
             )
             items.append(item)

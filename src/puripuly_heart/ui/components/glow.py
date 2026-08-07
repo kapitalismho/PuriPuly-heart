@@ -1,9 +1,3 @@
-"""Reusable glow effect components.
-
-Provides configurable glow orb effects that can be applied to cards or backgrounds.
-Uses BoxShadow to simulate light bloom effects.
-"""
-
 from dataclasses import dataclass
 
 import flet as ft
@@ -51,25 +45,21 @@ GLOW_BACKGROUND = GlowConfig(
 
 
 def _create_glow_orb(config: GlowConfig, color: str = COLOR_PRIMARY) -> ft.Container:
-    """Create a glow orb container with the given configuration.
+    """Create an invisible placeholder orb container.
+
+    The orb layer is kept transparent so glow effects render as nothing.
 
     Args:
         config: Glow configuration settings.
         color: Base color for the glow (from theme).
 
     Returns:
-        Container with BoxShadow glow effect.
+        Container with no glow effect.
     """
     return ft.Container(
         width=config.width,
         height=config.height,
         bgcolor=ft.Colors.TRANSPARENT,
-        shadow=ft.BoxShadow(
-            blur_radius=config.blur_radius,
-            spread_radius=config.spread_radius,
-            color=ft.Colors.with_opacity(config.opacity, color),
-            offset=ft.Offset(0, 0),
-        ),
         right=config.right,
         bottom=config.bottom,
     )
@@ -80,10 +70,7 @@ def create_glow_stack(
     config: GlowConfig = GLOW_CARD,
     color: str = COLOR_PRIMARY,
 ) -> ft.Stack:
-    """Wrap content in a Stack with a glow orb in the background.
-
-    The glow is positioned at the bottom-right corner by default,
-    creating a subtle ambient light effect.
+    """Wrap content in a Stack with an invisible orb layer in the background.
 
     Args:
         content: The foreground content control (e.g., Column, Row).
@@ -91,7 +78,7 @@ def create_glow_stack(
         color: Base color for the glow (from theme, defaults to COLOR_PRIMARY).
 
     Returns:
-        Stack containing the glow layer and content layer.
+        Stack containing the orb layer and content layer.
     """
     return ft.Stack(
         controls=[

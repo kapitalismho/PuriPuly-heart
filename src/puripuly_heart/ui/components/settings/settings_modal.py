@@ -273,16 +273,6 @@ class SettingsModal:
             )
             border = None
 
-        shadow = (
-            ft.BoxShadow(
-                blur_radius=2,
-                color=ft.Colors.with_opacity(0.05, ft.Colors.BLACK),
-                offset=ft.Offset(0, 1),
-            )
-            if not is_selected
-            else None
-        )
-
         if self._show_description and option.description:
             content = ft.Column(
                 controls=[
@@ -322,7 +312,6 @@ class SettingsModal:
             on_click=None if option.disabled else lambda e, val=option.value: self._select(val),
             on_hover=None if option.disabled else self._on_item_hover,
             animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
-            shadow=shadow,
             height=110,
         )
 

@@ -67,21 +67,5 @@ def get_app_theme(font_family: str | None = None) -> ft.Theme:
     )
 
 
-def get_card_shadow() -> ft.BoxShadow:
-    """Return the standard card shadow with warm color from theme.
-
-    Uses COLOR_ON_PRIMARY_CONTAINER for a warm, cohesive shadow that
-    blends naturally with the pink/coral color scheme.
-    """
-    return ft.BoxShadow(
-        blur_radius=FOUNDATION_DESIGN_TOKENS.shadow.blur_radius,
-        color=ft.Colors.with_opacity(
-            FOUNDATION_DESIGN_TOKENS.shadow.opacity,
-            COLOR_ON_PRIMARY_CONTAINER,
-        ),
-        offset=ft.Offset(
-            FOUNDATION_DESIGN_TOKENS.shadow.offset_x,
-            FOUNDATION_DESIGN_TOKENS.shadow.offset_y,
-        ),
-        spread_radius=FOUNDATION_DESIGN_TOKENS.shadow.spread_radius,
-    )
+def get_card_shadow() -> ft.BoxShadow | None:
+    return None

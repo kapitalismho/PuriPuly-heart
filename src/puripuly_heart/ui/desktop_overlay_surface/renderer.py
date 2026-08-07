@@ -19,16 +19,10 @@ from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationSnapshot,
 )
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
-    _DESKTOP_CAPTION_AMBIENT_SHADOW_BLUR,
-    _DESKTOP_CAPTION_AMBIENT_SHADOW_COLOR,
-    _DESKTOP_CAPTION_AMBIENT_SHADOW_OFFSET,
     _DESKTOP_CAPTION_BACKGROUND_RGB,
     _DESKTOP_CAPTION_CJK_FONT_FAMILY,
     _DESKTOP_CAPTION_CJK_LANGUAGE_PRIMARY_SUBTAGS,
     _DESKTOP_CAPTION_CJK_WIDTH_EM,
-    _DESKTOP_CAPTION_CONTACT_SHADOW_BLUR,
-    _DESKTOP_CAPTION_CONTACT_SHADOW_COLOR,
-    _DESKTOP_CAPTION_CONTACT_SHADOW_OFFSET,
     _DESKTOP_CAPTION_DYNAMIC_WIDTH_SAFETY,
     _DESKTOP_CAPTION_EMOJI_WIDTH_EM,
     _DESKTOP_CAPTION_LATIN_FONT_FAMILY,
@@ -199,7 +193,6 @@ def build_desktop_empty_lock_action(
         height=1.0,
         weight=ft.FontWeight.BOLD,
         font_family=_desktop_caption_font_family_for_text(label),
-        shadow=_caption_text_shadow(ft),
         decoration=None,
     )
     return ft.TextButton(
@@ -1244,25 +1237,9 @@ def _build_flet_text(
             height=line.line_height,
             weight=_flet_font_weight(ft, line.weight),
             font_family=line.font_family,
-            shadow=_caption_text_shadow(ft),
             foreground=None,
         ),
     )
-
-
-def _caption_text_shadow(ft: Any) -> list[Any]:
-    return [
-        ft.BoxShadow(
-            color=_DESKTOP_CAPTION_CONTACT_SHADOW_COLOR,
-            offset=_DESKTOP_CAPTION_CONTACT_SHADOW_OFFSET,
-            blur_radius=_DESKTOP_CAPTION_CONTACT_SHADOW_BLUR,
-        ),
-        ft.BoxShadow(
-            color=_DESKTOP_CAPTION_AMBIENT_SHADOW_COLOR,
-            offset=_DESKTOP_CAPTION_AMBIENT_SHADOW_OFFSET,
-            blur_radius=_DESKTOP_CAPTION_AMBIENT_SHADOW_BLUR,
-        ),
-    ]
 
 
 def _flet_font_weight(ft: Any, weight: str) -> Any:
@@ -1569,6 +1546,5 @@ def _apply_retained_caption_line(
         height=displayed_line.line_height,
         weight=_flet_font_weight(ft, displayed_line.weight),
         font_family=displayed_line.font_family,
-        shadow=_caption_text_shadow(ft),
         foreground=None,
     )
