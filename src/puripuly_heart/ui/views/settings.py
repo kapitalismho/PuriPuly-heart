@@ -1063,11 +1063,6 @@ class SettingsView(ft.Column):
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._peer_auto_languages_description = ft.Text(
-            t("settings.peer_auto_languages.description"),
-            size=16,
-            color=COLOR_SECONDARY,
-        )
         self._peer_auto_languages_editor = LanguageHintEditor(
             on_add=self._on_peer_auto_languages_add,
             on_remove=self._on_peer_auto_languages_remove,
@@ -1076,12 +1071,9 @@ class SettingsView(ft.Column):
             ft.Column(
                 [
                     self._peer_auto_languages_title,
-                    ft.Container(height=6),
-                    self._peer_auto_languages_description,
-                    ft.Container(height=12),
                     self._peer_auto_languages_editor,
                 ],
-                spacing=0,
+                spacing=12,
             ),
             height=None,
         )
@@ -2485,11 +2477,8 @@ class SettingsView(ft.Column):
         self._custom_vocab_description_text.value = self._custom_vocabulary_description_copy()
         self._apply_custom_vocabulary_tag_editor_locale()
         peer_auto_languages_title = getattr(self, "_peer_auto_languages_title", None)
-        peer_auto_languages_description = getattr(self, "_peer_auto_languages_description", None)
         if peer_auto_languages_title is not None:
             peer_auto_languages_title.value = t("settings.peer_auto_languages.title")
-        if peer_auto_languages_description is not None:
-            peer_auto_languages_description.value = t("settings.peer_auto_languages.description")
         peer_auto_languages_editor = getattr(self, "_peer_auto_languages_editor", None)
         if peer_auto_languages_editor is not None and hasattr(
             peer_auto_languages_editor, "apply_locale"
@@ -2500,7 +2489,6 @@ class SettingsView(ft.Column):
                 self._prompt_for_text,
                 self._custom_vocab_description_text,
                 peer_auto_languages_title,
-                peer_auto_languages_description,
             ):
                 if control is not None:
                     with contextlib.suppress(Exception):
