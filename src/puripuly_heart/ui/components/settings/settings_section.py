@@ -7,7 +7,6 @@ from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL,
     COLOR_SURFACE,
-    get_card_shadow,
 )
 
 
@@ -50,10 +49,8 @@ class SettingsSection(ft.Container):
             content=content_container,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
-            border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
             expand=expand,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            shadow=get_card_shadow(),
         )
 
     def apply_locale(self) -> None:

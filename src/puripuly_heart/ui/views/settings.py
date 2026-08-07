@@ -13,8 +13,9 @@ from pathlib import Path
 from typing import Callable
 
 import flet as ft
-
 from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
+from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
+
 from puripuly_heart.app.wiring import create_secret_store
 from puripuly_heart.config.llm_profiles import (
     profile_for_alias,
@@ -51,7 +52,6 @@ from puripuly_heart.config.settings import (
     with_telemetry_consent,
 )
 from puripuly_heart.core.language import get_stt_compatibility_warning
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 from puripuly_heart.ui.components.managed_trial_usage_bar import ManagedTrialUsageBar
 from puripuly_heart.ui.components.settings import (
     ApiKeyField,
@@ -3539,6 +3539,7 @@ class SettingsView(ft.Column):
                     bgcolor=ft.Colors.ORANGE_700,
                     duration=4000,
                     behavior=ft.SnackBarBehavior.FLOATING,
+                    elevation=0,
                     margin=ft.Margin.only(bottom=90),
                     padding=20,
                 )

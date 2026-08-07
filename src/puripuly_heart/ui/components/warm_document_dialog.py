@@ -6,12 +6,10 @@ from dataclasses import dataclass
 import flet as ft
 
 from puripuly_heart.ui.theme import (
-    COLOR_DIVIDER,
     COLOR_NEUTRAL_DARK,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
     COLOR_SURFACE,
-    get_card_shadow,
 )
 
 DIALOG_WIDTH = 720
@@ -190,8 +188,6 @@ def open_warm_document_dialog(
         ),
         bgcolor=COLOR_SURFACE,
         border_radius=30,
-        border=ft.Border.all(1, ft.Colors.with_opacity(0.35, COLOR_DIVIDER)),
-        shadow=get_card_shadow(),
         content=ft.Column(
             controls=[
                 body,

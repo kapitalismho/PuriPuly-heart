@@ -19,7 +19,6 @@ from puripuly_heart.ui.theme import (
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
     COLOR_SURFACE,
-    get_card_shadow,
 )
 
 
@@ -102,7 +101,6 @@ class SettingsModal:
             padding=ft.Padding.symmetric(horizontal=32, vertical=32),
             bgcolor=COLOR_SURFACE,
             border_radius=28,
-            shadow=get_card_shadow(),
         )
 
         # Transparent AlertDialog

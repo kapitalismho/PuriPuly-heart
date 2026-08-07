@@ -3,7 +3,7 @@ from __future__ import annotations
 import flet as ft
 
 from puripuly_heart.ui.logs.contract import LogsSurfaceRegions, LogsSurfaceSlots
-from puripuly_heart.ui.theme import COLOR_SURFACE, get_card_shadow
+from puripuly_heart.ui.theme import COLOR_SURFACE
 
 LOGS_HEADER_BUTTON_SPACING = 4
 LOGS_CARD_BORDER_RADIUS = 16
@@ -49,10 +49,8 @@ def compose_logs_surface(slots: LogsSurfaceSlots) -> LogsSurfaceRegions:
         content=ft.Container(content=card_content, expand=True),
         bgcolor=COLOR_SURFACE,
         border_radius=LOGS_CARD_BORDER_RADIUS,
-        border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
         expand=True,
         clip_behavior=ft.ClipBehavior.HARD_EDGE,
-        shadow=get_card_shadow(),
     )
 
     return LogsSurfaceRegions(

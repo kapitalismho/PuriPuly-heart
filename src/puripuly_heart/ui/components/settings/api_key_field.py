@@ -258,6 +258,7 @@ class ApiKeyField(ft.Row):
                     bgcolor=bgcolor,
                     duration=4000,
                     behavior=ft.SnackBarBehavior.FLOATING,
+                    elevation=0,
                     margin=ft.Margin.only(bottom=90),
                     padding=20,
                 )

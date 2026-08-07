@@ -212,10 +212,10 @@ class TextSubtabShell(ft.Column):
     def _is_bottom_docked(self) -> bool:
         return self.subtab_bar_position == "bottom"
 
-    def _build_subtab_bar_border(self) -> ft.Border:
+    def _build_subtab_bar_border(self) -> ft.Border | None:
         if self._is_bottom_docked:
             return ft.Border.only(top=ft.BorderSide(1, COLOR_DIVIDER))
-        return ft.Border.all(1, ft.Colors.with_opacity(0.8, COLOR_DIVIDER))
+        return None
 
     def _build_subtab_row_controls(self) -> list[ft.Control]:
         if not self._is_bottom_docked:

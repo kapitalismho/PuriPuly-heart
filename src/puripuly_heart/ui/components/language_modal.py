@@ -17,7 +17,6 @@ from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
     COLOR_SURFACE,
-    get_card_shadow,
 )
 
 logger = logging.getLogger(__name__)
@@ -120,10 +119,9 @@ class LanguageModal:
             padding=ft.Padding.symmetric(horizontal=32, vertical=32),
             bgcolor=COLOR_SURFACE,
             border_radius=28,
-            shadow=get_card_shadow(),
         )
 
-        # Transparent AlertDialog, content handles the background/shadow
+        # Transparent AlertDialog, content handles the background
         self._dialog = ft.AlertDialog(
             modal=False,
             content=modal_content,
@@ -267,10 +265,8 @@ class LanguageModal:
 
         if is_hover_active(e):
             text_control.color = COLOR_PRIMARY
-            # container.bgcolor = ft.Colors.with_opacity(0.05, COLOR_PRIMARY) # Removed per user request
         else:
             text_control.color = COLOR_NEUTRAL_DARK
-            # container.bgcolor = COLOR_BACKGROUND # Keep original
 
         container.update()
 

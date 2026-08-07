@@ -8,11 +8,9 @@ from puripuly_heart.ui.flet_runtime import is_control_mounted
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import get_locale, t
 from puripuly_heart.ui.theme import (
-    COLOR_DIVIDER,
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
     COLOR_SURFACE,
-    get_card_shadow,
 )
 
 _DIALOG_WIDTH = 450
@@ -124,8 +122,6 @@ class MicrophoneTestDialog:
             padding=28,
             bgcolor=COLOR_SURFACE,
             border_radius=30,
-            border=ft.Border.all(1, ft.Colors.with_opacity(0.35, COLOR_DIVIDER)),
-            shadow=get_card_shadow(),
             alignment=ft.Alignment.CENTER,
             content=ft.Column(
                 controls=[

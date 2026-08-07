@@ -7,12 +7,10 @@ import flet as ft
 
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
-    COLOR_DIVIDER,
     COLOR_NEUTRAL_DARK,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
     COLOR_SURFACE,
-    get_card_shadow,
 )
 
 DEBUG_PREVIEW_PANEL_DATA_KEY = "debug-preview-panel"
@@ -154,10 +152,8 @@ class DebugPreviewPanel(ft.Container):
         self._popover = ft.Container(
             visible=False,
             bgcolor=COLOR_SURFACE,
-            border=ft.Border.all(1, ft.Colors.with_opacity(0.75, COLOR_DIVIDER)),
             border_radius=14,
             padding=ft.Padding.symmetric(horizontal=8, vertical=8),
-            shadow=get_card_shadow(),
             content=ft.Column(
                 controls=list(self._action_buttons.values()),
                 spacing=2,

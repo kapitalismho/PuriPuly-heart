@@ -48,15 +48,6 @@ class FoundationTypographyTokens:
 
 
 @dataclass(frozen=True, slots=True)
-class FoundationShadowTokens:
-    blur_radius: int
-    opacity: float
-    offset_x: int
-    offset_y: int
-    spread_radius: int
-
-
-@dataclass(frozen=True, slots=True)
 class FoundationWindowTokens:
     width: int
     height: int
@@ -71,7 +62,6 @@ class FoundationDesignTokens:
     spacing: FoundationSpacingTokens
     radius: FoundationRadiusTokens
     typography: FoundationTypographyTokens
-    shadow: FoundationShadowTokens
     window: FoundationWindowTokens
     default_font_family: str
     icon_asset: str
@@ -115,13 +105,6 @@ FOUNDATION_DESIGN_TOKENS = FoundationDesignTokens(
         body=14,
         label=12,
     ),
-    shadow=FoundationShadowTokens(
-        blur_radius=10,
-        opacity=0.05,
-        offset_x=0,
-        offset_y=2,
-        spread_radius=0,
-    ),
     window=FoundationWindowTokens(
         width=1136,
         height=850,
@@ -140,7 +123,6 @@ __all__ = [
     "FoundationDesignTokens",
     "FoundationPaletteTokens",
     "FoundationRadiusTokens",
-    "FoundationShadowTokens",
     "FoundationSpacingTokens",
     "FoundationTypographyTokens",
     "FoundationWindowTokens",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import flet as ft
 
-from puripuly_heart.ui.theme import COLOR_SURFACE, get_card_shadow
+from puripuly_heart.ui.theme import COLOR_SURFACE
 
 
 class SharedCardWrapper(ft.Container):
@@ -28,9 +28,7 @@ class SharedCardWrapper(ft.Container):
             content=content_container,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
-            border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
             expand=resolved_expand,
             height=resolved_height,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            shadow=get_card_shadow(),
         )

@@ -65,7 +65,3 @@ def get_app_theme(font_family: str | None = None) -> ft.Theme:
             linux=ft.PageTransitionTheme.NONE,
         ),
     )
-
-
-def get_card_shadow() -> ft.BoxShadow | None:
-    return None

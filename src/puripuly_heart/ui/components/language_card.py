@@ -8,7 +8,6 @@ from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SURFACE,
-    get_card_shadow,
 )
 
 # CJK (Chinese, Japanese, Korean) characters start at this Unicode point
@@ -204,10 +203,8 @@ class LanguageCard(ft.Container):
             content=content_container,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
-            border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
             expand=True,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            shadow=get_card_shadow(),
         )
 
     def set_row_labels(self, self_label: str, peer_label: str) -> None:

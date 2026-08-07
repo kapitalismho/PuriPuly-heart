@@ -1536,6 +1536,7 @@ class FletDesktopRendererWindow:
                     on_select,
                 ),
                 disabled=selected,
+                style=ft.ButtonStyle(elevation=0),
             )
             self._preview_option_buttons[(group, value)] = button
             buttons.append(button)

@@ -7,6 +7,10 @@ import webbrowser
 from pathlib import Path
 
 import flet as ft
+from puripuly_heart.core.discord_oauth_loopback import (
+    render_discord_oauth_callback_completion_page,
+)
+from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_application import (
@@ -18,15 +22,11 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
     application_shutdown_callback,
 )
-from puripuly_heart.core.discord_oauth_loopback import (
-    render_discord_oauth_callback_completion_page,
-)
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 from puripuly_heart.ui.components.bottom_nav import BottomNavBar
 from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
 from puripuly_heart.ui.components.discord_managed_auth_dialog import DiscordManagedAuthDialog
@@ -716,6 +716,7 @@ class TranslatorApp:
             bgcolor=COLOR_SUCCESS,
             duration=GITHUB_STAR_PROMPT_DURATION_MS,
             behavior=ft.SnackBarBehavior.FLOATING,
+            elevation=0,
             margin=ft.Margin.only(bottom=90),
             padding=20,
         )
@@ -1325,6 +1326,7 @@ class TranslatorApp:
                 bgcolor=ft.Colors.ORANGE_700,
                 duration=4000,
                 behavior=ft.SnackBarBehavior.FLOATING,
+                elevation=0,
                 margin=ft.Margin.only(bottom=90),
                 padding=20,
             )
@@ -1883,6 +1885,7 @@ class TranslatorApp:
             bgcolor=bgcolor,
             duration=duration,
             behavior=ft.SnackBarBehavior.FLOATING,
+            elevation=0,
             margin=ft.Margin.only(bottom=90),
             padding=20,
         )
@@ -2014,6 +2017,7 @@ async def _check_and_notify_update(
             ),
             bgcolor=COLOR_SUCCESS,
             behavior=ft.SnackBarBehavior.FLOATING,
+            elevation=0,
             margin=ft.Margin.only(bottom=90),
             padding=20,
             duration=30000,  # 30초

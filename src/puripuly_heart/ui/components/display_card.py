@@ -16,7 +16,6 @@ from puripuly_heart.ui.theme import (
     COLOR_SECONDARY,
     COLOR_SURFACE,
     COLOR_WARNING,
-    get_card_shadow,
 )
 
 # CJK (Chinese, Japanese, Korean) characters start at this Unicode point.
@@ -58,7 +57,7 @@ def _apply_debug_prefix(text: str, debug_prefix: str | None) -> str:
 
 
 class DisplayCard(ft.Container):
-    """Multi-purpose display card with input field and decorative gradient."""
+    """Multi-purpose display card with input field."""
 
     def __init__(
         self,
@@ -197,10 +196,8 @@ class DisplayCard(ft.Container):
             content=content_container,
             bgcolor=COLOR_SURFACE,
             border_radius=16,
-            border=ft.Border.all(1, ft.Colors.with_opacity(0.4, ft.Colors.WHITE)),
             expand=True,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            shadow=get_card_shadow(),
         )
 
     def _handle_submit(self, e):
