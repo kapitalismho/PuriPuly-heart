@@ -1,0 +1,357 @@
+{
+  "finished_at_utc": "2026-08-07T12:03:12.743871+00:00",
+  "parity_id": "phase1_research_parity",
+  "records": {
+    "eres": {
+      "E-standard": {
+        "golden_silence": {
+          "embedding_cosine": 1.0,
+          "embedding_mae": 3.264518454670906e-05,
+          "fbank_max_abs_error": 0.0
+        },
+        "golden_single_utterance": {
+          "embedding_cosine": 0.9999999403953552,
+          "embedding_mae": 0.00026955644716508687,
+          "fbank_max_abs_error": 0.0005817413330078125
+        },
+        "golden_two_utterance_gap400": {
+          "embedding_cosine": 1.0,
+          "embedding_mae": 0.00037187579437159,
+          "fbank_max_abs_error": 0.0005817413330078125
+        },
+        "speaker1_a_cn_16k.wav": {
+          "embedding_cosine": 0.9999999403953552,
+          "embedding_mae": 9.141567716142163e-05,
+          "fbank_max_abs_error": 0.00016117095947265625
+        },
+        "speaker1_b_cn_16k.wav": {
+          "embedding_cosine": 1.0000001192092896,
+          "embedding_mae": 8.698316378286108e-05,
+          "fbank_max_abs_error": 0.0002570152282714844
+        },
+        "speaker2_a_cn_16k.wav": {
+          "embedding_cosine": 1.0,
+          "embedding_mae": 9.539954044157639e-05,
+          "fbank_max_abs_error": 0.000270843505859375
+        }
+      },
+      "E-w24s4ep4": {
+        "golden_silence": {
+          "embedding_cosine": 1.0000001192092896,
+          "embedding_mae": 1.1589300811465364e-05,
+          "fbank_max_abs_error": 0.0
+        },
+        "golden_single_utterance": {
+          "embedding_cosine": 1.0,
+          "embedding_mae": 0.00019692233763635159,
+          "fbank_max_abs_error": 0.0005817413330078125
+        },
+        "golden_two_utterance_gap400": {
+          "embedding_cosine": 1.0,
+          "embedding_mae": 0.00012182164937257767,
+          "fbank_max_abs_error": 0.0005817413330078125
+        },
+        "speaker1_a_cn_16k.wav": {
+          "embedding_cosine": 1.0,
+          "embedding_mae": 5.477946251630783e-05,
+          "fbank_max_abs_error": 0.00016117095947265625
+        },
+        "speaker1_b_cn_16k.wav": {
+          "embedding_cosine": 0.9999999403953552,
+          "embedding_mae": 4.270594217814505e-05,
+          "fbank_max_abs_error": 0.0002570152282714844
+        },
+        "speaker2_a_cn_16k.wav": {
+          "embedding_cosine": 1.0,
+          "embedding_mae": 5.402361784945242e-05,
+          "fbank_max_abs_error": 0.000270843505859375
+        }
+      }
+    },
+    "ls_eend_frontend": {
+      "golden_silence": {
+        "mine_offline_frames": 20,
+        "mine_stream_frames": 20,
+        "offline_max_abs_error": 0.0,
+        "reference_offline_frames": 20,
+        "stream_max_abs_error": 0.0
+      },
+      "golden_single_utterance": {
+        "mine_offline_frames": 30,
+        "mine_stream_frames": 30,
+        "offline_max_abs_error": 1.4066696166992188e-05,
+        "reference_offline_frames": 30,
+        "stream_max_abs_error": 1.4185905456542969e-05
+      },
+      "golden_two_utterance_gap400": {
+        "mine_offline_frames": 50,
+        "mine_stream_frames": 50,
+        "offline_max_abs_error": 1.4066696166992188e-05,
+        "reference_offline_frames": 50,
+        "stream_max_abs_error": 1.4185905456542969e-05
+      },
+      "speaker1_a_cn_16k.wav": {
+        "mine_offline_frames": 38,
+        "mine_stream_frames": 38,
+        "offline_max_abs_error": 1.3113021850585938e-06,
+        "reference_offline_frames": 38,
+        "stream_max_abs_error": 4.5299530029296875e-06
+      },
+      "speaker1_b_cn_16k.wav": {
+        "mine_offline_frames": 50,
+        "mine_stream_frames": 50,
+        "offline_max_abs_error": 4.291534423828125e-06,
+        "reference_offline_frames": 50,
+        "stream_max_abs_error": 4.589557647705078e-06
+      },
+      "speaker2_a_cn_16k.wav": {
+        "mine_offline_frames": 54,
+        "mine_stream_frames": 54,
+        "offline_max_abs_error": 8.463859558105469e-06,
+        "reference_offline_frames": 54,
+        "stream_max_abs_error": 7.987022399902344e-06
+      }
+    },
+    "ls_eend_neural": {
+      "L-AMI": {
+        "golden_silence": {
+          "missing_keys": 0,
+          "onnx_frames": 20,
+          "prob_max_abs_error": 1.4901161193847656e-07,
+          "prob_mean_abs_error": 3.8743017682918435e-08,
+          "torch_frames": 20,
+          "unexpected_keys": 0
+        },
+        "golden_single_utterance": {
+          "missing_keys": 0,
+          "onnx_frames": 30,
+          "prob_max_abs_error": 1.7881393432617188e-07,
+          "prob_mean_abs_error": 3.957086036621149e-08,
+          "torch_frames": 30,
+          "unexpected_keys": 0
+        },
+        "golden_two_utterance_gap400": {
+          "missing_keys": 0,
+          "onnx_frames": 50,
+          "prob_max_abs_error": 3.2782554626464844e-06,
+          "prob_mean_abs_error": 4.937251318892777e-08,
+          "torch_frames": 50,
+          "unexpected_keys": 0
+        },
+        "speaker1_a_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 38,
+          "prob_max_abs_error": 7.748603820800781e-07,
+          "prob_mean_abs_error": 4.2481381967718335e-08,
+          "torch_frames": 38,
+          "unexpected_keys": 0
+        },
+        "speaker1_b_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 50,
+          "prob_max_abs_error": 5.364418029785156e-07,
+          "prob_mean_abs_error": 3.3577283176100536e-08,
+          "torch_frames": 50,
+          "unexpected_keys": 0
+        },
+        "speaker2_a_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 54,
+          "prob_max_abs_error": 4.5299530029296875e-06,
+          "prob_mean_abs_error": 4.608321901855561e-08,
+          "torch_frames": 54,
+          "unexpected_keys": 0
+        }
+      },
+      "L-CALLHOME": {
+        "golden_silence": {
+          "missing_keys": 0,
+          "onnx_frames": 20,
+          "prob_max_abs_error": 1.7881393432617188e-07,
+          "prob_mean_abs_error": 4.1392112848370743e-08,
+          "torch_frames": 20,
+          "unexpected_keys": 0
+        },
+        "golden_single_utterance": {
+          "missing_keys": 0,
+          "onnx_frames": 30,
+          "prob_max_abs_error": 1.4901161193847656e-07,
+          "prob_mean_abs_error": 4.1833629893517355e-08,
+          "torch_frames": 30,
+          "unexpected_keys": 0
+        },
+        "golden_two_utterance_gap400": {
+          "missing_keys": 0,
+          "onnx_frames": 50,
+          "prob_max_abs_error": 5.960464477539062e-07,
+          "prob_mean_abs_error": 4.185570645631742e-08,
+          "torch_frames": 50,
+          "unexpected_keys": 0
+        },
+        "speaker1_a_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 38,
+          "prob_max_abs_error": 1.7881393432617188e-07,
+          "prob_mean_abs_error": 3.5117942331908125e-08,
+          "torch_frames": 38,
+          "unexpected_keys": 0
+        },
+        "speaker1_b_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 50,
+          "prob_max_abs_error": 4.172325134277344e-07,
+          "prob_mean_abs_error": 3.80807456679122e-08,
+          "torch_frames": 50,
+          "unexpected_keys": 0
+        },
+        "speaker2_a_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 54,
+          "prob_max_abs_error": 5.364418029785156e-07,
+          "prob_mean_abs_error": 3.7038276445855445e-08,
+          "torch_frames": 54,
+          "unexpected_keys": 0
+        }
+      },
+      "L-DIHARD-II": {
+        "golden_silence": {
+          "missing_keys": 0,
+          "onnx_frames": 20,
+          "prob_max_abs_error": 1.1920928955078125e-07,
+          "prob_mean_abs_error": 3.588696273482128e-08,
+          "torch_frames": 20,
+          "unexpected_keys": 0
+        },
+        "golden_single_utterance": {
+          "missing_keys": 0,
+          "onnx_frames": 30,
+          "prob_max_abs_error": 2.384185791015625e-07,
+          "prob_mean_abs_error": 4.5779678714552574e-08,
+          "torch_frames": 30,
+          "unexpected_keys": 0
+        },
+        "golden_two_utterance_gap400": {
+          "missing_keys": 0,
+          "onnx_frames": 50,
+          "prob_max_abs_error": 4.76837158203125e-07,
+          "prob_mean_abs_error": 4.5746563870352475e-08,
+          "torch_frames": 50,
+          "unexpected_keys": 0
+        },
+        "speaker1_a_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 38,
+          "prob_max_abs_error": 2.086162567138672e-07,
+          "prob_mean_abs_error": 3.744897014712478e-08,
+          "torch_frames": 38,
+          "unexpected_keys": 0
+        },
+        "speaker1_b_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 50,
+          "prob_max_abs_error": 1.4901161193847656e-07,
+          "prob_mean_abs_error": 3.6060811225979705e-08,
+          "torch_frames": 50,
+          "unexpected_keys": 0
+        },
+        "speaker2_a_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 54,
+          "prob_max_abs_error": 5.066394805908203e-07,
+          "prob_mean_abs_error": 3.771281598119458e-08,
+          "torch_frames": 54,
+          "unexpected_keys": 0
+        }
+      },
+      "L-DIHARD-III": {
+        "golden_silence": {
+          "missing_keys": 0,
+          "onnx_frames": 20,
+          "prob_max_abs_error": 3.5762786865234375e-07,
+          "prob_mean_abs_error": 3.8743017682918435e-08,
+          "torch_frames": 20,
+          "unexpected_keys": 0
+        },
+        "golden_single_utterance": {
+          "missing_keys": 0,
+          "onnx_frames": 30,
+          "prob_max_abs_error": 2.086162567138672e-07,
+          "prob_mean_abs_error": 4.3213368883243675e-08,
+          "torch_frames": 30,
+          "unexpected_keys": 0
+        },
+        "golden_two_utterance_gap400": {
+          "missing_keys": 0,
+          "onnx_frames": 50,
+          "prob_max_abs_error": 2.384185791015625e-07,
+          "prob_mean_abs_error": 4.182259161211732e-08,
+          "torch_frames": 50,
+          "unexpected_keys": 0
+        },
+        "speaker1_a_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 38,
+          "prob_max_abs_error": 2.384185791015625e-07,
+          "prob_mean_abs_error": 3.49000863764104e-08,
+          "torch_frames": 38,
+          "unexpected_keys": 0
+        },
+        "speaker1_b_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 50,
+          "prob_max_abs_error": 1.7881393432617188e-07,
+          "prob_mean_abs_error": 3.5812458776263156e-08,
+          "torch_frames": 50,
+          "unexpected_keys": 0
+        },
+        "speaker2_a_cn_16k.wav": {
+          "missing_keys": 0,
+          "onnx_frames": 54,
+          "prob_max_abs_error": 8.940696716308594e-07,
+          "prob_mean_abs_error": 3.739087617304904e-08,
+          "torch_frames": 54,
+          "unexpected_keys": 0
+        }
+      }
+    },
+    "ls_eend_thirdparty_streaming_deviation": {
+      "golden_silence": {
+        "max_abs_error": 0.0,
+        "official_frames": 20,
+        "third_party_stream_frames": 20
+      },
+      "golden_single_utterance": {
+        "max_abs_error": 1.4007091522216797e-05,
+        "official_frames": 30,
+        "third_party_stream_frames": 30
+      },
+      "golden_two_utterance_gap400": {
+        "max_abs_error": 1.4007091522216797e-05,
+        "official_frames": 50,
+        "third_party_stream_frames": 50
+      },
+      "speaker1_a_cn_16k.wav": {
+        "max_abs_error": 4.9173831939697266e-06,
+        "official_frames": 38,
+        "third_party_stream_frames": 37
+      },
+      "speaker1_b_cn_16k.wav": {
+        "max_abs_error": 4.649162292480469e-06,
+        "official_frames": 50,
+        "third_party_stream_frames": 49
+      },
+      "speaker2_a_cn_16k.wav": {
+        "max_abs_error": 8.881092071533203e-06,
+        "official_frames": 54,
+        "third_party_stream_frames": 53
+      }
+    }
+  },
+  "revisions": {
+    "eres_standard": "1cf80d41fb3435bd3d8df185b5c423333b2db42a",
+    "eres_w24": "d41a54156a6216b4c7611447be0548e4b0afb1ba",
+    "fs_eend": "adcdde1327bc731cc4e718aa009b8d78317388e5",
+    "ls_eend_onnx": "cc40a1e1242c148fbbc15c132e43b8ac15056e53"
+  },
+  "started_at_utc": "2026-08-07T12:02:56.336051+00:00"
+}

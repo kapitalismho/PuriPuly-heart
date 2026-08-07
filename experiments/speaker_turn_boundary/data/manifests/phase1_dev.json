@@ -1,0 +1,104 @@
+{
+  "baseline_sha": "adf8cde2b5b166beb95c50a39e8941d2fee3601e",
+  "canonical_sample_rate_hz": 16000,
+  "cases": [
+    {
+      "case_id": "zero_gap_handoff_ab",
+      "duration_samples": 73600,
+      "regions": [
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8000,
+          "speakers": [],
+          "start_sample": 0
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 40000,
+          "speakers": [
+            "A"
+          ],
+          "start_sample": 8000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 65600,
+          "speakers": [
+            "B"
+          ],
+          "start_sample": 40000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 73600,
+          "speakers": [],
+          "start_sample": 65600
+        }
+      ],
+      "seed": 2026,
+      "wav_relative_path": "generated/zero_gap_handoff_ab.wav",
+      "wav_sha256": "7a38749c7bee4824cd28d9ea14743cc4858e0196eac17b0c857fc5826b94e788"
+    },
+    {
+      "case_id": "overlap_300ms_ab",
+      "duration_samples": 75200,
+      "regions": [
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 8000,
+          "speakers": [],
+          "start_sample": 0
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 40000,
+          "speakers": [
+            "A"
+          ],
+          "start_sample": 8000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 48000,
+          "speakers": [
+            "A",
+            "B"
+          ],
+          "start_sample": 40000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 67200,
+          "speakers": [
+            "B"
+          ],
+          "start_sample": 48000
+        },
+        {
+          "ambiguous": false,
+          "audio_epoch": 0,
+          "end_sample": 75200,
+          "speakers": [],
+          "start_sample": 67200
+        }
+      ],
+      "seed": 2026,
+      "wav_relative_path": "generated/overlap_300ms_ab.wav",
+      "wav_sha256": "f310c8d480a422658c3d53d36a71aba1907eb9864214b8c51a57cf923c188824"
+    }
+  ],
+  "generator": {
+    "script": "build_phase1_cases.py",
+    "seed": 2026
+  },
+  "manifest_id": "phase1_dev",
+  "schema_version": "experiments.speaker_turn_boundary.manifest.v1"
+}

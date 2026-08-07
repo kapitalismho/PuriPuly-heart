@@ -1,0 +1,6 @@
+# Per-profile sweep artifacts are large and regenerable; keep only the
+# aggregate summaries (committed) and parity records.
+results/sweep_ls_eend_*.json
+results/sweep_eres_*.json
+!results/sweep_ls_eend_summary_*.json
+!results/sweep_eres_summary_*.json

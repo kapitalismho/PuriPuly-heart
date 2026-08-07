@@ -1,0 +1,193 @@
+{
+  "finished_at_utc": "2026-08-07T14:08:07.238538+00:00",
+  "parity_id": "phase1_frontend_parity",
+  "records": {
+    "artifacts": {
+      "E-standard:pretrained_eres2netv2.ckpt": {
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\eres_std\\pretrained_eres2netv2.ckpt",
+        "reason": "ok",
+        "verified": true
+      },
+      "E-w24s4ep4:pretrained_eres2netv2w24s4ep4.ckpt": {
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\eres_w24\\pretrained_eres2netv2w24s4ep4.ckpt",
+        "reason": "ok",
+        "verified": true
+      },
+      "FS-EEND:ami.ckpt": {
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\ckpts\\ami.ckpt",
+        "reason": "ok",
+        "verified": true
+      },
+      "FS-EEND:ch.ckpt": {
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\ckpts\\ch.ckpt",
+        "reason": "ok",
+        "verified": true
+      },
+      "FS-EEND:dih2.ckpt": {
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\ckpts\\dih2.ckpt",
+        "reason": "ok",
+        "verified": true
+      },
+      "FS-EEND:dih3.ckpt": {
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\ckpts\\dih3.ckpt",
+        "reason": "ok",
+        "verified": true
+      },
+      "L-AMI:ls_eend_ami_step.onnx": {
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\AMI\\ls_eend_ami_step.onnx",
+        "reason": "ok",
+        "verified": true
+      },
+      "L-CALLHOME:ls_eend_callhome_step.onnx": {
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\CALLHOME\\ls_eend_callhome_step.onnx",
+        "reason": "ok",
+        "verified": true
+      },
+      "L-DIHARD-II:ls_eend_dih2_step.onnx": {
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\DIHARD II\\ls_eend_dih2_step.onnx",
+        "reason": "ok",
+        "verified": true
+      },
+      "L-DIHARD-III:ls_eend_dih3_step.onnx": {
+        "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\DIHARD III\\ls_eend_dih3_step.onnx",
+        "reason": "ok",
+        "verified": true
+      }
+    },
+    "checkpoints": {
+      "L-AMI": {
+        "onnx_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\AMI\\ls_eend_ami_step.onnx",
+        "onnx_present": true,
+        "sidecar_present": true
+      },
+      "L-CALLHOME": {
+        "onnx_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\CALLHOME\\ls_eend_callhome_step.onnx",
+        "onnx_present": true,
+        "sidecar_present": true
+      },
+      "L-DIHARD-II": {
+        "onnx_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\DIHARD II\\ls_eend_dih2_step.onnx",
+        "onnx_present": true,
+        "sidecar_present": true
+      },
+      "L-DIHARD-III": {
+        "onnx_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\DIHARD III\\ls_eend_dih3_step.onnx",
+        "onnx_present": true,
+        "sidecar_present": true
+      }
+    },
+    "chunked_vs_whole_file_frontend": {
+      "golden_silence": {
+        "chunked_frames": 20,
+        "frames_equal": true,
+        "max_abs_error": 0.0,
+        "whole_frames": 20
+      },
+      "golden_single_utterance": {
+        "chunked_frames": 30,
+        "frames_equal": false,
+        "max_abs_error": 9.5367431640625e-07,
+        "whole_frames": 30
+      },
+      "golden_two_utterance_gap400": {
+        "chunked_frames": 50,
+        "frames_equal": false,
+        "max_abs_error": 9.5367431640625e-07,
+        "whole_frames": 50
+      },
+      "speaker1_a_cn_16k.wav": {
+        "chunked_frames": 38,
+        "frames_equal": false,
+        "max_abs_error": 4.917383193969727e-07,
+        "whole_frames": 38
+      },
+      "speaker1_b_cn_16k.wav": {
+        "chunked_frames": 50,
+        "frames_equal": false,
+        "max_abs_error": 5.364418029785156e-07,
+        "whole_frames": 50
+      },
+      "speaker2_a_cn_16k.wav": {
+        "chunked_frames": 54,
+        "frames_equal": false,
+        "max_abs_error": 7.152557373046875e-07,
+        "whole_frames": 54
+      }
+    },
+    "fbank_smoke": {
+      "dim": 80,
+      "frames": 498,
+      "mean": -6.82279109954834,
+      "std": 6.737180233001709
+    },
+    "frontend_checks": {
+      "mapping": {
+        "initial_latency_ms": 987.875,
+        "lookback_16k": 1375,
+        "output_frame_available_16k_count": {
+          "0": 15806,
+          "9": 30206
+        },
+        "output_frame_center_16k": {
+          "0": 14431,
+          "9": 28831
+        }
+      },
+      "offline_model_frame_counts": {
+        "golden_silence": 20,
+        "golden_single_utterance": 30,
+        "golden_two_utterance_gap400": 50,
+        "speaker1_a_cn_16k.wav": 38,
+        "speaker1_b_cn_16k.wav": 50,
+        "speaker2_a_cn_16k.wav": 54
+      }
+    },
+    "frontend_profile": {
+      "context_recp": 7,
+      "conv_delay": 9,
+      "feat_type": "logmel23_cummn",
+      "fft_size": 256,
+      "frame_hz": 10.0,
+      "hop_length": 80,
+      "n_mels": 23,
+      "resampler_center_16k": 31,
+      "resampler_taps": 63,
+      "sample_rate_hz": 8000,
+      "subsampling": 10,
+      "win_length": 200
+    },
+    "resampler_determinism": {
+      "output_count": 9985,
+      "outputs_equal": true
+    }
+  },
+  "runtime_metadata": {
+    "b0_vad_hangover_ms": 500,
+    "b0_vad_max_segment_ms": 7000,
+    "b0_vad_pre_roll_ms": 500,
+    "b0_vad_profile": "peer",
+    "b0_vad_speech_threshold": 0.5,
+    "b0_vad_start_commit_chunks": 3,
+    "b0_vad_start_debounce_chunks": 3,
+    "baseline_label": "dev",
+    "baseline_sha": "94b545ad9bd937345319422a36802e911e047502",
+    "canonical_sample_rate_hz": 16000,
+    "cpu_count": 16,
+    "machine": "AMD64",
+    "onnxruntime_version": "1.28.0",
+    "ort_graph_optimization": "ORT_ENABLE_ALL",
+    "ort_inter_op_threads": 1,
+    "ort_intra_op_threads": 1,
+    "ort_provider": "CPUExecutionProvider",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "platform_release": "11",
+    "platform_version": "10.0.22631",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "python_full": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "python_implementation": "CPython",
+    "python_version": "3.12.10",
+    "ram_total_bytes": 33933414400,
+    "vad_coalesce_window_ms": 500
+  },
+  "started_at_utc": "2026-08-07T14:08:05.774611+00:00"
+}

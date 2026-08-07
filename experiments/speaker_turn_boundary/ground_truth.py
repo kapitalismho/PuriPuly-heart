@@ -89,6 +89,47 @@ class RegionTransition:
     ambiguous: bool
 
 
+def rebase_regions_to_epoch(
+    regions: list[SpeakerRegion],
+    audio_epoch: int,
+) -> list[SpeakerRegion]:
+    return [
+        SpeakerRegion(
+            audio_epoch=audio_epoch,
+            start_sample=region.start_sample,
+            end_sample=region.end_sample,
+            speakers=region.speakers,
+            ambiguous=region.ambiguous,
+        )
+        for region in regions
+    ]
+
+
+def active_speech_sample_count(regions: list[SpeakerRegion]) -> int:
+    intervals = sorted(
+        (region.start_sample, region.end_sample)
+        for region in regions
+        if not region.ambiguous and region.speakers
+    )
+    total = 0
+    merged_start: int | None = None
+    merged_end: int | None = None
+    for start_sample, end_sample in intervals:
+        if merged_start is None:
+            merged_start = start_sample
+            merged_end = end_sample
+            continue
+        if start_sample <= merged_end:
+            merged_end = max(merged_end, end_sample)
+            continue
+        total += merged_end - merged_start
+        merged_start = start_sample
+        merged_end = end_sample
+    if merged_start is not None and merged_end is not None:
+        total += merged_end - merged_start
+    return total
+
+
 def validate_region_sequence(regions: list[SpeakerRegion]) -> None:
     if not regions:
         return

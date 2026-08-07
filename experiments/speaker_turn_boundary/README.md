@@ -174,6 +174,48 @@ is tight for the VAD-only policy).
   `stale_detector_events`, `coalesced_count`, `duplicate_count`,
   `detector_cut_count`, `total_logical_cuts = vad_cut_count + detector_cut_count`.
 
+### Phase 1 benchmark metrics (corrected semantics)
+
+Phase 1 adds benchmark metrics over the coalesced logical cuts. The pinned
+definitions (fixed after the Phase 1 metric review; see `PHASE1_REPORT.md`
+section 7a):
+
+- **Matching**: deterministic maximum-cardinality one-to-one GT/cut matching
+  per `audio_epoch` (both sides sorted by position, 1D two-pointer greedy,
+  which is optimal for maximum cardinality). Used consistently for recall at
+  every deadline and for matched false-cut accounting.
+- **Recall**: `recall_at_ms` matches GT changes against the product
+  (coalesced VAD + detector) cuts at 250/500/1000/1500/2000 ms deadlines;
+  `detector_only_recall_at_ms` matches GT changes against the **raw
+  pre-coalescing detector boundaries** (converted to canonical cuts),
+  independent of product coalescing: a detector event absorbed by a VAD
+  boundary still counts for the detector-only arm.
+- **False cuts**: one-to-one matched at the pinned 500 ms product tolerance
+  (`PRODUCT_FALSE_CUT_TOLERANCE_MS = VAD_COALESCE_WINDOW_MS`). A cut that
+  matches no GT change within the tolerance is false; a cut exactly matching
+  GT is never false. `product_false_cuts` counts over the coalesced cuts;
+  `detector_only_false_cuts` counts over the raw detector events.
+- **Smoke separation**: unannotated smoke wavs are never used in GT recall,
+  false-cut, or speech-hour aggregates. They are kept as separate
+  `smoke_epochs` diagnostics plus `smoke_case_count` and
+  `smoke_detector_cut_count_total` on the aggregate.
+- **Speech-hour denominator**: `false_cuts_per_speech_hour` divides by the
+  annotated active-speech sample count (union of non-ambiguous regions with
+  active speakers; overlapping regions are never double-counted). The exact
+  sample count is stored machine-readably as `active_speech_samples` on every
+  case metric, aggregate, and summary entry. Whole WAV length is never used
+  as the denominator.
+- **B0 and incremental**: every profile result carries the true VAD-only B0
+  aggregate (`b0_aggregate`, computed with no detector events) and
+  `incremental_over_b0`: `incremental_recall_at_500ms` and
+  `incremental_false_cuts` = candidate product false cuts minus B0 product
+  false cuts (clamped at 0).
+- **Result schema**: sweep results use
+  `experiments.speaker_turn_boundary.sweep.v2`; summaries use
+  `experiments.speaker_turn_boundary.sweep_summary.v1` and are structured as
+  `{schema_version, manifest_id, detector_family, variants: {checkpoint:
+  {profile_id: {aggregate, b0, incremental_over_b0}}}}`.
+
 ### Ground-truth active-speaker-set transitions
 
 Regions are contiguous segments with a constant active-speaker set

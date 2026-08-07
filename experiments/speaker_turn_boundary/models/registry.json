@@ -1,0 +1,229 @@
+{
+  "artifacts": [
+    {
+      "artifact_id": "L-AMI:ls_eend_ami_step.onnx",
+      "file_name": "ls_eend_ami_step.onnx",
+      "kind": "onnx_step_model",
+      "license": "mit",
+      "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+      "sha256": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+      "size_bytes": 44480761,
+      "source_url": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX/tree/main/AMI"
+    },
+    {
+      "artifact_id": "L-AMI:ls_eend_ami_step.json",
+      "file_name": "ls_eend_ami_step.json",
+      "kind": "onnx_sidecar",
+      "license": "mit",
+      "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+      "sha256": "47f29718254995ec017636d5ff31fef8b20bf47dca30d883edcb91e022dc3353",
+      "size_bytes": 1329,
+      "source_url": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX/tree/main/AMI"
+    },
+    {
+      "artifact_id": "L-CALLHOME:ls_eend_callhome_step.onnx",
+      "file_name": "ls_eend_callhome_step.onnx",
+      "kind": "onnx_step_model",
+      "license": "mit",
+      "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+      "sha256": "b79b1b1cb2a070bfb92543d90af5530681af0e45da8bf5771e515e9c644b6604",
+      "size_bytes": 44483833,
+      "source_url": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX/tree/main/CALLHOME"
+    },
+    {
+      "artifact_id": "L-CALLHOME:ls_eend_callhome_step.json",
+      "file_name": "ls_eend_callhome_step.json",
+      "kind": "onnx_sidecar",
+      "license": "mit",
+      "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+      "sha256": "049084141fb3d7694e4bbdc257024761d6f6e64b8782e47d7426e3f35009dffa",
+      "size_bytes": 1329,
+      "source_url": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX/tree/main/CALLHOME"
+    },
+    {
+      "artifact_id": "L-DIHARD-II:ls_eend_dih2_step.onnx",
+      "file_name": "ls_eend_dih2_step.onnx",
+      "kind": "onnx_step_model",
+      "license": "mit",
+      "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+      "sha256": "5df89a22ba87989a01217e51d674cc547877ce5b7100dce920ab63adc3258302",
+      "size_bytes": 44486905,
+      "source_url": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX/tree/main/DIHARD II"
+    },
+    {
+      "artifact_id": "L-DIHARD-II:ls_eend_dih2_step.json",
+      "file_name": "ls_eend_dih2_step.json",
+      "kind": "onnx_sidecar",
+      "license": "mit",
+      "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+      "sha256": "ecb42ca07888a297b3e0ae277b19e1a1412e1fa68309233f9e6196b06128f0a9",
+      "size_bytes": 1335,
+      "source_url": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX/tree/main/DIHARD II"
+    },
+    {
+      "artifact_id": "L-DIHARD-III:ls_eend_dih3_step.onnx",
+      "file_name": "ls_eend_dih3_step.onnx",
+      "kind": "onnx_step_model",
+      "license": "mit",
+      "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+      "sha256": "587ad263b46aaa5d4fc7fb9e0524d1990455f7286c3a47b2371d08df8b5671c8",
+      "size_bytes": 44486905,
+      "source_url": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX/tree/main/DIHARD III"
+    },
+    {
+      "artifact_id": "L-DIHARD-III:ls_eend_dih3_step.json",
+      "file_name": "ls_eend_dih3_step.json",
+      "kind": "onnx_sidecar",
+      "license": "mit",
+      "revision": "cc40a1e1242c148fbbc15c132e43b8ac15056e53",
+      "sha256": "ecb42ca07888a297b3e0ae277b19e1a1412e1fa68309233f9e6196b06128f0a9",
+      "size_bytes": 1335,
+      "source_url": "https://huggingface.co/GradientDescent2718/LS-EEND-ONNX/tree/main/DIHARD III"
+    },
+    {
+      "artifact_id": "FS-EEND:ami.ckpt",
+      "file_name": "ami.ckpt",
+      "kind": "pytorch_checkpoint",
+      "license": "MIT",
+      "revision": "adcdde1327bc731cc4e718aa009b8d78317388e5",
+      "sha256": "5b1df8f050faabda0432a650567c0e4db9826e54ba7d709677bfe3e62db5a73e",
+      "size_bytes": 49977074,
+      "source_url": "https://drive.google.com/file/d/1Zbc-8fXr_9kydjYS5SAeIaYDr6O1Ik74"
+    },
+    {
+      "artifact_id": "FS-EEND:ch.ckpt",
+      "file_name": "ch.ckpt",
+      "kind": "pytorch_checkpoint",
+      "license": "MIT",
+      "revision": "adcdde1327bc731cc4e718aa009b8d78317388e5",
+      "sha256": "eab0b7183075044e665dcdbd88d82c3e49094cd87c5ac862715fe6ca880e6afd",
+      "size_bytes": 49974764,
+      "source_url": "https://drive.google.com/file/d/1W8nYAB6YoEKMM5KZX-apVADvHaYc2Fre"
+    },
+    {
+      "artifact_id": "FS-EEND:dih2.ckpt",
+      "file_name": "dih2.ckpt",
+      "kind": "pytorch_checkpoint",
+      "license": "MIT",
+      "revision": "adcdde1327bc731cc4e718aa009b8d78317388e5",
+      "sha256": "2d6de53d69d99a3ee3737425bff4aa7490b7981f527994ca552fb6b2adf25b0f",
+      "size_bytes": 49980603,
+      "source_url": "https://drive.google.com/file/d/1vu7VSTnrNsooz5DzaodmctjdwblfB3wv"
+    },
+    {
+      "artifact_id": "FS-EEND:dih3.ckpt",
+      "file_name": "dih3.ckpt",
+      "kind": "pytorch_checkpoint",
+      "license": "MIT",
+      "revision": "adcdde1327bc731cc4e718aa009b8d78317388e5",
+      "sha256": "da62f7e16f422f1c6518bd781e2e54c318b16881fc168f60a20db7870372818c",
+      "size_bytes": 49980603,
+      "source_url": "https://drive.google.com/file/d/115iaEG1OZwXa9tSyScXGtWeOk9JLfpER"
+    },
+    {
+      "artifact_id": "E-standard:pretrained_eres2netv2.ckpt",
+      "file_name": "pretrained_eres2netv2.ckpt",
+      "kind": "pytorch_checkpoint",
+      "license": "Apache-2.0",
+      "revision": "1cf80d41fb3435bd3d8df185b5c423333b2db42a",
+      "sha256": "0eb4057106b2573dd7b132cf0c36273ab29afd192c1610f80baa9c556dbb963c",
+      "sidecar": {
+        "baseWidth": 26,
+        "embedding_size": 192,
+        "expansion": 2,
+        "feat_dim": 80,
+        "model_id": "iic/speech_eres2netv2_sv_zh-cn_16k-common",
+        "revision": "1cf80d41fb3435bd3d8df185b5c423333b2db42a",
+        "scale": 2
+      },
+      "size_bytes": 71768231,
+      "source_url": "https://modelscope.cn/models/iic/speech_eres2netv2_sv_zh-cn_16k-common"
+    },
+    {
+      "artifact_id": "E-w24s4ep4:pretrained_eres2netv2w24s4ep4.ckpt",
+      "file_name": "pretrained_eres2netv2w24s4ep4.ckpt",
+      "kind": "pytorch_checkpoint",
+      "license": "Apache-2.0",
+      "revision": "d41a54156a6216b4c7611447be0548e4b0afb1ba",
+      "sha256": "740bb6584a99ee4cf910101536acba38c15a8017ea6a3a2813ec668fb62981f1",
+      "sidecar": {
+        "baseWidth": 24,
+        "embedding_size": 192,
+        "expansion": 4,
+        "feat_dim": 80,
+        "model_id": "iic/speech_eres2netv2w24s4ep4_sv_zh-cn_16k-common",
+        "revision": "d41a54156a6216b4c7611447be0548e4b0afb1ba",
+        "scale": 4
+      },
+      "size_bytes": 214688240,
+      "source_url": "https://modelscope.cn/models/iic/speech_eres2netv2w24s4ep4_sv_zh-cn_16k-common"
+    }
+  ],
+  "eres_onnx_exports": [
+    {
+      "dynamic_axes": {
+        "embedding": [
+          0
+        ],
+        "fbank": [
+          1
+        ]
+      },
+      "file_name": "eres2netv2.onnx",
+      "input": "fbank (1,T,80)",
+      "opset": 17,
+      "output": "embedding (1,192)",
+      "sha256": "7a6d4f89dcb92a554806bdf6bfb13c7fae0a63e8f992a49b3a503b9a03c705cf",
+      "size_bytes": 71441209
+    },
+    {
+      "dynamic_axes": {
+        "embedding": [
+          0
+        ],
+        "fbank": [
+          1
+        ]
+      },
+      "file_name": "eres2netv2_static.onnx",
+      "input": "fbank (1,T,80)",
+      "opset": 17,
+      "output": "embedding (1,192)",
+      "sha256": "ad71b87985c6889706031ab24edb58991fd34f1da029aff116372d6136262cc6",
+      "size_bytes": 71441201
+    },
+    {
+      "dynamic_axes": {
+        "embedding": [
+          0
+        ],
+        "fbank": [
+          1
+        ]
+      },
+      "file_name": "eres2netv2_w24s4ep4.onnx",
+      "input": "fbank (1,T,80)",
+      "opset": 17,
+      "output": "embedding (1,192)",
+      "sha256": "3761572a872a29f36af66065075cc9a48adc23c8b26fb0c68488aa3ed8f35f26",
+      "size_bytes": 214043983
+    },
+    {
+      "dynamic_axes": {
+        "embedding": [
+          0
+        ],
+        "fbank": [
+          1
+        ]
+      },
+      "file_name": "eres2netv2_w24s4ep4_static.onnx",
+      "input": "fbank (1,T,80)",
+      "opset": 17,
+      "output": "embedding (1,192)",
+      "sha256": "e58d82933f3fb7c3f12b59bb68137f5f78886cd1bfebb79342ded12322cc9a6a",
+      "size_bytes": 214043975
+    }
+  ],
+  "schema_version": "experiments.speaker_turn_boundary.provenance.v1"
+}
