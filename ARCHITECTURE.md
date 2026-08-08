@@ -41,7 +41,7 @@ core runtime and domain contracts
 | OS audio             | Microphone, output loopback, process capture                      |
 | STT backends         | Audio to transcript events                                        |
 | Translation backends | Transcript to translated text                                     |
-| VRChat OSC           | Bidirectional control, canonical state publication, chatbox output, and mute input |
+| VRChat OSC           | Bidirectional control, canonical state, chatbox output, mute      |
 | Overlay processes    | Desktop and VR subtitle presentation                              |
 | GPU worker           | Native local GPU ASR                                              |
 | Broker               | Managed identity, entitlement, credentials, telemetry             |
@@ -66,8 +66,8 @@ Broker is a control-plane dependency, not part of the normal utterance data path
 | Output runtime          | Routing, delivery tasks, destinations, delivery history    | `core/runtime/output.py`                              |
 | Overlay owners          | Overlay selection, process lifecycle, state, calibration   | `app/services/overlay_application.py`            |
 | Managed-account runtime | Authentication, entitlement, usage, credential release     | `app/wiring_managed_account.py`                      |
-| OSC control runtime  | Shared receiver lifecycle, control routing, state publication, discovery/restart | `app/services/osc/control_runtime.py` |
-| OSCQuery service     | Zeroconf discovery, receiver advertisement, and OSCQuery HTTP tree | `core/osc/oscquery.py` |
+| OSC control runtime   | Receiver lifecycle, routing, state publication, restart    | `app/services/osc/control_runtime.py`                        |
+| OSCQuery service      | Zeroconf discovery, receiver advertisement, OSCQuery tree | `core/osc/oscquery.py`                                        |
 | Shutdown adapter        | Ordered application teardown                               | `app/adapters/application_runtime_shutdown.py`      |
 
 
@@ -142,8 +142,8 @@ managed authentication
 | GPU worker      | `GpuWorkerClientPort`, `GpuWorkerProcessFactoryPort` | Native worker process adapter            |
 | Secrets         | `SecretStore`                                        | Keyring, encrypted file, memory          |
 | Shutdown        | Runtime shutdown ports                               | Application shutdown adapter             |
-| OSC control ABI | Stable parameter schema and codec contract           | `core/osc/control_schema.py`, `core/osc/control_codec.py` |
-| OSC integration | `OscControlApplicationPort`, `OscQueryServicePort`    | `app/services/osc/`, `core/osc/oscquery.py` |
+| OSC control ABI | Stable parameter schema and codec contract           | Control schema and codec                |
+| OSC integration | `OscControlApplicationPort`, `OscQueryServicePort`    | OSC control adapter, OSCQuery adapter   |
 
 
 Multiple adapters on one port are alternatives unless the owner explicitly supports multiple destinations.
