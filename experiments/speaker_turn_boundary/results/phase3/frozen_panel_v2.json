@@ -1,0 +1,197 @@
+{
+  "dev_manifest_sha256": "8369c51a82777a01814a35bac34301252842492fb12583b5f20733d75d92ca8e",
+  "dev_rows_sha256": "6fc01ce8f679aad4e4d9c6d5c45a1d0552f0ba030e46306a7a308466155c8f19",
+  "frontend_contracts": {
+    "eres2netv2": "939532cf4976273533672708fe50a29791928444df17f17d3a9360976b82073d",
+    "ls_eend": "9630fb389bbaba6b574e9fba4c1162ddb102189a295106a8091230b95c04d757"
+  },
+  "frozen_sha256": "5fad96cde4d3e79c547e5e87bd50549e68c526adf866ad4057c525d5416d9fa2",
+  "metric_contract": {
+    "boundary_localization_tolerance_ms": 500,
+    "causal_recall_deadlines_ms": [
+      250,
+      500,
+      1000,
+      1500,
+      2000
+    ],
+    "coalesce_window_samples": 8000,
+    "false_cut_attribution_horizon_ms": 2000,
+    "five_minute_denominator": "source_session_time",
+    "matching": "deterministic_ordered_one_to_one_max_cardinality_then_min_delay_and_localization",
+    "product_matching": "lock_b0_matches_then_match_added_noncoalesced_detector_cuts",
+    "rate_budget_role": "reference_slice_only_not_elimination"
+  },
+  "model_hashes": {
+    "eres2netv2:E-standard": "7a6d4f89dcb92a554806bdf6bfb13c7fae0a63e8f992a49b3a503b9a03c705cf",
+    "eres2netv2:E-w24s4ep4": "3761572a872a29f36af66065075cc9a48adc23c8b26fb0c68488aa3ed8f35f26",
+    "ls_eend:L-AMI": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+    "ls_eend:L-CALLHOME": "b79b1b1cb2a070bfb92543d90af5530681af0e45da8bf5771e515e9c644b6604",
+    "ls_eend:L-DIHARD-II": "5df89a22ba87989a01217e51d674cc547877ce5b7100dce920ab63adc3258302",
+    "ls_eend:L-DIHARD-III": "587ad263b46aaa5d4fc7fb9e0524d1990455f7286c3a47b2371d08df8b5671c8"
+  },
+  "panels": {
+    "eres2netv2": [
+      {
+        "checkpoint": "E-w24s4ep4",
+        "dev_extra_false_cuts": 4877,
+        "dev_recovered_b0_misses_at_ms": {
+          "1000": 220,
+          "1500": 220,
+          "2000": 220,
+          "250": 160,
+          "500": 191
+        },
+        "family": "eres2netv2",
+        "params": {
+          "anchor_ema_alpha": 0.9,
+          "anchor_update": "none",
+          "confirmation": 1,
+          "mutual_similarity_threshold": 0.5,
+          "step_seconds": 0.1,
+          "threshold": 0.7,
+          "window_seconds": 0.5
+        },
+        "profile_id": "E-w24s4ep4:anchor-W0.5-s0.1-thr0.70-c1-none",
+        "profile_kind": "stable_anchor",
+        "selection_roles": [
+          "maximum_500ms_recovery"
+        ]
+      },
+      {
+        "checkpoint": "E-w24s4ep4",
+        "dev_extra_false_cuts": 686,
+        "dev_recovered_b0_misses_at_ms": {
+          "1000": 194,
+          "1500": 194,
+          "2000": 194,
+          "250": 82,
+          "500": 158
+        },
+        "family": "eres2netv2",
+        "params": {
+          "anchor_ema_alpha": 0.9,
+          "anchor_update": "ema",
+          "confirmation": 1,
+          "mutual_similarity_threshold": 0.5,
+          "step_seconds": 0.25,
+          "threshold": 0.45,
+          "window_seconds": 0.5
+        },
+        "profile_id": "E-w24s4ep4:anchor-W0.5-s0.25-thr0.45-c1-ema",
+        "profile_kind": "stable_anchor",
+        "selection_roles": [
+          "integer_frontier_knee"
+        ]
+      },
+      {
+        "checkpoint": "E-w24s4ep4",
+        "dev_extra_false_cuts": 15,
+        "dev_recovered_b0_misses_at_ms": {
+          "1000": 26,
+          "1500": 29,
+          "2000": 29,
+          "250": 0,
+          "500": 7
+        },
+        "family": "eres2netv2",
+        "params": {
+          "anchor_ema_alpha": 0.9,
+          "anchor_update": "ema",
+          "confirmation": 2,
+          "mutual_similarity_threshold": 0.5,
+          "step_seconds": 0.1,
+          "threshold": 0.3,
+          "window_seconds": 0.75
+        },
+        "profile_id": "E-w24s4ep4:anchor-W0.75-s0.1-thr0.30-c2-ema",
+        "profile_kind": "stable_anchor",
+        "selection_roles": [
+          "lowest_cost_nonzero_500ms_recovery"
+        ]
+      }
+    ],
+    "ls_eend": [
+      {
+        "checkpoint": "L-AMI",
+        "dev_extra_false_cuts": 3,
+        "dev_recovered_b0_misses_at_ms": {
+          "1000": 4,
+          "1500": 4,
+          "2000": 4,
+          "250": 0,
+          "500": 1
+        },
+        "family": "ls_eend",
+        "params": {
+          "median_width": 11,
+          "persistence": 3,
+          "policy": "dominant_replacement",
+          "threshold": 0.7
+        },
+        "profile_id": "L-AMI:dominant_replacement@thr0.70-p3-med11",
+        "profile_kind": "reducer",
+        "selection_roles": [
+          "lowest_cost_nonzero_500ms_recovery"
+        ]
+      },
+      {
+        "checkpoint": "L-CALLHOME",
+        "dev_extra_false_cuts": 310,
+        "dev_recovered_b0_misses_at_ms": {
+          "1000": 69,
+          "1500": 71,
+          "2000": 71,
+          "250": 16,
+          "500": 42
+        },
+        "family": "ls_eend",
+        "params": {
+          "median_width": 11,
+          "persistence": 1,
+          "policy": "new_speaker_onset",
+          "threshold": 0.55
+        },
+        "profile_id": "L-CALLHOME:new_speaker_onset@thr0.55-p1-med11",
+        "profile_kind": "reducer",
+        "selection_roles": [
+          "integer_frontier_knee"
+        ]
+      },
+      {
+        "checkpoint": "L-DIHARD-III",
+        "dev_extra_false_cuts": 782,
+        "dev_recovered_b0_misses_at_ms": {
+          "1000": 96,
+          "1500": 96,
+          "2000": 96,
+          "250": 36,
+          "500": 72
+        },
+        "family": "ls_eend",
+        "params": {
+          "median_width": 1,
+          "persistence": 2,
+          "policy": "new_speaker_onset",
+          "threshold": 0.4
+        },
+        "profile_id": "L-DIHARD-III:new_speaker_onset@thr0.40-p2-med1",
+        "profile_kind": "reducer",
+        "selection_roles": [
+          "maximum_500ms_recovery"
+        ]
+      }
+    ]
+  },
+  "schema_version": "experiments.speaker_turn_boundary.phase3.frozen_panel.v2",
+  "selection_policy": {
+    "rate_budgets_are_elimination_caps": false,
+    "roles": [
+      "zero_extra_false",
+      "lowest_cost_nonzero_500ms_recovery",
+      "integer_frontier_knee",
+      "maximum_500ms_recovery"
+    ],
+    "source": "full integer-count Pareto frontier"
+  }
+}

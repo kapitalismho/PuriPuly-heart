@@ -1,0 +1,129 @@
+{
+  "artifact_sha256": "c010107f54a778ee45cbf4b9a6d5068d86b1ae64ffd09bae3e828b51d415e288",
+  "frontend_contracts": {
+    "eres2netv2": "939532cf4976273533672708fe50a29791928444df17f17d3a9360976b82073d",
+    "ls_eend": "9630fb389bbaba6b574e9fba4c1162ddb102189a295106a8091230b95c04d757"
+  },
+  "manifests": {
+    "mixed_dev_pool": {
+      "active_speech_seconds": 1822.57,
+      "case_count": 204,
+      "gt_change_count": 374,
+      "manifest_sha256": "8369c51a82777a01814a35bac34301252842492fb12583b5f20733d75d92ca8e",
+      "source_seconds": 2591.8986875
+    }
+  },
+  "metric_contract": {
+    "boundary_localization_tolerance_ms": 500,
+    "causal_recall_deadlines_ms": [
+      250,
+      500,
+      1000,
+      1500,
+      2000
+    ],
+    "coalesce_window_samples": 8000,
+    "false_cut_attribution_horizon_ms": 2000,
+    "five_minute_denominator": "source_session_time",
+    "matching": "deterministic_ordered_one_to_one_max_cardinality_then_min_delay_and_localization",
+    "product_matching": "lock_b0_matches_then_match_added_noncoalesced_detector_cuts",
+    "rate_budget_role": "reference_slice_only_not_elimination"
+  },
+  "model_files": {
+    "eres2netv2:E-standard": {
+      "onnx_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\eres_onnx\\eres2netv2.onnx",
+      "onnx_sha256": "7a6d4f89dcb92a554806bdf6bfb13c7fae0a63e8f992a49b3a503b9a03c705cf",
+      "passed": true
+    },
+    "eres2netv2:E-w24s4ep4": {
+      "onnx_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\eres_onnx\\eres2netv2_w24s4ep4.onnx",
+      "onnx_sha256": "3761572a872a29f36af66065075cc9a48adc23c8b26fb0c68488aa3ed8f35f26",
+      "passed": true
+    },
+    "ls_eend:L-AMI": {
+      "onnx_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\AMI\\ls_eend_ami_step.onnx",
+      "onnx_sha256": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+      "passed": true,
+      "sidecar_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\AMI\\ls_eend_ami_step.json",
+      "sidecar_sha256": "47f29718254995ec017636d5ff31fef8b20bf47dca30d883edcb91e022dc3353"
+    },
+    "ls_eend:L-CALLHOME": {
+      "onnx_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\CALLHOME\\ls_eend_callhome_step.onnx",
+      "onnx_sha256": "b79b1b1cb2a070bfb92543d90af5530681af0e45da8bf5771e515e9c644b6604",
+      "passed": true,
+      "sidecar_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\CALLHOME\\ls_eend_callhome_step.json",
+      "sidecar_sha256": "049084141fb3d7694e4bbdc257024761d6f6e64b8782e47d7426e3f35009dffa"
+    },
+    "ls_eend:L-DIHARD-II": {
+      "onnx_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\DIHARD II\\ls_eend_dih2_step.onnx",
+      "onnx_sha256": "5df89a22ba87989a01217e51d674cc547877ce5b7100dce920ab63adc3258302",
+      "passed": true,
+      "sidecar_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\DIHARD II\\ls_eend_dih2_step.json",
+      "sidecar_sha256": "ecb42ca07888a297b3e0ae277b19e1a1412e1fa68309233f9e6196b06128f0a9"
+    },
+    "ls_eend:L-DIHARD-III": {
+      "onnx_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\DIHARD III\\ls_eend_dih3_step.onnx",
+      "onnx_sha256": "587ad263b46aaa5d4fc7fb9e0524d1990455f7286c3a47b2371d08df8b5671c8",
+      "passed": true,
+      "sidecar_path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\LS-EEND-ONNX\\repo\\DIHARD III\\ls_eend_dih3_step.json",
+      "sidecar_sha256": "ecb42ca07888a297b3e0ae277b19e1a1412e1fa68309233f9e6196b06128f0a9"
+    }
+  },
+  "model_hashes": {
+    "eres2netv2:E-standard": "7a6d4f89dcb92a554806bdf6bfb13c7fae0a63e8f992a49b3a503b9a03c705cf",
+    "eres2netv2:E-w24s4ep4": "3761572a872a29f36af66065075cc9a48adc23c8b26fb0c68488aa3ed8f35f26",
+    "ls_eend:L-AMI": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+    "ls_eend:L-CALLHOME": "b79b1b1cb2a070bfb92543d90af5530681af0e45da8bf5771e515e9c644b6604",
+    "ls_eend:L-DIHARD-II": "5df89a22ba87989a01217e51d674cc547877ce5b7100dce920ab63adc3258302",
+    "ls_eend:L-DIHARD-III": "587ad263b46aaa5d4fc7fb9e0524d1990455f7286c3a47b2371d08df8b5671c8"
+  },
+  "profile_counts": {
+    "eres2netv2_adjacent": 360,
+    "eres2netv2_stable_anchor": 576,
+    "ls_eend": 432
+  },
+  "runtime_metadata": {
+    "b0_vad_hangover_ms": 500,
+    "b0_vad_max_segment_ms": 7000,
+    "b0_vad_pre_roll_ms": 500,
+    "b0_vad_profile": "peer",
+    "b0_vad_speech_threshold": 0.5,
+    "b0_vad_start_commit_chunks": 3,
+    "b0_vad_start_debounce_chunks": 3,
+    "baseline_label": "dev",
+    "baseline_sha": "5e8b0a10332a88cdc95f9965f71360469e62976a",
+    "canonical_sample_rate_hz": 16000,
+    "cpu_count": 16,
+    "machine": "AMD64",
+    "onnxruntime_version": "1.28.0",
+    "ort_graph_optimization": "ORT_ENABLE_ALL",
+    "ort_inter_op_threads": 1,
+    "ort_intra_op_threads": 1,
+    "ort_provider": "CPUExecutionProvider",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "platform_release": "11",
+    "platform_version": "10.0.22631",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "python_full": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "python_implementation": "CPython",
+    "python_version": "3.12.10",
+    "ram_total_bytes": 33933414400,
+    "vad_coalesce_window_ms": 500
+  },
+  "schema_version": "experiments.speaker_turn_boundary.phase3.preflight.v2",
+  "source_contract_hashes": {
+    "PHASE3_DESIGN.md": "c599a875a11b7bffb5d28632c07508cc43c7eb0a179f26ebb7cd38fd2607c33a",
+    "coalescing.py": "6016c2d4405dfae23cf0b62c6f322342091cbf54b0d5f494d5b7255532c99752",
+    "frontend.py": "ca879777c88b51fdf9d720427778e3fb6b2a7594b5b2e019ca5cd59baeb8d881",
+    "phase3_data.py": "1dd01ea556672582b1c1158930f48a7027d7bbdc300bd9e43e01775f7a7e4600",
+    "phase3_eres.py": "954bf2cea184a77ddc0ad6ad274590368735a93045cbda13a37e468550269b2a",
+    "phase3_eval.py": "d2fa1a1dd1e71743a3db17c8f21dbd214db16a326211e5227cee14fb3285effb",
+    "phase3_funnel.py": "8eed50780c42c666c6633ad5f2875cb0961aca49363a7a02773396109af8e82c",
+    "phase3_ls.py": "524830b20e6535215b871679dcbbc29e8d733cc0f3a2e3b43359bde8e6a6b914",
+    "phase3_metrics.py": "327907943755c9e90405746bc383c68faa7dd544b93f55b67ee58f267076b408",
+    "phase3_stages.py": "da41e9e6e16a485e184d901b9c21f75f3907b9822630c1b5d4506a642dc6f101",
+    "reducer.py": "39c4db5fb5a98ca48bc3bbae982af0f9fa3dfe83c0db9978c29f91eb7ce5a759",
+    "run_phase3.py": "e470c7c75b7142814c12cb696de824e40f39b6d16df32cae6983eb7880eff184",
+    "vad_baseline.py": "7a3965fdb01eb7391dde985e5c498162d80b4e5ab565205626d684a66d8ff627"
+  }
+}

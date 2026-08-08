@@ -1,0 +1,54 @@
+{
+  "contract_sha256": "dea58cdd50174be5bad5e6c8f68247b8f34801442623d65f84f73aaac63ec9eb",
+  "frontend_contracts": {
+    "eres2netv2": "939532cf4976273533672708fe50a29791928444df17f17d3a9360976b82073d",
+    "ls_eend": "9630fb389bbaba6b574e9fba4c1162ddb102189a295106a8091230b95c04d757"
+  },
+  "manifest_sha256": "8369c51a82777a01814a35bac34301252842492fb12583b5f20733d75d92ca8e",
+  "metric_contract": {
+    "boundary_localization_tolerance_ms": 500,
+    "causal_recall_deadlines_ms": [
+      250,
+      500,
+      1000,
+      1500,
+      2000
+    ],
+    "coalesce_window_samples": 8000,
+    "false_cut_attribution_horizon_ms": 2000,
+    "five_minute_denominator": "source_session_time",
+    "matching": "deterministic_ordered_one_to_one_max_cardinality_then_min_delay_and_localization",
+    "product_matching": "lock_b0_matches_then_match_added_noncoalesced_detector_cuts",
+    "rate_budget_role": "reference_slice_only_not_elimination"
+  },
+  "model_hashes": {
+    "eres2netv2:E-standard": "7a6d4f89dcb92a554806bdf6bfb13c7fae0a63e8f992a49b3a503b9a03c705cf",
+    "eres2netv2:E-w24s4ep4": "3761572a872a29f36af66065075cc9a48adc23c8b26fb0c68488aa3ed8f35f26",
+    "ls_eend:L-AMI": "5a2b813ffe41170e40d0fc08a6eb1699e579e377af30c7962d07885608a6aa77",
+    "ls_eend:L-CALLHOME": "b79b1b1cb2a070bfb92543d90af5530681af0e45da8bf5771e515e9c644b6604",
+    "ls_eend:L-DIHARD-II": "5df89a22ba87989a01217e51d674cc547877ce5b7100dce920ab63adc3258302",
+    "ls_eend:L-DIHARD-III": "587ad263b46aaa5d4fc7fb9e0524d1990455f7286c3a47b2371d08df8b5671c8"
+  },
+  "profile_counts": {
+    "b0": 1,
+    "eres2netv2_adjacent": 360,
+    "eres2netv2_stable_anchor": 576,
+    "ls_eend": 432
+  },
+  "schema_version": "experiments.speaker_turn_boundary.phase3.dev_run_contract.v2",
+  "source_contract_hashes": {
+    "PHASE3_DESIGN.md": "c599a875a11b7bffb5d28632c07508cc43c7eb0a179f26ebb7cd38fd2607c33a",
+    "coalescing.py": "6016c2d4405dfae23cf0b62c6f322342091cbf54b0d5f494d5b7255532c99752",
+    "frontend.py": "ca879777c88b51fdf9d720427778e3fb6b2a7594b5b2e019ca5cd59baeb8d881",
+    "phase3_data.py": "1dd01ea556672582b1c1158930f48a7027d7bbdc300bd9e43e01775f7a7e4600",
+    "phase3_eres.py": "954bf2cea184a77ddc0ad6ad274590368735a93045cbda13a37e468550269b2a",
+    "phase3_eval.py": "d2fa1a1dd1e71743a3db17c8f21dbd214db16a326211e5227cee14fb3285effb",
+    "phase3_funnel.py": "8eed50780c42c666c6633ad5f2875cb0961aca49363a7a02773396109af8e82c",
+    "phase3_ls.py": "524830b20e6535215b871679dcbbc29e8d733cc0f3a2e3b43359bde8e6a6b914",
+    "phase3_metrics.py": "327907943755c9e90405746bc383c68faa7dd544b93f55b67ee58f267076b408",
+    "phase3_stages.py": "da41e9e6e16a485e184d901b9c21f75f3907b9822630c1b5d4506a642dc6f101",
+    "reducer.py": "39c4db5fb5a98ca48bc3bbae982af0f9fa3dfe83c0db9978c29f91eb7ce5a759",
+    "run_phase3.py": "e470c7c75b7142814c12cb696de824e40f39b6d16df32cae6983eb7880eff184",
+    "vad_baseline.py": "7a3965fdb01eb7391dde985e5c498162d80b4e5ab565205626d684a66d8ff627"
+  }
+}

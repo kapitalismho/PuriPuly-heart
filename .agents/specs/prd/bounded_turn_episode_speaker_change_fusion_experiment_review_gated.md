@@ -6,22 +6,23 @@ Status: normative experiment plan; implementation has not started.
 
 Authority order:
 
-1. Explicit user decisions in the experiment thread, including discarding the long-session design
-2. `.agents/specs/prd/speaker_change_turn_boundary_experiment_handoff_en(1).md`
-3. GitHub issue #51
-4. This plan
-5. Verified raw artifacts from committed Phases 0-2 and the uncommitted Phase 3 development sweep
-6. Older reports and analyses as historical evidence only
+1. Explicit user decisions in the experiment thread.
+2. `.agents/specs/prd/speaker_change_turn_boundary_experiment_handoff_en(1).md`.
+3. This normative experiment plan.
+4. GitHub issue #51 as product/history context where it does not conflict with the items above.
+5. Verified raw artifacts from committed Phases 0-2 and the uncommitted Phase 3 development sweep.
+6. Older reports and analyses as historical evidence only.
 
-This plan replaces the discarded long-session design. Continuous 15-30 minute replay,
-long-term speaker-return memory, session-age drift, and long-session model-state claims
-are out of scope.
+If a lower-authority artifact conflicts with the action, scoring, sampling, or selection
+contract in this plan, the lower-authority artifact is not normative for the new run.
+Historical artifacts may be reused only as evidence or cached model output after their
+identity and causal semantics are verified.
 
 The experiment answers a product question:
 
 > Can causal speaker-change evidence, after proposal stabilization and VAD fusion,
 > reduce speech from different speakers being finalized in one STT/translation turn
-> without causing too many harmful splits inside continuous same-speaker speech?
+> without causing too many harmful or excessive same-speaker splits?
 
 This is not a general diarization benchmark. Production wiring is out of scope. The
 result may recommend a detector and policy for a later implementation task, but it may
@@ -33,18 +34,20 @@ The following decisions are frozen before implementation.
 
 1. The primary audio condition is one mono mixed-audio source timeline at 16 kHz.
 2. The evaluation unit is a bounded turn episode, not a complete meeting.
-3. Model state resets at the episode boundary and remains continuous inside the episode.
+3. Episode-local reset plus warm-up is permitted for scored evaluation only after the state-equivalence contract in Section 5.4 passes for the relevant family/profile class. If it fails, source-prefix state snapshots or source-prefix replay are required.
 4. VAD utterance boundaries do not reset LS-EEND neural state inside an episode.
 5. A detector proposal is never scored as a product cut before causal clustering and fusion.
 6. Clean and gap speaker handoffs are hard-boundary targets.
-7. Interruption/overlap onset is a soft-marker target and is excluded from the hard-turn headline.
-8. Same-speaker pauses are neutral. They receive neither speaker-change benefit credit nor harmful-active-split cost.
+7. Interruption/overlap onset is a soft-marker target and is excluded from the clean/gap hard-turn headline.
+8. Same-speaker pauses receive no speaker-change benefit credit and no severe active-speech-split label, but detector-created pause splits remain a separately measured fragmentation cost.
 9. A hard logical boundary ends the current logical STT/translation turn while keeping VAD state, detector state, and translation context alive. Provider-specific audio commit mechanics are tested later with oracle traces.
-10. Primary benefit is reduction of mixed-speaker turn contamination.
-11. Primary harm is a hard boundary inside stable same-speaker active speech.
+10. Primary benefit is reduction of mixed-speaker turn contamination on the clean/gap headline stratum defined in Section 13.
+11. Primary severe harm is a hard boundary inside stable same-speaker active speech. Harm flags are independent of reference-match benefit attribution.
 12. No arbitrary false-split cap removes candidates before the development frontier is constructed.
 13. Held-out selection uses a frozen multi-point panel, never one ratio-selected family representative.
 14. The previously touched Phase 3 held-out manifests are historical validation inputs, not the sole confirmatory held-out set for this experiment.
+15. Target-enriched episode pools are used for comparative efficacy and failure analysis, not to infer natural five-minute/session rates. Natural-rate estimates come only from the unbiased natural-exposure pool defined in Section 16.
+16. Newly recorded private or product-domain conversational audio is not required by this experiment. Its absence is an external-validity limitation, not an automatic experiment failure.
 
 ## 2. Non-goals
 
@@ -52,11 +55,13 @@ The following decisions are frozen before implementation.
 - Speaker names or diarization UI
 - Source separation
 - Claiming that overlap-onset detection produces clean mono speaker turns
-- Long-session memory, speaker return after minutes, or state-drift evaluation
 - Production runtime wiring
 - Provider comparison before provider-neutral action semantics are validated
 - Treating every unmatched detector reaction as user-visible harm
+- Treating every same-speaker pause split as zero-cost
 - Choosing a production threshold from transition-pooled recall
+- Inferring natural five-minute false-split or contamination rates from target-enriched episodes
+- Requiring newly recorded private or product-domain conversational audio as a gate to complete the experiment
 
 ## 3. Product baseline and desired hard action
 
@@ -183,21 +188,55 @@ Default construction:
 The scoring start must not occur while a proposal cluster is pending. If extraction
 cannot provide a stable warm-up frontier, the episode is diagnostic-only.
 
+Each scored episode is tagged as one of:
+
+- `hard_only`: the scored region contains clean/gap hard targets and no overlap reference or stable overlap interval;
+- `overlap_present`: the scored region contains an overlap reference or stable overlap interval;
+- `negative_only`: no different-speaker hard target is present.
+
+The primary clean/gap contamination headline uses only `hard_only` exposure.
+`negative_only` episodes are reserved for fragmentation/false-action analysis, and
+`overlap_present` episodes are reported separately.
+
 ### 5.2 Synthetic episodes
 
 Existing synthetic cases remain complete episodes. New synthetic cases use the same
 canonical schema and include explicit warm-up when needed by the detector frontend.
 
-### 5.3 State contract
+### 5.3 Episode state contract
 
-- reset LS hidden state, ERes anchor state, VAD state, cluster state, and fusion state at episode start;
+- reset LS hidden state, ERes anchor state, VAD state, cluster state, and fusion state at episode start only when Section 5.4 permits reset-based evaluation;
 - feed warm-up audio through all stateful components;
 - exclude warm-up actions and references from headline counts;
 - retain state across all VAD events within the scored portion;
 - finalize pending proposals causally at episode end and label any tail-dependent action;
 - never pad neural windows with future or artificial audio.
 
-### 5.4 Statistical grouping
+### 5.4 State-equivalence contract
+
+Bounded extraction must not silently change the detector state seen at a scored target.
+Before reset-plus-warm-up episodes are accepted for a family/profile class, run a fixed
+state-parity set in two modes:
+
+1. `source_prefix`: replay the original source from its start through the target region;
+2. `episode_reset`: reset at the extracted episode start, replay the declared warm-up,
+   then score the same target region.
+
+Compare, at minimum:
+
+- raw LS posteriors or ERes embeddings/similarity scores at aligned source coordinates;
+- proposal count and proposal kinds;
+- proposal boundary positions and observation frontiers;
+- post-clustering actions and safe-frontier progression.
+
+The parity tolerance is frozen before the comparison and is family/output specific.
+If the parity gate passes, reset-plus-warm-up episodes may be used for that declared
+family/profile class. If it fails materially, scored episodes for that class must start
+from deterministic source-prefix state snapshots or source-prefix replay. A failed
+parity case remains diagnostic evidence and cannot be hidden by increasing warm-up
+post hoc.
+
+### 5.5 Statistical grouping
 
 All episodes from one source session share one uncertainty block. Synthetic episodes
 share a block when they reuse the same source speakers, utterances, or transformation
@@ -286,24 +325,36 @@ word timing creates an explicit unscored interval. Actions in it are counted as
 B0 reproduces the current peer VAD configuration and causal event timing. It contains
 no speaker signal.
 
-### 7.2 B1: structural fusion control
+### 7.2 B1: structural-engine equivalence control
 
-B1 uses the same logical-action engine, silence interval handling, maximum-duration
-classification, and provider-neutral segmentation mechanics as neural systems, but
-receives no neural proposals.
+B1 routes the exact B0 VAD event stream through the new logical-action, evidence, and
+scoring infrastructure but receives no neural proposals.
 
-B1 identifies benefits caused by corrected product mechanics rather than speaker evidence.
+In the absence of neural proposals, B1 hard segmentation must be action-for-action and
+source-sample-for-source-sample identical to B0, including ordinary VAD and any existing
+maximum-duration behavior. New bookkeeping, silence-interval attribution, or action
+schemas may not create, delete, move, or accelerate a B0 boundary.
+
+Any B0/B1 segmentation difference is an implementation-contract failure, not a product
+gain. B1 exists to prove that later neural gains are not artifacts of a rewritten
+baseline engine.
 
 ### 7.3 Frequency-matched segmentation controls
 
 For each frozen neural policy, create deterministic non-speaker controls with the same
-per-episode hard-action count:
+per-episode detector-created hard-action count. Control placement may use only
+product-observable causal information available to the tested policy; reference active-
+speaker labels, future GT boundaries, and unobserved future audio are forbidden inputs.
 
-- uniformly spaced eligible active-speech cuts;
-- energy-change peaks without speaker embeddings;
-- shuffled neural boundary positions within the same episode while preserving action count and causal availability distribution where possible.
+Required controls:
 
-Seeds and selection rules are frozen. If these controls yield comparable contamination
+- uniformly spaced cuts inside causal VAD-active eligible regions;
+- energy-change peaks computed only from causally observed audio, without speaker embeddings;
+- shuffled neural boundary positions within the same causal VAD-active regions while preserving action count and the empirical causal-availability distribution as closely as possible.
+
+Every control action must satisfy `boundary_source_sample <= observed_source_sample_at_emit`.
+Seeds, eligibility rules, and infeasible-placement behavior are frozen. GT is used only
+after action generation for scoring. If these controls yield comparable contamination
 reduction, the apparent benefit is segment shortening rather than speaker specificity.
 
 ### 7.4 LS-EEND family
@@ -353,6 +404,7 @@ ProposalEvent {
     observed_source_sample_at_emit
     emitted_monotonic_ns
     confidence
+    confidence_semantics_id
     state_provenance
     debug_evidence
 }
@@ -362,7 +414,7 @@ Invariants:
 
 - `observed_source_sample_at_emit >= boundary_source_sample`;
 - events are deterministic for identical audio, model, frontend, and profile;
-- confidence increases with change strength within one profile;
+- `confidence` is interpreted only under its declared `confidence_semantics_id`; no cross-kind or cross-semantics comparison is allowed unless a frozen calibration contract explicitly makes the values comparable;
 - the proposal records every confirmation sample or posterior frame used;
 - an event cannot read samples beyond its observation frontier;
 - epoch and source-session identity are mandatory;
@@ -400,21 +452,24 @@ and frozen before full development scoring.
 3. The cluster closes at source observation `o0 + D`.
 4. A proposal joins only if it arrives by cluster close, shares the epoch, and its boundary is within `W` of `b0`.
 5. Proposals not eligible for the open cluster remain queued in causal order.
-6. `first` chooses the opening proposal.
-7. `max_confidence` chooses the greatest confidence; ties prefer earlier observation, smaller absolute distance to the cluster median, earlier boundary, then proposal ID.
-8. The cluster boundary equals one observed proposal boundary. No non-observed averaged boundary is invented.
-9. Cluster availability is the maximum of cluster close and the representative's observation frontier.
-10. After emission, proposals arriving before `availability + R` are suppressed and recorded as refractory proposals.
-11. A suppressed proposal never becomes a user-visible action but remains evidence.
-12. Episode-end closure uses only audio already observed and is labeled `tail_closed`.
+6. Determine the cluster output kind before selecting its representative. For LS mixed-kind clusters, use the frozen semantic priority `overlap_onset > dominant_replacement > new_track_onset > track_instability`. ERes clusters remain `speaker_change_unknown`.
+7. Restrict representative selection to proposals compatible with the chosen output kind. `first` chooses the earliest eligible proposal in that subset.
+8. `max_confidence` may be used only when all candidate proposals in the representative subset share a comparable frozen `confidence_semantics_id`. Otherwise the deterministic fallback is `first`. Ties prefer earlier observation, smaller absolute distance to the compatible-subset boundary median, earlier boundary, then proposal ID.
+9. The cluster boundary equals the chosen representative proposal boundary. No non-observed averaged boundary is invented.
+10. Cluster availability is the maximum of cluster close and the representative's observation frontier.
+11. After emission, proposals arriving before `availability + R` are suppressed and recorded as refractory proposals.
+12. A suppressed proposal never becomes a user-visible action but remains evidence.
+13. Episode-end closure uses only audio already observed and is labeled `tail_closed`.
 
 The refractory sweep explicitly measures loss on short B turns and rapid A-B-C
 handoffs. Refractory is not assumed to be beneficial.
 
 ### 9.3 Cluster evidence
 
-Store member proposal IDs, representative reason, suppression reason, cluster open and
-close frontiers, boundary spread, confidence distribution, and refractory ownership.
+Store member proposal IDs, chosen output kind, compatible representative subset,
+representative proposal ID, representative reason, confidence semantics, suppression
+reason, cluster open and close frontiers, boundary spread, confidence distribution, and
+refractory ownership.
 
 ## 10. Hard/soft actionization
 
@@ -424,7 +479,7 @@ Actionization uses only model and causal audio state, never reference labels.
 - LS `overlap_onset` requests a soft marker.
 - LS unstable-track proposals are diagnostic-only.
 - ERes `speaker_change_unknown` requests a hard candidate because ERes does not expose overlap state; reference overlap analysis later measures the cost of that limitation.
-- a cluster containing incompatible LS kinds follows the frozen priority `overlap_onset > dominant_replacement > new_track_onset > track_instability`;
+- cluster output kind and representative boundary always come from semantically compatible proposals under Section 9;
 - hard and soft outputs from one cluster cannot both create product actions.
 
 ## 11. Causal VAD fusion
@@ -514,26 +569,38 @@ B0 actions are replayed independently. Neural systems do not receive recovery cr
 by reassigning a B0 success, but may receive acceleration credit when the same logical
 target becomes usable earlier.
 
-### 12.3 Product attribution
+### 12.3 Product attribution and orthogonal harm flags
 
-Every final action/reference outcome is one of:
+Reference matching assigns benefit/miss attribution. Harm classification is a separate
+axis. A boundary may legitimately match a hard reference and still receive a harm flag
+when its actual source position fragments preceding same-speaker speech.
+
+Each reference receives one `benefit_attribution` value where applicable:
 
 - `retained_b0_success`
 - `recovered_b0_hard_miss`
 - `accelerated_b0_success`
 - `correct_soft_marker`
-- `duplicate_hard_boundary`
-- `harmful_active_split`
-- `lexical_split`
-- `neutral_pause_split`
-- `structural_split`
-- `overlap_hard_action`
 - `late_target_action`
-- `unscored_action`
 - `hard_miss`
 - `soft_miss`
+- `none`
 
-These categories are stored per action, not derived only from aggregate subtraction.
+Each final action independently stores zero or more `harm_or_structure_flags`:
+
+- `harmful_active_split`
+- `lexical_split`
+- `same_speaker_pause_split`
+- `duplicate_hard_boundary`
+- `structural_split`
+- `overlap_hard_action`
+- `unscored_action`
+
+A matched action is not presumed harmless. In particular, an early boundary inside the
+500 ms matching tolerance can receive recovery/acceleration credit and simultaneously
+receive `harmful_active_split` or `lexical_split` when the corresponding observable
+conditions hold. Aggregate reports preserve both axes rather than forcing one exclusive
+label.
 
 ## 13. Primary benefit: mixed-speaker turn contamination
 
@@ -542,92 +609,138 @@ These categories are stored per action, not derived only from aggregate subtract
 Sort final hard boundaries by source position. Episode edges and hard boundaries define
 logical segments. Actions with identical boundary positions form one boundary.
 
-### 13.2 Contamination algorithm
+### 13.2 Turn-owner threshold
+
+A singleton speaker becomes the owner of a logical segment only after at least 100 ms
+of continuous scorable singleton speech from that speaker inside the segment. Shorter
+singleton runs before ownership are treated as annotation/onset jitter for ownership
+purposes and are reported separately. Sensitivity views at 50 and 200 ms are mandatory.
+
+This ownership threshold is unrelated to the 250 ms mixed-turn reporting threshold in
+Section 13.4.
+
+### 13.3 Contamination algorithm
 
 For each logical segment:
 
 1. intersect the segment with reference active-speaker intervals;
-2. exclude silence, ambiguous intervals, and overlap intervals from the primary contamination numerator;
-3. find the first substantive singleton speaker in the segment;
-4. before any different singleton speaker appears, that speaker owns the turn;
-5. once a different singleton speaker appears, all subsequent singleton speech until the next hard boundary is contamination, including a later return of the original speaker;
+2. exclude silence, ambiguous intervals, and overlap intervals from the contamination numerator and denominator for that stratum;
+3. identify the first singleton speaker satisfying the 100 ms ownership threshold;
+4. before any different singleton speaker satisfies the same threshold, that speaker owns the turn;
+5. once a different qualifying singleton speaker appears, all subsequent qualifying singleton speech until the next hard boundary is contamination, including a later return of the original speaker;
 6. do not double-count source samples;
-7. report excluded overlap and unscored duration separately.
+7. report excluded overlap, sub-threshold singleton speech, and unscored duration separately.
 
-This makes a segment containing `A -> B -> C` charge B and C speech as contamination
-of A's logical turn. A premature split before the actual handoff does not receive false
-benefit: if the successor segment still begins with A and later contains B, B remains
-contamination.
+This makes a segment containing `A -> B -> C` charge qualifying B and C speech as
+contamination of A's logical turn. A premature split before the actual handoff does not
+receive false benefit: if the successor segment still becomes owned by A and later
+contains B, qualifying B speech remains contamination.
 
-### 13.3 Reported benefit metrics
+### 13.4 Primary clean/gap headline
 
-- primary contamination ratio: contaminated singleton-speech source samples divided by
-  all scorable singleton-speech source samples;
-- primary paired effect: candidate contamination ratio minus B1 contamination ratio
-  within each source block, reported as percentage-point change with negative meaning
-  improvement;
-- contamination milliseconds per episode and source session;
-- contamination seconds per five-minute source session;
-- contamination milliseconds per active-speech hour;
-- absolute and relative reduction from B0 and B1;
+The primary product headline is computed only on the predeclared `hard_only` headline
+stratum from Section 5.1. `negative_only` exposure contributes to harm and false-action
+analysis but not to the contamination denominator. Scored regions with any overlap
+reference or stable overlap interval are not allowed to contribute to the primary
+clean/gap contamination reduction.
+
+Report:
+
+- `clean_gap_contamination_ratio`: contaminated singleton-speech samples divided by all scorable singleton-speech samples in the clean/gap headline stratum;
+- primary paired effect: candidate minus B1 `clean_gap_contamination_ratio` within each source block, with negative values meaning improvement;
+- the same paired comparison against B0;
 - logical turns containing at least 100, 250, and 500 ms of a second singleton speaker;
-- primary mixed-turn rate at the predeclared 250 ms substantive threshold;
+- primary mixed-turn rate at the predeclared 250 ms second-speaker threshold;
 - clean and gap hard targets remaining merged;
 - recovered B0 misses versus accelerated B0 successes;
 - contamination avoided per final detector-created hard action.
+
+### 13.5 Overlap-containing contamination is secondary
+
+For `overlap_present` episodes, report all-singleton contamination separately. In
+addition, recompute a counterfactual view with detector-created hard actions inside
+reference overlap regions suppressed. The difference is labeled
+`overlap_hard_action_contamination_contribution` and may not be used to support the
+clean/gap headline claim.
+
+A family whose favorable overall contamination result disappears or reverses on the
+clean/gap headline stratum is overlap-dependent and cannot be called clean-turn
+product-positive.
+
+### 13.6 Exposure and rate reporting
+
+Target-enriched episode pools report raw milliseconds, ratios, and rates per **sampled**
+scorable exposure only. They are not converted into natural five-minute/session rates.
+
+Natural five-minute or source-hour contamination estimates are reported only from the
+`natural_exposure_validation` pool in Section 16.4. Every rate label states whether its
+denominator is target-enriched sampled exposure or unbiased natural exposure.
 
 Transition recall is secondary diagnostic evidence.
 
 ## 14. Primary harm: same-speaker fragmentation
 
-Only unmatched final hard actions can receive false-split harm labels.
+Harm flags are evaluated from the emitted boundary location and reference speech state,
+independently of whether the action matched a hard reference.
 
 ### 14.1 Harmful active split
 
-An action is `harmful_active_split` when:
+An action receives `harmful_active_split` when:
 
 - the boundary lies inside a singleton active-speaker interval;
 - at least 200 ms of the same singleton speaker is continuously active on both sides;
-- no compatible hard reference is matched;
 - the action is not a structural maximum-duration boundary;
 - the interval is fully scorable.
+
+A compatible reference match does not suppress this flag. This deliberately captures
+an early but reference-matchable boundary that fragments the outgoing speaker.
 
 Report sensitivity at 100 and 300 ms guards without changing the primary 200 ms label.
 
 ### 14.2 Lexical split
 
-Where trusted word timing exists, a boundary is a lexical split when it lies inside a
-word interval with at least 20 ms of that word on both sides. Word timing source,
-revision, and coverage are recorded. Missing word timing produces `not_observable`, not
-an inferred negative.
+Where trusted word timing exists, any hard action is a lexical split when it lies inside
+a word interval with at least 20 ms of that word on both sides. Word timing source,
+revision, and coverage are recorded. Matching a speaker-change reference does not
+suppress the lexical flag. Missing word timing produces `not_observable`, not an inferred
+negative.
 
-### 14.3 Neutral pause split
+### 14.3 Same-speaker pause split
 
-An unmatched action inside silence between two singleton spans of the same speaker is
-neutral. It is reported separately and cannot improve speaker-change benefit.
+A detector-created hard action inside silence between two singleton spans of the same
+speaker receives `same_speaker_pause_split`. It is not a severe active-speech harm and
+receives no speaker-change benefit, but it is not zero-cost: it increases same-speaker
+turn fragmentation and is a secondary frontier dimension/tie-breaker.
 
 ### 14.4 Duplicate hard boundary
 
-More than one post-fusion hard boundary attributed to one hard reference is a duplicate.
-Clustering should suppress most duplicates; remaining duplicates expose fusion failure.
+More than one post-fusion hard boundary attributed to one hard reference receives a
+duplicate flag. Clustering should suppress most duplicates; remaining duplicates expose
+fusion failure.
 
 ### 14.5 Overlap hard action
 
-A hard action inside an overlap target or stable overlap interval is reported as an
-overlap hard action. It is neither clean-handoff benefit nor same-speaker harm.
-Downstream replay determines whether it is useful or harmful.
+A hard action inside an overlap target or stable overlap interval receives
+`overlap_hard_action`. It is neither clean/gap benefit nor same-speaker active-speech
+harm. Downstream replay and the overlap counterfactual in Section 13.5 determine its
+observed consequences.
 
 ### 14.6 Fragmentation metrics
 
-- harmful active splits per five-minute source session;
-- harmful active splits per active-speech hour;
-- lexical splits per hour of word-aligned speech;
-- duplicate hard actions per source hour;
-- neutral pause splits;
+On every target-enriched pool report:
+
+- harmful active splits per sampled active-speech hour and raw count;
+- lexical splits per sampled hour of word-aligned speech and raw count;
+- duplicate hard actions per sampled source hour and raw count;
+- same-speaker pause splits and `same_speaker_extra_turn_count`;
 - detector-created fragments with less than 250, 500, and 1000 ms active speech;
 - p10/p50/p90 final segment duration and active-speech duration;
 - number of consecutive fragments owned by the same speaker;
 - legacy unmatched boundary count, labeled historical diagnostic only.
+
+Natural five-minute/session fragmentation rates are reported only from
+`natural_exposure_validation`. No target-enriched count is extrapolated to a typical
+session rate.
 
 ## 15. Timing and runtime metrics
 
@@ -688,9 +801,9 @@ and transform where possible.
 
 ### 16.3 Public conversational episode pool
 
-Use authorized AMI and AliMeeting sources already in experiment scope. Do not add ICSI,
-AISHELL-4, or another corpus merely to create long-session coverage. Additional corpora
-require a separate coverage finding and authorization.
+Use authorized AMI and AliMeeting sources already in experiment scope. Additional public
+corpora are added only when the metadata inventory identifies a concrete missing product
+stratum or independent-block shortfall and the addition is separately authorized.
 
 Before audio evaluation, build a metadata-only inventory containing:
 
@@ -722,10 +835,23 @@ across both corpora even when the equal-corpus pooled point estimate is favorabl
 
 ### 16.4 Pool roles
 
-- `diagnostic_dev`: controlled synthetic and public development episodes used for policy construction;
-- `frontier_dev`: independently blocked development episodes used for final curves;
+- `diagnostic_dev`: controlled synthetic and public development episodes used for signal diagnostics and policy construction;
+- `frontier_dev`: development episodes used for final development curves and panel construction;
 - `historical_validation`: previously touched Phase 3 held-out sources, never used for confirmatory claims;
-- `confirmatory_heldout`: newly selected unused source sessions and speaker groups, inaccessible until freeze.
+- `confirmatory_heldout`: newly selected unused source sessions and speaker groups, inaccessible until freeze;
+- `natural_exposure_validation`: deterministic, source-time-uniform bounded windows sampled independently of speaker-transition annotations, used only to estimate natural contamination/fragmentation rates and to compare them with target-enriched estimates.
+
+`diagnostic_dev` and `frontier_dev` are disjoint at the strongest available source-session,
+meeting-family, recurring-participant-component, recording, and synthetic-source grouping.
+No target, negative, or transformed derivative from a `diagnostic_dev` block may enter
+`frontier_dev`.
+
+For `natural_exposure_validation`, window start positions are chosen from source time by
+a frozen hash/uniform rule before speaker-transition labels are inspected. Windows use
+the same bounded replay machinery and state-equivalence contract. Sampling probabilities,
+eligible source duration, and unsampled exclusions are recorded. Five-minute/session and
+source-hour rates may be estimated only from this pool (or from complete unbiased source
+coverage), never from target-enriched episode pools.
 
 ## 17. Split and leakage contract
 
@@ -773,7 +899,6 @@ or from proposal/fusion policy. They do not select held-out thresholds alone.
 - batch/stream and source-sample timing parity;
 - continuous-within-episode versus VAD-reset ablation.
 
-No long-term identity or speaker-return conclusion is allowed.
 
 ### 18.2 ERes diagnostics
 
@@ -790,16 +915,29 @@ No long-term identity or speaker-return conclusion is allowed.
 
 ### 18.3 Signal-level stop condition
 
+The signal gate is executable only after every tested scalar signal registers a frozen
+`signal_extractor_id` in `proposal_contract.json`. Each extractor declares its sign,
+causal horizon, valid-window rule, and treatment of missing observations.
+
+Primary hard-target AUC uses a 500 ms causal horizon:
+
+- positive example: the strongest declared change-evidence scalar whose observation frontier is no later than hard-target evidence onset + 500 ms;
+- matched same-speaker negative: the strongest scalar in the identically sized causal window after the matched pseudo-boundary;
+- ERes change strength uses the frozen monotonic transform of cosine similarity declared by the profile (for the standard low-similarity-means-change score this is `1 - cosine`);
+- LS uses only explicitly declared hard-target change-strength scalars; overlap-only scores cannot satisfy the hard-target gate.
+
+If no valid observation exists by the horizon, the extractor applies its frozen missing-
+observation rule rather than searching later audio. Sensitivity AUCs at 250 and 1000 ms
+are reported but do not replace the primary 500 ms gate.
+
 For every frozen scalar signal, calculate ROC-AUC for different-speaker hard targets
 versus matched same-speaker acoustic negatives. Compare it with the strongest declared
-acoustic-only score on the identical examples. LS overlap scores receive a separate
-overlap-versus-singleton diagnostic and cannot satisfy the hard-target gate.
+acoustic-only score on the identical examples.
 
 For each family, use session-block bootstrap on the paired AUC difference:
 
 - `signal_go`: at least one hard-target score has a 95% lower bound greater than zero;
-- `signal_limited`: the point estimate is greater than zero but the interval includes
-  zero, or the comparison has fewer than eight independent blocks;
+- `signal_limited`: the point estimate is greater than zero but the interval includes zero, or the comparison has fewer than eight independent blocks;
 - `signal_stop`: every hard-target score has a 95% upper bound at or below zero.
 
 `signal_go` receives the full predeclared policy grid. `signal_limited` receives the
@@ -829,12 +967,15 @@ prosody, codec, noise, and pause conditions.
 
 ### F3. Frequency-matched segmentation
 
-Compare every finalist to non-speaker controls with matched hard-action counts.
+Compare every finalist to non-speaker controls with matched hard-action counts. Control
+actions must satisfy the causal/observable rules in Section 7.3.
 
 ### F4. Boundary-position shuffle
 
-Shuffle boundary positions within eligible regions while preserving action count and
-availability delay. Similar benefit after shuffling falsifies speaker-specific timing.
+Shuffle boundary positions only within causally eligible VAD-active regions while
+preserving hard-action count and causal availability as closely as possible. Every
+shuffled boundary must satisfy `boundary_source_sample <= availability`. Similar benefit
+after shuffling falsifies speaker-specific timing.
 
 ### F5. Recovery versus acceleration
 
@@ -843,8 +984,9 @@ availability of a B0-owned gap boundary.
 
 ### F6. Overlap-separated result
 
-Remove all overlap references from the hard headline and report overlap soft markers
-and overlap hard actions separately.
+Exclude `overlap_present` episodes from the clean/gap headline. Report overlap soft
+markers, overlap hard actions, and overlap-hard-action contamination contribution
+separately.
 
 ### F7. Session robustness
 
@@ -861,10 +1003,48 @@ contamination, detector evaluation stops.
 
 Measure loss for 250, 500, and 750 ms successor turns under each refractory setting.
 
-### F10. Same-speaker pause neutrality
+### F10. Same-speaker pause cost
 
-Verify that treating pause splits as neutral cannot hide lexical or active-speech
-fragmentation.
+Verify that classifying pause splits as non-severe cannot hide lexical/active-speech
+fragmentation, and report the resulting same-speaker extra-turn count separately.
+
+### F11. Episode-state equivalence
+
+Run the source-prefix versus episode-reset comparison from Section 5.4. If proposal or
+action parity fails materially, reset-based scored results for that family/profile class
+are invalid until source-prefix state is restored.
+
+### F12. Matched-but-harmful boundary
+
+Use fixtures where a hard action falls within the allowed reference matching tolerance
+but still lies inside outgoing same-speaker active speech or a word. Verify that the
+action can receive benefit attribution and `harmful_active_split`/`lexical_split`
+simultaneously.
+
+### F13. Overlap-contribution ablation
+
+Compare all-episode contamination with the clean/gap headline and with overlap hard
+actions counterfactually suppressed. A favorable conclusion that depends on overlap hard
+actions is not clean-turn product evidence.
+
+### F14. Sampling-rate validity
+
+Compare target-enriched exposure metrics with `natural_exposure_validation`. Verify that
+five-minute/hour estimates are emitted only from unbiased natural exposure and that no
+report silently rescales enriched counts into natural prevalence.
+
+### F15. Cluster kind/representative consistency
+
+Construct mixed LS-kind clusters and verify that output kind, representative proposal,
+boundary coordinate, confidence semantics, and availability are semantically compatible
+under Section 9.
+
+### F16. Turn-owner jitter sensitivity
+
+Perturb eligible reference singleton interval edges by deterministic +/-20 and +/-50 ms
+views without changing the normative labels. Report sensitivity of the contamination
+headline and verify that the 100 ms ownership threshold prevents annotation jitter from
+dominating the conclusion.
 
 ## 20. Development search and frontier
 
@@ -890,6 +1070,7 @@ A profile is dominated only if another profile is no worse in all of:
 - harmful active splits;
 - lexical splits where observable;
 - duplicate hard boundaries;
+- same-speaker extra turns, including pause splits;
 - hard-target recall at every causal deadline;
 - causal delay;
 - runtime cost;
@@ -897,14 +1078,16 @@ A profile is dominated only if another profile is no worse in all of:
 and is strictly better in at least one. Missing lexical coverage cannot be treated as
 zero lexical harm.
 
-The complete integer frontier is preserved. Hourly and five-minute rates are views of
-raw counts, not pre-frontier caps.
+The complete integer frontier is preserved. Target-enriched frontiers use raw integer
+counts and sampled-exposure metrics. Natural five-minute/hour views are attached only
+from `natural_exposure_validation` and are never used as a hidden pre-frontier cap.
 
 ### 20.3 Cross-family matched-harm comparison
 
 Use the union of achieved integer harmful-active-split counts on the same development
 exposure. At each allowance, select the greatest contamination reduction without
-exceeding the allowance. Report exact achieved cost rather than pretending continuous
+exceeding the allowance; ties prefer fewer same-speaker extra turns, then fewer lexical
+splits and duplicates. Report exact achieved cost rather than pretending continuous
 interpolation.
 
 This comparison does not eliminate high-cost profiles; it makes LS and ERes comparable
@@ -922,7 +1105,8 @@ Freeze up to three unique profiles per family:
 - `maximum_benefit`: maximize contamination reduction, then minimize harmful active splits and duplicates.
 
 Knee ties prefer lower `x`, then greater `y`. All remaining ties prefer fewer lexical
-splits, lower p95 causal delay, lower runtime cost, and lexical profile ID. If either
+splits, fewer same-speaker extra turns, lower p95 causal delay, lower runtime cost, and
+lexical profile ID. If either
 axis has zero range, the endpoints coincide, or no interior point has positive signed
 gain, omit the knee rather than inventing a medium point. Collapse duplicate profiles
 and record the reason.
@@ -945,6 +1129,8 @@ episodes are not independent uncertainty units.
 - keep recurring-participant connected components in one resampled block;
 - report median paired difference and percentile 95% interval;
 - report corpus macro summaries and equal-corpus pooled summaries;
+- keep target-enriched comparative effects separate from natural-exposure prevalence/rate estimates;
+- for `natural_exposure_validation`, aggregate uniformly sampled source-time windows within session before session-level macro/paired summaries and record sampled versus eligible source duration;
 - include raw transition/action/time counts;
 - use transition-pooled micro metrics only as descriptive diagnostics.
 
@@ -991,9 +1177,13 @@ Oracle grid:
 
 ```text
 availability delay: 250, 500, 750, 1000, 1250, 1500, 2000 ms
-boundary offset: -200, -100, 0, +100, +200 ms
+boundary offset: -500, -300, -200, -100, 0, +100, +200, +300, +500 ms
 holdback: 0, 250, 500, 750, 1000, 1500, 2000 ms
 ```
+
+The +/-500 ms offsets are mandatory sentinels because the hard-reference matcher permits
+500 ms localization tolerance. If the development p95 absolute localization error exceeds
+500 ms, extend the oracle grid to cover that p95 before provider selection.
 
 Verify for every case:
 
@@ -1135,6 +1325,16 @@ heldout_session_evidence/<frozen-hash>/<session>.json
 heldout_summary.json
 oracle_provider_neutral.json
 provider_replay/<provider>/<frozen-hash>.json
+reviews/phase_0_pre_execution.md
+reviews/phase_1_pre_execution.md
+reviews/phase_2_pre_execution.md
+reviews/phase_3_pre_execution.md
+reviews/phase_4_pre_execution.md
+reviews/phase_5_pre_execution.md
+reviews/phase_6_pre_execution.md
+reviews/phase_7_pre_execution.md
+reviews/phase_8_pre_execution.md
+reviews/phase_9_pre_execution.md
 decision.json
 ```
 
@@ -1151,28 +1351,116 @@ Code-polish tests are not a gate. The following scientific invariants are mandat
 7. Gap interval matching accepts any boundary inside the annotated silence.
 8. A detector proposal before B onset receives no gap speaker-change evidence credit.
 9. A pre-existing VAD gap boundary remains valid product separation.
-10. Overlap soft references cannot raise hard-boundary headline recall.
-11. Warm-up actions cannot enter scored counts.
-12. Unscored intervals cannot enter benefit or harm numerators.
-13. Contamination source samples are never double-counted.
-14. A premature boundary that leaves A and B in the successor turn does not receive contamination-reduction credit.
-15. Harmful active split requires the same singleton speaker on both guarded sides.
-16. Missing word timing is not treated as absence of lexical harm.
-17. B0 and B1 use the same episode/reference/fusion infrastructure as neural systems.
-18. Frequency-matched controls exactly match declared action counts.
-19. Bootstrap resamples blocks, not transitions.
-20. Cross-split source, speaker, recording, and transformation overlap fails closed.
-21. Held-out cannot open without a valid frozen self-hash.
-22. Incomplete held-out sessions cannot produce a decision.
-23. Provider-neutral assembly conserves every source sample exactly once.
-24. Stale epoch actions cannot mutate the next epoch.
-25. Detector safe frontier is monotonic, conservative, and never violated by a later event.
-26. Qwen-style safe drain does not release a region before the safe frontier covers it.
-27. Deepgram reconnect mapping permits repeated source spans without duplicate normalized words.
+10. Overlap soft references cannot raise clean/gap hard-boundary headline recall.
+11. `overlap_present` episodes cannot enter the primary clean/gap contamination headline.
+12. Warm-up actions cannot enter scored counts.
+13. Unscored intervals cannot enter benefit or harm numerators.
+14. Contamination source samples are never double-counted.
+15. A premature boundary that leaves A and B in the successor turn does not receive false contamination-reduction credit.
+16. Turn ownership requires the frozen 100 ms substantive singleton threshold; 50/200 ms sensitivity views are reproducible.
+17. Harm flags are independent of benefit matching: a matched boundary can still be an active or lexical split.
+18. Harmful active split requires the same singleton speaker on both guarded sides.
+19. Missing word timing is not treated as absence of lexical harm.
+20. Same-speaker pause splits are non-severe but remain counted as same-speaker extra turns.
+21. B1 hard segmentation is exactly identical to B0 when no neural proposals are present.
+22. Frequency-matched controls exactly match declared action counts and use no GT to generate actions.
+23. Every control/shuffled action satisfies `boundary_source_sample <= observed_source_sample_at_emit`.
+24. Cluster output kind and representative boundary come from semantically compatible proposals.
+25. `max_confidence` is not used across incompatible confidence semantics.
+26. Episode reset-plus-warm-up scored evaluation is forbidden until its family/profile-class state-equivalence test passes; otherwise source-prefix state is required.
+27. `diagnostic_dev` and `frontier_dev` are group-disjoint.
+28. Bootstrap resamples blocks, not transitions.
+29. Cross-split source, speaker, recording, and transformation overlap fails closed.
+30. Five-minute/session natural rates are emitted only from unbiased natural exposure or complete source coverage.
+31. Held-out cannot open without a valid frozen self-hash.
+32. Incomplete held-out sessions cannot produce a decision.
+33. Provider-neutral assembly conserves every source sample exactly once.
+34. Stale epoch actions cannot mutate the next epoch.
+35. Detector safe frontier is monotonic, conservative, and never violated by a later event.
+36. Qwen-style safe drain does not release a region before the safe frontier covers it.
+37. Deepgram reconnect mapping permits repeated source spans without duplicate normalized words.
 
-## 29. Execution phases and gates
+## 29. Execution phases, mandatory pre-execution reviews, and gates
+
+### 29.0 Global review rule
+
+Every Phase 0-9 requires an explicit **pre-execution review**. The review is a scientific
+and experiment-design gate, not a retrospective report review.
+
+The required ordering is:
+
+```text
+previous phase accepted
+  -> prepare next-phase review bundle
+  -> independent pre-execution review
+  -> resolve every required change
+  -> review approval recorded
+  -> execute the phase
+  -> independent evidence verification / phase-exit gate
+  -> only then prepare the next phase
+```
+
+A phase may not begin experimental execution while its review verdict is `rejected` or
+`approved_with_required_changes` with unresolved changes. If the review changes any
+normative contract, code hash, manifest, scoring rule, search grid, split, or decision
+rule, the affected review bundle must be regenerated and reviewed again before execution.
+
+The pre-execution review must happen **before** the phase performs any action that can
+make later correction expensive, leak confirmatory information, or produce apparently
+valid but structurally invalid evidence. This includes, as applicable:
+
+- opening or materializing scored audio/annotations beyond what the prior phase approved;
+- running new neural inference or a large policy sweep;
+- generating scored episode manifests;
+- adding data or changing sampling rules;
+- constructing or freezing a selection panel;
+- opening confirmatory held-out paths;
+- using provider credentials or making paid/live provider calls;
+- producing a final model/policy recommendation.
+
+Small scaffolding code may be written solely to make the review bundle concrete, but it
+must not be used to generate accepted scientific results before approval.
+
+Each phase review produces `reviews/phase_<N>_pre_execution.md` with:
+
+- exact plan/self-hash and source SHA under review;
+- phase scope and explicit non-goals;
+- prior-phase evidence the phase depends on;
+- exact inputs, manifests, caches, code/config hashes, and proposed outputs;
+- scoring, causal, split, state, and statistical assumptions relevant to the phase;
+- falsification/stop conditions that can prevent the phase from proceeding;
+- expected compute/data/provider cost and any irreversible access;
+- reviewer findings classified as `blocking`, `major`, or `minor`;
+- final verdict: `approved`, `approved_with_required_changes`, or `rejected`;
+- every required change and the hash of the corrected artifact when applicable.
+
+`approved_with_required_changes` is not permission to execute until every required change
+is resolved and the reviewer records a final `approved` verdict. Review approval never
+replaces the phase-exit gate: the phase still must produce and independently verify its
+required evidence after execution.
+
+A single blanket review cannot approve multiple later phases. Every phase must receive a
+new review using the artifacts actually accepted from the preceding phase.
 
 ### Phase 0: checkpoint and contract freeze
+
+**Mandatory pre-execution review timing:** before implementing experiment schemas,
+reference/action/fusion logic, replay semantics, or any new model execution. This is the
+highest-leverage structure review; if the product question, action semantics, primary
+benefit/harm, sampling interpretation, or authority order is wrong, implementation must
+not start.
+
+The Phase 0 reviewer must examine at minimum:
+
+- the product question and asymmetric error costs;
+- B0/B1 semantics and the exact `logical_finalize` action contract;
+- clean/gap versus overlap taxonomy;
+- contamination, harm, timing, and natural-exposure definitions;
+- proposal -> clustering -> actionization -> VAD-fusion causal structure;
+- source-time/epoch/safe-frontier contracts;
+- split/held-out authority and the planned statistical unit;
+- whether any historical artifact is being treated as normative without justification;
+- whether the planned falsification tests can actually invalidate the intended claims.
 
 Deliverables:
 
@@ -1181,12 +1469,27 @@ Deliverables:
 - this plan's self-hash;
 - reference/action/fusion schema;
 - detector progress and safe-frontier schema;
-- B0 logical-finalize replay description.
+- B0 logical-finalize replay description;
+- approved Phase 0 pre-execution review artifact.
 
 Gate: no held-out access and no new model execution before the action/scoring contract
-passes invariant tests.
+passes invariant tests and the Phase 0 review verdict is `approved`.
 
 ### Phase 1: metadata coverage inventory
+
+**Mandatory pre-execution review timing:** after Phase 0 is accepted, but before building
+or using the inventory to add data, change sampling, or open additional corpus material
+for scored evaluation.
+
+The Phase 1 reviewer must examine at minimum:
+
+- inventory fields and how each field affects later design decisions;
+- independent-block and participant-component grouping rules;
+- the distinction between target-enriched and natural-exposure sampling;
+- the proposed source-time-uniform sampling frame for natural exposure;
+- leakage risks and training-overlap metadata;
+- minimum independent-block rules and the exact trigger for adding data;
+- whether any proposed data addition targets an observed coverage gap rather than raw hours.
 
 Deliverables:
 
@@ -1195,11 +1498,30 @@ Deliverables:
 - B0-separated versus B0-missed hard targets;
 - negative exposure inventory;
 - word-timing observability;
-- exact data-gap list and compute/storage forecast.
+- exact data-gap list and compute/storage forecast;
+- natural-exposure eligible duration and frozen source-time sampling frame;
+- approved Phase 1 pre-execution review artifact.
 
-Gate: data additions must target an observed gap, not an arbitrary hour count.
+Gate: data additions must target an observed gap, not an arbitrary hour count. Any data
+addition or sampling-rule change proposed from the inventory must be included in the
+accepted Phase 1 evidence and reviewed before it is materialized for Phase 2 scoring.
 
 ### Phase 2: episode/reference implementation
+
+**Mandatory pre-execution review timing:** after the Phase 1 inventory is accepted and
+before generating scored episode/reference manifests or running stateful model replay on
+those episodes.
+
+The Phase 2 reviewer must examine at minimum:
+
+- bounded-episode extraction rules and non-overlap guarantees;
+- hard/soft/neutral/unscored reference construction;
+- gap interval-valued matching and overlap exclusion from the hard headline;
+- turn-owner threshold and annotation-jitter sensitivity plan;
+- state-equivalence test design, tolerance, and source-prefix fallback;
+- diagnostic/frontier/held-out group-disjointness;
+- natural-exposure manifest generation before transition-conditioned inspection;
+- sampled waveform/annotation audit procedure.
 
 Deliverables:
 
@@ -1207,12 +1529,30 @@ Deliverables:
 - interval-valued hard references;
 - hard/soft/neutral/unscored timelines;
 - deterministic manifests;
-- sampled waveform/annotation audit.
+- sampled waveform/annotation audit;
+- episode state-equivalence report and source-prefix snapshot fallback path;
+- natural-exposure window manifest generated without transition-label-conditioned placement;
+- approved Phase 2 pre-execution review artifact.
 
-Gate: all reference and split invariants pass, and sampled episodes agree with source
-annotations.
+Gate: all reference and split invariants pass, sampled episodes agree with source
+annotations, and every family/profile class used for reset-based scoring passes the
+state-equivalence gate or is switched to source-prefix state.
 
 ### Phase 3: provider-neutral logical-action oracle
+
+**Mandatory pre-execution review timing:** before executing the oracle delay/offset/
+holdback grid. The reviewer must validate the lifecycle experiment structure before any
+neural detector is allowed to consume a full policy sweep.
+
+The Phase 3 reviewer must examine at minimum:
+
+- canonical PCM turn-assembler ownership semantics;
+- sample conservation and no-duplication invariants;
+- oracle boundary offset, availability-delay, and holdback coverage;
+- the +/-500 ms localization sentinels and p95 grid-extension rule;
+- safe-frontier drain, timeout, stale-epoch, and late-action behavior;
+- contamination and unrecoverable-audio calculations;
+- whether a failed assembler test would correctly stop later detector evaluation.
 
 Deliverables:
 
@@ -1220,12 +1560,27 @@ Deliverables:
 - delay/offset/holdback grid;
 - source-sample conservation and ownership evidence;
 - safe-frontier drain and timeout evidence;
-- contamination ceiling and unrecoverable-late curve.
+- contamination ceiling and unrecoverable-late curve;
+- approved Phase 3 pre-execution review artifact.
 
 Gate: logical actions must conserve audio and reduce oracle contamination before any
 neural family consumes a full policy sweep or confirmatory held-out access.
 
 ### Phase 4: raw signal diagnostics
+
+**Mandatory pre-execution review timing:** before any new large neural inference run or
+full diagnostic sweep. Cache inspection and tiny parity fixtures may be prepared for the
+review, but the production-shaped diagnostic execution starts only after approval.
+
+The Phase 4 reviewer must examine at minimum:
+
+- checkpoint/model/frontend provenance and exact reusable cache identities;
+- LS resampler/frontend source-time mapping and causal delay accounting;
+- ERes frontend/export parity and exact window coordinates;
+- state-equivalence disposition for each family/profile class;
+- declared `signal_extractor_id`, sign, causal horizon, missing-observation rule, and AUC construction;
+- acoustic-only and same-speaker matched controls;
+- `signal_go` / `signal_limited` / `signal_stop` rules and whether they can stop compute without post-hoc interpretation.
 
 Deliverables:
 
@@ -1233,11 +1588,27 @@ Deliverables:
 - LS 16-to-8 kHz streaming frontend timing and source-mapping parity;
 - ERes calibration/anchor/oracle report;
 - acoustic-negative controls;
-- signal-level go/limited/stop disposition.
+- signal-level go/limited/stop disposition;
+- approved Phase 4 pre-execution review artifact.
 
 Gate: only signal-positive or diagnostic-limited families enter the full policy sweep.
 
 ### Phase 5: corrected proposal and fusion replay
+
+**Mandatory pre-execution review timing:** before launching the clustering/refractory/VAD-
+fusion grid or corrected large development replay.
+
+The Phase 5 reviewer must examine at minimum:
+
+- proposal schema and confidence semantics;
+- mixed-kind clustering and representative-selection rules;
+- debounce/refractory parameter grid and short-turn stress coverage;
+- hard/soft actionization and overlap handling;
+- VAD association, replacement/acceleration, and duplicate suppression;
+- B0/B1 equivalence;
+- same-proposal policy ladder and frequency-matched/shuffle controls;
+- orthogonal benefit attribution versus harm flags;
+- expected row count, cache reuse, runtime forecast, and completeness checks.
 
 Deliverables:
 
@@ -1245,23 +1616,62 @@ Deliverables:
 - clustering/refractory rows;
 - VAD fusion actions;
 - policy-ladder ablations;
-- corrected rescoring of historical development caches.
+- corrected rescoring of historical development caches;
+- approved Phase 5 pre-execution review artifact.
 
 Gate: independent recomputation agrees on actions, contamination, harm, and timing.
 
 ### Phase 6: development frontier and freeze
+
+**Mandatory pre-execution review timing:** after Phase 5 evidence is accepted but before
+constructing the final selection panel, locking profile IDs, or creating the self-hashed
+contract that will authorize confirmatory held-out access.
+
+The Phase 6 reviewer must examine at minimum:
+
+- exact primary clean/gap contamination metric and harm dimensions;
+- target-enriched versus natural-exposure rate labels;
+- Pareto dominance and matched-harm comparison implementation;
+- low-harm / frontier-knee / maximum-benefit selection rules;
+- treatment of missing lexical observability;
+- cross-family comparability and B0/B1 reference handling;
+- session-block statistics and leave-one-session-out robustness;
+- whether the proposed panel was chosen without held-out information.
 
 Deliverables:
 
 - full product-metric frontiers;
 - matched-harm comparisons;
 - low/knee/high panels;
+- target-enriched versus natural-exposure rate-validity report;
 - self-hashed frozen contract;
-- no-selection explanation when no positive frontier exists.
+- no-selection explanation when no positive frontier exists;
+- approved Phase 6 pre-execution review artifact covering the exact freeze candidate.
 
-Gate: every expected development row completes before freeze.
+Gate: every expected development row completes before freeze. The frozen contract is not
+valid for held-out access until the Phase 6 review approves the exact panel, hashes,
+scoring code, split graph, and expected held-out counts that the contract binds.
 
 ### Phase 7: confirmatory held-out
+
+**Mandatory pre-execution review timing:** immediately before **any confirmatory held-out
+audio path, annotation, manifest payload, or aggregate is opened by the runner**. This is
+a hard information-barrier review, not a review after held-out results exist.
+
+The Phase 7 reviewer must examine at minimum:
+
+- the Phase 6 frozen self-hash and all bound code/config/profile IDs;
+- proof that held-out groups were not accessed during development;
+- expected held-out source sessions/blocks/episodes and completeness checks;
+- frozen panel completeness, including deliberately poor/high-cost points;
+- bootstrap seed/block graph and no-retuning guarantees;
+- clean/gap headline versus overlap reporting masks;
+- natural-exposure held-out sampling frame where applicable;
+- runner safeguards that prevent partial pooled conclusions or threshold changes.
+
+The runner must require the approved Phase 7 review artifact/hash before resolving or
+opening confirmatory held-out paths. An accidental early access invalidates the affected
+source group under Section 17.
 
 Deliverables:
 
@@ -1269,22 +1679,63 @@ Deliverables:
 - session-block uncertainty;
 - complete frozen panel including poor points;
 - clean/gap headline and separate overlap result;
-- runtime evidence.
+- natural-exposure contamination/fragmentation rates where the unbiased pool is available;
+- runtime evidence;
+- approved Phase 7 pre-execution review artifact.
 
-Gate: no pooled conclusion from partial session completion.
+Gate: no pooled conclusion from partial session completion and no confirmatory execution
+without the pre-access review approval.
 
 ### Phase 8: provider-specific frozen trace replay
+
+**Mandatory pre-execution review timing:** after confirmatory detector traces are accepted
+and before provider-specific replay, credential use, paid/live provider calls, or changes
+to provider finalization policy arms.
+
+The Phase 8 reviewer must examine at minimum:
+
+- exact frozen detector/action traces to be reused without retuning;
+- provider-neutral oracle evidence supporting the proposed lifecycle mechanics;
+- source/provider timestamp mapping and reconnect behavior for Deepgram;
+- Qwen holdback, safe drain, timeout, and commit ordering;
+- Soniox native-speaker baseline and criteria for excluding the local detector;
+- one-factor-at-a-time versus explicitly factorial provider arms;
+- transcript integrity, loss/duplication, and latency acceptance metrics;
+- provider model/API/runtime versions, credential mode, run budget, and sanitized logging.
 
 Deliverables:
 
 - exact same frozen real-detector traces;
 - transcript integrity and latency;
 - provider-specific feasibility;
-- native Soniox comparison where applicable.
+- native Soniox comparison where applicable;
+- approved Phase 8 pre-execution review artifact.
 
-Gate: boundary metrics alone cannot yield a product-positive recommendation.
+Gate: boundary metrics alone cannot yield a product-positive recommendation. Provider-
+specific execution cannot begin before review approval.
 
 ### Phase 9: independent verification and conclusion
+
+**Mandatory pre-execution review timing:** after all evidence-generating phases are closed
+but before writing the final model/policy recommendation or implementation handoff. The
+review freezes the final-analysis procedure so the conclusion cannot be adapted to the
+most favorable observed result.
+
+The Phase 9 reviewer must examine at minimum:
+
+- completeness of every required phase and review artifact;
+- exact coordinator recomputation procedure from per-session evidence;
+- provenance/cache/split/timing audit plan;
+- deterministic failure-example selection rule;
+- decision-framework mapping to signal-positive, policy-positive, provider-feasible, and product-candidate outcomes;
+- negative-outcome rules and external-validity caveat;
+- confirmation that no threshold, panel, fusion, or provider policy is being changed after held-out/provider results.
+
+The Phase 9 verifier/reviewer must be independent of the execution worker whose results
+are being checked. If the final review discovers a structural flaw that would require
+changing a frozen experiment contract, the affected claim is withdrawn or the experiment
+returns to the earliest affected phase; it is not repaired by post-hoc rescoring under a
+new rule and presented as if it were confirmatory.
 
 Deliverables:
 
@@ -1292,7 +1743,11 @@ Deliverables:
 - provenance/cache/split/timing audit;
 - failure-example audit selected by frozen rule;
 - explicit model-signal, policy, provider, and product conclusions;
-- implementation handoff or no-selection report.
+- implementation handoff or no-selection report;
+- approved Phase 9 pre-conclusion review artifact.
+
+Gate: no final implementation recommendation is issued until the Phase 9 review is
+`approved` and the independent recomputation/audit agrees with the accepted evidence.
 
 ## 30. Failure-example selection
 
@@ -1322,8 +1777,10 @@ The family contains causal speaker-specific evidence beyond acoustic/frequency c
 
 ### 31.2 Policy-positive
 
-A causal clustering/fusion profile reduces contamination relative to B1 at matched
-harm on development and preserves effect direction across held-out source blocks.
+A causal clustering/fusion profile reduces primary clean/gap contamination relative to
+both B1 and B0 at matched severe harm on development and preserves effect direction
+across confirmatory held-out source blocks. If B0 and B1 are not identical, the run is
+invalid under the B1 equivalence contract rather than interpreted as a policy result.
 
 ### 31.3 Provider-feasible
 
@@ -1334,10 +1791,10 @@ or finalization delay.
 
 At least one frozen point:
 
-- has positive held-out contamination reduction with session-block evidence;
+- has positive held-out clean/gap contamination reduction relative to both B0 and B1 with session-block evidence;
 - is better than frequency-matched controls;
-- has an explicitly reported harmful-active-split rate;
-- does not depend on overlap being counted as a clean hard success;
+- has an explicitly reported harmful-active-split rate on sampled exposure and a separately reported same-speaker extra-turn cost;
+- does not depend on overlap hard actions to produce the clean/gap benefit;
 - does not materially worsen downstream transcript integrity;
 - meets runtime/backpressure requirements;
 - binds exact model, frontend, proposal, cluster, fusion, and provider policy.
@@ -1345,6 +1802,13 @@ At least one frozen point:
 An exact product tolerance for harmful splits may remain a product-owner decision. The
 experiment still reports the full matched-harm frontier and can recommend dominance or
 no selection without inventing a cap.
+
+Because newly recorded private/product-domain conversational audio is unavailable, a
+successful detector/policy may be labeled `provisional_product_candidate` and handed to
+a later implementation task with an explicit external-validity caveat. Lack of such
+audio does not by itself invalidate the public/synthetic confirmatory experiment or
+forbid implementation-oriented selection. It does forbid claiming measured product-
+domain generalization that was not observed.
 
 ### 31.5 Required negative outcomes
 
@@ -1356,18 +1820,28 @@ Use explicit outcomes when appropriate:
 - `provisional_product_candidate`
 - `no_local_detector_selected`
 
-No production-ready claim is allowed without representative product-domain audio.
+## 32. Independent review, verification, and worker governance
 
-## 32. Independent verification and worker governance
+Every Phase 0-9 first receives the mandatory pre-execution review defined in Section 29.
+The phase execution worker is not dispatched until the review verdict is `approved`.
+Where tooling permits, the pre-execution reviewer must be a fresh worker/reviewer distinct
+from the worker that will implement or execute the phase. A reviewer must not inspect
+restricted confirmatory held-out content earlier than the phase contract permits.
 
-Each execution phase uses a fresh paid DeepSeek OpenCode worker. The worker:
+If a reviewer finds a blocking or required change, the coordinator updates the affected
+contract/artifact, records the new hash, and requests re-review. The execution worker may
+not treat `approved_with_required_changes` as permission to start. One review may not be
+reused to approve later phases whose inputs have changed.
 
-- receives the exact phase scope and timeout requirements;
+Each execution phase then uses a fresh paid DeepSeek OpenCode worker. The execution worker:
+
+- receives the exact approved phase scope, review artifact/hash, and timeout requirements;
+- does not expand the experiment beyond the approved review scope;
 - does not retry or restart a failed full run without a new coordinator instruction;
 - reports `worker_done` or escalation;
 - is monitored with ten-minute event waits rather than one-minute polling.
 
-Worker reports are not evidence. The coordinator independently verifies:
+Reviewer or worker reports are not scientific evidence by themselves. The coordinator independently verifies:
 
 - file and self hashes;
 - expected session/profile counts;
@@ -1380,7 +1854,9 @@ Worker reports are not evidence. The coordinator independently verifies:
 - harmful-split classifications;
 - session-block bootstrap inputs;
 - aggregate recomputation;
-- provider audio conservation.
+- provider audio conservation;
+- presence and approval status of the required pre-execution review artifact for every completed phase;
+- proof that no phase produced accepted experimental evidence before its review approval.
 
 Experiment-scientific tests are strict. Code style, docstrings, and unrelated polishing
 are not acceptance gates.
@@ -1397,23 +1873,34 @@ introduces no intended production architecture change.
 
 ## 34. Immediate implementation order
 
-1. Record SHA, dirty state, and historical artifact hashes.
-2. Create `turn_episode_v1` schemas and scientific contract tests.
-3. Build metadata-only coverage inventory without opening confirmatory held-out audio.
-4. Implement interval-valued reference actions and bounded episode extraction.
-5. Implement contamination and same-speaker harm scoring against hand-built fixtures.
-6. Implement and pass the provider-neutral PCM oracle grid.
-7. Implement causal cluster/refractory replay.
-8. Implement VAD fusion and complete action evidence.
-9. Verify reuse of LS captures and ERes embeddings.
-10. Correctly rescore existing development evidence.
-11. Decide data additions from inventory findings.
-12. Build the full development frontier and frozen panel.
-13. For each execution phase, dispatch a new paid DeepSeek OpenCode worker and
-    independently verify its output before accepting the phase gate.
-14. Open confirmatory held-out only after the oracle, development, and freeze gates pass.
+The ordering below is subordinate to the mandatory review gates in Section 29. **Do not
+batch multiple phases under one review. Before starting any item that belongs to a new
+phase, obtain that phase's explicit pre-execution approval first.**
 
-Until steps 1-11 complete, the accepted experiment conclusion is:
+1. Record SHA, dirty state, historical artifact hashes, and prepare the Phase 0 review bundle.
+2. Obtain Phase 0 pre-execution approval before implementing experiment schemas or running new model work.
+3. Create `turn_episode_v1` schemas and scientific contract tests; verify the Phase 0 exit gate.
+4. Prepare and obtain Phase 1 pre-execution approval.
+5. Build metadata-only coverage inventory without opening confirmatory held-out audio; verify the Phase 1 exit gate.
+6. Prepare and obtain Phase 2 pre-execution approval before scored episode/reference generation.
+7. Implement interval-valued reference actions, bounded episode extraction, source-prefix versus reset-plus-warm-up state-equivalence fixtures, snapshot fallback, contamination/harm scoring fixtures, and the unbiased natural-exposure manifest; verify the Phase 2 exit gate.
+8. Prepare and obtain Phase 3 pre-execution approval before running the provider-neutral oracle grid.
+9. Implement and pass the provider-neutral PCM oracle grid; verify the Phase 3 exit gate.
+10. Prepare and obtain Phase 4 pre-execution approval before any new large neural inference or full diagnostic sweep.
+11. Run accepted raw signal diagnostics and verify the Phase 4 signal gate.
+12. Prepare and obtain Phase 5 pre-execution approval before the full clustering/refractory/VAD-fusion development sweep.
+13. Implement causal cluster/refractory replay, VAD fusion, complete action evidence, cache reuse verification, and corrected development rescoring; verify the Phase 5 exit gate.
+14. Decide any data additions only from the accepted inventory findings and under the Phase 1/2 reviewed sampling contract.
+15. Prepare and obtain Phase 6 pre-execution approval before constructing the final frontier/panel or self-hashed freeze.
+16. Build the full development frontier and frozen panel; verify the Phase 6 freeze gate.
+17. Prepare and obtain the Phase 7 **pre-held-out-access** approval. Do not resolve or open confirmatory held-out paths before this approval.
+18. Run confirmatory held-out exactly under the frozen contract and verify complete-session evidence.
+19. Prepare and obtain Phase 8 pre-execution approval before provider-specific replay, credentials, or paid/live provider calls.
+20. Run provider-specific frozen-trace replay and verify transcript/runtime evidence.
+21. Prepare and obtain Phase 9 pre-conclusion approval before writing the final recommendation or implementation handoff.
+22. Perform independent final recomputation/audit and issue the conclusion only after the Phase 9 gate passes.
+
+Until the corrected development evidence and its required review gates through Phase 5 are complete, the accepted experiment conclusion is:
 
 > Useful raw speaker-change signal exists in both families, but no corrected
 > product-level detector/fusion selection has been made.
