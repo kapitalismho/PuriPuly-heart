@@ -716,7 +716,7 @@
   "length_samples": 16789675,
   "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
   "runtime": {
-    "elapsed_s": 2.855
+    "elapsed_s": 4.176
   },
   "session_id": "ami_ES2004a",
   "trace_hash": "3c5f61766b6579652b02ea7f4338b58276da4e7db57811fbf1100c64869ee155",

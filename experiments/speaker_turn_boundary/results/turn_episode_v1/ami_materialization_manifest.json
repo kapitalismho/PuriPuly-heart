@@ -1,0 +1,218 @@
+{
+  "content_sha256": "d6e0974d1b069c468b2379bcdf2a7241f522f6cc7eb186de1facd8d30c7f01be",
+  "meetings": {
+    "EN2001d": {
+      "annotation_duration_s": 3546.453,
+      "decoded_duration_s": 3546.379,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\EN2001d\\EN2001d.Mix-Headset.wav",
+      "group": "development",
+      "sha256": "12646b67dd73da62e51e89482b5bfd432e72da34614be61c8294f3c2c3b7ab51",
+      "size_bytes": 113484162,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/EN2001d/audio/EN2001d.Mix-Headset.wav"
+    },
+    "EN2002c": {
+      "annotation_duration_s": 2972.33,
+      "decoded_duration_s": 2972.256,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\EN2002c\\EN2002c.Mix-Headset.wav",
+      "group": "development",
+      "sha256": "a057708b3adb553f709fcde97d2af8e0455076bc3f88c250975227433d6e0270",
+      "size_bytes": 95112236,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/EN2002c/audio/EN2002c.Mix-Headset.wav"
+    },
+    "EN2006a": {
+      "annotation_duration_s": 3525.546,
+      "decoded_duration_s": 3525.493,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\EN2006a\\EN2006a.Mix-Headset.wav",
+      "group": "reserved",
+      "sha256": "4e10dd0209c661af4769e2fa9c34a3b4804c852e8ba098d9dc9026127261e211",
+      "size_bytes": 112815832,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/EN2006a/audio/EN2006a.Mix-Headset.wav"
+    },
+    "EN2009d": {
+      "annotation_duration_s": 5324.416,
+      "decoded_duration_s": 5324.373,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\EN2009d\\EN2009d.Mix-Headset.wav",
+      "group": "reserved",
+      "sha256": "eeb4a5ff47cadba8c75bdf32213b9264805027faa943c7f55eec0423c6ea4312",
+      "size_bytes": 170379992,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/EN2009d/audio/EN2009d.Mix-Headset.wav"
+    },
+    "ES2002b": {
+      "annotation_duration_s": 2281.0,
+      "decoded_duration_s": 2279.755,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2002b\\ES2002b.Mix-Headset.wav",
+      "group": "reserved",
+      "sha256": "977fbf6cd473cfb1984b41755762eea4d7ffdad3fb15adcfdebcb8842163ec66",
+      "size_bytes": 72952194,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2002b/audio/ES2002b.Mix-Headset.wav"
+    },
+    "ES2014a": {
+      "annotation_duration_s": 1149.0,
+      "decoded_duration_s": 1149.013,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2014a\\ES2014a.Mix-Headset.wav",
+      "group": "reserved",
+      "sha256": "9d29e308566b8c7be4c328f4a2998e371e5f506384f111042ec91b465f7f792c",
+      "size_bytes": 36768472,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2014a/audio/ES2014a.Mix-Headset.wav"
+    },
+    "ES2015d": {
+      "annotation_duration_s": 1931.0,
+      "decoded_duration_s": 1931.563,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2015d\\ES2015d.Mix-Headset.wav",
+      "group": "development",
+      "sha256": "0e7a2c371f73c461bfca6244f491760fa76047f7b64dc74cbecfff67af921222",
+      "size_bytes": 61810050,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2015d/audio/ES2015d.Mix-Headset.wav"
+    },
+    "ES2016a": {
+      "annotation_duration_s": 1384.0,
+      "decoded_duration_s": 1384.189,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2016a\\ES2016a.Mix-Headset.wav",
+      "group": "reserved",
+      "sha256": "152c6970818df773e0c44de1da077288f0d966f9a22530819ed1b4400353d128",
+      "size_bytes": 44294104,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2016a/audio/ES2016a.Mix-Headset.wav"
+    },
+    "TS3003b": {
+      "annotation_duration_s": 2210.305,
+      "decoded_duration_s": 2210.304,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3003b\\TS3003b.Mix-Headset.wav",
+      "group": "reserved",
+      "sha256": "0c94f3a09ab747caa7714efe8852f5ff37d36cf272b75709344991df1aa266ca",
+      "size_bytes": 70729772,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003b/audio/TS3003b.Mix-Headset.wav"
+    },
+    "TS3004a": {
+      "annotation_duration_s": 1345.324,
+      "decoded_duration_s": 1345.323,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3004a\\TS3004a.Mix-Headset.wav",
+      "group": "reserved",
+      "sha256": "ca3bc00d6c85451918290b0a3dd137e322ad8b063fd26f71fe3bdaa42ad66719",
+      "size_bytes": 43050368,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3004a/audio/TS3004a.Mix-Headset.wav"
+    },
+    "TS3005b": {
+      "annotation_duration_s": 2439.916,
+      "decoded_duration_s": 2439.915,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3005b\\TS3005b.Mix-Headset.wav",
+      "group": "development",
+      "sha256": "8020ab7c3f26f1a876e4675b00dadba38f01b7f3b6639990999b1ee4c37513db",
+      "size_bytes": 78077312,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3005b/audio/TS3005b.Mix-Headset.wav"
+    },
+    "TS3006a": {
+      "annotation_duration_s": 1252.865,
+      "decoded_duration_s": 1252.864,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3006a\\TS3006a.Mix-Headset.wav",
+      "group": "development",
+      "sha256": "d3a14878e387563dd7f6cc4d9fa26e70cd1073f2b7f90102a076878cb29bb6f3",
+      "size_bytes": 40091692,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3006a/audio/TS3006a.Mix-Headset.wav"
+    },
+    "TS3007a": {
+      "annotation_duration_s": 1609.345,
+      "decoded_duration_s": 1609.344,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3007a\\TS3007a.Mix-Headset.wav",
+      "group": "development",
+      "sha256": "eb758a584903a8d894790764b7217a43634f80d147b8db879815e74d1d1a7882",
+      "size_bytes": 51499052,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3007a/audio/TS3007a.Mix-Headset.wav"
+    },
+    "TS3008b": {
+      "annotation_duration_s": 2320.0,
+      "decoded_duration_s": 2320.96,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3008b\\TS3008b.Mix-Headset.wav",
+      "group": "reserved",
+      "sha256": "49d3c9bc7718e9a2b7739b1a481eab8c2f5bc067d8742e2e111876a0b3565734",
+      "size_bytes": 74270764,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3008b/audio/TS3008b.Mix-Headset.wav"
+    },
+    "TS3009b": {
+      "annotation_duration_s": 2460.0,
+      "decoded_duration_s": 2460.053,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3009b\\TS3009b.Mix-Headset.wav",
+      "group": "development",
+      "sha256": "97267d50549d64cff3ae5fb81f4d7db54deeaf625a79f2e0a2b2dde84070f5d1",
+      "size_bytes": 78721750,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3009b/audio/TS3009b.Mix-Headset.wav"
+    },
+    "TS3012c": {
+      "annotation_duration_s": 2376.0,
+      "decoded_duration_s": 2376.469,
+      "destination": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\TS3012c\\TS3012c.Mix-Headset.wav",
+      "group": "development",
+      "sha256": "55db4479ddcd055b4e514f2bfaf63d02d76da4c3a13e67b0fcb4aeb30698ea17",
+      "size_bytes": 76047062,
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3012c/audio/TS3012c.Mix-Headset.wav"
+    }
+  },
+  "plan_blob": "24340f488f1bb46c666a5fc15eef2fc87ef1f826",
+  "schema_version": "turn_episode_v1.ami_materialization",
+  "selected_meetings": [
+    {
+      "group": "development",
+      "meeting_id": "EN2002c"
+    },
+    {
+      "group": "development",
+      "meeting_id": "TS3006a"
+    },
+    {
+      "group": "development",
+      "meeting_id": "EN2001d"
+    },
+    {
+      "group": "development",
+      "meeting_id": "TS3009b"
+    },
+    {
+      "group": "development",
+      "meeting_id": "ES2015d"
+    },
+    {
+      "group": "development",
+      "meeting_id": "TS3007a"
+    },
+    {
+      "group": "development",
+      "meeting_id": "TS3012c"
+    },
+    {
+      "group": "development",
+      "meeting_id": "TS3005b"
+    },
+    {
+      "group": "reserved",
+      "meeting_id": "TS3003b"
+    },
+    {
+      "group": "reserved",
+      "meeting_id": "ES2014a"
+    },
+    {
+      "group": "reserved",
+      "meeting_id": "TS3004a"
+    },
+    {
+      "group": "reserved",
+      "meeting_id": "EN2006a"
+    },
+    {
+      "group": "reserved",
+      "meeting_id": "EN2009d"
+    },
+    {
+      "group": "reserved",
+      "meeting_id": "TS3008b"
+    },
+    {
+      "group": "reserved",
+      "meeting_id": "ES2016a"
+    },
+    {
+      "group": "reserved",
+      "meeting_id": "ES2002b"
+    }
+  ],
+  "selection_rule": "preflight-passing (mono 16k PCM16, duration within 2s of annotation); component graph over global participant ids and series; exclude touched components; order by sha256(meeting_id); new component only; 8 development then 8 reserved"
+}

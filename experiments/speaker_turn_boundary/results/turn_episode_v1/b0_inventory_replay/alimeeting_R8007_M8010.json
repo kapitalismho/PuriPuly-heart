@@ -728,7 +728,7 @@
   "length_samples": 29701151,
   "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
   "runtime": {
-    "elapsed_s": 4.97
+    "elapsed_s": 7.287
   },
   "session_id": "alimeeting_R8007_M8010",
   "trace_hash": "0f354ca6ee3cd8fca80d2ef4a15836e3ced045e9372ce05cfd386cbb2faf0fdc",

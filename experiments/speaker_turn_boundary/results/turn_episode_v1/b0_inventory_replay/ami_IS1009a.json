@@ -740,7 +740,7 @@
   "length_samples": 13421333,
   "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
   "runtime": {
-    "elapsed_s": 2.246
+    "elapsed_s": 3.161
   },
   "session_id": "ami_IS1009a",
   "trace_hash": "cc1f5f1dfe93b3bbd9ef617bc36259923becd59cfbbf0dcff6a83330ca1c5575",
