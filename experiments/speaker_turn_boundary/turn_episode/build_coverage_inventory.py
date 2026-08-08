@@ -356,10 +356,13 @@ def _annotation_paths_for(corpus: str, meeting_id: str, corpus_root: Path) -> li
 def load_ami_annotation_meetings(
     annotations_dir: Path,
     meetings_meta: dict[str, dict[str, str]],
+    corpus_root: Path,
+    materialization: dict[str, dict[str, Any]] | None = None,
 ) -> list[SessionInventory]:
     words_dir = annotations_dir / "words"
     if not words_dir.is_dir():
         return []
+    materialization = materialization or {}
     by_meeting: dict[str, list[Path]] = {}
     for words_path in sorted(words_dir.glob("*.words.xml")):
         meeting_id = words_path.name.split(".")[0]
@@ -400,22 +403,33 @@ def load_ami_annotation_meetings(
         }
         component = tuple(sorted(global_ids)) or tuple(speakers)
         targets = _classify_targets(regions)
+        manifest_entry = materialization.get(meeting_id)
+        if manifest_entry is not None and manifest_entry.get("group") != "development":
+            continue
+        wav_path = None
+        wav_sha = None
+        touched_status = "untouched"
+        if manifest_entry is not None:
+            destination = Path(str(manifest_entry["destination"]))
+            wav_path = str(destination.relative_to(corpus_root))
+            wav_sha = str(manifest_entry["sha256"])
+            touched_status = "dev_added"
         meetings.append(
             SessionInventory(
-                session_id=f"ami_annot_{meeting_id}",
+                session_id=f"ami_{meeting_id}",
                 corpus="ami",
                 meeting_id=meeting_id,
-                touched_status="untouched",
+                touched_status=touched_status,
                 duration_samples=duration_samples,
                 active_speech_samples=active_speech_samples(regions),
                 singleton_active_samples=singleton_active_samples(regions),
                 stable_singleton_active_samples=stable_singleton_active_samples(regions),
-                wav_path=None,
-                wav_sha256=None,
+                wav_path=wav_path,
+                wav_sha256=wav_sha,
                 annotation_sha256=hash_annotation_files(paths),
                 speakers=tuple(speakers),
                 speaker_component=component,
-                recording_condition="annotation_only",
+                recording_condition="headset_mix_16k_mono" if manifest_entry else "annotation_only",
                 word_alignment_coverage="word_level",
                 language="english",
                 training_overlap_risk={"ls_eend": "in_domain_ami"},
@@ -666,6 +680,12 @@ def main() -> None:
         help="output directory (default: experiments/speaker_turn_boundary/results/turn_episode_v1)",
     )
     parser.add_argument("--skip-b0", action="store_true", help="skip B0 replay (diagnostic)")
+    parser.add_argument(
+        "--ami-materialization-manifest",
+        type=Path,
+        default=None,
+        help="ami_materialization_manifest.json from materialize_ami_additions.py",
+    )
     args = parser.parse_args()
 
     corpus_root = args.corpus_root or external.corpus_root()
@@ -690,15 +710,36 @@ def main() -> None:
         (name, Phase2Manifest.load(manifests_dir / name)) for name, _ in pilot_manifests
     ]
 
+    materialization: dict[str, dict[str, Any]] | None = None
+    reserved_materialized: dict[str, Any] = {}
+    if args.ami_materialization_manifest is not None:
+        materialization = json.loads(
+            args.ami_materialization_manifest.read_text(encoding="utf-8")
+        ).get("meetings")
+        reserved_materialized = {
+            meeting_id: entry
+            for meeting_id, entry in (materialization or {}).items()
+            if entry.get("group") == "reserved"
+        }
+
     # Natural-exposure frame is constructed from duration only, before any
-    # transition-label inspection (frozen contract, bundle Section 5).
-    natural = natural_frame_from_durations(
-        [
-            (str(case.case_id), int(case.duration_samples))
-            for _, manifest in loaded_manifests
-            for case in manifest.cases
-        ]
-    )
+    # transition-label inspection (frozen contract, bundle Section 5). It covers
+    # pilot sessions plus development and reserved materialized sessions; durations
+    # come from the materialization manifest / annotations (no labels involved).
+    frame_durations: list[tuple[str, int]] = [
+        (str(case.case_id), int(case.duration_samples))
+        for _, manifest in loaded_manifests
+        for case in manifest.cases
+    ]
+    if materialization:
+        for meeting_id, entry in materialization.items():
+            frame_durations.append(
+                (
+                    f"ami_{meeting_id}",
+                    int(round(float(entry["decoded_duration_s"]) * CANONICAL_SAMPLE_RATE_HZ)),
+                )
+            )
+    natural = natural_frame_from_durations(frame_durations)
 
     sessions: list[SessionInventory] = []
     for (_, manifest), (_, touched_map) in zip(loaded_manifests, pilot_manifests):
@@ -709,6 +750,12 @@ def main() -> None:
     expected_sessions = {f"ami_{mid}" for mid in AMI_MATERIALIZED} | {
         f"alimeeting_{sid}" for sid in ALIMEETING_SESSIONS
     }
+    if materialization:
+        expected_sessions |= {
+            f"ami_{meeting_id}"
+            for meeting_id, entry in materialization.items()
+            if entry.get("group") == "development"
+        }
     actual_sessions = {s.session_id for s in sessions}
     missing = expected_sessions - actual_sessions
     if missing:
@@ -716,7 +763,9 @@ def main() -> None:
 
     annotations_dir = corpus_root / "ami" / "annotations"
     meetings_meta = _load_meetings_xml(annotations_dir) if annotations_dir.is_dir() else {}
-    annotation_sessions = load_ami_annotation_meetings(annotations_dir, meetings_meta)
+    annotation_sessions = load_ami_annotation_meetings(
+        annotations_dir, meetings_meta, corpus_root, materialization
+    )
 
     synthetic_counts: dict[str, Any] = {}
     for name in ("ls_dev", "ls_held_out_clean", "ls_held_out_other", "mixed_dev_pool"):
@@ -745,13 +794,13 @@ def main() -> None:
     group_graph = build_group_graph(all_sessions, synthetic_group_ids)
 
     # B0 replay runs before any inventory artifact is written; the final
-    # inventory is written only after all 12 evidence files exist (fail-closed).
+    # inventory is written only after every expected evidence file exists
+    # (pilot sessions + development materialized sessions; fail-closed).
+    scorable_sessions = [s for s in all_sessions if s.wav_path is not None]
     b0_dir = args.out / "b0_inventory_replay"
     b0_dir.mkdir(parents=True, exist_ok=True)
     b0_evidence_hashes: dict[str, str] = {}
-    for session in sessions:
-        if session.wav_path is None:
-            continue
+    for session in scorable_sessions:
         wav_path = (wav_root / session.wav_path).resolve()
         if args.skip_b0:
             evidence_path = b0_dir / f"{session.session_id}.json"
@@ -807,7 +856,7 @@ def main() -> None:
         for corpus in corpora:
             independent_blocks[corpus] = independent_blocks.get(corpus, 0) + 1
     summary["independent_block_estimate"] = independent_blocks
-    summary["untouched_scorable_sessions"] = {
+    untouched_scorable = {
         "ami": sum(
             1
             for s in all_sessions
@@ -816,6 +865,17 @@ def main() -> None:
         "alimeeting": sum(
             1 for s in all_sessions if s.corpus == "alimeeting" and s.touched_status == "untouched"
         ),
+    }
+    if reserved_materialized:
+        untouched_scorable["ami"] = untouched_scorable.get("ami", 0) + len(reserved_materialized)
+    summary["untouched_scorable_sessions"] = untouched_scorable
+    summary["reserved_materialized_not_opened"] = {
+        meeting_id: {
+            "decoded_duration_s": entry["decoded_duration_s"],
+            "sha256": entry["sha256"],
+            "size_bytes": entry["size_bytes"],
+        }
+        for meeting_id, entry in sorted(reserved_materialized.items())
     }
 
     code_hashes = {
