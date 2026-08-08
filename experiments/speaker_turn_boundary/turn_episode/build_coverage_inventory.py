@@ -534,12 +534,57 @@ def target_enriched_selection(sessions: list[SessionInventory]) -> dict[str, Any
     return out
 
 
-def build_group_graph(sessions: list[SessionInventory]) -> dict[str, Any]:
-    components: dict[tuple[str, ...], list[str]] = {}
+class _UnionFind:
+    def __init__(self) -> None:
+        self.parent: dict[str, str] = {}
+
+    def find(self, node: str) -> str:
+        if node not in self.parent:
+            self.parent[node] = node
+        root = node
+        while self.parent[root] != root:
+            root = self.parent[root]
+        while self.parent[node] != root:
+            self.parent[node], node = root, self.parent[node]
+        return root
+
+    def union(self, a: str, b: str) -> None:
+        root_a = self.find(a)
+        root_b = self.find(b)
+        if root_a != root_b:
+            self.parent[root_b] = root_a
+
+
+def build_group_graph(
+    sessions: list[SessionInventory],
+    synthetic_group_ids: list[str],
+) -> dict[str, Any]:
+    uf = _UnionFind()
     for session in sessions:
-        key = tuple(sorted(session.speaker_component)) or (session.session_id,)
-        components.setdefault(key, []).append(session.session_id)
-    serialized = {"|".join(key): sorted(ids) for key, ids in sorted(components.items())}
+        uf.find(session.session_id)
+    for group_id in synthetic_group_ids:
+        uf.find(group_id)
+    by_participant: dict[str, list[str]] = {}
+    for session in sessions:
+        for participant in session.speaker_component:
+            by_participant.setdefault(participant, []).append(session.session_id)
+    for ids in by_participant.values():
+        for other in ids[1:]:
+            uf.union(ids[0], other)
+    by_series: dict[str, list[str]] = {}
+    for session in sessions:
+        if session.corpus == "ami" and session.meeting_id:
+            series = session.meeting_id.rstrip("abcdefghijklmnopqrstuvwxyz")
+            by_series.setdefault(series, []).append(session.session_id)
+    for ids in by_series.values():
+        for other in ids[1:]:
+            uf.union(ids[0], other)
+    components: dict[str, list[str]] = {}
+    for session in sessions:
+        components.setdefault(uf.find(session.session_id), []).append(session.session_id)
+    for group_id in synthetic_group_ids:
+        components.setdefault(uf.find(group_id), []).append(group_id)
+    serialized = {"|".join(sorted(ids)): sorted(ids) for ids in sorted(components.values())}
     return {
         "component_sessions": serialized,
         "graph_hash": sha256_bytes(canonical_json(serialized).encode("utf-8")),
@@ -582,7 +627,8 @@ def replay_b0(session: SessionInventory, wav_path: Path) -> dict[str, Any]:
         separated = any(interval[0] <= b.boundary_source_sample <= interval[1] for b in boundaries)
         classification.append(
             {
-                "gt_index": index,
+                "gt_index": target["gt_index"],
+                "reference_index_in_session": index,
                 "kind": target["kind"],
                 "target_sample": target["target_sample"],
                 "acceptable_interval": interval,
@@ -695,7 +741,29 @@ def main() -> None:
 
     enriched = target_enriched_selection(sessions)
     all_sessions = sessions + annotation_sessions
-    group_graph = build_group_graph(all_sessions)
+    synthetic_group_ids = [f"synthetic:{name}" for name in synthetic_counts]
+    group_graph = build_group_graph(all_sessions, synthetic_group_ids)
+
+    # B0 replay runs before any inventory artifact is written; the final
+    # inventory is written only after all 12 evidence files exist (fail-closed).
+    b0_dir = args.out / "b0_inventory_replay"
+    b0_dir.mkdir(parents=True, exist_ok=True)
+    b0_evidence_hashes: dict[str, str] = {}
+    for session in sessions:
+        if session.wav_path is None:
+            continue
+        wav_path = (wav_root / session.wav_path).resolve()
+        if args.skip_b0:
+            evidence_path = b0_dir / f"{session.session_id}.json"
+            if not evidence_path.is_file():
+                raise InventoryError(f"skip-b0 requested but evidence missing: {evidence_path}")
+        else:
+            evidence = replay_b0(session, wav_path)
+            evidence_path = b0_dir / f"{session.session_id}.json"
+            evidence_path.write_text(canonical_json(evidence) + "\n", encoding="utf-8")
+        b0_evidence_hashes[session.session_id] = sha256_file(b0_dir / f"{session.session_id}.json")
+    if set(b0_evidence_hashes) != actual_sessions:
+        raise InventoryError("B0 replay evidence is incomplete")
 
     summary: dict[str, Any] = {"corpus": {}}
     for session in all_sessions:
@@ -726,18 +794,18 @@ def main() -> None:
         entry["overlap_soft_targets"] += len(session.overlap_soft_targets)
         entry["same_speaker_pause_intervals"] += len(session.same_speaker_pause_intervals)
 
-    independent_blocks: dict[str, int] = {
-        "ami": len(
-            {
-                tuple(sorted(s.speaker_component))
-                for s in all_sessions
-                if s.corpus == "ami" and s.wav_path is not None
-            }
-        ),
-        "alimeeting": len(
-            {tuple(sorted(s.speaker_component)) for s in all_sessions if s.corpus == "alimeeting"}
-        ),
-    }
+    component_to_sessions: dict[str, list[str]] = group_graph["component_sessions"]
+    scorable_by_component: dict[str, set[str]] = {}
+    for session in all_sessions:
+        if session.wav_path is None:
+            continue
+        for component, ids in component_to_sessions.items():
+            if session.session_id in ids:
+                scorable_by_component.setdefault(component, set()).add(session.corpus)
+    independent_blocks: dict[str, int] = {}
+    for component, corpora in scorable_by_component.items():
+        for corpus in corpora:
+            independent_blocks[corpus] = independent_blocks.get(corpus, 0) + 1
     summary["independent_block_estimate"] = independent_blocks
     summary["untouched_scorable_sessions"] = {
         "ami": sum(
@@ -759,7 +827,7 @@ def main() -> None:
         "phase2_schemas": sha256_file(
             Path(__file__).resolve().parent.parent / "corpus" / "phase2_schemas.py"
         ),
-        "silero_adapter": sha256_file(
+        "silero": sha256_file(
             Path(__file__).resolve().parent.parent.parent.parent
             / "src"
             / "puripuly_heart"
@@ -768,6 +836,7 @@ def main() -> None:
             / "silero.py"
         ),
         "silero_model": SILERO_MODEL_SHA256,
+        "b0_evidence_sha256": b0_evidence_hashes,
     }
 
     inventory: dict[str, Any] = {
@@ -797,25 +866,6 @@ def main() -> None:
     with details_path.open("w", encoding="utf-8") as handle:
         for session in all_sessions:
             handle.write(json.dumps(session.to_row(), sort_keys=True) + "\n")
-
-    b0_dir = args.out / "b0_inventory_replay"
-    b0_dir.mkdir(parents=True, exist_ok=True)
-    if not args.skip_b0:
-        for session in sessions:
-            if session.wav_path is None:
-                continue
-            wav_path = (wav_root / session.wav_path).resolve()
-            evidence = replay_b0(session, wav_path)
-            (b0_dir / f"{session.session_id}.json").write_text(
-                canonical_json(evidence) + "\n", encoding="utf-8"
-            )
-    else:
-        for session in sessions:
-            if session.wav_path is None:
-                continue
-            target = b0_dir / f"{session.session_id}.json"
-            if not target.is_file():
-                raise InventoryError(f"skip-b0 requested but evidence missing: {target}")
 
     print(f"wrote {inventory_path}")
     print(f"wrote {details_path}")
