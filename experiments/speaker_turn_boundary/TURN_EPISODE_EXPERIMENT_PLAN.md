@@ -1360,13 +1360,9 @@ No production-ready claim is allowed without representative product-domain audio
 
 ## 32. Independent verification and worker governance
 
-The coordinator owns design, implementation, and acceptance.
-
 Each execution phase uses a fresh paid DeepSeek OpenCode worker. The worker:
 
-- receives exact commands and timeout requirements;
-- performs execution only;
-- does not edit source, manifests, contracts, or results;
+- receives the exact phase scope and timeout requirements;
 - does not retry or restart a failed full run without a new coordinator instruction;
 - reports `worker_done` or escalation;
 - is monitored with ten-minute event waits rather than one-minute polling.
@@ -1413,9 +1409,8 @@ introduces no intended production architecture change.
 10. Correctly rescore existing development evidence.
 11. Decide data additions from inventory findings.
 12. Build the full development frontier and frozen panel.
-13. For each phase that needs model or replay execution, dispatch a new paid DeepSeek
-    OpenCode worker with coordinator-authored commands; independently verify its output
-    before accepting the phase gate.
+13. For each execution phase, dispatch a new paid DeepSeek OpenCode worker and
+    independently verify its output before accepting the phase gate.
 14. Open confirmatory held-out only after the oracle, development, and freeze gates pass.
 
 Until steps 1-11 complete, the accepted experiment conclusion is:
