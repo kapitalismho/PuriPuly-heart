@@ -8,9 +8,9 @@ The scored episode/reference manifests and the natural-exposure window manifest 
 been generated yet, and no stateful model replay has run on episodes.
 
 Revision history: rev 1 initial bundle (candidate HEAD `22c45dd9`); rev 2 resolves
-P2-001 through P2-013 (candidate `0ad094df`); rev 3 (this revision) resolves P2-014
-through P2-026 per the round-2 review (candidate HEAD at review time, confirmed via
-`git rev-parse HEAD`).
+P2-001 through P2-013 (candidate `0ad094df`); rev 3 resolves P2-014 through P2-026
+(candidate `02080e1e`); rev 4 (this revision) resolves P2-027 through P2-032 per the
+round-3 review (candidate HEAD at review time, confirmed via `git rev-parse HEAD`).
 
 ## 1. Artifacts under review
 
@@ -211,14 +211,20 @@ floor division — frozen, finding P2-007) and `session_end` the wav duration in
   be provable from **replay-derived detector progress evidence** (never from annotation
   boundaries alone) before the episode is scorable:
   - `b0/peer`: after replaying the declared warm-up in `episode_reset` mode, the
-    engine's DetectorProgress must show `safe_boundary_frontier_sample <= scored_start`
-    at the scored start (PRD Section 4.10 semantics: no pending VAD segment, pre-roll,
-    or hangover can emit a boundary inside the scored region from warm-up audio), with
-    the progress trace validated monotonic and conservative (invariant 35). If the
-    safe frontier cannot be proven at or before the scored start, the episode is
-    `diagnostic_only` with reason `unstable_warmup_frontier`. The readiness predicate
-    therefore runs the same replay machinery as the state-equivalence test (Section 8)
-    and is derived from the same evidence.
+    engine's DetectorProgress must show the safe frontier **covering the scored start**
+    (finding P2-027): `safe_boundary_frontier_sample >= scored_start` with the frozen
+    half-open convention that a frontier at `s` settles all boundaries at or before
+    `s` (PRD Section 4.10), so a frontier at or beyond `scored_start` proves no pending
+    VAD segment, pre-roll, or hangover can emit a boundary inside the scored region
+    from warm-up audio. In addition the fixture validates explicit pending-state
+    clearing (no in-progress VAD segment whose start precedes the scored start), and
+    the progress trace is validated monotonic and conservative (invariant 35;
+    `observed_source_sample` monotonic, `safe_boundary_frontier_sample <=
+    observed_source_sample`). If the safe frontier cannot be proven at or beyond the
+    scored start, the episode is `diagnostic_only` with reason
+    `unstable_warmup_frontier`. The readiness predicate therefore runs the same replay
+    machinery as the state-equivalence test (Section 8) and is derived from the same
+    evidence.
   - `ls_eend/*`, `eres2netv2/*`: declared at Phase 4 when checkpoints are pinned; the
     predicate must cover frontend buffering, neural lookback, confirmation, and cluster
     debounce via the safe-frontier contract (Section 4.10) and is frozen there before
@@ -277,6 +283,14 @@ preserves every discarded/ambiguous pattern as an explicit reference (finding P2
   words lacking timing into explicit `unscored` intervals (never silently skipped;
   finding P2-005). Missing word timing is never treated as absence of lexical harm
   (invariant 19).
+- **Unscored covering-interval rule (frozen, finding P2-030):** a word lacking timing
+  has no source coordinates, so its covering interval is bounded conservatively and
+  deterministically from neighboring timed records: from the end of the previous timed
+  word (or the previous region boundary, or session start when none) to the start of
+  the next timed word (or the next region boundary, or session end when none).
+  Consecutive missing-timing words merge into one covering interval; a missing-timing
+  span at a session boundary is bounded by that boundary. The independent audit
+  (Section 11) must reproduce these intervals exactly from the raw annotation files.
 - Clean/gap hard references are the only `primary_case=true` references and the only
   ones entering the clean/gap headline stratum (Sections 12.1, 13.4).
 - `overlap_present` episodes cannot enter the primary clean/gap contamination headline
@@ -318,20 +332,30 @@ manifest case regions by the same ReferenceBuilder and audited (Sections 5.3, 11
 finding P2-011). The Phase 1 synthetic manifests are the independent annotation
 authority for synthetic cases.
 
-**Real-recording exclusion (frozen, finding P2-014):** `mixed_dev_pool.json` contains
-two complete real AMI recordings (`ami_ES2003a`, `ami_IS1008a`, wav paths under
-`ami/audio/...`). These cases are **excluded from synthetic registration**: their
-source samples are already covered by the public sessions ES2003a/IS1008a (scorable
-pilot sessions), so registering them as `synthetic:mixed_dev_pool` would place the same
-source samples in two pools and violate Section 16.4 group-disjointness and the
-non-overlap invariant. Frozen rule: any manifest case whose `wav_relative_path` starts
-with `ami/` or `alimeeting/` is not registered as synthetic; it is recorded in the
-manifest header as `excluded_real_recording` with its source-session id, and its source
-session binds to the corresponding public session component (already covered). The
-remaining 202 `mixed_dev_pool` cases are synthetic and registered under
-`synthetic:mixed_dev_pool`. The builder asserts that no registered episode's source
-samples overlap any other registered episode's source samples within the same pool
-(fail-closed, invariant 29).
+**Real-recording exclusion and synthetic deduplication (frozen, findings P2-014,
+P2-028):** `mixed_dev_pool.json` contains the 202 `ls_dev` cases verbatim plus two
+complete real AMI recordings (`ami_ES2003a`, `ami_IS1008a`, wav paths under
+`ami/audio/...`) — verified: `mixed_ids - ls_dev_ids = {ami_ES2003a, ami_IS1008a}`.
+
+- Frozen canonical registration order: `ls_dev`, `ls_held_out_clean`,
+  `ls_held_out_other`, `mixed_dev_pool`.
+- **Deduplication rule:** canonical case identity = `(case_id, wav_relative_path,
+  wav_sha256)`. A case already registered under an earlier manifest is **skipped**
+  (recorded in the manifest header as `deduplicated` with case ids and counts).
+  Applying this rule, `mixed_dev_pool` contributes zero new cases: its 202 duplicates
+  of `ls_dev` are skipped and its 2 real recordings are excluded by the
+  real-recording exclusion (below).
+- **Real-recording exclusion rule (finding P2-014):** any manifest case whose
+  `wav_relative_path` starts with `ami/` or `alimeeting/` is never registered as
+  synthetic; it is recorded in the manifest header as `excluded_real_recording` with
+  its source-session id. The source samples of `ami_ES2003a`/`ami_IS1008a` are already
+  covered by the public sessions ES2003a/IS1008a (scorable pilot sessions), so no
+  source sample appears in more than one scored episode within a pool (Section 5.1)
+  and Section 16.4 group-disjointness holds.
+- The builder asserts that no registered episode's source samples overlap any other
+  registered episode's source samples within the same pool (fail-closed, invariant
+  29), and the per-manifest `deduplicated`/`excluded_real_recording` counts are part of
+  the manifest content hash.
 
 ### 5.3 Determinism and provenance (findings P2-010, P2-011)
 
@@ -364,18 +388,21 @@ matcher** (finding P2-006), not just interval membership:
 - **Eligibility (Section 12.1):** a final action matches a reference only if (1) source
   session and epoch agree; (2) action kind is compatible (`hard_boundary` actions match
   hard references, soft markers match soft references); (3) the boundary lies within the
-  reference's stored acceptable interval — **the acceptable interval is the final
-  tolerance-encoded eligibility window, applied exactly once (finding P2-020):** for
-  clean targets the interval `[B onset - 500 ms, B onset]` already encodes the declared
-  500 ms localization tolerance (Section 6.1, same semantics as the Phase 1 B0
-  classification rule), and the matcher does **not** expand it a second time; for gap
-  targets any boundary inside `[A speech offset, B onset]` matches with zero
-  localization error, distance to the nearest interval edge outside it (Section 6.2,
-  invariant 7); (4) detector-derived evidence was not available before
+  reference's   stored acceptable interval — **the acceptable interval is the final
+  tolerance-encoded eligibility window, applied exactly once (findings P2-020,
+  P2-029):** for clean targets the interval `[B onset - 500 ms, B onset]` already
+  encodes the declared 500 ms localization tolerance (Section 6.1, same semantics as
+  the Phase 1 B0 classification rule), and the matcher does **not** expand it a second
+  time; for gap targets the acceptable interval `[A speech offset, B onset]` is the
+  raw annotated silence, and the matcher applies the declared 500 ms localization
+  tolerance closure **exactly once**: eligibility window `[A speech offset - 500 ms,
+  B onset + 500 ms]`, with zero localization error inside the annotated gap and
+  distance to the nearest interval edge outside it (Section 6.2, invariant 7);
+  (4) detector-derived evidence was not available before
   detector-evidence onset (B onset; invariant 8); (5) availability meets the declared
   deadline (250/500/1000/1500/2000 ms); (6) ordered one-to-one matching is preserved
-  (invariant 6). Edge fixtures test boundaries at exactly and just beyond each interval
-  edge (finding P2-020).
+  (invariant 6). Edge fixtures test boundaries at exactly and just beyond each
+  eligibility edge for both clean and gap targets (findings P2-020, P2-029).
 - **Gap pre-existing VAD validity (invariant 9):** a VAD-owned action inside a gap
   acceptable interval is valid product separation even when available before B onset;
   it is reported `pre-existing` rather than rejected, and detector recovery credit
@@ -497,18 +524,24 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
   deterministic, corpus-stratified, and asserts that no component is split across pools
   (invariant 27). Synthetic manifests (`ls_dev`, `ls_held_out_clean`, `ls_held_out_other`,
   `mixed_dev_pool`) are assigned wholly to `diagnostic_dev` (groups `synthetic:<name>`).
-- **Historical label carried through (findings P2-012, P2-023):** each session and
-  episode records its historical status from a frozen normalized set:
+- **Historical label carried through (findings P2-012, P2-023, P2-031):** each session
+  and episode records its historical status from a frozen normalized set:
   `dev_pilot` (previously touched development), `held_out_pilot` (previously touched
   held-out — historical validation only), `dev_added` (newly materialized development
   additions, never previously touched — normalized as fresh development evidence and
-  eligible for panel/development use), `untouched` (reserved, unopened). Historical
-  (previously touched) evidence is development-usable but is excluded from every
-  confirmatory/panel claim path: the manifest header and later Phase 6 panel
-  construction must assert that no confirmatory selection uses a session whose
-  historical status is not `untouched` plus the Phase 6-7 approved held-out set, and
-  that `dev_added`/`dev_pilot`/`held_out_pilot` sessions never enter confirmatory
-  claims.
+  eligible for panel/development use), `untouched` (reserved, unopened).
+  **Synthetic manifests/cases are assigned frozen historical statuses too (finding
+  P2-031):** `ls_dev` and `mixed_dev_pool` (deduplicated, Section 5.2) -> `dev_pilot`;
+  `ls_held_out_clean` and `ls_held_out_other` -> `held_out_pilot` (previously touched
+  synthetic held-out; historical validation only, never confirmatory). The status is
+  persisted per synthetic case in the dev manifest and participates in the panel
+  assertions below.
+  Historical (previously touched) evidence is development-usable but is excluded from
+  every confirmatory/panel claim path: the manifest header and later Phase 6 panel
+  construction must assert that no confirmatory selection uses a session or synthetic
+  case whose historical status is not `untouched` plus the Phase 6-7 approved held-out
+  set, and that `dev_added`/`dev_pilot`/`held_out_pilot` sessions and cases never
+  enter confirmatory claims.
 - Cross-split overlap fails closed (invariant 29): the manifest generator asserts, per
   session and per episode, that all episodes of a session belong to exactly one pool and
   that the group graph hash bound in Phase 1 is unchanged.
@@ -535,15 +568,19 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
 - Natural windows are replayed with the same bounded replay machinery and
   state-equivalence contract (Section 16.4); five-minute/session/source-hour rates may
   be estimated only from this pool (invariant 30), and Phase 2 does not estimate them.
-- **Natural-window subrange mapping (frozen, finding P2-022):** a natural window is a
-  30 s unit whose full window equals its scored region — `W = S = [start_ms, start_ms
-  + 30 s]` (clipped at session end), warm-up and tail are recorded as
-  `warmup_truncated=true` / `tail_truncated=true` (zero-length). The Section 5.1
-  10-20 s scored rule and the target-enriched warm-up/tail defaults apply to
-  target-enriched episodes only; natural windows are scored over their full extent
-  with the zero warm-up/tail explicitly recorded, never silently assumed. Natural
-  windows therefore do not claim the 5 s warm-up / 3 s tail construction; their scored
-  denominator is the full window (sampled vs eligible recorded).
+- **Natural-window type and subrange mapping (frozen, findings P2-022, P2-032):** a
+  natural window is a **separate exposure-window type** `window_type =
+  natural_exposure`, distinct from target-enriched episodes (`window_type =
+  target_enriched`). A natural window is a 30 s unit whose full window equals its
+  scored region — `W = S = [start_ms, start_ms + 30 s]` (clipped at session end),
+  warm-up and tail recorded as `warmup_truncated=true` / `tail_truncated=true`
+  (zero-length). The Section 5.1 10-20 s scored rule, the 30 s cap, and the
+  target-enriched warm-up/tail defaults apply to `window_type = target_enriched`
+  episodes only; natural windows are scored over their full extent with the zero
+  warm-up/tail explicitly recorded, never silently assumed, and their scored
+  denominator is the full window (sampled vs eligible recorded). Natural windows are
+  therefore never subject to the target-enriched bounds stop conditions (Section 14),
+  which are scoped to `window_type = target_enriched`.
 - Natural window episode ids follow the frozen format (Section 5.3) with
   `anchor_suffix` empty and `pool = natural_exposure_validation`.
 
@@ -618,9 +655,11 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
   re-bucketing disjointness assertion, finding P2-015) → phase stops.
 - Any registered synthetic case whose wav path resolves under `ami/` or `alimeeting/`
   (real-recording exclusion, finding P2-014) → phase stops.
-- Any `scorable` episode with total duration > 30 s, or scored region < 10 s or > 20 s,
-  or a `diagnostic_only` episode that still contributes to a scored numerator → phase
-  stops (findings P2-001, P2-004).
+- Any `scorable` target-enriched episode (`window_type = target_enriched`) with total
+  duration > 30 s, or scored region < 10 s or > 20 s, or a `diagnostic_only` episode
+  that still contributes to a scored numerator → phase stops (findings P2-001,
+  P2-004, P2-032). Natural windows (`window_type = natural_exposure`) are exempt from
+  these target-enriched bounds by the frozen Section 10 mapping.
 - Reference timeline rebuild disagrees with the Phase 1 classifier output on any shared
   target, or the independent audit re-derivation disagrees on any sampled episode →
   phase stops (determinism defect).
@@ -689,6 +728,12 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
 | P2-024 | important | warm-up/scored boundary crossing intervals undefined; warm-up actions could match | resolved in Section 5.2 (half-open scored clipping; clipped intervals; targets in warm-up not scored; all warm-up actions rejected before matching, invariant 12) |
 | P2-025 | note | provenance ledger omitted corpus parsers, synthetic manifests, contracts | resolved in Section 1.1 (full ledger: corpus parsers, all synthetic manifests, proposal/fusion contracts) |
 | P2-026 | note | implementations are prospective, not execution evidence | acknowledged (Section 18): implementation artifacts are produced only after approval and independently verified at the Phase 2 exit gate |
+| P2-027 | blocker | readiness inequality `safe_frontier <= scored_start` was vacuous | resolved in Section 4.4 (safe frontier must **cover** the scored start: `safe_boundary_frontier_sample >= scored_start`, half-open convention frozen, plus explicit pending-state validation and monotonic/conservative trace validation) |
+| P2-028 | blocker | `mixed_dev_pool` duplicates the 202 `ls_dev` cases (identical ids/wavs) + 2 real recordings, so both registrations would fail the no-overlap assertion | resolved in Section 5.2 (canonical case identity deduplication across manifests in frozen order; `mixed_dev_pool` contributes zero new cases; deduplicated/excluded counts in the manifest hash) |
+| P2-029 | blocker | gap eligibility not tolerance-closed; valid boundaries just outside the gap edges were rejected | resolved in Section 6 (gap eligibility window = `[A offset - 500 ms, B onset + 500 ms]`, tolerance closure applied exactly once; zero error inside the annotated gap; edge fixtures both sides) |
+| P2-030 | important | missing-timing words have no coordinates; covering intervals unbounded | resolved in Section 5.1 (deterministic conservative covering rule from neighboring timed records/region boundaries/session bounds; consecutive missing-timing spans merged; audit reproduces exactly) |
+| P2-031 | important | synthetic registrations had no historical status rule | resolved in Section 9 (frozen statuses: ls_dev/mixed_dev_pool -> dev_pilot; ls_held_out_clean/other -> held_out_pilot; persisted per synthetic case; included in panel assertions) |
+| P2-032 | important | natural 30 s scored windows conflicted with the 10-20 s scored stop condition | resolved in Sections 10, 14 (separate `window_type = natural_exposure`; target-enriched bounds apply only to `window_type = target_enriched`; natural windows scored over full extent with zero warm-up/tail recorded) |
 
 ## 18. Execution and exit-gate note (finding P2-026)
 
