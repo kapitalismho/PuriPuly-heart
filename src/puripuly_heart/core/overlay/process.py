@@ -510,7 +510,7 @@ class OverlayProcessManager:
     task_factory: Any | None = None
     retry_ownership_changed: Callable[[bool], Awaitable[None]] | None = None
     graceful_shutdown_request: Callable[[], Awaitable[None]] | None = None
-    graceful_shutdown_timeout_s: float = 1.5
+    graceful_shutdown_timeout_s: float = 3.0
     selected_target: str | None = None
     fallback_reason: str | None = None
     geometry_authority: str | None = None
@@ -528,6 +528,7 @@ class OverlayProcessManager:
     _executable_mtime: float | None = field(init=False, default=None)
     _failure_dumped: bool = field(init=False, default=False)
     _shutdown_requested: bool = field(init=False, default=False)
+    _shutdown_acknowledged: bool = field(init=False, default=False)
     native_retry_owner_confirmed: bool = field(init=False, default=False)
     _accepted_ready_generation: int | None = field(init=False, default=None, repr=False)
     _trace_generation: int = field(init=False, default=0, repr=False)
@@ -569,6 +570,7 @@ class OverlayProcessManager:
         self._last_exit_code = None
         self._failure_dumped = False
         self._shutdown_requested = False
+        self._shutdown_acknowledged = False
         self.restart_scheduled = False
         self.failure_reason = None
         self._accepted_ready_generation = None
@@ -624,9 +626,19 @@ class OverlayProcessManager:
 
         process = self._process
         if process is not None:
-            if getattr(process, "returncode", None) is None:
+            graceful_shutdown_complete = False
+            if self.graceful_shutdown_request is not None:
+                graceful_shutdown_complete = await self._request_graceful_shutdown_before_terminate(
+                    process,
+                    request_already_sent=self._shutdown_requested,
+                )
+            if (
+                not graceful_shutdown_complete
+                and getattr(process, "returncode", None) is None
+                and self._last_exit_code is None
+            ):
                 self._record_process("terminate_requested", pid=getattr(process, "pid", None))
-            await process.terminate()
+                await process.terminate()
             await self._drain_process_events(process)
             self._record_process(
                 "process_exited",
@@ -857,15 +869,16 @@ class OverlayProcessManager:
                             await self._fail("runtime_crashed", terminate_process=False)
                     return
         finally:
-            for task in (event_task, bridge_task, exit_task):
+            if self._active_process_event_task is event_task:
+                await self._reconcile_terminal_process_events(process, event_task)
+                self._active_process_event_task = None
+            for task in (bridge_task, exit_task):
                 if task is not None and not task.done():
                     task.cancel()
             await asyncio.gather(
-                *[task for task in (event_task, bridge_task, exit_task) if task is not None],
+                *[task for task in (bridge_task, exit_task) if task is not None],
                 return_exceptions=True,
             )
-            if self._active_process_event_task is event_task:
-                self._active_process_event_task = None
             if self._active_process_exit_task is exit_task:
                 self._active_process_exit_task = None
 
@@ -885,6 +898,14 @@ class OverlayProcessManager:
     ) -> asyncio.Task[Any]:
         if self.task_factory is not None:
             return self.task_factory(coroutine, task_name=task_name)
+        return asyncio.create_task(coroutine, name=f"OverlayProcessManager:{task_name}")
+
+    @staticmethod
+    def _create_cleanup_task(
+        coroutine: Coroutine[Any, Any, Any],
+        *,
+        task_name: str,
+    ) -> asyncio.Task[Any]:
         return asyncio.create_task(coroutine, name=f"OverlayProcessManager:{task_name}")
 
     async def _handle_lifecycle_event(
@@ -954,6 +975,27 @@ class OverlayProcessManager:
                     reason="invalid_overlay_trace",
                     accepted=False,
                 )
+            return "ignored"
+        if event_type == "shutdown_complete":
+            if not trusted_process_event:
+                self._record_process(
+                    "renderer_message_ignored",
+                    reason="untrusted_shutdown_complete",
+                    accepted=False,
+                )
+                return "ignored"
+            event_instance_id = event.get("overlay_instance_id")
+            if event_instance_id != self.overlay_instance_id:
+                self._record_process(
+                    "renderer_message_ignored",
+                    reason="stale_overlay_instance",
+                    event_overlay_instance_id=event_instance_id,
+                    accepted=False,
+                )
+                return "ignored"
+            if not self._shutdown_acknowledged:
+                self._shutdown_acknowledged = True
+                self._record_process("graceful_shutdown_acknowledged")
             return "ignored"
         if allow_ready and trusted_process_event and event_type == "overlay_ready":
             event_instance_id = event.get("overlay_instance_id")
@@ -1184,6 +1226,8 @@ class OverlayProcessManager:
     async def _request_graceful_shutdown_before_terminate(
         self,
         process: OverlayManagedProcess,
+        *,
+        request_already_sent: bool = False,
     ) -> bool:
         request = self.graceful_shutdown_request
         if request is None:
@@ -1196,85 +1240,159 @@ class OverlayProcessManager:
             return False
 
         active_event_task = self._active_process_event_task
-        if active_event_task is not None and not active_event_task.done():
-            active_event_task.cancel()
-            await asyncio.gather(active_event_task, return_exceptions=True)
+        if active_event_task is not None:
+            await self._reconcile_terminal_process_events(process, active_event_task)
         if self._active_process_event_task is active_event_task:
             self._active_process_event_task = None
 
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout_s
-        try:
-            await asyncio.wait_for(request(), timeout=timeout_s)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self._record_process(
-                "graceful_shutdown_request_failed",
-                exception_type=type(exc).__name__,
-            )
-            return False
+        if not request_already_sent:
+            try:
+                await asyncio.wait_for(request(), timeout=timeout_s)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self._record_process(
+                    "graceful_shutdown_request_failed",
+                    exception_type=type(exc).__name__,
+                )
+                return False
 
-        self._record_process("graceful_close_requested")
-        ack_task = self._create_task(
-            process.next_event(),
-            task_name="graceful-shutdown-ack",
+        self._record_process(
+            "graceful_close_requested",
+            request_already_sent=request_already_sent,
         )
+        ack_task: asyncio.Task[dict[str, object]] | None = None
+        if not self._shutdown_acknowledged:
+            ack_task = self._create_cleanup_task(
+                process.next_event(),
+                task_name="graceful-shutdown-ack",
+            )
         exit_task = self._active_process_exit_task
+        owns_exit_task = exit_task is None
         if exit_task is None:
-            exit_task = self._create_task(
+            exit_task = self._create_cleanup_task(
                 process.wait(),
                 task_name="graceful-shutdown-process-wait",
             )
             self._active_process_exit_task = exit_task
-        acknowledged = False
+        acknowledged = self._shutdown_acknowledged
+        process_exited = self._process_exit_confirmed(process, exit_task)
         try:
             while True:
-                remaining_s = deadline - loop.time()
-                if remaining_s <= 0.0:
-                    break
-                done, _pending = await asyncio.wait(
-                    {ack_task, exit_task},
-                    timeout=remaining_s,
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                if not done:
-                    break
-                if ack_task in done:
-                    try:
-                        event = ack_task.result()
-                    except Exception:
-                        break
-                    if (
-                        event.get("type") == "shutdown_complete"
-                        and event.get("overlay_instance_id") == self.overlay_instance_id
-                    ):
-                        acknowledged = True
-                        self._record_process("graceful_shutdown_acknowledged")
-                    else:
-                        await self._record_shutdown_lifecycle_event(event)
-                        ack_task = self._create_task(
-                            process.next_event(),
-                            task_name="graceful-shutdown-ack",
-                        )
-                if acknowledged and exit_task.done():
-                    self._last_exit_code = exit_task.result()
+                if acknowledged and process_exited:
+                    self._last_exit_code = self._process_exit_code(process, exit_task)
                     self._record_process(
                         "graceful_shutdown_process_exit",
                         exit_code=self._last_exit_code,
                     )
                     return True
+                remaining_s = deadline - loop.time()
+                if remaining_s <= 0.0:
+                    break
+                wait_tasks: set[asyncio.Task[object]] = set()
+                if not process_exited:
+                    wait_tasks.add(exit_task)
+                if ack_task is not None:
+                    wait_tasks.add(ack_task)
+                if not wait_tasks:
+                    break
+                done, _pending = await asyncio.wait(
+                    wait_tasks,
+                    timeout=remaining_s,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if not done:
+                    break
+                if ack_task is not None and ack_task in done:
+                    try:
+                        event = ack_task.result()
+                    except Exception:
+                        break
+                    await self._record_shutdown_lifecycle_event(event)
+                    acknowledged = self._shutdown_acknowledged
+                    ack_task = None
+                    if not acknowledged:
+                        ack_task = self._create_cleanup_task(
+                            process.next_event(),
+                            task_name="graceful-shutdown-ack",
+                        )
+                if exit_task in done:
+                    process_exited = self._process_exit_confirmed(process, exit_task)
+                    if process_exited:
+                        self._last_exit_code = self._process_exit_code(process, exit_task)
+                        if ack_task is not None:
+                            await self._reconcile_terminal_process_events(process, ack_task)
+                            ack_task = None
+                        else:
+                            await self._drain_process_events(process)
+                        acknowledged = self._shutdown_acknowledged
+                        if acknowledged:
+                            self._record_process(
+                                "graceful_shutdown_process_exit",
+                                exit_code=self._last_exit_code,
+                            )
+                            return True
+                        if ack_task is None:
+                            ack_task = self._create_cleanup_task(
+                                process.next_event(),
+                                task_name="graceful-shutdown-ack",
+                            )
+                        continue
+                    break
         finally:
-            if not ack_task.done():
-                ack_task.cancel()
-            await asyncio.gather(ack_task, return_exceptions=True)
+            process_exited = process_exited or self._process_exit_confirmed(process, exit_task)
+            cleanup_tasks: list[asyncio.Task[object]] = []
+            if ack_task is not None:
+                if not ack_task.done():
+                    ack_task.cancel()
+                cleanup_tasks.append(ack_task)
+            if owns_exit_task:
+                if not exit_task.done():
+                    exit_task.cancel()
+                cleanup_tasks.append(exit_task)
+            if cleanup_tasks:
+                await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+            if owns_exit_task and self._active_process_exit_task is exit_task:
+                self._active_process_exit_task = None
 
         self._record_process(
             "graceful_shutdown_timeout",
-            acknowledged=acknowledged,
-            process_exited=exit_task.done(),
+            acknowledged=self._shutdown_acknowledged,
+            process_exited=process_exited,
         )
         return False
+
+    @staticmethod
+    def _process_exit_confirmed(
+        process: OverlayManagedProcess,
+        exit_task: asyncio.Task[int | None],
+    ) -> bool:
+        if getattr(process, "returncode", None) is not None:
+            return True
+        if not exit_task.done() or exit_task.cancelled():
+            return False
+        try:
+            return exit_task.exception() is None and exit_task.result() is not None
+        except (asyncio.CancelledError, Exception):
+            return False
+
+    @staticmethod
+    def _process_exit_code(
+        process: OverlayManagedProcess,
+        exit_task: asyncio.Task[int | None],
+    ) -> int | None:
+        returncode = getattr(process, "returncode", None)
+        if isinstance(returncode, int):
+            return returncode
+        if not exit_task.done() or exit_task.cancelled():
+            return None
+        try:
+            result = exit_task.result()
+        except (asyncio.CancelledError, Exception):
+            return None
+        return result if isinstance(result, int) else None
 
     async def _fail(
         self,
@@ -1345,9 +1463,12 @@ class OverlayProcessManager:
             graceful_shutdown_complete = await self._request_graceful_shutdown_before_terminate(
                 process
             )
-            if not graceful_shutdown_complete:
-                if getattr(process, "returncode", None) is None:
-                    self._record_process("terminate_requested", pid=getattr(process, "pid", None))
+            if (
+                not graceful_shutdown_complete
+                and getattr(process, "returncode", None) is None
+                and self._last_exit_code is None
+            ):
+                self._record_process("terminate_requested", pid=getattr(process, "pid", None))
                 await process.terminate()
             await self._drain_process_events(process)
             self._record_process(
@@ -1424,7 +1545,10 @@ class OverlayProcessManager:
             await self._record_shutdown_lifecycle_event(event)
 
     async def _record_shutdown_lifecycle_event(self, event: object) -> None:
-        if isinstance(event, dict) and event.get("type") == "overlay_trace":
+        if isinstance(event, dict) and event.get("type") in {
+            "overlay_trace",
+            "shutdown_complete",
+        }:
             await self._handle_lifecycle_event(event, allow_ready=False)
             return
         event_type = str(event.get("type", "")) if isinstance(event, dict) else ""

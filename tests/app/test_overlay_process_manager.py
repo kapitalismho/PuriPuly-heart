@@ -88,12 +88,18 @@ class FakeOverlayManagedProcess(OverlayManagedProcess):
         return await self._events.get()
 
     async def wait(self) -> int | None:
-        return await self._exit_future
+        return await asyncio.shield(self._exit_future)
 
     async def terminate(self) -> None:
         self.terminated = True
         if not self._exit_future.done():
             self._exit_future.set_result(0)
+
+    @property
+    def returncode(self) -> int | None:
+        if not self._exit_future.done() or self._exit_future.cancelled():
+            return None
+        return self._exit_future.result()
 
     def _schedule_transitions(self) -> None:
         async def runner() -> None:
@@ -413,6 +419,236 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
 
     assert process.terminate_calls == 2
     assert manager._process is None
+
+
+@pytest.mark.asyncio
+async def test_overlay_process_manager_stop_awaits_pre_requested_graceful_cleanup() -> None:
+    process = FakeOverlayManagedProcess()
+    shutdown_request_calls = 0
+
+    def reject_new_runtime_task(
+        coroutine: object,
+        *,
+        task_name: str,
+    ) -> asyncio.Task[object]:
+        _ = task_name
+        close = getattr(coroutine, "close", None)
+        if callable(close):
+            close()
+        raise RuntimeError("runtime is closing to new tasks")
+
+    async def request_shutdown() -> None:
+        nonlocal shutdown_request_calls
+        shutdown_request_calls += 1
+
+    manager = OverlayProcessManager(
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.2,
+        selected_target="desktop",
+        geometry_authority="flet",
+        task_factory=reject_new_runtime_task,
+    )
+    manager.state = "connected"
+    manager._process = process
+    manager._attach_process_diagnostics(process)
+    manager.mark_shutdown_requested()
+    for event in (
+        "stop_requested",
+        "graceful_close_requested",
+        "process_exited",
+        "pid_file_removed",
+    ):
+        await process._events.put(
+            {
+                "type": "overlay_trace",
+                "component": "flet_desktop_view_process",
+                "event": event,
+                "generation": 1,
+                "monotonic_ms": 1,
+            }
+        )
+    await process._events.put(
+        {
+            "type": "shutdown_complete",
+            "overlay_instance_id": manager.overlay_instance_id,
+        }
+    )
+    process._exit_future.set_result(0)
+
+    await manager.stop()
+
+    assert shutdown_request_calls == 0
+    assert process.terminated is False
+    assert manager.state == "off"
+    assert manager._process is None
+    assert manager.diagnostics is not None
+    process_events = manager.diagnostics.process_events
+    child_events = [
+        event["trace_event"]
+        for event in process_events
+        if event.get("trace_component") == "flet_desktop_view_process"
+    ]
+    assert child_events == [
+        "stop_requested",
+        "graceful_close_requested",
+        "process_exited",
+        "pid_file_removed",
+    ]
+    manager_events = [event["event"] for event in process_events]
+    assert "graceful_shutdown_acknowledged" in manager_events
+    assert "terminate_requested" not in manager_events
+
+
+@pytest.mark.asyncio
+async def test_overlay_process_manager_latches_ack_consumed_by_connected_monitor() -> None:
+    process = FakeOverlayManagedProcess()
+    shutdown_request_calls = 0
+
+    async def request_shutdown() -> None:
+        nonlocal shutdown_request_calls
+        shutdown_request_calls += 1
+
+    manager = OverlayProcessManager(
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.2,
+        selected_target="desktop",
+        geometry_authority="flet",
+    )
+    manager.state = "connected"
+    manager._process = process
+    manager._attach_process_diagnostics(process)
+    manager._monitor_task = manager._create_task(
+        manager._monitor_connected_process(),
+        task_name="connected-process-monitor",
+    )
+    await asyncio.sleep(0)
+    manager.mark_shutdown_requested()
+    await process._events.put(
+        {
+            "type": "shutdown_complete",
+            "overlay_instance_id": manager.overlay_instance_id,
+        }
+    )
+    for _ in range(10):
+        if manager._shutdown_acknowledged:
+            break
+        await asyncio.sleep(0)
+    assert manager._shutdown_acknowledged is True
+
+    async def exit_after_stop_begins() -> None:
+        await asyncio.sleep(0.01)
+        process._exit_future.set_result(0)
+
+    exit_task = asyncio.create_task(exit_after_stop_begins())
+    await manager.stop()
+    await exit_task
+
+    assert shutdown_request_calls == 0
+    assert process.terminated is False
+    assert manager.state == "off"
+    assert manager.diagnostics is not None
+    manager_events = manager.diagnostics.process_events
+    assert sum(event["event"] == "graceful_shutdown_acknowledged" for event in manager_events) == 1
+    assert not any(event["event"] == "graceful_shutdown_timeout" for event in manager_events)
+    assert not any(event["event"] == "terminate_requested" for event in manager_events)
+
+
+@pytest.mark.asyncio
+async def test_overlay_process_manager_reconciles_ack_read_during_monitor_cancellation() -> None:
+    class AckHandoffManager(OverlayProcessManager):
+        def __post_init__(self) -> None:
+            super().__post_init__()
+            self.ack_handoff_reached = asyncio.Event()
+
+        async def _handle_lifecycle_event(
+            self,
+            event: object,
+            *,
+            allow_ready: bool,
+            trusted_process_event: bool = True,
+        ) -> str:
+            if (
+                isinstance(event, dict)
+                and event.get("type") == "shutdown_complete"
+                and not self.ack_handoff_reached.is_set()
+            ):
+                self.ack_handoff_reached.set()
+                await asyncio.Event().wait()
+            return await super()._handle_lifecycle_event(
+                event,
+                allow_ready=allow_ready,
+                trusted_process_event=trusted_process_event,
+            )
+
+    process = FakeOverlayManagedProcess()
+    manager = AckHandoffManager(
+        graceful_shutdown_request=lambda: asyncio.sleep(0),
+        graceful_shutdown_timeout_s=0.2,
+        selected_target="desktop",
+        geometry_authority="flet",
+    )
+    manager.state = "connected"
+    manager._process = process
+    manager._attach_process_diagnostics(process)
+    manager._monitor_task = manager._create_task(
+        manager._monitor_connected_process(),
+        task_name="connected-process-monitor",
+    )
+    await asyncio.sleep(0)
+    manager.mark_shutdown_requested()
+    await process._events.put(
+        {
+            "type": "shutdown_complete",
+            "overlay_instance_id": manager.overlay_instance_id,
+        }
+    )
+    await asyncio.wait_for(manager.ack_handoff_reached.wait(), timeout=0.2)
+    assert manager._shutdown_acknowledged is False
+
+    async def exit_after_stop_begins() -> None:
+        await asyncio.sleep(0.01)
+        process._exit_future.set_result(0)
+
+    exit_task = asyncio.create_task(exit_after_stop_begins())
+    await manager.stop()
+    await exit_task
+
+    assert process.terminated is False
+    assert manager.diagnostics is not None
+    manager_events = manager.diagnostics.process_events
+    assert sum(event["event"] == "graceful_shutdown_acknowledged" for event in manager_events) == 1
+    assert not any(event["event"] == "graceful_shutdown_timeout" for event in manager_events)
+    assert not any(event["event"] == "terminate_requested" for event in manager_events)
+
+
+@pytest.mark.asyncio
+async def test_overlay_process_manager_timeout_does_not_claim_cancelled_waiter_exited() -> None:
+    process = FakeOverlayManagedProcess()
+
+    async def request_shutdown() -> None:
+        return None
+
+    manager = OverlayProcessManager(
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.01,
+        selected_target="desktop",
+        geometry_authority="flet",
+    )
+    manager.state = "connected"
+    manager._process = process
+    manager._attach_process_diagnostics(process)
+
+    await manager.stop()
+
+    assert process.terminated is True
+    assert manager.diagnostics is not None
+    timeout_event = next(
+        event
+        for event in manager.diagnostics.process_events
+        if event["event"] == "graceful_shutdown_timeout"
+    )
+    assert timeout_event["acknowledged"] is False
+    assert timeout_event["process_exited"] is False
 
 
 def test_overlay_process_manager_cleanup_manifest_preserves_path_when_unlink_fails() -> None:

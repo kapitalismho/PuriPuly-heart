@@ -28,7 +28,6 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
         ("src/puripuly_heart/core/stt/controller.py", ASYNCIO_CREATE_TASK): 6,
         ("src/puripuly_heart/core/overlay/bridge.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/overlay/presenter.py", ASYNCIO_CREATE_TASK): 1,
-        ("src/puripuly_heart/core/overlay/process.py", ASYNCIO_CREATE_TASK): 2,
         ("src/puripuly_heart/providers/stt/soniox.py", ASYNCIO_CREATE_TASK): 3,
         ("src/puripuly_heart/ui/components/subtab_shell.py", BARE_RUN_TASK): 1,
         ("src/puripuly_heart/ui/flet_runtime.py", BARE_RUN_TASK): 1,
@@ -59,6 +58,7 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
             "src/puripuly_heart/core/runtime/desktop_overlay_bounds.py",
             ASYNCIO_CREATE_TASK,
         ): 1,
+        ("src/puripuly_heart/core/overlay/process.py", ASYNCIO_CREATE_TASK): 3,
         (
             "src/puripuly_heart/core/runtime/overlay_session_fallback.py",
             ASYNCIO_CREATE_TASK,
@@ -85,7 +85,7 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
         ("src/puripuly_heart/app/services/manual_typing.py", LOOP_CREATE_TASK): 1,
         ("src/puripuly_heart/providers/stt/local_gpu.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/ui/desktop_overlay_repro.py", ASYNCIO_CREATE_TASK): 3,
-        ("src/puripuly_heart/ui/flet_desktop_runtime.py", ASYNCIO_CREATE_TASK): 3,
+        ("src/puripuly_heart/ui/flet_desktop_runtime.py", ASYNCIO_CREATE_TASK): 2,
         ("src/puripuly_heart/ui/foundation/runtime.py", RUN_TASK): 1,
     }
 )
@@ -118,7 +118,7 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     (
         "src/puripuly_heart/core/overlay/process.py",
         ASYNCIO_CREATE_TASK,
-    ): "overlay process manager wraps subprocess monitor tasks with named factories and shutdown cleanup",
+    ): "overlay subprocess and process-manager owners name reader, monitor, and locally awaited shutdown-cleanup tasks and gather them before releasing process state",
     (
         "src/puripuly_heart/providers/stt/soniox.py",
         ASYNCIO_CREATE_TASK,

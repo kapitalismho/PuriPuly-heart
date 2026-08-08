@@ -1002,7 +1002,7 @@ class FletDesktopRendererWindow:
         if process_owner is None:
             await close_page_window()
         else:
-            await process_owner.close(close_page_window)
+            await process_owner.close()
 
         task = self._app_task
         if task is not None and not task.done():
@@ -1021,8 +1021,11 @@ class FletDesktopRendererWindow:
                         await asyncio.gather(task, return_exceptions=True)
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(
+                    "[DesktopOverlay] Window cleanup failed: exception_type=%s",
+                    type(exc).__name__,
+                )
         self._window_z_order_port.close()
 
     async def dispatch_snapshot(self, snapshot: OverlayPresentationSnapshot) -> None:
