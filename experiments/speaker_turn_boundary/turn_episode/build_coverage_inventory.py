@@ -86,11 +86,6 @@ def canonical_json(data: Any) -> str:
     return json.dumps(data, sort_keys=True, indent=2, ensure_ascii=False)
 
 
-def hash_include(session_id: str, pool: str, key: str) -> bool:
-    digest = hashlib.sha256(f"{session_id}:{pool}:{key}".encode("utf-8")).hexdigest()
-    return int(digest[:2], 16) < TARGET_ENRICHED_HASH_PREFIX_BOUND
-
-
 def natural_include(session_id: str, start_ms: int) -> bool:
     digest = hashlib.sha256(f"{session_id}:{start_ms}".encode("utf-8")).hexdigest()
     return int(digest[:2], 16) < NATURAL_HASH_PREFIX_BOUND
@@ -104,12 +99,17 @@ class SessionInventory:
     touched_status: str  # dev_pilot | held_out_pilot | untouched
     duration_samples: int
     active_speech_samples: int
+    singleton_active_samples: int
+    stable_singleton_active_samples: int
     wav_path: str | None
     wav_sha256: str | None
+    annotation_sha256: str | None
     speakers: tuple[str, ...]
     speaker_component: tuple[str, ...]
     recording_condition: str
     word_alignment_coverage: str
+    language: str
+    training_overlap_risk: dict[str, str]
     annotation_file_count: int
     regions: tuple[SpeakerRegion, ...]
     hard_clean_gap_targets: list[dict[str, Any]] = field(default_factory=list)
@@ -126,12 +126,17 @@ class SessionInventory:
             "duration_samples": self.duration_samples,
             "duration_s": round(self.duration_samples / CANONICAL_SAMPLE_RATE_HZ, 3),
             "active_speech_samples": self.active_speech_samples,
+            "singleton_active_samples": self.singleton_active_samples,
+            "stable_singleton_active_samples": self.stable_singleton_active_samples,
             "wav_path": self.wav_path,
             "wav_sha256": self.wav_sha256,
+            "annotation_sha256": self.annotation_sha256,
             "speakers": list(self.speakers),
             "speaker_component": list(self.speaker_component),
             "recording_condition": self.recording_condition,
             "word_alignment_coverage": self.word_alignment_coverage,
+            "language": self.language,
+            "training_overlap_risk": self.training_overlap_risk,
             "annotation_file_count": self.annotation_file_count,
             "hard_clean_gap_targets": self.hard_clean_gap_targets,
             "overlap_soft_targets": self.overlap_soft_targets,
@@ -146,6 +151,32 @@ def active_speech_samples(regions: list[SpeakerRegion]) -> int:
         for region in regions
         if region.speakers and not region.ambiguous
     )
+
+
+def singleton_active_samples(regions: list[SpeakerRegion]) -> int:
+    return sum(
+        region.end_sample - region.start_sample
+        for region in regions
+        if len(region.speakers) == 1 and not region.ambiguous
+    )
+
+
+def stable_singleton_active_samples(
+    regions: list[SpeakerRegion],
+    stability_ms: int = 100,
+) -> int:
+    return sum(
+        region.end_sample - region.start_sample
+        for region in regions
+        if len(region.speakers) == 1
+        and not region.ambiguous
+        and (region.end_sample - region.start_sample) >= stability_ms * SAMPLES_PER_MS
+    )
+
+
+def hash_annotation_files(paths: list[Path]) -> str:
+    digests = [sha256_file(path) for path in sorted(paths)]
+    return sha256_bytes("\n".join(digests).encode("utf-8"))
 
 
 def _target(gt_index: int, kind: str, target_sample: int, interval: list[int]) -> dict[str, Any]:
@@ -261,11 +292,16 @@ def load_pilot_session(
     partition = dict(condition.get("partition_meta") or {})
     agents = dict(partition.get("agents") or {})
     if corpus == "ami" and agents:
-        component = tuple(
-            sorted({agents.get(letter) for letter in speakers if agents.get(letter)})
-        ) or tuple(speakers)
+        global_ids = {
+            agents.get(letter)
+            for speaker in speakers
+            for letter in [speaker.rsplit(".Participant", 1)[-1]]
+            if agents.get(letter)
+        }
+        component = tuple(sorted(global_ids)) or tuple(speakers)
     else:
         component = tuple(speakers)
+    annotation_paths = _annotation_paths_for(corpus, meeting_id, wav_root)
     targets = _classify_targets(regions)
     return SessionInventory(
         session_id=session_id,
@@ -274,12 +310,21 @@ def load_pilot_session(
         touched_status=touched_status,
         duration_samples=int(case.duration_samples),
         active_speech_samples=active_speech_samples(regions),
+        singleton_active_samples=singleton_active_samples(regions),
+        stable_singleton_active_samples=stable_singleton_active_samples(regions),
         wav_path=str(wav_path.relative_to(wav_root)) if wav_path.is_file() else None,
         wav_sha256=wav_sha,
+        annotation_sha256=hash_annotation_files(annotation_paths) if annotation_paths else None,
         speakers=tuple(speakers),
         speaker_component=component,
         recording_condition=recording_condition,
         word_alignment_coverage="word_level" if corpus == "ami" else "interval_level",
+        language="english" if corpus == "ami" else "chinese",
+        training_overlap_risk=(
+            {"ls_eend": "in_domain_ami"}
+            if corpus == "ami"
+            else {"ls_eend": "unseen", "eres": "unknown"}
+        ),
         annotation_file_count=len(regions),
         regions=tuple(regions),
         hard_clean_gap_targets=targets["hard_clean_gap_targets"],
@@ -287,6 +332,25 @@ def load_pilot_session(
         same_speaker_pause_intervals=targets["same_speaker_pause_intervals"],
         short_turn_distribution_ms=_short_turn_distribution(regions),
     )
+
+
+def _annotation_paths_for(corpus: str, meeting_id: str, corpus_root: Path) -> list[Path]:
+    if corpus == "ami":
+        words_dir = corpus_root / "ami" / "annotations" / "words"
+        if words_dir.is_dir():
+            return sorted(words_dir.glob(f"{meeting_id}.*.words.xml"))
+    if corpus == "alimeeting":
+        textgrid = (
+            corpus_root
+            / "alimeeting"
+            / "Eval_Ali"
+            / "Eval_Ali_far"
+            / "textgrid_dir"
+            / f"{meeting_id}.TextGrid"
+        )
+        if textgrid.is_file():
+            return [textgrid]
+    return []
 
 
 def load_ami_annotation_meetings(
@@ -328,9 +392,13 @@ def load_ami_annotation_meetings(
         regions, _ = words_to_regions(words, duration_samples)
         speakers = sorted({s for region in regions for s in region.speakers})
         agents = dict(meta.get("agents") or {})
-        component = tuple(
-            sorted({agents.get(letter) for letter in speakers if agents.get(letter)})
-        ) or tuple(speakers)
+        global_ids = {
+            agents.get(letter)
+            for speaker in speakers
+            for letter in [speaker.rsplit(".Participant", 1)[-1]]
+            if agents.get(letter)
+        }
+        component = tuple(sorted(global_ids)) or tuple(speakers)
         targets = _classify_targets(regions)
         meetings.append(
             SessionInventory(
@@ -340,12 +408,17 @@ def load_ami_annotation_meetings(
                 touched_status="untouched",
                 duration_samples=duration_samples,
                 active_speech_samples=active_speech_samples(regions),
+                singleton_active_samples=singleton_active_samples(regions),
+                stable_singleton_active_samples=stable_singleton_active_samples(regions),
                 wav_path=None,
                 wav_sha256=None,
+                annotation_sha256=hash_annotation_files(paths),
                 speakers=tuple(speakers),
                 speaker_component=component,
                 recording_condition="annotation_only",
                 word_alignment_coverage="word_level",
+                language="english",
+                training_overlap_risk={"ls_eend": "in_domain_ami"},
                 annotation_file_count=len(regions),
                 regions=tuple(regions),
                 hard_clean_gap_targets=targets["hard_clean_gap_targets"],
@@ -357,18 +430,21 @@ def load_ami_annotation_meetings(
     return meetings
 
 
-def natural_frame(sessions: list[SessionInventory]) -> dict[str, Any]:
+def natural_frame_from_durations(
+    session_durations: list[tuple[str, int]],
+) -> dict[str, Any]:
+    """Duration-only frame construction; runs before any transition-label inspection."""
     windows: list[dict[str, Any]] = []
     eligible_ms = 0
     sampled_ms = 0
-    for session in sessions:
-        duration_ms = session.duration_samples // SAMPLES_PER_MS
+    for session_id, duration_samples in sorted(session_durations):
+        duration_ms = duration_samples // SAMPLES_PER_MS
         start_ms = 0
         while start_ms < duration_ms:
-            keep = natural_include(session.session_id, start_ms)
+            keep = natural_include(session_id, start_ms)
             windows.append(
                 {
-                    "session_id": session.session_id,
+                    "session_id": session_id,
                     "start_ms": start_ms,
                     "included": keep,
                     "eligible_duration_ms": min(NATURAL_WINDOW_MS, duration_ms - start_ms),
@@ -386,6 +462,12 @@ def natural_frame(sessions: list[SessionInventory]) -> dict[str, Any]:
         "sampled_duration_ms": sampled_ms,
         "windows": windows,
     }
+
+
+def natural_frame(sessions: list[SessionInventory]) -> dict[str, Any]:
+    return natural_frame_from_durations(
+        [(session.session_id, session.duration_samples) for session in sessions]
+    )
 
 
 def _overlaps(a: list[int], b: list[int]) -> bool:
@@ -410,25 +492,33 @@ def target_enriched_selection(sessions: list[SessionInventory]) -> dict[str, Any
         )
         kept_pos: list[dict[str, Any]] = []
         for index, target in pos_ranked:
-            if not hash_include(session.session_id, "positive", str(index)):
+            digest = hashlib.sha256(
+                f"{session.session_id}:positive:{index}".encode("utf-8")
+            ).hexdigest()
+            if int(digest[:2], 16) >= TARGET_ENRICHED_HASH_PREFIX_BOUND:
                 continue
             conflict = any(
                 _overlaps(target["acceptable_interval"], k["acceptable_interval"]) for k in kept_pos
             )
             if conflict:
                 continue
-            kept_pos.append(target)
+            kept_pos.append({**target, "rank": index, "selection_digest": digest})
             if len(kept_pos) >= MAX_POSITIVE_PER_SESSION:
                 break
         kept_neg: list[dict[str, Any]] = []
         for index, target in neg_ranked:
-            if not hash_include(session.session_id, "negative", str(index)):
+            digest = hashlib.sha256(
+                f"{session.session_id}:negative:{index}".encode("utf-8")
+            ).hexdigest()
+            if int(digest[:2], 16) >= TARGET_ENRICHED_HASH_PREFIX_BOUND:
                 continue
             interval = [target["silence_start_sample"], target["silence_end_sample"]]
             conflict = any(_overlaps(interval, k["interval"]) for k in kept_neg)
             if conflict:
                 continue
-            kept_neg.append({**target, "interval": interval})
+            kept_neg.append(
+                {**target, "interval": interval, "rank": index, "selection_digest": digest}
+            )
             if len(kept_neg) >= MAX_NEGATIVE_PER_SESSION:
                 break
         out["eligible_counts"][session.session_id] = {
@@ -542,16 +632,30 @@ def main() -> None:
     wav_root = corpus_root
     manifests_dir = Path(__file__).resolve().parent.parent / "data" / "manifests"
 
-    sessions: list[SessionInventory] = []
-    for manifest_name, touched_map in (
+    pilot_manifests = (
         ("ami_dev_pilot.json", {f"ami_{c}": "dev_pilot" for c in AMI_DEV_TOUCHED}),
         ("ami_held_out_pilot.json", {f"ami_{c}": "held_out_pilot" for c in AMI_HELDOUT_TOUCHED}),
         (
             "alimeeting_eval_pilot.json",
             {f"alimeeting_{c}": "held_out_pilot" for c in ALIMEETING_SESSIONS},
         ),
-    ):
-        manifest = Phase2Manifest.load(manifests_dir / manifest_name)
+    )
+    loaded_manifests = [
+        (name, Phase2Manifest.load(manifests_dir / name)) for name, _ in pilot_manifests
+    ]
+
+    # Natural-exposure frame is constructed from duration only, before any
+    # transition-label inspection (frozen contract, bundle Section 5).
+    natural = natural_frame_from_durations(
+        [
+            (str(case.case_id), int(case.duration_samples))
+            for _, manifest in loaded_manifests
+            for case in manifest.cases
+        ]
+    )
+
+    sessions: list[SessionInventory] = []
+    for (_, manifest), (_, touched_map) in zip(loaded_manifests, pilot_manifests):
         for case in manifest.cases:
             touched = touched_map.get(str(case.case_id), "untouched")
             sessions.append(load_pilot_session(case, wav_root, touched))
@@ -589,7 +693,6 @@ def main() -> None:
             "expected_kinds": sorted(kinds),
         }
 
-    natural = natural_frame(sessions)
     enriched = target_enriched_selection(sessions)
     all_sessions = sessions + annotation_sessions
     group_graph = build_group_graph(all_sessions)
@@ -615,6 +718,10 @@ def main() -> None:
             entry["scorable_sessions"] += 1
             entry["duration_s"] += session.duration_samples / CANONICAL_SAMPLE_RATE_HZ
             entry["active_speech_s"] += session.active_speech_samples / CANONICAL_SAMPLE_RATE_HZ
+            entry.setdefault("stable_singleton_active_s", 0.0)
+            entry["stable_singleton_active_s"] += (
+                session.stable_singleton_active_samples / CANONICAL_SAMPLE_RATE_HZ
+            )
         entry["hard_clean_gap_targets"] += len(session.hard_clean_gap_targets)
         entry["overlap_soft_targets"] += len(session.overlap_soft_targets)
         entry["same_speaker_pause_intervals"] += len(session.same_speaker_pause_intervals)
@@ -646,6 +753,20 @@ def main() -> None:
     code_hashes = {
         "inventory_script": sha256_file(Path(__file__).resolve()),
         "vad_baseline": sha256_file(Path(__file__).resolve().parent.parent / "vad_baseline.py"),
+        "events": sha256_file(Path(__file__).resolve().parent.parent / "events.py"),
+        "config": sha256_file(Path(__file__).resolve().parent.parent / "config.py"),
+        "ground_truth": sha256_file(Path(__file__).resolve().parent.parent / "ground_truth.py"),
+        "phase2_schemas": sha256_file(
+            Path(__file__).resolve().parent.parent / "corpus" / "phase2_schemas.py"
+        ),
+        "silero_adapter": sha256_file(
+            Path(__file__).resolve().parent.parent.parent.parent
+            / "src"
+            / "puripuly_heart"
+            / "core"
+            / "vad"
+            / "silero.py"
+        ),
         "silero_model": SILERO_MODEL_SHA256,
     }
 
