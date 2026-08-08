@@ -10,7 +10,6 @@ import math
 import os
 import re
 import sys
-import time
 import traceback
 from collections.abc import Awaitable, Callable, Mapping
 from concurrent.futures import Future as ConcurrentFuture
@@ -67,6 +66,10 @@ from puripuly_heart.core.overlay.protocol import (
 )
 from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationSnapshot,
+)
+from puripuly_heart.ui.desktop_overlay_startup import (
+    DesktopOverlayStartupCoordinator,
+    DesktopOverlayStartupPhase,
 )
 from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_BACKGROUND_RGB as _DESKTOP_CAPTION_BACKGROUND_RGB,
@@ -412,7 +415,10 @@ from puripuly_heart.ui.desktop_window_zorder import (
     WindowZOrderPort,
     create_window_z_order_port,
 )
-from puripuly_heart.ui.flet_desktop_runtime import patch_hidden_view_launcher
+from puripuly_heart.ui.flet_desktop_runtime import (
+    FletDesktopViewProcessOwner,
+    patch_hidden_view_launcher,
+)
 from puripuly_heart.ui.flet_runtime import invoke_control_method
 from puripuly_heart.ui.fonts import assets_dir
 from puripuly_heart.ui.i18n import t_for_locale
@@ -445,9 +451,26 @@ _REQUIRED_MANIFEST_STRING_FIELDS = {
 }
 _REQUIRED_MANIFEST_INT_FIELDS = {"contract_version", "parent_pid", "startup_deadline_ms"}
 _DESKTOP_WINDOW_BOUNDS_EVENT_NAMES = {"MOVE", "MOVED", "RESIZE", "RESIZED"}
-_INITIAL_RUNTIME_CONTROL_DRAIN_TIMEOUT_S = 0.05
-_PROGRAMMATIC_BOUNDS_ECHO_SUPPRESSION_S = 0.25
 _PROGRAMMATIC_BOUNDS_ECHO_TOLERANCE_PX = 2.0
+
+
+def _emit_desktop_lifecycle_trace(
+    component: str,
+    event: str,
+    fields: Mapping[str, object],
+) -> None:
+    print(
+        json.dumps(
+            {
+                "type": "overlay_trace",
+                "component": component,
+                "event": event,
+                **fields,
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
 
 
 # Reviewable snapshot mapping table required before renderer coding.
@@ -672,12 +695,6 @@ class _RuntimeOutcome:
 
 
 @dataclass(frozen=True, slots=True)
-class _ProgrammaticBoundsEchoSuppression:
-    signature: tuple[float, float, float, float]
-    expires_at: float
-
-
-@dataclass(frozen=True, slots=True)
 class _DesktopRenderTrace:
     content_kind: str
     surface_visible: bool
@@ -712,10 +729,14 @@ async def _default_flet_app_runner(
     target: Callable[[Any], object],
     *,
     on_process_started: Callable[[int, str | None], None] | None = None,
+    process_owner: FletDesktopViewProcessOwner | None = None,
 ) -> None:
     import flet as ft
 
-    with patch_hidden_view_launcher(on_process_started=on_process_started):
+    with patch_hidden_view_launcher(
+        on_process_started=on_process_started,
+        process_owner=process_owner,
+    ):
         await ft.run_async(
             main=target,
             view=ft.AppView.FLET_APP_HIDDEN,
@@ -752,6 +773,7 @@ class FletDesktopRendererWindow:
         preview_catalog: DesktopOverlayPreviewCatalog | None = None,
         window_z_order_port: WindowZOrderPort | None = None,
         window_process_info_provider: FletProcessInfoProvider | None = None,
+        view_process_owner: FletDesktopViewProcessOwner | None = None,
     ) -> None:
         if (
             app_runner is not None
@@ -771,17 +793,23 @@ class FletDesktopRendererWindow:
         self._window_z_order_required = window_z_order_port is not None or (
             app_runner is None and preview_catalog is None and os.name == "nt"
         )
+        self._structured_lifecycle_trace_enabled = app_runner is None and preview_catalog is None
         if app_runner is None:
+            self._view_process_owner = view_process_owner or FletDesktopViewProcessOwner(
+                trace_sink=self._record_process_lifecycle,
+            )
 
             async def run_default_app(target: Callable[[Any], object]) -> None:
                 await _default_flet_app_runner(
                     target,
                     on_process_started=self._record_flet_process,
+                    process_owner=self._view_process_owner,
                 )
 
             self._app_runner = run_default_app
         else:
             self._app_runner = app_runner
+            self._view_process_owner = view_process_owner
         self._window_process_info_provider = window_process_info_provider
         self._event_sink = event_sink
         self._locale = locale
@@ -806,12 +834,17 @@ class FletDesktopRendererWindow:
         self._page_start_error: BaseException | None = None
         self._flet_process_pid: int | None = None
         self._flet_pid_file: str | None = None
+        self._startup_generation = 0
+        self._startup_coordinator: DesktopOverlayStartupCoordinator | None = None
         self._interaction_mode_lock = asyncio.Lock()
         self._interaction_generation = 0
         self._window_z_order_task: ScheduledCallbackTask | None = None
         self._bounds_sample_task: asyncio.Task[None] | None = None
         self._scheduled_callback_tasks: set[ScheduledCallbackTask] = set()
-        self._programmatic_bounds_echo_suppression: _ProgrammaticBoundsEchoSuppression | None = None
+        self._programmatic_bounds_signatures: dict[
+            int,
+            set[tuple[float, float, float, float]],
+        ] = {}
         self._last_reported_bounds: tuple[float, float, float, float] | None = None
         self._caption_card_width_floor_by_block: dict[tuple[str, str, int], float] = {}
         self._last_render_trace: _DesktopRenderTrace | None = None
@@ -820,6 +853,16 @@ class FletDesktopRendererWindow:
         self._preview_backdrop: Any | None = None
         self._preview_busy_background: Any | None = None
         self._preview_option_buttons: dict[tuple[str, str], Any] = {}
+
+    @property
+    def startup_generation(self) -> int:
+        coordinator = self._startup_coordinator
+        return coordinator.generation if coordinator is not None and coordinator.ready else 0
+
+    @property
+    def startup_phase(self) -> str | None:
+        coordinator = self._startup_coordinator
+        return coordinator.phase.value if coordinator is not None else None
 
     def prime_startup_runtime_controls(
         self,
@@ -867,6 +910,15 @@ class FletDesktopRendererWindow:
         else:
             self._snapshot = initial_snapshot
             self._visual_state = self._startup_visual_state or DesktopCaptionVisualState()
+            previous_coordinator = self._startup_coordinator
+            if previous_coordinator is not None:
+                previous_coordinator.retire()
+            self._startup_generation += 1
+            self._startup_coordinator = DesktopOverlayStartupCoordinator(
+                self._startup_generation,
+                trace_sink=self._record_startup_lifecycle,
+            )
+        self._programmatic_bounds_signatures.clear()
         self._last_snapshot_revision = self._snapshot.revision
         self._page_ready.clear()
         self._closed.clear()
@@ -897,6 +949,8 @@ class FletDesktopRendererWindow:
                     await self._app_task
                 raise RuntimeError("desktop overlay Flet page was not created")
             if self._page_start_error is not None:
+                if self._app_task.done():
+                    await asyncio.gather(self._app_task, return_exceptions=True)
                 raise RuntimeError(
                     "desktop overlay Flet page configuration failed"
                 ) from self._page_start_error
@@ -917,6 +971,10 @@ class FletDesktopRendererWindow:
 
     async def close(self) -> None:
         self._closed.set()
+        coordinator = self._startup_coordinator
+        if coordinator is not None:
+            coordinator.retire()
+        self._programmatic_bounds_signatures.clear()
         async with self._interaction_mode_lock:
             self._interaction_generation += 1
             await self._cancel_window_z_order_task()
@@ -926,7 +984,9 @@ class FletDesktopRendererWindow:
         await self._cancel_scheduled_callback_tasks()
         await self._cancel_bounds_sample()
 
-        if page is not None:
+        async def close_page_window() -> None:
+            if page is None:
+                return
             window = page.window
             try:
                 await invoke_control_method(window, "close")
@@ -935,6 +995,12 @@ class FletDesktopRendererWindow:
                 if callable(destroy):
                     with contextlib.suppress(Exception):
                         await invoke_control_method(window, "destroy")
+
+        process_owner = self._view_process_owner
+        if process_owner is None:
+            await close_page_window()
+        else:
+            await process_owner.close(close_page_window)
 
         task = self._app_task
         if task is not None and not task.done():
@@ -1076,15 +1142,21 @@ class FletDesktopRendererWindow:
             await self._close_late_page(page)
             return
         self._page = page
+        coordinator = self._startup_coordinator
+        if coordinator is None:
+            self._page_start_error = RuntimeError("desktop overlay startup coordinator is missing")
+            self._page_ready.set()
+            raise self._page_start_error
         try:
             self._bind_window_z_order_process()
             self._configure_base_window(page)
             self._render_page()
+            coordinator.advance(DesktopOverlayStartupPhase.PAGE_CONFIGURED)
         except Exception as exc:
             self._page_start_error = exc
             self._page_ready.set()
             raise
-        await self._finish_hidden_window_startup()
+        await self._finish_hidden_window_startup(coordinator)
 
     def _handle_preview_page(self, page: Any) -> None:
         if self._closed.is_set():
@@ -1100,11 +1172,23 @@ class FletDesktopRendererWindow:
             self._page_ready.set()
             raise
 
-    async def _finish_hidden_window_startup(self) -> None:
+    async def _finish_hidden_window_startup(
+        self,
+        coordinator: DesktopOverlayStartupCoordinator,
+    ) -> None:
         try:
-            await self._place_window_before_show()
-            if not self._closed.is_set():
-                self._show_configured_window()
+            page = self._page
+            if page is None:
+                raise RuntimeError("desktop overlay Flet page is missing")
+            await invoke_control_method(page.window, "wait_until_ready_to_show")
+            coordinator.advance(DesktopOverlayStartupPhase.NATIVE_READY)
+            await self._confirm_window_bounds()
+            coordinator.advance(DesktopOverlayStartupPhase.BOUNDS_CONFIRMED)
+            if self._closed.is_set() or not coordinator.accepts(self._startup_generation):
+                raise RuntimeError("desktop overlay startup generation was retired")
+            await self._show_configured_window()
+            coordinator.advance(DesktopOverlayStartupPhase.VISIBLE_CONFIRMED)
+            coordinator.advance(DesktopOverlayStartupPhase.READY)
         except Exception as exc:
             self._page_start_error = exc
             raise
@@ -1126,6 +1210,22 @@ class FletDesktopRendererWindow:
             return
         self._flet_process_pid = int(pid) if int(pid) > 0 else None
         self._flet_pid_file = pid_file
+
+    def _record_process_lifecycle(self, event: str, fields: dict[str, object]) -> None:
+        if self._structured_lifecycle_trace_enabled:
+            _emit_desktop_lifecycle_trace("flet_view_process", event, fields)
+        details = " ".join(f"{key}={value}" for key, value in sorted(fields.items()))
+        self._emit_detailed_log(f"flet_process event={event} {details}".rstrip())
+
+    def _record_startup_lifecycle(self, event: str, fields: dict[str, object]) -> None:
+        if self._structured_lifecycle_trace_enabled:
+            _emit_desktop_lifecycle_trace(
+                "desktop_window_startup",
+                event,
+                {"geometry_authority": "flet", **fields},
+            )
+        details = " ".join(f"{key}={value}" for key, value in sorted(fields.items()))
+        self._emit_detailed_log(f"startup event={event} {details}".rstrip())
 
     def _bind_window_z_order_process(self) -> None:
         provider = self._window_process_info_provider
@@ -1178,10 +1278,10 @@ class FletDesktopRendererWindow:
             window.top = bounds["y"]
             window.width = bounds["width"]
             window.height = bounds["height"]
-            self._programmatic_bounds_echo_suppression = _ProgrammaticBoundsEchoSuppression(
-                signature=_bounds_signature(bounds),
-                expires_at=time.monotonic() + _PROGRAMMATIC_BOUNDS_ECHO_SUPPRESSION_S,
-            )
+            self._track_programmatic_bounds(bounds)
+            coordinator = self._startup_coordinator
+            if coordinator is not None:
+                coordinator.record("bounds_applied", canonical_bounds=dict(bounds))
         elif _finite_non_bool_number(getattr(window, "width", None)) in {None, 0}:
             window.width = DESKTOP_FLET_DEFAULT_WIDTH
         if self._preview_catalog is None and _finite_non_bool_number(
@@ -1295,23 +1395,25 @@ class FletDesktopRendererWindow:
         window = page.window
         window.ignore_mouse_events = locked
 
-    def _show_configured_window(self) -> None:
+    async def _show_configured_window(self) -> None:
         page = self._page
         if page is None:
             return
         window = page.window
+        coordinator = self._startup_coordinator
+        if coordinator is not None:
+            coordinator.record("show_requested")
         window.visible = True
         page.update()
-        self._run_page_task(self._reveal_window_through_platform_port)
+        await self._confirm_window_visible()
 
-    async def _place_window_before_show(self) -> None:
+    async def _confirm_window_bounds(self) -> None:
         bounds = self._startup_window_bounds
         if bounds is None:
-            self._emit_detailed_log("window_placement reason=startup_bounds_missing applied=False")
             return
         title = self._window_title()
         try:
-            result = await self._window_z_order_port.place_window_before_show(
+            result = await self._window_z_order_port.confirm_window_bounds(
                 title,
                 x=int(round(float(bounds["x"]))),
                 y=int(round(float(bounds["y"]))),
@@ -1322,59 +1424,68 @@ class FletDesktopRendererWindow:
             raise
         except Exception as exc:
             self._emit_detailed_log(
-                f"window_placement reason=port_error exception_type={type(exc).__name__}"
+                "window_bounds_confirmation "
+                f"reason=port_error exception_type={type(exc).__name__}"
             )
             if self._window_z_order_required:
                 logger.warning(
-                    "[DesktopOverlay] Desktop overlay window placement failed: "
+                    "[DesktopOverlay] Desktop overlay window bounds confirmation failed: "
                     "reason=port_error exception_type=%s",
                     type(exc).__name__,
                 )
             return
         self._emit_detailed_log(
-            "window_placement "
-            f"reason={result.reason} applied={result.applied} "
+            "window_bounds_confirmation "
+            f"reason={result.reason} confirmed={result.confirmed} "
             f"title_confirmed={result.title_confirmed} "
             f"bounds_confirmed={result.bounds_confirmed} "
             f"win32_error={result.win32_error}"
         )
-        if self._window_z_order_required and not result.applied:
-            logger.warning(
-                "[DesktopOverlay] Desktop overlay window placement failed: "
-                "reason=%s win32_error=%s",
-                result.reason,
-                result.win32_error,
+        if self._window_z_order_required and not result.confirmed:
+            raise RuntimeError(
+                "desktop overlay canonical bounds were not confirmed: "
+                f"reason={result.reason} win32_error={result.win32_error}"
             )
 
-    async def _reveal_window_through_platform_port(self) -> None:
+    async def _confirm_window_visible(self) -> None:
         title = self._window_title()
+        bounds = self._startup_window_bounds
+        if bounds is None:
+            return
         try:
-            result = await self._window_z_order_port.reveal_window(title)
+            result = await self._window_z_order_port.confirm_window_visible(
+                title,
+                x=int(round(float(bounds["x"]))),
+                y=int(round(float(bounds["y"]))),
+                width=int(round(float(bounds["width"]))),
+                height=int(round(float(bounds["height"]))),
+            )
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             self._emit_detailed_log(
-                f"window_reveal reason=port_error exception_type={type(exc).__name__}"
+                "window_visibility_confirmation "
+                f"reason=port_error exception_type={type(exc).__name__}"
             )
             if self._window_z_order_required:
                 logger.warning(
-                    "[DesktopOverlay] Desktop overlay window reveal failed: "
+                    "[DesktopOverlay] Desktop overlay window visibility confirmation failed: "
                     "reason=port_error exception_type=%s",
                     type(exc).__name__,
                 )
             return
         self._emit_detailed_log(
-            "window_reveal "
-            f"reason={result.reason} applied={result.applied} "
+            "window_visibility_confirmation "
+            f"reason={result.reason} confirmed={result.confirmed} "
             f"title_confirmed={result.title_confirmed} "
             f"visible_confirmed={result.visible_confirmed} "
+            f"bounds_confirmed={result.bounds_confirmed} "
             f"win32_error={result.win32_error}"
         )
-        if self._window_z_order_required and not result.applied:
-            logger.warning(
-                "[DesktopOverlay] Desktop overlay window reveal failed: reason=%s win32_error=%s",
-                result.reason,
-                result.win32_error,
+        if self._window_z_order_required and not result.confirmed:
+            raise RuntimeError(
+                "desktop overlay visibility was not confirmed: "
+                f"reason={result.reason} win32_error={result.win32_error}"
             )
 
     def _window_title(self) -> str:
@@ -1891,10 +2002,7 @@ class FletDesktopRendererWindow:
             f"height={bounds['height']}"
         )
         self._apply_window_bounds_without_rerender(bounds)
-        self._programmatic_bounds_echo_suppression = _ProgrammaticBoundsEchoSuppression(
-            signature=_bounds_signature(bounds),
-            expires_at=time.monotonic() + _PROGRAMMATIC_BOUNDS_ECHO_SUPPRESSION_S,
-        )
+        self._track_programmatic_bounds(bounds)
         self._render_page()
 
     def _apply_window_bounds_without_rerender(self, bounds: dict[str, int | float]) -> None:
@@ -1912,6 +2020,11 @@ class FletDesktopRendererWindow:
             return
         if not _is_window_bounds_event(event):
             return
+        coordinator = self._startup_coordinator
+        if coordinator is None or not coordinator.ready:
+            self._emit_detailed_log("bounds_sample dropped reason=startup_not_ready")
+            return
+        generation = coordinator.generation
         self._emit_detailed_log(
             f"window_event type={getattr(event, 'type', getattr(event, 'data', None))} "
             f"interaction_mode={self._interaction_mode}"
@@ -1922,18 +2035,24 @@ class FletDesktopRendererWindow:
                 f"interaction_mode={self._interaction_mode}"
             )
             return
-        self._run_page_task(self._schedule_bounds_sample)
 
-    async def _schedule_bounds_sample(self) -> None:
-        if self._closed.is_set():
+        async def schedule_bounds_sample() -> None:
+            await self._schedule_bounds_sample(generation)
+
+        self._run_page_task(schedule_bounds_sample)
+
+    async def _schedule_bounds_sample(self, generation: int) -> None:
+        if not self._startup_generation_is_ready(generation):
             return
         await self._cancel_bounds_sample()
-        if self._closed.is_set():
+        if not self._startup_generation_is_ready(generation):
             return
         self._emit_detailed_log(
             f"bounds_sample scheduled interaction_mode={self._interaction_mode}"
         )
-        self._bounds_sample_task = asyncio.create_task(self._emit_debounced_bounds_sample())
+        self._bounds_sample_task = asyncio.create_task(
+            self._emit_debounced_bounds_sample(generation)
+        )
 
     async def _cancel_bounds_sample(self) -> None:
         task = self._bounds_sample_task
@@ -1942,19 +2061,19 @@ class FletDesktopRendererWindow:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
 
-    async def _emit_debounced_bounds_sample(self) -> None:
-        if self._closed.is_set():
+    async def _emit_debounced_bounds_sample(self, generation: int) -> None:
+        if not self._startup_generation_is_ready(generation):
             return
         if self._bounds_debounce_s > 0:
             await asyncio.sleep(self._bounds_debounce_s)
-        if self._closed.is_set():
+        if not self._startup_generation_is_ready(generation):
             return
         bounds = _sample_page_window_bounds(self._page)
         if bounds is None:
             self._emit_detailed_log("bounds_sample dropped reason=no_bounds")
             return
         signature = _bounds_signature(bounds)
-        if self._is_programmatic_bounds_echo(signature):
+        if self._is_programmatic_bounds_echo(signature, generation):
             self._emit_detailed_log(
                 "bounds_sample dropped reason=programmatic_echo "
                 f"x={bounds['x']} y={bounds['y']} width={bounds['width']} "
@@ -1976,7 +2095,6 @@ class FletDesktopRendererWindow:
                 f"height={bounds['height']}"
             )
             return
-        self._programmatic_bounds_echo_suppression = None
         self._last_reported_bounds = signature
         self._emit_detailed_log(
             "bounds_sample emitted source=user persist=True "
@@ -1988,6 +2106,7 @@ class FletDesktopRendererWindow:
                 "event": "window_bounds_changed",
                 "source": "user",
                 "persist": True,
+                "generation": generation,
                 **bounds,
             }
         )
@@ -2027,17 +2146,45 @@ class FletDesktopRendererWindow:
             return
         print(f"[DesktopOverlay][Detail] {message}", flush=True)
 
+    def _track_programmatic_bounds(self, bounds: Mapping[str, int | float]) -> None:
+        coordinator = self._startup_coordinator
+        if coordinator is None or coordinator.retired:
+            return
+        self._programmatic_bounds_signatures.setdefault(coordinator.generation, set()).add(
+            _bounds_signature(bounds)
+        )
+
+    def _startup_generation_is_ready(self, generation: int) -> bool:
+        coordinator = self._startup_coordinator
+        if self._closed.is_set() or coordinator is None:
+            return False
+        if not coordinator.accepts(generation):
+            coordinator.reject("bounds_callback", generation)
+            return False
+        return coordinator.ready
+
     def _is_programmatic_bounds_echo(
         self,
         signature: tuple[float, float, float, float],
+        generation: int,
     ) -> bool:
-        suppression = self._programmatic_bounds_echo_suppression
-        if suppression is None:
+        signatures = self._programmatic_bounds_signatures.get(generation)
+        if not signatures:
             return False
-        if time.monotonic() > suppression.expires_at:
-            self._programmatic_bounds_echo_suppression = None
+        matched = next(
+            (
+                candidate
+                for candidate in signatures
+                if _bounds_signatures_close(signature, candidate)
+            ),
+            None,
+        )
+        if matched is None:
             return False
-        return _bounds_signatures_close(signature, suppression.signature)
+        signatures.discard(matched)
+        if not signatures:
+            self._programmatic_bounds_signatures.pop(generation, None)
+        return True
 
     def _track_scheduled_callback_task(self, task: object) -> None:
         if not isinstance(task, (asyncio.Future, ConcurrentFuture)):
@@ -2395,7 +2542,6 @@ class DesktopOverlayRenderer:
         self._websocket: Any | None = None
         self._tasks: set[asyncio.Task[_RuntimeOutcome | None]] = set()
         self._ui_queue: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
-        self._startup_pending_messages: asyncio.Queue[object] = asyncio.Queue()
         self._last_accepted_snapshot_revision = -1
 
     @property
@@ -2427,13 +2573,37 @@ class DesktopOverlayRenderer:
                 startup_runtime_controls_to_dispatch = prime_startup_runtime_controls(
                     initial_runtime_controls
                 )
+            canonical_bounds_present = any(
+                payload.get("command") == "apply_window_bounds"
+                and _parse_runtime_window_bounds(payload) is not None
+                for payload in initial_runtime_controls
+            )
+            if isinstance(self.window, FletDesktopRendererWindow) and not canonical_bounds_present:
+                raise DesktopOverlayStartupError(
+                    "window_configuration_failed",
+                    "desktop overlay startup requires canonical window bounds",
+                )
             await self.window.start(initial_snapshot)
             self._last_accepted_snapshot_revision = initial_snapshot.revision
             for payload in startup_runtime_controls_to_dispatch:
                 await self.window.dispatch_runtime_control(payload)
             unexpected_startup_failure_reason = "renderer_init_failed"
             self._start_runtime_tasks(websocket)
-            await self._emit_lifecycle({"type": "overlay_ready"})
+            ready_event: dict[str, object] = {"type": "overlay_ready"}
+            ready_event["overlay_instance_id"] = self.manifest.overlay_instance_id
+            startup_generation = getattr(self.window, "startup_generation", 0)
+            if isinstance(startup_generation, int) and startup_generation > 0:
+                ready_event["generation"] = startup_generation
+            if isinstance(startup_generation, int) and startup_generation > 0:
+                _emit_desktop_lifecycle_trace(
+                    "desktop_renderer",
+                    "overlay_ready_emitted",
+                    {
+                        "generation": startup_generation,
+                        "overlay_instance_id": self.manifest.overlay_instance_id,
+                    },
+                )
+            await self._emit_lifecycle(ready_event)
             outcome = await self._wait_for_runtime_outcome()
             return outcome.exit_code
         except DesktopOverlayStartupError as exc:
@@ -2457,9 +2627,14 @@ class DesktopOverlayRenderer:
                 safe_exception_message,
                 safe_exception_traceback,
             )
-            await self._emit_lifecycle(
-                {"type": "startup_error", "failure_reason": unexpected_startup_failure_reason}
-            )
+            failure_event: dict[str, object] = {
+                "type": "startup_error",
+                "failure_reason": unexpected_startup_failure_reason,
+            }
+            startup_phase = getattr(self.window, "startup_phase", None)
+            if isinstance(startup_phase, str):
+                failure_event["startup_phase"] = startup_phase
+            await self._emit_lifecycle(failure_event)
             return _STARTUP_FAILURE_EXIT_CODE
         finally:
             await self.shutdown()
@@ -2470,14 +2645,26 @@ class DesktopOverlayRenderer:
                 return
             self._shutdown_event.set()
 
+            window_closed = False
+            try:
+                await self.window.close()
+            except Exception:
+                pass
+            else:
+                window_closed = True
+            if window_closed:
+                await self._emit_lifecycle(
+                    {
+                        "type": "shutdown_complete",
+                        "overlay_instance_id": self.manifest.overlay_instance_id,
+                    }
+                )
+
             websocket = self._websocket
             self._websocket = None
             if websocket is not None:
                 with contextlib.suppress(Exception):
                     await websocket.close()
-
-            with contextlib.suppress(Exception):
-                await self.window.close()
 
             current_task = asyncio.current_task()
             pending_tasks = [
@@ -2512,11 +2699,6 @@ class DesktopOverlayRenderer:
         self,
         websocket: Any,
     ) -> tuple[OverlayPresentationSnapshot, tuple[dict[str, object], ...]]:
-        snapshot = await self._receive_initial_snapshot(websocket)
-        runtime_controls = await self._drain_startup_runtime_controls(websocket)
-        return snapshot, runtime_controls
-
-    async def _receive_initial_snapshot(self, websocket: Any) -> OverlayPresentationSnapshot:
         timeout_s = max(0.1, self.manifest.startup_deadline_ms / 1000.0)
         try:
             raw_message = await asyncio.wait_for(websocket.recv(), timeout=timeout_s)
@@ -2541,45 +2723,30 @@ class DesktopOverlayRenderer:
                 "desktop overlay initial snapshot is invalid",
             )
         try:
-            return _parse_snapshot_message(message)
+            snapshot = _parse_snapshot_message(message)
         except Exception as exc:
             raise DesktopOverlayStartupError(
                 "renderer_init_failed",
                 "desktop overlay initial snapshot is invalid",
             ) from exc
-
-    async def _drain_startup_runtime_controls(
-        self,
-        websocket: Any,
-    ) -> tuple[dict[str, object], ...]:
+        raw_controls = message.get("startup_runtime_controls")
+        if not isinstance(raw_controls, list):
+            raise DesktopOverlayStartupError(
+                "runtime_control_invalid",
+                "desktop overlay initial runtime controls are not framed with the snapshot",
+            )
         controls: list[dict[str, object]] = []
-        deadline = asyncio.get_running_loop().time() + _INITIAL_RUNTIME_CONTROL_DRAIN_TIMEOUT_S
-        while True:
-            timeout_s = max(0.0, deadline - asyncio.get_running_loop().time())
-            if timeout_s <= 0:
-                break
-            try:
-                raw_message = await asyncio.wait_for(websocket.recv(), timeout=timeout_s)
-            except TimeoutError:
-                break
-            except Exception:
-                break
-            try:
-                message = _load_bridge_message(raw_message)
-            except ValueError:
-                await self._startup_pending_messages.put(raw_message)
-                continue
-            if message.get("type") != "runtime_control":
-                await self._startup_pending_messages.put(raw_message)
-                continue
-            payload = _parse_runtime_control_payload(message)
+        for raw_control in raw_controls:
+            payload = _parse_runtime_control_payload(
+                {"type": "runtime_control", "payload": raw_control}
+            )
             if payload is None:
                 raise DesktopOverlayStartupError(
                     "runtime_control_invalid",
                     "desktop overlay initial runtime control is invalid",
                 )
             controls.append(payload)
-        return tuple(controls)
+        return snapshot, tuple(controls)
 
     def _start_runtime_tasks(self, websocket: Any) -> None:
         self._tasks = {
@@ -2617,11 +2784,6 @@ class DesktopOverlayRenderer:
 
     async def _bridge_reader_loop(self, websocket: Any) -> _RuntimeOutcome:
         try:
-            while not self._startup_pending_messages.empty():
-                raw_message = await self._startup_pending_messages.get()
-                outcome = await self._handle_bridge_message(raw_message)
-                if outcome is not None:
-                    return outcome
             async for raw_message in websocket:
                 outcome = await self._handle_bridge_message(raw_message)
                 if outcome is not None:

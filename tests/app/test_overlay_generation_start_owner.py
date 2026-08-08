@@ -6,15 +6,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
-
-from puripuly_heart.app.services import (
-    overlay_generation_start as overlay_generation_start_module,
-)
 from puripuly_heart.app.services.overlay_generation_start import (
     OverlayGenerationStartDiagnostic,
     OverlayGenerationStartEffects,
     OverlayGenerationStartOwner,
     OverlayGenerationStartRequest,
+)
+
+from puripuly_heart.app.services import (
+    overlay_generation_start as overlay_generation_start_module,
 )
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.resolved import ResolvedOverlayConfig
@@ -100,6 +100,9 @@ class FakeBridge:
     ) -> None:
         self.initial_controls = [dict(control) for control in controls]
         self.events.append("bridge:desktop_controls")
+
+    async def broadcast_shutdown(self) -> None:
+        self.events.append("bridge:shutdown")
 
 
 class FakeProcessManager:
@@ -320,11 +323,13 @@ async def test_owner_assembles_connected_generation_and_hands_off_monitor(
         assert runtime.renderer_events is not None
         assert harness.renderer_calls == ["overlay-instance"]
         assert manager.kwargs["retry_ownership_changed"] is None
+        assert callable(manager.kwargs["graceful_shutdown_request"])
         assert FakeBridge.instances[0].initial_controls[-1]["mode"] == "locked"
         assert "presenter:native_retry:False" not in FakePresenter.events
     else:
         assert runtime.renderer_events is None
         assert harness.renderer_calls == []
+        assert manager.kwargs["graceful_shutdown_request"] is None
         retry = manager.kwargs["retry_ownership_changed"]
         assert retry is not None
         await retry(True)

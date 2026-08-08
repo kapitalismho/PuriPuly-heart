@@ -248,6 +248,7 @@ class OverlayGenerationStartOwner:
                 logging_mode=effects.logging_mode(),
                 diagnostics=diagnostics,
                 task_factory=runtime.create_child_task,
+                graceful_shutdown_request=(bridge.broadcast_shutdown if request.desktop else None),
                 retry_ownership_changed=(
                     None
                     if request.desktop

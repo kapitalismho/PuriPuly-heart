@@ -587,6 +587,65 @@ async def test_overlay_process_manager_terminates_child_on_startup_timeout() -> 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("startup_error", "expected_failure"),
+    [(None, "startup_timeout"), ("renderer_init_failed", "renderer_init_failed")],
+)
+async def test_overlay_process_manager_waits_for_renderer_cleanup_ack_before_escalation(
+    startup_error: str | None,
+    expected_failure: str,
+) -> None:
+    runner = FakeProcessRunner(startup_error=startup_error)
+    shutdown_requests: list[str] = []
+    manager: OverlayProcessManager
+
+    async def request_shutdown() -> None:
+        shutdown_requests.append("requested")
+        process = runner.last_process
+        assert process is not None
+        await process._events.put(
+            {
+                "type": "shutdown_complete",
+                "overlay_instance_id": manager.overlay_instance_id,
+            }
+        )
+        if not process._exit_future.done():
+            process._exit_future.set_result(0)
+
+    manager = OverlayProcessManager(
+        process_runner=runner,
+        startup_timeout_ms=10,
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.2,
+    )
+
+    await manager.start()
+
+    assert manager.state == "failed"
+    assert manager.failure_reason == expected_failure
+    assert shutdown_requests == ["requested"]
+    assert runner.last_process is not None
+    assert runner.last_process.terminated is False
+
+
+@pytest.mark.asyncio
+async def test_overlay_process_manager_native_failure_has_no_desktop_ack_delay() -> None:
+    runner = FakeProcessRunner(startup_error="steamvr_not_running")
+    manager = OverlayProcessManager(
+        process_runner=runner,
+        graceful_shutdown_request=None,
+        graceful_shutdown_timeout_s=60.0,
+    )
+
+    await asyncio.wait_for(manager.start(), timeout=0.2)
+
+    assert manager.state == "failed"
+    assert manager.failure_reason == "steamvr_not_running"
+    assert runner.last_process is not None
+    assert runner.last_process.terminated is True
+
+
+@pytest.mark.asyncio
 async def test_overlay_process_manager_consumes_structured_stdout_events_from_default_runner(
     tmp_path: Path,
 ) -> None:
@@ -1577,6 +1636,78 @@ async def test_retry_ownership_capability_is_conservative_and_renegotiable() -> 
     await manager._fail("runtime_crashed", terminate_process=False)
     assert manager.native_retry_owner_confirmed is False
     assert changes == [True, False, True, False]
+
+
+@pytest.mark.asyncio
+async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -> None:
+    manager = OverlayProcessManager(overlay_instance_id="overlay-current")
+
+    stale = await manager._handle_lifecycle_event(
+        {
+            "type": "overlay_ready",
+            "overlay_instance_id": "overlay-retired",
+            "generation": 1,
+        },
+        allow_ready=True,
+    )
+    accepted = await manager._handle_lifecycle_event(
+        {
+            "type": "overlay_ready",
+            "overlay_instance_id": "overlay-current",
+            "generation": 2,
+        },
+        allow_ready=True,
+    )
+    duplicate = await manager._handle_lifecycle_event(
+        {
+            "type": "overlay_ready",
+            "overlay_instance_id": "overlay-current",
+            "generation": 2,
+        },
+        allow_ready=True,
+    )
+
+    assert (stale, accepted, duplicate) == ("ignored", "ready", "ignored")
+    assert manager._accepted_ready_generation == 2
+
+
+@pytest.mark.asyncio
+async def test_window_bounds_event_rejects_generation_other_than_ready_generation() -> None:
+    events: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    manager = OverlayProcessManager(
+        overlay_instance_id="overlay-current",
+        renderer_events=events,
+    )
+    await manager._handle_lifecycle_event(
+        {
+            "type": "overlay_ready",
+            "overlay_instance_id": "overlay-current",
+            "generation": 4,
+        },
+        allow_ready=True,
+    )
+
+    def bounds_event(generation: int) -> dict[str, object]:
+        return {
+            "type": "overlay_event",
+            "payload": {
+                "event": "window_bounds_changed",
+                "source": "user",
+                "persist": True,
+                "generation": generation,
+                "x": 100,
+                "y": 200,
+                "width": 900,
+                "height": 240,
+            },
+        }
+
+    await manager._handle_lifecycle_event(bounds_event(3), allow_ready=False)
+    assert events.empty()
+
+    current = bounds_event(4)
+    await manager._handle_lifecycle_event(current, allow_ready=False)
+    assert await events.get() == current
 
 
 @pytest.mark.asyncio
