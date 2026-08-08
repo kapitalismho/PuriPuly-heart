@@ -10,8 +10,9 @@ been generated yet, and no stateful model replay has run on episodes.
 Revision history: rev 1 initial bundle (candidate HEAD `22c45dd9`); rev 2 resolves
 P2-001 through P2-013 (candidate `0ad094df`); rev 3 resolves P2-014 through P2-026
 (candidate `02080e1e`); rev 4 resolves P2-027 through P2-032 (candidate `cae36504`);
-rev 5 (this revision) resolves P2-033 through P2-035 per the round-4 review (candidate
-HEAD at review time, confirmed via `git rev-parse HEAD`).
+rev 5 resolves P2-033 through P2-035 (candidate `38babe13`); rev 6 (this revision)
+resolves P2-036 through P2-037 per the round-5 review (candidate HEAD at review time,
+confirmed via `git rev-parse HEAD`).
 
 ## 1. Artifacts under review
 
@@ -138,17 +139,35 @@ With `T` the anchor sample (target sample for hard positives; silence midpoint f
 negatives, computed as `silence_start + (silence_end - silence_start) // 2`, integer
 floor division — frozen, finding P2-007) and `session_end` the wav duration in samples:
 
-- **Detector-chunk alignment rule (frozen, finding P2-033):** all episode window
-  bounds are 512-sample chunk-aligned (`CANONICAL_CHUNK_SAMPLES`, the B0 processing
-  unit). Scored start `S.start = ceil_to_chunk(max(0, T - 5 s))`; scored end
-  `S.end = min(session_end, ceil_to_chunk(min(session_end, T + 5 s)))`; warm-up start
-  `W.start = max(0, floor_to_chunk(scored_start - 5 s))`; tail end
-  `W.end = min(session_end, ceil_to_chunk(scored_end + 3 s))`. The scored region is
-  therefore at least 10 s (rounding up can add up to 511 samples, so scored duration
-  lies in [10.00, 10.03] s for single anchors) and at most 20 s after the Section 4.3
-  cap; warm-up is at least 5 s; the tail is at least 3 s when source context permits.
+- **Centralized chunk-aligned half-open bound calculation (frozen, finding P2-036):**
+  one helper `chunk_aligned_bounds(T, session_end)` computes every episode window
+  bound; no other bound rule exists (single-anchor, merged, and truncated cases all
+  use it). With `last_full_chunk_end = floor_to_chunk(session_end)` (the existing
+  `replay_wav_epoch` semantics drop the final partial chunk, so no boundary can be
+  emitted at or beyond `last_full_chunk_end`):
+  - `scored_start = ceil_to_chunk(max(0, T - 5 s))` (chunk-aligned);
+  - `scored_end = min(ceil_to_chunk(min(session_end, T + 5 s)), last_full_chunk_end)`
+    (chunk-aligned; the annotation-domain scored end may extend into the partial tail,
+    recorded as `unaligned_source_end = true` when `session_end` is not
+    chunk-aligned, with the replay/parity treatment defined below);
+  - `warm_start = floor_to_chunk(max(0, scored_start - 5 s))` (chunk-aligned);
+  - `tail_end = min(session_end, ceil_to_chunk(scored_end + 3 s))` with the same
+    unaligned-source-end rule.
+  - The scored region is therefore at least 10 s (rounding up adds at most 511
+    samples) and at most 20 s after the Section 4.3 cap; warm-up is at least 5 s; the
+    tail is at least 3 s when source context permits.
+- **Unaligned source-end replay/parity treatment (frozen, finding P2-036):** when the
+  session ends inside a chunk, the final partial chunk is **dropped identically in
+  both `source_prefix` and `episode_reset` modes** (existing `replay_wav_epoch`
+  behavior, verified in `vad_baseline.py`), the episode record marks
+  `unaligned_source_end = true`, and the B0 replay domain ends at
+  `last_full_chunk_end`. References whose acceptable intervals lie entirely in the
+  unprocessed partial tail are recorded `tail_unprocessed` and cannot be matched in
+  this phase (they are reference-only; tail semantics are handled by the Phase 5
+  replay machinery).
 - Truncation (session start or end) is **recorded**, never silently accepted:
-  `warmup_truncated = S.start - W.start < 5 s`, `tail_truncated = W.end - S.end < 3 s`.
+  `warmup_truncated = scored_start - warm_start < 5 s`,
+  `tail_truncated = tail_end - scored_end < 3 s`.
 
 ### 4.3 Merging, non-overlap, 30 s cap, and 10-20 s scored rule (findings P2-001, P2-004)
 
@@ -157,11 +176,12 @@ floor division — frozen, finding P2-007) and `session_end` the wav duration in
   deterministic anchor order.
 - **Scored-exposure rule (frozen):** every `scorable` episode must have a scored region
   of at least 10 s and at most 20 s.
-  - Single-anchor episodes: scored region is `[max(0, T - 5 s), min(session_end, T + 5 s)]`;
-    if that region is shorter than 10 s (session too short or end-clipping), the episode
-    is **not scorable**: it is emitted `diagnostic_only` with recorded reason
-    `scored_truncated` (finding P2-004; truncated coverage recorded, never silently
-    accepted).
+  - Single-anchor episodes: scored region and window bounds come from the single
+    centralized `chunk_aligned_bounds(T, session_end)` helper (Section 4.2, finding
+    P2-036); if the resulting scored region is shorter than 10 s (session too short or
+    end-clipping), the episode is **not scorable**: it is emitted `diagnostic_only`
+    with recorded reason `scored_truncated` (finding P2-004; truncated coverage
+    recorded, never silently accepted).
   - Merged episodes: the union of scored regions is capped at 20 s by trimming from the
     end of the union (deterministic). Any selected anchor whose own scored interval
     falls outside the capped scored region is recorded as `coverage_loss` (its target is
@@ -216,29 +236,43 @@ floor division — frozen, finding P2-007) and `session_end` the wav duration in
   be provable from **replay-derived detector progress evidence** (never from annotation
   boundaries alone) before the episode is scorable:
   - `b0/peer`: readiness is frozen as (a) **chunk-aligned scored start** (Section 4.2
-    alignment rule) and (b) **scored-region parity equality** between `source_prefix`
-    and `episode_reset` modes (Section 8.2), which is the empirical proof that no
-    warm-up-derived output appears in the scored region. The B0 safe frontier
-    semantics are exact (finding P2-033): the engine advances
-    `safe_boundary_frontier_sample` to the start of the last fully processed chunk
-    (`vad_baseline.py` progress rows), so after warm-up replay the frontier is
-    `scored_start - 512` and can never reach `scored_start` without processing scored
-    audio. Because a VAD boundary at sample `s` is emitted only while processing chunk
-    `[s, s + 512)`, warm-up replay emits no boundary at or beyond `scored_start`
-    (it processes no chunk starting at/after `scored_start`), and every boundary in
-    the scored region is determined exclusively by scored-region audio replayed
-    identically in both modes — parity equality therefore proves readiness. Scored
-    audio is never used to establish warm-up readiness other than through this
-    PRD-required parity comparison (Section 5.4). The readiness report records the
-    frontier at scored start and the parity result per episode.
+    centralized bound calculation), (b) **pending-start inspection** (below), and
+    (c) **scored-region parity equality** between `source_prefix` and `episode_reset`
+    modes (Section 8.2). The B0 safe frontier semantics are exact (finding P2-033):
+    the engine advances `safe_boundary_frontier_sample` to the start of the last fully
+    processed chunk (`vad_baseline.py` progress rows), so after warm-up replay the
+    frontier is `scored_start - 512` and can never reach `scored_start` without
+    processing scored audio. Because a VAD boundary at sample `s` is emitted only
+    while processing chunk `[s, s + 512)`, warm-up replay emits no boundary at or
+    beyond `scored_start` (it processes no chunk starting at/after `scored_start`),
+    and every boundary in the scored region is determined exclusively by scored-region
+    audio replayed identically in both modes. Scored audio is never used to establish
+    warm-up readiness other than through this PRD-required parity comparison
+    (Section 5.4). The readiness report records the frontier at scored start, the
+    pending-start evidence, and the parity result per episode.
+  - **Pending-start inspection (frozen, finding P2-037):** production `VadGating`
+    retains `_pending_start_id` across chunks (peer start commitment requires
+    `PEER_VAD_START_DEBOUNCE_CHUNKS`/`PEER_VAD_START_COMMIT_CHUNKS` of speech
+    evidence; `gating.py`), so a warm-up-derived pending start can commit at the first
+    scored chunk and emit a boundary at the scored start. The readiness procedure
+    therefore **inspects the pending-start state after the warm-up replay and does
+    not treat parity alone as proof that pending state was absent**: if a pending
+    start exists at the warm-up/scored boundary, warm-up is extended chunk-by-chunk
+    (the scored start advances in 512-sample steps) until the pending start clears
+    (commits or aborts), subject to (i) the anchor remaining inside the scored region
+    and (ii) the scored duration remaining >= 10 s; otherwise the episode is
+    `diagnostic_only` with reason `pending_state_unresolved`. A moved scored start is
+    recorded (`scored_start_extended` with the pending-start evidence: start chunk,
+    cleared chunk, outcome). Committed active VAD state is permitted and retained
+    (Section 5.3); only unresolved pending starts trigger the extension rule.
   - **Pending-state validation (finding P2-034):** committed active VAD state is
     permitted across the scored region (production `VadGating` intentionally retains
     committed segments; Section 5.3 "retain state across all VAD events within the
     scored portion"). The readiness predicate rejects only pending starts/clusters
-    capable of **retrospective** output before the scored frontier: for B0 there are
-    none (VAD emits only at chunk starts as chunks are processed; no retroactive
-    confirmation), and for LS/ERes the predicate is declared at Phase 4 covering
-    confirmation/cluster debounce lookback via the safe-frontier contract.
+    capable of **retrospective** output before the scored frontier: for B0 this is
+    the pending-start inspection above, and for LS/ERes the predicate is declared at
+    Phase 4 covering confirmation/cluster debounce lookback via the safe-frontier
+    contract.
   - `ls_eend/*`, `eres2netv2/*`: declared at Phase 4 when checkpoints are pinned; the
     predicate must cover frontend buffering, neural lookback, confirmation, and cluster
     debounce via the safe-frontier contract (Section 4.10) and is frozen there before
@@ -688,10 +722,13 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
   `source_prefix_required`; the fixture report must show the disposition table complete
   with no untested class used for reset-based scoring (finding P2-008). Safe-frontier
   trace parity (finding P2-017) is part of the failure condition.
-- B0 readiness (chunk-aligned scored start + scored-region parity, findings P2-033,
-  P2-034) cannot be proven for an episode → that episode is `diagnostic_only`; the
-  readiness report must account for every scorable episode. Committed active VAD state
-  alone never triggers this (finding P2-034).
+- B0 readiness (chunk-aligned scored start + pending-start inspection + scored-region
+  parity, findings P2-033, P2-034, P2-037) cannot be proven for an episode → that
+  episode is `diagnostic_only` (`pending_state_unresolved` / `unstable_warmup_frontier`);
+  the readiness report must account for every scorable episode and record the
+  pending-start evidence per episode. Committed active VAD state alone never triggers
+  this (finding P2-034); an unresolved pending start that cannot be cleared within the
+  scored-duration constraint does (finding P2-037).
 - Natural-exposure manifest selection differs from the Phase 1 frame for the opened
   sessions → phase stops (frame was frozen before label inspection; a difference means
   the frame was regenerated).
@@ -758,6 +795,8 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
 | P2-033 | blocker | B0 safe frontier advances only to processed chunk starts; warm-up-only replay cannot reach `frontier >= scored_start` at arbitrary coordinates | resolved in Sections 4.2, 4.4 (512-sample chunk-alignment rule for all window bounds; B0 readiness = chunk-aligned scored start + scored-region parity equality; exact frontier semantics recorded — frontier at scored start is `scored_start - 512` by construction; scored audio never establishes readiness beyond the PRD-required parity comparison) |
 | P2-034 | important | "no in-progress VAD segment" conflated committed VAD state with pending state | resolved in Section 4.4 (committed active VAD state permitted and retained; only pending starts/clusters capable of retrospective output are rejected — none exist for B0; LS/ERes predicate declared at Phase 4) |
 | P2-035 | note | deferred structural taxonomy could be mistaken for complete | resolved in Sections 5.1, 13 (explicit deferral marker `max_duration_and_terminal_deferred_phase3_8` in every Phase 2 manifest/report; later claims involving those actions must cite Phase 3/8 coverage) |
+| P2-036 | blocker | chunk alignment applied inconsistently (single-anchor/merged/truncated cases; unaligned session-end bounds) | resolved in Sections 4.2, 4.3 (single centralized `chunk_aligned_bounds` helper used everywhere; unaligned source end recorded and its replay/parity treatment frozen: partial tail chunk dropped identically in both modes per existing `replay_wav_epoch` semantics; `tail_unprocessed` references recorded) |
+| P2-037 | blocker | scored-region parity alone does not prove pending-start state absent; `VadGating` can retain `_pending_start_id` across the warm-up/scored boundary | resolved in Section 4.4 (pending-start inspection after warm-up replay; warm-up extended chunk-by-chunk until the pending start clears, subject to anchor-in-region and >= 10 s scored constraints; otherwise `diagnostic_only` `pending_state_unresolved`; `scored_start_extended` evidence recorded; committed active VAD state permitted) |
 
 ## 18. Execution and exit-gate note (finding P2-026)
 
