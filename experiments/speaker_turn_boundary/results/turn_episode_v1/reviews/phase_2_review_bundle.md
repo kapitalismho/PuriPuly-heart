@@ -7,9 +7,10 @@ the Phase 1 exit gate was verified (including the approved AMI data addition, ad
 The scored episode/reference manifests and the natural-exposure window manifest have **not**
 been generated yet, and no stateful model replay has run on episodes.
 
-Revision history: rev 1 initial bundle (candidate HEAD `22c45dd9`); rev 2 (this revision)
-resolves P2-001 through P2-013 per the round-1 review (candidate HEAD at review time,
-confirmed via `git rev-parse HEAD`).
+Revision history: rev 1 initial bundle (candidate HEAD `22c45dd9`); rev 2 resolves
+P2-001 through P2-013 (candidate `0ad094df`); rev 3 (this revision) resolves P2-014
+through P2-026 per the round-2 review (candidate HEAD at review time, confirmed via
+`git rev-parse HEAD`).
 
 ## 1. Artifacts under review
 
@@ -42,6 +43,19 @@ confirmed via `git rev-parse HEAD`).
 | `coverage_inventory.json` (bytes) | `02a6a118fc90c0d747e9548f07003177b3fc703f33d408d5338427cb6163dd46` |
 | `coverage_inventory_details.jsonl` (bytes) | `15b2e4f0efa270985c3bbc6d848ee9ed25496089268e561bff921c5c1be3ef8c` |
 | `ami_materialization_manifest.json` (bytes) | `06fe15fff87bb78218df2c086bd711590378f8741164909b59704f56841ab6c9` |
+| `corpus/ami.py` | `e77171299cb7d358f2a3f029e78386d91492e94e49ca683bac90ac5173c4d0dc` |
+| `corpus/alimeeting.py` | `f69b733c703e0060245a2d9229258caddc602238c18c7c242570713670ea929a` |
+| `corpus/librispeech.py` | `05b77dc735f572da37da0c9ebe595415f5acf4b5c40bd22e3f792dd31402d1f4` |
+| `corpus/external.py` | `262d40233371905e6a6fac2efee2da1412c6d6df44d91ea4eb8fd2220ba21b56` |
+| `corpus/mixing.py` | `ffd707787003051f5e95e9dabb70afb4eb675b970461e75cd6c062d7f121abc6` |
+| `corpus/puripuly_like.py` | `5f5df4ce0879bd5f7ffa35d571e700852a490803bd966c9f7a90c0f4ee848642` |
+| `corpus/validation.py` | `66d863a0ada96fcc765097dd574ea4b2edfc5eed6ed873aee13df34d65ff964d` |
+| `data/manifests/ls_dev.json` | `14347cdbdb2eff4cc73489f1b59d6755723d9098089dad66ae222984e90370dd` |
+| `data/manifests/ls_held_out_clean.json` | `c0aabc5ad8c3f00ec53d45f3b372b8ebca7ca9237720a1bb7a70b8de7dda2581` |
+| `data/manifests/ls_held_out_other.json` | `f0d169394a9fdee9e708bc9cad46c0547946bf967799fa4e2e1a398ddb984079` |
+| `data/manifests/mixed_dev_pool.json` | `1221176c92f50a2b096e4cd64d5da0168527918e3fba539273c614eabf07a398` |
+| `proposal_contract.json` | `0448edd933fd1d9d0a0b4d5f9f2631cb0f630c892fc4d46e1a3ec9740e80b7fb` |
+| `fusion_contract.json` | `bfda0c3c0ea7b6613ded79e9639692a33449dcf34202b1f2a5e7ec14c45f9873` |
 
 Any change to these inputs invalidates the Phase 2 outputs bound to them; the Phase 2
 manifests record these hashes in their provenance headers.
@@ -157,13 +171,20 @@ floor division — frozen, finding P2-007) and `session_end` the wav duration in
     target inside the window (Section 5.1); the split candidate nearest the window
     midpoint is chosen (earliest on ties). Both parts must again satisfy the scored
     rule; a part that cannot is emitted `diagnostic_only` with recorded reason.
-  - **If no valid split candidate exists, the merged window is never kept as one
-    scorable episode over 30 s (finding P2-001).** Instead the episode fails closed:
-    the anchors are re-bucketed in deterministic order so that each resulting full
-    window ≤ 30 s (first-fit in anchor order), every bucketed part satisfying the
-    scored rule is scorable, and any part that cannot satisfy the scored rule is
-    emitted `diagnostic_only` with `coverage_loss` recorded. The builder asserts that
-    no `scorable` episode exceeds 30 s and fails closed otherwise.
+  - **If no valid split candidate exists, a deterministic re-bucketing algorithm
+    (frozen, finding P2-015) runs instead:** anchors of the merged group are kept in
+    sorted order; the last anchor of the group is removed (with `coverage_loss`
+    reason `no_split_point`) and the union re-computed; this repeats until the union is
+    <= 30 s. Removed anchors are **never emitted** as episodes (no overlap can be
+    created by them). The kept group emits one episode. This is applied per merged
+    group; the resulting emitted episodes are pairwise disjoint **by construction**
+    (each group's emitted window is the union of kept anchors <= 30 s and no other
+    episode contains samples of removed anchors) **and** the builder additionally
+    asserts pairwise disjointness of all emitted episodes within the pool, failing
+    closed on any violation. If the disjointness assertion cannot be satisfied for a
+    group even after tail-removal, the whole group is emitted `diagnostic_only` with
+    `coverage_loss` for every anchor (fail-closed, never a > 30 s or overlapping
+    scorable episode).
 - **Invariant (fails closed):** after merging, no two scored episodes within the same
   pool share any source sample (Section 5.1 "no source sample appears in more than one
   scored episode within the same pool"). Episodes from different sessions can never
@@ -185,14 +206,19 @@ floor division — frozen, finding P2-007) and `session_end` the wav duration in
   reference or stable overlap interval; else `hard_only` if it contains clean/gap hard
   references; else `negative_only`. Precedence: `overlap_present` > `hard_only` >
   `negative_only`.
-- **Scoring-start readiness predicate (frozen, finding P2-002):** per family/profile
-  class, a frozen predicate `scoring_start_ready(class, episode)` must be provable from
-  deterministic information before the episode is scorable:
-  - `b0/peer`: `warmup >= 5000 ms` (covers the 500 ms pre-roll ring and 500 ms hangover
-    with a deterministic margin) **and** the last speech-region boundary before the
-    scored start lies at least 1000 ms before it (i.e., no VAD hangover segment can
-    produce a boundary inside the scored region from warm-up audio). If not provable,
-    the episode is `diagnostic_only` with reason `unstable_warmup_frontier`.
+- **Scoring-start readiness predicate (frozen, finding P2-002, P2-016):** per
+  family/profile class, a frozen predicate `scoring_start_ready(class, episode)` must
+  be provable from **replay-derived detector progress evidence** (never from annotation
+  boundaries alone) before the episode is scorable:
+  - `b0/peer`: after replaying the declared warm-up in `episode_reset` mode, the
+    engine's DetectorProgress must show `safe_boundary_frontier_sample <= scored_start`
+    at the scored start (PRD Section 4.10 semantics: no pending VAD segment, pre-roll,
+    or hangover can emit a boundary inside the scored region from warm-up audio), with
+    the progress trace validated monotonic and conservative (invariant 35). If the
+    safe frontier cannot be proven at or before the scored start, the episode is
+    `diagnostic_only` with reason `unstable_warmup_frontier`. The readiness predicate
+    therefore runs the same replay machinery as the state-equivalence test (Section 8)
+    and is derived from the same evidence.
   - `ls_eend/*`, `eres2netv2/*`: declared at Phase 4 when checkpoints are pinned; the
     predicate must cover frontend buffering, neural lookback, confirmation, and cluster
     debounce via the safe-frontier contract (Section 4.10) and is frozen there before
@@ -218,11 +244,21 @@ floor division — frozen, finding P2-007) and `session_end` the wav duration in
 
 A **new reference builder** (`turn_episode/build_episodes.py::ReferenceBuilder`, finding
 P2-005) walks the per-session region timeline (`SpeakerRegion` sequence from the Phase 1
-inventory) and produces the **complete** reference taxonomy. The Phase 1 classifier
-(`_classify_targets`) remains the inventory-count authority; the Phase 2 builder is the
-authoritative per-episode reference source and is independently re-derived by the audit
-(Section 11). The builder preserves every discarded/ambiguous pattern as an explicit
-reference (finding P2-005):
+inventory) **plus raw annotation records** (finding P2-018) and produces the
+**complete** Phase 2 taxonomy. The Phase 1 classifier (`_classify_targets`) remains the
+inventory-count authority; the Phase 2 builder is the authoritative per-episode
+reference source and is independently re-derived by the audit (Section 11). The builder
+preserves every discarded/ambiguous pattern as an explicit reference (finding P2-005):
+
+- **Raw annotation input (finding P2-018):** because the existing AMI parser discards
+  words lacking timing (they never reach the `SpeakerRegion` timeline), the builder
+  additionally consumes the raw annotation records — AMI `words.xml` word elements
+  (with and without timing) and AliMeeting TextGrid interval records — and derives
+  explicit `unscored` intervals from (a) words/spans lacking timing, (b) ambiguous
+  regions, (c) missing speaker coverage, and (d) channel-misalignment/coverage gaps
+  declared by the corpus parser. Missing annotation coverage is thereby distinguished
+  from true silence in the timelines (finding P2-018); the audit (Section 11)
+  re-derives the same taxonomy directly from the raw annotation files.
 
 ### 5.1 Reference kinds (frozen)
 
@@ -233,7 +269,7 @@ reference (finding P2-005):
 | interruption `{A}->{A,B}` | `soft_overlap_marker` | B onset | `[B onset - 500 ms, B onset]` | B onset | no |
 | departure `{A,B}->{B}` (`speaker_left`) | `state_update` | None | `[change sample, change sample]` | change sample | no |
 | same-speaker pause `{A}->{}->{A}` | `neutral_pause` | None | `[A offset, A next onset]` | next onset | no |
-| structural (session start, episode edges; VAD max-duration and terminal flushes deferred to Phase 3/8) | `structural` | boundary sample | `[sample, sample]` | sample | no |
+| structural (session start, episode edges — Phase 2 scope; VAD max-duration and terminal flushes **explicitly excluded** from Phase 2 timelines/scoring, deferred to Phase 3/8) | `structural` | boundary sample | `[sample, sample]` | sample | no |
 | unscored (ambiguous region, missing speaker coverage, channel misalignment, insufficient/missing word timing) | `unscored` | None | covering interval | interval start | no |
 
 - The builder derives departures (`{A,B}->{B}`) and same-speaker pauses that the Phase 1
@@ -254,16 +290,25 @@ reference (finding P2-005):
   P2-007): a region that is singleton same-speaker or empty (silence), `duration >=
   100 ms`, `not ambiguous`, and whose boundary lies at least 2 s (2000 ms) from every
   hard/soft target inside the window.
-- Episode edges and the session start produce `structural` references (Phase 2 scope;
-  VAD max-duration and terminal flush finalization semantics stay deferred to Phase
-  3/8 per Phase 1 finding P1-B0-003).
+- Episode edges and the session start produce `structural` references. VAD
+  maximum-duration and terminal-flush structural references are **explicitly excluded
+  from Phase 2 timelines and scoring** and deferred to Phase 3/8 (finding P2-021):
+  Phase 2 does not claim a complete structural taxonomy; the deferral is recorded in
+  the manifest header.
 
 ### 5.2 Episode timeline
 
 Per episode: references whose acceptable interval or target intersects the episode's
-scored region. References in the warm-up region are excluded from the reference
-timeline entirely (Section 5.3 "exclude warm-up actions and references from headline
-counts"; warm-up is unscored by construction). Each reference carries
+scored region, with **half-open scored clipping** (finding P2-024): a reference is
+included iff its acceptable interval intersects `[scored_start, scored_end)` in
+half-open terms and its target/evidence onset >= scored_start; an interval crossing
+the warm-up/scored boundary is clipped to `[max(interval.start, scored_start),
+interval.end]` for matching; a reference whose target lies in warm-up is not scored
+(recorded `warmup_excluded`). **All warm-up actions are rejected before matching**
+(invariant 12): any final action with boundary < scored_start can never match any
+reference in the episode. References in the warm-up region are excluded from the
+reference timeline entirely (Section 5.3 "exclude warm-up actions and references from
+headline counts"; warm-up is unscored by construction). Each reference carries
 `episode_pool_tag` matching its episode tag and `scorable` matching the episode status.
 
 Synthetic episodes (complete cases from the Phase 1 manifests `ls_dev`,
@@ -273,25 +318,43 @@ manifest case regions by the same ReferenceBuilder and audited (Sections 5.3, 11
 finding P2-011). The Phase 1 synthetic manifests are the independent annotation
 authority for synthetic cases.
 
+**Real-recording exclusion (frozen, finding P2-014):** `mixed_dev_pool.json` contains
+two complete real AMI recordings (`ami_ES2003a`, `ami_IS1008a`, wav paths under
+`ami/audio/...`). These cases are **excluded from synthetic registration**: their
+source samples are already covered by the public sessions ES2003a/IS1008a (scorable
+pilot sessions), so registering them as `synthetic:mixed_dev_pool` would place the same
+source samples in two pools and violate Section 16.4 group-disjointness and the
+non-overlap invariant. Frozen rule: any manifest case whose `wav_relative_path` starts
+with `ami/` or `alimeeting/` is not registered as synthetic; it is recorded in the
+manifest header as `excluded_real_recording` with its source-session id, and its source
+session binds to the corresponding public session component (already covered). The
+remaining 202 `mixed_dev_pool` cases are synthetic and registered under
+`synthetic:mixed_dev_pool`. The builder asserts that no registered episode's source
+samples overlap any other registered episode's source samples within the same pool
+(fail-closed, invariant 29).
+
 ### 5.3 Determinism and provenance (findings P2-010, P2-011)
 
 - Reference ids: `"{session_id}:{episode_id}:{gt_index}"` (hard/soft) /
   `"{session_id}:{episode_id}:pause:{rank}"` / `...:departure:{index}` /
   `...:structural:{index}` / `...:unscored:{index}` — unique, deterministic.
-- **Episode id (frozen, finding P2-010):**
+- **Episode id (frozen, finding P2-010, P2-019):**
   `"{pool}:{session_id}:{scored_start}:{scored_end}:{anchor_suffix}"` where
-  `anchor_suffix` is the sorted `gt_index` list of the episode's anchors joined by `'.'`
-  (empty for natural windows). The id never contains wall-clock or iteration-order
-  data.
-- **Non-circular hashing (frozen, finding P2-010):** each episode's content hash is the
-  SHA-256 of the canonical JSON of its own payload (no self-reference). The manifest
-  content hash is the SHA-256 of the canonical JSON of the payload excluding the
-  manifest's own `content_sha256` field (same scheme as `coverage_inventory.json`),
-  where the per-episode hash is part of the payload — the per-episode hash never
-  includes the manifest hash, so no circularity is possible.
+  `anchor_suffix` is the sorted list of **typed anchor ids** joined by `'.'`:
+  `p{gt_index}` for hard-positive anchors and `n{rank}` for negative anchors (negative
+  anchors carry `rank`, not `gt_index`, in the Phase 1 selection — finding P2-019);
+  empty for natural windows. The id never contains wall-clock or iteration-order data.
+- **Non-circular hashing (frozen, finding P2-010, P2-019):** each episode's content
+  hash is the SHA-256 of the canonical JSON of its own payload (no self-reference).
+  The manifest content hash is the SHA-256 of the canonical JSON of the payload
+  **excluding both the manifest's own `content_sha256` field and every per-episode
+  `episode_manifest_id` field** (same scheme as `coverage_inventory.json`). The
+  per-episode hash never includes the manifest hash, so no circularity is possible.
 - Per-episode manifest identity recorded in each episode: `episode_manifest_id` =
-  `episode_manifest_dev.json:<content_sha256>` computed after the payload hashes, so
-  the cache contract (Section 27.2) binds a deterministic manifest identity.
+  `episode_manifest_dev.json:<content_sha256>` is **filled after** the manifest content
+  hash is computed and is stored as a non-hashed annotation field (finding P2-019), so
+  the cache contract (Section 27.2) binds a deterministic manifest identity without
+  circular hashing.
 
 ## 6. Gap interval-valued matching and overlap exclusion (Sections 12.1-12.2, 13.4-13.5)
 
@@ -301,13 +364,18 @@ matcher** (finding P2-006), not just interval membership:
 - **Eligibility (Section 12.1):** a final action matches a reference only if (1) source
   session and epoch agree; (2) action kind is compatible (`hard_boundary` actions match
   hard references, soft markers match soft references); (3) the boundary lies within the
-  acceptable interval **expanded by the localization tolerance** (primary 500 ms, view
-  250 ms) — for gap targets any boundary inside `[A speech offset, B onset]` matches
-  with zero localization error, distance to the nearest interval edge outside it
-  (Section 6.2, invariant 7); (4) detector-derived evidence was not available before
+  reference's stored acceptable interval — **the acceptable interval is the final
+  tolerance-encoded eligibility window, applied exactly once (finding P2-020):** for
+  clean targets the interval `[B onset - 500 ms, B onset]` already encodes the declared
+  500 ms localization tolerance (Section 6.1, same semantics as the Phase 1 B0
+  classification rule), and the matcher does **not** expand it a second time; for gap
+  targets any boundary inside `[A speech offset, B onset]` matches with zero
+  localization error, distance to the nearest interval edge outside it (Section 6.2,
+  invariant 7); (4) detector-derived evidence was not available before
   detector-evidence onset (B onset; invariant 8); (5) availability meets the declared
   deadline (250/500/1000/1500/2000 ms); (6) ordered one-to-one matching is preserved
-  (invariant 6).
+  (invariant 6). Edge fixtures test boundaries at exactly and just beyond each interval
+  edge (finding P2-020).
 - **Gap pre-existing VAD validity (invariant 9):** a VAD-owned action inside a gap
   acceptable interval is valid product separation even when available before B onset;
   it is reported `pre-existing` rather than rejected, and detector recovery credit
@@ -369,11 +437,11 @@ not just boundary pairs):
 
 - B0: (a) raw boundary trace within the scored region — `(boundary_source_sample,
   observed_source_sample_at_emit)` identity, exact match on the canonical projection
-  (tolerance 0); (b) **safe-frontier progression** — per-boundary
-  `boundary_source_sample <= observed_source_sample_at_emit` and monotonic
-  `observed_source_sample_at_emit` over the epoch, derived from the replay's trace
-  (DetectorProgress rows are emitted by the fixture's re-run; Phase 1 evidence did not
-  retain them, which is why the parity re-runs B0 in both modes);
+  (tolerance 0); (b) **DetectorProgress safe-frontier trace (finding P2-017)** — the
+  aligned `(observed_source_sample, safe_boundary_frontier_sample)` rows within the
+  scored region are compared and hashed exactly between the two modes, with
+  monotonicity of observed and safe frontiers and `safe_boundary_frontier_sample <=
+  observed_source_sample` validated per row (Section 4.10, invariant 35);
   (c) boundary count and `trace_hash` over the scored region.
 - LS/ERes (declared now, executed Phase 4): raw LS posteriors (max L1 over aligned
   frames in the scored region <= 1e-2), ERes embeddings/similarity (aligned-window
@@ -429,13 +497,18 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
   deterministic, corpus-stratified, and asserts that no component is split across pools
   (invariant 27). Synthetic manifests (`ls_dev`, `ls_held_out_clean`, `ls_held_out_other`,
   `mixed_dev_pool`) are assigned wholly to `diagnostic_dev` (groups `synthetic:<name>`).
-- **Historical label carried through (finding P2-012):** each session and episode
-  records its historical status (`dev_pilot` / `held_out_pilot` / `untouched` from the
-  Phase 1 inventory). Historical (previously touched) evidence is development-usable
-  but is excluded from every confirmatory/panel claim path: the manifest header and
-  later Phase 6 panel construction must assert that no panel/confirmatory selection
-  uses a session whose historical status is not `untouched` plus the Phase 6-7
-  approved held-out set.
+- **Historical label carried through (findings P2-012, P2-023):** each session and
+  episode records its historical status from a frozen normalized set:
+  `dev_pilot` (previously touched development), `held_out_pilot` (previously touched
+  held-out — historical validation only), `dev_added` (newly materialized development
+  additions, never previously touched — normalized as fresh development evidence and
+  eligible for panel/development use), `untouched` (reserved, unopened). Historical
+  (previously touched) evidence is development-usable but is excluded from every
+  confirmatory/panel claim path: the manifest header and later Phase 6 panel
+  construction must assert that no confirmatory selection uses a session whose
+  historical status is not `untouched` plus the Phase 6-7 approved held-out set, and
+  that `dev_added`/`dev_pilot`/`held_out_pilot` sessions never enter confirmatory
+  claims.
 - Cross-split overlap fails closed (invariant 29): the manifest generator asserts, per
   session and per episode, that all episodes of a session belong to exactly one pool and
   that the group graph hash bound in Phase 1 is unchanged.
@@ -462,6 +535,15 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
 - Natural windows are replayed with the same bounded replay machinery and
   state-equivalence contract (Section 16.4); five-minute/session/source-hour rates may
   be estimated only from this pool (invariant 30), and Phase 2 does not estimate them.
+- **Natural-window subrange mapping (frozen, finding P2-022):** a natural window is a
+  30 s unit whose full window equals its scored region — `W = S = [start_ms, start_ms
+  + 30 s]` (clipped at session end), warm-up and tail are recorded as
+  `warmup_truncated=true` / `tail_truncated=true` (zero-length). The Section 5.1
+  10-20 s scored rule and the target-enriched warm-up/tail defaults apply to
+  target-enriched episodes only; natural windows are scored over their full extent
+  with the zero warm-up/tail explicitly recorded, never silently assumed. Natural
+  windows therefore do not claim the 5 s warm-up / 3 s tail construction; their scored
+  denominator is the full window (sampled vs eligible recorded).
 - Natural window episode ids follow the frozen format (Section 5.3) with
   `anchor_suffix` empty and `pool = natural_exposure_validation`.
 
@@ -532,7 +614,10 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
 - Any cross-pool source-sample overlap, any session assigned to two pools, any
   component split across pools, or any change to the Phase 1 group graph hash → phase
   stops, fails closed.
-- Non-overlap assertion among scored episodes within a pool fails → phase stops.
+- Non-overlap assertion among scored episodes within a pool fails (including the
+  re-bucketing disjointness assertion, finding P2-015) → phase stops.
+- Any registered synthetic case whose wav path resolves under `ami/` or `alimeeting/`
+  (real-recording exclusion, finding P2-014) → phase stops.
 - Any `scorable` episode with total duration > 30 s, or scored region < 10 s or > 20 s,
   or a `diagnostic_only` episode that still contributes to a scored numerator → phase
   stops (findings P2-001, P2-004).
@@ -542,7 +627,11 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
 - Audit sample mismatch (waveform bytes or annotation re-derivation) → phase stops.
 - B0 state-equivalence failure for the `b0/peer` class → that class is recorded
   `source_prefix_required`; the fixture report must show the disposition table complete
-  with no untested class used for reset-based scoring (finding P2-008).
+  with no untested class used for reset-based scoring (finding P2-008). Safe-frontier
+  trace parity (finding P2-017) is part of the failure condition.
+- B0 readiness predicate cannot be proven from replay-derived safe-frontier evidence
+  (finding P2-016) for an episode → that episode is `diagnostic_only`; the readiness
+  report must account for every scorable episode.
 - Natural-exposure manifest selection differs from the Phase 1 frame for the opened
   sessions → phase stops (frame was frozen before label inspection; a difference means
   the frame was regenerated).
@@ -587,3 +676,27 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
 | P2-011 | important | synthetic episodes lacked an audit authority | resolved in Sections 5.2, 11 (synthetic manifests as independent authority; synthetic references audited) |
 | P2-012 | note | historical label not carried through splits | resolved in Section 9 (historical status per session/episode; excluded from confirmatory/panel claims) |
 | P2-013 | note | code/config/input hash ledger missing | resolved in Section 1.1 (full SHA-256 ledger) |
+| P2-014 | blocker | `mixed_dev_pool` contains complete real AMI recordings (ES2003a, IS1008a) but was assigned to `diagnostic_dev` as synthetic, creating cross-pool source overlap | resolved in Section 5.2 (real-recording exclusion rule: cases with wav under `ami/`/`alimeeting/` are not registered as synthetic; recorded as `excluded_real_recording`; fail-closed no-overlap assert) |
+| P2-015 | blocker | first-fit re-bucketing could create overlapping buckets | resolved in Section 4.3 (tail-removal re-bucketing that never emits removed anchors; pairwise-disjoint by construction plus fail-closed assertion; unresolvable groups -> diagnostic_only) |
+| P2-016 | blocker | B0 readiness used annotation boundaries, not detector pending state | resolved in Section 4.4 (replay-derived DetectorProgress safe-frontier <= scored_start; unprovable -> diagnostic_only `unstable_warmup_frontier`) |
+| P2-017 | blocker | B0 parity did not compare `safe_boundary_frontier_sample` values | resolved in Section 8.2 (aligned (observed, safe-frontier) trace compared and hashed exactly; monotonic/conservative validation per row, invariant 35) |
+| P2-018 | blocker | region-only builder cannot recover words lacking timing (AMI parser discards them) | resolved in Section 5 (builder consumes raw annotation records plus regions; missing-timing spans become explicit unscored intervals; audit re-derives from raw files) |
+| P2-019 | blocker | negative anchors lack gt_index (colliding/undefined episode ids); manifest hash circularity via episode_manifest_id | resolved in Section 5.3 (typed anchor ids `p{gt_index}`/`n{rank}`; manifest hash excludes content_sha256 AND per-episode episode_manifest_id; id filled post-hash as non-hashed annotation) |
+| P2-020 | important | tolerance applied twice (interval + expansion) | resolved in Section 6 (acceptable interval is the final tolerance-encoded window, applied once; edge fixtures at/just beyond boundaries) |
+| P2-021 | important | deferred structural taxonomy contradicted "complete" claim | resolved in Sections 5.1 (VAD max-duration/terminal structural excluded from Phase 2, deferral recorded, no completeness claim) |
+| P2-022 | important | natural windows lacked warmup/scored/tail mapping | resolved in Section 10 (natural window: full window = scored region; zero warm-up/tail recorded as truncated; 10-20 s rule is target-enriched-only) |
+| P2-023 | important | historical status contract omitted `dev_added` | resolved in Section 9 (frozen normalized status set {dev_pilot, held_out_pilot, dev_added, untouched}; dev_added = fresh development evidence; confirmatory = untouched only) |
+| P2-024 | important | warm-up/scored boundary crossing intervals undefined; warm-up actions could match | resolved in Section 5.2 (half-open scored clipping; clipped intervals; targets in warm-up not scored; all warm-up actions rejected before matching, invariant 12) |
+| P2-025 | note | provenance ledger omitted corpus parsers, synthetic manifests, contracts | resolved in Section 1.1 (full ledger: corpus parsers, all synthetic manifests, proposal/fusion contracts) |
+| P2-026 | note | implementations are prospective, not execution evidence | acknowledged (Section 18): implementation artifacts are produced only after approval and independently verified at the Phase 2 exit gate |
+
+## 18. Execution and exit-gate note (finding P2-026)
+
+- The modules named in this bundle (`build_episodes.py`, `state_equivalence.py`,
+  `scoring.py`, `audit.py`) and the scored manifests do not exist yet. This bundle is a
+  pre-execution design review: the Phase 2 reviewer examines the **frozen rules** above
+  before any scored episode/reference generation (PRD Section 29 Phase 2 timing).
+- Implementation proceeds only after the review verdict is `approved`; the Phase 2 exit
+  gate then independently verifies the actual artifacts (manifests, state-equivalence
+  report, scoring fixture report, audit report) against this bundle and the PRD.
+| P2-026 | note | implementations are prospective, not execution evidence | acknowledged (Section 18): implementation artifacts are produced only after approval and independently verified at the Phase 2 exit gate |
