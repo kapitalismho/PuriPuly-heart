@@ -1,0 +1,5893 @@
+{
+  "code_hashes": {
+    "inventory_script": "5271527cf8a8b0551fcf4929a7268b2a8569604cc961b55442f125445b380808",
+    "silero_model": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+    "vad_baseline": "7a3965fdb01eb7391dde985e5c498162d80b4e5ab565205626d684a66d8ff627"
+  },
+  "completed_materialized_sessions": [
+    "alimeeting_R8001_M8004",
+    "alimeeting_R8003_M8001",
+    "alimeeting_R8007_M8010",
+    "alimeeting_R8007_M8011",
+    "alimeeting_R8008_M8013",
+    "alimeeting_R8009_M8018",
+    "alimeeting_R8009_M8019",
+    "alimeeting_R8009_M8020",
+    "ami_ES2003a",
+    "ami_ES2004a",
+    "ami_IS1008a",
+    "ami_IS1009a"
+  ],
+  "completeness": {
+    "complete": true,
+    "missing": []
+  },
+  "content_sha256": "072dee12f5f3302d8cf6b047babefef186ab76908a7206a538bb751a7c41b4e9",
+  "corpus_root": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora",
+  "expected_materialized_sessions": [
+    "alimeeting_R8001_M8004",
+    "alimeeting_R8003_M8001",
+    "alimeeting_R8007_M8010",
+    "alimeeting_R8007_M8011",
+    "alimeeting_R8008_M8013",
+    "alimeeting_R8009_M8018",
+    "alimeeting_R8009_M8019",
+    "alimeeting_R8009_M8020",
+    "ami_ES2003a",
+    "ami_ES2004a",
+    "ami_IS1008a",
+    "ami_IS1009a"
+  ],
+  "group_graph": {
+    "component_sessions": {
+      "EN2001a.ParticipantA|EN2001a.ParticipantB|EN2001a.ParticipantC|EN2001a.ParticipantD|EN2001a.ParticipantE": [
+        "ami_annot_EN2001a"
+      ],
+      "EN2001b.ParticipantA|EN2001b.ParticipantB|EN2001b.ParticipantC|EN2001b.ParticipantD": [
+        "ami_annot_EN2001b"
+      ],
+      "EN2001d.ParticipantA|EN2001d.ParticipantB|EN2001d.ParticipantC|EN2001d.ParticipantD|EN2001d.ParticipantE": [
+        "ami_annot_EN2001d"
+      ],
+      "EN2001e.ParticipantA|EN2001e.ParticipantB|EN2001e.ParticipantC|EN2001e.ParticipantD|EN2001e.ParticipantE": [
+        "ami_annot_EN2001e"
+      ],
+      "EN2002a.ParticipantA|EN2002a.ParticipantB|EN2002a.ParticipantC|EN2002a.ParticipantD": [
+        "ami_annot_EN2002a"
+      ],
+      "EN2002b.ParticipantA|EN2002b.ParticipantB|EN2002b.ParticipantC|EN2002b.ParticipantD": [
+        "ami_annot_EN2002b"
+      ],
+      "EN2002c.ParticipantA|EN2002c.ParticipantB|EN2002c.ParticipantC": [
+        "ami_annot_EN2002c"
+      ],
+      "EN2002d.ParticipantA|EN2002d.ParticipantB|EN2002d.ParticipantC|EN2002d.ParticipantD": [
+        "ami_annot_EN2002d"
+      ],
+      "EN2003a.ParticipantA|EN2003a.ParticipantB|EN2003a.ParticipantC": [
+        "ami_annot_EN2003a"
+      ],
+      "EN2004a.ParticipantA|EN2004a.ParticipantB|EN2004a.ParticipantC|EN2004a.ParticipantD": [
+        "ami_annot_EN2004a"
+      ],
+      "EN2005a.ParticipantA|EN2005a.ParticipantB|EN2005a.ParticipantC|EN2005a.ParticipantD": [
+        "ami_annot_EN2005a"
+      ],
+      "EN2006a.ParticipantA|EN2006a.ParticipantB|EN2006a.ParticipantC|EN2006a.ParticipantD": [
+        "ami_annot_EN2006a"
+      ],
+      "EN2006b.ParticipantA|EN2006b.ParticipantB|EN2006b.ParticipantC|EN2006b.ParticipantD": [
+        "ami_annot_EN2006b"
+      ],
+      "EN2009b.ParticipantA|EN2009b.ParticipantB|EN2009b.ParticipantC": [
+        "ami_annot_EN2009b"
+      ],
+      "EN2009c.ParticipantA|EN2009c.ParticipantB|EN2009c.ParticipantC": [
+        "ami_annot_EN2009c"
+      ],
+      "EN2009d.ParticipantA|EN2009d.ParticipantB|EN2009d.ParticipantC|EN2009d.ParticipantD": [
+        "ami_annot_EN2009d"
+      ],
+      "ES2002a.ParticipantA|ES2002a.ParticipantB|ES2002a.ParticipantC|ES2002a.ParticipantD": [
+        "ami_annot_ES2002a"
+      ],
+      "ES2002b.ParticipantA|ES2002b.ParticipantB|ES2002b.ParticipantC|ES2002b.ParticipantD": [
+        "ami_annot_ES2002b"
+      ],
+      "ES2002c.ParticipantA|ES2002c.ParticipantB|ES2002c.ParticipantC|ES2002c.ParticipantD": [
+        "ami_annot_ES2002c"
+      ],
+      "ES2002d.ParticipantA|ES2002d.ParticipantB|ES2002d.ParticipantC|ES2002d.ParticipantD": [
+        "ami_annot_ES2002d"
+      ],
+      "ES2003a.ParticipantA|ES2003a.ParticipantB|ES2003a.ParticipantC|ES2003a.ParticipantD": [
+        "ami_ES2003a"
+      ],
+      "ES2003b.ParticipantA|ES2003b.ParticipantB|ES2003b.ParticipantC|ES2003b.ParticipantD": [
+        "ami_annot_ES2003b"
+      ],
+      "ES2003c.ParticipantA|ES2003c.ParticipantB|ES2003c.ParticipantC|ES2003c.ParticipantD": [
+        "ami_annot_ES2003c"
+      ],
+      "ES2003d.ParticipantA|ES2003d.ParticipantB|ES2003d.ParticipantC|ES2003d.ParticipantD": [
+        "ami_annot_ES2003d"
+      ],
+      "ES2004a.ParticipantA|ES2004a.ParticipantB|ES2004a.ParticipantC|ES2004a.ParticipantD": [
+        "ami_ES2004a"
+      ],
+      "ES2004b.ParticipantA|ES2004b.ParticipantB|ES2004b.ParticipantC|ES2004b.ParticipantD": [
+        "ami_annot_ES2004b"
+      ],
+      "ES2004c.ParticipantA|ES2004c.ParticipantB|ES2004c.ParticipantC|ES2004c.ParticipantD": [
+        "ami_annot_ES2004c"
+      ],
+      "ES2004d.ParticipantA|ES2004d.ParticipantB|ES2004d.ParticipantC|ES2004d.ParticipantD": [
+        "ami_annot_ES2004d"
+      ],
+      "ES2005a.ParticipantA|ES2005a.ParticipantB|ES2005a.ParticipantC|ES2005a.ParticipantD": [
+        "ami_annot_ES2005a"
+      ],
+      "ES2005b.ParticipantA|ES2005b.ParticipantB|ES2005b.ParticipantC|ES2005b.ParticipantD": [
+        "ami_annot_ES2005b"
+      ],
+      "ES2005c.ParticipantA|ES2005c.ParticipantB|ES2005c.ParticipantC|ES2005c.ParticipantD": [
+        "ami_annot_ES2005c"
+      ],
+      "ES2005d.ParticipantA|ES2005d.ParticipantB|ES2005d.ParticipantC|ES2005d.ParticipantD": [
+        "ami_annot_ES2005d"
+      ],
+      "ES2006a.ParticipantA|ES2006a.ParticipantB|ES2006a.ParticipantC|ES2006a.ParticipantD": [
+        "ami_annot_ES2006a"
+      ],
+      "ES2006b.ParticipantA|ES2006b.ParticipantB|ES2006b.ParticipantC|ES2006b.ParticipantD": [
+        "ami_annot_ES2006b"
+      ],
+      "ES2006c.ParticipantA|ES2006c.ParticipantB|ES2006c.ParticipantC|ES2006c.ParticipantD": [
+        "ami_annot_ES2006c"
+      ],
+      "ES2006d.ParticipantA|ES2006d.ParticipantB|ES2006d.ParticipantC|ES2006d.ParticipantD": [
+        "ami_annot_ES2006d"
+      ],
+      "ES2007a.ParticipantA|ES2007a.ParticipantB|ES2007a.ParticipantC|ES2007a.ParticipantD": [
+        "ami_annot_ES2007a"
+      ],
+      "ES2007b.ParticipantA|ES2007b.ParticipantB|ES2007b.ParticipantC|ES2007b.ParticipantD": [
+        "ami_annot_ES2007b"
+      ],
+      "ES2007c.ParticipantA|ES2007c.ParticipantB|ES2007c.ParticipantC|ES2007c.ParticipantD": [
+        "ami_annot_ES2007c"
+      ],
+      "ES2007d.ParticipantA|ES2007d.ParticipantB|ES2007d.ParticipantC|ES2007d.ParticipantD": [
+        "ami_annot_ES2007d"
+      ],
+      "ES2008a.ParticipantA|ES2008a.ParticipantB|ES2008a.ParticipantC|ES2008a.ParticipantD": [
+        "ami_annot_ES2008a"
+      ],
+      "ES2008b.ParticipantA|ES2008b.ParticipantB|ES2008b.ParticipantC|ES2008b.ParticipantD": [
+        "ami_annot_ES2008b"
+      ],
+      "ES2008c.ParticipantA|ES2008c.ParticipantB|ES2008c.ParticipantC|ES2008c.ParticipantD": [
+        "ami_annot_ES2008c"
+      ],
+      "ES2008d.ParticipantA|ES2008d.ParticipantB|ES2008d.ParticipantC|ES2008d.ParticipantD": [
+        "ami_annot_ES2008d"
+      ],
+      "ES2009a.ParticipantA|ES2009a.ParticipantB|ES2009a.ParticipantC|ES2009a.ParticipantD": [
+        "ami_annot_ES2009a"
+      ],
+      "ES2009b.ParticipantA|ES2009b.ParticipantB|ES2009b.ParticipantC|ES2009b.ParticipantD": [
+        "ami_annot_ES2009b"
+      ],
+      "ES2009c.ParticipantA|ES2009c.ParticipantB|ES2009c.ParticipantC|ES2009c.ParticipantD": [
+        "ami_annot_ES2009c"
+      ],
+      "ES2009d.ParticipantA|ES2009d.ParticipantB|ES2009d.ParticipantC|ES2009d.ParticipantD": [
+        "ami_annot_ES2009d"
+      ],
+      "ES2010a.ParticipantA|ES2010a.ParticipantB|ES2010a.ParticipantC|ES2010a.ParticipantD": [
+        "ami_annot_ES2010a"
+      ],
+      "ES2010b.ParticipantA|ES2010b.ParticipantB|ES2010b.ParticipantC|ES2010b.ParticipantD": [
+        "ami_annot_ES2010b"
+      ],
+      "ES2010c.ParticipantA|ES2010c.ParticipantB|ES2010c.ParticipantC|ES2010c.ParticipantD": [
+        "ami_annot_ES2010c"
+      ],
+      "ES2010d.ParticipantA|ES2010d.ParticipantB|ES2010d.ParticipantC|ES2010d.ParticipantD": [
+        "ami_annot_ES2010d"
+      ],
+      "ES2011a.ParticipantA|ES2011a.ParticipantB|ES2011a.ParticipantC|ES2011a.ParticipantD": [
+        "ami_annot_ES2011a"
+      ],
+      "ES2011b.ParticipantA|ES2011b.ParticipantB|ES2011b.ParticipantC|ES2011b.ParticipantD": [
+        "ami_annot_ES2011b"
+      ],
+      "ES2011c.ParticipantA|ES2011c.ParticipantB|ES2011c.ParticipantC|ES2011c.ParticipantD": [
+        "ami_annot_ES2011c"
+      ],
+      "ES2011d.ParticipantA|ES2011d.ParticipantB|ES2011d.ParticipantC|ES2011d.ParticipantD": [
+        "ami_annot_ES2011d"
+      ],
+      "ES2012a.ParticipantA|ES2012a.ParticipantB|ES2012a.ParticipantC|ES2012a.ParticipantD": [
+        "ami_annot_ES2012a"
+      ],
+      "ES2012b.ParticipantA|ES2012b.ParticipantB|ES2012b.ParticipantC|ES2012b.ParticipantD": [
+        "ami_annot_ES2012b"
+      ],
+      "ES2012c.ParticipantA|ES2012c.ParticipantB|ES2012c.ParticipantC|ES2012c.ParticipantD": [
+        "ami_annot_ES2012c"
+      ],
+      "ES2012d.ParticipantA|ES2012d.ParticipantB|ES2012d.ParticipantC|ES2012d.ParticipantD": [
+        "ami_annot_ES2012d"
+      ],
+      "ES2013a.ParticipantA|ES2013a.ParticipantB|ES2013a.ParticipantC|ES2013a.ParticipantD": [
+        "ami_annot_ES2013a"
+      ],
+      "ES2013b.ParticipantA|ES2013b.ParticipantB|ES2013b.ParticipantC|ES2013b.ParticipantD": [
+        "ami_annot_ES2013b"
+      ],
+      "ES2013c.ParticipantA|ES2013c.ParticipantB|ES2013c.ParticipantC|ES2013c.ParticipantD": [
+        "ami_annot_ES2013c"
+      ],
+      "ES2013d.ParticipantA|ES2013d.ParticipantB|ES2013d.ParticipantC|ES2013d.ParticipantD": [
+        "ami_annot_ES2013d"
+      ],
+      "ES2014a.ParticipantA|ES2014a.ParticipantB|ES2014a.ParticipantC|ES2014a.ParticipantD": [
+        "ami_annot_ES2014a"
+      ],
+      "ES2014b.ParticipantA|ES2014b.ParticipantB|ES2014b.ParticipantC|ES2014b.ParticipantD": [
+        "ami_annot_ES2014b"
+      ],
+      "ES2014c.ParticipantA|ES2014c.ParticipantB|ES2014c.ParticipantC|ES2014c.ParticipantD": [
+        "ami_annot_ES2014c"
+      ],
+      "ES2014d.ParticipantA|ES2014d.ParticipantB|ES2014d.ParticipantC|ES2014d.ParticipantD": [
+        "ami_annot_ES2014d"
+      ],
+      "ES2015a.ParticipantA|ES2015a.ParticipantB|ES2015a.ParticipantC|ES2015a.ParticipantD": [
+        "ami_annot_ES2015a"
+      ],
+      "ES2015b.ParticipantA|ES2015b.ParticipantB|ES2015b.ParticipantC|ES2015b.ParticipantD": [
+        "ami_annot_ES2015b"
+      ],
+      "ES2015c.ParticipantA|ES2015c.ParticipantB|ES2015c.ParticipantC|ES2015c.ParticipantD": [
+        "ami_annot_ES2015c"
+      ],
+      "ES2015d.ParticipantA|ES2015d.ParticipantB|ES2015d.ParticipantC|ES2015d.ParticipantD": [
+        "ami_annot_ES2015d"
+      ],
+      "ES2016a.ParticipantA|ES2016a.ParticipantB|ES2016a.ParticipantC|ES2016a.ParticipantD": [
+        "ami_annot_ES2016a"
+      ],
+      "ES2016b.ParticipantA|ES2016b.ParticipantB|ES2016b.ParticipantC|ES2016b.ParticipantD": [
+        "ami_annot_ES2016b"
+      ],
+      "ES2016c.ParticipantA|ES2016c.ParticipantB|ES2016c.ParticipantC|ES2016c.ParticipantD": [
+        "ami_annot_ES2016c"
+      ],
+      "ES2016d.ParticipantA|ES2016d.ParticipantB|ES2016d.ParticipantC|ES2016d.ParticipantD": [
+        "ami_annot_ES2016d"
+      ],
+      "IB4001.ParticipantA|IB4001.ParticipantB|IB4001.ParticipantC|IB4001.ParticipantD": [
+        "ami_annot_IB4001"
+      ],
+      "IB4002.ParticipantA|IB4002.ParticipantB|IB4002.ParticipantC|IB4002.ParticipantD": [
+        "ami_annot_IB4002"
+      ],
+      "IB4003.ParticipantA|IB4003.ParticipantB|IB4003.ParticipantC|IB4003.ParticipantD": [
+        "ami_annot_IB4003"
+      ],
+      "IB4004.ParticipantA|IB4004.ParticipantB|IB4004.ParticipantC|IB4004.ParticipantD": [
+        "ami_annot_IB4004"
+      ],
+      "IB4005.ParticipantA|IB4005.ParticipantB|IB4005.ParticipantC|IB4005.ParticipantD": [
+        "ami_annot_IB4005"
+      ],
+      "IB4010.ParticipantA|IB4010.ParticipantB|IB4010.ParticipantC|IB4010.ParticipantD": [
+        "ami_annot_IB4010"
+      ],
+      "IB4011.ParticipantA|IB4011.ParticipantB|IB4011.ParticipantC|IB4011.ParticipantD": [
+        "ami_annot_IB4011"
+      ],
+      "IN1001.ParticipantA|IN1001.ParticipantB|IN1001.ParticipantC": [
+        "ami_annot_IN1001"
+      ],
+      "IN1002.ParticipantA|IN1002.ParticipantB|IN1002.ParticipantC|IN1002.ParticipantD": [
+        "ami_annot_IN1002"
+      ],
+      "IN1005.ParticipantA|IN1005.ParticipantB|IN1005.ParticipantC|IN1005.ParticipantD": [
+        "ami_annot_IN1005"
+      ],
+      "IN1007.ParticipantA|IN1007.ParticipantB|IN1007.ParticipantC|IN1007.ParticipantD": [
+        "ami_annot_IN1007"
+      ],
+      "IN1008.ParticipantA|IN1008.ParticipantB|IN1008.ParticipantC|IN1008.ParticipantD": [
+        "ami_annot_IN1008"
+      ],
+      "IN1009.ParticipantA|IN1009.ParticipantB|IN1009.ParticipantC|IN1009.ParticipantD": [
+        "ami_annot_IN1009"
+      ],
+      "IN1012.ParticipantA|IN1012.ParticipantB|IN1012.ParticipantC|IN1012.ParticipantD": [
+        "ami_annot_IN1012"
+      ],
+      "IN1013.ParticipantA|IN1013.ParticipantB|IN1013.ParticipantC|IN1013.ParticipantD": [
+        "ami_annot_IN1013"
+      ],
+      "IN1014.ParticipantA|IN1014.ParticipantB|IN1014.ParticipantC|IN1014.ParticipantD": [
+        "ami_annot_IN1014"
+      ],
+      "IN1016.ParticipantA|IN1016.ParticipantB|IN1016.ParticipantC|IN1016.ParticipantD": [
+        "ami_annot_IN1016"
+      ],
+      "IS1000a.ParticipantA|IS1000a.ParticipantB|IS1000a.ParticipantC|IS1000a.ParticipantD": [
+        "ami_annot_IS1000a"
+      ],
+      "IS1000b.ParticipantA|IS1000b.ParticipantB|IS1000b.ParticipantC|IS1000b.ParticipantD": [
+        "ami_annot_IS1000b"
+      ],
+      "IS1000c.ParticipantA|IS1000c.ParticipantB|IS1000c.ParticipantC|IS1000c.ParticipantD": [
+        "ami_annot_IS1000c"
+      ],
+      "IS1000d.ParticipantA|IS1000d.ParticipantB|IS1000d.ParticipantC|IS1000d.ParticipantD": [
+        "ami_annot_IS1000d"
+      ],
+      "IS1001a.ParticipantA|IS1001a.ParticipantB|IS1001a.ParticipantC|IS1001a.ParticipantD": [
+        "ami_annot_IS1001a"
+      ],
+      "IS1001b.ParticipantA|IS1001b.ParticipantB|IS1001b.ParticipantC|IS1001b.ParticipantD": [
+        "ami_annot_IS1001b"
+      ],
+      "IS1001c.ParticipantA|IS1001c.ParticipantB|IS1001c.ParticipantC|IS1001c.ParticipantD": [
+        "ami_annot_IS1001c"
+      ],
+      "IS1001d.ParticipantA|IS1001d.ParticipantB|IS1001d.ParticipantC|IS1001d.ParticipantD": [
+        "ami_annot_IS1001d"
+      ],
+      "IS1002b.ParticipantA|IS1002b.ParticipantB|IS1002b.ParticipantC|IS1002b.ParticipantD": [
+        "ami_annot_IS1002b"
+      ],
+      "IS1002c.ParticipantA|IS1002c.ParticipantB|IS1002c.ParticipantC|IS1002c.ParticipantD": [
+        "ami_annot_IS1002c"
+      ],
+      "IS1002d.ParticipantA|IS1002d.ParticipantB|IS1002d.ParticipantC|IS1002d.ParticipantD": [
+        "ami_annot_IS1002d"
+      ],
+      "IS1003a.ParticipantA|IS1003a.ParticipantB|IS1003a.ParticipantC|IS1003a.ParticipantD": [
+        "ami_annot_IS1003a"
+      ],
+      "IS1003b.ParticipantA|IS1003b.ParticipantB|IS1003b.ParticipantC|IS1003b.ParticipantD": [
+        "ami_annot_IS1003b"
+      ],
+      "IS1003c.ParticipantA|IS1003c.ParticipantB|IS1003c.ParticipantC|IS1003c.ParticipantD": [
+        "ami_annot_IS1003c"
+      ],
+      "IS1003d.ParticipantA|IS1003d.ParticipantB|IS1003d.ParticipantC|IS1003d.ParticipantD": [
+        "ami_annot_IS1003d"
+      ],
+      "IS1004a.ParticipantA|IS1004a.ParticipantB|IS1004a.ParticipantC|IS1004a.ParticipantD": [
+        "ami_annot_IS1004a"
+      ],
+      "IS1004b.ParticipantA|IS1004b.ParticipantB|IS1004b.ParticipantC|IS1004b.ParticipantD": [
+        "ami_annot_IS1004b"
+      ],
+      "IS1004c.ParticipantA|IS1004c.ParticipantB|IS1004c.ParticipantC|IS1004c.ParticipantD": [
+        "ami_annot_IS1004c"
+      ],
+      "IS1004d.ParticipantA|IS1004d.ParticipantB|IS1004d.ParticipantC|IS1004d.ParticipantD": [
+        "ami_annot_IS1004d"
+      ],
+      "IS1005a.ParticipantA|IS1005a.ParticipantB|IS1005a.ParticipantC|IS1005a.ParticipantD": [
+        "ami_annot_IS1005a"
+      ],
+      "IS1005b.ParticipantA|IS1005b.ParticipantB|IS1005b.ParticipantC|IS1005b.ParticipantD": [
+        "ami_annot_IS1005b"
+      ],
+      "IS1005c.ParticipantA|IS1005c.ParticipantB|IS1005c.ParticipantC|IS1005c.ParticipantD": [
+        "ami_annot_IS1005c"
+      ],
+      "IS1006a.ParticipantA|IS1006a.ParticipantB|IS1006a.ParticipantC|IS1006a.ParticipantD": [
+        "ami_annot_IS1006a"
+      ],
+      "IS1006b.ParticipantA|IS1006b.ParticipantB|IS1006b.ParticipantC|IS1006b.ParticipantD": [
+        "ami_annot_IS1006b"
+      ],
+      "IS1006c.ParticipantA|IS1006c.ParticipantB|IS1006c.ParticipantC|IS1006c.ParticipantD": [
+        "ami_annot_IS1006c"
+      ],
+      "IS1006d.ParticipantA|IS1006d.ParticipantB|IS1006d.ParticipantC|IS1006d.ParticipantD": [
+        "ami_annot_IS1006d"
+      ],
+      "IS1007a.ParticipantA|IS1007a.ParticipantB|IS1007a.ParticipantC|IS1007a.ParticipantD": [
+        "ami_annot_IS1007a"
+      ],
+      "IS1007b.ParticipantA|IS1007b.ParticipantB|IS1007b.ParticipantC|IS1007b.ParticipantD": [
+        "ami_annot_IS1007b"
+      ],
+      "IS1007c.ParticipantA|IS1007c.ParticipantB|IS1007c.ParticipantC|IS1007c.ParticipantD": [
+        "ami_annot_IS1007c"
+      ],
+      "IS1007d.ParticipantA|IS1007d.ParticipantB|IS1007d.ParticipantC|IS1007d.ParticipantD": [
+        "ami_annot_IS1007d"
+      ],
+      "IS1008a.ParticipantA|IS1008a.ParticipantB|IS1008a.ParticipantC|IS1008a.ParticipantD": [
+        "ami_IS1008a"
+      ],
+      "IS1008b.ParticipantA|IS1008b.ParticipantB|IS1008b.ParticipantC|IS1008b.ParticipantD": [
+        "ami_annot_IS1008b"
+      ],
+      "IS1008c.ParticipantA|IS1008c.ParticipantB|IS1008c.ParticipantC|IS1008c.ParticipantD": [
+        "ami_annot_IS1008c"
+      ],
+      "IS1008d.ParticipantA|IS1008d.ParticipantB|IS1008d.ParticipantC|IS1008d.ParticipantD": [
+        "ami_annot_IS1008d"
+      ],
+      "IS1009a.ParticipantA|IS1009a.ParticipantB|IS1009a.ParticipantC|IS1009a.ParticipantD": [
+        "ami_IS1009a"
+      ],
+      "IS1009b.ParticipantA|IS1009b.ParticipantB|IS1009b.ParticipantC|IS1009b.ParticipantD": [
+        "ami_annot_IS1009b"
+      ],
+      "IS1009c.ParticipantA|IS1009c.ParticipantB|IS1009c.ParticipantC|IS1009c.ParticipantD": [
+        "ami_annot_IS1009c"
+      ],
+      "IS1009d.ParticipantA|IS1009d.ParticipantB|IS1009d.ParticipantC|IS1009d.ParticipantD": [
+        "ami_annot_IS1009d"
+      ],
+      "SPK8001|SPK8002|SPK8003|SPK8004": [
+        "alimeeting_R8003_M8001"
+      ],
+      "SPK8013|SPK8014|SPK8015|SPK8016": [
+        "alimeeting_R8001_M8004"
+      ],
+      "SPK8021|SPK8022": [
+        "alimeeting_R8009_M8018"
+      ],
+      "SPK8023|SPK8024": [
+        "alimeeting_R8009_M8019"
+      ],
+      "SPK8025|SPK8026": [
+        "alimeeting_R8009_M8020"
+      ],
+      "SPK8047|SPK8048|SPK8049": [
+        "alimeeting_R8008_M8013"
+      ],
+      "SPK8050|SPK8054|SPK8055|SPK8056": [
+        "alimeeting_R8007_M8010"
+      ],
+      "SPK8066|SPK8067|SPK8068|SPK8069": [
+        "alimeeting_R8007_M8011"
+      ],
+      "TS3003a.ParticipantA|TS3003a.ParticipantB|TS3003a.ParticipantC|TS3003a.ParticipantD": [
+        "ami_annot_TS3003a"
+      ],
+      "TS3003b.ParticipantA|TS3003b.ParticipantB|TS3003b.ParticipantC|TS3003b.ParticipantD": [
+        "ami_annot_TS3003b"
+      ],
+      "TS3003c.ParticipantA|TS3003c.ParticipantB|TS3003c.ParticipantC|TS3003c.ParticipantD": [
+        "ami_annot_TS3003c"
+      ],
+      "TS3003d.ParticipantA|TS3003d.ParticipantB|TS3003d.ParticipantC|TS3003d.ParticipantD": [
+        "ami_annot_TS3003d"
+      ],
+      "TS3004a.ParticipantA|TS3004a.ParticipantB|TS3004a.ParticipantC|TS3004a.ParticipantD": [
+        "ami_annot_TS3004a"
+      ],
+      "TS3004b.ParticipantA|TS3004b.ParticipantB|TS3004b.ParticipantC|TS3004b.ParticipantD": [
+        "ami_annot_TS3004b"
+      ],
+      "TS3004c.ParticipantA|TS3004c.ParticipantB|TS3004c.ParticipantC|TS3004c.ParticipantD": [
+        "ami_annot_TS3004c"
+      ],
+      "TS3004d.ParticipantA|TS3004d.ParticipantB|TS3004d.ParticipantC|TS3004d.ParticipantD": [
+        "ami_annot_TS3004d"
+      ],
+      "TS3005a.ParticipantA|TS3005a.ParticipantB|TS3005a.ParticipantC|TS3005a.ParticipantD": [
+        "ami_annot_TS3005a"
+      ],
+      "TS3005b.ParticipantA|TS3005b.ParticipantB|TS3005b.ParticipantC|TS3005b.ParticipantD": [
+        "ami_annot_TS3005b"
+      ],
+      "TS3005c.ParticipantA|TS3005c.ParticipantB|TS3005c.ParticipantC|TS3005c.ParticipantD": [
+        "ami_annot_TS3005c"
+      ],
+      "TS3005d.ParticipantA|TS3005d.ParticipantB|TS3005d.ParticipantC|TS3005d.ParticipantD": [
+        "ami_annot_TS3005d"
+      ],
+      "TS3006a.ParticipantA|TS3006a.ParticipantB|TS3006a.ParticipantC|TS3006a.ParticipantD": [
+        "ami_annot_TS3006a"
+      ],
+      "TS3006b.ParticipantA|TS3006b.ParticipantB|TS3006b.ParticipantC|TS3006b.ParticipantD": [
+        "ami_annot_TS3006b"
+      ],
+      "TS3006c.ParticipantA|TS3006c.ParticipantB|TS3006c.ParticipantC|TS3006c.ParticipantD": [
+        "ami_annot_TS3006c"
+      ],
+      "TS3006d.ParticipantA|TS3006d.ParticipantB|TS3006d.ParticipantC|TS3006d.ParticipantD": [
+        "ami_annot_TS3006d"
+      ],
+      "TS3007a.ParticipantA|TS3007a.ParticipantB|TS3007a.ParticipantC|TS3007a.ParticipantD": [
+        "ami_annot_TS3007a"
+      ],
+      "TS3007b.ParticipantA|TS3007b.ParticipantB|TS3007b.ParticipantC|TS3007b.ParticipantD": [
+        "ami_annot_TS3007b"
+      ],
+      "TS3007c.ParticipantA|TS3007c.ParticipantB|TS3007c.ParticipantC|TS3007c.ParticipantD": [
+        "ami_annot_TS3007c"
+      ],
+      "TS3007d.ParticipantA|TS3007d.ParticipantB|TS3007d.ParticipantC|TS3007d.ParticipantD": [
+        "ami_annot_TS3007d"
+      ],
+      "TS3008a.ParticipantA|TS3008a.ParticipantB|TS3008a.ParticipantC|TS3008a.ParticipantD": [
+        "ami_annot_TS3008a"
+      ],
+      "TS3008b.ParticipantA|TS3008b.ParticipantB|TS3008b.ParticipantC|TS3008b.ParticipantD": [
+        "ami_annot_TS3008b"
+      ],
+      "TS3008c.ParticipantA|TS3008c.ParticipantB|TS3008c.ParticipantC|TS3008c.ParticipantD": [
+        "ami_annot_TS3008c"
+      ],
+      "TS3008d.ParticipantA|TS3008d.ParticipantB|TS3008d.ParticipantC|TS3008d.ParticipantD": [
+        "ami_annot_TS3008d"
+      ],
+      "TS3009a.ParticipantA|TS3009a.ParticipantB|TS3009a.ParticipantC|TS3009a.ParticipantD": [
+        "ami_annot_TS3009a"
+      ],
+      "TS3009b.ParticipantA|TS3009b.ParticipantB|TS3009b.ParticipantC|TS3009b.ParticipantD": [
+        "ami_annot_TS3009b"
+      ],
+      "TS3009c.ParticipantA|TS3009c.ParticipantB|TS3009c.ParticipantC|TS3009c.ParticipantD": [
+        "ami_annot_TS3009c"
+      ],
+      "TS3009d.ParticipantA|TS3009d.ParticipantB|TS3009d.ParticipantC|TS3009d.ParticipantD": [
+        "ami_annot_TS3009d"
+      ],
+      "TS3010a.ParticipantA|TS3010a.ParticipantB|TS3010a.ParticipantC|TS3010a.ParticipantD": [
+        "ami_annot_TS3010a"
+      ],
+      "TS3010b.ParticipantA|TS3010b.ParticipantB|TS3010b.ParticipantC|TS3010b.ParticipantD": [
+        "ami_annot_TS3010b"
+      ],
+      "TS3010c.ParticipantA|TS3010c.ParticipantB|TS3010c.ParticipantC|TS3010c.ParticipantD": [
+        "ami_annot_TS3010c"
+      ],
+      "TS3010d.ParticipantA|TS3010d.ParticipantB|TS3010d.ParticipantC|TS3010d.ParticipantD": [
+        "ami_annot_TS3010d"
+      ],
+      "TS3011a.ParticipantA|TS3011a.ParticipantB|TS3011a.ParticipantC|TS3011a.ParticipantD": [
+        "ami_annot_TS3011a"
+      ],
+      "TS3011b.ParticipantA|TS3011b.ParticipantB|TS3011b.ParticipantC|TS3011b.ParticipantD": [
+        "ami_annot_TS3011b"
+      ],
+      "TS3011c.ParticipantA|TS3011c.ParticipantB|TS3011c.ParticipantC|TS3011c.ParticipantD": [
+        "ami_annot_TS3011c"
+      ],
+      "TS3011d.ParticipantA|TS3011d.ParticipantB|TS3011d.ParticipantC|TS3011d.ParticipantD": [
+        "ami_annot_TS3011d"
+      ],
+      "TS3012a.ParticipantA|TS3012a.ParticipantB|TS3012a.ParticipantC|TS3012a.ParticipantD": [
+        "ami_annot_TS3012a"
+      ],
+      "TS3012b.ParticipantA|TS3012b.ParticipantB|TS3012b.ParticipantC|TS3012b.ParticipantD": [
+        "ami_annot_TS3012b"
+      ],
+      "TS3012c.ParticipantA|TS3012c.ParticipantB|TS3012c.ParticipantC|TS3012c.ParticipantD": [
+        "ami_annot_TS3012c"
+      ],
+      "TS3012d.ParticipantA|TS3012d.ParticipantB|TS3012d.ParticipantC|TS3012d.ParticipantD": [
+        "ami_annot_TS3012d"
+      ]
+    },
+    "graph_hash": "456073e8d5aacaac3d69765422ef3837b7bfe6fe960ac61200c3b19b599b4225"
+  },
+  "natural_exposure": {
+    "eligible_duration_ms": 19109998,
+    "inclusion_rule": "sha256(session_id:start_ms) prefix < 16 (1/16)",
+    "sampled_duration_ms": 913833,
+    "window_count": 641,
+    "window_ms": 30000,
+    "windows": [
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "ami_ES2003a",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 960000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 990000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 1020000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 1050000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 1080000
+      },
+      {
+        "eligible_duration_ms": 29765,
+        "included": false,
+        "session_id": "ami_ES2003a",
+        "start_ms": 1110000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "ami_IS1008a",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1008a",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 13833,
+        "included": true,
+        "session_id": "ami_IS1008a",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "ami_ES2004a",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "ami_ES2004a",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 960000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 990000
+      },
+      {
+        "eligible_duration_ms": 29354,
+        "included": false,
+        "session_id": "ami_ES2004a",
+        "start_ms": 1020000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "ami_IS1009a",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 28833,
+        "included": false,
+        "session_id": "ami_IS1009a",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 960000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 990000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1020000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1050000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1080000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1110000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1140000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1170000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1200000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1230000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1260000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1290000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1320000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1350000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1380000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1410000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1440000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1470000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1500000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1530000
+      },
+      {
+        "eligible_duration_ms": 13850,
+        "included": false,
+        "session_id": "alimeeting_R8001_M8004",
+        "start_ms": 1560000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 960000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 990000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1020000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1050000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1080000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1110000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1140000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1170000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1200000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1230000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1260000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1290000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1320000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1350000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1380000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1410000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1440000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1470000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1500000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1530000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1560000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1590000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1620000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1650000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1680000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1710000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1740000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1770000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1800000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1830000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1860000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1890000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1920000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1950000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 1980000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 2010000
+      },
+      {
+        "eligible_duration_ms": 28000,
+        "included": false,
+        "session_id": "alimeeting_R8003_M8001",
+        "start_ms": 2040000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 960000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 990000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1020000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1050000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1080000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1110000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1140000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1170000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1200000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1230000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1260000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1290000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1320000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1350000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1380000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1410000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1440000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1470000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1500000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1530000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1560000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1590000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1620000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1650000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1680000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1710000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1740000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1770000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1800000
+      },
+      {
+        "eligible_duration_ms": 26321,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8010",
+        "start_ms": 1830000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 960000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 990000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1020000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1050000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1080000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1110000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1140000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1170000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1200000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1230000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1260000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1290000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1320000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1350000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1380000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1410000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1440000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1470000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1500000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1530000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1560000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1590000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1620000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1650000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1680000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1710000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1740000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1770000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1800000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1830000
+      },
+      {
+        "eligible_duration_ms": 1546,
+        "included": false,
+        "session_id": "alimeeting_R8007_M8011",
+        "start_ms": 1860000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 960000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 990000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1020000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1050000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1080000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1110000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1140000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1170000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1200000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1230000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1260000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1290000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1320000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1350000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1380000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1410000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1440000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1470000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1500000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1530000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1560000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1590000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1620000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1650000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1680000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1710000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1740000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1770000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1800000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1830000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1860000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1890000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1920000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1950000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 1980000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 2010000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 2040000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 2070000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 2100000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 2130000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 2160000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 2190000
+      },
+      {
+        "eligible_duration_ms": 19470,
+        "included": false,
+        "session_id": "alimeeting_R8008_M8013",
+        "start_ms": 2220000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 960000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 990000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1020000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1050000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1080000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1110000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1140000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1170000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1200000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1230000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1260000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1290000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1320000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1350000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1380000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1410000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1440000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1470000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1500000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1530000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1560000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1590000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1620000
+      },
+      {
+        "eligible_duration_ms": 4657,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8018",
+        "start_ms": 1650000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 960000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 990000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1020000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1050000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1080000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1110000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1140000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1170000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1200000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1230000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1260000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1290000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1320000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1350000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1380000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1410000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1440000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1470000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1500000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1530000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1560000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1590000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1620000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1650000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1680000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1710000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1740000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1770000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1800000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1830000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1860000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1890000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1920000
+      },
+      {
+        "eligible_duration_ms": 23926,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8019",
+        "start_ms": 1950000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 0
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 30000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 60000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 90000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 120000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 150000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 180000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 210000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 240000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 270000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 300000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 330000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 360000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 390000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 420000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 450000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 480000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 510000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 540000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 570000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 600000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 630000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 660000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 690000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 720000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 750000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 780000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 810000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 840000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 870000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 900000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 930000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 960000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 990000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1020000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1050000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1080000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1110000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1140000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1170000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1200000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1230000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1260000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1290000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1320000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1350000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1380000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1410000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1440000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1470000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1500000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1530000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1560000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1590000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1620000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1650000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1680000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1710000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1740000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1770000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1800000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": true,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1830000
+      },
+      {
+        "eligible_duration_ms": 30000,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1860000
+      },
+      {
+        "eligible_duration_ms": 20443,
+        "included": false,
+        "session_id": "alimeeting_R8009_M8020",
+        "start_ms": 1890000
+      }
+    ]
+  },
+  "plan_blob": "24340f488f1bb46c666a5fc15eef2fc87ef1f826",
+  "schema_version": "turn_episode_v1.coverage_inventory",
+  "summary": {
+    "corpus": {
+      "alimeeting": {
+        "active_speech_s": 13972.869999999999,
+        "annotated_sessions": 8,
+        "duration_s": 15138.215,
+        "hard_clean_gap_targets": 933,
+        "materialized_sessions": 8,
+        "overlap_soft_targets": 3645,
+        "same_speaker_pause_intervals": 775,
+        "scorable_sessions": 8
+      },
+      "ami": {
+        "active_speech_s": 2809.9300000000003,
+        "annotated_sessions": 171,
+        "duration_s": 3971.7866875,
+        "hard_clean_gap_targets": 23732,
+        "materialized_sessions": 4,
+        "overlap_soft_targets": 48637,
+        "same_speaker_pause_intervals": 10655,
+        "scorable_sessions": 4
+      }
+    },
+    "independent_block_estimate": {
+      "alimeeting": 8,
+      "ami": 4
+    },
+    "untouched_scorable_sessions": {
+      "alimeeting": 0,
+      "ami": 0
+    }
+  },
+  "synthetic": {
+    "ls_dev": {
+      "active_speech_samples": 6478400,
+      "case_count": 202,
+      "duration_samples": 8132800,
+      "expected_kinds": []
+    },
+    "ls_held_out_clean": {
+      "active_speech_samples": 6459200,
+      "case_count": 202,
+      "duration_samples": 8113600,
+      "expected_kinds": []
+    },
+    "ls_held_out_other": {
+      "active_speech_samples": 6465600,
+      "case_count": 202,
+      "duration_samples": 8120000,
+      "expected_kinds": []
+    },
+    "mixed_dev_pool": {
+      "active_speech_samples": 29161120,
+      "case_count": 204,
+      "duration_samples": 41470379,
+      "expected_kinds": []
+    }
+  },
+  "target_enriched": {
+    "eligible_counts": {
+      "alimeeting_R8001_M8004": {
+        "hard_positive_eligible": 46,
+        "hard_positive_selected": 2,
+        "negative_eligible": 26,
+        "negative_selected": 1
+      },
+      "alimeeting_R8003_M8001": {
+        "hard_positive_eligible": 120,
+        "hard_positive_selected": 10,
+        "negative_eligible": 79,
+        "negative_selected": 4
+      },
+      "alimeeting_R8007_M8010": {
+        "hard_positive_eligible": 60,
+        "hard_positive_selected": 5,
+        "negative_eligible": 14,
+        "negative_selected": 1
+      },
+      "alimeeting_R8007_M8011": {
+        "hard_positive_eligible": 120,
+        "hard_positive_selected": 3,
+        "negative_eligible": 18,
+        "negative_selected": 2
+      },
+      "alimeeting_R8008_M8013": {
+        "hard_positive_eligible": 271,
+        "hard_positive_selected": 12,
+        "negative_eligible": 41,
+        "negative_selected": 2
+      },
+      "alimeeting_R8009_M8018": {
+        "hard_positive_eligible": 156,
+        "hard_positive_selected": 11,
+        "negative_eligible": 95,
+        "negative_selected": 4
+      },
+      "alimeeting_R8009_M8019": {
+        "hard_positive_eligible": 70,
+        "hard_positive_selected": 7,
+        "negative_eligible": 292,
+        "negative_selected": 12
+      },
+      "alimeeting_R8009_M8020": {
+        "hard_positive_eligible": 90,
+        "hard_positive_selected": 8,
+        "negative_eligible": 210,
+        "negative_selected": 12
+      },
+      "ami_ES2003a": {
+        "hard_positive_eligible": 43,
+        "hard_positive_selected": 3,
+        "negative_eligible": 35,
+        "negative_selected": 2
+      },
+      "ami_ES2004a": {
+        "hard_positive_eligible": 59,
+        "hard_positive_selected": 3,
+        "negative_eligible": 35,
+        "negative_selected": 2
+      },
+      "ami_IS1008a": {
+        "hard_positive_eligible": 68,
+        "hard_positive_selected": 4,
+        "negative_eligible": 36,
+        "negative_selected": 1
+      },
+      "ami_IS1009a": {
+        "hard_positive_eligible": 61,
+        "hard_positive_selected": 7,
+        "negative_eligible": 18,
+        "negative_selected": 2
+      }
+    },
+    "per_session": {
+      "alimeeting_R8001_M8004": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              811200,
+              823520
+            ],
+            "evidence_onset_sample": 823520,
+            "gt_index": 4,
+            "kind": "gap_speaker_change",
+            "target_sample": 823520
+          },
+          {
+            "acceptable_interval": [
+              12763040,
+              12768800
+            ],
+            "evidence_onset_sample": 12768800,
+            "gt_index": 273,
+            "kind": "gap_speaker_change",
+            "target_sample": 12768800
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              17114560,
+              17132480
+            ],
+            "silence_end_sample": 17132480,
+            "silence_start_sample": 17114560,
+            "speaker": "SPK8013",
+            "speech_after_end": 17197600,
+            "speech_before_start": 16958240
+          }
+        ]
+      },
+      "alimeeting_R8003_M8001": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              505440,
+              513920
+            ],
+            "evidence_onset_sample": 513920,
+            "gt_index": 1,
+            "kind": "gap_speaker_change",
+            "target_sample": 513920
+          },
+          {
+            "acceptable_interval": [
+              2806080,
+              2811840
+            ],
+            "evidence_onset_sample": 2811840,
+            "gt_index": 26,
+            "kind": "gap_speaker_change",
+            "target_sample": 2811840
+          },
+          {
+            "acceptable_interval": [
+              7057600,
+              7062560
+            ],
+            "evidence_onset_sample": 7062560,
+            "gt_index": 103,
+            "kind": "gap_speaker_change",
+            "target_sample": 7062560
+          },
+          {
+            "acceptable_interval": [
+              13334080,
+              13336320
+            ],
+            "evidence_onset_sample": 13336320,
+            "gt_index": 200,
+            "kind": "gap_speaker_change",
+            "target_sample": 13336320
+          },
+          {
+            "acceptable_interval": [
+              20519040,
+              20534400
+            ],
+            "evidence_onset_sample": 20534400,
+            "gt_index": 354,
+            "kind": "gap_speaker_change",
+            "target_sample": 20534400
+          },
+          {
+            "acceptable_interval": [
+              22079840,
+              22080800
+            ],
+            "evidence_onset_sample": 22080800,
+            "gt_index": 399,
+            "kind": "gap_speaker_change",
+            "target_sample": 22080800
+          },
+          {
+            "acceptable_interval": [
+              24303360,
+              24318240
+            ],
+            "evidence_onset_sample": 24318240,
+            "gt_index": 436,
+            "kind": "gap_speaker_change",
+            "target_sample": 24318240
+          },
+          {
+            "acceptable_interval": [
+              24541920,
+              24548320
+            ],
+            "evidence_onset_sample": 24548320,
+            "gt_index": 440,
+            "kind": "gap_speaker_change",
+            "target_sample": 24548320
+          },
+          {
+            "acceptable_interval": [
+              25027360,
+              25030080
+            ],
+            "evidence_onset_sample": 25030080,
+            "gt_index": 447,
+            "kind": "gap_speaker_change",
+            "target_sample": 25030080
+          },
+          {
+            "acceptable_interval": [
+              30809760,
+              30814560
+            ],
+            "evidence_onset_sample": 30814560,
+            "gt_index": 556,
+            "kind": "gap_speaker_change",
+            "target_sample": 30814560
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              9539040,
+              9545600
+            ],
+            "silence_end_sample": 9545600,
+            "silence_start_sample": 9539040,
+            "speaker": "SPK8004",
+            "speech_after_end": 9630880,
+            "speech_before_start": 9476800
+          },
+          {
+            "interval": [
+              20477760,
+              20492320
+            ],
+            "silence_end_sample": 20492320,
+            "silence_start_sample": 20477760,
+            "speaker": "SPK8002",
+            "speech_after_end": 20519040,
+            "speech_before_start": 20434240
+          },
+          {
+            "interval": [
+              23565600,
+              23584800
+            ],
+            "silence_end_sample": 23584800,
+            "silence_start_sample": 23565600,
+            "speaker": "SPK8003",
+            "speech_after_end": 23671200,
+            "speech_before_start": 23527520
+          },
+          {
+            "interval": [
+              32476320,
+              32487360
+            ],
+            "silence_end_sample": 32487360,
+            "silence_start_sample": 32476320,
+            "speaker": "SPK8003",
+            "speech_after_end": 32608960,
+            "speech_before_start": 32375520
+          }
+        ]
+      },
+      "alimeeting_R8007_M8010": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              4187520,
+              4191840
+            ],
+            "evidence_onset_sample": 4191840,
+            "gt_index": 172,
+            "kind": "gap_speaker_change",
+            "target_sample": 4191840
+          },
+          {
+            "acceptable_interval": [
+              18430880,
+              18436320
+            ],
+            "evidence_onset_sample": 18436320,
+            "gt_index": 752,
+            "kind": "gap_speaker_change",
+            "target_sample": 18436320
+          },
+          {
+            "acceptable_interval": [
+              19746240,
+              19758400
+            ],
+            "evidence_onset_sample": 19758400,
+            "gt_index": 793,
+            "kind": "gap_speaker_change",
+            "target_sample": 19758400
+          },
+          {
+            "acceptable_interval": [
+              19763840,
+              19765280
+            ],
+            "evidence_onset_sample": 19765280,
+            "gt_index": 794,
+            "kind": "gap_speaker_change",
+            "target_sample": 19765280
+          },
+          {
+            "acceptable_interval": [
+              24374400,
+              24387040
+            ],
+            "evidence_onset_sample": 24387040,
+            "gt_index": 976,
+            "kind": "gap_speaker_change",
+            "target_sample": 24387040
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              27208320,
+              27214080
+            ],
+            "silence_end_sample": 27214080,
+            "silence_start_sample": 27208320,
+            "speaker": "SPK8056",
+            "speech_after_end": 27233760,
+            "speech_before_start": 27191040
+          }
+        ]
+      },
+      "alimeeting_R8007_M8011": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              8035520,
+              8041280
+            ],
+            "evidence_onset_sample": 8041280,
+            "gt_index": 154,
+            "kind": "gap_speaker_change",
+            "target_sample": 8041280
+          },
+          {
+            "acceptable_interval": [
+              14222720,
+              14235200
+            ],
+            "evidence_onset_sample": 14235200,
+            "gt_index": 291,
+            "kind": "gap_speaker_change",
+            "target_sample": 14235200
+          },
+          {
+            "acceptable_interval": [
+              26637920,
+              26647040
+            ],
+            "evidence_onset_sample": 26647040,
+            "gt_index": 631,
+            "kind": "gap_speaker_change",
+            "target_sample": 26647040
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              18512960,
+              18527200
+            ],
+            "silence_end_sample": 18527200,
+            "silence_start_sample": 18512960,
+            "speaker": "SPK8066",
+            "speech_after_end": 18565280,
+            "speech_before_start": 18485440
+          },
+          {
+            "interval": [
+              23512160,
+              23526240
+            ],
+            "silence_end_sample": 23526240,
+            "silence_start_sample": 23512160,
+            "speaker": "SPK8069",
+            "speech_after_end": 23541280,
+            "speech_before_start": 23497920
+          }
+        ]
+      },
+      "alimeeting_R8008_M8013": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              5788640,
+              5808960
+            ],
+            "evidence_onset_sample": 5808960,
+            "gt_index": 69,
+            "kind": "gap_speaker_change",
+            "target_sample": 5808960
+          },
+          {
+            "acceptable_interval": [
+              6480000,
+              6504000
+            ],
+            "evidence_onset_sample": 6504000,
+            "gt_index": 80,
+            "kind": "gap_speaker_change",
+            "target_sample": 6504000
+          },
+          {
+            "acceptable_interval": [
+              8552800,
+              8559360
+            ],
+            "evidence_onset_sample": 8559360,
+            "gt_index": 113,
+            "kind": "gap_speaker_change",
+            "target_sample": 8559360
+          },
+          {
+            "acceptable_interval": [
+              14911200,
+              14914080
+            ],
+            "evidence_onset_sample": 14914080,
+            "gt_index": 224,
+            "kind": "gap_speaker_change",
+            "target_sample": 14914080
+          },
+          {
+            "acceptable_interval": [
+              17512320,
+              17524640
+            ],
+            "evidence_onset_sample": 17524640,
+            "gt_index": 285,
+            "kind": "gap_speaker_change",
+            "target_sample": 17524640
+          },
+          {
+            "acceptable_interval": [
+              18471200,
+              18477600
+            ],
+            "evidence_onset_sample": 18477600,
+            "gt_index": 309,
+            "kind": "gap_speaker_change",
+            "target_sample": 18477600
+          },
+          {
+            "acceptable_interval": [
+              18607520,
+              18638400
+            ],
+            "evidence_onset_sample": 18638400,
+            "gt_index": 312,
+            "kind": "gap_speaker_change",
+            "target_sample": 18638400
+          },
+          {
+            "acceptable_interval": [
+              20502720,
+              20516320
+            ],
+            "evidence_onset_sample": 20516320,
+            "gt_index": 361,
+            "kind": "gap_speaker_change",
+            "target_sample": 20516320
+          },
+          {
+            "acceptable_interval": [
+              22145760,
+              22148480
+            ],
+            "evidence_onset_sample": 22148480,
+            "gt_index": 406,
+            "kind": "gap_speaker_change",
+            "target_sample": 22148480
+          },
+          {
+            "acceptable_interval": [
+              23628640,
+              23639360
+            ],
+            "evidence_onset_sample": 23639360,
+            "gt_index": 435,
+            "kind": "gap_speaker_change",
+            "target_sample": 23639360
+          },
+          {
+            "acceptable_interval": [
+              24203360,
+              24212800
+            ],
+            "evidence_onset_sample": 24212800,
+            "gt_index": 448,
+            "kind": "gap_speaker_change",
+            "target_sample": 24212800
+          },
+          {
+            "acceptable_interval": [
+              24759520,
+              24767680
+            ],
+            "evidence_onset_sample": 24767680,
+            "gt_index": 463,
+            "kind": "gap_speaker_change",
+            "target_sample": 24767680
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              25369280,
+              25385760
+            ],
+            "silence_end_sample": 25385760,
+            "silence_start_sample": 25369280,
+            "speaker": "SPK8049",
+            "speech_after_end": 25432640,
+            "speech_before_start": 25360160
+          },
+          {
+            "interval": [
+              30778400,
+              30794400
+            ],
+            "silence_end_sample": 30794400,
+            "silence_start_sample": 30778400,
+            "speaker": "SPK8047",
+            "speech_after_end": 30845600,
+            "speech_before_start": 30772640
+          }
+        ]
+      },
+      "alimeeting_R8009_M8018": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              70080,
+              74560
+            ],
+            "evidence_onset_sample": 74560,
+            "gt_index": 2,
+            "kind": "gap_speaker_change",
+            "target_sample": 74560
+          },
+          {
+            "acceptable_interval": [
+              338400,
+              342400
+            ],
+            "evidence_onset_sample": 342400,
+            "gt_index": 7,
+            "kind": "gap_speaker_change",
+            "target_sample": 342400
+          },
+          {
+            "acceptable_interval": [
+              3558240,
+              3561600
+            ],
+            "evidence_onset_sample": 3561600,
+            "gt_index": 47,
+            "kind": "gap_speaker_change",
+            "target_sample": 3561600
+          },
+          {
+            "acceptable_interval": [
+              3905600,
+              3912480
+            ],
+            "evidence_onset_sample": 3912480,
+            "gt_index": 54,
+            "kind": "gap_speaker_change",
+            "target_sample": 3912480
+          },
+          {
+            "acceptable_interval": [
+              6173280,
+              6173920
+            ],
+            "evidence_onset_sample": 6173920,
+            "gt_index": 75,
+            "kind": "gap_speaker_change",
+            "target_sample": 6173920
+          },
+          {
+            "acceptable_interval": [
+              7037280,
+              7040800
+            ],
+            "evidence_onset_sample": 7040800,
+            "gt_index": 86,
+            "kind": "gap_speaker_change",
+            "target_sample": 7040800
+          },
+          {
+            "acceptable_interval": [
+              15312960,
+              15313120
+            ],
+            "evidence_onset_sample": 15313120,
+            "gt_index": 216,
+            "kind": "gap_speaker_change",
+            "target_sample": 15313120
+          },
+          {
+            "acceptable_interval": [
+              18050400,
+              18055520
+            ],
+            "evidence_onset_sample": 18055520,
+            "gt_index": 251,
+            "kind": "gap_speaker_change",
+            "target_sample": 18055520
+          },
+          {
+            "acceptable_interval": [
+              20368320,
+              20383040
+            ],
+            "evidence_onset_sample": 20383040,
+            "gt_index": 284,
+            "kind": "gap_speaker_change",
+            "target_sample": 20383040
+          },
+          {
+            "acceptable_interval": [
+              20781600,
+              20785120
+            ],
+            "evidence_onset_sample": 20785120,
+            "gt_index": 290,
+            "kind": "gap_speaker_change",
+            "target_sample": 20785120
+          },
+          {
+            "acceptable_interval": [
+              22192480,
+              22199840
+            ],
+            "evidence_onset_sample": 22199840,
+            "gt_index": 307,
+            "kind": "gap_speaker_change",
+            "target_sample": 22199840
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              4204480,
+              4213760
+            ],
+            "silence_end_sample": 4213760,
+            "silence_start_sample": 4204480,
+            "speaker": "SPK8021",
+            "speech_after_end": 4258240,
+            "speech_before_start": 4063840
+          },
+          {
+            "interval": [
+              11852640,
+              11869120
+            ],
+            "silence_end_sample": 11869120,
+            "silence_start_sample": 11852640,
+            "speaker": "SPK8021",
+            "speech_after_end": 11932320,
+            "speech_before_start": 11796160
+          },
+          {
+            "interval": [
+              14413440,
+              14420800
+            ],
+            "silence_end_sample": 14420800,
+            "silence_start_sample": 14413440,
+            "speaker": "SPK8021",
+            "speech_after_end": 14450240,
+            "speech_before_start": 14389760
+          },
+          {
+            "interval": [
+              24033120,
+              24044480
+            ],
+            "silence_end_sample": 24044480,
+            "silence_start_sample": 24033120,
+            "speaker": "SPK8021",
+            "speech_after_end": 24206720,
+            "speech_before_start": 23962080
+          }
+        ]
+      },
+      "alimeeting_R8009_M8019": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              8905760,
+              8928960
+            ],
+            "evidence_onset_sample": 8928960,
+            "gt_index": 63,
+            "kind": "gap_speaker_change",
+            "target_sample": 8928960
+          },
+          {
+            "acceptable_interval": [
+              9638720,
+              9659520
+            ],
+            "evidence_onset_sample": 9659520,
+            "gt_index": 74,
+            "kind": "gap_speaker_change",
+            "target_sample": 9659520
+          },
+          {
+            "acceptable_interval": [
+              12034880,
+              12041760
+            ],
+            "evidence_onset_sample": 12041760,
+            "gt_index": 96,
+            "kind": "gap_speaker_change",
+            "target_sample": 12041760
+          },
+          {
+            "acceptable_interval": [
+              21301280,
+              21308160
+            ],
+            "evidence_onset_sample": 21308160,
+            "gt_index": 161,
+            "kind": "gap_speaker_change",
+            "target_sample": 21308160
+          },
+          {
+            "acceptable_interval": [
+              24509120,
+              24545760
+            ],
+            "evidence_onset_sample": 24545760,
+            "gt_index": 177,
+            "kind": "gap_speaker_change",
+            "target_sample": 24545760
+          },
+          {
+            "acceptable_interval": [
+              25385120,
+              25403040
+            ],
+            "evidence_onset_sample": 25403040,
+            "gt_index": 179,
+            "kind": "gap_speaker_change",
+            "target_sample": 25403040
+          },
+          {
+            "acceptable_interval": [
+              30330080,
+              30330720
+            ],
+            "evidence_onset_sample": 30330720,
+            "gt_index": 222,
+            "kind": "gap_speaker_change",
+            "target_sample": 30330720
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              182080,
+              185760
+            ],
+            "silence_end_sample": 185760,
+            "silence_start_sample": 182080,
+            "speaker": "SPK8023",
+            "speech_after_end": 271520,
+            "speech_before_start": 158560
+          },
+          {
+            "interval": [
+              486560,
+              503360
+            ],
+            "silence_end_sample": 503360,
+            "silence_start_sample": 486560,
+            "speaker": "SPK8024",
+            "speech_after_end": 551840,
+            "speech_before_start": 466560
+          },
+          {
+            "interval": [
+              551840,
+              571200
+            ],
+            "silence_end_sample": 571200,
+            "silence_start_sample": 551840,
+            "speaker": "SPK8024",
+            "speech_after_end": 602720,
+            "speech_before_start": 503360
+          },
+          {
+            "interval": [
+              742400,
+              748320
+            ],
+            "silence_end_sample": 748320,
+            "silence_start_sample": 742400,
+            "speaker": "SPK8024",
+            "speech_after_end": 762560,
+            "speech_before_start": 689280
+          },
+          {
+            "interval": [
+              5039840,
+              5051040
+            ],
+            "silence_end_sample": 5051040,
+            "silence_start_sample": 5039840,
+            "speaker": "SPK8024",
+            "speech_after_end": 5069120,
+            "speech_before_start": 4959520
+          },
+          {
+            "interval": [
+              9782720,
+              9786560
+            ],
+            "silence_end_sample": 9786560,
+            "silence_start_sample": 9782720,
+            "speaker": "SPK8024",
+            "speech_after_end": 9817760,
+            "speech_before_start": 9767520
+          },
+          {
+            "interval": [
+              10848800,
+              10856640
+            ],
+            "silence_end_sample": 10856640,
+            "silence_start_sample": 10848800,
+            "speaker": "SPK8024",
+            "speech_after_end": 10888640,
+            "speech_before_start": 10834080
+          },
+          {
+            "interval": [
+              12470240,
+              12482400
+            ],
+            "silence_end_sample": 12482400,
+            "silence_start_sample": 12470240,
+            "speaker": "SPK8024",
+            "speech_after_end": 12501440,
+            "speech_before_start": 12443040
+          },
+          {
+            "interval": [
+              14056960,
+              14064960
+            ],
+            "silence_end_sample": 14064960,
+            "silence_start_sample": 14056960,
+            "speaker": "SPK8023",
+            "speech_after_end": 14157440,
+            "speech_before_start": 14011040
+          },
+          {
+            "interval": [
+              16296320,
+              16307040
+            ],
+            "silence_end_sample": 16307040,
+            "silence_start_sample": 16296320,
+            "speaker": "SPK8024",
+            "speech_after_end": 16355360,
+            "speech_before_start": 16223360
+          },
+          {
+            "interval": [
+              16355360,
+              16360800
+            ],
+            "silence_end_sample": 16360800,
+            "silence_start_sample": 16355360,
+            "speaker": "SPK8024",
+            "speech_after_end": 16374720,
+            "speech_before_start": 16307040
+          },
+          {
+            "interval": [
+              17099840,
+              17111040
+            ],
+            "silence_end_sample": 17111040,
+            "silence_start_sample": 17099840,
+            "speaker": "SPK8024",
+            "speech_after_end": 17170400,
+            "speech_before_start": 17062080
+          }
+        ]
+      },
+      "alimeeting_R8009_M8020": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              12761600,
+              12764160
+            ],
+            "evidence_onset_sample": 12764160,
+            "gt_index": 110,
+            "kind": "gap_speaker_change",
+            "target_sample": 12764160
+          },
+          {
+            "acceptable_interval": [
+              14354240,
+              14356000
+            ],
+            "evidence_onset_sample": 14356000,
+            "gt_index": 138,
+            "kind": "gap_speaker_change",
+            "target_sample": 14356000
+          },
+          {
+            "acceptable_interval": [
+              14578880,
+              14584800
+            ],
+            "evidence_onset_sample": 14584800,
+            "gt_index": 142,
+            "kind": "gap_speaker_change",
+            "target_sample": 14584800
+          },
+          {
+            "acceptable_interval": [
+              18493760,
+              18517920
+            ],
+            "evidence_onset_sample": 18517920,
+            "gt_index": 191,
+            "kind": "gap_speaker_change",
+            "target_sample": 18517920
+          },
+          {
+            "acceptable_interval": [
+              18615200,
+              18619680
+            ],
+            "evidence_onset_sample": 18619680,
+            "gt_index": 193,
+            "kind": "gap_speaker_change",
+            "target_sample": 18619680
+          },
+          {
+            "acceptable_interval": [
+              19623680,
+              19630080
+            ],
+            "evidence_onset_sample": 19630080,
+            "gt_index": 203,
+            "kind": "gap_speaker_change",
+            "target_sample": 19630080
+          },
+          {
+            "acceptable_interval": [
+              26384480,
+              26392800
+            ],
+            "evidence_onset_sample": 26392800,
+            "gt_index": 267,
+            "kind": "gap_speaker_change",
+            "target_sample": 26392800
+          },
+          {
+            "acceptable_interval": [
+              27240160,
+              27241280
+            ],
+            "evidence_onset_sample": 27241280,
+            "gt_index": 273,
+            "kind": "gap_speaker_change",
+            "target_sample": 27241280
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              2166080,
+              2173440
+            ],
+            "silence_end_sample": 2173440,
+            "silence_start_sample": 2166080,
+            "speaker": "SPK8026",
+            "speech_after_end": 2215680,
+            "speech_before_start": 2088960
+          },
+          {
+            "interval": [
+              3996480,
+              4000480
+            ],
+            "silence_end_sample": 4000480,
+            "silence_start_sample": 3996480,
+            "speaker": "SPK8026",
+            "speech_after_end": 4005440,
+            "speech_before_start": 3903360
+          },
+          {
+            "interval": [
+              6700640,
+              6713760
+            ],
+            "silence_end_sample": 6713760,
+            "silence_start_sample": 6700640,
+            "speaker": "SPK8025",
+            "speech_after_end": 6736160,
+            "speech_before_start": 6680160
+          },
+          {
+            "interval": [
+              6817760,
+              6824640
+            ],
+            "silence_end_sample": 6824640,
+            "silence_start_sample": 6817760,
+            "speaker": "SPK8025",
+            "speech_after_end": 6850400,
+            "speech_before_start": 6755520
+          },
+          {
+            "interval": [
+              7020320,
+              7028160
+            ],
+            "silence_end_sample": 7028160,
+            "silence_start_sample": 7020320,
+            "speaker": "SPK8025",
+            "speech_after_end": 7102880,
+            "speech_before_start": 6962400
+          },
+          {
+            "interval": [
+              7102880,
+              7108320
+            ],
+            "silence_end_sample": 7108320,
+            "silence_start_sample": 7102880,
+            "speaker": "SPK8025",
+            "speech_after_end": 7174880,
+            "speech_before_start": 7028160
+          },
+          {
+            "interval": [
+              8166560,
+              8171520
+            ],
+            "silence_end_sample": 8171520,
+            "silence_start_sample": 8166560,
+            "speaker": "SPK8025",
+            "speech_after_end": 8221760,
+            "speech_before_start": 8108640
+          },
+          {
+            "interval": [
+              15490880,
+              15499360
+            ],
+            "silence_end_sample": 15499360,
+            "silence_start_sample": 15490880,
+            "speaker": "SPK8025",
+            "speech_after_end": 15577440,
+            "speech_before_start": 15452000
+          },
+          {
+            "interval": [
+              16832480,
+              16837440
+            ],
+            "silence_end_sample": 16837440,
+            "silence_start_sample": 16832480,
+            "speaker": "SPK8025",
+            "speech_after_end": 16863360,
+            "speech_before_start": 16786560
+          },
+          {
+            "interval": [
+              20623360,
+              20633280
+            ],
+            "silence_end_sample": 20633280,
+            "silence_start_sample": 20623360,
+            "speaker": "SPK8025",
+            "speech_after_end": 20664960,
+            "speech_before_start": 20544480
+          },
+          {
+            "interval": [
+              21477440,
+              21489120
+            ],
+            "silence_end_sample": 21489120,
+            "silence_start_sample": 21477440,
+            "speaker": "SPK8025",
+            "speech_after_end": 21490880,
+            "speech_before_start": 21364640
+          },
+          {
+            "interval": [
+              22881920,
+              22887360
+            ],
+            "silence_end_sample": 22887360,
+            "silence_start_sample": 22881920,
+            "speaker": "SPK8026",
+            "speech_after_end": 22917600,
+            "speech_before_start": 22825440
+          }
+        ]
+      },
+      "ami_ES2003a": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              210880,
+              211840
+            ],
+            "evidence_onset_sample": 211840,
+            "gt_index": 0,
+            "kind": "gap_speaker_change",
+            "target_sample": 211840
+          },
+          {
+            "acceptable_interval": [
+              4384480,
+              4389920
+            ],
+            "evidence_onset_sample": 4389920,
+            "gt_index": 26,
+            "kind": "gap_speaker_change",
+            "target_sample": 4389920
+          },
+          {
+            "acceptable_interval": [
+              16603840,
+              16732480
+            ],
+            "evidence_onset_sample": 16732480,
+            "gt_index": 71,
+            "kind": "gap_speaker_change",
+            "target_sample": 16732480
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              16095680,
+              16116000
+            ],
+            "silence_end_sample": 16116000,
+            "silence_start_sample": 16095680,
+            "speaker": "ES2003a.ParticipantD",
+            "speech_after_end": 16140000,
+            "speech_before_start": 16037760
+          },
+          {
+            "interval": [
+              17475200,
+              17492320
+            ],
+            "silence_end_sample": 17492320,
+            "silence_start_sample": 17475200,
+            "speaker": "ES2003a.ParticipantB",
+            "speech_after_end": 17550720,
+            "speech_before_start": 17416480
+          }
+        ]
+      },
+      "ami_ES2004a": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              13791040,
+              13797280
+            ],
+            "evidence_onset_sample": 13797280,
+            "gt_index": 166,
+            "kind": "gap_speaker_change",
+            "target_sample": 13797280
+          },
+          {
+            "acceptable_interval": [
+              13961440,
+              13967200
+            ],
+            "evidence_onset_sample": 13967200,
+            "gt_index": 172,
+            "kind": "gap_speaker_change",
+            "target_sample": 13967200
+          },
+          {
+            "acceptable_interval": [
+              14162720,
+              14162880
+            ],
+            "evidence_onset_sample": 14162880,
+            "gt_index": 174,
+            "kind": "gap_speaker_change",
+            "target_sample": 14162880
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              1854240,
+              1881920
+            ],
+            "silence_end_sample": 1881920,
+            "silence_start_sample": 1854240,
+            "speaker": "ES2004a.ParticipantB",
+            "speech_after_end": 2575200,
+            "speech_before_start": 1530880
+          },
+          {
+            "interval": [
+              14597600,
+              14619040
+            ],
+            "silence_end_sample": 14619040,
+            "silence_start_sample": 14597600,
+            "speaker": "ES2004a.ParticipantB",
+            "speech_after_end": 14778400,
+            "speech_before_start": 14589760
+          }
+        ]
+      },
+      "ami_IS1008a": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              649920,
+              786240
+            ],
+            "evidence_onset_sample": 786240,
+            "gt_index": 0,
+            "kind": "gap_speaker_change",
+            "target_sample": 786240
+          },
+          {
+            "acceptable_interval": [
+              1577600,
+              1588480
+            ],
+            "evidence_onset_sample": 1588480,
+            "gt_index": 10,
+            "kind": "gap_speaker_change",
+            "target_sample": 1588480
+          },
+          {
+            "acceptable_interval": [
+              4679840,
+              4684160
+            ],
+            "evidence_onset_sample": 4684160,
+            "gt_index": 45,
+            "kind": "gap_speaker_change",
+            "target_sample": 4684160
+          },
+          {
+            "acceptable_interval": [
+              8265440,
+              8275520
+            ],
+            "evidence_onset_sample": 8275520,
+            "gt_index": 70,
+            "kind": "gap_speaker_change",
+            "target_sample": 8275520
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              8005920,
+              8020640
+            ],
+            "silence_end_sample": 8020640,
+            "silence_start_sample": 8005920,
+            "speaker": "IS1008a.ParticipantA",
+            "speech_after_end": 8032320,
+            "speech_before_start": 7813280
+          }
+        ]
+      },
+      "ami_IS1009a": {
+        "hard_positive_selected": [
+          {
+            "acceptable_interval": [
+              2671840,
+              3008960
+            ],
+            "evidence_onset_sample": 3008960,
+            "gt_index": 19,
+            "kind": "gap_speaker_change",
+            "target_sample": 3008960
+          },
+          {
+            "acceptable_interval": [
+              3013440,
+              3120640
+            ],
+            "evidence_onset_sample": 3120640,
+            "gt_index": 20,
+            "kind": "gap_speaker_change",
+            "target_sample": 3120640
+          },
+          {
+            "acceptable_interval": [
+              3124320,
+              3128960
+            ],
+            "evidence_onset_sample": 3128960,
+            "gt_index": 21,
+            "kind": "gap_speaker_change",
+            "target_sample": 3128960
+          },
+          {
+            "acceptable_interval": [
+              5367840,
+              5376320
+            ],
+            "evidence_onset_sample": 5376320,
+            "gt_index": 47,
+            "kind": "gap_speaker_change",
+            "target_sample": 5376320
+          },
+          {
+            "acceptable_interval": [
+              8036320,
+              8044320
+            ],
+            "evidence_onset_sample": 8044320,
+            "gt_index": 82,
+            "kind": "gap_speaker_change",
+            "target_sample": 8044320
+          },
+          {
+            "acceptable_interval": [
+              10202080,
+              10211520
+            ],
+            "evidence_onset_sample": 10211520,
+            "gt_index": 125,
+            "kind": "gap_speaker_change",
+            "target_sample": 10211520
+          },
+          {
+            "acceptable_interval": [
+              10641120,
+              10643520
+            ],
+            "evidence_onset_sample": 10643520,
+            "gt_index": 134,
+            "kind": "gap_speaker_change",
+            "target_sample": 10643520
+          }
+        ],
+        "negative_selected": [
+          {
+            "interval": [
+              4360320,
+              4394880
+            ],
+            "silence_end_sample": 4394880,
+            "silence_start_sample": 4360320,
+            "speaker": "IS1009a.ParticipantA",
+            "speech_after_end": 4415200,
+            "speech_before_start": 4160320
+          },
+          {
+            "interval": [
+              6014880,
+              6036000
+            ],
+            "silence_end_sample": 6036000,
+            "silence_start_sample": 6014880,
+            "speaker": "IS1009a.ParticipantA",
+            "speech_after_end": 6039680,
+            "speech_before_start": 5876000
+          }
+        ]
+      }
+    }
+  }
+}

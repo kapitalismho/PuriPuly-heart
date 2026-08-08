@@ -1,0 +1,4423 @@
+{
+  "b0_missed_count": 271,
+  "b0_separated_count": 0,
+  "boundary_count": 57,
+  "classification": [
+    {
+      "acceptable_interval": [
+        135040,
+        146240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 0,
+      "kind": "gap_speaker_change",
+      "target_sample": 146240
+    },
+    {
+      "acceptable_interval": [
+        411680,
+        418400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 1,
+      "kind": "gap_speaker_change",
+      "target_sample": 418400
+    },
+    {
+      "acceptable_interval": [
+        518080,
+        522400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 2,
+      "kind": "gap_speaker_change",
+      "target_sample": 522400
+    },
+    {
+      "acceptable_interval": [
+        766720,
+        771840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 3,
+      "kind": "gap_speaker_change",
+      "target_sample": 771840
+    },
+    {
+      "acceptable_interval": [
+        908000,
+        912960
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 4,
+      "kind": "gap_speaker_change",
+      "target_sample": 912960
+    },
+    {
+      "acceptable_interval": [
+        917920,
+        934880
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 5,
+      "kind": "gap_speaker_change",
+      "target_sample": 934880
+    },
+    {
+      "acceptable_interval": [
+        1291040,
+        1294080
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 6,
+      "kind": "gap_speaker_change",
+      "target_sample": 1294080
+    },
+    {
+      "acceptable_interval": [
+        1541440,
+        1546400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 7,
+      "kind": "gap_speaker_change",
+      "target_sample": 1546400
+    },
+    {
+      "acceptable_interval": [
+        1555840,
+        1558720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 8,
+      "kind": "gap_speaker_change",
+      "target_sample": 1558720
+    },
+    {
+      "acceptable_interval": [
+        1830720,
+        1835040
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 9,
+      "kind": "gap_speaker_change",
+      "target_sample": 1835040
+    },
+    {
+      "acceptable_interval": [
+        1845600,
+        1858720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 10,
+      "kind": "gap_speaker_change",
+      "target_sample": 1858720
+    },
+    {
+      "acceptable_interval": [
+        1947360,
+        1948480
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 11,
+      "kind": "gap_speaker_change",
+      "target_sample": 1948480
+    },
+    {
+      "acceptable_interval": [
+        1968000,
+        1976320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 12,
+      "kind": "gap_speaker_change",
+      "target_sample": 1976320
+    },
+    {
+      "acceptable_interval": [
+        2142240,
+        2145760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 13,
+      "kind": "gap_speaker_change",
+      "target_sample": 2145760
+    },
+    {
+      "acceptable_interval": [
+        2309120,
+        2318400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 14,
+      "kind": "gap_speaker_change",
+      "target_sample": 2318400
+    },
+    {
+      "acceptable_interval": [
+        2419360,
+        2419520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 15,
+      "kind": "gap_speaker_change",
+      "target_sample": 2419520
+    },
+    {
+      "acceptable_interval": [
+        2446240,
+        2449920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 16,
+      "kind": "gap_speaker_change",
+      "target_sample": 2449920
+    },
+    {
+      "acceptable_interval": [
+        2497120,
+        2497280
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 17,
+      "kind": "gap_speaker_change",
+      "target_sample": 2497280
+    },
+    {
+      "acceptable_interval": [
+        2880960,
+        2882880
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 18,
+      "kind": "gap_speaker_change",
+      "target_sample": 2882880
+    },
+    {
+      "acceptable_interval": [
+        2918080,
+        2937120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 19,
+      "kind": "gap_speaker_change",
+      "target_sample": 2937120
+    },
+    {
+      "acceptable_interval": [
+        3057920,
+        3064000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 20,
+      "kind": "gap_speaker_change",
+      "target_sample": 3064000
+    },
+    {
+      "acceptable_interval": [
+        3071040,
+        3074240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 21,
+      "kind": "gap_speaker_change",
+      "target_sample": 3074240
+    },
+    {
+      "acceptable_interval": [
+        3241760,
+        3241920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 22,
+      "kind": "gap_speaker_change",
+      "target_sample": 3241920
+    },
+    {
+      "acceptable_interval": [
+        3248960,
+        3269760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 23,
+      "kind": "gap_speaker_change",
+      "target_sample": 3269760
+    },
+    {
+      "acceptable_interval": [
+        3389120,
+        3392480
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 24,
+      "kind": "gap_speaker_change",
+      "target_sample": 3392480
+    },
+    {
+      "acceptable_interval": [
+        3511200,
+        3517760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 25,
+      "kind": "gap_speaker_change",
+      "target_sample": 3517760
+    },
+    {
+      "acceptable_interval": [
+        3565120,
+        3582560
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 26,
+      "kind": "gap_speaker_change",
+      "target_sample": 3582560
+    },
+    {
+      "acceptable_interval": [
+        3588640,
+        3598720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 27,
+      "kind": "gap_speaker_change",
+      "target_sample": 3598720
+    },
+    {
+      "acceptable_interval": [
+        3814080,
+        3844320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 28,
+      "kind": "gap_speaker_change",
+      "target_sample": 3844320
+    },
+    {
+      "acceptable_interval": [
+        3990720,
+        3992000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 29,
+      "kind": "gap_speaker_change",
+      "target_sample": 3992000
+    },
+    {
+      "acceptable_interval": [
+        4081280,
+        4096000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 30,
+      "kind": "gap_speaker_change",
+      "target_sample": 4096000
+    },
+    {
+      "acceptable_interval": [
+        4566400,
+        4570400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 31,
+      "kind": "gap_speaker_change",
+      "target_sample": 4570400
+    },
+    {
+      "acceptable_interval": [
+        4743040,
+        4755840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 32,
+      "kind": "gap_speaker_change",
+      "target_sample": 4755840
+    },
+    {
+      "acceptable_interval": [
+        4899360,
+        4903680
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 33,
+      "kind": "gap_speaker_change",
+      "target_sample": 4903680
+    },
+    {
+      "acceptable_interval": [
+        5136960,
+        5139520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 34,
+      "kind": "gap_speaker_change",
+      "target_sample": 5139520
+    },
+    {
+      "acceptable_interval": [
+        5196640,
+        5207360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 35,
+      "kind": "gap_speaker_change",
+      "target_sample": 5207360
+    },
+    {
+      "acceptable_interval": [
+        5306560,
+        5315360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 36,
+      "kind": "gap_speaker_change",
+      "target_sample": 5315360
+    },
+    {
+      "acceptable_interval": [
+        5321920,
+        5334880
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 37,
+      "kind": "gap_speaker_change",
+      "target_sample": 5334880
+    },
+    {
+      "acceptable_interval": [
+        5543680,
+        5547200
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 38,
+      "kind": "gap_speaker_change",
+      "target_sample": 5547200
+    },
+    {
+      "acceptable_interval": [
+        5558240,
+        5566560
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 39,
+      "kind": "gap_speaker_change",
+      "target_sample": 5566560
+    },
+    {
+      "acceptable_interval": [
+        5788640,
+        5808960
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 40,
+      "kind": "gap_speaker_change",
+      "target_sample": 5808960
+    },
+    {
+      "acceptable_interval": [
+        6015040,
+        6024000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 41,
+      "kind": "gap_speaker_change",
+      "target_sample": 6024000
+    },
+    {
+      "acceptable_interval": [
+        6170080,
+        6182400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 42,
+      "kind": "gap_speaker_change",
+      "target_sample": 6182400
+    },
+    {
+      "acceptable_interval": [
+        6186720,
+        6190400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 43,
+      "kind": "gap_speaker_change",
+      "target_sample": 6190400
+    },
+    {
+      "acceptable_interval": [
+        6301120,
+        6320320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 44,
+      "kind": "gap_speaker_change",
+      "target_sample": 6320320
+    },
+    {
+      "acceptable_interval": [
+        6480000,
+        6504000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 45,
+      "kind": "gap_speaker_change",
+      "target_sample": 6504000
+    },
+    {
+      "acceptable_interval": [
+        6509280,
+        6536640
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 46,
+      "kind": "gap_speaker_change",
+      "target_sample": 6536640
+    },
+    {
+      "acceptable_interval": [
+        6612960,
+        6634400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 47,
+      "kind": "gap_speaker_change",
+      "target_sample": 6634400
+    },
+    {
+      "acceptable_interval": [
+        6757600,
+        6808160
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 48,
+      "kind": "gap_speaker_change",
+      "target_sample": 6808160
+    },
+    {
+      "acceptable_interval": [
+        6949120,
+        6975040
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 49,
+      "kind": "gap_speaker_change",
+      "target_sample": 6975040
+    },
+    {
+      "acceptable_interval": [
+        7081120,
+        7099520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 50,
+      "kind": "gap_speaker_change",
+      "target_sample": 7099520
+    },
+    {
+      "acceptable_interval": [
+        7236320,
+        7249120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 51,
+      "kind": "gap_speaker_change",
+      "target_sample": 7249120
+    },
+    {
+      "acceptable_interval": [
+        7309920,
+        7311520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 52,
+      "kind": "gap_speaker_change",
+      "target_sample": 7311520
+    },
+    {
+      "acceptable_interval": [
+        7350560,
+        7365920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 53,
+      "kind": "gap_speaker_change",
+      "target_sample": 7365920
+    },
+    {
+      "acceptable_interval": [
+        7476320,
+        7502080
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 54,
+      "kind": "gap_speaker_change",
+      "target_sample": 7502080
+    },
+    {
+      "acceptable_interval": [
+        7541920,
+        7544960
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 55,
+      "kind": "gap_speaker_change",
+      "target_sample": 7544960
+    },
+    {
+      "acceptable_interval": [
+        8247200,
+        8262240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 56,
+      "kind": "gap_speaker_change",
+      "target_sample": 8262240
+    },
+    {
+      "acceptable_interval": [
+        8330880,
+        8331840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 57,
+      "kind": "gap_speaker_change",
+      "target_sample": 8331840
+    },
+    {
+      "acceptable_interval": [
+        8552800,
+        8559360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 58,
+      "kind": "gap_speaker_change",
+      "target_sample": 8559360
+    },
+    {
+      "acceptable_interval": [
+        8675360,
+        8687840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 59,
+      "kind": "gap_speaker_change",
+      "target_sample": 8687840
+    },
+    {
+      "acceptable_interval": [
+        8976160,
+        8984480
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 60,
+      "kind": "gap_speaker_change",
+      "target_sample": 8984480
+    },
+    {
+      "acceptable_interval": [
+        9005280,
+        9035680
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 61,
+      "kind": "gap_speaker_change",
+      "target_sample": 9035680
+    },
+    {
+      "acceptable_interval": [
+        9280320,
+        9288640
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 62,
+      "kind": "gap_speaker_change",
+      "target_sample": 9288640
+    },
+    {
+      "acceptable_interval": [
+        9520960,
+        9525920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 63,
+      "kind": "gap_speaker_change",
+      "target_sample": 9525920
+    },
+    {
+      "acceptable_interval": [
+        9534560,
+        9539840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 64,
+      "kind": "gap_speaker_change",
+      "target_sample": 9539840
+    },
+    {
+      "acceptable_interval": [
+        9565120,
+        9577920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 65,
+      "kind": "gap_speaker_change",
+      "target_sample": 9577920
+    },
+    {
+      "acceptable_interval": [
+        9757120,
+        9761120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 66,
+      "kind": "gap_speaker_change",
+      "target_sample": 9761120
+    },
+    {
+      "acceptable_interval": [
+        9769120,
+        9780320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 67,
+      "kind": "gap_speaker_change",
+      "target_sample": 9780320
+    },
+    {
+      "acceptable_interval": [
+        10057760,
+        10064960
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 68,
+      "kind": "gap_speaker_change",
+      "target_sample": 10064960
+    },
+    {
+      "acceptable_interval": [
+        10405760,
+        10413760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 69,
+      "kind": "clean_handoff",
+      "target_sample": 10413760
+    },
+    {
+      "acceptable_interval": [
+        10420800,
+        10429120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 70,
+      "kind": "gap_speaker_change",
+      "target_sample": 10429120
+    },
+    {
+      "acceptable_interval": [
+        10443680,
+        10454720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 71,
+      "kind": "gap_speaker_change",
+      "target_sample": 10454720
+    },
+    {
+      "acceptable_interval": [
+        10513920,
+        10525120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 72,
+      "kind": "gap_speaker_change",
+      "target_sample": 10525120
+    },
+    {
+      "acceptable_interval": [
+        10597600,
+        10597760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 73,
+      "kind": "gap_speaker_change",
+      "target_sample": 10597760
+    },
+    {
+      "acceptable_interval": [
+        10785600,
+        10791520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 74,
+      "kind": "gap_speaker_change",
+      "target_sample": 10791520
+    },
+    {
+      "acceptable_interval": [
+        10806400,
+        10811840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 75,
+      "kind": "gap_speaker_change",
+      "target_sample": 10811840
+    },
+    {
+      "acceptable_interval": [
+        11307840,
+        11342400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 76,
+      "kind": "gap_speaker_change",
+      "target_sample": 11342400
+    },
+    {
+      "acceptable_interval": [
+        11483520,
+        11495520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 77,
+      "kind": "gap_speaker_change",
+      "target_sample": 11495520
+    },
+    {
+      "acceptable_interval": [
+        11506880,
+        11514560
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 78,
+      "kind": "gap_speaker_change",
+      "target_sample": 11514560
+    },
+    {
+      "acceptable_interval": [
+        11554880,
+        11559200
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 79,
+      "kind": "gap_speaker_change",
+      "target_sample": 11559200
+    },
+    {
+      "acceptable_interval": [
+        11564160,
+        11578400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 80,
+      "kind": "gap_speaker_change",
+      "target_sample": 11578400
+    },
+    {
+      "acceptable_interval": [
+        11632960,
+        11655360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 81,
+      "kind": "gap_speaker_change",
+      "target_sample": 11655360
+    },
+    {
+      "acceptable_interval": [
+        11659840,
+        11663840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 82,
+      "kind": "gap_speaker_change",
+      "target_sample": 11663840
+    },
+    {
+      "acceptable_interval": [
+        11671360,
+        11679840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 83,
+      "kind": "gap_speaker_change",
+      "target_sample": 11679840
+    },
+    {
+      "acceptable_interval": [
+        11770240,
+        11797120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 84,
+      "kind": "gap_speaker_change",
+      "target_sample": 11797120
+    },
+    {
+      "acceptable_interval": [
+        11880160,
+        11886880
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 85,
+      "kind": "gap_speaker_change",
+      "target_sample": 11886880
+    },
+    {
+      "acceptable_interval": [
+        12747200,
+        12750240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 86,
+      "kind": "gap_speaker_change",
+      "target_sample": 12750240
+    },
+    {
+      "acceptable_interval": [
+        12936320,
+        12940800
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 87,
+      "kind": "gap_speaker_change",
+      "target_sample": 12940800
+    },
+    {
+      "acceptable_interval": [
+        12943840,
+        12946720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 88,
+      "kind": "gap_speaker_change",
+      "target_sample": 12946720
+    },
+    {
+      "acceptable_interval": [
+        13056800,
+        13076320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 89,
+      "kind": "gap_speaker_change",
+      "target_sample": 13076320
+    },
+    {
+      "acceptable_interval": [
+        13274560,
+        13300640
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 90,
+      "kind": "gap_speaker_change",
+      "target_sample": 13300640
+    },
+    {
+      "acceptable_interval": [
+        13409440,
+        13419040
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 91,
+      "kind": "gap_speaker_change",
+      "target_sample": 13419040
+    },
+    {
+      "acceptable_interval": [
+        13431040,
+        13433760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 92,
+      "kind": "gap_speaker_change",
+      "target_sample": 13433760
+    },
+    {
+      "acceptable_interval": [
+        13527360,
+        13532960
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 93,
+      "kind": "gap_speaker_change",
+      "target_sample": 13532960
+    },
+    {
+      "acceptable_interval": [
+        13541280,
+        13548960
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 94,
+      "kind": "gap_speaker_change",
+      "target_sample": 13548960
+    },
+    {
+      "acceptable_interval": [
+        13819840,
+        13825120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 95,
+      "kind": "gap_speaker_change",
+      "target_sample": 13825120
+    },
+    {
+      "acceptable_interval": [
+        13827520,
+        13835520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 96,
+      "kind": "clean_handoff",
+      "target_sample": 13835520
+    },
+    {
+      "acceptable_interval": [
+        13953760,
+        13962080
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 97,
+      "kind": "gap_speaker_change",
+      "target_sample": 13962080
+    },
+    {
+      "acceptable_interval": [
+        14268960,
+        14280000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 98,
+      "kind": "gap_speaker_change",
+      "target_sample": 14280000
+    },
+    {
+      "acceptable_interval": [
+        14331680,
+        14352960
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 99,
+      "kind": "gap_speaker_change",
+      "target_sample": 14352960
+    },
+    {
+      "acceptable_interval": [
+        14588160,
+        14594720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 100,
+      "kind": "gap_speaker_change",
+      "target_sample": 14594720
+    },
+    {
+      "acceptable_interval": [
+        14601760,
+        14607840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 101,
+      "kind": "gap_speaker_change",
+      "target_sample": 14607840
+    },
+    {
+      "acceptable_interval": [
+        14653440,
+        14663520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 102,
+      "kind": "gap_speaker_change",
+      "target_sample": 14663520
+    },
+    {
+      "acceptable_interval": [
+        14741760,
+        14751840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 103,
+      "kind": "gap_speaker_change",
+      "target_sample": 14751840
+    },
+    {
+      "acceptable_interval": [
+        14911200,
+        14914080
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 104,
+      "kind": "gap_speaker_change",
+      "target_sample": 14914080
+    },
+    {
+      "acceptable_interval": [
+        15037920,
+        15041120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 105,
+      "kind": "gap_speaker_change",
+      "target_sample": 15041120
+    },
+    {
+      "acceptable_interval": [
+        15097920,
+        15111520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 106,
+      "kind": "gap_speaker_change",
+      "target_sample": 15111520
+    },
+    {
+      "acceptable_interval": [
+        15137280,
+        15140320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 107,
+      "kind": "gap_speaker_change",
+      "target_sample": 15140320
+    },
+    {
+      "acceptable_interval": [
+        15207360,
+        15227520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 108,
+      "kind": "gap_speaker_change",
+      "target_sample": 15227520
+    },
+    {
+      "acceptable_interval": [
+        15372480,
+        15384000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 109,
+      "kind": "gap_speaker_change",
+      "target_sample": 15384000
+    },
+    {
+      "acceptable_interval": [
+        15418880,
+        15419360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 110,
+      "kind": "gap_speaker_change",
+      "target_sample": 15419360
+    },
+    {
+      "acceptable_interval": [
+        15649120,
+        15654560
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 111,
+      "kind": "gap_speaker_change",
+      "target_sample": 15654560
+    },
+    {
+      "acceptable_interval": [
+        15669760,
+        15676800
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 112,
+      "kind": "gap_speaker_change",
+      "target_sample": 15676800
+    },
+    {
+      "acceptable_interval": [
+        15828960,
+        15832000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 113,
+      "kind": "gap_speaker_change",
+      "target_sample": 15832000
+    },
+    {
+      "acceptable_interval": [
+        15840480,
+        15858880
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 114,
+      "kind": "gap_speaker_change",
+      "target_sample": 15858880
+    },
+    {
+      "acceptable_interval": [
+        15866720,
+        15892800
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 115,
+      "kind": "gap_speaker_change",
+      "target_sample": 15892800
+    },
+    {
+      "acceptable_interval": [
+        16067360,
+        16088320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 116,
+      "kind": "gap_speaker_change",
+      "target_sample": 16088320
+    },
+    {
+      "acceptable_interval": [
+        16189600,
+        16193440
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 117,
+      "kind": "gap_speaker_change",
+      "target_sample": 16193440
+    },
+    {
+      "acceptable_interval": [
+        16512160,
+        16530400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 118,
+      "kind": "gap_speaker_change",
+      "target_sample": 16530400
+    },
+    {
+      "acceptable_interval": [
+        16817120,
+        16823840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 119,
+      "kind": "gap_speaker_change",
+      "target_sample": 16823840
+    },
+    {
+      "acceptable_interval": [
+        16946240,
+        16952480
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 120,
+      "kind": "gap_speaker_change",
+      "target_sample": 16952480
+    },
+    {
+      "acceptable_interval": [
+        17443200,
+        17447520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 121,
+      "kind": "gap_speaker_change",
+      "target_sample": 17447520
+    },
+    {
+      "acceptable_interval": [
+        17479200,
+        17489120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 122,
+      "kind": "gap_speaker_change",
+      "target_sample": 17489120
+    },
+    {
+      "acceptable_interval": [
+        17497280,
+        17505440
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 123,
+      "kind": "gap_speaker_change",
+      "target_sample": 17505440
+    },
+    {
+      "acceptable_interval": [
+        17512320,
+        17524640
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 124,
+      "kind": "gap_speaker_change",
+      "target_sample": 17524640
+    },
+    {
+      "acceptable_interval": [
+        17618560,
+        17639680
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 125,
+      "kind": "gap_speaker_change",
+      "target_sample": 17639680
+    },
+    {
+      "acceptable_interval": [
+        17838560,
+        17847520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 126,
+      "kind": "gap_speaker_change",
+      "target_sample": 17847520
+    },
+    {
+      "acceptable_interval": [
+        17865440,
+        17869600
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 127,
+      "kind": "gap_speaker_change",
+      "target_sample": 17869600
+    },
+    {
+      "acceptable_interval": [
+        17906560,
+        17914720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 128,
+      "kind": "gap_speaker_change",
+      "target_sample": 17914720
+    },
+    {
+      "acceptable_interval": [
+        18095840,
+        18096000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 129,
+      "kind": "gap_speaker_change",
+      "target_sample": 18096000
+    },
+    {
+      "acceptable_interval": [
+        18105120,
+        18112000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 130,
+      "kind": "gap_speaker_change",
+      "target_sample": 18112000
+    },
+    {
+      "acceptable_interval": [
+        18135360,
+        18140480
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 131,
+      "kind": "gap_speaker_change",
+      "target_sample": 18140480
+    },
+    {
+      "acceptable_interval": [
+        18148640,
+        18154720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 132,
+      "kind": "gap_speaker_change",
+      "target_sample": 18154720
+    },
+    {
+      "acceptable_interval": [
+        18189440,
+        18193440
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 133,
+      "kind": "gap_speaker_change",
+      "target_sample": 18193440
+    },
+    {
+      "acceptable_interval": [
+        18200160,
+        18204480
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 134,
+      "kind": "gap_speaker_change",
+      "target_sample": 18204480
+    },
+    {
+      "acceptable_interval": [
+        18337280,
+        18339360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 135,
+      "kind": "gap_speaker_change",
+      "target_sample": 18339360
+    },
+    {
+      "acceptable_interval": [
+        18471200,
+        18477600
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 136,
+      "kind": "gap_speaker_change",
+      "target_sample": 18477600
+    },
+    {
+      "acceptable_interval": [
+        18483040,
+        18493120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 137,
+      "kind": "gap_speaker_change",
+      "target_sample": 18493120
+    },
+    {
+      "acceptable_interval": [
+        18498080,
+        18540000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 138,
+      "kind": "gap_speaker_change",
+      "target_sample": 18540000
+    },
+    {
+      "acceptable_interval": [
+        18607520,
+        18638400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 139,
+      "kind": "gap_speaker_change",
+      "target_sample": 18638400
+    },
+    {
+      "acceptable_interval": [
+        18724160,
+        18728480
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 140,
+      "kind": "gap_speaker_change",
+      "target_sample": 18728480
+    },
+    {
+      "acceptable_interval": [
+        18739840,
+        18747200
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 141,
+      "kind": "gap_speaker_change",
+      "target_sample": 18747200
+    },
+    {
+      "acceptable_interval": [
+        19011040,
+        19013760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 142,
+      "kind": "gap_speaker_change",
+      "target_sample": 19013760
+    },
+    {
+      "acceptable_interval": [
+        19085280,
+        19086240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 143,
+      "kind": "gap_speaker_change",
+      "target_sample": 19086240
+    },
+    {
+      "acceptable_interval": [
+        19125760,
+        19127360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 144,
+      "kind": "gap_speaker_change",
+      "target_sample": 19127360
+    },
+    {
+      "acceptable_interval": [
+        19134080,
+        19142080
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 145,
+      "kind": "gap_speaker_change",
+      "target_sample": 19142080
+    },
+    {
+      "acceptable_interval": [
+        19193120,
+        19193280
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 146,
+      "kind": "gap_speaker_change",
+      "target_sample": 19193280
+    },
+    {
+      "acceptable_interval": [
+        19543840,
+        19546720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 147,
+      "kind": "gap_speaker_change",
+      "target_sample": 19546720
+    },
+    {
+      "acceptable_interval": [
+        19592160,
+        19594720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 148,
+      "kind": "gap_speaker_change",
+      "target_sample": 19594720
+    },
+    {
+      "acceptable_interval": [
+        19602400,
+        19625440
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 149,
+      "kind": "gap_speaker_change",
+      "target_sample": 19625440
+    },
+    {
+      "acceptable_interval": [
+        19645120,
+        19668000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 150,
+      "kind": "gap_speaker_change",
+      "target_sample": 19668000
+    },
+    {
+      "acceptable_interval": [
+        19718080,
+        19719200
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 151,
+      "kind": "gap_speaker_change",
+      "target_sample": 19719200
+    },
+    {
+      "acceptable_interval": [
+        19836000,
+        19837920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 152,
+      "kind": "gap_speaker_change",
+      "target_sample": 19837920
+    },
+    {
+      "acceptable_interval": [
+        19924960,
+        19937760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 153,
+      "kind": "gap_speaker_change",
+      "target_sample": 19937760
+    },
+    {
+      "acceptable_interval": [
+        19946880,
+        19950720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 154,
+      "kind": "gap_speaker_change",
+      "target_sample": 19950720
+    },
+    {
+      "acceptable_interval": [
+        20036320,
+        20062400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 155,
+      "kind": "gap_speaker_change",
+      "target_sample": 20062400
+    },
+    {
+      "acceptable_interval": [
+        20150240,
+        20155040
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 156,
+      "kind": "gap_speaker_change",
+      "target_sample": 20155040
+    },
+    {
+      "acceptable_interval": [
+        20313120,
+        20329920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 157,
+      "kind": "gap_speaker_change",
+      "target_sample": 20329920
+    },
+    {
+      "acceptable_interval": [
+        20337440,
+        20340320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 158,
+      "kind": "gap_speaker_change",
+      "target_sample": 20340320
+    },
+    {
+      "acceptable_interval": [
+        20502720,
+        20516320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 159,
+      "kind": "gap_speaker_change",
+      "target_sample": 20516320
+    },
+    {
+      "acceptable_interval": [
+        20723200,
+        20740640
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 160,
+      "kind": "gap_speaker_change",
+      "target_sample": 20740640
+    },
+    {
+      "acceptable_interval": [
+        20798560,
+        20800000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 161,
+      "kind": "gap_speaker_change",
+      "target_sample": 20800000
+    },
+    {
+      "acceptable_interval": [
+        20808320,
+        20809120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 162,
+      "kind": "gap_speaker_change",
+      "target_sample": 20809120
+    },
+    {
+      "acceptable_interval": [
+        20886880,
+        20888960
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 163,
+      "kind": "gap_speaker_change",
+      "target_sample": 20888960
+    },
+    {
+      "acceptable_interval": [
+        20990080,
+        21004960
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 164,
+      "kind": "gap_speaker_change",
+      "target_sample": 21004960
+    },
+    {
+      "acceptable_interval": [
+        21013280,
+        21036800
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 165,
+      "kind": "gap_speaker_change",
+      "target_sample": 21036800
+    },
+    {
+      "acceptable_interval": [
+        21055840,
+        21064320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 166,
+      "kind": "gap_speaker_change",
+      "target_sample": 21064320
+    },
+    {
+      "acceptable_interval": [
+        21075200,
+        21117600
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 167,
+      "kind": "gap_speaker_change",
+      "target_sample": 21117600
+    },
+    {
+      "acceptable_interval": [
+        21226400,
+        21228480
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 168,
+      "kind": "gap_speaker_change",
+      "target_sample": 21228480
+    },
+    {
+      "acceptable_interval": [
+        21427840,
+        21443840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 169,
+      "kind": "gap_speaker_change",
+      "target_sample": 21443840
+    },
+    {
+      "acceptable_interval": [
+        21474400,
+        21475680
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 170,
+      "kind": "gap_speaker_change",
+      "target_sample": 21475680
+    },
+    {
+      "acceptable_interval": [
+        21579840,
+        21586400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 171,
+      "kind": "gap_speaker_change",
+      "target_sample": 21586400
+    },
+    {
+      "acceptable_interval": [
+        21823040,
+        21824160
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 172,
+      "kind": "gap_speaker_change",
+      "target_sample": 21824160
+    },
+    {
+      "acceptable_interval": [
+        21829920,
+        21837280
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 173,
+      "kind": "gap_speaker_change",
+      "target_sample": 21837280
+    },
+    {
+      "acceptable_interval": [
+        21973120,
+        21975680
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 174,
+      "kind": "gap_speaker_change",
+      "target_sample": 21975680
+    },
+    {
+      "acceptable_interval": [
+        22135200,
+        22138880
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 175,
+      "kind": "gap_speaker_change",
+      "target_sample": 22138880
+    },
+    {
+      "acceptable_interval": [
+        22145760,
+        22148480
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 176,
+      "kind": "gap_speaker_change",
+      "target_sample": 22148480
+    },
+    {
+      "acceptable_interval": [
+        22477440,
+        22477920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 177,
+      "kind": "gap_speaker_change",
+      "target_sample": 22477920
+    },
+    {
+      "acceptable_interval": [
+        22487840,
+        22495520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 178,
+      "kind": "gap_speaker_change",
+      "target_sample": 22495520
+    },
+    {
+      "acceptable_interval": [
+        22600640,
+        22630720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 179,
+      "kind": "gap_speaker_change",
+      "target_sample": 22630720
+    },
+    {
+      "acceptable_interval": [
+        22946080,
+        22958240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 180,
+      "kind": "gap_speaker_change",
+      "target_sample": 22958240
+    },
+    {
+      "acceptable_interval": [
+        22963520,
+        22975040
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 181,
+      "kind": "gap_speaker_change",
+      "target_sample": 22975040
+    },
+    {
+      "acceptable_interval": [
+        23326880,
+        23343360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 182,
+      "kind": "gap_speaker_change",
+      "target_sample": 23343360
+    },
+    {
+      "acceptable_interval": [
+        23444000,
+        23450720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 183,
+      "kind": "gap_speaker_change",
+      "target_sample": 23450720
+    },
+    {
+      "acceptable_interval": [
+        23554560,
+        23575200
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 184,
+      "kind": "gap_speaker_change",
+      "target_sample": 23575200
+    },
+    {
+      "acceptable_interval": [
+        23584640,
+        23593120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 185,
+      "kind": "gap_speaker_change",
+      "target_sample": 23593120
+    },
+    {
+      "acceptable_interval": [
+        23628640,
+        23639360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 186,
+      "kind": "gap_speaker_change",
+      "target_sample": 23639360
+    },
+    {
+      "acceptable_interval": [
+        23686400,
+        23691040
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 187,
+      "kind": "gap_speaker_change",
+      "target_sample": 23691040
+    },
+    {
+      "acceptable_interval": [
+        23725600,
+        23753920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 188,
+      "kind": "gap_speaker_change",
+      "target_sample": 23753920
+    },
+    {
+      "acceptable_interval": [
+        23946560,
+        23954720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 189,
+      "kind": "gap_speaker_change",
+      "target_sample": 23954720
+    },
+    {
+      "acceptable_interval": [
+        23961760,
+        23978400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 190,
+      "kind": "gap_speaker_change",
+      "target_sample": 23978400
+    },
+    {
+      "acceptable_interval": [
+        23984640,
+        23988800
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 191,
+      "kind": "gap_speaker_change",
+      "target_sample": 23988800
+    },
+    {
+      "acceptable_interval": [
+        24131040,
+        24150080
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 192,
+      "kind": "gap_speaker_change",
+      "target_sample": 24150080
+    },
+    {
+      "acceptable_interval": [
+        24203360,
+        24212800
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 193,
+      "kind": "gap_speaker_change",
+      "target_sample": 24212800
+    },
+    {
+      "acceptable_interval": [
+        24433120,
+        24439840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 194,
+      "kind": "gap_speaker_change",
+      "target_sample": 24439840
+    },
+    {
+      "acceptable_interval": [
+        24448480,
+        24461920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 195,
+      "kind": "gap_speaker_change",
+      "target_sample": 24461920
+    },
+    {
+      "acceptable_interval": [
+        24587680,
+        24591200
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 196,
+      "kind": "gap_speaker_change",
+      "target_sample": 24591200
+    },
+    {
+      "acceptable_interval": [
+        24599360,
+        24624000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 197,
+      "kind": "gap_speaker_change",
+      "target_sample": 24624000
+    },
+    {
+      "acceptable_interval": [
+        24722240,
+        24732480
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 198,
+      "kind": "gap_speaker_change",
+      "target_sample": 24732480
+    },
+    {
+      "acceptable_interval": [
+        24751040,
+        24755200
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 199,
+      "kind": "gap_speaker_change",
+      "target_sample": 24755200
+    },
+    {
+      "acceptable_interval": [
+        24759520,
+        24767680
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 200,
+      "kind": "gap_speaker_change",
+      "target_sample": 24767680
+    },
+    {
+      "acceptable_interval": [
+        24857440,
+        24876000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 201,
+      "kind": "gap_speaker_change",
+      "target_sample": 24876000
+    },
+    {
+      "acceptable_interval": [
+        25246880,
+        25262400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 202,
+      "kind": "gap_speaker_change",
+      "target_sample": 25262400
+    },
+    {
+      "acceptable_interval": [
+        25335680,
+        25344160
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 203,
+      "kind": "gap_speaker_change",
+      "target_sample": 25344160
+    },
+    {
+      "acceptable_interval": [
+        25351040,
+        25360160
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 204,
+      "kind": "gap_speaker_change",
+      "target_sample": 25360160
+    },
+    {
+      "acceptable_interval": [
+        25432640,
+        25439040
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 205,
+      "kind": "gap_speaker_change",
+      "target_sample": 25439040
+    },
+    {
+      "acceptable_interval": [
+        25557760,
+        25561600
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 206,
+      "kind": "gap_speaker_change",
+      "target_sample": 25561600
+    },
+    {
+      "acceptable_interval": [
+        25820320,
+        25820640
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 207,
+      "kind": "gap_speaker_change",
+      "target_sample": 25820640
+    },
+    {
+      "acceptable_interval": [
+        25854880,
+        25859040
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 208,
+      "kind": "gap_speaker_change",
+      "target_sample": 25859040
+    },
+    {
+      "acceptable_interval": [
+        26552640,
+        26563520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 209,
+      "kind": "gap_speaker_change",
+      "target_sample": 26563520
+    },
+    {
+      "acceptable_interval": [
+        26933600,
+        26949920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 210,
+      "kind": "gap_speaker_change",
+      "target_sample": 26949920
+    },
+    {
+      "acceptable_interval": [
+        26971840,
+        26977120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 211,
+      "kind": "gap_speaker_change",
+      "target_sample": 26977120
+    },
+    {
+      "acceptable_interval": [
+        27066560,
+        27086240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 212,
+      "kind": "gap_speaker_change",
+      "target_sample": 27086240
+    },
+    {
+      "acceptable_interval": [
+        27427040,
+        27429920
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 213,
+      "kind": "gap_speaker_change",
+      "target_sample": 27429920
+    },
+    {
+      "acceptable_interval": [
+        27498560,
+        27505280
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 214,
+      "kind": "gap_speaker_change",
+      "target_sample": 27505280
+    },
+    {
+      "acceptable_interval": [
+        27630560,
+        27643360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 215,
+      "kind": "gap_speaker_change",
+      "target_sample": 27643360
+    },
+    {
+      "acceptable_interval": [
+        27655040,
+        27660320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 216,
+      "kind": "gap_speaker_change",
+      "target_sample": 27660320
+    },
+    {
+      "acceptable_interval": [
+        27789280,
+        27791520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 217,
+      "kind": "gap_speaker_change",
+      "target_sample": 27791520
+    },
+    {
+      "acceptable_interval": [
+        27801120,
+        27807520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 218,
+      "kind": "gap_speaker_change",
+      "target_sample": 27807520
+    },
+    {
+      "acceptable_interval": [
+        27832320,
+        27842400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 219,
+      "kind": "gap_speaker_change",
+      "target_sample": 27842400
+    },
+    {
+      "acceptable_interval": [
+        27849120,
+        27868000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 220,
+      "kind": "gap_speaker_change",
+      "target_sample": 27868000
+    },
+    {
+      "acceptable_interval": [
+        27984160,
+        28020160
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 221,
+      "kind": "gap_speaker_change",
+      "target_sample": 28020160
+    },
+    {
+      "acceptable_interval": [
+        28216960,
+        28217120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 222,
+      "kind": "gap_speaker_change",
+      "target_sample": 28217120
+    },
+    {
+      "acceptable_interval": [
+        28225760,
+        28232000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 223,
+      "kind": "gap_speaker_change",
+      "target_sample": 28232000
+    },
+    {
+      "acceptable_interval": [
+        28337920,
+        28342720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 224,
+      "kind": "gap_speaker_change",
+      "target_sample": 28342720
+    },
+    {
+      "acceptable_interval": [
+        28534880,
+        28542880
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 225,
+      "kind": "clean_handoff",
+      "target_sample": 28542880
+    },
+    {
+      "acceptable_interval": [
+        28646240,
+        28649600
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 226,
+      "kind": "gap_speaker_change",
+      "target_sample": 28649600
+    },
+    {
+      "acceptable_interval": [
+        28671360,
+        28674880
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 227,
+      "kind": "gap_speaker_change",
+      "target_sample": 28674880
+    },
+    {
+      "acceptable_interval": [
+        28682080,
+        28709120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 228,
+      "kind": "gap_speaker_change",
+      "target_sample": 28709120
+    },
+    {
+      "acceptable_interval": [
+        28843040,
+        28843680
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 229,
+      "kind": "gap_speaker_change",
+      "target_sample": 28843680
+    },
+    {
+      "acceptable_interval": [
+        29112000,
+        29117120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 230,
+      "kind": "gap_speaker_change",
+      "target_sample": 29117120
+    },
+    {
+      "acceptable_interval": [
+        29126720,
+        29126880
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 231,
+      "kind": "gap_speaker_change",
+      "target_sample": 29126880
+    },
+    {
+      "acceptable_interval": [
+        29139200,
+        29146080
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 232,
+      "kind": "gap_speaker_change",
+      "target_sample": 29146080
+    },
+    {
+      "acceptable_interval": [
+        29223680,
+        29232160
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 233,
+      "kind": "gap_speaker_change",
+      "target_sample": 29232160
+    },
+    {
+      "acceptable_interval": [
+        29323840,
+        29333600
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 234,
+      "kind": "gap_speaker_change",
+      "target_sample": 29333600
+    },
+    {
+      "acceptable_interval": [
+        29436640,
+        29445600
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 235,
+      "kind": "gap_speaker_change",
+      "target_sample": 29445600
+    },
+    {
+      "acceptable_interval": [
+        29682880,
+        29687040
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 236,
+      "kind": "gap_speaker_change",
+      "target_sample": 29687040
+    },
+    {
+      "acceptable_interval": [
+        29734720,
+        29736640
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 237,
+      "kind": "gap_speaker_change",
+      "target_sample": 29736640
+    },
+    {
+      "acceptable_interval": [
+        29868800,
+        29876160
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 238,
+      "kind": "gap_speaker_change",
+      "target_sample": 29876160
+    },
+    {
+      "acceptable_interval": [
+        29881920,
+        29896160
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 239,
+      "kind": "gap_speaker_change",
+      "target_sample": 29896160
+    },
+    {
+      "acceptable_interval": [
+        30017440,
+        30022400
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 240,
+      "kind": "gap_speaker_change",
+      "target_sample": 30022400
+    },
+    {
+      "acceptable_interval": [
+        30312160,
+        30317600
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 241,
+      "kind": "gap_speaker_change",
+      "target_sample": 30317600
+    },
+    {
+      "acceptable_interval": [
+        30558880,
+        30564160
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 242,
+      "kind": "gap_speaker_change",
+      "target_sample": 30564160
+    },
+    {
+      "acceptable_interval": [
+        30764640,
+        30772640
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 243,
+      "kind": "gap_speaker_change",
+      "target_sample": 30772640
+    },
+    {
+      "acceptable_interval": [
+        31277440,
+        31281280
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 244,
+      "kind": "gap_speaker_change",
+      "target_sample": 31281280
+    },
+    {
+      "acceptable_interval": [
+        31286080,
+        31291520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 245,
+      "kind": "gap_speaker_change",
+      "target_sample": 31291520
+    },
+    {
+      "acceptable_interval": [
+        31408640,
+        31413760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 246,
+      "kind": "gap_speaker_change",
+      "target_sample": 31413760
+    },
+    {
+      "acceptable_interval": [
+        31461120,
+        31475200
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 247,
+      "kind": "gap_speaker_change",
+      "target_sample": 31475200
+    },
+    {
+      "acceptable_interval": [
+        31592640,
+        31597120
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 248,
+      "kind": "gap_speaker_change",
+      "target_sample": 31597120
+    },
+    {
+      "acceptable_interval": [
+        31661920,
+        31678560
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 249,
+      "kind": "gap_speaker_change",
+      "target_sample": 31678560
+    },
+    {
+      "acceptable_interval": [
+        31862400,
+        31865760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 250,
+      "kind": "gap_speaker_change",
+      "target_sample": 31865760
+    },
+    {
+      "acceptable_interval": [
+        32176480,
+        32185440
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 251,
+      "kind": "gap_speaker_change",
+      "target_sample": 32185440
+    },
+    {
+      "acceptable_interval": [
+        32367040,
+        32370240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 252,
+      "kind": "gap_speaker_change",
+      "target_sample": 32370240
+    },
+    {
+      "acceptable_interval": [
+        32547360,
+        32558240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 253,
+      "kind": "gap_speaker_change",
+      "target_sample": 32558240
+    },
+    {
+      "acceptable_interval": [
+        32727840,
+        32729280
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 254,
+      "kind": "gap_speaker_change",
+      "target_sample": 32729280
+    },
+    {
+      "acceptable_interval": [
+        32759680,
+        32759840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 255,
+      "kind": "gap_speaker_change",
+      "target_sample": 32759840
+    },
+    {
+      "acceptable_interval": [
+        32798240,
+        32813760
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 256,
+      "kind": "gap_speaker_change",
+      "target_sample": 32813760
+    },
+    {
+      "acceptable_interval": [
+        33033440,
+        33038720
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 257,
+      "kind": "gap_speaker_change",
+      "target_sample": 33038720
+    },
+    {
+      "acceptable_interval": [
+        33047040,
+        33051680
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 258,
+      "kind": "gap_speaker_change",
+      "target_sample": 33051680
+    },
+    {
+      "acceptable_interval": [
+        33270560,
+        33285280
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 259,
+      "kind": "gap_speaker_change",
+      "target_sample": 33285280
+    },
+    {
+      "acceptable_interval": [
+        33466880,
+        33472000
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 260,
+      "kind": "gap_speaker_change",
+      "target_sample": 33472000
+    },
+    {
+      "acceptable_interval": [
+        33736320,
+        33739840
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 261,
+      "kind": "gap_speaker_change",
+      "target_sample": 33739840
+    },
+    {
+      "acceptable_interval": [
+        33958400,
+        33982240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 262,
+      "kind": "gap_speaker_change",
+      "target_sample": 33982240
+    },
+    {
+      "acceptable_interval": [
+        34195040,
+        34207520
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 263,
+      "kind": "gap_speaker_change",
+      "target_sample": 34207520
+    },
+    {
+      "acceptable_interval": [
+        34346080,
+        34351360
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 264,
+      "kind": "gap_speaker_change",
+      "target_sample": 34351360
+    },
+    {
+      "acceptable_interval": [
+        34487840,
+        34504320
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 265,
+      "kind": "gap_speaker_change",
+      "target_sample": 34504320
+    },
+    {
+      "acceptable_interval": [
+        34770080,
+        34778240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 266,
+      "kind": "gap_speaker_change",
+      "target_sample": 34778240
+    },
+    {
+      "acceptable_interval": [
+        35256160,
+        35260960
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 267,
+      "kind": "gap_speaker_change",
+      "target_sample": 35260960
+    },
+    {
+      "acceptable_interval": [
+        35287360,
+        35290080
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 268,
+      "kind": "gap_speaker_change",
+      "target_sample": 35290080
+    },
+    {
+      "acceptable_interval": [
+        35669280,
+        35678240
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 269,
+      "kind": "gap_speaker_change",
+      "target_sample": 35678240
+    },
+    {
+      "acceptable_interval": [
+        35735680,
+        35739040
+      ],
+      "b0_missed": true,
+      "b0_separated": false,
+      "gt_index": 270,
+      "kind": "gap_speaker_change",
+      "target_sample": 35739040
+    }
+  ],
+  "corpus": "alimeeting",
+  "length_samples": 35831528,
+  "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+  "runtime": {
+    "elapsed_s": 6.023
+  },
+  "session_id": "alimeeting_R8008_M8013",
+  "trace_hash": "ad599302e2471a690acfc777b60f3883954094f60d09ad5f86263b589438fb37",
+  "trace_projection": [
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 646144,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 16384,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 629760,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 1,
+        "prev_utterance_start_sample": 625664,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 1262,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 646656,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 775168,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 99840,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 675328,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 2,
+        "prev_utterance_start_sample": 646144,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 1514,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 775680,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 856064,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 23040,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 833024,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 3,
+        "prev_utterance_start_sample": 775168,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 1672,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 856576,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 995328,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 92672,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 902656,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 4,
+        "prev_utterance_start_sample": 856064,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 1944,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 995840,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 1043456,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 40448,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 1003008,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 5,
+        "prev_utterance_start_sample": 995328,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 2038,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 1043968,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 1112576,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 35840,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 1076736,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 6,
+        "prev_utterance_start_sample": 1043456,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 2173,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 1113088,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 1225216,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 1024,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "max_duration",
+        "prev_speech_end_sample": 1224192,
+        "prev_trailing_silence_ms": 0,
+        "prev_utterance_seq": 7,
+        "prev_utterance_start_sample": 1112576,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 2393,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 1225728,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 1340928,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 2048,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "max_duration",
+        "prev_speech_end_sample": 1338880,
+        "prev_trailing_silence_ms": 0,
+        "prev_utterance_seq": 8,
+        "prev_utterance_start_sample": 1225216,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 2619,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 1341440,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 2408960,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 1029120,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 1379840,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 9,
+        "prev_utterance_start_sample": 1340928,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 4705,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 2409472,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 2678784,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 268800,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 2409984,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 10,
+        "prev_utterance_start_sample": 2408960,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 5232,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 2679296,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 2840576,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 65536,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 2775040,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 11,
+        "prev_utterance_start_sample": 2678784,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 5548,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 2841088,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 3019776,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 128512,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 2891264,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 12,
+        "prev_utterance_start_sample": 2840576,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 5898,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 3020288,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 3079168,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 49152,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 3030016,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 13,
+        "prev_utterance_start_sample": 3019776,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 6014,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 3079680,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 3332096,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 155136,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 3176960,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 14,
+        "prev_utterance_start_sample": 3079168,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 6508,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 3332608,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 3352064,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 19456,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 3332608,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 15,
+        "prev_utterance_start_sample": 3332096,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 6547,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 3352576,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 4057088,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 598528,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 3458560,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 16,
+        "prev_utterance_start_sample": 3352064,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 7924,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 4057600,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 4252160,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 173568,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 4078592,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 17,
+        "prev_utterance_start_sample": 4057088,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 8305,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 4252672,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 4287488,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 27648,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 4259840,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 18,
+        "prev_utterance_start_sample": 4252160,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 8374,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 4288000,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 4406784,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 29696,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 4377088,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 19,
+        "prev_utterance_start_sample": 4287488,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 8607,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 4407296,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 4461568,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 52736,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 4408832,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 20,
+        "prev_utterance_start_sample": 4406784,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 8714,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 4462080,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 4932608,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 452608,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 4480000,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 21,
+        "prev_utterance_start_sample": 4461568,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 9634,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 4933120,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 5101568,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 156160,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 4945408,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 22,
+        "prev_utterance_start_sample": 4932608,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 9964,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 5102080,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 5280256,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 174592,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 5105664,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 23,
+        "prev_utterance_start_sample": 5101568,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 10313,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 5280768,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 5361152,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 65024,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 5296128,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 24,
+        "prev_utterance_start_sample": 5280256,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 10471,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 5361664,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 5414912,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 51712,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 5363200,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 25,
+        "prev_utterance_start_sample": 5361152,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 10576,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 5415424,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 5500416,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 15360,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 5485056,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 26,
+        "prev_utterance_start_sample": 5414912,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 10743,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 5500928,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 5692416,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 134144,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 5558272,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 27,
+        "prev_utterance_start_sample": 5500416,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 11118,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 5692928,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 5784576,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 78336,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 5706240,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 28,
+        "prev_utterance_start_sample": 5692416,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 11298,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 5785088,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 7282176,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 1492992,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 5789184,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 29,
+        "prev_utterance_start_sample": 5784576,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 14223,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 7282688,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 8035328,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 750080,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 7285248,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 30,
+        "prev_utterance_start_sample": 7282176,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 15694,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 8035840,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 8188928,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 95232,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 8093696,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 31,
+        "prev_utterance_start_sample": 8035328,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 15994,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 8189440,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 8911872,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 721920,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 8189952,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 32,
+        "prev_utterance_start_sample": 8188928,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 17406,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 8912384,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 9464320,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 529920,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 8934400,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 33,
+        "prev_utterance_start_sample": 8911872,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 18485,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 9464832,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 9508352,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 34816,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 9473536,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 34,
+        "prev_utterance_start_sample": 9464320,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 18571,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 9508864,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 9810432,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 292352,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 9518080,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 35,
+        "prev_utterance_start_sample": 9508352,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 19161,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 9810944,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 10022400,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 206848,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 9815552,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 36,
+        "prev_utterance_start_sample": 9810432,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 19575,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 10022912,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 10102784,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 49664,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 10053120,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 37,
+        "prev_utterance_start_sample": 10022400,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 19732,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 10103296,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 11117568,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 1014272,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 10103296,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 38,
+        "prev_utterance_start_sample": 10102784,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 21714,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 11118080,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 11173376,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 27136,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 11146240,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 39,
+        "prev_utterance_start_sample": 11117568,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 21823,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 11173888,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 11456512,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 281088,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 11175424,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 40,
+        "prev_utterance_start_sample": 11173376,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 22376,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 11457024,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 12777472,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 1320448,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 11457024,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 41,
+        "prev_utterance_start_sample": 11456512,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 24956,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 12777984,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 13522944,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 743424,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 12779520,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 42,
+        "prev_utterance_start_sample": 12777472,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 26412,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 13523456,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 13591552,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 64512,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 13527040,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 43,
+        "prev_utterance_start_sample": 13522944,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 26546,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 13592064,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 13681152,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 88064,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 13593088,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 44,
+        "prev_utterance_start_sample": 13591552,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 26721,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 13681664,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 16343040,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 2651648,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 13691392,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 45,
+        "prev_utterance_start_sample": 13681152,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 31920,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 16343552,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 16423424,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 72704,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 16350720,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 46,
+        "prev_utterance_start_sample": 16343040,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 32077,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 16423936,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 16570880,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 58880,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 16512000,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 47,
+        "prev_utterance_start_sample": 16423424,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 32365,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 16571392,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 16602624,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 13312,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 16589312,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 48,
+        "prev_utterance_start_sample": 16570880,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 32427,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 16603136,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 19174912,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 2561536,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 16613376,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 49,
+        "prev_utterance_start_sample": 16602624,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 37451,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 19175424,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 21121536,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 1938944,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 19182592,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 50,
+        "prev_utterance_start_sample": 19174912,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 41253,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 21122048,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 24632320,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 3507712,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 21124608,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 51,
+        "prev_utterance_start_sample": 21121536,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 48110,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 24632832,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 24748544,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 100864,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 24647680,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 52,
+        "prev_utterance_start_sample": 24632320,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 48337,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 24749056,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 30878720,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 6129664,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 24749056,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 53,
+        "prev_utterance_start_sample": 24748544,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 60310,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 30879232,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 30995968,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 114176,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 30881792,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 54,
+        "prev_utterance_start_sample": 30878720,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 60539,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 30996480,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 33889280,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 2888192,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 31001088,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 55,
+        "prev_utterance_start_sample": 30995968,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 66190,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 33889792,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 35436032,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 1539584,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 33896448,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 56,
+        "prev_utterance_start_sample": 33889280,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 69211,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 35436544,
+      "source": "vad_b0"
+    },
+    {
+      "audio_epoch": 0,
+      "boundary_source_sample": 35463680,
+      "confidence": null,
+      "debug": {
+        "chunk_samples": 512,
+        "gap_samples": 24064,
+        "hangover_ms": 500,
+        "max_segment_ms": 7000,
+        "pre_roll_samples": 8000,
+        "prev_end_reason": "silence",
+        "prev_speech_end_sample": 35439616,
+        "prev_trailing_silence_ms": 512,
+        "prev_utterance_seq": 57,
+        "prev_utterance_start_sample": 35436032,
+        "profile": "peer",
+        "ring_buffer_ms": 500,
+        "speech_threshold": 0.5,
+        "start_chunk_index": 69265,
+        "start_commit_chunks": 3,
+        "start_debounce_chunks": 3
+      },
+      "observed_source_sample_at_emit": 35464192,
+      "source": "vad_b0"
+    }
+  ]
+}
