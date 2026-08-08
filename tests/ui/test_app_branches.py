@@ -10,6 +10,7 @@ import pytest
 
 pytest.importorskip("flet")
 import flet as ft
+from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 import puripuly_heart.ui.app as app_module
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
@@ -34,7 +35,6 @@ from puripuly_heart.config.settings import (
     with_telemetry_consent,
 )
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
@@ -2925,6 +2925,34 @@ async def test_on_providers_changed_applies_consumed_provider_draft() -> None:
     assert len(app.page.tasks) == 1
     await app.page.tasks[0]()
     assert seen == ["managed-settings"]
+
+
+@pytest.mark.asyncio
+async def test_on_providers_changed_runtime_only_reload_does_not_consume_provider_draft() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    app._settings_mutation_queue = []
+    app._settings_mutation_worker_active = False
+    consumed = {"draft": False, "reload": True}
+    app.view_settings = SimpleNamespace(
+        has_provider_changes=True,
+        consume_translation_extension_runtime_reload=lambda: consumed.__setitem__("reload", False)
+        or True,
+        consume_provider_apply_settings=lambda: consumed.__setitem__("draft", True),
+    )
+    seen: list[object] = []
+
+    async def fake_apply_providers(*, persist_settings: bool = True) -> None:
+        seen.append(persist_settings)
+
+    app.controller = SimpleNamespace(apply_providers=fake_apply_providers)
+
+    app._on_providers_changed()
+    assert len(app.page.tasks) == 1
+    await app.page.tasks[0]()
+
+    assert seen == [False]
+    assert consumed == {"draft": False, "reload": False}
 
 
 @pytest.mark.asyncio

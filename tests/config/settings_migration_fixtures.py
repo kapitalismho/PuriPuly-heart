@@ -56,6 +56,8 @@ VNEXT_NATIVE_PERSISTED_LEAF_PATHS = frozenset(
         "intent.desktop_audio.capture_target.kind",
         "intent.desktop_audio.capture_target.device_name",
         "intent.desktop_audio.capture_target.process",
+        "intent.translation.extension_id",
+        "intent.translation.previous_llm_model",
     }
 ) | frozenset(
     f"state.provider_verification.{provider}.{field}"

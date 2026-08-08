@@ -10,10 +10,16 @@ from puripuly_heart.config.settings import (
     OpenRouterProviderRouting,
     STTProviderName,
     TranslationConnection,
+    TranslationModel,
 )
+from puripuly_heart.core.translation_extensions import TranslationExtensionRegistry
 
 
-def build_llm_provider_signature(settings: AppSettings) -> tuple[object, ...]:
+def build_llm_provider_signature(
+    settings: AppSettings,
+    *,
+    translation_extensions: TranslationExtensionRegistry | None = None,
+) -> tuple[object, ...]:
     primary_uses_openrouter = settings.provider.llm == LLMProviderName.OPENROUTER
     fallback_uses_openrouter = bool(
         settings.translation.fallback.enabled
@@ -36,7 +42,23 @@ def build_llm_provider_signature(settings: AppSettings) -> tuple[object, ...]:
             in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
         )
     )
+    extension_signature: tuple[object, ...] | None = None
+    if settings.translation.model == TranslationModel.CUSTOM_HTTP:
+        selected_id = settings.translation.extension_id
+        selected = (
+            translation_extensions.snapshot.get(selected_id)
+            if translation_extensions is not None
+            else None
+        )
+        extension_signature = (
+            selected_id,
+            selected.fingerprint if selected is not None else None,
+        )
     return (
+        settings.translation.model,
+        settings.translation.connection,
+        settings.translation.extension_id,
+        extension_signature,
         settings.provider.llm,
         settings.llm.concurrency_limit,
         settings.gemini.llm_model if settings.provider.llm == LLMProviderName.GEMINI else None,

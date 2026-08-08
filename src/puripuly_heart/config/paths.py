@@ -10,6 +10,7 @@ APP_DIR_NAME = STABLE_APP_DIR_NAME
 SETTINGS_FILENAME = "settings.json"
 VAD_MODEL_FILENAME = "silero_vad.onnx"
 MODELS_DIRNAME = "models"
+TRANSLATION_EXTENSIONS_DIRNAME = "translation_extensions"
 
 
 def user_config_dir(*, app_dir_name: str = APP_DIR_NAME) -> Path:
@@ -46,3 +47,7 @@ def default_vad_model_path() -> Path:
 
 def default_models_dir() -> Path:
     return user_config_dir() / MODELS_DIRNAME
+
+
+def default_translation_extensions_dir() -> Path:
+    return user_config_dir() / TRANSLATION_EXTENSIONS_DIRNAME

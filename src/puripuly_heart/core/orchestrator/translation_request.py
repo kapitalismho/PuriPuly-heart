@@ -3,13 +3,12 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Protocol, cast
+from typing import Protocol
 from uuid import UUID
 
 from puripuly_heart.config.prompts import render_translation_prompt_template, warm_prompt_cache
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.language import get_llm_language_name, map_detected_language_for_llm
-from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
 from puripuly_heart.core.messages import (
     SEVERITY_ERROR,
@@ -38,6 +37,11 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
     TranslationTurnOutcome,
     TranslationTurnProcessResult,
+)
+from puripuly_heart.core.translation_backend import (
+    LlmTranslationBackend,
+    TranslationBackend,
+    TranslationBackendRequest,
 )
 from puripuly_heart.core.translation_policy import TranslationContextPolicy
 from puripuly_heart.domain.events import UIEventType
@@ -342,8 +346,8 @@ class TranslationRequestOwner:
         config_snapshot = request.config_snapshot or self.config_snapshot()
         provider_request = self._capture_provider_request()
         if provider_request is None:
-            raise RuntimeError("LLM is not configured")
-        provider, generation = provider_request
+            raise RuntimeError("translation backend is not configured")
+        provider, backend, generation = provider_request
         prepared = self.prepare(
             request.text,
             channel=request.channel,
@@ -353,13 +357,15 @@ class TranslationRequestOwner:
         if request.record_latency:
             self._record_latency(request.channel, request.utterance_id, "llm_request_start")
         try:
-            raw_translation = await provider.translate(
-                utterance_id=request.utterance_id,
-                text=request.text,
-                system_prompt=prepared.system_prompt,
-                source_language=prepared.source_language,
-                target_language=prepared.target_language,
-                context=prepared.context,
+            raw_translation = await backend.translate(
+                TranslationBackendRequest(
+                    utterance_id=request.utterance_id,
+                    text=request.text,
+                    system_prompt=prepared.system_prompt,
+                    source_language=prepared.source_language,
+                    target_language=prepared.target_language,
+                    context=prepared.context,
+                )
             )
         except Exception:
             self._raise_if_stale_provider_request(provider, generation)
@@ -402,7 +408,7 @@ class TranslationRequestOwner:
                 "translation_unavailable",
                 source_language=request.detected_language,
             )
-        provider, generation = provider_request
+        provider, backend, generation = provider_request
         request_source = self._request_source_language(
             request.channel,
             detected_language=request.detected_language,
@@ -442,13 +448,15 @@ class TranslationRequestOwner:
             )
             self._record_latency(request.channel, request.utterance_id, "llm_request_start")
             try:
-                raw_translation = await provider.translate(
-                    utterance_id=request.utterance_id,
-                    text=request.text,
-                    system_prompt=prepared.system_prompt,
-                    source_language=source_language,
-                    target_language=request.target_language,
-                    context=prepared.context,
+                raw_translation = await backend.translate(
+                    TranslationBackendRequest(
+                        utterance_id=request.utterance_id,
+                        text=request.text,
+                        system_prompt=prepared.system_prompt,
+                        source_language=source_language,
+                        target_language=request.target_language,
+                        context=prepared.context,
+                    )
                 )
             except Exception:
                 self._raise_if_stale_provider_request(provider, generation)
@@ -500,15 +508,20 @@ class TranslationRequestOwner:
             ),
         )
 
-    def _capture_provider_request(self) -> tuple[LLMProvider, int] | None:
+    def _capture_provider_request(self) -> tuple[object, TranslationBackend, int] | None:
         provider, generation = self.provider_runtime.current_provider_generation()
         if provider is None:
             return None
-        return cast(LLMProvider, provider), generation
+        backend = (
+            provider
+            if isinstance(provider, TranslationBackend)
+            else LlmTranslationBackend(provider)
+        )
+        return provider, backend, generation
 
     def _raise_if_stale_provider_request(
         self,
-        provider: LLMProvider,
+        provider: object,
         generation: int,
     ) -> None:
         if not self.provider_runtime.is_current_provider_generation(

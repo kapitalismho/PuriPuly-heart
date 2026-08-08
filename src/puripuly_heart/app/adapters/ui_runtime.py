@@ -264,10 +264,17 @@ class UiProviderRuntimeAdapter:
         settings: object | None = None,
         *,
         force_rebuild_llm: bool = False,
+        persist_settings: bool = True,
     ) -> object:
+        if persist_settings:
+            return await self.provider_application.apply(
+                settings,
+                force_rebuild_llm=force_rebuild_llm,
+            )
         return await self.provider_application.apply(
             settings,
             force_rebuild_llm=force_rebuild_llm,
+            persist_settings=persist_settings,
         )
 
     async def install_selected_gpu_model_if_needed(self) -> None:
@@ -308,7 +315,22 @@ class UiProviderRuntimeAdapter:
         self.provider_settings.persist_verification(provider, key, success)
 
     async def persist_provider_secret_change(self, key: str, value: str) -> bool:
-        return await self.provider_settings.change_secret(key, value)
+        succeeded = await self.provider_settings.change_secret(key, value)
+        current = self.settings.current
+        extension_id = None if current is None else current.translation.extension_id
+        if (
+            succeeded
+            and key.startswith("translation_extension.")
+            and current is not None
+            and current.translation.model == "custom_http"
+            and extension_id is not None
+            and key.startswith(f"translation_extension.{extension_id}.")
+        ):
+            await self.apply_providers(
+                force_rebuild_llm=True,
+                persist_settings=False,
+            )
+        return succeeded
 
     def clear_provider_verification(self, provider: str) -> None:
         self.provider_settings.persist_verification(provider, "", False)

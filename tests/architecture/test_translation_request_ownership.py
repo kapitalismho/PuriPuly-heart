@@ -70,7 +70,7 @@ def test_request_side_effects_are_owned_only_by_translation_request_owner() -> N
             if not isinstance(node, ast.Call):
                 continue
             if isinstance(node.func, ast.Attribute) and node.func.attr == "translate":
-                if isinstance(node.func.value, ast.Name) and node.func.value.id == "provider":
+                if isinstance(node.func.value, ast.Name) and node.func.value.id == "backend":
                     production_request_calls.append((path, node.lineno))
             if _call_name(node) == "render_translation_prompt_template":
                 prompt_render_calls.append((path, node.lineno))

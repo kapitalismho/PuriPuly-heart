@@ -55,6 +55,7 @@ from puripuly_heart.config.settings import (
     OpenRouterSelectionAlias,
     QwenRegion,
     TranslationConnection,
+    TranslationModel,
 )
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.fallback_racing import LLMProviderAttempt
@@ -204,7 +205,13 @@ def _runtime_resolution_input_from_compatibility_settings(
         deepseek_model=settings.deepseek.llm_model,
         concurrency_limit=settings.llm.concurrency_limit,
     )
-    if settings.provider.llm == LLMProviderName.QWEN:
+    if settings.translation.model == TranslationModel.CUSTOM_HTTP:
+        translation_intent = normalize_translation_runtime_intent(
+            model="custom_http",
+            connection="custom_http",
+            concurrency_limit=settings.llm.concurrency_limit,
+        )
+    elif settings.provider.llm == LLMProviderName.QWEN:
         translation_intent = normalize_translation_runtime_intent(
             model=TRANSLATION_MODEL_QWEN_35_PLUS,
             connection=TRANSLATION_CONNECTION_OFFICIAL_BYOK,

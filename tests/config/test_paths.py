@@ -33,6 +33,10 @@ def test_default_paths_use_user_config_dir(monkeypatch, tmp_path):
     assert (
         paths.default_vad_model_path() == tmp_path / paths.APP_DIR_NAME / paths.VAD_MODEL_FILENAME
     )
+    assert (
+        paths.default_translation_extensions_dir()
+        == tmp_path / paths.APP_DIR_NAME / paths.TRANSLATION_EXTENSIONS_DIRNAME
+    )
 
 
 def test_user_config_dir_windows_fallback(monkeypatch):
@@ -42,6 +46,16 @@ def test_user_config_dir_windows_fallback(monkeypatch):
 
     expected = Path.home() / "AppData" / "Local" / "app"
     assert paths.user_config_dir(app_dir_name="app") == expected
+
+
+def test_user_config_dir_windows_prefers_local_appdata(monkeypatch, tmp_path):
+    monkeypatch.setattr(paths.sys, "platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "roaming"))
+
+    assert paths.default_translation_extensions_dir() == (
+        tmp_path / "local" / paths.APP_DIR_NAME / paths.TRANSLATION_EXTENSIONS_DIRNAME
+    )
 
 
 def test_user_config_dir_darwin(monkeypatch):

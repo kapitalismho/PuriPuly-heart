@@ -72,6 +72,7 @@ class LlmProviderRebuildContext:
     settings: object
     replace_provider: LlmProviderReplace
     requires_secret: bool
+    resource_label: str = "LLM provider"
 
 
 @dataclass(slots=True)
@@ -98,9 +99,9 @@ class LlmProviderRebuildOwner:
         self.availability_sink(provider is None and context.requires_secret)
         await self.usage_refresh()
         if provider is None:
-            self.failure_sink("LLM provider not available")
+            self.failure_sink(f"{context.resource_label} not available")
             return
-        self.success_sink("[Settings] LLM provider rebuilt successfully")
+        self.success_sink(f"[Settings] {context.resource_label} rebuilt successfully")
 
 
 @dataclass(slots=True)

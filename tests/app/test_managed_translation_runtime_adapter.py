@@ -3,22 +3,24 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-
 from puripuly_heart.app.services.managed_auth import ManagedAuthState
 from puripuly_heart.app.wiring_managed_auth_factory import (
     ManagedTranslationRuntimeAdapter,
 )
+from puripuly_heart.core.managed_openrouter_release import (
+    ManagedOpenRouterReleaseBehavior,
+    ManagedOpenRouterReleaseDiagnostics,
+    ManagedOpenRouterReleaseResult,
+)
+
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
     OpenRouterCredentialSource,
     QwenRegion,
     TranslationConnection,
-)
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterReleaseBehavior,
-    ManagedOpenRouterReleaseDiagnostics,
-    ManagedOpenRouterReleaseResult,
+    TranslationModel,
+    TranslationSettings,
 )
 
 
@@ -99,6 +101,52 @@ def test_state_projects_runtime_provider_region_and_managed_auth_snapshot() -> N
     assert state.managed_selected is True
     assert state.managed_china is True
     assert state.managed_local_key_available is True
+
+
+def test_state_labels_custom_http_without_reusing_inactive_llm_metadata() -> None:
+    settings = AppSettings()
+    settings.provider.llm = LLMProviderName.QWEN
+    settings.qwen.region = QwenRegion.BEIJING
+    settings.translation = TranslationSettings(
+        model=TranslationModel.CUSTOM_HTTP,
+        connection=TranslationConnection.CUSTOM_HTTP,
+        extension_id="demo",
+    )
+    adapter = _adapter(
+        settings,
+        AuthAdapter(_auth_state()),
+        runtime_snapshot=(True, True, object()),
+    )
+
+    state = adapter.state()
+
+    assert state.llm_available is True
+    assert state.provider_name == "custom_http"
+    assert state.qwen_region is None
+    assert state.managed_selected is False
+
+
+@pytest.mark.asyncio
+async def test_custom_http_prepare_skips_managed_release_service() -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.CUSTOM_HTTP,
+        connection=TranslationConnection.CUSTOM_HTTP,
+        extension_id="demo",
+    )
+
+    async def unexpected_prepare() -> object:
+        raise AssertionError("managed release must not prepare for Custom HTTP")
+
+    adapter = _adapter(
+        settings,
+        AuthAdapter(_auth_state()),
+        service=SimpleNamespace(prepare_for_translation=unexpected_prepare),
+    )
+
+    result = await adapter.prepare()
+
+    assert result.ready is True
 
 
 @pytest.mark.asyncio

@@ -1609,3 +1609,14 @@ def test_resolved_output_uses_lookup_references_not_raw_secret_values() -> None:
     assert config.fallback.target.credential.reference is not None
     assert "sk-" not in config.fallback.target.credential.reference
     assert "secret" not in config.fallback.target.credential.reference
+
+
+def test_runtime_fallback_rejects_custom_http() -> None:
+    runtime_resolution = _runtime_resolution_module()
+
+    with pytest.raises(ValueError, match="cannot be used as fallback"):
+        runtime_resolution.TranslationFallbackRuntimeIntent(
+            enabled=True,
+            model=runtime_resolution.TRANSLATION_MODEL_CUSTOM_HTTP,
+            connection=runtime_resolution.TRANSLATION_CONNECTION_CUSTOM_HTTP,
+        )

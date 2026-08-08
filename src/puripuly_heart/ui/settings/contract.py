@@ -126,6 +126,8 @@ class SettingsApiSlotProvider(Protocol):
 
     def translation_connection_control(self) -> ft.Control: ...
 
+    def translation_extension_control(self) -> ft.Control: ...
+
     def translation_fallback_control(self) -> ft.Control: ...
 
     def gpu_device_control(self) -> ft.Control: ...
@@ -151,9 +153,11 @@ class SettingsApiSurfaceSlots:
     managed_key: ft.Control
     peer_expected_language: ft.Control
     api_keys: ft.Control
+    translation_extension: ft.Control | None = None
 
     @classmethod
     def from_slot_provider(cls, provider: SettingsApiSlotProvider) -> SettingsApiSurfaceSlots:
+        extension_factory = getattr(provider, "translation_extension_control", None)
         return cls(
             self_stt=provider.self_stt_control(),
             peer_stt=provider.peer_stt_control(),
@@ -165,6 +169,7 @@ class SettingsApiSurfaceSlots:
             managed_key=provider.managed_key_control(),
             peer_expected_language=provider.peer_expected_language_control(),
             api_keys=provider.api_keys_control(),
+            translation_extension=(extension_factory() if callable(extension_factory) else None),
         )
 
 

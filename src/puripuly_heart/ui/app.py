@@ -431,6 +431,18 @@ class TranslatorApp:
     def _build_layout(self):
         self.view_dashboard = DashboardView()
         self.view_settings = SettingsView()
+        set_translation_extension_registry = getattr(
+            self.view_settings,
+            "set_translation_extension_registry",
+            None,
+        )
+        translation_extension_registry = getattr(
+            self.application,
+            "translation_extension_registry",
+            None,
+        )
+        if callable(set_translation_extension_registry):
+            set_translation_extension_registry(translation_extension_registry)
         self.view_logs = LogsView()
         self.view_about = AboutView()
         self.view_settings.set_overlay_runtime_state(self.overlay_state)
@@ -1408,8 +1420,23 @@ class TranslatorApp:
         self.view_logs.set_runtime_logging_mode(resolved_mode)
 
     def _on_providers_changed(self) -> None:
-        pending_settings = None
         view_settings = getattr(self, "view_settings", None)
+        consume_translation_extension_runtime_reload = getattr(
+            view_settings,
+            "consume_translation_extension_runtime_reload",
+            None,
+        )
+        if callable(consume_translation_extension_runtime_reload) and (
+            consume_translation_extension_runtime_reload()
+        ):
+
+            async def _runtime_only_task():
+                await self.application.apply_providers(persist_settings=False)
+
+            self._queue_settings_mutation_task(_runtime_only_task)
+            return
+
+        pending_settings = None
         consume_provider_apply_settings = getattr(
             view_settings,
             "consume_provider_apply_settings",

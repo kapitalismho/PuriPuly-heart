@@ -141,6 +141,7 @@ class UiApplicationBoundary:
         state: UiApplicationStatePort,
         runtime_shutdown: ApplicationRuntimeShutdownPort,
         runtime_logging: ApplicationRuntimeLoggingPort,
+        translation_extension_registry: object | None = None,
     ) -> None:
         self._startup = startup
         self._input_runtime = input_runtime
@@ -153,6 +154,7 @@ class UiApplicationBoundary:
         self._engagement = engagement
         self._diagnostics = diagnostics
         self._runtime_logging = runtime_logging
+        self.translation_extension_registry = translation_extension_registry
         self._runtime_shutdown = runtime_shutdown
         self._state_owner = state
         self._github_star_prompt_runtime = GithubStarPromptRuntime(
@@ -327,17 +329,36 @@ class UiApplicationBoundary:
         settings: Any | None = None,
         *,
         force_rebuild_llm: bool = False,
+        persist_settings: bool = True,
     ) -> object:
         if force_rebuild_llm:
             if settings is None:
-                return await self._provider.apply_providers(force_rebuild_llm=True)
+                if persist_settings:
+                    return await self._provider.apply_providers(force_rebuild_llm=True)
+                return await self._provider.apply_providers(
+                    force_rebuild_llm=True,
+                    persist_settings=False,
+                )
+            if persist_settings:
+                return await self._provider.apply_providers(
+                    settings,
+                    force_rebuild_llm=True,
+                )
             return await self._provider.apply_providers(
                 settings,
                 force_rebuild_llm=True,
+                persist_settings=False,
             )
         if settings is None:
-            return await self._provider.apply_providers()
-        return await self._provider.apply_providers(settings)
+            if persist_settings:
+                return await self._provider.apply_providers()
+            return await self._provider.apply_providers(persist_settings=False)
+        if persist_settings:
+            return await self._provider.apply_providers(settings)
+        return await self._provider.apply_providers(
+            settings,
+            persist_settings=False,
+        )
 
     async def install_selected_gpu_model_if_needed(self) -> None:
         await self._provider.install_selected_gpu_model_if_needed()

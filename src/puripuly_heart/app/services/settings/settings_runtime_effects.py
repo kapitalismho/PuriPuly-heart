@@ -46,6 +46,7 @@ from puripuly_heart.config.settings import (
     OVERLAY_TARGET_DESKTOP,
     AppSettings,
     LLMProviderName,
+    TranslationModel,
 )
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.orchestrator.configuration import (
@@ -367,7 +368,10 @@ class SettingsRuntimeEffectsAdapter:
                 local_asr_runtime is not None
                 and local_asr_runtime.snapshot.channel_for("peer").provider_id is not None
             ),
-            qwen_llm_desired=settings.provider.llm == LLMProviderName.QWEN,
+            qwen_llm_desired=(
+                settings.translation.model != TranslationModel.CUSTOM_HTTP
+                and settings.provider.llm == LLMProviderName.QWEN
+            ),
             llm_available=llm_runtime is not None and llm_runtime.provider is not None,
         )
 

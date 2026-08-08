@@ -111,6 +111,9 @@ from puripuly_heart.app.services.settings_runtime_effects import (
     SettingsRuntimeEffectsAdapter,
     SettingsRuntimeEffectsState,
 )
+from puripuly_heart.app.services.translation_extension_registry import (
+    TranslationExtensionRegistryService,
+)
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
@@ -177,7 +180,7 @@ from puripuly_heart.composition.application_startup import (
     compose_application_startup,
 )
 from puripuly_heart.composition.application_state import ApplicationUiStateAdapter
-from puripuly_heart.config.paths import user_config_dir
+from puripuly_heart.config.paths import default_translation_extensions_dir, user_config_dir
 from puripuly_heart.config.settings import (
     OVERLAY_TARGET_STEAMVR,
     AppSettings,
@@ -185,6 +188,7 @@ from puripuly_heart.config.settings import (
     OpenRouterCredentialSource,
     QwenLLMModel,
     STTProviderName,
+    TranslationModel,
     build_managed_openrouter_byok_target_settings,
     with_telemetry_consent,
 )
@@ -218,6 +222,7 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionState,
 )
 from puripuly_heart.core.telemetry import TranslationSuccessTelemetryService
+from puripuly_heart.core.translation_extensions import TranslationExtensionRegistry
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 STT_RESET_DEADLINE_S = 300.0
@@ -350,10 +355,12 @@ def compose_application_runtime(
     ) = None,
 ) -> UiApplicationPort:
     settings = compose_settings_owner(config_path)
+    translation_extensions = TranslationExtensionRegistry(default_translation_extensions_dir())
+    translation_extensions.reload()
     clock = SystemClock()
     ingress = ApplicationIngressGate()
     pipeline = RuntimePipelineHandle()
-    signatures = ProviderRuntimeSignatures()
+    signatures = ProviderRuntimeSignatures(translation_extensions=translation_extensions)
     effects_state = SettingsRuntimeEffectsState()
     manual_fallback = ManualLocalASRFallbackOwner()
     event_bridge: UIEventBridgePort | None = None
@@ -1452,6 +1459,7 @@ def compose_application_runtime(
         translation_runtime_configuration_provider=(
             lambda: pipeline.translation_runtime_configuration
         ),
+        translation_extensions=translation_extensions,
         self_capture_provider=lambda: pipeline.self_capture,
         self_capture_owner=self_capture_owner,
         peer=lambda: require_peer().owner,
@@ -1580,6 +1588,7 @@ def compose_application_runtime(
         configure_vrc_mic=lambda *, enabled: (require_vrc_mic_sync().configure(enabled=enabled)),
         stt_failure_sink=log_error,
         cleanup_failure_sink=lambda message, exc: log_error(f"{message}: {exc}"),
+        translation_extensions=translation_extensions,
     )
 
     runtime_components = RuntimeCompositionComponents(
@@ -1599,6 +1608,9 @@ def compose_application_runtime(
         return "alibaba_singapore"
 
     def llm_requires_secret(provider: LLMProviderName) -> bool:
+        value = current_settings()
+        if value is not None and value.translation.model == TranslationModel.CUSTOM_HTTP:
+            return False
         return provider in {
             LLMProviderName.GEMINI,
             LLMProviderName.OPENROUTER,
@@ -1611,6 +1623,7 @@ def compose_application_runtime(
         llm_runtime = pipeline.llm_runtime
         return bool(
             value is not None
+            and value.translation.model != TranslationModel.CUSTOM_HTTP
             and value.provider.llm == LLMProviderName.OPENROUTER
             and value.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
             and llm_runtime is not None
@@ -1788,6 +1801,7 @@ def compose_application_runtime(
         ),
         runtime_shutdown=runtime_shutdown,
         runtime_logging=runtime_logging,
+        translation_extension_registry=TranslationExtensionRegistryService(translation_extensions),
     )
 
     async def initialize_local_asr_evidence(value: object) -> None:

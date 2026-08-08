@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+from puripuly_heart.config.paths import default_translation_extensions_dir
+from puripuly_heart.core.translation_extensions import (
+    TranslationExtensionRegistry,
+    TranslationExtensionRegistrySnapshot,
+)
+
+
+@dataclass(slots=True)
+class TranslationExtensionRegistryService:
+    registry: TranslationExtensionRegistry
+
+    @classmethod
+    def from_default_directory(cls) -> TranslationExtensionRegistryService:
+        registry = TranslationExtensionRegistry(default_translation_extensions_dir())
+        registry.reload()
+        return cls(registry)
+
+    @property
+    def directory(self) -> Path:
+        return self.registry.directory
+
+    @property
+    def snapshot(self) -> TranslationExtensionRegistrySnapshot:
+        return self.registry.snapshot
+
+    def reload(self) -> TranslationExtensionRegistrySnapshot:
+        return self.registry.reload()
+
+    def get(self, extension_id: str) -> object | None:
+        return self.registry.get(extension_id)
+
+
+__all__ = ["TranslationExtensionRegistryService"]

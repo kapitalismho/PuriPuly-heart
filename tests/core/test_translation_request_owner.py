@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field, replace
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -25,6 +26,11 @@ from puripuly_heart.core.orchestrator.translation_request import (
     TranslationRequestOwner,
 )
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
+from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.translation_extensions import (
+    HttpExtensionTranslationBackend,
+    parse_translation_extension,
+)
 from puripuly_heart.domain.models import ChannelId, Translation
 
 
@@ -82,6 +88,21 @@ class BlockingProvider(RecordingProvider):
         self.entered.set()
         await self.release.wait()
         return await super().translate(**kwargs)
+
+
+@dataclass
+class BlockingHttpClient:
+    entered: asyncio.Event = field(default_factory=asyncio.Event)
+    release: asyncio.Event = field(default_factory=asyncio.Event)
+    closed: bool = False
+
+    async def post(self, _url: str, **_kwargs: object) -> SimpleNamespace:
+        self.entered.set()
+        await self.release.wait()
+        return SimpleNamespace(status_code=200, text="Hola")
+
+    async def aclose(self) -> None:
+        self.closed = True
 
 
 @dataclass
@@ -252,6 +273,38 @@ async def test_direct_request_rejects_stale_provider_completion() -> None:
 
     with pytest.raises(StaleProviderCompletion):
         await task
+
+
+@pytest.mark.asyncio
+async def test_http_backend_rejects_completion_after_runtime_replacement() -> None:
+    client = BlockingHttpClient()
+    extension = parse_translation_extension(
+        {
+            "schema_version": 1,
+            "id": "demo",
+            "name": "Demo",
+            "url": "http://127.0.0.1:1/translate",
+            "request": {"body": {"type": "none"}},
+            "response": {"type": "text"},
+        }
+    )
+    backend = HttpExtensionTranslationBackend(
+        extension,
+        InMemorySecretStore(),
+        client_factory=lambda **_kwargs: client,
+    )
+    fixture = build_owner(backend)
+    task = asyncio.create_task(
+        fixture.owner.translate(DirectTranslationRequest(utterance_id=uuid4(), text="hello"))
+    )
+    await client.entered.wait()
+
+    await fixture.provider_runtime.replace_provider(RecordingProvider(), start=False)
+    client.release.set()
+
+    with pytest.raises(StaleProviderCompletion):
+        await task
+    assert client.closed is True
 
 
 @pytest.mark.asyncio

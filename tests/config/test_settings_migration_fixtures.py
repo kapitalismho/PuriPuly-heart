@@ -176,6 +176,8 @@ def test_vnext_native_provider_verification_evidence_leaves_are_explicitly_exclu
             "intent.desktop_audio.capture_target.kind",
             "intent.desktop_audio.capture_target.device_name",
             "intent.desktop_audio.capture_target.process",
+            "intent.translation.extension_id",
+            "intent.translation.previous_llm_model",
         }
     )
     classified_vnext_destinations = {

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "libretranslate",
+  "name": "LibreTranslate",
+  "description": "LibreTranslate managed translation API",
+  "url": "https://libretranslate.com/translate",
+  "request": {
+    "query": {},
+    "body": {
+      "type": "json",
+      "value": {
+        "q": "{{text}}",
+        "source": "{{source_language}}",
+        "target": "{{target_language}}",
+        "format": "text",
+        "api_key": "{{secret:api_key}}"
+      }
+    }
+  },
+  "response": {
+    "type": "json",
+    "pointer": "/translatedText"
+  },
+  "secrets": [
+    {
+      "id": "api_key",
+      "label": "API Key"
+    }
+  ]
+}

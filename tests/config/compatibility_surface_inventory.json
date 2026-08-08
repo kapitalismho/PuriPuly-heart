@@ -997,6 +997,17 @@
   ],
   "non_public_module_classifications": [
     {
+      "surface": "translation backend and extension implementation modules",
+      "classification": "internal_translation_contract",
+      "module_prefixes": [
+        "puripuly_heart.app.services.translation_extension_registry",
+        "puripuly_heart.app.wiring.wiring_translation_backend",
+        "puripuly_heart.core.translation_backend",
+        "puripuly_heart.core.translation_extensions"
+      ],
+      "rationale": "The provider-neutral translation contract, filesystem registry, HTTP adapter, and application registry wrapper are internal implementation boundaries for the Custom HTTP translation feature; they are imported by composition and focused tests rather than exposed as external compatibility facades."
+    },
+    {
       "surface": "underscore-prefixed symbols imported by tests",
       "classification": "private_internal_or_test_compatibility",
       "examples": [
