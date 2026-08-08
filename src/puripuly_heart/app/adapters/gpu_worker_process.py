@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import logging
 import os
 import secrets
 import sys
 import tempfile
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,6 +32,11 @@ from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 GPU_WORKER_CONTRACT_VERSION = 2
 GPU_WORKER_EXECUTABLE_NAME = "PuriPulyHeartGpuWorker.exe"
 _MAX_FRAME_BYTES = 4 * 1024 * 1024
+_MAX_STDERR_LINES = 64
+_MAX_STDERR_LINE_CHARS = 2_000
+_STDERR_FAILURE_FLUSH_SECONDS = 0.05
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -257,6 +264,8 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
     _close_complete: asyncio.Event = field(init=False, repr=False)
     _last_heartbeat: float = field(init=False, repr=False)
     _terminal_error: GpuWorkerClosedError | None = field(init=False, default=None, repr=False)
+    _stderr_tail: deque[str] = field(init=False, repr=False)
+    _stderr_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _closed: bool = field(init=False, default=False, repr=False)
     _closing: bool = field(init=False, default=False, repr=False)
 
@@ -267,6 +276,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
         self._close_lock = asyncio.Lock()
         self._close_complete = asyncio.Event()
         self._last_heartbeat = time.monotonic()
+        self._stderr_tail = deque(maxlen=_MAX_STDERR_LINES)
         start_lifecycle_task(self._scope, self._read_frames(), name="frame-reader")
         start_lifecycle_task(self._scope, self._monitor_process(), name="process-monitor")
         start_lifecycle_task(self._scope, self._monitor_heartbeat(), name="heartbeat-monitor")
@@ -277,10 +287,10 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
                 name="stdout-drain",
             )
         if self.process.stderr is not None:
-            start_lifecycle_task(
+            self._stderr_task = start_lifecycle_task(
                 self._scope,
-                self._drain_stream(self.process.stderr),
-                name="stderr-drain",
+                self._capture_stderr(self.process.stderr),
+                name="stderr-capture",
             )
 
     @property
@@ -497,6 +507,11 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
                             code="event_stream_closed",
                             exit_code=self.process.returncode,
                         )
+                        await asyncio.sleep(_STDERR_FAILURE_FLUSH_SECONDS)
+                        self._log_failure_stderr(
+                            failure_code="event_stream_closed",
+                            exit_code=self.process.returncode,
+                        )
                     return
                 payload = _decode_frame(raw)
                 if not _valid_session_frame(payload, self.session_id):
@@ -506,7 +521,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
                     self._last_heartbeat = time.monotonic()
                     continue
                 if frame_type == "response":
-                    self._handle_response(payload)
+                    await self._handle_response(payload)
                     continue
                 if frame_type == "event":
                     await self._handle_event(payload)
@@ -522,12 +537,13 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
                 code="frame_reader_failed",
                 failure_type=type(exc).__name__,
             )
+            self._log_failure_stderr(failure_code="frame_reader_failed")
             self._terminal_error = error
             self._fail_pending(error)
         finally:
             await self._events.put(None)
 
-    def _handle_response(self, payload: dict[str, object]) -> None:
+    async def _handle_response(self, payload: dict[str, object]) -> None:
         request_id = payload.get("request_id")
         if not isinstance(request_id, str):
             return
@@ -535,6 +551,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
         if future is None or future.done():
             return
         if payload.get("status") == "ok":
+            self._stderr_tail.clear()
             response_payload = payload.get("payload")
             if isinstance(response_payload, dict):
                 future.set_result(cast(dict[str, object], response_payload))
@@ -543,9 +560,18 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
             return
         code = payload.get("error_code")
         response_payload = payload.get("payload")
+        failure_code = code if isinstance(code, str) else "worker_failure"
+        if failure_code == "cancelled":
+            self._stderr_tail.clear()
+        else:
+            await asyncio.sleep(_STDERR_FAILURE_FLUSH_SECONDS)
+            self._log_failure_stderr(
+                failure_code=failure_code,
+                request_id=request_id,
+            )
         future.set_exception(
             GpuWorkerRequestError(
-                code if isinstance(code, str) else "worker_failure",
+                failure_code,
                 (
                     cast(dict[str, object], response_payload)
                     if isinstance(response_payload, dict)
@@ -574,9 +600,15 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
     async def _monitor_process(self) -> None:
         await self.process.wait()
         if not self._closing:
+            if self._stderr_task is not None:
+                await asyncio.gather(self._stderr_task, return_exceptions=True)
             error = GpuWorkerClosedError(
                 "worker process exited",
                 code="worker_process_exited",
+                exit_code=self.process.returncode,
+            )
+            self._log_failure_stderr(
+                failure_code="worker_process_exited",
                 exit_code=self.process.returncode,
             )
             self._terminal_error = error
@@ -592,6 +624,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
                 "worker heartbeat timed out",
                 code="heartbeat_timeout",
             )
+            self._log_failure_stderr(failure_code="heartbeat_timeout")
             self._terminal_error = error
             self._fail_pending(error)
             if self.process.returncode is None:
@@ -601,6 +634,34 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
     async def _drain_stream(self, stream: asyncio.StreamReader) -> None:
         while await stream.readline():
             pass
+
+    async def _capture_stderr(self, stream: asyncio.StreamReader) -> None:
+        while raw_line := await stream.readline():
+            line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+            if not line:
+                continue
+            if len(line) > _MAX_STDERR_LINE_CHARS:
+                line = f"{line[:_MAX_STDERR_LINE_CHARS]}…"
+            self._stderr_tail.append(line)
+
+    def _log_failure_stderr(
+        self,
+        *,
+        failure_code: str,
+        request_id: str | None = None,
+        exit_code: int | None = None,
+    ) -> None:
+        stderr_tail = tuple(self._stderr_tail)
+        self._stderr_tail.clear()
+        if not stderr_tail:
+            return
+        logger.error(
+            "[GPUWorker][Failure] failure_code=%s request_id=%s exit_code=%s stderr_tail=%s",
+            failure_code,
+            request_id or "none",
+            exit_code if exit_code is not None else "none",
+            json.dumps(stderr_tail, ensure_ascii=False),
+        )
 
     def _fail_pending(self, error: BaseException) -> None:
         for future in tuple(self._pending.values()):

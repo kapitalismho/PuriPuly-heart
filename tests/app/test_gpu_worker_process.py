@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
@@ -141,6 +142,34 @@ async def test_started_decode_failure_has_event_and_finite_exact_timing(
     assert error.value.fields["rtf"] == (
         error.value.fields["decode_seconds"] / error.value.fields["audio_seconds"]
     )
+    await client.close()
+
+
+async def test_started_decode_failure_logs_captured_worker_stderr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("FAKE_GPU_WORKER_STARTED_FAILURE", "1")
+    monkeypatch.setenv("FAKE_GPU_WORKER_STDERR_ON_FAILURE", "1")
+    client = await _factory().start(mode="persistent")
+    await client.next_event()
+    await client.activate(model_path=tmp_path / "model.gguf", device_id="vulkan:0")
+    audio_path = tmp_path / "audio.wav"
+    audio_path.write_bytes(b"fixture")
+
+    with caplog.at_level(logging.ERROR, logger=gpu_worker_process_module.logger.name):
+        with pytest.raises(GpuWorkerRequestError, match="decode_failure"):
+            await client.transcribe(
+                request_id="stderr-decode-failure",
+                channel="peer",
+                audio_path=audio_path,
+            )
+
+    failure_log = next(message for message in caplog.messages if "[GPUWorker][Failure]" in message)
+    assert "failure_code=decode_failure" in failure_log
+    assert "request_id=stderr-decode-failure" in failure_log
+    assert "native decoder rejected peer frame: invalid token state" in failure_log
     await client.close()
 
 

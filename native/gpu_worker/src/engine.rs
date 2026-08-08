@@ -330,6 +330,7 @@ fn read_wav(path: &Path) -> Result<Vec<f32>, EngineError> {
 }
 
 fn map_model_load_error(error: Error) -> EngineError {
+    report_native_error("model_load", &error);
     match error {
         Error::ModelFileNotFound(_) => EngineError::ModelMissing,
         Error::ModelLoad(_) => EngineError::ModelInvalid,
@@ -340,6 +341,7 @@ fn map_model_load_error(error: Error) -> EngineError {
 }
 
 fn map_warmup_error(error: Error) -> EngineError {
+    report_native_error("warmup", &error);
     match error {
         Error::Aborted { .. } => EngineError::Cancelled,
         Error::OutOfMemory(_) => EngineError::OutOfMemory,
@@ -349,6 +351,7 @@ fn map_warmup_error(error: Error) -> EngineError {
 }
 
 fn map_decode_error(error: Error) -> EngineError {
+    report_native_error("decode", &error);
     match error {
         Error::Aborted { .. } => EngineError::Cancelled,
         Error::OutOfMemory(_) => EngineError::OutOfMemory,
@@ -358,11 +361,19 @@ fn map_decode_error(error: Error) -> EngineError {
 }
 
 fn map_backend_error(error: Error) -> EngineError {
+    report_native_error("backend", &error);
     match error {
         Error::OutOfMemory(_) => EngineError::OutOfMemory,
         Error::Backend(_) => EngineError::BackendFailure,
         _ => EngineError::BackendFailure,
     }
+}
+
+fn report_native_error(stage: &str, error: &Error) {
+    eprintln!(
+        "[GPUWorker][Native] stage={stage} raw_status={} error={error}",
+        error.raw_status()
+    );
 }
 
 #[cfg(test)]

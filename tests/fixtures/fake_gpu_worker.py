@@ -133,6 +133,12 @@ for raw in reader:
             }
         )
         if os.environ.get("FAKE_GPU_WORKER_STARTED_FAILURE") == "1":
+            if os.environ.get("FAKE_GPU_WORKER_STDERR_ON_FAILURE") == "1":
+                print(
+                    "native decoder rejected peer frame: invalid token state",
+                    file=sys.stderr,
+                    flush=True,
+                )
             send(
                 {
                     "type": "response",
