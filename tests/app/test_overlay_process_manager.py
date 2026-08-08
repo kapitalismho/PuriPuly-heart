@@ -139,6 +139,7 @@ async def test_asyncio_overlay_process_terminate_escalates_to_kill_after_grace()
         stdout = None
         stderr = None
         returncode = None
+        pid = 4321
 
         def __init__(self) -> None:
             self.terminate_calls = 0
@@ -169,6 +170,46 @@ async def test_asyncio_overlay_process_terminate_escalates_to_kill_after_grace()
 
     assert process.terminate_calls == 1
     assert process.kill_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_overlay_manager_traces_asyncio_process_kill_escalation() -> None:
+    class HangingProcess:
+        stdout = None
+        stderr = None
+        returncode = None
+        pid = 4321
+
+        def __init__(self) -> None:
+            self._wait_future: asyncio.Future[int | None] = (
+                asyncio.get_running_loop().create_future()
+            )
+
+        def terminate(self) -> None:
+            return None
+
+        def kill(self) -> None:
+            self.returncode = -9
+            self._wait_future.set_result(self.returncode)
+
+        async def wait(self) -> int | None:
+            return await self._wait_future
+
+    managed = process_module._AsyncioOverlayProcess(
+        process=HangingProcess(),
+        terminate_grace_s=0.0,
+    )
+    manager = OverlayProcessManager(selected_target="desktop", geometry_authority="flet")
+    manager.state = "connected"
+    manager._process = managed
+    manager._attach_process_diagnostics(managed)
+
+    await manager.stop()
+
+    assert manager.diagnostics is not None
+    events = [event["event"] for event in manager.diagnostics.process_events]
+    assert events.index("terminate_requested") < events.index("kill_requested")
+    assert events.index("kill_requested") < events.index("process_exited")
 
 
 @dataclass(slots=True)
@@ -1669,6 +1710,162 @@ async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -
 
     assert (stale, accepted, duplicate) == ("ignored", "ready", "ignored")
     assert manager._accepted_ready_generation == 2
+    assert manager.diagnostics is not None
+    rejected = [
+        event
+        for event in manager.diagnostics.process_events
+        if event.get("event") == "renderer_message_ignored"
+    ]
+    assert {event.get("reason") for event in rejected} == {
+        "stale_overlay_instance",
+        "duplicate_ready_generation",
+    }
+    assert all(event["accepted"] is False for event in rejected)
+
+
+@pytest.mark.asyncio
+async def test_overlay_trace_records_complete_sanitized_generation_context(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    manager = OverlayProcessManager(
+        overlay_instance_id="overlay-trace",
+        logging_mode="detailed",
+        selected_target="desktop",
+        fallback_reason="steamvr_not_running",
+        geometry_authority="flet",
+    )
+
+    with caplog.at_level("INFO", logger="puripuly_heart.core.overlay.process"):
+        outcome = await manager._handle_lifecycle_event(
+            {
+                "type": "overlay_trace",
+                "component": "desktop_window_startup",
+                "event": "bounds_confirmed",
+                "generation": 7,
+                "phase": "bounds_confirmed",
+                "monotonic_ms": 18.25,
+                "accepted": True,
+                "parent_pid": 2468,
+                "canonical_bounds": {"x": 20, "y": 30, "width": 900, "height": 240},
+                "observed_bounds": [20, 30, 900, 240],
+            },
+            allow_ready=False,
+        )
+
+    assert outcome == "ignored"
+    assert manager.diagnostics is not None
+    event = manager.diagnostics.process_events[-1]
+    assert event["trace_component"] == "desktop_window_startup"
+    assert event["trace_event"] == "bounds_confirmed"
+    assert event["generation"] == 7
+    assert event["source_monotonic_ms"] == 18.25
+    assert event["selected_target"] == "desktop"
+    assert event["fallback_reason"] == "steamvr_not_running"
+    assert event["geometry_authority"] == "flet"
+    assert event["parent_pid"] == 2468
+    assert event["canonical_bounds"] == {"x": 20, "y": 30, "width": 900, "height": 240}
+    assert event["observed_bounds"] == [20, 30, 900, 240]
+    assert any('"trace_event": "bounds_confirmed"' in message for message in caplog.messages)
+
+
+@pytest.mark.asyncio
+async def test_overlay_stop_drains_terminal_child_lifecycle_trace() -> None:
+    class DrainingProcess:
+        pid = 4321
+        returncode = 0
+
+        async def next_event(self) -> dict[str, object]:
+            raise AssertionError("next_event should not be called")
+
+        async def wait(self) -> int | None:
+            return self.returncode
+
+        async def terminate(self) -> None:
+            return None
+
+        def set_logging_mode(self, mode: str) -> None:
+            _ = mode
+
+        def drain_events(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "type": "overlay_trace",
+                    "component": "flet_view_process",
+                    "event": "pid_file_removed",
+                    "generation": 1,
+                    "monotonic_ms": 44.0,
+                }
+            ]
+
+    manager = OverlayProcessManager(selected_target="desktop", geometry_authority="flet")
+    manager._process = DrainingProcess()
+
+    await manager.stop()
+
+    assert manager.diagnostics is not None
+    assert any(
+        event.get("trace_event") == "pid_file_removed"
+        for event in manager.diagnostics.process_events
+    )
+
+
+@pytest.mark.asyncio
+async def test_connected_expected_exit_drains_all_terminal_child_traces() -> None:
+    class ExitedProcess:
+        pid = 4321
+        returncode = 0
+
+        def __init__(self) -> None:
+            self.events = [
+                {
+                    "type": "overlay_trace",
+                    "component": "flet_view_process",
+                    "event": event,
+                    "generation": 3,
+                    "parent_pid": 9876,
+                    "monotonic_ms": monotonic_ms,
+                }
+                for event, monotonic_ms in (
+                    ("stop_requested", 41.0),
+                    ("process_exited", 42.0),
+                    ("pid_file_removed", 43.0),
+                )
+            ]
+
+        async def next_event(self) -> dict[str, object]:
+            return self.events.pop(0)
+
+        async def wait(self) -> int | None:
+            return self.returncode
+
+        async def terminate(self) -> None:
+            return None
+
+        def set_logging_mode(self, mode: str) -> None:
+            _ = mode
+
+        def drain_events(self) -> list[dict[str, object]]:
+            events = list(self.events)
+            self.events.clear()
+            return events
+
+    process = ExitedProcess()
+    manager = OverlayProcessManager(selected_target="desktop", geometry_authority="flet")
+    manager.state = "connected"
+    manager._process = process
+    manager.mark_shutdown_requested()
+
+    await manager._monitor_connected_process()
+    await manager.stop()
+
+    assert manager.diagnostics is not None
+    child_events = [
+        event.get("trace_event")
+        for event in manager.diagnostics.process_events
+        if event.get("trace_component") == "flet_view_process"
+    ]
+    assert child_events == ["stop_requested", "process_exited", "pid_file_removed"]
+    assert process.events == []
 
 
 @pytest.mark.asyncio

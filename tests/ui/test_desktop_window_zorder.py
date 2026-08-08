@@ -381,6 +381,7 @@ async def test_windows_zorder_port_confirms_flet_owned_hidden_bounds_without_mut
         hwnd=101,
         title_confirmed=True,
         bounds_confirmed=True,
+        observed_bounds=(320, 720, 1344, 320),
     )
     assert api.placement_calls == []
     assert api.show_calls == []

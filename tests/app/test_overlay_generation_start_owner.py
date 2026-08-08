@@ -315,6 +315,9 @@ async def test_owner_assembles_connected_generation_and_hands_off_monitor(
     assert manager.kwargs["startup_timeout_ms"] == 3210
     assert manager.kwargs["locale"] == "ko"
     assert manager.kwargs["logging_mode"] == "detailed"
+    assert manager.kwargs["selected_target"] == ("desktop" if desktop else "steamvr")
+    assert manager.kwargs["fallback_reason"] is None
+    assert manager.kwargs["geometry_authority"] == ("flet" if desktop else "native")
     assert FakePresenter.events.index("bridge:start") < FakePresenter.events.index("sink:replace")
     assert FakePresenter.events.index("sink:replace") < FakePresenter.events.index("manager:create")
     assert FakePresenter.events.index("manager:start") < FakePresenter.events.index("connected")

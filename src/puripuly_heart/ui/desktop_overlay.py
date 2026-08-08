@@ -412,6 +412,8 @@ from puripuly_heart.ui.desktop_overlay_surface.renderer import (
 )
 from puripuly_heart.ui.desktop_window_zorder import (
     NoopWindowZOrderPort,
+    WindowBoundsConfirmation,
+    WindowVisibilityConfirmation,
     WindowZOrderPort,
     create_window_z_order_port,
 )
@@ -1182,12 +1184,26 @@ class FletDesktopRendererWindow:
                 raise RuntimeError("desktop overlay Flet page is missing")
             await invoke_control_method(page.window, "wait_until_ready_to_show")
             coordinator.advance(DesktopOverlayStartupPhase.NATIVE_READY)
-            await self._confirm_window_bounds()
-            coordinator.advance(DesktopOverlayStartupPhase.BOUNDS_CONFIRMED)
+            bounds_confirmation = await self._confirm_window_bounds()
+            coordinator.advance(
+                DesktopOverlayStartupPhase.BOUNDS_CONFIRMED,
+                canonical_bounds=dict(self._startup_window_bounds or {}),
+                observed_bounds=(
+                    bounds_confirmation.observed_bounds if bounds_confirmation is not None else None
+                ),
+            )
             if self._closed.is_set() or not coordinator.accepts(self._startup_generation):
                 raise RuntimeError("desktop overlay startup generation was retired")
-            await self._show_configured_window()
-            coordinator.advance(DesktopOverlayStartupPhase.VISIBLE_CONFIRMED)
+            visibility_confirmation = await self._show_configured_window()
+            coordinator.advance(
+                DesktopOverlayStartupPhase.VISIBLE_CONFIRMED,
+                canonical_bounds=dict(self._startup_window_bounds or {}),
+                observed_bounds=(
+                    visibility_confirmation.observed_bounds
+                    if visibility_confirmation is not None
+                    else None
+                ),
+            )
             coordinator.advance(DesktopOverlayStartupPhase.READY)
         except Exception as exc:
             self._page_start_error = exc
@@ -1395,22 +1411,26 @@ class FletDesktopRendererWindow:
         window = page.window
         window.ignore_mouse_events = locked
 
-    async def _show_configured_window(self) -> None:
+    async def _show_configured_window(
+        self,
+    ) -> WindowVisibilityConfirmation | None:
         page = self._page
         if page is None:
-            return
+            return None
         window = page.window
         coordinator = self._startup_coordinator
         if coordinator is not None:
             coordinator.record("show_requested")
         window.visible = True
         page.update()
-        await self._confirm_window_visible()
+        return await self._confirm_window_visible()
 
-    async def _confirm_window_bounds(self) -> None:
+    async def _confirm_window_bounds(
+        self,
+    ) -> WindowBoundsConfirmation | None:
         bounds = self._startup_window_bounds
         if bounds is None:
-            return
+            return None
         title = self._window_title()
         try:
             result = await self._window_z_order_port.confirm_window_bounds(
@@ -1433,7 +1453,7 @@ class FletDesktopRendererWindow:
                     "reason=port_error exception_type=%s",
                     type(exc).__name__,
                 )
-            return
+            return None
         self._emit_detailed_log(
             "window_bounds_confirmation "
             f"reason={result.reason} confirmed={result.confirmed} "
@@ -1446,12 +1466,15 @@ class FletDesktopRendererWindow:
                 "desktop overlay canonical bounds were not confirmed: "
                 f"reason={result.reason} win32_error={result.win32_error}"
             )
+        return result
 
-    async def _confirm_window_visible(self) -> None:
+    async def _confirm_window_visible(
+        self,
+    ) -> WindowVisibilityConfirmation | None:
         title = self._window_title()
         bounds = self._startup_window_bounds
         if bounds is None:
-            return
+            return None
         try:
             result = await self._window_z_order_port.confirm_window_visible(
                 title,
@@ -1473,7 +1496,7 @@ class FletDesktopRendererWindow:
                     "reason=port_error exception_type=%s",
                     type(exc).__name__,
                 )
-            return
+            return None
         self._emit_detailed_log(
             "window_visibility_confirmation "
             f"reason={result.reason} confirmed={result.confirmed} "
@@ -1487,6 +1510,7 @@ class FletDesktopRendererWindow:
                 "desktop overlay visibility was not confirmed: "
                 f"reason={result.reason} win32_error={result.win32_error}"
             )
+        return result
 
     def _window_title(self) -> str:
         return t_for_locale(

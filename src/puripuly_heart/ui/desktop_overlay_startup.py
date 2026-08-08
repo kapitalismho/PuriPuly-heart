@@ -50,7 +50,7 @@ class DesktopOverlayStartupCoordinator:
     def retired(self) -> bool:
         return self._retired
 
-    def advance(self, phase: DesktopOverlayStartupPhase) -> None:
+    def advance(self, phase: DesktopOverlayStartupPhase, **fields: object) -> None:
         if self._retired:
             raise RuntimeError("retired desktop overlay startup generation cannot advance")
         current_index = self._SEQUENCE.index(self.phase)
@@ -62,7 +62,7 @@ class DesktopOverlayStartupCoordinator:
                 f"illegal desktop overlay startup transition: {self.phase.value} -> {phase.value}"
             )
         self.phase = phase
-        self._emit(phase.value, accepted=True)
+        self._emit(phase.value, accepted=True, **fields)
 
     def accepts(self, generation: int) -> bool:
         return not self._retired and generation == self.generation

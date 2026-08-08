@@ -64,3 +64,23 @@ def test_startup_coordinator_rejects_stale_generation_and_retired_work() -> None
         coordinator.advance(DesktopOverlayStartupPhase.PAGE_CONFIGURED)
     assert events[-1][1]["accepted"] is False
     assert events[-1][1]["event_generation"] == 2
+
+
+def test_startup_coordinator_attaches_confirmation_evidence_to_phase_trace() -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+    coordinator = DesktopOverlayStartupCoordinator(
+        4,
+        trace_sink=lambda event, fields: events.append((event, fields)),
+    )
+    coordinator.advance(DesktopOverlayStartupPhase.PAGE_CONFIGURED)
+    coordinator.advance(DesktopOverlayStartupPhase.NATIVE_READY)
+    coordinator.advance(
+        DesktopOverlayStartupPhase.BOUNDS_CONFIRMED,
+        canonical_bounds={"x": 10, "y": 20, "width": 800, "height": 240},
+        observed_bounds=(10, 20, 800, 240),
+    )
+
+    event, fields = events[-1]
+    assert event == "bounds_confirmed"
+    assert fields["canonical_bounds"] == {"x": 10, "y": 20, "width": 800, "height": 240}
+    assert fields["observed_bounds"] == (10, 20, 800, 240)

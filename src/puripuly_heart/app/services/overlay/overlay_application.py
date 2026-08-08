@@ -526,7 +526,15 @@ class OverlayApplicationOwner:
             target=target,
             clock=self.clock,
             startup_timeout_ms=OVERLAY_STARTUP_TIMEOUT_MS,
+            fallback_reason=self._fallback_owner.reason if self._fallback_owner.active else None,
         )
+
+    def record_lifecycle_trace(self, event: str, **fields: object) -> None:
+        runtime = self._runtime
+        manager = runtime.process_manager if runtime is not None else None
+        record_trace = getattr(manager, "record_lifecycle_trace", None)
+        if callable(record_trace):
+            record_trace("peer_application", event, **fields)
 
     def _generation_effects(self) -> OverlayGenerationStartEffects:
         return OverlayGenerationStartEffects(

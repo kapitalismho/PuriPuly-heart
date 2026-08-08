@@ -44,6 +44,7 @@ class WindowVisibilityConfirmation:
     visible_confirmed: bool = False
     bounds_confirmed: bool = False
     win32_error: int | None = None
+    observed_bounds: tuple[int, int, int, int] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +55,7 @@ class WindowBoundsConfirmation:
     title_confirmed: bool = False
     bounds_confirmed: bool = False
     win32_error: int | None = None
+    observed_bounds: tuple[int, int, int, int] | None = None
 
 
 class WindowZOrderPort(Protocol):
@@ -120,7 +122,12 @@ class NoopWindowZOrderPort:
         width: int,
         height: int,
     ) -> WindowBoundsConfirmation:
-        return WindowBoundsConfirmation(confirmed=True, reason="framework_authority")
+        return WindowBoundsConfirmation(
+            confirmed=True,
+            reason="framework_authority",
+            bounds_confirmed=True,
+            observed_bounds=(x, y, width, height),
+        )
 
     async def confirm_window_visible(
         self,
@@ -137,6 +144,7 @@ class NoopWindowZOrderPort:
             reason="framework_authority",
             visible_confirmed=True,
             bounds_confirmed=True,
+            observed_bounds=(x, y, width, height),
         )
 
     def close(self) -> None:
@@ -223,6 +231,7 @@ class WindowsWindowZOrderPort:
 
         logical_bounds = (int(x), int(y), int(width), int(height))
         target_bounds: tuple[int, int, int, int] | None = None
+        observed_bounds: tuple[int, int, int, int] | None = None
         confirmed_since: float | None = None
         while True:
             if not self._binding_is_current(pid, generation):
@@ -240,16 +249,16 @@ class WindowsWindowZOrderPort:
                     title_confirmed=title_confirmed,
                 )
             now = loop.time()
-            actual_bounds = self._api.window_bounds(hwnd)
-            if actual_bounds is not None:
-                scaled_target = _native_target_bounds(logical_bounds, actual_bounds)
+            observed_bounds = self._api.window_bounds(hwnd)
+            if observed_bounds is not None:
+                scaled_target = _native_target_bounds(logical_bounds, observed_bounds)
                 if scaled_target is not None and scaled_target != target_bounds:
                     target_bounds = scaled_target
                     confirmed_since = None
             if (
-                actual_bounds is not None
+                observed_bounds is not None
                 and target_bounds is not None
-                and _window_bounds_close(actual_bounds, target_bounds)
+                and _window_bounds_close(observed_bounds, target_bounds)
             ):
                 if confirmed_since is None:
                     confirmed_since = now
@@ -260,6 +269,7 @@ class WindowsWindowZOrderPort:
                         hwnd=hwnd,
                         title_confirmed=title_confirmed,
                         bounds_confirmed=True,
+                        observed_bounds=observed_bounds,
                     )
             else:
                 confirmed_since = None
@@ -271,6 +281,7 @@ class WindowsWindowZOrderPort:
                     hwnd=hwnd,
                     title_confirmed=title_confirmed,
                     bounds_confirmed=confirmed_since is not None,
+                    observed_bounds=observed_bounds,
                 )
             await self._sleep(min(self._poll_interval_s, remaining))
 
@@ -332,6 +343,7 @@ class WindowsWindowZOrderPort:
 
         logical_bounds = (x, y, width, height)
         target_bounds: tuple[int, int, int, int] | None = None
+        observed_bounds: tuple[int, int, int, int] | None = None
         confirmed_since: float | None = None
         visible_confirmed = False
         bounds_confirmed = False
@@ -351,16 +363,16 @@ class WindowsWindowZOrderPort:
                 )
             now = loop.time()
             visible_confirmed = self._api.is_window_visible(hwnd)
-            actual_bounds = self._api.window_bounds(hwnd)
-            if actual_bounds is not None:
-                scaled_target = _native_target_bounds(logical_bounds, actual_bounds)
+            observed_bounds = self._api.window_bounds(hwnd)
+            if observed_bounds is not None:
+                scaled_target = _native_target_bounds(logical_bounds, observed_bounds)
                 if scaled_target is not None and scaled_target != target_bounds:
                     target_bounds = scaled_target
                     confirmed_since = None
             bounds_confirmed = (
-                actual_bounds is not None
+                observed_bounds is not None
                 and target_bounds is not None
-                and _window_bounds_close(actual_bounds, target_bounds)
+                and _window_bounds_close(observed_bounds, target_bounds)
             )
             if visible_confirmed and bounds_confirmed:
                 if confirmed_since is None:
@@ -373,6 +385,7 @@ class WindowsWindowZOrderPort:
                         title_confirmed=title_confirmed,
                         visible_confirmed=True,
                         bounds_confirmed=True,
+                        observed_bounds=observed_bounds,
                     )
             else:
                 confirmed_since = None
@@ -385,6 +398,7 @@ class WindowsWindowZOrderPort:
                     title_confirmed=title_confirmed,
                     visible_confirmed=visible_confirmed,
                     bounds_confirmed=bounds_confirmed,
+                    observed_bounds=observed_bounds,
                 )
             await self._sleep(min(self._poll_interval_s, remaining))
 

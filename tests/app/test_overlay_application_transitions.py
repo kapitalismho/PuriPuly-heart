@@ -319,10 +319,14 @@ async def test_internal_steamvr_fallback_keeps_one_visible_peer_activation() -> 
 async def test_retry_every_enable_policy_retries_configured_steamvr_after_disable() -> None:
     recorder = Recorder()
     owner = make_owner(recorder)
-    owner.fallback_owner.activate()
+    owner.fallback_owner.activate("steamvr_not_running")
+    owner.active_target = "desktop"
 
     assert owner.snapshot.fallback_policy == "retry_every_enable"
     assert owner.effective_target_for_start() == "desktop"
+    request = owner._generation_request()
+    assert request.target == "desktop"
+    assert request.fallback_reason == "steamvr_not_running"
 
     await owner.set_enabled(False)
 

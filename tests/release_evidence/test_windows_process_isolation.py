@@ -151,6 +151,8 @@ def test_latest_peer_failure_reason_ignores_later_nonfailure_diagnostics() -> No
 @pytest.mark.asyncio
 async def test_fixture_invokes_the_committed_gui_retry_action_contract() -> None:
     class Runtime:
+        snapshot = type("Snapshot", (), {"effective_active": True})()
+
         async def retry_process_capture(self, *, config) -> bool:  # noqa: ANN001
             assert config == "fresh-resolved-config"
             return True

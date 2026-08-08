@@ -84,6 +84,7 @@ class _AsyncioOverlayProcess:
     _events: asyncio.Queue[dict[str, object]] = field(default_factory=asyncio.Queue)
     _reader_tasks: list[asyncio.Task[None]] = field(default_factory=list)
     _diagnostics: OverlayDiagnosticsRecorder | None = None
+    _lifecycle_sink: Callable[[str, dict[str, object]], None] | None = None
     _logging_mode: str = field(init=False, default="basic")
 
     def __post_init__(self) -> None:
@@ -102,6 +103,28 @@ class _AsyncioOverlayProcess:
     def set_logging_mode(self, mode: str) -> None:
         self._logging_mode = normalize_overlay_logging_mode(mode)
 
+    def attach_lifecycle_sink(
+        self,
+        sink: Callable[[str, dict[str, object]], None] | None,
+    ) -> None:
+        self._lifecycle_sink = sink
+
+    @property
+    def pid(self) -> int | None:
+        return self.process.pid
+
+    @property
+    def returncode(self) -> int | None:
+        return self.process.returncode
+
+    def drain_events(self) -> list[dict[str, object]]:
+        events: list[dict[str, object]] = []
+        while True:
+            try:
+                events.append(self._events.get_nowait())
+            except asyncio.QueueEmpty:
+                return events
+
     async def next_event(self) -> dict[str, object]:
         return await self._events.get()
 
@@ -118,6 +141,9 @@ class _AsyncioOverlayProcess:
         if self.process.returncode is None:
             kill = getattr(self.process, "kill", None)
             if callable(kill):
+                sink = self._lifecycle_sink
+                if sink is not None:
+                    sink("kill_requested", {"pid": self.pid})
                 with contextlib.suppress(ProcessLookupError):
                     kill()
         await self.wait()
@@ -485,6 +511,9 @@ class OverlayProcessManager:
     retry_ownership_changed: Callable[[bool], Awaitable[None]] | None = None
     graceful_shutdown_request: Callable[[], Awaitable[None]] | None = None
     graceful_shutdown_timeout_s: float = 1.5
+    selected_target: str | None = None
+    fallback_reason: str | None = None
+    geometry_authority: str | None = None
 
     state: str = field(init=False, default="off")
     failure_reason: str | None = field(init=False, default=None)
@@ -501,6 +530,8 @@ class OverlayProcessManager:
     _shutdown_requested: bool = field(init=False, default=False)
     native_retry_owner_confirmed: bool = field(init=False, default=False)
     _accepted_ready_generation: int | None = field(init=False, default=None, repr=False)
+    _trace_generation: int = field(init=False, default=0, repr=False)
+    _last_trace_phase: str | None = field(init=False, default=None, repr=False)
     _active_process_event_task: asyncio.Task[dict[str, object]] | None = field(
         init=False,
         default=None,
@@ -541,6 +572,8 @@ class OverlayProcessManager:
         self.restart_scheduled = False
         self.failure_reason = None
         self._accepted_ready_generation = None
+        self._trace_generation += 1
+        self._last_trace_phase = None
         await self._set_native_retry_owner_confirmed(False, force_notify=True)
 
         manifest = self._build_manifest()
@@ -552,7 +585,6 @@ class OverlayProcessManager:
             )
             self._record_process(
                 "spawn_requested",
-                pid=os.getpid(),
                 executable_path=executable_path,
                 executable_mtime=self._executable_mtime,
                 logging_mode=self.logging_mode,
@@ -564,7 +596,11 @@ class OverlayProcessManager:
             self._record_process("manifest_written", manifest_path=self._manifest_path)
             self._process = await self.process_runner.spawn(executable_path, self._manifest_path)
             self._attach_process_diagnostics(self._process)
-            self._record_process("process_spawned", manifest_path=self._manifest_path)
+            self._record_process(
+                "process_started",
+                pid=getattr(self._process, "pid", None),
+                manifest_path=self._manifest_path,
+            )
             await self._wait_for_startup()
         except OverlayPreparationError as error:
             await self._fail(error.failure_reason)
@@ -578,6 +614,7 @@ class OverlayProcessManager:
     async def stop(self) -> None:
         self.state = "stopping"
         self._current_phase = "stopping"
+        self._record_process("stop_requested")
 
         monitor_task = self._monitor_task
         self._monitor_task = None
@@ -587,7 +624,16 @@ class OverlayProcessManager:
 
         process = self._process
         if process is not None:
+            if getattr(process, "returncode", None) is None:
+                self._record_process("terminate_requested", pid=getattr(process, "pid", None))
             await process.terminate()
+            await self._drain_process_events(process)
+            self._record_process(
+                "process_exited",
+                pid=getattr(process, "pid", None),
+                returncode=getattr(process, "returncode", None),
+            )
+            self._detach_process_lifecycle_sink(process)
             if self._process is process:
                 self._process = None
         await self._set_native_retry_owner_confirmed(False)
@@ -673,6 +719,8 @@ class OverlayProcessManager:
                             task_name="connected-process-monitor",
                         )
                         await asyncio.sleep(0)
+                        if handoff_exit_task.done() and self._monitor_task is not None:
+                            await asyncio.shield(self._monitor_task)
                         return
                     if outcome == "failed":
                         return
@@ -698,6 +746,8 @@ class OverlayProcessManager:
                             task_name="connected-process-monitor",
                         )
                         await asyncio.sleep(0)
+                        if handoff_exit_task.done() and self._monitor_task is not None:
+                            await asyncio.shield(self._monitor_task)
                         return
                     if outcome == "failed":
                         return
@@ -706,7 +756,7 @@ class OverlayProcessManager:
                 if exit_task in done:
                     exit_code = exit_task.result()
                     self._last_exit_code = exit_code
-                    self._record_process("process_exit", phase="startup", exit_code=exit_code)
+                    self._record_process("process_exited", phase="startup", exit_code=exit_code)
                     await self._fail(
                         self._map_exit_code_to_failure_reason(exit_code),
                         terminate_process=False,
@@ -794,9 +844,11 @@ class OverlayProcessManager:
                 if exit_task in done:
                     exit_code = exit_task.result()
                     self._last_exit_code = exit_code
-                    self._record_process("process_exit", phase="connected", exit_code=exit_code)
+                    self._record_process("process_exited", phase="connected", exit_code=exit_code)
+                    await self._reconcile_terminal_process_events(process, event_task)
                     if self.state == "connected" and exit_code is not None:
                         if self._shutdown_requested and exit_code == 0:
+                            self._detach_process_lifecycle_sink(process)
                             self._process = None
                             self._cleanup_manifest()
                             self.state = "stopping"
@@ -843,7 +895,11 @@ class OverlayProcessManager:
         trusted_process_event: bool = True,
     ) -> str:
         if not isinstance(event, dict):
-            self._record_process("renderer_message_ignored", reason="malformed_message")
+            self._record_process(
+                "renderer_message_ignored",
+                reason="malformed_message",
+                accepted=False,
+            )
             logger.warning(
                 "[OverlayProcess] Ignoring malformed renderer message with type: %s",
                 type(event).__name__,
@@ -869,20 +925,35 @@ class OverlayProcessManager:
                 and (generation is None or self._is_non_negative_int(generation))
                 and (monotonic_ms is None or self._is_finite_non_bool_number(monotonic_ms))
             ):
-                self._record_process(
-                    "overlay_trace",
-                    trace_component=component,
-                    trace_event=trace_event,
+                phase = event.get("phase")
+                if isinstance(phase, str):
+                    self._last_trace_phase = phase
+                self.record_lifecycle_trace(
+                    component,
+                    trace_event,
                     generation=generation,
                     monotonic_ms=monotonic_ms,
+                    phase=phase,
+                    accepted=event.get("accepted"),
+                    event_generation=event.get("event_generation"),
                     geometry_authority=event.get("geometry_authority"),
+                    canonical_bounds=event.get("canonical_bounds"),
+                    observed_bounds=event.get("observed_bounds"),
                     pid=event.get("pid"),
+                    parent_pid=event.get("parent_pid"),
+                    endpoint_identity=event.get("endpoint_identity"),
                     returncode=event.get("returncode"),
                     kill_on_job_close=event.get("kill_on_job_close"),
                     job_failure_reason=event.get("job_failure_reason", event.get("reason")),
+                    failure_phase=event.get("failure_phase", event.get("startup_phase")),
+                    timeout_phase=event.get("timeout_phase"),
                 )
             else:
-                self._record_process("renderer_message_ignored", reason="invalid_overlay_trace")
+                self._record_process(
+                    "renderer_message_ignored",
+                    reason="invalid_overlay_trace",
+                    accepted=False,
+                )
             return "ignored"
         if allow_ready and trusted_process_event and event_type == "overlay_ready":
             event_instance_id = event.get("overlay_instance_id")
@@ -891,6 +962,8 @@ class OverlayProcessManager:
                     "renderer_message_ignored",
                     reason="stale_overlay_instance",
                     event_overlay_instance_id=event_instance_id,
+                    generation=event.get("generation"),
+                    accepted=False,
                 )
                 return "ignored"
             ready_generation = event.get("generation")
@@ -898,6 +971,7 @@ class OverlayProcessManager:
                 self._record_process(
                     "renderer_message_ignored",
                     reason="invalid_ready_generation",
+                    accepted=False,
                 )
                 return "ignored"
             if ready_generation is not None and self._accepted_ready_generation is not None:
@@ -905,6 +979,7 @@ class OverlayProcessManager:
                     "renderer_message_ignored",
                     reason="duplicate_ready_generation",
                     generation=ready_generation,
+                    accepted=False,
                 )
                 return "ignored"
             if isinstance(ready_generation, int):
@@ -922,6 +997,9 @@ class OverlayProcessManager:
             )
             return "ready"
         if event_type in {"startup_error", "runtime_error"}:
+            startup_phase = event.get("startup_phase")
+            if isinstance(startup_phase, str):
+                self._last_trace_phase = startup_phase
             await self._fail(self._extract_failure_reason(event))
             return "failed"
         if event_type == "overlay_event":
@@ -959,6 +1037,7 @@ class OverlayProcessManager:
                 "renderer_message_ignored",
                 event_type="overlay_event",
                 reason="invalid_payload",
+                accepted=False,
             )
             logger.warning("[OverlayProcess] Ignoring overlay_event without object payload")
             return
@@ -975,6 +1054,7 @@ class OverlayProcessManager:
                     renderer_event=renderer_event_type,
                     reason="stale_generation",
                     generation=event_generation,
+                    accepted=False,
                 )
                 return
         if not self._is_valid_renderer_event_payload(payload):
@@ -983,6 +1063,7 @@ class OverlayProcessManager:
                 event_type="overlay_event",
                 renderer_event=renderer_event_type,
                 reason="invalid_payload",
+                accepted=False,
             )
             logger.warning(
                 "[OverlayProcess] Ignoring invalid renderer event: %r",
@@ -1009,7 +1090,11 @@ class OverlayProcessManager:
         try:
             self.renderer_events.put_nowait(event)
         except asyncio.QueueFull:
-            self._record_process("renderer_event_dropped", renderer_event=renderer_event_type)
+            self._record_process(
+                "renderer_event_dropped",
+                renderer_event=renderer_event_type,
+                accepted=False,
+            )
             logger.warning(
                 "[OverlayProcess] Dropping renderer event because controller queue is full: %s",
                 renderer_event_type,
@@ -1130,7 +1215,7 @@ class OverlayProcessManager:
             )
             return False
 
-        self._record_process("graceful_shutdown_requested")
+        self._record_process("graceful_close_requested")
         ack_task = self._create_task(
             process.next_event(),
             task_name="graceful-shutdown-ack",
@@ -1167,6 +1252,7 @@ class OverlayProcessManager:
                         acknowledged = True
                         self._record_process("graceful_shutdown_acknowledged")
                     else:
+                        await self._record_shutdown_lifecycle_event(event)
                         ack_task = self._create_task(
                             process.next_event(),
                             task_name="graceful-shutdown-ack",
@@ -1210,6 +1296,7 @@ class OverlayProcessManager:
         self._record_process(
             "failure",
             failure_reason=failure_reason,
+            failure_phase=self._last_trace_phase or self._current_phase,
             phase=(
                 "connected"
                 if self._last_transition in {"overlay_ready", "bridge_ready"}
@@ -1259,10 +1346,22 @@ class OverlayProcessManager:
                 process
             )
             if not graceful_shutdown_complete:
+                if getattr(process, "returncode", None) is None:
+                    self._record_process("terminate_requested", pid=getattr(process, "pid", None))
                 await process.terminate()
+            await self._drain_process_events(process)
+            self._record_process(
+                "process_exited",
+                pid=getattr(process, "pid", None),
+                returncode=getattr(process, "returncode", None),
+            )
+            self._detach_process_lifecycle_sink(process)
             if self._process is process:
                 self._process = None
         elif not terminate_process:
+            if process is not None:
+                await self._drain_process_events(process)
+                self._detach_process_lifecycle_sink(process)
             self._process = None
         await self._set_native_retry_owner_confirmed(False)
 
@@ -1284,10 +1383,90 @@ class OverlayProcessManager:
         attach = getattr(process, "attach_diagnostics", None)
         if callable(attach) and self.diagnostics is not None:
             attach(self.diagnostics, overlay_instance_id=self.overlay_instance_id)
+        attach_lifecycle_sink = getattr(process, "attach_lifecycle_sink", None)
+        if callable(attach_lifecycle_sink):
+            attach_lifecycle_sink(self._record_managed_process_lifecycle)
         set_logging_mode = getattr(process, "set_logging_mode", None)
         if callable(set_logging_mode):
             set_logging_mode(self.logging_mode)
 
+    def _record_managed_process_lifecycle(
+        self,
+        event: str,
+        fields: dict[str, object],
+    ) -> None:
+        self._record_process(event, **fields)
+
+    @staticmethod
+    def _detach_process_lifecycle_sink(process: OverlayManagedProcess) -> None:
+        attach_lifecycle_sink = getattr(process, "attach_lifecycle_sink", None)
+        if callable(attach_lifecycle_sink):
+            attach_lifecycle_sink(None)
+
+    async def _reconcile_terminal_process_events(
+        self,
+        process: OverlayManagedProcess,
+        event_task: asyncio.Task[dict[str, object]],
+    ) -> None:
+        if not event_task.done():
+            event_task.cancel()
+        results = await asyncio.gather(event_task, return_exceptions=True)
+        event = results[0]
+        if not isinstance(event, BaseException):
+            await self._record_shutdown_lifecycle_event(event)
+        await self._drain_process_events(process)
+
+    async def _drain_process_events(self, process: OverlayManagedProcess) -> None:
+        drain_events = getattr(process, "drain_events", None)
+        if not callable(drain_events):
+            return
+        for event in drain_events():
+            await self._record_shutdown_lifecycle_event(event)
+
+    async def _record_shutdown_lifecycle_event(self, event: object) -> None:
+        if isinstance(event, dict) and event.get("type") == "overlay_trace":
+            await self._handle_lifecycle_event(event, allow_ready=False)
+            return
+        event_type = str(event.get("type", "")) if isinstance(event, dict) else ""
+        self._record_process(
+            "lifecycle_event",
+            event_type=event_type,
+            accepted=False,
+            reason="shutdown_drain",
+        )
+
+    def record_lifecycle_trace(
+        self,
+        component: str,
+        event: str,
+        **fields: object,
+    ) -> None:
+        self._record_process(
+            "overlay_trace",
+            trace_component=component,
+            trace_event=event,
+            **fields,
+        )
+
     def _record_process(self, event: str, **fields: object) -> None:
         if self.diagnostics is not None:
-            self.diagnostics.record_process(event, **fields)
+            if fields.get("generation") is None:
+                fields["generation"] = self._trace_generation
+            if fields.get("selected_target") is None:
+                fields["selected_target"] = self.selected_target
+            if fields.get("fallback_reason") is None:
+                fields["fallback_reason"] = self.fallback_reason
+            if fields.get("geometry_authority") is None:
+                fields["geometry_authority"] = self.geometry_authority
+            if "parent_pid" not in fields:
+                fields["parent_pid"] = os.getpid()
+            if fields.get("phase") is None:
+                fields["phase"] = self._current_phase
+            if fields.get("accepted") is None:
+                fields["accepted"] = True
+            payload = self.diagnostics.record_process(event, **fields)
+            if self.logging_mode == "detailed":
+                logger.info(
+                    "[OverlayProcess][Lifecycle] %s",
+                    json.dumps(payload, ensure_ascii=True, sort_keys=True),
+                )

@@ -1325,6 +1325,14 @@
       "rationale": "The desktop overlay caption plan/slot contract and its Flet renderer are internal UI composition boundaries consumed by the desktop overlay renderer window, not external import compatibility surfaces."
     },
     {
+      "surface": "puripuly_heart.ui desktop overlay startup coordinator",
+      "classification": "internal_ui_desktop_overlay_lifecycle",
+      "modules": [
+        "puripuly_heart.ui.desktop_overlay_startup"
+      ],
+      "rationale": "The desktop overlay startup coordinator is an internal generation and readiness boundary consumed by the desktop overlay renderer, not an external import compatibility surface."
+    },
+    {
       "surface": "puripuly_heart.ui.foundation modules",
       "classification": "internal_ui_foundation",
       "module_prefixes": [

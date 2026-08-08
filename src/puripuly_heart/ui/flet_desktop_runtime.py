@@ -391,6 +391,7 @@ class FletDesktopViewProcessOwner:
         sink = self._trace_sink
         if sink is None:
             return
+        fields.setdefault("parent_pid", os.getpid())
         fields["monotonic_ms"] = round((time.monotonic() - self._trace_started_at) * 1000, 3)
         sink(event, fields)
 

@@ -103,6 +103,26 @@ async def test_owner_normal_close_waits_for_exit_before_removing_pid_file(
 
 
 @pytest.mark.asyncio
+async def test_owner_trace_reports_renderer_pid_as_flet_view_parent(tmp_path: Path) -> None:
+    process = FakeProcess()
+    pid_file = _pid_file(tmp_path)
+    events: list[tuple[str, dict[str, object]]] = []
+    owner = FletDesktopViewProcessOwner(
+        graceful_timeout_s=0.05,
+        trace_sink=lambda event, fields: events.append((event, dict(fields))),
+        process_job=FakeProcessJob(),
+    )
+    await owner.attach(process, str(pid_file))
+
+    await owner.close(lambda: process.exit())
+
+    assert events
+    assert all(fields["parent_pid"] == os.getpid() for _event, fields in events)
+    started = next(fields for event, fields in events if event == "process_started")
+    assert started["pid"] == 4321
+
+
+@pytest.mark.asyncio
 async def test_owner_escalates_from_graceful_close_to_terminate(tmp_path: Path) -> None:
     process = FakeProcess()
     pid_file = _pid_file(tmp_path)
