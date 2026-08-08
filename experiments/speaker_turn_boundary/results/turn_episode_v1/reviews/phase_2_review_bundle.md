@@ -156,15 +156,15 @@ floor division — frozen, finding P2-007) and `session_end` the wav duration in
   - The scored region is therefore at least 10 s (rounding up adds at most 511
     samples) and at most 20 s after the Section 4.3 cap; warm-up is at least 5 s; the
     tail is at least 3 s when source context permits.
-- **Unaligned source-end replay/parity treatment (frozen, finding P2-036):** when the
-  session ends inside a chunk, the final partial chunk is **dropped identically in
-  both `source_prefix` and `episode_reset` modes** (existing `replay_wav_epoch`
-  behavior, verified in `vad_baseline.py`), the episode record marks
-  `unaligned_source_end = true`, and the B0 replay domain ends at
-  `last_full_chunk_end`. References whose acceptable intervals lie entirely in the
-  unprocessed partial tail are recorded `tail_unprocessed` and cannot be matched in
-  this phase (they are reference-only; tail semantics are handled by the Phase 5
-  replay machinery).
+- **Unaligned source-end replay/parity treatment (frozen, findings P2-036, P2-038):**
+  when the session ends inside a chunk, the final partial chunk is **dropped
+  identically in both `source_prefix` and `episode_reset` modes** (existing
+  `replay_wav_epoch` behavior, verified in `vad_baseline.py`), the episode record
+  marks `unaligned_source_end = true`, and the B0 replay domain ends at
+  `last_full_chunk_end`. Any reference whose target/evidence onset is at or beyond
+  `last_full_chunk_end` is recorded `tail_unprocessed` / `coverage_loss` and excluded
+  from scored denominators (Section 5.2); tail semantics are handled by the Phase 5
+  replay machinery.
 - Truncation (session start or end) is **recorded**, never silently accepted:
   `warmup_truncated = scored_start - warm_start < 5 s`,
   `tail_truncated = tail_end - scored_end < 3 s`.
@@ -361,17 +361,30 @@ preserves every discarded/ambiguous pattern as an explicit reference (finding P2
 ### 5.2 Episode timeline
 
 Per episode: references whose acceptable interval or target intersects the episode's
-scored region, with **half-open scored clipping** (finding P2-024): a reference is
-included iff its acceptable interval intersects `[scored_start, scored_end)` in
-half-open terms and its target/evidence onset >= scored_start; an interval crossing
-the warm-up/scored boundary is clipped to `[max(interval.start, scored_start),
-interval.end]` for matching; a reference whose target lies in warm-up is not scored
-(recorded `warmup_excluded`). **All warm-up actions are rejected before matching**
-(invariant 12): any final action with boundary < scored_start can never match any
-reference in the episode. References in the warm-up region are excluded from the
-reference timeline entirely (Section 5.3 "exclude warm-up actions and references from
-headline counts"; warm-up is unscored by construction). Each reference carries
-`episode_pool_tag` matching its episode tag and `scorable` matching the episode status.
+**processed scored interval** (finding P2-038), with **half-open scored clipping**
+(finding P2-024): the processed scored interval is `[scored_start,
+processed_scored_end)` where `processed_scored_end = min(scored_end,
+last_full_chunk_end)` (the B0 replay domain; the final partial chunk is dropped). A
+reference is included iff its acceptable interval intersects the processed scored
+interval in half-open terms **and** its target/evidence onset satisfies
+`scored_start <= onset < processed_scored_end`. Consequences:
+- a reference whose interval crosses the warm-up/scored boundary is clipped to
+  `[max(interval.start, scored_start), interval.end]` for matching; a reference whose
+  target lies in warm-up is not scored (recorded `warmup_excluded`);
+- a reference whose target/evidence onset lies at or beyond `processed_scored_end`
+  (inside the dropped partial tail chunk) is recorded `tail_unprocessed` /
+  `coverage_loss` and **excluded from every scored numerator and denominator** —
+  it can never become a scored hard miss (finding P2-038, invariants 12-13);
+- if the episode's own anchor target/evidence onset is not
+  `< processed_scored_end`, the episode is `diagnostic_only` with reason
+  `anchor_in_unprocessed_tail`.
+**All warm-up actions are rejected before matching** (invariant 12): any final action
+with boundary < scored_start can never match any reference in the episode. References
+in the warm-up region are excluded from the reference timeline entirely (Section 5.3
+"exclude warm-up actions and references from headline counts"; warm-up is unscored by
+construction). Each reference carries `episode_pool_tag` matching its episode tag and
+`scorable` matching the episode status. Fixtures cover targets exactly at and inside
+the dropped partial chunk (finding P2-038).
 
 Synthetic episodes (complete cases from the Phase 1 manifests `ls_dev`,
 `ls_held_out_clean`, `ls_held_out_other`, `mixed_dev_pool`) are registered in the dev
@@ -717,6 +730,9 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
 - Reference timeline rebuild disagrees with the Phase 1 classifier output on any shared
   target, or the independent audit re-derivation disagrees on any sampled episode →
   phase stops (determinism defect).
+- Any scorable reference whose target/evidence onset is at or beyond the processed
+  scored end (tail_unprocessed leak into scored denominators), or any episode anchored
+  on such a target that is not `diagnostic_only` (finding P2-038) → phase stops.
 - Audit sample mismatch (waveform bytes or annotation re-derivation) → phase stops.
 - B0 state-equivalence failure for the `b0/peer` class → that class is recorded
   `source_prefix_required`; the fixture report must show the disposition table complete
@@ -797,6 +813,7 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
 | P2-035 | note | deferred structural taxonomy could be mistaken for complete | resolved in Sections 5.1, 13 (explicit deferral marker `max_duration_and_terminal_deferred_phase3_8` in every Phase 2 manifest/report; later claims involving those actions must cite Phase 3/8 coverage) |
 | P2-036 | blocker | chunk alignment applied inconsistently (single-anchor/merged/truncated cases; unaligned session-end bounds) | resolved in Sections 4.2, 4.3 (single centralized `chunk_aligned_bounds` helper used everywhere; unaligned source end recorded and its replay/parity treatment frozen: partial tail chunk dropped identically in both modes per existing `replay_wav_epoch` semantics; `tail_unprocessed` references recorded) |
 | P2-037 | blocker | scored-region parity alone does not prove pending-start state absent; `VadGating` can retain `_pending_start_id` across the warm-up/scored boundary | resolved in Section 4.4 (pending-start inspection after warm-up replay; warm-up extended chunk-by-chunk until the pending start clears, subject to anchor-in-region and >= 10 s scored constraints; otherwise `diagnostic_only` `pending_state_unresolved`; `scored_start_extended` evidence recorded; committed active VAD state permitted) |
+| P2-038 | blocker | a reference with target/evidence onset inside the dropped partial tail chunk could enter scored denominators as an unmatchable hard miss | resolved in Sections 4.2, 5.2, 14 (processed scored interval `[scored_start, min(scored_end, last_full_chunk_end))`; reference inclusion requires `scored_start <= target/evidence onset < processed_scored_end`; tail-unprocessed references excluded from scored denominators; anchor in unprocessed tail -> `diagnostic_only` `anchor_in_unprocessed_tail`; fixtures at/inside the dropped chunk) |
 
 ## 18. Execution and exit-gate note (finding P2-026)
 
