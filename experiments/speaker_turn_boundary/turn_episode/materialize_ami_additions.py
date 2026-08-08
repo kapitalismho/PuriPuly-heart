@@ -153,10 +153,11 @@ def _preflight_pass(
         return False
     if len(header) < 44 or header[:4] != b"RIFF" or header[8:12] != b"WAVE":
         return False
+    format_tag = int.from_bytes(header[20:22], "little")
     channels = int.from_bytes(header[22:24], "little")
     sample_rate = int.from_bytes(header[24:28], "little")
     bits = int.from_bytes(header[34:36], "little")
-    if channels != 1 or sample_rate != CANONICAL_RATE_HZ or bits != 16:
+    if format_tag != 1 or channels != 1 or sample_rate != CANONICAL_RATE_HZ or bits != 16:
         return False
     decoded_s = length / 32000.0
     return abs(decoded_s - annotation_duration_s) <= DURATION_TOLERANCE_S
@@ -197,8 +198,7 @@ def compute_frozen_selection(
     return development, reserved
 
 
-def download_with_resume(url: str, destination: Path) -> None:
-    part = destination.with_name(destination.name + ".part")
+def download_with_resume(url: str, part: Path) -> None:
     part.parent.mkdir(parents=True, exist_ok=True)
     offset = part.stat().st_size if part.is_file() else 0
     headers = {"User-Agent": "stb-turn-episode/1.0"}
@@ -210,17 +210,33 @@ def download_with_resume(url: str, destination: Path) -> None:
     except urllib.error.HTTPError as exc:
         if exc.code == 416 and offset > 0:
             part.unlink()
+            offset = 0
             request = urllib.request.Request(url, headers={"User-Agent": "stb-turn-episode/1.0"})
             response = urllib.request.urlopen(request, timeout=120)
         else:
-            raise MaterializationError(f"download failed for {destination.name}: {exc}") from exc
+            raise MaterializationError(f"download failed for {part.name}: {exc}") from exc
+    if offset > 0:
+        if response.status != 206:
+            part.unlink()
+            offset = 0
+            request = urllib.request.Request(url, headers={"User-Agent": "stb-turn-episode/1.0"})
+            response = urllib.request.urlopen(request, timeout=120)
+        else:
+            content_range = response.headers.get("Content-Range", "")
+            expected = f"bytes {offset}-"
+            if not content_range.startswith(expected):
+                part.unlink()
+                offset = 0
+                request = urllib.request.Request(
+                    url, headers={"User-Agent": "stb-turn-episode/1.0"}
+                )
+                response = urllib.request.urlopen(request, timeout=120)
     with response, part.open("ab") as handle:
         while True:
             block = response.read(1 << 20)
             if not block:
                 break
             handle.write(block)
-    part.replace(destination)
 
 
 def main() -> None:
@@ -265,8 +281,22 @@ def main() -> None:
         info = infos[meeting_id]
         group = "development" if meeting_id in expected_dev else "reserved"
         destination = corpus_root / "ami" / "audio" / meeting_id / f"{meeting_id}.Mix-Headset.wav"
+        part = destination.with_name(destination.name + ".part")
         if not destination.is_file():
-            download_with_resume(ami_mirror_url(meeting_id), destination)
+            download_with_resume(ami_mirror_url(meeting_id), part)
+            try:
+                samples = load_canonical_wav(part)
+            except Exception as exc:
+                raise MaterializationError(
+                    f"{meeting_id}: invalid canonical wav after download: {exc}"
+                ) from exc
+            decoded_duration_s = samples.size / CANONICAL_RATE_HZ
+            if abs(decoded_duration_s - info.duration_s) > DURATION_TOLERANCE_S:
+                raise MaterializationError(
+                    f"{meeting_id}: decoded {decoded_duration_s:.1f}s vs annotation "
+                    f"{info.duration_s:.1f}s"
+                )
+            part.replace(destination)
         try:
             samples = load_canonical_wav(destination)
         except Exception as exc:

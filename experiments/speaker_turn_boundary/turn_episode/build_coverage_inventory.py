@@ -54,6 +54,26 @@ MAX_NEGATIVE_PER_SESSION = 12
 AMI_MATERIALIZED = ("ES2003a", "ES2004a", "IS1008a", "IS1009a")
 AMI_DEV_TOUCHED = ("ES2003a", "IS1008a")
 AMI_HELDOUT_TOUCHED = ("ES2004a", "IS1009a")
+AMI_DEVELOPMENT_ADDITIONS = (
+    "EN2002c",
+    "TS3006a",
+    "EN2001d",
+    "TS3009b",
+    "ES2015d",
+    "TS3007a",
+    "TS3012c",
+    "TS3005b",
+)
+AMI_RESERVED_ADDITIONS = (
+    "TS3003b",
+    "ES2014a",
+    "TS3004a",
+    "EN2006a",
+    "EN2009d",
+    "TS3008b",
+    "ES2016a",
+    "ES2002b",
+)
 ALIMEETING_SESSIONS = (
     "R8001_M8004",
     "R8003_M8001",
@@ -371,11 +391,20 @@ def load_ami_annotation_meetings(
     for meeting_id, paths in sorted(by_meeting.items()):
         if meeting_id in AMI_MATERIALIZED:
             continue
+        manifest_entry = materialization.get(meeting_id) if materialization else None
+        if manifest_entry is not None and manifest_entry.get("group") != "development":
+            # Reserved sessions are never opened: no words parsing, no region
+            # extraction, no label access (addendum Section 2.2).
+            continue
         meta = meetings_meta.get(meeting_id) or {}
         duration_s = meta.get("duration_s")
         if not duration_s:
             continue
         duration_samples = int(float(duration_s) * CANONICAL_SAMPLE_RATE_HZ)
+        if manifest_entry is not None:
+            duration_samples = int(
+                round(float(manifest_entry["decoded_duration_s"]) * CANONICAL_SAMPLE_RATE_HZ)
+            )
         words: list[AmiWord] = []
         for words_path in paths:
             speaker = f"{meeting_id}.Participant{words_path.name.split('.')[1]}"
@@ -403,9 +432,6 @@ def load_ami_annotation_meetings(
         }
         component = tuple(sorted(global_ids)) or tuple(speakers)
         targets = _classify_targets(regions)
-        manifest_entry = materialization.get(meeting_id)
-        if manifest_entry is not None and manifest_entry.get("group") != "development":
-            continue
         wav_path = None
         wav_sha = None
         touched_status = "untouched"
@@ -713,9 +739,32 @@ def main() -> None:
     materialization: dict[str, dict[str, Any]] | None = None
     reserved_materialized: dict[str, Any] = {}
     if args.ami_materialization_manifest is not None:
-        materialization = json.loads(
-            args.ami_materialization_manifest.read_text(encoding="utf-8")
-        ).get("meetings")
+        raw_manifest = json.loads(args.ami_materialization_manifest.read_text(encoding="utf-8"))
+        payload = {k: v for k, v in raw_manifest.items() if k != "content_sha256"}
+        expected_hash = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
+        if expected_hash != raw_manifest.get("content_sha256"):
+            raise InventoryError("ami materialization manifest content_sha256 mismatch")
+        selected = raw_manifest.get("selected_meetings") or []
+        selected_map = {item["meeting_id"]: item["group"] for item in selected}
+        if selected_map != {m: "development" for m in AMI_DEVELOPMENT_ADDITIONS} | {
+            m: "reserved" for m in AMI_RESERVED_ADDITIONS
+        }:
+            raise InventoryError("ami materialization manifest selection mismatch")
+        materialization = raw_manifest.get("meetings")
+        for meeting_id, entry in (materialization or {}).items():
+            expected_group = selected_map.get(meeting_id)
+            if expected_group is None or entry.get("group") != expected_group:
+                raise InventoryError(f"ami manifest group mismatch for {meeting_id}")
+            destination = Path(str(entry["destination"]))
+            if not destination.is_file():
+                raise InventoryError(f"ami manifest file missing: {destination}")
+            actual_sha = external.sha256_file(destination)
+            if actual_sha != entry.get("sha256"):
+                raise InventoryError(f"ami manifest sha256 mismatch for {meeting_id}")
+            if destination.stat().st_size != entry.get("size_bytes"):
+                raise InventoryError(f"ami manifest size mismatch for {meeting_id}")
         reserved_materialized = {
             meeting_id: entry
             for meeting_id, entry in (materialization or {}).items()
@@ -747,6 +796,13 @@ def main() -> None:
             touched = touched_map.get(str(case.case_id), "untouched")
             sessions.append(load_pilot_session(case, wav_root, touched))
 
+    annotations_dir = corpus_root / "ami" / "annotations"
+    meetings_meta = _load_meetings_xml(annotations_dir) if annotations_dir.is_dir() else {}
+    annotation_sessions = load_ami_annotation_meetings(
+        annotations_dir, meetings_meta, corpus_root, materialization
+    )
+    all_sessions = sessions + annotation_sessions
+
     expected_sessions = {f"ami_{mid}" for mid in AMI_MATERIALIZED} | {
         f"alimeeting_{sid}" for sid in ALIMEETING_SESSIONS
     }
@@ -756,16 +812,10 @@ def main() -> None:
             for meeting_id, entry in materialization.items()
             if entry.get("group") == "development"
         }
-    actual_sessions = {s.session_id for s in sessions}
+    actual_sessions = {s.session_id for s in all_sessions if s.wav_path is not None}
     missing = expected_sessions - actual_sessions
     if missing:
         raise InventoryError(f"expected materialized sessions missing: {sorted(missing)}")
-
-    annotations_dir = corpus_root / "ami" / "annotations"
-    meetings_meta = _load_meetings_xml(annotations_dir) if annotations_dir.is_dir() else {}
-    annotation_sessions = load_ami_annotation_meetings(
-        annotations_dir, meetings_meta, corpus_root, materialization
-    )
 
     synthetic_counts: dict[str, Any] = {}
     for name in ("ls_dev", "ls_held_out_clean", "ls_held_out_other", "mixed_dev_pool"):
@@ -788,15 +838,14 @@ def main() -> None:
             "expected_kinds": sorted(kinds),
         }
 
-    enriched = target_enriched_selection(sessions)
-    all_sessions = sessions + annotation_sessions
+    scorable_sessions = [s for s in all_sessions if s.wav_path is not None]
+    enriched = target_enriched_selection(scorable_sessions)
     synthetic_group_ids = [f"synthetic:{name}" for name in synthetic_counts]
     group_graph = build_group_graph(all_sessions, synthetic_group_ids)
 
     # B0 replay runs before any inventory artifact is written; the final
     # inventory is written only after every expected evidence file exists
     # (pilot sessions + development materialized sessions; fail-closed).
-    scorable_sessions = [s for s in all_sessions if s.wav_path is not None]
     b0_dir = args.out / "b0_inventory_replay"
     b0_dir.mkdir(parents=True, exist_ok=True)
     b0_evidence_hashes: dict[str, str] = {}
