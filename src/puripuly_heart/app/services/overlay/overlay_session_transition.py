@@ -32,6 +32,7 @@ class OverlaySessionStartExecution:
     resolve_target: OverlaySessionTargetFactory
     on_starting: OverlaySessionStartingHandler
     run_start: OverlaySessionStartOperation
+    replace_starting: bool = False
 
 
 OverlaySessionStartExecutionFactory = Callable[[], OverlaySessionStartExecution]
@@ -90,7 +91,9 @@ class OverlaySessionTransitionOwner:
     ) -> OverlaySessionStartStatus:
         async with self._serialization_lock():
             execution = execution_factory()
-            if execution.state in {"starting", "connected"}:
+            if execution.state == "connected" or (
+                execution.state == "starting" and not execution.replace_starting
+            ):
                 self._emit(
                     OverlaySessionTransitionDiagnostic(
                         operation="start",

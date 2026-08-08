@@ -458,7 +458,9 @@ class OverlayApplicationOwner:
         generation = self._fallback_owner.generation
         reason = self._fallback_owner.reason
         try:
-            status = await self._transition_owner.begin_start(self._start_execution)
+            status = await self._transition_owner.begin_start(
+                lambda: self._start_execution(replace_starting=True)
+            )
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -470,7 +472,11 @@ class OverlayApplicationOwner:
             return
         await self._complete_fallback_failure(reason, generation=generation)
 
-    def _start_execution(self) -> OverlaySessionStartExecution:
+    def _start_execution(
+        self,
+        *,
+        replace_starting: bool = False,
+    ) -> OverlaySessionStartExecution:
         return OverlaySessionStartExecution(
             state=self._state,
             previous_runtime=self._runtime,
@@ -479,15 +485,17 @@ class OverlayApplicationOwner:
             resolve_target=self.effective_target_for_start,
             on_starting=self._mark_starting,
             run_start=self.run_start,
+            replace_starting=replace_starting,
         )
 
     def _mark_starting(self, runtime: OverlayRuntimeHandle, target: str) -> None:
         if self._runtime is not runtime:
             raise RuntimeError("overlay start transition runtime is not current")
         self._active_target = target
-        self._transition_state("starting")
         self._auto_restart_scheduled = False
-        self._notify_state()
+        if self._state != "starting":
+            self._transition_state("starting")
+            self._notify_state()
 
     async def _apply_retry_ownership(
         self,
@@ -669,7 +677,6 @@ class OverlayApplicationOwner:
                 await self._complete_fallback_failure(reason)
                 return
             self._failure_reason = None
-            self._transition_state("off", preserve_peer_activation=True)
             try:
                 await self.refresh_peer_dependencies()
             except asyncio.CancelledError:
@@ -682,7 +689,6 @@ class OverlayApplicationOwner:
                 )
                 await self._complete_fallback_failure(reason)
                 return
-            self._notify_state()
             self.publish_fallback(True)
             if not self._fallback_owner.schedule():
                 await self._complete_fallback_failure(reason)
@@ -925,7 +931,7 @@ class OverlayApplicationOwner:
             not self._ingress_stopped
             and state.settings_available
             and state.overlay_intent_enabled
-            and self._state not in {"starting", "connected"}
+            and self._state == "starting"
         )
 
     def stop_ingress(self) -> None:
