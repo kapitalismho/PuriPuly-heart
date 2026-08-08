@@ -5,10 +5,11 @@ Phase 1; immediate implementation order Section 34 steps 4-5). The Phase 0 revie
 approved (`reviews/phase_0_pre_execution.md`); Phase 0 deliverables are committed. The
 Phase 1 inventory has **not** been built yet.
 
-Revision history: rev 1 initial bundle (candidate `2f5a03db`); rev 2 resolves review
-findings P1-RANGE-001, P1-B0-001, P1-B0-002, P1-B0-003, P1-GROUP-001, P1-SAMPLING-001,
+Revision history: rev 1 initial bundle (candidate `2f5a03db`); rev 2 resolves
+P1-RANGE-001, P1-B0-001, P1-B0-002, P1-B0-003, P1-GROUP-001, P1-SAMPLING-001,
 P1-PROV-001, P1-COUNT-001 (candidate `00ff8635`); rev 3 resolves P1-RANGE-002,
-P1-GROUP-002, P1-PROV-002 (this revision).
+P1-GROUP-002, P1-PROV-002 (candidate `e3d88151`); rev 4 (this revision, candidate
+`33550846`) restates the exact review range and the AMI identity source.
 
 ## 1. Artifacts under review
 
@@ -19,7 +20,7 @@ P1-GROUP-002, P1-PROV-002 (this revision).
 | Plan self-hash | `8c6bed2e564b9ec80e26ee6b73701985c863b7beb68e51590be7a5faf173aad4` |
 | Restart commit (base) | `fef0a6b312df34680d9db0fd858e28ae054ace89` |
 | Work branch | `experiment-v2-speaker-change-turn-boundaries-ls` |
-| Review base..candidate | `fef0a6b3..e3d88151` (rev-3 candidate `e3d88151`; rev-1 candidate `2f5a03db`, rev-2 candidate `00ff8635`; working tree clean at bundle time) |
+| Review base..candidate | `fef0a6b3..33550846` (rev-4 candidate `33550846`; rev-1 `2f5a03db`, rev-2 `00ff8635`, rev-3 `e3d88151`; working tree clean at bundle time) |
 | Phase 0 evidence this phase depends on | `reviews/phase_0_pre_execution.md` (approved), `reviews/phase_0_review_bundle.md`, `turn_episode/schemas.py`, `turn_episode/contracts.py`, `proposal_contract.json`, `fusion_contract.json` |
 | Historical hash ledger | `reviews/historical_artifact_ledger.json` |
 
@@ -290,6 +291,7 @@ Deterministic per-session hash-stratified sampling, frozen before Phase 2:
 | --- | --- | --- | --- |
 | P1-RANGE-001 | blocker | bundle recorded stale head; candidate is 2f5a03db | resolved in Section 1 (rev-1 range fef0a6b3..2f5a03db) |
 | P1-RANGE-002 | blocker | rev-2 bundle still named the rev-1 candidate | resolved in Section 1 (rev-3 range fef0a6b3..e3d88151) |
+| P1-RANGE-003 | blocker | rev-4 bundle named the rev-3 candidate after the range-fix commit | resolved in Section 1 (rev-4 range fef0a6b3..33550846) |
 | P1-B0-001 | blocker | legacy B0 runner rejects phase2-v1 manifests | resolved in Section 4.1 (dedicated inventory script, raw `replay_wav_epoch` path) |
 | P1-B0-002 | important | "not neural inference" false; Silero is ONNX | resolved in Section 4.1 (baseline engine wording; model hash bound) |
 | P1-B0-003 | important | classification inputs unspecified; coalescer non-normative; terminal boundaries deferred | resolved in Sections 4.1-4.2 (raw traces only; frozen classification rule) |
