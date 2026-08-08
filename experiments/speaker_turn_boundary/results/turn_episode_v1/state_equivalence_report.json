@@ -1,6 +1,6 @@
 {
   "class": "b0/peer",
-  "content_sha256": "b6a6bfdc49ce512e741543a09e93c1ce3265767a0e74f350ba3c7c2494d68f33",
+  "content_sha256": "07a375de5584bdf5210aa41176dea7ff72fd34cecd5a8633ed10d035bb91bba1",
   "convergence_diagnostic": [
     {
       "episode_id": "diagnostic_dev:alimeeting_R8001_M8004:12688384:12849152:p273",
@@ -1181,7 +1181,7 @@
     "contracts": "b207d3f8b9720df5dd228aa8bd8b479c54622abb905a9ca04f580820a6fc3c03",
     "episode_manifest_dev": "9d8e0db9efb5c7fdbaf21b5af630f216165f5dd30047b4422658a0a1803dd613",
     "schemas": "a9fa4571b1bab3cf88d6739a3732c1cc62f753a46d51d59c2db7526468eb8868",
-    "state_equivalence": "5a3f4bac831f011e2e52a9b80e1d2b03640c15ece53557869fc5f05fd5d0f4b3"
+    "state_equivalence": "f756e84e76ee9d6f081ce58118308ae835bb0ac7ebddb4aea0ef83c2d4d972e9"
   },
   "parity_skipped": false,
   "pending_state_notes": "per-episode pending-start inspection recorded in episode_manifest_dev.json flags.readiness; 1 episode diagnostic_only pending_state_unresolved",
