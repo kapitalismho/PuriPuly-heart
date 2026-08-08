@@ -39,6 +39,7 @@ PLAN_BLOB = "24340f488f1bb46c666a5fc15eef2fc87ef1f826"
 STRUCTURAL_DEFERRAL = "max_duration_and_terminal_deferred_phase3_8"
 
 POOLS = ("diagnostic_dev", "frontier_dev")
+P1_GROUP_GRAPH_HASH = "7ebf4dffa0af180910007a318d0e3d1e77f7f048dbae852199ddd45f74cce7eb"
 SYNTHETIC_ORDER = ("ls_dev", "ls_held_out_clean", "ls_held_out_other", "mixed_dev_pool")
 SYNTHETIC_HISTORY = {
     "ls_dev": "dev_pilot",
@@ -207,28 +208,41 @@ def missing_timing_intervals(
     session_end: int,
     sample_rate_hz: int = CANONICAL_SAMPLE_RATE_HZ,
 ) -> list[tuple[int, int]]:
-    timed = [w for w in raw_words if w.start_time_s is not None and w.end_time_s is not None]
-    missing = [w for w in raw_words if w.start_time_s is None or w.end_time_s is None]
-    if not missing:
+    """Frozen covering rule (bundle P2-030): each maximal run of consecutive
+    missing-timing words inside one participant file is bounded deterministically
+    and conservatively by its neighboring timed records in the same file: from the
+    end of the previous timed word (or session start when none) to the start of the
+    next timed word (or session end when none). A word without source coordinates
+    cannot be proven to lie after any region boundary, so the session bounds are
+    the only conservative fallback. Consecutive missing words form one covering
+    interval; intervals overlapping across files are merged; spans are clamped to
+    [0, session_end]."""
+    if not raw_words:
         return []
-    ordered_timed = sorted(timed, key=lambda w: (w.start_time_s or 0.0, w.end_time_s or 0.0))
     intervals: list[tuple[int, int]] = []
-    for word in missing:
-        start_s = 0.0
-        end_s = session_end / sample_rate_hz
-        for timed_word in ordered_timed:
-            if (timed_word.end_time_s or 0.0) <= (
-                word.start_time_s if word.start_time_s is not None else 1e18
-            ):
-                start_s = max(start_s, timed_word.end_time_s or 0.0)
-            if (timed_word.start_time_s or 1e18) >= (
-                word.end_time_s if word.end_time_s is not None else 0.0
-            ):
-                end_s = min(end_s, timed_word.start_time_s or 0.0)
-        start_sample = max(0, int(round(start_s * sample_rate_hz)))
-        end_sample = min(session_end, int(round(end_s * sample_rate_hz)))
-        if end_sample > start_sample:
-            intervals.append((start_sample, end_sample))
+    for path_index in sorted({w.path_index for w in raw_words}):
+        file_words = [w for w in raw_words if w.path_index == path_index]
+        run_open = False
+        prev_end_s = 0.0
+        for word in file_words:
+            if word.start_time_s is None or word.end_time_s is None:
+                run_open = True
+                continue
+            if run_open:
+                next_start_s = word.start_time_s or 0.0
+                start_sample = max(0, min(session_end, int(round(prev_end_s * sample_rate_hz))))
+                end_sample = max(
+                    start_sample, min(session_end, int(round(next_start_s * sample_rate_hz)))
+                )
+                if end_sample > start_sample:
+                    intervals.append((start_sample, end_sample))
+                run_open = False
+            prev_end_s = word.end_time_s or 0.0
+        if run_open:
+            start_sample = max(0, min(session_end, int(round(prev_end_s * sample_rate_hz))))
+            end_sample = max(start_sample, session_end)
+            if end_sample > start_sample:
+                intervals.append((start_sample, end_sample))
     merged: list[tuple[int, int]] = []
     for start, end in sorted(intervals):
         if merged and start <= merged[-1][1]:
@@ -837,8 +851,9 @@ def finalize_episodes(
             import wave as wave_module
 
             with wave_module.open(str(session.wav_abs_path), "rb") as handle:
-                handle.setpos(bounds.scored_start)
-                frames = handle.readframes(processed_scored_end - bounds.scored_start)
+                slice_end = min(bounds.tail_end, int(handle.getnframes()))
+                handle.setpos(bounds.warm_start)
+                frames = handle.readframes(slice_end - bounds.warm_start)
             slice_sha = sha256_bytes(frames)
         flags: dict[str, Any] = {
             "warmup_truncated": (bounds.scored_start - bounds.warm_start) / SAMPLES_PER_MS
@@ -1104,6 +1119,31 @@ def main() -> None:
         ids = sorted(s for s in opened_sessions if str(details_rows[s]["corpus"]) == corpus)
         by_corpus_rank[corpus] = {sid: rank for rank, sid in enumerate(ids)}
 
+    # P2-SPLIT-001: the Phase 1 group graph is frozen; the builder fails closed on a
+    # changed graph hash and on any component split across pools (invariants 27, 29).
+    graph = inventory["group_graph"]
+    if graph.get("graph_hash") != P1_GROUP_GRAPH_HASH:
+        raise Phase2Error(
+            f"group graph hash mismatch (frozen={P1_GROUP_GRAPH_HASH}, "
+            f"actual={graph.get('graph_hash')})"
+        )
+    opened_set = set(opened_sessions)
+    covered_by_graph = set()
+    for component_id, member_ids in graph["component_sessions"].items():
+        opened_members = [sid for sid in member_ids if sid in opened_set]
+        covered_by_graph.update(opened_members)
+        pools = {
+            pool_for_session(sid, details_rows[sid]["corpus"], by_corpus_rank)
+            for sid in opened_members
+        }
+        if len(pools) > 1:
+            raise Phase2Error(f"component split across pools: {component_id} -> {sorted(pools)}")
+    if covered_by_graph != opened_set:
+        raise Phase2Error(
+            "opened sessions not covered by group graph components: "
+            f"{sorted(opened_set - covered_by_graph)}"
+        )
+
     pilot_cases: dict[str, list[Any]] = {}
     for name in ("ami_dev_pilot.json", "ami_held_out_pilot.json", "alimeeting_eval_pilot.json"):
         manifest = Phase2Manifest.load(manifests_dir / name)
@@ -1149,6 +1189,14 @@ def main() -> None:
         "inventory": inventory["content_sha256"],
     }
 
+    from .pinned_ledger import ledger_verification
+
+    provenance = {
+        "generated_from": code_hashes,
+        **ledger_verification(),
+        "group_graph_hash": graph["graph_hash"],
+    }
+
     pool_split = {pool: [] for pool in POOLS}
     for record in records:
         pool_split.setdefault(record.pool, []).append(record.episode_id)
@@ -1158,7 +1206,7 @@ def main() -> None:
         "schema_version": "turn_episode_v1",
         "manifest_id": "episode_manifest_dev",
         "plan_blob": PLAN_BLOB,
-        "generated_from": code_hashes,
+        **provenance,
         "pool_split": {pool: sorted(ids) for pool, ids in pool_split.items()},
         "deduplicated": synthetic_header["deduplicated"],
         "excluded_real_recording": synthetic_header["excluded_real_recording"],
@@ -1181,7 +1229,8 @@ def main() -> None:
         "schema_version": "turn_episode_v1",
         "manifest_id": "natural_exposure_manifest",
         "plan_blob": PLAN_BLOB,
-        "generated_from": code_hashes,
+        **provenance,
+        "structural_taxonomy_status": STRUCTURAL_DEFERRAL,
         "window_frame": {
             "window_ms": inventory["natural_exposure"]["window_ms"],
             "inclusion_rule": inventory["natural_exposure"]["inclusion_rule"],

@@ -1,13 +1,49 @@
 {
   "annotation_failures": [],
-  "content_sha256": "b20fc0d6f5b30ee0eeb944ee612e4e1721c1a40e871c053902109bb11c9f12c3",
+  "content_sha256": "41de0f4cd887ec1f463fd24fabab1f2eb51c3cc9c53ba6d2d78c8c816fa58994",
+  "diagnostic_sampled": 9,
   "generated_from": {
-    "audit": "89f39c87f1f4aae22f2f5e2f23507dc249d6b27de5d7d70ed5a61276c9bc559f",
-    "build_episodes": "1e3ea74e35e403a71d5af6d284b61126ac06d16dfa31172dc039b0462d524a8b",
-    "episode_manifest_dev": "9d8e0db9efb5c7fdbaf21b5af630f216165f5dd30047b4422658a0a1803dd613",
+    "audit": "694f310aad722297445bf277f5e94440dea1cf13bec7e0b3ac103938dc0d5a75",
+    "build_episodes": "71912519c0cb9bdff214b0dff667e44b9199ec221cddfa785d65089c8475e955",
+    "episode_manifest_dev": "8cca25757ebef14af7386e902ea09f584fbc231ee555a46f435ae097d9b4c0e8",
     "schemas": "a9fa4571b1bab3cf88d6739a3732c1cc62f753a46d51d59c2db7526468eb8868"
   },
   "passed": true,
+  "pinned_ledger": {
+    "ami_materialization_manifest.json": "06fe15fff87bb78218df2c086bd711590378f8741164909b59704f56841ab6c9",
+    "config.py": "f4eb24e6c81ebcb0bdd71b6c0c9098595ae4bdddf53e05df6bd8eea925d146a6",
+    "corpus/alimeeting.py": "f69b733c703e0060245a2d9229258caddc602238c18c7c242570713670ea929a",
+    "corpus/ami.py": "e77171299cb7d358f2a3f029e78386d91492e94e49ca683bac90ac5173c4d0dc",
+    "corpus/external.py": "262d40233371905e6a6fac2efee2da1412c6d6df44d91ea4eb8fd2220ba21b56",
+    "corpus/librispeech.py": "05b77dc735f572da37da0c9ebe595415f5acf4b5c40bd22e3f792dd31402d1f4",
+    "corpus/mixing.py": "ffd707787003051f5e95e9dabb70afb4eb675b970461e75cd6c062d7f121abc6",
+    "corpus/phase2_schemas.py": "7a6b4b0c9033b5ebdc97db552943c522a5218f5166e039db4b37f6744861dcf2",
+    "corpus/puripuly_like.py": "5f5df4ce0879bd5f7ffa35d571e700852a490803bd966c9f7a90c0f4ee848642",
+    "corpus/validation.py": "66d863a0ada96fcc765097dd574ea4b2edfc5eed6ed873aee13df34d65ff964d",
+    "coverage_inventory.json": "02a6a118fc90c0d747e9548f07003177b3fc703f33d408d5338427cb6163dd46",
+    "coverage_inventory_details.jsonl": "15b2e4f0efa270985c3bbc6d848ee9ed25496089268e561bff921c5c1be3ef8c",
+    "data/manifests/ls_dev.json": "14347cdbdb2eff4cc73489f1b59d6755723d9098089dad66ae222984e90370dd",
+    "data/manifests/ls_held_out_clean.json": "c0aabc5ad8c3f00ec53d45f3b372b8ebca7ca9237720a1bb7a70b8de7dda2581",
+    "data/manifests/ls_held_out_other.json": "f0d169394a9fdee9e708bc9cad46c0547946bf967799fa4e2e1a398ddb984079",
+    "data/manifests/mixed_dev_pool.json": "1221176c92f50a2b096e4cd64d5da0168527918e3fba539273c614eabf07a398",
+    "events.py": "2193bda0f06ff9e3d4171402c9ce2296ed273f10994de35332ca070d212b347a",
+    "fusion_contract.json": "bfda0c3c0ea7b6613ded79e9639692a33449dcf34202b1f2a5e7ec14c45f9873",
+    "ground_truth.py": "34d2236595c4fb3e105b1aa5da8b4fa05e513f33979ca63c8c6903299d0f820d",
+    "proposal_contract.json": "0448edd933fd1d9d0a0b4d5f9f2631cb0f630c892fc4d46e1a3ec9740e80b7fb",
+    "silero_vad.onnx": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+    "src/puripuly_heart/core/vad/silero.py": "43079df5bc36ecb924b1aec7991cff2a16c04ab126bb54907c4b2a570e2cd109",
+    "turn_episode/build_coverage_inventory.py": "dd360c9e60a5838feaea17e4b335d1fc93cdbd6df4f426077a2eedbd30e1a1e7",
+    "turn_episode/contracts.py": "b207d3f8b9720df5dd228aa8bd8b479c54622abb905a9ca04f580820a6fc3c03",
+    "turn_episode/materialize_ami_additions.py": "bf431bb5b22ec79032ee6fbe876d5ab330893521536481e590f9b054932ccdc7",
+    "turn_episode/schemas.py": "a9fa4571b1bab3cf88d6739a3732c1cc62f753a46d51d59c2db7526468eb8868",
+    "vad_baseline.py": "7a3965fdb01eb7391dde985e5c498162d80b4e5ab565205626d684a66d8ff627"
+  },
+  "pinned_ledger_delta": {
+    "turn_episode/schemas.py": {
+      "frozen": "8c449b2ed07fba11bb1e45f01cad6b22fe1c98eb8006a2600bee90170f45f2f9",
+      "live": "a9fa4571b1bab3cf88d6739a3732c1cc62f753a46d51d59c2db7526468eb8868"
+    }
+  },
   "public_sampled": 12,
   "report_id": "audit_report",
   "results": [
@@ -15,147 +51,104 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 5,
-        "registered_count": 5
+        "rebuilt_count": 7,
+        "registered_count": 7
       },
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:22068224:22228480:p406",
       "pool": "diagnostic_dev",
       "slice_match": {
-        "actual": "c6c679c02c1fdee085643c29deeae4f6bdc18ebe5d336b2e3c7353112cfe4cb0",
+        "actual": "08ee977f7ab79c0d8575b81e9012672587aea06ead05d79365359ac3c0691990",
         "passed": true,
-        "recorded": "c6c679c02c1fdee085643c29deeae4f6bdc18ebe5d336b2e3c7353112cfe4cb0"
+        "recorded": "08ee977f7ab79c0d8575b81e9012672587aea06ead05d79365359ac3c0691990",
+        "span": [
+          21987840,
+          22276608
+        ]
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "bytes": 320512,
+        "bytes": 577536,
         "passed": true,
-        "samples": 160256
+        "samples": 288768
       }
     },
     {
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 2,
-        "registered_count": 2
+        "rebuilt_count": 4,
+        "registered_count": 4
       },
       "episode_id": "diagnostic_dev:ami_TS3009b:2841088:3060736:n6.n7",
       "pool": "diagnostic_dev",
       "slice_match": {
-        "actual": "bcfe4e2f27bc9a9a7e52dfe0232789dad20cfaf527e6d0974493d1711def714a",
+        "actual": "147297fb4c110b749ce873565824afe7e6c16a7e68e6ceec739831829047566b",
         "passed": true,
-        "recorded": "bcfe4e2f27bc9a9a7e52dfe0232789dad20cfaf527e6d0974493d1711def714a"
+        "recorded": "147297fb4c110b749ce873565824afe7e6c16a7e68e6ceec739831829047566b",
+        "span": [
+          2760704,
+          3108864
+        ]
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "bytes": 439296,
+        "bytes": 696320,
         "passed": true,
-        "samples": 219648
+        "samples": 348160
       }
     },
     {
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 7,
-        "registered_count": 7
+        "rebuilt_count": 9,
+        "registered_count": 9
       },
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:18397184:18717184:p309.p312",
       "pool": "diagnostic_dev",
       "slice_match": {
-        "actual": "90dabe8def14919faef48dc3c3c57a9ec7b1a2fa853ec3ae30d22cf600a3dcad",
+        "actual": "18f47a57caf77b5ac75f8e2071cb5197b5fbfdd9291437ae690cac15b973fb26",
         "passed": true,
-        "recorded": "90dabe8def14919faef48dc3c3c57a9ec7b1a2fa853ec3ae30d22cf600a3dcad"
+        "recorded": "18f47a57caf77b5ac75f8e2071cb5197b5fbfdd9291437ae690cac15b973fb26",
+        "span": [
+          18316800,
+          18766848
+        ]
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "bytes": 640000,
+        "bytes": 900096,
         "passed": true,
-        "samples": 320000
+        "samples": 450048
       }
     },
     {
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 2,
-        "registered_count": 2
+        "rebuilt_count": 4,
+        "registered_count": 4
       },
       "episode_id": "diagnostic_dev:ami_ES2003a:17403392:17564160:n32",
       "pool": "diagnostic_dev",
       "slice_match": {
-        "actual": "1c8c4445908cdfff97d81fd3060bc6e0c065ffa1c14467f30d5172281ca303f6",
+        "actual": "03e206029044eb476b168ea8459ebf01e51cd85bd264f25a864b92aad3203fd8",
         "passed": true,
-        "recorded": "1c8c4445908cdfff97d81fd3060bc6e0c065ffa1c14467f30d5172281ca303f6"
+        "recorded": "03e206029044eb476b168ea8459ebf01e51cd85bd264f25a864b92aad3203fd8",
+        "span": [
+          17323008,
+          17612288
+        ]
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "bytes": 321536,
+        "bytes": 578560,
         "passed": true,
-        "samples": 160768
-      }
-    },
-    {
-      "annotation": {
-        "mismatch": null,
-        "passed": true,
-        "rebuilt_count": 4,
-        "registered_count": 4
-      },
-      "episode_id": "frontier_dev:ami_TS3005b:16468992:16629760:p102",
-      "pool": "frontier_dev",
-      "slice_match": {
-        "actual": "5e9259618ae85ad464a2386153b033ae8cc329127112a0c9e8653299dbf16b1d",
-        "passed": true,
-        "recorded": "5e9259618ae85ad464a2386153b033ae8cc329127112a0c9e8653299dbf16b1d"
-      },
-      "tag_consistency": true,
-      "waveform": {
-        "bytes": 321536,
-        "passed": true,
-        "samples": 160768
-      }
-    },
-    {
-      "annotation": {
-        "mismatch": null,
-        "passed": true,
-        "rebuilt_count": 2,
-        "registered_count": 2
-      },
-      "episode_id": "frontier_dev:ami_TS3012c:15705600:15866368:n20",
-      "pool": "frontier_dev",
-      "slice_match": {
-        "actual": "67bf4a1d595663f138ca0d170981de3dacd46837d6d87919b095a9af6400cd83",
-        "passed": true,
-        "recorded": "67bf4a1d595663f138ca0d170981de3dacd46837d6d87919b095a9af6400cd83"
-      },
-      "tag_consistency": true,
-      "waveform": {
-        "bytes": 321536,
-        "passed": true,
-        "samples": 160768
-      }
-    },
-    {
-      "annotation": {
-        "mismatch": null,
-        "passed": true,
-        "rebuilt_count": 4,
-        "registered_count": 4
-      },
-      "episode_id": "frontier_dev:alimeeting_R8003_M8001:6982144:7142912:p103",
-      "pool": "frontier_dev",
-      "slice_match": {
-        "actual": "b4366ab54ce2635c13e945e4c1cc3ff11c927c4510225bc35e33543ffc648689",
-        "passed": true,
-        "recorded": "b4366ab54ce2635c13e945e4c1cc3ff11c927c4510225bc35e33543ffc648689"
-      },
-      "tag_consistency": true,
-      "waveform": {
-        "bytes": 321536,
-        "passed": true,
-        "samples": 160768
+        "samples": 289280
       }
     },
     {
@@ -165,39 +158,75 @@
         "rebuilt_count": 6,
         "registered_count": 6
       },
-      "episode_id": "frontier_dev:ami_TS3005b:33033216:33246208:p508",
+      "episode_id": "frontier_dev:ami_TS3005b:16468992:16629760:p102",
       "pool": "frontier_dev",
       "slice_match": {
-        "actual": "d03d887e9e653d41a0603ff93bb22e76261a60870e728f069d818b477adcf74a",
+        "actual": "f61a9d38ea85741c7ea44a08db5f2be38c3f25543fb329a68a3381d17cff6f58",
         "passed": true,
-        "recorded": "d03d887e9e653d41a0603ff93bb22e76261a60870e728f069d818b477adcf74a"
+        "recorded": "f61a9d38ea85741c7ea44a08db5f2be38c3f25543fb329a68a3381d17cff6f58",
+        "span": [
+          16388608,
+          16677888
+        ]
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "bytes": 425984,
+        "bytes": 578560,
         "passed": true,
-        "samples": 212992
+        "samples": 289280
       }
     },
     {
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 4,
+        "registered_count": 4
       },
-      "episode_id": "frontier_dev:ami_TS3007a:17163776:17324032:p192",
+      "episode_id": "frontier_dev:ami_TS3012c:15705600:15866368:n20",
       "pool": "frontier_dev",
       "slice_match": {
-        "actual": "6867de11da6f29a74fe8f9c872e31e8c5f98aaf35e69e042717d43e338cd3f30",
+        "actual": "f6d4243aac397fd1e28db0cabbc7b8aabdd49131bc6588e4bdb2f96699cd893b",
         "passed": true,
-        "recorded": "6867de11da6f29a74fe8f9c872e31e8c5f98aaf35e69e042717d43e338cd3f30"
+        "recorded": "f6d4243aac397fd1e28db0cabbc7b8aabdd49131bc6588e4bdb2f96699cd893b",
+        "span": [
+          15625216,
+          15914496
+        ]
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "bytes": 320512,
+        "bytes": 578560,
         "passed": true,
-        "samples": 160256
+        "samples": 289280
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 6,
+        "registered_count": 6
+      },
+      "episode_id": "frontier_dev:alimeeting_R8003_M8001:6982144:7142912:p103",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "91a1044abf4e6200d9ba509cce31a007af18ae9010b7454d3d49bf9308bff3b6",
+        "passed": true,
+        "recorded": "91a1044abf4e6200d9ba509cce31a007af18ae9010b7454d3d49bf9308bff3b6",
+        "span": [
+          6901760,
+          7191040
+        ]
+      },
+      "status": "scorable",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 578560,
+        "passed": true,
+        "samples": 289280
       }
     },
     {
@@ -207,39 +236,75 @@
         "rebuilt_count": 8,
         "registered_count": 8
       },
-      "episode_id": "frontier_dev:alimeeting_R8003_M8001:20404736:20614656:n40.p354",
+      "episode_id": "frontier_dev:ami_TS3005b:33033216:33246208:p508",
       "pool": "frontier_dev",
       "slice_match": {
-        "actual": "72ea3aa8aff71a3f3cf1a29f3d75ecd3b6fe866c0db2ac10507cb850f7c46983",
+        "actual": "5af7b1f91aa07ecaea7d3c37df29783f48b1d823a02beb41348891b1ed688017",
         "passed": true,
-        "recorded": "72ea3aa8aff71a3f3cf1a29f3d75ecd3b6fe866c0db2ac10507cb850f7c46983"
+        "recorded": "5af7b1f91aa07ecaea7d3c37df29783f48b1d823a02beb41348891b1ed688017",
+        "span": [
+          32952832,
+          33246208
+        ]
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "bytes": 419840,
+        "bytes": 586752,
         "passed": true,
-        "samples": 209920
+        "samples": 293376
       }
     },
     {
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 4,
-        "registered_count": 4
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
-      "episode_id": "frontier_dev:alimeeting_R8009_M8018:3832320:3992576:p54",
+      "episode_id": "frontier_dev:ami_TS3007a:17163776:17324032:p192",
       "pool": "frontier_dev",
       "slice_match": {
-        "actual": "5f65cb3ef21d42b0bb701c00cc210ec99fa27b248c3d1c6c551a5658feb42f18",
+        "actual": "7c5a73f718a58cbfc844cb37bff26b46838af291e43c2f23c44149bc80d9c179",
         "passed": true,
-        "recorded": "5f65cb3ef21d42b0bb701c00cc210ec99fa27b248c3d1c6c551a5658feb42f18"
+        "recorded": "7c5a73f718a58cbfc844cb37bff26b46838af291e43c2f23c44149bc80d9c179",
+        "span": [
+          17083392,
+          17372160
+        ]
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "bytes": 320512,
+        "bytes": 577536,
         "passed": true,
-        "samples": 160256
+        "samples": 288768
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 10,
+        "registered_count": 10
+      },
+      "episode_id": "frontier_dev:alimeeting_R8003_M8001:20404736:20614656:n40.p354",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "d1b64d2d64ec0da27710d95d3d03cf515a9eb47670cd1a1e7becf6cc4568b420",
+        "passed": true,
+        "recorded": "d1b64d2d64ec0da27710d95d3d03cf515a9eb47670cd1a1e7becf6cc4568b420",
+        "span": [
+          20324352,
+          20662784
+        ]
+      },
+      "status": "scorable",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 676864,
+        "passed": true,
+        "samples": 338432
       }
     },
     {
@@ -249,33 +314,299 @@
         "rebuilt_count": 6,
         "registered_count": 6
       },
-      "episode_id": "frontier_dev:ami_TS3005b:26631680:26791936:p337",
+      "episode_id": "frontier_dev:alimeeting_R8009_M8018:3832320:3992576:p54",
       "pool": "frontier_dev",
       "slice_match": {
-        "actual": "787b3d9de2367734da0a5f75bf744237f5c563a3064850b12ef2271b7ba3de05",
+        "actual": "7389de0142733017d851045a95209c98e59ffc51e1258690289385c508da63ea",
         "passed": true,
-        "recorded": "787b3d9de2367734da0a5f75bf744237f5c563a3064850b12ef2271b7ba3de05"
+        "recorded": "7389de0142733017d851045a95209c98e59ffc51e1258690289385c508da63ea",
+        "span": [
+          3751936,
+          4040704
+        ]
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
-        "bytes": 320512,
+        "bytes": 577536,
         "passed": true,
-        "samples": 160256
+        "samples": 288768
       }
     },
     {
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 8,
+        "registered_count": 8
+      },
+      "episode_id": "frontier_dev:ami_TS3005b:26631680:26791936:p337",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "1c764557e709312024ad9ab154c9dbb763aa4c80cf7c18789334edec060ff46d",
+        "passed": true,
+        "recorded": "1c764557e709312024ad9ab154c9dbb763aa4c80cf7c18789334edec060ff46d",
+        "span": [
+          26551296,
+          26840064
+        ]
+      },
+      "status": "scorable",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 577536,
+        "passed": true,
+        "samples": 288768
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 7,
+        "registered_count": 7
+      },
+      "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:602624:825856:n8",
+      "pool": "diagnostic_dev",
+      "slice_match": {
+        "actual": "0008ea56f0eb2632cacec822f467fa26f6d595d0b636615ac48fcc5642e2920b",
+        "passed": true,
+        "recorded": "0008ea56f0eb2632cacec822f467fa26f6d595d0b636615ac48fcc5642e2920b",
+        "span": [
+          602624,
+          873984
+        ]
+      },
+      "status": "diagnostic_only",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 542720,
+        "passed": true,
+        "samples": 271360
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 7,
+        "registered_count": 7
+      },
+      "episode_id": "frontier_dev:ami_ES2004a:13931008:14243328:p172.p174",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "64698a19257eeb3218abb912708562f42f8018cfa221a5c6cea6defbcf886086",
+        "passed": true,
+        "recorded": "64698a19257eeb3218abb912708562f42f8018cfa221a5c6cea6defbcf886086",
+        "span": [
+          13931008,
+          14291456
+        ]
+      },
+      "status": "diagnostic_only",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 720896,
+        "passed": true,
+        "samples": 360448
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 8,
+        "registered_count": 8
+      },
+      "episode_id": "frontier_dev:alimeeting_R8009_M8018:0:320000:p2.p7",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "7f53fa93d4b00f89dbc67e691910922661eefa9f285e2e94042d6cfe9677f4d4",
+        "passed": true,
+        "recorded": "7f53fa93d4b00f89dbc67e691910922661eefa9f285e2e94042d6cfe9677f4d4",
+        "span": [
+          0,
+          470528
+        ]
+      },
+      "status": "diagnostic_only",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 941056,
+        "passed": true,
+        "samples": 470528
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 6,
+        "registered_count": 6
+      },
+      "episode_id": "frontier_dev:alimeeting_R8009_M8020:6858752:7178752:n63.n64",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "34cb92de72e2539e0c5557b571939f389b1bba7379a220eb027e5ab893fc47d7",
+        "passed": true,
+        "recorded": "34cb92de72e2539e0c5557b571939f389b1bba7379a220eb027e5ab893fc47d7",
+        "span": [
+          6858752,
+          7234048
+        ]
+      },
+      "status": "diagnostic_only",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 750592,
+        "passed": true,
+        "samples": 375296
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 6,
+        "registered_count": 6
+      },
+      "episode_id": "frontier_dev:alimeeting_R8009_M8020:14450176:14665216:p142",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "2314f547ecf900041cca683141a281d9394621ed933f50e34c0a874d3fe9e316",
+        "passed": true,
+        "recorded": "2314f547ecf900041cca683141a281d9394621ed933f50e34c0a874d3fe9e316",
+        "span": [
+          14450176,
+          14713344
+        ]
+      },
+      "status": "diagnostic_only",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 526336,
+        "passed": true,
+        "samples": 263168
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 5,
+        "registered_count": 5
+      },
+      "episode_id": "frontier_dev:alimeeting_R8003_M8001:24238080:24373760:p436",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "0705ea873488c15342655c607956df0795196f93b8f53c6db0a361e1afd9f6a1",
+        "passed": true,
+        "recorded": "0705ea873488c15342655c607956df0795196f93b8f53c6db0a361e1afd9f6a1",
+        "span": [
+          24157696,
+          24373760
+        ]
+      },
+      "status": "diagnostic_only",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 432128,
+        "passed": true,
+        "samples": 216064
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 7,
+        "registered_count": 7
+      },
+      "episode_id": "frontier_dev:alimeeting_R8003_M8001:24373760:24628736:p440",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "614cef7f2f3d6bff0b661df3048f4d1db881606e438ae4333fd53eb9eef2ae8a",
+        "passed": true,
+        "recorded": "614cef7f2f3d6bff0b661df3048f4d1db881606e438ae4333fd53eb9eef2ae8a",
+        "span": [
+          24373760,
+          24676864
+        ]
+      },
+      "status": "diagnostic_only",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 606208,
+        "passed": true,
+        "samples": 303104
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 8,
+        "registered_count": 8
+      },
+      "episode_id": "frontier_dev:ami_TS3007a:12855296:13099008:n58",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "b5132536b9fd3c0653973b2d549524373c65c4d72a217c4f32197340988893c5",
+        "passed": true,
+        "recorded": "b5132536b9fd3c0653973b2d549524373c65c4d72a217c4f32197340988893c5",
+        "span": [
+          12855296,
+          13147136
+        ]
+      },
+      "status": "diagnostic_only",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 583680,
+        "passed": true,
+        "samples": 291840
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 9,
+        "registered_count": 9
+      },
+      "episode_id": "frontier_dev:ami_TS3005b:33246208:33447936:p515",
+      "pool": "frontier_dev",
+      "slice_match": {
+        "actual": "4e33f508779d7317881c7b813dd8bdfee757aaa516702af6f265a24150a09687",
+        "passed": true,
+        "recorded": "4e33f508779d7317881c7b813dd8bdfee757aaa516702af6f265a24150a09687",
+        "span": [
+          33246208,
+          33496064
+        ]
+      },
+      "status": "diagnostic_only",
+      "tag_consistency": true,
+      "waveform": {
+        "bytes": 499712,
+        "passed": true,
+        "samples": 249856
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_overlap_d200_o0100_01:0:65600:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -286,15 +617,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d075_g0300_02:0:32000:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -305,15 +637,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d200_g0100_01:0:68800:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -324,15 +657,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d200_o0300_01:0:62400:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -343,15 +677,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d150_g0100_00:0:52800:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -362,15 +697,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d075_g0300_00:0:32000:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -381,15 +717,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d200_o0100_03:0:65600:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -400,15 +737,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d075_g0000_00:0:27200:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -419,15 +757,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d050_g0000_01:0:19200:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -438,15 +777,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d100_o0300_02:0:30400:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -457,15 +797,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d150_o0300_03:0:46400:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -476,15 +817,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d075_o0100_02:0:25600:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -495,15 +837,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_same_speaker_d200_g0800_00:0:80000:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -514,15 +857,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d100_g0300_00:0:40000:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -533,15 +877,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d150_g0300_03:0:56000:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -552,15 +897,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d075_o0100_00:0:25600:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -571,15 +917,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_overlap_d075_o0500_01:0:19200:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -590,15 +937,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d030_g0300_02:0:19200:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -609,15 +957,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_overlap_d100_o0100_02:0:33600:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -628,15 +977,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_dev:dev-clean_same_speaker_d050_g0800_01:0:32000:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -647,15 +997,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d200_g0000_03:0:67200:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -666,15 +1017,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d100_g0300_01:0:40000:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -685,15 +1037,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d030_g0800_01:0:26240:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -704,15 +1057,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_same_speaker_d100_g0100_01:0:36800:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,
@@ -723,15 +1077,16 @@
       "annotation": {
         "mismatch": null,
         "passed": true,
-        "rebuilt_count": 1,
-        "registered_count": 1
+        "rebuilt_count": 3,
+        "registered_count": 3
       },
       "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d030_g0300_01:0:18560:",
       "pool": "diagnostic_dev",
       "slice_match": {
         "passed": null,
-        "reason": "wav_missing"
+        "reason": "no_recorded_slice"
       },
+      "status": "scorable",
       "tag_consistency": true,
       "waveform": {
         "passed": null,

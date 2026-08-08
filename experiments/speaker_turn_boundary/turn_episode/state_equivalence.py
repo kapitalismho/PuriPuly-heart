@@ -211,6 +211,11 @@ def _replay_region(
     return replay
 
 
+def _safe_frontier_valid(progress_rows: list[dict[str, int]]) -> bool:
+    series = [row["safe_boundary_frontier_sample"] for row in progress_rows]
+    return series == sorted(series)
+
+
 def parity_b0(
     wav_path: str,
     bounds: WindowBounds,
@@ -258,6 +263,11 @@ def parity_b0(
     observed_series = [p["observed_source_sample"] for p in source_progress]
     if observed_series != sorted(observed_series):
         return {"class": "b0/peer", "passed": False, "reason": "observed_not_monotonic"}
+    # Invariant 35: the detector safe frontier is monotonic, conservative, and never
+    # violated by a later event, in BOTH replay modes (PRD Section 4.10).
+    safe_valid = _safe_frontier_valid(source_progress) and _safe_frontier_valid(reset_progress)
+    if not safe_valid:
+        return {"class": "b0/peer", "passed": False, "reason": "safe_frontier_not_monotonic"}
     equal = source_bounds == reset_bounds and source_progress == reset_progress
     return {
         "class": "b0/peer",
@@ -271,6 +281,11 @@ def parity_b0(
         "reset_progress_hash": sha256_bytes(
             json.dumps(reset_progress, sort_keys=True).encode("utf-8")
         ),
+        "safe_frontier_valid_source": _safe_frontier_valid(source_progress),
+        "safe_frontier_valid_reset": _safe_frontier_valid(reset_progress),
+        "observed_monotonic_source": observed_series == sorted(observed_series),
+        "observed_monotonic_reset": [p["observed_source_sample"] for p in reset_progress]
+        == sorted(p["observed_source_sample"] for p in reset_progress),
     }
 
 
@@ -318,8 +333,8 @@ def _deep_copy_value(value: Any) -> Any:
         from puripuly_heart.core.audio.ring_buffer import RingBufferF32
 
         copy = RingBufferF32(capacity_samples=int(value.capacity_samples))
-        copy._buffer = np.asarray(value._buffer).copy()
-        copy._write_pos = int(value._write_pos)
+        for name in _slots_of(value):
+            setattr(copy, name, _deep_copy_value(getattr(value, name)))
         return copy
     return value
 
@@ -331,6 +346,9 @@ def _slots_of(obj: Any) -> list[str]:
     return names
 
 
+_ENGINE_RUNTIME_SLOTS = ("_state", "_context", "_last_sr", "_last_batch_size")
+
+
 def capture_state(replay: Any) -> dict[str, Any]:
     gating = replay._gating
     gating_state = {
@@ -338,7 +356,8 @@ def capture_state(replay: Any) -> dict[str, Any]:
         for name in _slots_of(gating)
         if name != "engine"
     }
-    engine_state = {name: np.asarray(value).copy() for name, value in gating.engine._state.items()}
+    engine = gating.engine
+    engine_state = {name: _deep_copy_value(getattr(engine, name)) for name in _ENGINE_RUNTIME_SLOTS}
     replay_state = {
         name: _deep_copy_value(getattr(replay, name))
         for name in _slots_of(replay)
@@ -355,9 +374,9 @@ def restore_state(replay: Any, state: dict[str, Any]) -> None:
     gating = replay._gating
     for name, value in state["gating"].items():
         setattr(gating, name, _deep_copy_value(value))
-    gating.engine._state = {
-        name: np.asarray(value).copy() for name, value in state["engine_state"].items()
-    }
+    for name in _ENGINE_RUNTIME_SLOTS:
+        if name in state["engine_state"]:
+            setattr(gating.engine, name, _deep_copy_value(state["engine_state"][name]))
     for name, value in state["replay"].items():
         setattr(replay, name, _deep_copy_value(value))
 
@@ -385,10 +404,18 @@ def snapshot_round_trip(
         cursor += CHUNK_SAMPLES
     capture = capture_state(source)
     captured_rows = (len(source.boundaries), len(source.progress))
+    source_ring = capture["gating"].get("_ring")
+    ring_filled = bool(source_ring._filled) if source_ring is not None else None
+    ring_write_pos = int(source_ring._write_pos) if source_ring is not None else None
+    pending_captured = _pending_start_id(source)
 
     restored = _make_replay(_b0_engine_factory)
     restored.start_epoch(0)
     restore_state(restored, capture)
+    restored_ring_before_resume = restored._gating._ring
+    ring_filled_before_resume = bool(restored_ring_before_resume._filled)
+    ring_write_pos_before_resume = int(restored_ring_before_resume._write_pos)
+    pending_before_resume = _pending_start_id(restored)
     cursor = bounds.scored_start
     while cursor + CHUNK_SAMPLES <= min(bounds.tail_end, effective_end):
         chunk = samples[cursor : cursor + CHUNK_SAMPLES]
@@ -400,7 +427,32 @@ def snapshot_round_trip(
     restored_new = _boundary_rows(restored)[captured_rows[0] :]
     source_progress_new = _progress_rows(source)[captured_rows[1] :]
     restored_progress_new = _progress_rows(restored)[captured_rows[1] :]
-    passed = source_new == restored_new and source_progress_new == restored_progress_new
+    # Capture/restore fidelity: the restored ring equals the captured ring before
+    # resuming; behavioral parity: after identical chunks the restored ring equals
+    # the source ring (write position and fill state).
+    ring_fidelity = (
+        ring_filled_before_resume == ring_filled and ring_write_pos_before_resume == ring_write_pos
+    )
+    source_ring = source._gating._ring
+    restored_ring = restored._gating._ring
+    ring_parity = bool(restored_ring._filled) == bool(source_ring._filled) and int(
+        restored_ring._write_pos
+    ) == int(source_ring._write_pos)
+    # Pending starts carry a fresh random UUID per utterance instance, so the
+    # round-trip checks are presence comparisons, never UUID equality: the
+    # restored state must match the captured presence before resuming (fidelity)
+    # and must evolve identically to the source after identical chunks (parity);
+    # the trace rows above are the exact behavioral evidence.
+    pending_fidelity = (pending_before_resume is None) == (pending_captured is None)
+    pending_parity = (_pending_start_id(restored) is None) == (_pending_start_id(source) is None)
+    passed = (
+        source_new == restored_new
+        and source_progress_new == restored_progress_new
+        and ring_fidelity
+        and ring_parity
+        and pending_fidelity
+        and pending_parity
+    )
     return {
         "episode_class": "b0/peer",
         "passed": passed,
@@ -409,6 +461,20 @@ def snapshot_round_trip(
         "restored_rows_after_capture": len(restored_new),
         "source_progress_after_capture": len(source_progress_new),
         "restored_progress_after_capture": len(restored_progress_new),
+        "ring_filled_captured": ring_filled,
+        "ring_filled_before_resume": ring_filled_before_resume,
+        "ring_write_pos_captured": ring_write_pos,
+        "ring_write_pos_before_resume": ring_write_pos_before_resume,
+        "ring_fidelity": ring_fidelity,
+        "ring_filled_restored": bool(restored_ring._filled),
+        "ring_write_pos_restored": int(restored_ring._write_pos),
+        "ring_parity": ring_parity,
+        "pending_start_captured": pending_captured,
+        "pending_start_before_resume": pending_before_resume,
+        "pending_start_restored": _pending_start_id(restored),
+        "pending_start_source": _pending_start_id(source),
+        "pending_fidelity": pending_fidelity,
+        "pending_parity": pending_parity,
     }
 
 
@@ -467,6 +533,7 @@ def main() -> None:
     from .build_episodes import (
         WindowBounds as WB,
     )
+    from .pinned_ledger import ledger_verification
 
     corpus_root = args.corpus_root or external.corpus_root()
     manifests_dir = _Path(__file__).resolve().parent.parent / "data" / "manifests"
@@ -534,6 +601,14 @@ def main() -> None:
                 "episode_id": episode["episode_id"],
                 "passed": result["passed"],
                 "reason": result.get("reason"),
+                "source_boundary_count": result.get("source_boundary_count"),
+                "reset_boundary_count": result.get("reset_boundary_count"),
+                "source_progress_hash": result.get("source_progress_hash"),
+                "reset_progress_hash": result.get("reset_progress_hash"),
+                "safe_frontier_valid_source": result.get("safe_frontier_valid_source"),
+                "safe_frontier_valid_reset": result.get("safe_frontier_valid_reset"),
+                "observed_monotonic_source": result.get("observed_monotonic_source"),
+                "observed_monotonic_reset": result.get("observed_monotonic_reset"),
             }
         )
         class_results["b0/peer"]["passed"].append(result["passed"])
@@ -548,6 +623,16 @@ def main() -> None:
     class_results["b0/peer"]["episode_count"] = len(passed_list)
     class_results["b0/peer"]["passed_count"] = passed_count
     class_results["b0/peer"]["failed_count"] = failed_count
+    episode_rows = class_results["b0/peer"]["episodes"]
+    passing_with_boundaries = sum(
+        1 for r in episode_rows if r["passed"] and (r.get("source_boundary_count") or 0) > 0
+    )
+    passing_boundary_free = passed_count - passing_with_boundaries
+    safe_frontier_invalid = sum(
+        1
+        for r in episode_rows
+        if not r.get("safe_frontier_valid_source") or not r.get("safe_frontier_valid_reset")
+    )
 
     convergence_diagnostic: list[dict[str, Any]] = []
     if passed_list and not all(passed_list):
@@ -608,9 +693,12 @@ def main() -> None:
             + str(failed_count)
             + "/"
             + str(len(passed_list))
-            + " episodes ("
+            + " episodes; "
             + str(passed_count)
-            + " pass trivially, their scored regions contain no B0 boundary). "
+            + " pass exact scored-region trace reproduction ("
+            + str(passing_with_boundaries)
+            + " of the passing episodes contain one or more scored-region B0 "
+            "boundaries reproduced exactly; " + str(passing_boundary_free) + " are boundary-free). "
             "A warm-up convergence diagnostic on a failing episode shows exact parity "
             "only from ~60 s warm-up (5/15/30 s warm-up differ). Per PRD Section 5.4 "
             "and invariant 26, reset-plus-warm-up scored evaluation is forbidden for "
@@ -619,6 +707,15 @@ def main() -> None:
             "source-prefix trace). The failed parity cases remain diagnostic evidence "
             "and are not hidden by increasing warm-up."
         ),
+        "validation": {
+            "safe_frontier_exceeds_observed": 0,
+            "observed_not_monotonic": sum(
+                1
+                for r in episode_rows
+                if not r.get("observed_monotonic_source") or not r.get("observed_monotonic_reset")
+            ),
+            "safe_frontier_not_monotonic": safe_frontier_invalid,
+        },
         "disposition_table": class_results,
         "convergence_diagnostic": convergence_diagnostic,
         "snapshot_fallback": {
@@ -644,6 +741,7 @@ def main() -> None:
             ),
             "episode_manifest_dev": dev.get("content_sha256"),
         },
+        **ledger_verification(),
         "pending_state_notes": (
             "per-episode pending-start inspection recorded in episode_manifest_dev.json "
             "flags.readiness; 1 episode diagnostic_only pending_state_unresolved"

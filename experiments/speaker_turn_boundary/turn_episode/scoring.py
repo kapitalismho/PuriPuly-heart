@@ -40,6 +40,8 @@ class Action:
     observed_source_sample_at_emit: int
     kind: str  # hard | soft
     owner: str  # b0 | detector
+    session_id: str = ""
+    audio_epoch: int = 0
 
     def __post_init__(self) -> None:
         if self.boundary_source_sample > self.observed_source_sample_at_emit:
@@ -53,6 +55,7 @@ class Match:
     benefit_attribution: str
     availability_delay_ms: int
     localization_error_ms: int
+    pre_existing: bool = False
 
 
 def is_gap_reference(reference: ReferenceAction) -> bool:
@@ -92,6 +95,12 @@ def action_eligible(
     scored_start: int,
     processed_scored_end: int,
 ) -> bool:
+    # Section 12.1.1: source session and epoch must agree.
+    if (
+        action.session_id != reference.source_session_id
+        or action.audio_epoch != reference.audio_epoch
+    ):
+        return False
     # Warm-up actions are rejected before matching (invariant 12): an action must
     # lie inside the processed scored region.
     if not (scored_start <= action.boundary_source_sample < processed_scored_end):
@@ -100,17 +109,19 @@ def action_eligible(
         return False
     if action.kind == "soft" and reference.action_kind != "soft_overlap_marker":
         return False
-    if reference.action_kind == "hard_boundary":
-        if not in_eligibility_window(action.boundary_source_sample, reference):
+    if reference.action_kind not in ("hard_boundary", "soft_overlap_marker"):
+        return False
+    if not in_eligibility_window(action.boundary_source_sample, reference):
+        return False
+    # Section 12.1.4: detector-derived evidence was not available before the
+    # detector-evidence onset (B onset) — applies to hard and soft detector
+    # actions; pre-existing VAD gap boundaries remain valid (invariant 9).
+    if action.owner == "detector":
+        if action.observed_source_sample_at_emit < reference.evidence_onset_sample:
             return False
-        # Detector proposals get no gap/clean credit before B onset (invariant 8);
-        # pre-existing VAD gap boundaries remain valid (invariant 9).
-        if action.owner == "detector":
-            if action.observed_source_sample_at_emit < reference.evidence_onset_sample:
-                return False
-        delay = action.observed_source_sample_at_emit - reference.evidence_onset_sample
-        if delay > MATCH_DEADLINE_MS * SAMPLES_PER_MS:
-            return False
+    delay = action.observed_source_sample_at_emit - reference.evidence_onset_sample
+    if delay > MATCH_DEADLINE_MS * SAMPLES_PER_MS:
+        return False
     return True
 
 
@@ -124,6 +135,43 @@ def _cost_tuple(
         localization_error_ms(action.boundary_source_sample, reference),
         action.action_id,
     )
+
+
+def benefit_attribution(
+    action: Action,
+    reference: ReferenceAction,
+    delay_ms: int,
+    all_actions: list[Action],
+) -> str:
+    """Section 12.3 benefit attribution for one matched reference.
+
+    - ``correct_soft_marker``: any soft-overlap marker match;
+    - ``retained_b0_success``: B0-owned hard match;
+    - ``late_target_action``: detector hard match only usable in the last
+      deadline window (delay in (1500, 2000] ms);
+    - ``accelerated_b0_success``: detector hard match whose availability is
+      earlier than an eligible B0 action for the same reference (Section 12.2);
+    - ``recovered_b0_hard_miss``: detector hard match with no earlier eligible
+      B0 action.
+    """
+    if reference.action_kind == "soft_overlap_marker":
+        return "correct_soft_marker"
+    if action.owner == "b0":
+        return "retained_b0_success"
+    if delay_ms > 1500:
+        return "late_target_action"
+    b0_actions = [
+        a
+        for a in all_actions
+        if a.owner == "b0"
+        and a.action_id != action.action_id
+        and in_eligibility_window(a.boundary_source_sample, reference)
+    ]
+    if b0_actions and action.observed_source_sample_at_emit < min(
+        a.observed_source_sample_at_emit for a in b0_actions
+    ):
+        return "accelerated_b0_success"
+    return "recovered_b0_hard_miss"
 
 
 def match_episode(
@@ -184,18 +232,24 @@ def match_episode(
     for reference_id, action_id in sorted(match_of_ref.items()):
         ref = next(r for r in eligible_refs if r.reference_id == reference_id)
         action = action_of_ref[reference_id]
+        raw_delay = action.observed_source_sample_at_emit - ref.evidence_onset_sample
+        # Section 12.1/15: a VAD-owned boundary available before B onset is a
+        # valid pre-existing product category, never a negative availability
+        # delay; it is reported as pre-existing with delay 0.
+        pre_existing = action.owner == "b0" and raw_delay < 0
+        delay_ms = (
+            max(0, round(raw_delay / SAMPLES_PER_MS))
+            if pre_existing
+            else round(raw_delay / SAMPLES_PER_MS)
+        )
         matches.append(
             Match(
                 reference_id=reference_id,
                 action_id=action_id,
-                benefit_attribution=(
-                    "retained_b0_success" if action.owner == "b0" else "recovered_b0_hard_miss"
-                ),
-                availability_delay_ms=round(
-                    (action.observed_source_sample_at_emit - ref.evidence_onset_sample)
-                    / SAMPLES_PER_MS
-                ),
+                benefit_attribution=benefit_attribution(action, ref, delay_ms, actions),
+                availability_delay_ms=delay_ms,
                 localization_error_ms=localization_error_ms(action.boundary_source_sample, ref),
+                pre_existing=pre_existing,
             )
         )
     matches.sort(key=lambda m: m.reference_id)
@@ -276,14 +330,26 @@ def same_speaker_pause_split(boundary: int, pause_intervals: list[tuple[int, int
     return False
 
 
-def lexical_split(boundary: int, word_intervals: list[tuple[int, int]]) -> bool | None:
+def lexical_split(
+    boundary: int,
+    word_intervals: list[tuple[int, int]],
+    unscored_intervals: list[tuple[int, int]] | None = None,
+) -> bool | None:
     """True when the boundary lies inside a word with >= 20 ms on both sides;
-    False when it lies in wordless (silence/uncovered) audio; None (not_observable)
-    when no word timing covers the region at all."""
+    False when it lies in wordless (silence/uncovered) audio; None
+    (not_observable) when the boundary falls in an unscored/ambiguous span whose
+    timing is unknown, or when no word timing is available at all (invariant 19:
+    missing word timing is never treated as absence of lexical harm)."""
+    if unscored_intervals:
+        for start, end in unscored_intervals:
+            if start <= boundary < end:
+                return None
+    if not word_intervals:
+        return None
     for start, end in word_intervals:
         if start <= boundary < end:
             return start <= boundary - 20 * SAMPLES_PER_MS and boundary + 20 * SAMPLES_PER_MS <= end
-    return None
+    return False
 
 
 def score_episode(
@@ -294,11 +360,15 @@ def score_episode(
     word_intervals: list[tuple[int, int]] | None,
     scored_start: int,
     scored_end: int,
+    unscored_intervals: list[tuple[int, int]] | None = None,
 ) -> dict[str, Any]:
     matches, hard_misses, deadline_views = match_episode(
         actions, references, scored_start, scored_end
     )
-    hard_boundaries = sorted(a.boundary_source_sample for a in actions if a.kind == "hard")
+    # Out-of-region actions are excluded from harm scoring and segment counts
+    # (invariant 12/13: only scored-region actions enter any numerator).
+    scored_actions = [a for a in actions if scored_start <= a.boundary_source_sample < scored_end]
+    hard_boundaries = sorted(a.boundary_source_sample for a in scored_actions if a.kind == "hard")
     segments = logical_segments(hard_boundaries, scored_start, scored_end)
     contamination: dict[str, int] = {}
     for threshold in ("50ms", "100ms", "200ms"):
@@ -316,7 +386,7 @@ def score_episode(
         "overlap_hard_action": 0,
         "lexical_not_observable": 0,
     }
-    for action in actions:
+    for action in scored_actions:
         if action.kind != "hard":
             continue
         if harmful_active_split(action.boundary_source_sample, singleton_intervals, 200):
@@ -331,12 +401,13 @@ def score_episode(
             for ref in references
         ):
             harm_flags["overlap_hard_action"] += 1
-        if word_intervals is not None:
-            split = lexical_split(action.boundary_source_sample, word_intervals)
-            if split is True:
-                harm_flags["lexical_split"] += 1
-            elif split is None:
-                harm_flags["lexical_not_observable"] += 1
+        split = lexical_split(
+            action.boundary_source_sample, word_intervals or [], unscored_intervals
+        )
+        if split is True:
+            harm_flags["lexical_split"] += 1
+        elif split is None:
+            harm_flags["lexical_not_observable"] += 1
     boundary_counts: dict[int, int] = {}
     for boundary in hard_boundaries:
         boundary_counts[boundary] = boundary_counts.get(boundary, 0) + 1
@@ -384,10 +455,21 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
             episode_pool_tag="hard_only",
         )
 
+    def act(
+        aid: str,
+        boundary: int,
+        observed: int,
+        kind: str,
+        owner: str,
+        session_id: str = "s",
+        audio_epoch: int = 0,
+    ) -> Action:
+        return Action(aid, boundary, observed, kind, owner, session_id, audio_epoch)
+
     # Invariant 7: gap interval matching accepts any boundary inside the annotated silence.
     def f7() -> bool:
         r = ref("gt0", "hard_boundary", 24000, (16000, 24000), 24000, gap=True)
-        action = Action("a1", 20000, 26000, "hard", "b0")
+        action = act("a1", 20000, 26000, "hard", "b0")
         return action_eligible(action, r, 0, 50000)
 
     run("inv7_gap_inside_interval", f7)
@@ -395,7 +477,7 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
     # Invariant 8: a detector proposal before B onset receives no gap credit.
     def f8() -> bool:
         r = ref("gt0", "hard_boundary", 24000, (16000, 24000), 24000, gap=True)
-        early = Action("a1", 20000, 20000, "hard", "detector")
+        early = act("a1", 20000, 20000, "hard", "detector")
         return not action_eligible(early, r, 0, 50000)
 
     run("inv8_no_gap_credit_before_b_onset", f8)
@@ -403,7 +485,7 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
     # Invariant 9: pre-existing VAD gap boundary is valid product separation.
     def f9() -> bool:
         r = ref("gt0", "hard_boundary", 24000, (16000, 24000), 24000, gap=True)
-        vad = Action("a1", 20000, 20000, "hard", "b0")
+        vad = act("a1", 20000, 20000, "hard", "b0")
         return action_eligible(vad, r, 0, 50000)
 
     run("inv9_pre_existing_vad_gap_valid", f9)
@@ -411,10 +493,8 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
     # P2-029: gap tolerance closure applied exactly once (edges at/just beyond).
     def f29() -> bool:
         r = ref("gt0", "hard_boundary", 24000, (16000, 24000), 24000, gap=True)
-        at_low = Action(
-            "a1", 16000 - LOCALIZATION_TOLERANCE_MS * SAMPLES_PER_MS, 30000, "hard", "b0"
-        )
-        just_beyond = Action(
+        at_low = act("a1", 16000 - LOCALIZATION_TOLERANCE_MS * SAMPLES_PER_MS, 30000, "hard", "b0")
+        just_beyond = act(
             "a2",
             24000 + LOCALIZATION_TOLERANCE_MS * SAMPLES_PER_MS + 1,
             33000,
@@ -426,6 +506,73 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
         )
 
     run("p2_029_gap_tolerance_once", f29)
+
+    # Exit-gate P2-SCORE-001: detector soft actions before evidence onset are rejected.
+    def fsoft() -> bool:
+        r = ref("gt0", "soft_overlap_marker", 24000, (20000, 24000), 24000, primary=False)
+        early = act("a1", 23000, 23000, "soft", "detector")
+        return not action_eligible(early, r, 0, 50000)
+
+    run("p2_score001_soft_detector_before_onset_rejected", fsoft)
+
+    # Exit-gate P2-SCORE-001: soft matches are labeled correct_soft_marker.
+    def fsoft2() -> bool:
+        r = ref("gt0", "soft_overlap_marker", 24000, (20000, 24000), 24000, primary=False)
+        action = act("a1", 23000, 24500, "soft", "detector")
+        matches, _, _ = match_episode([action], [r], 0, 50000)
+        return len(matches) == 1 and matches[0].benefit_attribution == "correct_soft_marker"
+
+    run("p2_score001_soft_match_correct_soft_marker", fsoft2)
+
+    # Exit-gate P2-SCORE-001: pre-existing VAD gap match gets a pre-existing disposition
+    # with delay 0, never a negative availability delay (Section 15).
+    def fpre() -> bool:
+        r = ref("gt0", "hard_boundary", 24000, (16000, 24000), 24000, gap=True)
+        vad = act("a1", 20000, 20000, "hard", "b0")
+        matches, _, _ = match_episode([vad], [r], 0, 50000)
+        return (
+            len(matches) == 1 and matches[0].pre_existing and matches[0].availability_delay_ms == 0
+        )
+
+    run("p2_score001_pre_existing_vad_disposition", fpre)
+
+    # Exit-gate P2-SCORE-001: source session/epoch context is enforced.
+    def fctx() -> bool:
+        r = ref("gt0", "hard_boundary", 24000, (20000, 24000), 24000)
+        other_session = act("a1", 23000, 24000, "hard", "b0", session_id="other")
+        other_epoch = act("a2", 23000, 24000, "hard", "b0", audio_epoch=1)
+        return not action_eligible(other_session, r, 0, 50000) and not action_eligible(
+            other_epoch, r, 0, 50000
+        )
+
+    run("p2_score001_session_epoch_context", fctx)
+
+    # Exit-gate P2-SCORE-001: detector recovery vs acceleration taxonomy.
+    def facc() -> bool:
+        r1 = ref("gt0", "hard_boundary", 24000, (20000, 24000), 24000)
+        r2 = ref("gt1", "hard_boundary", 26000, (23000, 26000), 26000)
+        d1 = act("d1", 23000, 24000, "hard", "detector")
+        b1 = act("b1", 23500, 26000, "hard", "b0")
+        matches, _, _ = match_episode([d1, b1], [r1, r2], 0, 50000)
+        attrs = {m.reference_id: m.benefit_attribution for m in matches}
+        detector_only, _, _ = match_episode([d1], [r1], 0, 50000)
+        return (
+            len(matches) == 2
+            and attrs.get("s:e:gt0") == "accelerated_b0_success"
+            and len(detector_only) == 1
+            and detector_only[0].benefit_attribution == "recovered_b0_hard_miss"
+        )
+
+    run("p2_score001_accelerated_vs_recovered", facc)
+
+    # Exit-gate P2-SCORE-001: late target action attribution in the last deadline view.
+    def flate() -> bool:
+        r = ref("gt0", "hard_boundary", 24000, (20000, 24000), 24000)
+        late = act("a1", 23000, 24000 + 1800 * SAMPLES_PER_MS, "hard", "detector")
+        matches, _, views = match_episode([late], [r], 0, 50000)
+        return len(matches) == 1 and matches[0].benefit_attribution == "late_target_action"
+
+    run("p2_score001_late_target_action", flate)
 
     # Invariant 6: ordered one-to-one matching (max cardinality).
     def f6() -> bool:
@@ -440,8 +587,8 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
             for i in range(2)
         ]
         actions = [
-            Action("a1", 9000, 12000, "hard", "detector"),
-            Action("a2", 10000, 18000, "hard", "detector"),
+            act("a1", 9000, 12000, "hard", "detector"),
+            act("a2", 10000, 18000, "hard", "detector"),
         ]
         matches, misses, _ = match_episode(actions, refs, 0, 50000)
         return len(matches) == 2 and len({m.action_id for m in matches}) == 2
@@ -454,7 +601,7 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
             ref("gt0", "hard_boundary", 10000, (2000, 10000), 10000),
             ref("gt1", "hard_boundary", 18000, (10000, 18000), 18000),
         ]
-        actions = [Action("a1", 9000, 12000, "hard", "detector")]
+        actions = [act("a1", 9000, 12000, "hard", "detector")]
         matches, _, _ = match_episode(actions, refs, 0, 50000)
         return len(matches) == 1
 
@@ -463,7 +610,7 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
     # Invariant 12: warm-up actions cannot enter scored counts (boundary < scored_start).
     def f12() -> bool:
         r = ref("gt0", "hard_boundary", 20000, (12000, 20000), 20000)
-        warmup = Action("a1", 5000, 9000, "hard", "b0")
+        warmup = act("a1", 5000, 9000, "hard", "b0")
         matches, misses, _ = match_episode([warmup], [r], 10000, 30000)
         return len(matches) == 0 and r.reference_id in misses
 
@@ -480,7 +627,7 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
             primary=False,
             scorable=False,
         )
-        action = Action("a1", 15000, 18000, "hard", "b0")
+        action = act("a1", 15000, 18000, "hard", "b0")
         matches, _, _ = match_episode([action], [r], 0, 50000)
         return len(matches) == 0
 
@@ -529,6 +676,15 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
 
     run("inv19_lexical_split_semantics", f19)
 
+    # Exit-gate P2-SCORE-002: a boundary in wordless audio (words present) is False,
+    # a boundary in an unscored/ambiguous span is not_observable (None).
+    def flex_region() -> bool:
+        outside = lexical_split(30000, [(31000, 32000), (33000, 34000)])
+        in_unscored = lexical_split(30000, [(29000, 31000)], unscored_intervals=[(29500, 31500)])
+        return outside is False and in_unscored is None
+
+    run("p2_score002_lexical_region_semantics", flex_region)
+
     # Invariant 20: same-speaker pause splits counted as extra turns.
     def f20() -> bool:
         return same_speaker_pause_split(30000, [(25000, 35000)])
@@ -550,7 +706,7 @@ def known_answer_fixtures() -> list[dict[str, Any]]:
         overlap_refs = [
             ref("gt0", "soft_overlap_marker", 20000, (15000, 20000), 20000, primary=False)
         ]
-        overlap_actions = [Action("a1", 18000, 20000, "hard", "detector")]
+        overlap_actions = [act("a1", 18000, 20000, "hard", "detector")]
         matches, misses, _ = match_episode(overlap_actions, overlap_refs, 0, 50000)
         return len(matches) == 0 and not misses
 
@@ -603,6 +759,7 @@ def main() -> None:
         out = args.out
 
     from .build_episodes import canonical_json, sha256_bytes, verify_manifest
+    from .pinned_ledger import ledger_verification
 
     verify_manifest(out / "episode_manifest_dev.json")
     fixtures = known_answer_fixtures()
@@ -616,7 +773,15 @@ def main() -> None:
             "contracts": sha256_bytes(
                 (Path(__file__).resolve().parent / "contracts.py").read_bytes()
             ),
+            "episode_manifest_dev": (
+                json.loads((out / "episode_manifest_dev.json").read_text(encoding="utf-8"))[
+                    "content_sha256"
+                ]
+                if (out / "episode_manifest_dev.json").is_file()
+                else None
+            ),
         },
+        **ledger_verification(),
         "fixtures": fixtures,
         "fixtures_passed": all(f["passed"] for f in fixtures),
         "baseline_smoke": {},
@@ -707,32 +872,47 @@ def run_b0_smoke(out: Path, corpus_root: Path | None = None) -> dict[str, Any]:
                 observed_source_sample_at_emit=int(b["observed_source_sample_at_emit"]),
                 kind="hard",
                 owner="b0",
+                session_id=session_id,
+                audio_epoch=0,
             )
             for b in trace["trace_projection"]
             if bounds["scored_start"] <= int(b["boundary_source_sample"]) < processed_end
         ]
         references = [ReferenceAction.from_dict(r) for r in episode["references"]]
         singleton_intervals = [
-            (r.start_sample, r.end_sample, sorted(r.speakers)[0])
+            (
+                max(r.start_sample, bounds["scored_start"]),
+                min(r.end_sample, processed_end),
+                sorted(r.speakers)[0],
+            )
             for r in session.regions
             if len(r.speakers) == 1
             and not r.ambiguous
-            and r.start_sample >= bounds["scored_start"]
-            and r.end_sample <= processed_end
+            and max(r.start_sample, bounds["scored_start"]) < min(r.end_sample, processed_end)
         ]
         pause_intervals = [
-            (r.start_sample, r.end_sample)
+            (
+                max(r.start_sample, bounds["scored_start"]),
+                min(r.end_sample, processed_end),
+            )
             for r in session.regions
             if not r.speakers
             and not r.ambiguous
-            and r.start_sample >= bounds["scored_start"]
-            and r.end_sample <= processed_end
+            and max(r.start_sample, bounds["scored_start"]) < min(r.end_sample, processed_end)
+        ]
+        unscored_intervals = [
+            (int(r.acceptable_interval[0]), int(r.acceptable_interval[1]))
+            for r in references
+            if r.action_kind == "unscored" and r.acceptable_interval[1] > r.acceptable_interval[0]
         ]
         word_intervals: list[tuple[int, int]] | None = None
         if session.corpus == "ami":
             word_intervals = _load_word_intervals_ami(
                 session.raw_words or [], bounds["scored_start"], processed_end
             )
+            word_timing_source = "ami_words"
+        else:
+            word_timing_source = "interval_level_only"
         scored = score_episode(
             actions,
             references,
@@ -741,6 +921,7 @@ def run_b0_smoke(out: Path, corpus_root: Path | None = None) -> dict[str, Any]:
             word_intervals,
             bounds["scored_start"],
             processed_end,
+            unscored_intervals,
         )
         episodes_scored += 1
         rows.append(
@@ -762,6 +943,7 @@ def run_b0_smoke(out: Path, corpus_root: Path | None = None) -> dict[str, Any]:
                 "same_speaker_pause_splits": scored["harm_flags"]["same_speaker_pause_split"],
                 "overlap_hard_actions": scored["harm_flags"]["overlap_hard_action"],
                 "duplicate_hard_boundaries": scored["harm_flags"]["duplicate_hard_boundary"],
+                "word_timing_source": word_timing_source,
             }
         )
     hard_only = [r for r in rows if r["tag"] == "hard_only"]
@@ -769,6 +951,8 @@ def run_b0_smoke(out: Path, corpus_root: Path | None = None) -> dict[str, Any]:
     negative = [r for r in rows if r["tag"] == "negative_only"]
     headline_contamination = sum(r["contamination_100ms_ms"] for r in hard_only)
     overlap_contamination = sum(r["contamination_100ms_ms"] for r in overlap)
+    word_rows = [r for r in rows if r["word_timing_source"] == "ami_words"]
+    interval_rows = [r for r in rows if r["word_timing_source"] == "interval_level_only"]
     return {
         "pool": "baseline_dev",
         "sessions": len(sessions),
@@ -783,6 +967,10 @@ def run_b0_smoke(out: Path, corpus_root: Path | None = None) -> dict[str, Any]:
         "hard_only_hard_misses": sum(r["hard_miss_count"] for r in hard_only),
         "total_lexical_splits": sum(r["lexical_splits"] for r in rows),
         "total_lexical_not_observable": sum(r["lexical_not_observable"] for r in rows),
+        "lexical_not_observable_ami_words": sum(r["lexical_not_observable"] for r in word_rows),
+        "lexical_not_observable_interval_level": sum(
+            r["lexical_not_observable"] for r in interval_rows
+        ),
         "total_harmful_active_splits": sum(r["harmful_active_splits"] for r in rows),
         "rows": rows,
         "note": "baseline dev evidence only; never confirmatory; never natural rates",
