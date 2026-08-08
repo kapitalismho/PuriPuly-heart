@@ -70,3 +70,36 @@ their Phase 4 parity passes.
   changed from ceil to floor to guarantee the frozen >= 10 s scored minimum
   (10 s = 160000 samples is not a multiple of the 512-sample chunk). Recorded in the
   bundle revision history; re-verified at the exit gate.
+
+## Exit-gate verification and remediation
+
+The Phase 2 exit gate was independently verified (fresh reviewer, candidate
+`8717d6fe`): VERDICT `fix` with P2-REF-001/002/003, P2-SCORE-001/002, P2-AUDIT-001/002,
+P2-STATE-001/002, P2-INTEGRITY-001/002. All findings were resolved in candidate
+`1ba8a362` (+ `d51a248c`):
+
+- References: intervals clipped to the processed scored region (P2-REF-001); episode
+  tags preserved on every reference incl. diagnostic_only and natural windows
+  (P2-REF-002); structural references at episode edges emitted (P2-REF-003).
+- Matcher: gap tolerance closure applied exactly once via a `:gap` reference marker
+  (P2-029 fixture); warm-up actions rejected via scored-region context; maximum-
+  cardinality augmenting-path matching with the lexicographic Section 12.2 objective
+  and deadline views (P2-SCORE-001); clean/gap headline masked to hard_only episodes
+  with overlap reported separately; lexical splits computed with word-timing
+  observability (171 splits, 47 not_observable) plus overlap/lexical fixtures
+  (P2-SCORE-002).
+- Audit: per-pool sampling with floor 8 per pool; independent re-derivation code
+  path; byte-identical slice comparison against build-time slice SHA-256; id/scorable/
+  tag consistency checks (P2-AUDIT-001/002).
+- State equivalence: real capture/restore round trip (gating fields, pre-roll ring,
+  pending start, RNN hidden state) reproducing the source-prefix trace exactly —
+  186/186 passed; finding text corrected to 74/186 parity failures (112 trivial
+  passes) with disposition source_prefix_required (P2-STATE-001/002).
+- Integrity: fail-closed manifest verification in every consumer; full
+  `generated_from` ledger and `structural_taxonomy_status` in every artifact
+  (P2-INTEGRITY-001/002).
+
+Final Phase 2 evidence (all self-hash verified): `episode_manifest_dev.json` (804
+episodes), `natural_exposure_manifest.json` (74 windows), `state_equivalence_report.json`,
+`scoring_fixture_report.json` (16/16 fixtures), `audit_report.json` (12 public + 25
+synthetic, zero failures).
