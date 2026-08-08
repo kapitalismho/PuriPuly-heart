@@ -3,6 +3,11 @@
 Fresh experiment harness for GitHub issue #51 (speaker-change turn boundaries:
 LS-EEND vs ERes2NetV2 and streaming ASR policies).
 
+The corrected bounded-episode product experiment is specified in
+[`TURN_EPISODE_EXPERIMENT_PLAN.md`](TURN_EPISODE_EXPERIMENT_PLAN.md). It treats
+detector output as proposals, scores final VAD/fusion actions, and does not inherit
+Phase 3 profile selections or false-cut conclusions.
+
 This directory implements **Phase 0 only**: baseline recording, canonical
 timeline, B0 VAD replay, coalescing semantics, ground-truth transition rules,
 deterministic manifests/result schemas, and the Phase 0 usage documentation.
