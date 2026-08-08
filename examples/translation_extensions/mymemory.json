@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "mymemory",
+  "name": "MyMemory",
+  "description": "MyMemory free translation API",
+  "url": "https://api.mymemory.translated.net/get",
+  "request": {
+    "query": {},
+    "body": {
+      "type": "form",
+      "value": {
+        "q": "{{text}}",
+        "langpair": "{{source_language}}|{{target_language}}",
+        "mt": "1"
+      }
+    }
+  },
+  "response": {
+    "type": "json",
+    "pointer": "/responseData/translatedText"
+  },
+  "secrets": []
+}

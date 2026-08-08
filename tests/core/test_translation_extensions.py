@@ -332,9 +332,9 @@ def test_registry_identity_and_fingerprint_survive_filename_changes(tmp_path: Pa
 
 
 def test_example_is_valid() -> None:
-    path = Path("examples/translation_extensions/libretranslate.json")
+    path = Path("examples/translation_extensions/mymemory.json")
 
     extension = parse_translation_extension(json.loads(path.read_text(encoding="utf-8")))
 
-    assert extension.id == "libretranslate"
-    assert extension.response.pointer == "/translatedText"
+    assert extension.id == "mymemory"
+    assert extension.response.pointer == "/responseData/translatedText"

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
+from urllib.parse import parse_qs
 from uuid import uuid4
 
 import httpx
@@ -470,15 +471,15 @@ async def test_backend_uses_local_fake_http_server_without_public_network(
 
 
 @pytest.mark.asyncio
-async def test_committed_libretranslate_example_uses_local_fake_http_server() -> None:
+async def test_committed_mymemory_example_uses_local_fake_http_server() -> None:
     received: list[tuple[str, dict[str, object]]] = []
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:
             length = int(self.headers["Content-Length"] or "0")
-            body = json.loads(self.rfile.read(length))
-            received.append((self.path, body))
-            payload = b'{"translatedText":"Hola"}'
+            form = parse_qs(self.rfile.read(length).decode("utf-8"))
+            received.append((self.path, {key: values[0] for key, values in form.items()}))
+            payload = b'{"responseData":{"translatedText":"Hola"}}'
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))
@@ -494,34 +495,24 @@ async def test_committed_libretranslate_example_uses_local_fake_http_server() ->
     backend = None
     try:
         sample_path = (
-            Path(__file__).parents[2]
-            / "examples"
-            / "translation_extensions"
-            / "libretranslate.json"
+            Path(__file__).parents[2] / "examples" / "translation_extensions" / "mymemory.json"
         )
         definition = replace(
             parse_translation_extension(json.loads(sample_path.read_text(encoding="utf-8"))),
-            url=f"http://127.0.0.1:{server.server_port}/translate",
+            url=f"http://127.0.0.1:{server.server_port}/get",
         )
-        secrets = InMemorySecretStore()
-        secrets.set(
-            translation_extension_secret_key(definition.id, "api_key"),
-            "fixture-api-key",
-        )
-        backend = HttpExtensionTranslationBackend(definition, secrets)
+        backend = HttpExtensionTranslationBackend(definition, InMemorySecretStore())
 
         result = await backend.translate(request())
 
         assert result.text == "Hola"
         assert received == [
             (
-                "/translate",
+                "/get",
                 {
                     "q": "Hello",
-                    "source": "en",
-                    "target": "es",
-                    "format": "text",
-                    "api_key": "fixture-api-key",
+                    "langpair": "en|es",
+                    "mt": "1",
                 },
             )
         ]

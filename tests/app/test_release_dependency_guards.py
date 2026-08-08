@@ -355,10 +355,10 @@ def test_shared_windows_build_script_checks_packaged_translation_extension_examp
         in script
     )
     assert (
-        "$packagedLibreTranslateExamplePath = Join-Path $packagedTranslationExamplesDir "
-        '"libretranslate.json"'
+        "$packagedMyMemoryExamplePath = Join-Path $packagedTranslationExamplesDir "
+        '"mymemory.json"'
     ) in script
-    assert "Packaged LibreTranslate example not found" in script
+    assert "Packaged MyMemory example not found" in script
     assert "-PathType Leaf" in script
 
 
@@ -390,7 +390,7 @@ def test_build_spec_bundles_translation_extension_examples() -> None:
         "        TRANSLATION_EXTENSION_EXAMPLES_PACKAGED_DIR.as_posix(),\n"
         "    ),"
     ) in spec
-    assert (ROOT / "examples/translation_extensions/libretranslate.json").is_file()
+    assert (ROOT / "examples/translation_extensions/mymemory.json").is_file()
 
 
 def test_vendored_openvr_bundle_files_exist_and_sha256_line_is_exact() -> None:

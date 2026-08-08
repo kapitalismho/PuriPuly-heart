@@ -409,7 +409,7 @@ $packagedNotoCjkLicensePath = Join-Path $packagedNotoCjkProvenanceDir "OFL.txt"
 $packagedNotoCjkReadmePath = Join-Path $packagedNotoCjkProvenanceDir "README.md"
 $packagedNotoCjkSha256SumsPath = Join-Path $packagedNotoCjkProvenanceDir "SHA256SUMS.txt"
 $packagedTranslationExamplesDir = Join-Path $distDir "examples\translation_extensions"
-$packagedLibreTranslateExamplePath = Join-Path $packagedTranslationExamplesDir "libretranslate.json"
+$packagedMyMemoryExamplePath = Join-Path $packagedTranslationExamplesDir "mymemory.json"
 $pinnedOpenVrVendorDllSha256FromFile = Get-PinnedSha256FromFile -Path $openVrVendorSha256Path
 if ($pinnedOpenVrVendorDllSha256FromFile -ne $PinnedOpenVrVendorDllSha256) {
     throw "Vendored OpenVR runtime DLL pinned SHA256 literal drifted from $openVrVendorSha256Path"
@@ -535,9 +535,9 @@ $exePath = Join-Path $PWD "dist/PuriPulyHeart/PuriPulyHeart.exe"
 if (-not (Test-Path $exePath)) {
     throw "Packaged executable not found: $exePath"
 }
-$packagedLibreTranslateExamplePath = [System.IO.Path]::GetFullPath($packagedLibreTranslateExamplePath)
-if (-not (Test-Path -LiteralPath $packagedLibreTranslateExamplePath -PathType Leaf)) {
-    throw "Packaged LibreTranslate example not found: $packagedLibreTranslateExamplePath"
+$packagedMyMemoryExamplePath = [System.IO.Path]::GetFullPath($packagedMyMemoryExamplePath)
+if (-not (Test-Path -LiteralPath $packagedMyMemoryExamplePath -PathType Leaf)) {
+    throw "Packaged MyMemory example not found: $packagedMyMemoryExamplePath"
 }
 $productionPackagedSmokeHelperPath = Join-Path $distDir "PuriPulyHeartProcessCaptureSmoke.exe"
 if (Test-Path $productionPackagedSmokeHelperPath) {
