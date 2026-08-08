@@ -9,8 +9,9 @@ been generated yet, and no stateful model replay has run on episodes.
 
 Revision history: rev 1 initial bundle (candidate HEAD `22c45dd9`); rev 2 resolves
 P2-001 through P2-013 (candidate `0ad094df`); rev 3 resolves P2-014 through P2-026
-(candidate `02080e1e`); rev 4 (this revision) resolves P2-027 through P2-032 per the
-round-3 review (candidate HEAD at review time, confirmed via `git rev-parse HEAD`).
+(candidate `02080e1e`); rev 4 resolves P2-027 through P2-032 (candidate `cae36504`);
+rev 5 (this revision) resolves P2-033 through P2-035 per the round-4 review (candidate
+HEAD at review time, confirmed via `git rev-parse HEAD`).
 
 ## 1. Artifacts under review
 
@@ -137,11 +138,15 @@ With `T` the anchor sample (target sample for hard positives; silence midpoint f
 negatives, computed as `silence_start + (silence_end - silence_start) // 2`, integer
 floor division — frozen, finding P2-007) and `session_end` the wav duration in samples:
 
-- scored region `S = [max(0, T - 5 s), min(session_end, T + 5 s)]` (10 s scored default,
-  Section 5.1 "10-20 seconds of scored audio");
-- full window `W = [max(0, S.start - 5 s), min(session_end, S.end + 3 s)]`
-  (≥5 s warm-up before the first scored interval, ≥3 s tail after the last scored target
-  "when source context permits").
+- **Detector-chunk alignment rule (frozen, finding P2-033):** all episode window
+  bounds are 512-sample chunk-aligned (`CANONICAL_CHUNK_SAMPLES`, the B0 processing
+  unit). Scored start `S.start = ceil_to_chunk(max(0, T - 5 s))`; scored end
+  `S.end = min(session_end, ceil_to_chunk(min(session_end, T + 5 s)))`; warm-up start
+  `W.start = max(0, floor_to_chunk(scored_start - 5 s))`; tail end
+  `W.end = min(session_end, ceil_to_chunk(scored_end + 3 s))`. The scored region is
+  therefore at least 10 s (rounding up can add up to 511 samples, so scored duration
+  lies in [10.00, 10.03] s for single anchors) and at most 20 s after the Section 4.3
+  cap; warm-up is at least 5 s; the tail is at least 3 s when source context permits.
 - Truncation (session start or end) is **recorded**, never silently accepted:
   `warmup_truncated = S.start - W.start < 5 s`, `tail_truncated = W.end - S.end < 3 s`.
 
@@ -210,21 +215,30 @@ floor division — frozen, finding P2-007) and `session_end` the wav duration in
   family/profile class, a frozen predicate `scoring_start_ready(class, episode)` must
   be provable from **replay-derived detector progress evidence** (never from annotation
   boundaries alone) before the episode is scorable:
-  - `b0/peer`: after replaying the declared warm-up in `episode_reset` mode, the
-    engine's DetectorProgress must show the safe frontier **covering the scored start**
-    (finding P2-027): `safe_boundary_frontier_sample >= scored_start` with the frozen
-    half-open convention that a frontier at `s` settles all boundaries at or before
-    `s` (PRD Section 4.10), so a frontier at or beyond `scored_start` proves no pending
-    VAD segment, pre-roll, or hangover can emit a boundary inside the scored region
-    from warm-up audio. In addition the fixture validates explicit pending-state
-    clearing (no in-progress VAD segment whose start precedes the scored start), and
-    the progress trace is validated monotonic and conservative (invariant 35;
-    `observed_source_sample` monotonic, `safe_boundary_frontier_sample <=
-    observed_source_sample`). If the safe frontier cannot be proven at or beyond the
-    scored start, the episode is `diagnostic_only` with reason
-    `unstable_warmup_frontier`. The readiness predicate therefore runs the same replay
-    machinery as the state-equivalence test (Section 8) and is derived from the same
-    evidence.
+  - `b0/peer`: readiness is frozen as (a) **chunk-aligned scored start** (Section 4.2
+    alignment rule) and (b) **scored-region parity equality** between `source_prefix`
+    and `episode_reset` modes (Section 8.2), which is the empirical proof that no
+    warm-up-derived output appears in the scored region. The B0 safe frontier
+    semantics are exact (finding P2-033): the engine advances
+    `safe_boundary_frontier_sample` to the start of the last fully processed chunk
+    (`vad_baseline.py` progress rows), so after warm-up replay the frontier is
+    `scored_start - 512` and can never reach `scored_start` without processing scored
+    audio. Because a VAD boundary at sample `s` is emitted only while processing chunk
+    `[s, s + 512)`, warm-up replay emits no boundary at or beyond `scored_start`
+    (it processes no chunk starting at/after `scored_start`), and every boundary in
+    the scored region is determined exclusively by scored-region audio replayed
+    identically in both modes — parity equality therefore proves readiness. Scored
+    audio is never used to establish warm-up readiness other than through this
+    PRD-required parity comparison (Section 5.4). The readiness report records the
+    frontier at scored start and the parity result per episode.
+  - **Pending-state validation (finding P2-034):** committed active VAD state is
+    permitted across the scored region (production `VadGating` intentionally retains
+    committed segments; Section 5.3 "retain state across all VAD events within the
+    scored portion"). The readiness predicate rejects only pending starts/clusters
+    capable of **retrospective** output before the scored frontier: for B0 there are
+    none (VAD emits only at chunk starts as chunks are processed; no retroactive
+    confirmation), and for LS/ERes the predicate is declared at Phase 4 covering
+    confirmation/cluster debounce lookback via the safe-frontier contract.
   - `ls_eend/*`, `eres2netv2/*`: declared at Phase 4 when checkpoints are pinned; the
     predicate must cover frontend buffering, neural lookback, confirmation, and cluster
     debounce via the safe-frontier contract (Section 4.10) and is frozen there before
@@ -641,10 +655,16 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
   the dev manifest header).
 - All JSON artifacts carry canonical content hashes; row files record direct byte
   SHA-256 (Section 27.3). Provenance headers record the Section 1.1 hash ledger.
+- **Structural-taxonomy deferral marker (finding P2-035):** every Phase 2
+  manifest/report header carries `structural_taxonomy_status:
+  "max_duration_and_terminal_deferred_phase3_8"`; no Phase 2 artifact presents the
+  structural-action taxonomy as complete, and any later claim involving VAD
+  maximum-duration or terminal-flush actions must cite the Phase 3/8 coverage that
+  produced those actions.
 - New code under `turn_episode/`: `build_episodes.py` (builder + ReferenceBuilder +
   manifests), `state_equivalence.py`, `scoring.py`, `audit.py` (plus a new
-  `EpisodeStatus` literal and any frozen tolerance/pool-split constants in
-  `contracts.py`/`schemas.py`).
+  `EpisodeStatus`/`window_type` literal and any frozen tolerance/pool-split constants
+  in `contracts.py`/`schemas.py`).
 
 ## 14. Falsification and stop conditions for Phase 2
 
@@ -668,9 +688,10 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
   `source_prefix_required`; the fixture report must show the disposition table complete
   with no untested class used for reset-based scoring (finding P2-008). Safe-frontier
   trace parity (finding P2-017) is part of the failure condition.
-- B0 readiness predicate cannot be proven from replay-derived safe-frontier evidence
-  (finding P2-016) for an episode → that episode is `diagnostic_only`; the readiness
-  report must account for every scorable episode.
+- B0 readiness (chunk-aligned scored start + scored-region parity, findings P2-033,
+  P2-034) cannot be proven for an episode → that episode is `diagnostic_only`; the
+  readiness report must account for every scorable episode. Committed active VAD state
+  alone never triggers this (finding P2-034).
 - Natural-exposure manifest selection differs from the Phase 1 frame for the opened
   sessions → phase stops (frame was frozen before label inspection; a difference means
   the frame was regenerated).
@@ -734,6 +755,9 @@ and cannot be hidden by increasing warm-up post hoc (Section 5.4).
 | P2-030 | important | missing-timing words have no coordinates; covering intervals unbounded | resolved in Section 5.1 (deterministic conservative covering rule from neighboring timed records/region boundaries/session bounds; consecutive missing-timing spans merged; audit reproduces exactly) |
 | P2-031 | important | synthetic registrations had no historical status rule | resolved in Section 9 (frozen statuses: ls_dev/mixed_dev_pool -> dev_pilot; ls_held_out_clean/other -> held_out_pilot; persisted per synthetic case; included in panel assertions) |
 | P2-032 | important | natural 30 s scored windows conflicted with the 10-20 s scored stop condition | resolved in Sections 10, 14 (separate `window_type = natural_exposure`; target-enriched bounds apply only to `window_type = target_enriched`; natural windows scored over full extent with zero warm-up/tail recorded) |
+| P2-033 | blocker | B0 safe frontier advances only to processed chunk starts; warm-up-only replay cannot reach `frontier >= scored_start` at arbitrary coordinates | resolved in Sections 4.2, 4.4 (512-sample chunk-alignment rule for all window bounds; B0 readiness = chunk-aligned scored start + scored-region parity equality; exact frontier semantics recorded — frontier at scored start is `scored_start - 512` by construction; scored audio never establishes readiness beyond the PRD-required parity comparison) |
+| P2-034 | important | "no in-progress VAD segment" conflated committed VAD state with pending state | resolved in Section 4.4 (committed active VAD state permitted and retained; only pending starts/clusters capable of retrospective output are rejected — none exist for B0; LS/ERes predicate declared at Phase 4) |
+| P2-035 | note | deferred structural taxonomy could be mistaken for complete | resolved in Sections 5.1, 13 (explicit deferral marker `max_duration_and_terminal_deferred_phase3_8` in every Phase 2 manifest/report; later claims involving those actions must cite Phase 3/8 coverage) |
 
 ## 18. Execution and exit-gate note (finding P2-026)
 
