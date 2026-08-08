@@ -1,0 +1,549 @@
+{
+  "annotation_failures": [],
+  "content_sha256": "ff6e4c41cf1bb8378005397d238328a1269d5d246e95f1878d4e45feb0361423",
+  "passed": true,
+  "public_sampled": 6,
+  "report_id": "audit_report",
+  "results": [
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 8,
+        "registered_count": 8
+      },
+      "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:22068224:22228480:p406",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": true,
+        "samples": 160256
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ami_TS3009b:2841088:3060736:n6.n7",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": true,
+        "samples": 219648
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 9,
+        "registered_count": 9
+      },
+      "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:18397184:18717184:p309.p312",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": true,
+        "samples": 320000
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 8,
+        "registered_count": 8
+      },
+      "episode_id": "frontier_dev:ami_TS3005b:16468992:16629760:p102",
+      "pool": "frontier_dev",
+      "waveform": {
+        "passed": true,
+        "samples": 160768
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "frontier_dev:ami_TS3012c:15705600:15866368:n20",
+      "pool": "frontier_dev",
+      "waveform": {
+        "passed": true,
+        "samples": 160768
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ami_ES2003a:17403392:17564160:n32",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": true,
+        "samples": 160768
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_overlap_d200_o0100_01:0:65600:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d075_g0300_02:0:32000:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d200_g0100_01:0:68800:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d200_o0300_01:0:62400:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d150_g0100_00:0:52800:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d075_g0300_00:0:32000:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d200_o0100_03:0:65600:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d075_g0000_00:0:27200:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d050_g0000_01:0:19200:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d100_o0300_02:0:30400:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d150_o0300_03:0:46400:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d075_o0100_02:0:25600:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_same_speaker_d200_g0800_00:0:80000:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d100_g0300_00:0:40000:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d150_g0300_03:0:56000:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d075_o0100_00:0:25600:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_overlap_d075_o0500_01:0:19200:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d030_g0300_02:0:19200:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 2,
+        "registered_count": 2
+      },
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_overlap_d100_o0100_02:0:33600:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_same_speaker_d050_g0800_01:0:32000:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d200_g0000_03:0:67200:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d100_g0300_01:0:40000:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d030_g0800_01:0:26240:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_same_speaker_d100_g0100_01:0:36800:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    },
+    {
+      "annotation": {
+        "mismatch": null,
+        "passed": true,
+        "rebuilt_count": 1,
+        "registered_count": 1
+      },
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d030_g0300_01:0:18560:",
+      "pool": "diagnostic_dev",
+      "waveform": {
+        "passed": null,
+        "reason": "wav_missing"
+      }
+    }
+  ],
+  "sampling_rule": "sha256(episode_id) prefix < 8 (1/32), floor 8 by smallest hash",
+  "schema_version": "turn_episode_v1",
+  "synthetic_sampled": 25,
+  "waveform_failures": [],
+  "waveform_unavailable": [
+    {
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_overlap_d200_o0100_01:0:65600:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d075_g0300_02:0:32000:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d200_g0100_01:0:68800:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d200_o0300_01:0:62400:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d150_g0100_00:0:52800:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d075_g0300_00:0:32000:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d200_o0100_03:0:65600:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d075_g0000_00:0:27200:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d050_g0000_01:0:19200:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d100_o0300_02:0:30400:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d150_o0300_03:0:46400:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d075_o0100_02:0:25600:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_same_speaker_d200_g0800_00:0:80000:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d100_g0300_00:0:40000:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d150_g0300_03:0:56000:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_overlap_d075_o0100_00:0:25600:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_overlap_d075_o0500_01:0:19200:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d030_g0300_02:0:19200:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_overlap_d100_o0100_02:0:33600:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_same_speaker_d050_g0800_01:0:32000:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d200_g0000_03:0:67200:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_dev:dev-clean_different_speaker_gap_d100_g0300_01:0:40000:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_different_speaker_gap_d030_g0800_01:0:26240:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_clean:test-clean_same_speaker_d100_g0100_01:0:36800:",
+      "reason": "wav_missing"
+    },
+    {
+      "episode_id": "diagnostic_dev:ls_held_out_other:test-other_different_speaker_gap_d030_g0300_01:0:18560:",
+      "reason": "wav_missing"
+    }
+  ]
+}
