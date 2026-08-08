@@ -1,4 +1,4 @@
-from .backend import HttpExtensionTranslationBackend, HttpExtensionTranslationError
+from .keys import translation_extension_secret_key, translation_extension_secret_key_prefix
 from .registry import (
     LoadedTranslationExtension,
     TranslationExtensionLoadError,
@@ -25,8 +25,6 @@ from .schema import (
 
 __all__ = [
     "JSONValue",
-    "HttpExtensionTranslationBackend",
-    "HttpExtensionTranslationError",
     "LoadedTranslationExtension",
     "TranslationExtension",
     "TranslationExtensionBody",
@@ -45,4 +43,6 @@ __all__ = [
     "parse_translation_extension",
     "render_translation_request",
     "resolve_json_pointer",
+    "translation_extension_secret_key",
+    "translation_extension_secret_key_prefix",
 ]

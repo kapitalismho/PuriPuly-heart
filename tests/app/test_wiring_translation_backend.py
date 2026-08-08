@@ -15,9 +15,9 @@ from puripuly_heart.config.settings import (
     TranslationSettings,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
-from puripuly_heart.core.translation_extensions import (
+from puripuly_heart.core.translation_extensions import TranslationExtensionRegistry
+from puripuly_heart.providers.translation.http_extension_backend import (
     HttpExtensionTranslationBackend,
-    TranslationExtensionRegistry,
 )
 
 

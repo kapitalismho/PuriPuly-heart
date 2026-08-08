@@ -5,9 +5,9 @@ from collections.abc import Callable
 from puripuly_heart.app.wiring.wiring_llm_factory import create_llm_provider
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.translation_backend import TranslationBackend
-from puripuly_heart.core.translation_extensions import (
+from puripuly_heart.core.translation_extensions import TranslationExtensionRegistry
+from puripuly_heart.providers.translation.http_extension_backend import (
     HttpExtensionTranslationBackend,
-    TranslationExtensionRegistry,
 )
 
 

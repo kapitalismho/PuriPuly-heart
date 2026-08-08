@@ -16,6 +16,8 @@ from puripuly_heart.core.translation_extensions import (
     parse_translation_extension,
     render_translation_request,
     resolve_json_pointer,
+    translation_extension_secret_key,
+    translation_extension_secret_key_prefix,
 )
 
 
@@ -204,6 +206,19 @@ def test_missing_secret_fails_without_exposing_secret_value() -> None:
 
     with pytest.raises(TranslationExtensionConfigurationError, match="missing required credential"):
         render_translation_request(extension, backend_request(), secrets={})
+
+
+def test_secret_store_keys_escape_dotted_segments_without_collisions() -> None:
+    assert translation_extension_secret_key("libretranslate", "api_key") == (
+        "translation_extension.libretranslate.api_key"
+    )
+    first = translation_extension_secret_key("a.b", "c")
+    second = translation_extension_secret_key("a", "b.c")
+
+    assert first == "translation_extension.a%2Eb.c"
+    assert second == "translation_extension.a.b%2Ec"
+    assert first != second
+    assert translation_extension_secret_key_prefix("a.b") == "translation_extension.a%2Eb."
 
 
 def test_json_pointer_supports_root_arrays_and_escaping() -> None:

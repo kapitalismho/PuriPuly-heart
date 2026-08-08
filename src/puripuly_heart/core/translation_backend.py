@@ -33,6 +33,10 @@ class LegacyTranslationProvider(Protocol):
     async def close(self) -> None: ...
 
 
+class TranslationSecretResolver(Protocol):
+    def get(self, key: str) -> str | None: ...
+
+
 class TranslationBackend(ABC):
     @abstractmethod
     async def translate(self, request: TranslationBackendRequest) -> Translation: ...
@@ -64,4 +68,5 @@ __all__ = [
     "LlmTranslationBackend",
     "TranslationBackend",
     "TranslationBackendRequest",
+    "TranslationSecretResolver",
 ]

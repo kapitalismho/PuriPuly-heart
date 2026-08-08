@@ -58,6 +58,7 @@ from puripuly_heart.config.settings import (
     with_telemetry_consent,
 )
 from puripuly_heart.core.language import get_stt_compatibility_warning
+from puripuly_heart.core.translation_extensions import translation_extension_secret_key
 from puripuly_heart.ui.components.managed_trial_usage_bar import ManagedTrialUsageBar
 from puripuly_heart.ui.components.settings import (
     ApiKeyField,
@@ -2491,7 +2492,7 @@ class SettingsView(ft.Column):
             return
         self._translation_extension_secret_dirty.discard(secret_id)
         result = self._on_secret_change(
-            f"translation_extension.{extension_id}.{secret_id}",
+            translation_extension_secret_key(extension_id, secret_id),
             value,
         )
         if inspect.isawaitable(result):

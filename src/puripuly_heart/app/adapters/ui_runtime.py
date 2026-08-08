@@ -48,6 +48,9 @@ from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryResult,
     TranslationSuccessTelemetryService,
 )
+from puripuly_heart.core.translation_extensions import (
+    translation_extension_secret_key_prefix,
+)
 
 
 @dataclass(slots=True)
@@ -324,7 +327,7 @@ class UiProviderRuntimeAdapter:
             and current is not None
             and current.translation.model == "custom_http"
             and extension_id is not None
-            and key.startswith(f"translation_extension.{extension_id}.")
+            and key.startswith(translation_extension_secret_key_prefix(extension_id))
         ):
             await self.apply_providers(
                 force_rebuild_llm=True,

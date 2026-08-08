@@ -4,8 +4,9 @@ import asyncio
 import json
 import logging
 import ssl
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from threading import Thread
 from uuid import uuid4
 
@@ -15,11 +16,14 @@ import pytest
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.translation_backend import TranslationBackendRequest
 from puripuly_heart.core.translation_extensions import (
-    HttpExtensionTranslationBackend,
-    HttpExtensionTranslationError,
     TranslationExtensionConfigurationError,
     TranslationExtensionResponseError,
     parse_translation_extension,
+    translation_extension_secret_key,
+)
+from puripuly_heart.providers.translation.http_extension_backend import (
+    HttpExtensionTranslationBackend,
+    HttpExtensionTranslationError,
 )
 
 
@@ -268,6 +272,56 @@ async def test_backend_missing_secret_fails_before_client_creation() -> None:
 
 
 @pytest.mark.asyncio
+async def test_backend_secret_keys_are_unambiguous_for_dotted_ids() -> None:
+    def secret_extension(extension_id: str, secret_id: str):
+        return parse_translation_extension(
+            {
+                "schema_version": 1,
+                "id": extension_id,
+                "name": "Dotted Secret Extension",
+                "url": "https://example.test/translate",
+                "request": {
+                    "body": {
+                        "type": "json",
+                        "value": {"credential": f"{{{{secret:{secret_id}}}}}"},
+                    }
+                },
+                "response": {"type": "text"},
+                "secrets": [{"id": secret_id, "label": "API Key"}],
+            }
+        )
+
+    first_definition = secret_extension("a.b", "c")
+    second_definition = secret_extension("a", "b.c")
+    first_secrets = InMemorySecretStore()
+    second_secrets = InMemorySecretStore()
+    first_secrets.set(translation_extension_secret_key("a.b", "c"), "first-secret")
+    second_secrets.set(translation_extension_secret_key("a", "b.c"), "second-secret")
+    first_client = FakeClient(response=FakeResponse(200, "first"))
+    second_client = FakeClient(response=FakeResponse(200, "second"))
+    first_backend = HttpExtensionTranslationBackend(
+        first_definition,
+        first_secrets,
+        client_factory=lambda **_: first_client,
+    )
+    second_backend = HttpExtensionTranslationBackend(
+        second_definition,
+        second_secrets,
+        client_factory=lambda **_: second_client,
+    )
+
+    try:
+        assert (await first_backend.translate(request())).text == "first"
+        assert (await second_backend.translate(request())).text == "second"
+    finally:
+        await first_backend.close()
+        await second_backend.close()
+
+    assert first_client.calls[0][1]["json"] == {"credential": "first-secret"}
+    assert second_client.calls[0][1]["json"] == {"credential": "second-secret"}
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("failure", "category"),
     [
@@ -407,6 +461,70 @@ async def test_backend_uses_local_fake_http_server_without_public_network(
         http_records = [record for record in caplog.records if record.name in {"httpx", "httpcore"}]
         assert all("Hello" not in record.getMessage() for record in http_records)
         assert all("local-secret" not in record.getMessage() for record in http_records)
+    finally:
+        if backend is not None:
+            await backend.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.mark.asyncio
+async def test_committed_libretranslate_example_uses_local_fake_http_server() -> None:
+    received: list[tuple[str, dict[str, object]]] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            length = int(self.headers["Content-Length"] or "0")
+            body = json.loads(self.rfile.read(length))
+            received.append((self.path, body))
+            payload = b'{"translatedText":"Hola"}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    backend = None
+    try:
+        sample_path = (
+            Path(__file__).parents[2]
+            / "examples"
+            / "translation_extensions"
+            / "libretranslate.json"
+        )
+        definition = replace(
+            parse_translation_extension(json.loads(sample_path.read_text(encoding="utf-8"))),
+            url=f"http://127.0.0.1:{server.server_port}/translate",
+        )
+        secrets = InMemorySecretStore()
+        secrets.set(
+            translation_extension_secret_key(definition.id, "api_key"),
+            "fixture-api-key",
+        )
+        backend = HttpExtensionTranslationBackend(definition, secrets)
+
+        result = await backend.translate(request())
+
+        assert result.text == "Hola"
+        assert received == [
+            (
+                "/translate",
+                {
+                    "q": "Hello",
+                    "source": "en",
+                    "target": "es",
+                    "format": "text",
+                    "api_key": "fixture-api-key",
+                },
+            )
+        ]
     finally:
         if backend is not None:
             await backend.close()
