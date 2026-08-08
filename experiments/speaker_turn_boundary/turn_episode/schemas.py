@@ -38,6 +38,8 @@ ReferenceActionKind = Literal[
     "unscored",
 ]
 EpisodePoolTag = Literal["hard_only", "overlap_present", "negative_only"]
+EpisodeStatus = Literal["scorable", "diagnostic_only"]
+WindowType = Literal["target_enriched", "natural_exposure"]
 FinalActionKind = Literal[
     "retain_vad",
     "accelerate_or_replace_vad",
@@ -91,6 +93,8 @@ _REFERENCE_ACTION_KINDS: frozenset[str] = frozenset(
     }
 )
 _EPISODE_POOL_TAGS: frozenset[str] = frozenset({"hard_only", "overlap_present", "negative_only"})
+_EPISODE_STATUSES: frozenset[str] = frozenset({"scorable", "diagnostic_only"})
+_WINDOW_TYPES: frozenset[str] = frozenset({"target_enriched", "natural_exposure"})
 _FINAL_ACTION_KINDS: frozenset[str] = frozenset(
     {
         "retain_vad",

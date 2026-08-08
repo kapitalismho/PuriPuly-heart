@@ -10,9 +10,18 @@ been generated yet, and no stateful model replay has run on episodes.
 Revision history: rev 1 initial bundle (candidate HEAD `22c45dd9`); rev 2 resolves
 P2-001 through P2-013 (candidate `0ad094df`); rev 3 resolves P2-014 through P2-026
 (candidate `02080e1e`); rev 4 resolves P2-027 through P2-032 (candidate `cae36504`);
-rev 5 resolves P2-033 through P2-035 (candidate `38babe13`); rev 6 (this revision)
-resolves P2-036 through P2-037 per the round-5 review (candidate HEAD at review time,
-confirmed via `git rev-parse HEAD`).
+rev 5 resolves P2-033 through P2-035 (candidate `38babe13`); rev 6 resolves P2-036
+through P2-037 (candidate `f0039139`); rev 7 resolves P2-038 (candidate `c64b47ee`);
+rev 8 (this revision) records an implementation-time amendment discovered during
+execution: `scored_start` uses `floor_to_chunk(max(0, T - 5 s))` instead of
+`ceil_to_chunk(...)`. Rationale: 10 s = 160000 samples is not a multiple of the
+512-sample chunk, so rounding both scored bounds up can shrink the scored region
+below the frozen 10 s minimum (observed: 159744 samples = 9.984 s); floor rounding of
+the start guarantees scored duration >= 10 s exactly, which is the intent of the
+frozen 10-20 s scored rule (finding P2-004) and of the rev-5 wording "the scored
+region is therefore at least 10 s". All other alignment rules (scored_end, warm-up,
+tail) are unchanged. Candidate HEAD at review time, confirmed via `git rev-parse
+HEAD`.
 
 ## 1. Artifacts under review
 
@@ -145,7 +154,8 @@ floor division — frozen, finding P2-007) and `session_end` the wav duration in
   use it). With `last_full_chunk_end = floor_to_chunk(session_end)` (the existing
   `replay_wav_epoch` semantics drop the final partial chunk, so no boundary can be
   emitted at or beyond `last_full_chunk_end`):
-  - `scored_start = ceil_to_chunk(max(0, T - 5 s))` (chunk-aligned);
+  - `scored_start = floor_to_chunk(max(0, T - 5 s))` (chunk-aligned; floor rounding
+    guarantees the scored region is at least 10 s — rev 8 amendment);
   - `scored_end = min(ceil_to_chunk(min(session_end, T + 5 s)), last_full_chunk_end)`
     (chunk-aligned; the annotation-domain scored end may extend into the partial tail,
     recorded as `unaligned_source_end = true` when `session_end` is not
