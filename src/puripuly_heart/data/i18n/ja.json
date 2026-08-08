@@ -208,7 +208,7 @@
   "settings.overlay.failure.unknown": "不明なオーバーレイエラー",
   "settings.overlay.calibration": "キャリブレーション",
   "settings.overlay.calibration.anchor": "基準点",
-  "settings.overlay.calibration.anchor.head_locked": "ヘッド固定",
+  "settings.overlay.calibration.anchor.head_locked": "頭部固定",
   "settings.overlay.calibration.offset_x": "横オフセット",
   "settings.overlay.calibration.offset_y": "縦オフセット",
   "settings.overlay.calibration.distance": "距離",
