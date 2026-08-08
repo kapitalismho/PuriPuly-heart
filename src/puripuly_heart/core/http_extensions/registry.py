@@ -5,54 +5,58 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .schema import (
-    TranslationExtension,
-    TranslationExtensionValidationError,
-    parse_translation_extension,
+    HttpExtension,
+    HttpExtensionValidationError,
+    parse_http_extension,
 )
 
 
 @dataclass(frozen=True, slots=True)
-class LoadedTranslationExtension:
-    definition: TranslationExtension
+class LoadedHttpExtension:
+    definition: HttpExtension
     source_path: Path
     fingerprint: str
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationExtensionLoadError:
+class HttpExtensionLoadError:
     source_path: Path
     message: str
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationExtensionRegistrySnapshot:
-    extensions: tuple[LoadedTranslationExtension, ...] = ()
-    errors: tuple[TranslationExtensionLoadError, ...] = ()
+class HttpExtensionRegistrySnapshot:
+    extensions: tuple[LoadedHttpExtension, ...] = ()
+    errors: tuple[HttpExtensionLoadError, ...] = ()
 
-    def get(self, extension_id: str) -> LoadedTranslationExtension | None:
+    def get(self, http_extension_id: str) -> LoadedHttpExtension | None:
         return next(
-            (extension for extension in self.extensions if extension.definition.id == extension_id),
+            (
+                extension
+                for extension in self.extensions
+                if extension.definition.id == http_extension_id
+            ),
             None,
         )
 
 
 @dataclass(slots=True)
-class TranslationExtensionRegistry:
+class HttpExtensionRegistry:
     directory: Path
-    _snapshot: TranslationExtensionRegistrySnapshot = field(
+    _snapshot: HttpExtensionRegistrySnapshot = field(
         init=False,
-        default_factory=TranslationExtensionRegistrySnapshot,
+        default_factory=HttpExtensionRegistrySnapshot,
         repr=False,
     )
 
     @property
-    def snapshot(self) -> TranslationExtensionRegistrySnapshot:
+    def snapshot(self) -> HttpExtensionRegistrySnapshot:
         return self._snapshot
 
-    def reload(self) -> TranslationExtensionRegistrySnapshot:
+    def reload(self) -> HttpExtensionRegistrySnapshot:
         self.directory.mkdir(parents=True, exist_ok=True)
-        loaded: list[LoadedTranslationExtension] = []
-        errors: list[TranslationExtensionLoadError] = []
+        loaded: list[LoadedHttpExtension] = []
+        errors: list[HttpExtensionLoadError] = []
         for source_path in sorted(
             (
                 path
@@ -63,55 +67,57 @@ class TranslationExtensionRegistry:
         ):
             try:
                 raw = json.loads(source_path.read_text(encoding="utf-8"))
-                definition = parse_translation_extension(raw, source_path=source_path)
+                definition = parse_http_extension(raw, source_path=source_path)
             except (
                 OSError,
                 TypeError,
                 UnicodeError,
                 json.JSONDecodeError,
-                TranslationExtensionValidationError,
+                HttpExtensionValidationError,
             ) as exc:
                 errors.append(
-                    TranslationExtensionLoadError(
+                    HttpExtensionLoadError(
                         source_path=source_path,
                         message=_safe_error_message(exc),
                     )
                 )
                 continue
             loaded.append(
-                LoadedTranslationExtension(
+                LoadedHttpExtension(
                     definition=definition,
                     source_path=source_path,
                     fingerprint=definition.fingerprint,
                 )
             )
 
-        by_id: dict[str, list[LoadedTranslationExtension]] = {}
+        by_id: dict[str, list[LoadedHttpExtension]] = {}
         for extension in loaded:
             by_id.setdefault(extension.definition.id, []).append(extension)
-        duplicate_ids = {extension_id for extension_id, items in by_id.items() if len(items) > 1}
+        duplicate_ids = {
+            http_extension_id for http_extension_id, items in by_id.items() if len(items) > 1
+        }
         if duplicate_ids:
-            retained: list[LoadedTranslationExtension] = []
+            retained: list[LoadedHttpExtension] = []
             for extension in loaded:
                 if extension.definition.id not in duplicate_ids:
                     retained.append(extension)
                     continue
                 errors.append(
-                    TranslationExtensionLoadError(
+                    HttpExtensionLoadError(
                         source_path=extension.source_path,
                         message=f"duplicate extension id: {extension.definition.id}",
                     )
                 )
             loaded = retained
 
-        self._snapshot = TranslationExtensionRegistrySnapshot(
+        self._snapshot = HttpExtensionRegistrySnapshot(
             extensions=tuple(sorted(loaded, key=lambda item: item.definition.id)),
             errors=tuple(sorted(errors, key=lambda item: item.source_path.name.casefold())),
         )
         return self._snapshot
 
-    def get(self, extension_id: str) -> LoadedTranslationExtension | None:
-        return self._snapshot.get(extension_id)
+    def get(self, http_extension_id: str) -> LoadedHttpExtension | None:
+        return self._snapshot.get(http_extension_id)
 
 
 def _safe_error_message(exc: Exception) -> str:
@@ -122,8 +128,8 @@ def _safe_error_message(exc: Exception) -> str:
 
 
 __all__ = [
-    "LoadedTranslationExtension",
-    "TranslationExtensionLoadError",
-    "TranslationExtensionRegistry",
-    "TranslationExtensionRegistrySnapshot",
+    "LoadedHttpExtension",
+    "HttpExtensionLoadError",
+    "HttpExtensionRegistry",
+    "HttpExtensionRegistrySnapshot",
 ]

@@ -362,7 +362,7 @@ def _default_translation_fallback_intent() -> TranslationFallbackIntent:
 class TranslationIntent:
     model: str = "gemma4_26b_31b"
     connection: str = "managed"
-    extension_id: str | None = None
+    http_extension_id: str | None = None
     previous_llm_model: str | None = None
     connection_history: dict[str, str] = field(
         default_factory=_default_translation_connection_history

@@ -14,14 +14,14 @@ from puripuly_heart.config.settings import (
     TranslationModel,
     TranslationSettings,
 )
+from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
-from puripuly_heart.core.translation_extensions import TranslationExtensionRegistry
 from puripuly_heart.providers.translation.http_extension_backend import (
     HttpExtensionTranslationBackend,
 )
 
 
-def _registry(tmp_path: Path) -> TranslationExtensionRegistry:
+def _registry(tmp_path: Path) -> HttpExtensionRegistry:
     (tmp_path / "libretranslate.json").write_text(
         json.dumps(
             {
@@ -40,7 +40,7 @@ def _registry(tmp_path: Path) -> TranslationExtensionRegistry:
         ),
         encoding="utf-8",
     )
-    registry = TranslationExtensionRegistry(tmp_path)
+    registry = HttpExtensionRegistry(tmp_path)
     registry.reload()
     return registry
 
@@ -50,7 +50,7 @@ def _custom_settings() -> AppSettings:
     settings.translation = TranslationSettings(
         model=TranslationModel.CUSTOM_HTTP,
         connection=TranslationConnection.CUSTOM_HTTP,
-        extension_id="libretranslate",
+        http_extension_id="libretranslate",
     )
     return settings
 
@@ -72,7 +72,7 @@ async def test_custom_http_factory_creates_only_the_extension_backend(
     backend = create_translation_backend(
         settings,
         secrets=InMemorySecretStore(),
-        translation_extensions=registry,
+        http_extensions=registry,
         managed_release_service=pytest.fail,
     )
 
@@ -83,13 +83,13 @@ async def test_custom_http_factory_creates_only_the_extension_backend(
 
 def test_custom_http_factory_rejects_missing_selected_extension(tmp_path: Path) -> None:
     settings = _custom_settings()
-    settings.translation.extension_id = "missing"
+    settings.translation.http_extension_id = "missing"
 
-    with pytest.raises(ValueError, match="selected translation extension is unavailable"):
+    with pytest.raises(ValueError, match="selected HTTP extension is unavailable"):
         create_translation_backend(
             settings,
             secrets=InMemorySecretStore(),
-            translation_extensions=_registry(tmp_path),
+            http_extensions=_registry(tmp_path),
         )
 
 
@@ -107,7 +107,7 @@ def test_llm_factory_path_remains_delegated(monkeypatch: pytest.MonkeyPatch) -> 
     result = create_translation_backend(
         settings,
         secrets=InMemorySecretStore(),
-        translation_extensions=TranslationExtensionRegistry(Path("unused")),
+        http_extensions=HttpExtensionRegistry(Path("unused")),
     )
 
     assert result is expected
@@ -118,13 +118,13 @@ def test_custom_http_definition_fingerprint_rebuilds_runtime_signature(tmp_path:
     registry = _registry(tmp_path)
     settings = _custom_settings()
 
-    before = build_llm_provider_signature(settings, translation_extensions=registry)
+    before = build_llm_provider_signature(settings, http_extensions=registry)
     extension_path = tmp_path / "libretranslate.json"
     changed = json.loads(extension_path.read_text(encoding="utf-8"))
     changed["description"] = "Changed local definition"
     extension_path.write_text(json.dumps(changed), encoding="utf-8")
     registry.reload()
-    after = build_llm_provider_signature(settings, translation_extensions=registry)
+    after = build_llm_provider_signature(settings, http_extensions=registry)
 
     assert before != after
     assert "local-secret" not in repr(after)

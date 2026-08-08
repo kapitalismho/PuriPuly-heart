@@ -81,7 +81,7 @@ class ProviderStrictSettingsSaveFailed(Exception):
     pass
 
 
-class _TranslationExtensionSecretSettingsRepository:
+class _HttpExtensionSecretSettingsRepository:
     async def load(self) -> SettingsSnapshot:
         return SettingsSnapshot(values={}, revision=None)
 
@@ -707,18 +707,18 @@ class ProviderSettingsOwner:
         )
 
     async def change_secret(self, secret_key: str, value: str) -> bool:
-        if secret_key.startswith("translation_extension."):
-            return await self._change_translation_extension_secret(secret_key, value)
+        if secret_key.startswith("http_extension."):
+            return await self._change_http_extension_secret(secret_key, value)
         return await self.secret_change.change(
             lambda: self._secret_change_execution(secret_key, value)
         )
 
-    async def _change_translation_extension_secret(self, secret_key: str, value: str) -> bool:
+    async def _change_http_extension_secret(self, secret_key: str, value: str) -> bool:
         return await self.secret_change.change(
-            lambda: self._translation_extension_secret_change_execution(secret_key, value)
+            lambda: self._http_extension_secret_change_execution(secret_key, value)
         )
 
-    def _translation_extension_secret_change_execution(
+    def _http_extension_secret_change_execution(
         self,
         secret_key: str,
         value: str,
@@ -726,12 +726,12 @@ class ProviderSettingsOwner:
         current = self._current()
         transaction = SecretSettingsTransaction(
             secret_store=self.secret_store_factory(current),
-            settings_repository=_TranslationExtensionSecretSettingsRepository(),
+            settings_repository=_HttpExtensionSecretSettingsRepository(),
         )
         return ProviderSecretChangeExecution(
             transaction=transaction,
             request=ProviderSecretChangeRequest(
-                provider="translation_extension",
+                provider="http_extension",
                 secret_key=secret_key,
                 secret_value=value,
                 settings_values=self.settings.legacy_snapshot_values(current),

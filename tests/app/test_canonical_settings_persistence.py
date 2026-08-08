@@ -351,7 +351,7 @@ async def test_provider_secret_change_invalidates_before_reverification_and_rela
 
 
 @pytest.mark.asyncio
-async def test_translation_extension_secret_change_uses_transaction_without_settings_write(
+async def test_http_extension_secret_change_uses_transaction_without_settings_write(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "settings.json"
@@ -361,11 +361,11 @@ async def test_translation_extension_secret_change_uses_transaction_without_sett
     before = copy.deepcopy(provider_settings.settings.current)
 
     assert await provider_settings.change_secret(
-        "translation_extension.demo.api_key",
+        "http_extension.demo.api_key",
         "extension-secret",
     )
 
-    assert store.get("translation_extension.demo.api_key") == "extension-secret"
+    assert store.get("http_extension.demo.api_key") == "extension-secret"
     assert provider_settings.settings.current == before
     assert not path.exists()
 

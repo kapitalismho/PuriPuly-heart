@@ -6,19 +6,19 @@ from uuid import uuid4
 
 import pytest
 
-from puripuly_heart.core.translation_backend import TranslationBackendRequest
-from puripuly_heart.core.translation_extensions import (
-    TranslationExtensionConfigurationError,
-    TranslationExtensionRegistry,
-    TranslationExtensionResponseError,
-    TranslationExtensionValidationError,
+from puripuly_heart.core.http_extensions import (
+    HttpExtensionConfigurationError,
+    HttpExtensionRegistry,
+    HttpExtensionResponseError,
+    HttpExtensionValidationError,
     extract_translation_text,
-    parse_translation_extension,
+    http_extension_secret_key,
+    http_extension_secret_key_prefix,
+    parse_http_extension,
     render_translation_request,
     resolve_json_pointer,
-    translation_extension_secret_key,
-    translation_extension_secret_key_prefix,
 )
+from puripuly_heart.core.translation_backend import TranslationBackendRequest
 
 
 def extension_data(**overrides: object) -> dict[str, object]:
@@ -51,7 +51,7 @@ def backend_request(**overrides: object) -> TranslationBackendRequest:
 
 
 def test_parse_minimal_extension() -> None:
-    extension = parse_translation_extension(extension_data())
+    extension = parse_http_extension(extension_data())
 
     assert extension.id == "sample"
     assert extension.request.body.type == "json"
@@ -60,7 +60,7 @@ def test_parse_minimal_extension() -> None:
 
 
 def test_parse_full_extension_and_render_nested_json() -> None:
-    extension = parse_translation_extension(
+    extension = parse_http_extension(
         extension_data(
             description="description",
             headers={"X-Key": "{{secret:key}}"},
@@ -136,8 +136,8 @@ def test_invalid_extension_is_rejected(change, message: str) -> None:
     data = extension_data()
     change(data)
 
-    with pytest.raises(TranslationExtensionValidationError, match=message):
-        parse_translation_extension(data)
+    with pytest.raises(HttpExtensionValidationError, match=message):
+        parse_http_extension(data)
 
 
 @pytest.mark.parametrize(
@@ -154,15 +154,13 @@ def test_unhashable_schema_discriminators_are_validation_errors(
     else:
         data["response"] = {"type": raw_value}
 
-    with pytest.raises(TranslationExtensionValidationError):
-        parse_translation_extension(data)
+    with pytest.raises(HttpExtensionValidationError):
+        parse_http_extension(data)
 
 
 def test_invalid_placeholder_does_not_echo_template_value() -> None:
-    with pytest.raises(
-        TranslationExtensionValidationError, match="unsupported placeholder"
-    ) as error:
-        parse_translation_extension(
+    with pytest.raises(HttpExtensionValidationError, match="unsupported placeholder") as error:
+        parse_http_extension(
             extension_data(
                 request={
                     "body": {
@@ -178,17 +176,17 @@ def test_invalid_placeholder_does_not_echo_template_value() -> None:
 
 @pytest.mark.parametrize("body_text", ["{{text}}}", "{{text", "text}}"])
 def test_unbalanced_placeholder_delimiters_are_rejected(body_text: str) -> None:
-    with pytest.raises(TranslationExtensionValidationError, match="placeholder syntax"):
-        parse_translation_extension(
+    with pytest.raises(HttpExtensionValidationError, match="placeholder syntax"):
+        parse_http_extension(
             extension_data(request={"body": {"type": "json", "value": {"text": body_text}}})
         )
 
 
 def test_form_and_no_body_extensions() -> None:
-    form = parse_translation_extension(
+    form = parse_http_extension(
         extension_data(request={"body": {"type": "form", "value": {"q": "{{text}}"}}})
     )
-    empty = parse_translation_extension(
+    empty = parse_http_extension(
         extension_data(request={"body": {"type": "none", "value": {"ignored": True}}})
     )
 
@@ -197,28 +195,28 @@ def test_form_and_no_body_extensions() -> None:
 
 
 def test_missing_secret_fails_without_exposing_secret_value() -> None:
-    extension = parse_translation_extension(
+    extension = parse_http_extension(
         extension_data(
             request={"body": {"type": "json", "value": {"key": "{{secret:key}}"}}},
             secrets=[{"id": "key", "label": "API Key"}],
         )
     )
 
-    with pytest.raises(TranslationExtensionConfigurationError, match="missing required credential"):
+    with pytest.raises(HttpExtensionConfigurationError, match="missing required credential"):
         render_translation_request(extension, backend_request(), secrets={})
 
 
 def test_secret_store_keys_escape_dotted_segments_without_collisions() -> None:
-    assert translation_extension_secret_key("libretranslate", "api_key") == (
-        "translation_extension.libretranslate.api_key"
+    assert http_extension_secret_key("libretranslate", "api_key") == (
+        "http_extension.libretranslate.api_key"
     )
-    first = translation_extension_secret_key("a.b", "c")
-    second = translation_extension_secret_key("a", "b.c")
+    first = http_extension_secret_key("a.b", "c")
+    second = http_extension_secret_key("a", "b.c")
 
-    assert first == "translation_extension.a%2Eb.c"
-    assert second == "translation_extension.a.b%2Ec"
+    assert first == "http_extension.a%2Eb.c"
+    assert second == "http_extension.a.b%2Ec"
     assert first != second
-    assert translation_extension_secret_key_prefix("a.b") == "translation_extension.a%2Eb."
+    assert http_extension_secret_key_prefix("a.b") == "http_extension.a%2Eb."
 
 
 def test_json_pointer_supports_root_arrays_and_escaping() -> None:
@@ -230,35 +228,33 @@ def test_json_pointer_supports_root_arrays_and_escaping() -> None:
 
 @pytest.mark.parametrize("pointer", ["value", "/bad~2escape"])
 def test_invalid_json_pointer_is_rejected(pointer: str) -> None:
-    with pytest.raises(TranslationExtensionValidationError):
-        parse_translation_extension(extension_data(response={"type": "json", "pointer": pointer}))
+    with pytest.raises(HttpExtensionValidationError):
+        parse_http_extension(extension_data(response={"type": "json", "pointer": pointer}))
 
 
 def test_response_extraction_rejects_invalid_results() -> None:
-    text_extension = parse_translation_extension(extension_data())
-    json_extension = parse_translation_extension(
+    text_extension = parse_http_extension(extension_data())
+    json_extension = parse_http_extension(
         extension_data(response={"type": "json", "pointer": "/text"})
     )
 
     assert extract_translation_text(text_extension, " Hola ") == "Hola"
     assert extract_translation_text(json_extension, '{"text":"Hola"}') == "Hola"
-    with pytest.raises(TranslationExtensionResponseError, match="empty"):
+    with pytest.raises(HttpExtensionResponseError, match="empty"):
         extract_translation_text(text_extension, "  ")
-    with pytest.raises(TranslationExtensionResponseError, match="invalid response JSON"):
+    with pytest.raises(HttpExtensionResponseError, match="invalid response JSON"):
         extract_translation_text(json_extension, "broken")
-    with pytest.raises(TranslationExtensionResponseError, match="missing"):
+    with pytest.raises(HttpExtensionResponseError, match="missing"):
         extract_translation_text(json_extension, "{}")
-    with pytest.raises(TranslationExtensionResponseError, match="string"):
+    with pytest.raises(HttpExtensionResponseError, match="string"):
         extract_translation_text(json_extension, '{"text":1}')
 
 
 def test_invalid_response_json_does_not_chain_private_response_data() -> None:
-    extension = parse_translation_extension(
-        extension_data(response={"type": "json", "pointer": "/text"})
-    )
+    extension = parse_http_extension(extension_data(response={"type": "json", "pointer": "/text"}))
     private_response = '{"text":"private-response",'
 
-    with pytest.raises(TranslationExtensionResponseError) as error:
+    with pytest.raises(HttpExtensionResponseError) as error:
         extract_translation_text(extension, private_response)
 
     assert str(error.value) == "invalid response JSON"
@@ -293,7 +289,7 @@ def test_registry_isolates_invalid_files_and_rejects_duplicate_ids(tmp_path: Pat
         json.dumps(extension_data(id="nested")), encoding="utf-8"
     )
 
-    snapshot = TranslationExtensionRegistry(tmp_path).reload()
+    snapshot = HttpExtensionRegistry(tmp_path).reload()
 
     assert [item.definition.id for item in snapshot.extensions] == ["other"]
     assert {item.source_path.name for item in snapshot.errors} == {
@@ -308,7 +304,7 @@ def test_registry_isolates_invalid_files_and_rejects_duplicate_ids(tmp_path: Pat
 def test_registry_identity_and_fingerprint_survive_filename_changes(tmp_path: Path) -> None:
     source = tmp_path / "first.json"
     source.write_text(json.dumps(extension_data()), encoding="utf-8")
-    registry = TranslationExtensionRegistry(tmp_path)
+    registry = HttpExtensionRegistry(tmp_path)
 
     first = registry.reload().get("sample")
     assert first is not None
@@ -332,9 +328,20 @@ def test_registry_identity_and_fingerprint_survive_filename_changes(tmp_path: Pa
 
 
 def test_example_is_valid() -> None:
-    path = Path("examples/translation_extensions/mymemory.json")
+    path = Path("examples/http_extensions/mymemory.json")
 
-    extension = parse_translation_extension(json.loads(path.read_text(encoding="utf-8")))
+    extension = parse_http_extension(json.loads(path.read_text(encoding="utf-8")))
 
     assert extension.id == "mymemory"
     assert extension.response.pointer == "/responseData/translatedText"
+
+
+def test_docs_schema_file_is_valid_json() -> None:
+    schema_path = Path("docs/http-extension.schema.json")
+
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+
+    assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["schema_version"]["const"] == 1
+    assert schema["properties"]["request"]["required"] == ["body"]

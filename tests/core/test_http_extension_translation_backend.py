@@ -14,14 +14,14 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from puripuly_heart.core.http_extensions import (
+    HttpExtensionConfigurationError,
+    HttpExtensionResponseError,
+    http_extension_secret_key,
+    parse_http_extension,
+)
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.translation_backend import TranslationBackendRequest
-from puripuly_heart.core.translation_extensions import (
-    TranslationExtensionConfigurationError,
-    TranslationExtensionResponseError,
-    parse_translation_extension,
-    translation_extension_secret_key,
-)
 from puripuly_heart.providers.translation.http_extension_backend import (
     HttpExtensionTranslationBackend,
     HttpExtensionTranslationError,
@@ -65,7 +65,7 @@ def request() -> TranslationBackendRequest:
 def extension(
     body_type: str = "json", body_value: object | None = None, response: object | None = None
 ):
-    return parse_translation_extension(
+    return parse_http_extension(
         {
             "schema_version": 1,
             "id": "demo",
@@ -205,7 +205,7 @@ async def test_backend_does_not_start_queued_request_after_close() -> None:
     release.set()
 
     await first
-    with pytest.raises(TranslationExtensionConfigurationError, match="backend is closed"):
+    with pytest.raises(HttpExtensionConfigurationError, match="backend is closed"):
         await second
     assert calls == 1
 
@@ -246,7 +246,7 @@ async def test_backend_missing_secret_fails_before_client_creation() -> None:
         client_created = True
         return FakeClient(response=FakeResponse(200, "unused"))
 
-    definition = parse_translation_extension(
+    definition = parse_http_extension(
         {
             "schema_version": 1,
             "id": "demo",
@@ -266,7 +266,7 @@ async def test_backend_missing_secret_fails_before_client_creation() -> None:
         definition, InMemorySecretStore(), client_factory=factory
     )
 
-    with pytest.raises(TranslationExtensionConfigurationError, match="missing required credential"):
+    with pytest.raises(HttpExtensionConfigurationError, match="missing required credential"):
         await backend.translate(request())
 
     assert client_created is False
@@ -274,11 +274,11 @@ async def test_backend_missing_secret_fails_before_client_creation() -> None:
 
 @pytest.mark.asyncio
 async def test_backend_secret_keys_are_unambiguous_for_dotted_ids() -> None:
-    def secret_extension(extension_id: str, secret_id: str):
-        return parse_translation_extension(
+    def secret_extension(http_extension_id: str, secret_id: str):
+        return parse_http_extension(
             {
                 "schema_version": 1,
-                "id": extension_id,
+                "id": http_extension_id,
                 "name": "Dotted Secret Extension",
                 "url": "https://example.test/translate",
                 "request": {
@@ -296,8 +296,8 @@ async def test_backend_secret_keys_are_unambiguous_for_dotted_ids() -> None:
     second_definition = secret_extension("a", "b.c")
     first_secrets = InMemorySecretStore()
     second_secrets = InMemorySecretStore()
-    first_secrets.set(translation_extension_secret_key("a.b", "c"), "first-secret")
-    second_secrets.set(translation_extension_secret_key("a", "b.c"), "second-secret")
+    first_secrets.set(http_extension_secret_key("a.b", "c"), "first-secret")
+    second_secrets.set(http_extension_secret_key("a", "b.c"), "second-secret")
     first_client = FakeClient(response=FakeResponse(200, "first"))
     second_client = FakeClient(response=FakeResponse(200, "second"))
     first_backend = HttpExtensionTranslationBackend(
@@ -390,7 +390,7 @@ async def test_backend_rejects_non_success_and_bad_response_without_body_leak() 
         InMemorySecretStore(),
         client_factory=lambda **_: response_client,
     )
-    with pytest.raises(TranslationExtensionResponseError, match="invalid response JSON"):
+    with pytest.raises(HttpExtensionResponseError, match="invalid response JSON"):
         await response_backend.translate(request())
 
 
@@ -419,7 +419,7 @@ async def test_backend_uses_local_fake_http_server_without_public_network(
     thread.start()
     backend = None
     try:
-        definition = parse_translation_extension(
+        definition = parse_http_extension(
             {
                 "schema_version": 1,
                 "id": "demo",
@@ -445,7 +445,7 @@ async def test_backend_uses_local_fake_http_server_without_public_network(
             }
         )
         secrets = InMemorySecretStore()
-        secrets.set("translation_extension.demo.api_key", "local-secret")
+        secrets.set("http_extension.demo.api_key", "local-secret")
         backend = HttpExtensionTranslationBackend(definition, secrets)
 
         caplog.set_level(logging.DEBUG, logger="httpx")
@@ -494,11 +494,9 @@ async def test_committed_mymemory_example_uses_local_fake_http_server() -> None:
     thread.start()
     backend = None
     try:
-        sample_path = (
-            Path(__file__).parents[2] / "examples" / "translation_extensions" / "mymemory.json"
-        )
+        sample_path = Path(__file__).parents[2] / "examples" / "http_extensions" / "mymemory.json"
         definition = replace(
-            parse_translation_extension(json.loads(sample_path.read_text(encoding="utf-8"))),
+            parse_http_extension(json.loads(sample_path.read_text(encoding="utf-8"))),
             url=f"http://127.0.0.1:{server.server_port}/get",
         )
         backend = HttpExtensionTranslationBackend(definition, InMemorySecretStore())
@@ -542,7 +540,7 @@ async def test_backend_suppresses_descendant_http_failure_logs_without_private_v
     source_value = "SOURCE-LEAK-ff19"
     secret_value = "LEAKME-SECRET-ff19\n"
     try:
-        definition = parse_translation_extension(
+        definition = parse_http_extension(
             {
                 "schema_version": 1,
                 "id": "privacy",
@@ -570,7 +568,7 @@ async def test_backend_suppresses_descendant_http_failure_logs_without_private_v
             }
         )
         secrets = InMemorySecretStore()
-        secrets.set("translation_extension.privacy.api_key", secret_value)
+        secrets.set("http_extension.privacy.api_key", secret_value)
         backend = HttpExtensionTranslationBackend(definition, secrets)
         caplog.set_level(logging.DEBUG, logger="httpx")
         caplog.set_level(logging.DEBUG, logger="httpcore")

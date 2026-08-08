@@ -16,7 +16,7 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     ProviderRuntimeOwner,
     ProviderRuntimeState,
 )
-from puripuly_heart.config.paths import default_translation_extensions_dir
+from puripuly_heart.config.paths import default_http_extensions_dir
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -25,6 +25,7 @@ from puripuly_heart.config.settings import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
+from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
@@ -32,7 +33,6 @@ from puripuly_heart.core.orchestrator.configuration import (
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import SelfCaptureSessionSnapshot
-from puripuly_heart.core.translation_extensions import TranslationExtensionRegistry
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 from .wiring_managed_account import ManagedOpenRouterReleaseRuntime
@@ -78,7 +78,7 @@ def project_translation_runtime_settings(
 
 @dataclass(slots=True)
 class ProviderRuntimeSignatures:
-    translation_extensions: TranslationExtensionRegistry | None = None
+    http_extensions: HttpExtensionRegistry | None = None
     last_self_runtime: tuple[object, ...] | None = None
     last_self_provider: tuple[object, ...] | None = None
     last_llm_provider: tuple[object, ...] | None = None
@@ -95,7 +95,7 @@ class ProviderRuntimeSignatures:
         self.last_self_provider = build_self_stt_provider_signature(settings)
         self.last_llm_provider = build_llm_provider_signature(
             settings,
-            translation_extensions=self.translation_extensions,
+            http_extensions=self.http_extensions,
         )
         peer.last_runtime_signature = build_peer_stt_runtime_signature(
             settings,
@@ -265,7 +265,7 @@ def compose_provider_runtime(
     config_path: Path,
     settings: SettingsOwner,
     llm_runtime_provider: Callable[[], ProviderRuntimeHandle | None],
-    translation_extensions: TranslationExtensionRegistry | None = None,
+    http_extensions: HttpExtensionRegistry | None = None,
     local_asr_runtime_provider: Callable[[], LocalASRProviderRuntimePort | None],
     translation_runtime_configuration_provider: Callable[
         [],
@@ -298,15 +298,13 @@ def compose_provider_runtime(
     additional_signature_sink: Callable[[AppSettings], None],
     signatures: ProviderRuntimeSignatures | None = None,
 ) -> ProviderRuntimeComponents:
-    effective_translation_extensions = translation_extensions
-    if effective_translation_extensions is None:
-        effective_translation_extensions = TranslationExtensionRegistry(
-            default_translation_extensions_dir()
-        )
-        effective_translation_extensions.reload()
+    effective_http_extensions = http_extensions
+    if effective_http_extensions is None:
+        effective_http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
+        effective_http_extensions.reload()
     signature_state = signatures or ProviderRuntimeSignatures()
-    if signature_state.translation_extensions is None:
-        signature_state.translation_extensions = effective_translation_extensions
+    if signature_state.http_extensions is None:
+        signature_state.http_extensions = effective_http_extensions
     effects = ProviderRuntimeEffects(
         settings=settings,
         llm_runtime_provider=llm_runtime_provider,
@@ -369,7 +367,7 @@ def compose_provider_runtime(
             return create_translation_backend(
                 settings_value,
                 secrets=secrets,
-                translation_extensions=effective_translation_extensions,
+                http_extensions=effective_http_extensions,
             )
         release = managed_release()
         await release.rebuild(secrets=secrets)
@@ -379,7 +377,7 @@ def compose_provider_runtime(
             managed_release_service=release.service,
             managed_delegate_ready=managed_delegate_ready,
             runtime_logging=runtime_logging,
-            translation_extensions=effective_translation_extensions,
+            http_extensions=effective_http_extensions,
         )
 
     llm_rebuild = LlmProviderRebuildOwner(
@@ -426,7 +424,7 @@ def compose_provider_runtime(
         ),
         llm_signature_builder=lambda current: build_llm_provider_signature(
             current,
-            translation_extensions=effective_translation_extensions,
+            http_extensions=effective_http_extensions,
         ),
         gpu_restart_decision=provider_runtime_requires_gpu_restart,
     )

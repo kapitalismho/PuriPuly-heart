@@ -70,6 +70,9 @@ from puripuly_heart.app.services.gpu_runtime_interaction import (
     GpuRuntimeInteractionOwner,
     GpuRuntimeInteractionState,
 )
+from puripuly_heart.app.services.http_extension_registry import (
+    HttpExtensionRegistryService,
+)
 from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningDiagnostic,
@@ -110,9 +113,6 @@ from puripuly_heart.app.services.settings_projection import SettingsProjectionOw
 from puripuly_heart.app.services.settings_runtime_effects import (
     SettingsRuntimeEffectsAdapter,
     SettingsRuntimeEffectsState,
-)
-from puripuly_heart.app.services.translation_extension_registry import (
-    TranslationExtensionRegistryService,
 )
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
@@ -180,7 +180,7 @@ from puripuly_heart.composition.application_startup import (
     compose_application_startup,
 )
 from puripuly_heart.composition.application_state import ApplicationUiStateAdapter
-from puripuly_heart.config.paths import default_translation_extensions_dir, user_config_dir
+from puripuly_heart.config.paths import default_http_extensions_dir, user_config_dir
 from puripuly_heart.config.settings import (
     OVERLAY_TARGET_STEAMVR,
     AppSettings,
@@ -195,6 +195,7 @@ from puripuly_heart.config.settings import (
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.clipboard.watcher import create_clipboard_watcher
 from puripuly_heart.core.clock import SystemClock
+from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
 )
@@ -222,7 +223,6 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionState,
 )
 from puripuly_heart.core.telemetry import TranslationSuccessTelemetryService
-from puripuly_heart.core.translation_extensions import TranslationExtensionRegistry
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 STT_RESET_DEADLINE_S = 300.0
@@ -355,12 +355,12 @@ def compose_application_runtime(
     ) = None,
 ) -> UiApplicationPort:
     settings = compose_settings_owner(config_path)
-    translation_extensions = TranslationExtensionRegistry(default_translation_extensions_dir())
-    translation_extensions.reload()
+    http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
+    http_extensions.reload()
     clock = SystemClock()
     ingress = ApplicationIngressGate()
     pipeline = RuntimePipelineHandle()
-    signatures = ProviderRuntimeSignatures(translation_extensions=translation_extensions)
+    signatures = ProviderRuntimeSignatures(http_extensions=http_extensions)
     effects_state = SettingsRuntimeEffectsState()
     manual_fallback = ManualLocalASRFallbackOwner()
     event_bridge: UIEventBridgePort | None = None
@@ -1459,7 +1459,7 @@ def compose_application_runtime(
         translation_runtime_configuration_provider=(
             lambda: pipeline.translation_runtime_configuration
         ),
-        translation_extensions=translation_extensions,
+        http_extensions=http_extensions,
         self_capture_provider=lambda: pipeline.self_capture,
         self_capture_owner=self_capture_owner,
         peer=lambda: require_peer().owner,
@@ -1588,7 +1588,7 @@ def compose_application_runtime(
         configure_vrc_mic=lambda *, enabled: (require_vrc_mic_sync().configure(enabled=enabled)),
         stt_failure_sink=log_error,
         cleanup_failure_sink=lambda message, exc: log_error(f"{message}: {exc}"),
-        translation_extensions=translation_extensions,
+        http_extensions=http_extensions,
     )
 
     runtime_components = RuntimeCompositionComponents(
@@ -1801,7 +1801,7 @@ def compose_application_runtime(
         ),
         runtime_shutdown=runtime_shutdown,
         runtime_logging=runtime_logging,
-        translation_extension_registry=TranslationExtensionRegistryService(translation_extensions),
+        http_extension_registry=HttpExtensionRegistryService(http_extensions),
     )
 
     async def initialize_local_asr_evidence(value: object) -> None:

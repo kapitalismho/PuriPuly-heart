@@ -589,7 +589,7 @@ def from_legacy_app_settings(
                 translation=TranslationIntent(
                     model=data["translation"]["model"],
                     connection=data["translation"]["connection"],
-                    extension_id=data["translation"].get("extension_id"),
+                    http_extension_id=data["translation"].get("http_extension_id"),
                     previous_llm_model=data["translation"].get("previous_llm_model"),
                     connection_history=dict(data["translation"]["connection_history"]),
                     concurrency_limit=int(data["llm"]["concurrency_limit"]),
@@ -926,8 +926,11 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
             "connection": intent.translation.fallback.connection,
         },
     }
-    if intent.translation.model == "custom_http" or intent.translation.extension_id is not None:
-        data["translation"]["extension_id"] = intent.translation.extension_id
+    if (
+        intent.translation.model == "custom_http"
+        or intent.translation.http_extension_id is not None
+    ):
+        data["translation"]["http_extension_id"] = intent.translation.http_extension_id
     if intent.translation.previous_llm_model is not None:
         data["translation"]["previous_llm_model"] = intent.translation.previous_llm_model
     data["languages"] = {

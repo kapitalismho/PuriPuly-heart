@@ -17,10 +17,11 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineStartCallbacks,
 )
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
-from puripuly_heart.config.paths import default_translation_extensions_dir
+from puripuly_heart.config.paths import default_http_extensions_dir
 from puripuly_heart.config.settings import AppSettings, STTProviderName, TranslationModel
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimeFactoryPort,
@@ -60,7 +61,6 @@ from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
-from puripuly_heart.core.translation_extensions import TranslationExtensionRegistry
 from puripuly_heart.domain.events import UIEvent
 
 from .wiring_llm_factory import create_llm_provider
@@ -509,7 +509,7 @@ class RuntimePipelineLauncher:
     configure_vrc_mic: Callable[..., Awaitable[None]]
     stt_failure_sink: Callable[[str], None]
     cleanup_failure_sink: Callable[[str, BaseException], None]
-    translation_extensions: TranslationExtensionRegistry | None = None
+    http_extensions: HttpExtensionRegistry | None = None
     failed_resources: RuntimePipelineResourceOwner | None = field(
         init=False,
         default=None,
@@ -559,7 +559,7 @@ class RuntimePipelineLauncher:
                 vrc_mic_audio_gate=vrc_mic_audio_gate,
                 receiver_active=receiver_active,
                 stt_failure_sink=self.stt_failure_sink,
-                translation_extensions=self.translation_extensions,
+                http_extensions=self.http_extensions,
                 resources=resources,
             )
             if pipeline.prepare_self_provider:
@@ -627,7 +627,7 @@ async def compose_runtime_pipeline(
     vrc_mic_audio_gate: VrcMicAudioGate | None,
     receiver_active: bool,
     stt_failure_sink: Callable[[str], None],
-    translation_extensions: TranslationExtensionRegistry | None = None,
+    http_extensions: HttpExtensionRegistry | None = None,
     resources: RuntimePipelineResourceOwner | None = None,
 ) -> RuntimePipelineComponents:
     owned_resources = resources is None
@@ -647,7 +647,7 @@ async def compose_runtime_pipeline(
             vrc_mic_audio_gate=vrc_mic_audio_gate,
             receiver_active=receiver_active,
             stt_failure_sink=stt_failure_sink,
-            translation_extensions=translation_extensions,
+            http_extensions=http_extensions,
             resources=pipeline_resources,
         )
     except BaseException as exc:
@@ -693,16 +693,13 @@ async def _compose_runtime_pipeline(
     vrc_mic_audio_gate: VrcMicAudioGate | None,
     receiver_active: bool,
     stt_failure_sink: Callable[[str], None],
-    translation_extensions: TranslationExtensionRegistry | None,
+    http_extensions: HttpExtensionRegistry | None,
     resources: RuntimePipelineResourceOwner,
 ) -> RuntimePipelineComponents:
     secrets = create_secret_store(settings.secrets, config_path=config_path)
-    if (
-        translation_extensions is None
-        and settings.translation.model == TranslationModel.CUSTOM_HTTP
-    ):
-        translation_extensions = TranslationExtensionRegistry(default_translation_extensions_dir())
-        translation_extensions.reload()
+    if http_extensions is None and settings.translation.model == TranslationModel.CUSTOM_HTTP:
+        http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
+        http_extensions.reload()
     if settings.translation.model != TranslationModel.CUSTOM_HTTP:
         await managed_release.rebuild(secrets=secrets)
 
@@ -712,8 +709,8 @@ async def _compose_runtime_pipeline(
             llm = create_translation_backend(
                 settings,
                 secrets=secrets,
-                translation_extensions=translation_extensions
-                or TranslationExtensionRegistry(default_translation_extensions_dir()),
+                http_extensions=http_extensions
+                or HttpExtensionRegistry(default_http_extensions_dir()),
             )
         else:
             llm = create_llm_provider(

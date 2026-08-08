@@ -23,64 +23,64 @@ _DANGEROUS_HEADERS = {
 }
 
 
-class TranslationExtensionError(ValueError):
+class HttpExtensionError(ValueError):
     pass
 
 
-class TranslationExtensionValidationError(TranslationExtensionError):
+class HttpExtensionValidationError(HttpExtensionError):
     pass
 
 
-class TranslationExtensionConfigurationError(TranslationExtensionError):
+class HttpExtensionConfigurationError(HttpExtensionError):
     pass
 
 
-class TranslationExtensionResponseError(TranslationExtensionError):
+class HttpExtensionResponseError(HttpExtensionError):
     pass
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationExtensionSecret:
+class HttpExtensionSecret:
     id: str
     label: str
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationExtensionBody:
+class HttpExtensionBody:
     type: str
     value: JSONValue | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationExtensionRequest:
+class HttpExtensionRequest:
     query: dict[str, str]
-    body: TranslationExtensionBody
+    body: HttpExtensionBody
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationExtensionResponse:
+class HttpExtensionResponse:
     type: str
     pointer: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationExtensionLanguageMap:
+class HttpExtensionLanguageMap:
     source: dict[str, str]
     target: dict[str, str]
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationExtension:
+class HttpExtension:
     schema_version: int
     id: str
     name: str
     description: str | None
     url: str
     headers: dict[str, str]
-    request: TranslationExtensionRequest
-    response: TranslationExtensionResponse
-    secrets: tuple[TranslationExtensionSecret, ...]
-    language_map: TranslationExtensionLanguageMap
+    request: HttpExtensionRequest
+    response: HttpExtensionResponse
+    secrets: tuple[HttpExtensionSecret, ...]
+    language_map: HttpExtensionLanguageMap
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -101,11 +101,11 @@ class TranslationExtension:
         return hashlib.sha256(payload).hexdigest()
 
 
-def parse_translation_extension(
+def parse_http_extension(
     value: object,
     *,
     source_path: Path | None = None,
-) -> TranslationExtension:
+) -> HttpExtension:
     prefix = f"{source_path}: " if source_path is not None else ""
     data = _require_mapping(value, f"{prefix}extension must be a JSON object")
     allowed = {
@@ -122,48 +122,46 @@ def parse_translation_extension(
     }
     unknown = set(data) - allowed
     if unknown:
-        raise TranslationExtensionValidationError(
+        raise HttpExtensionValidationError(
             f"{prefix}unsupported extension field: {sorted(unknown)[0]}"
         )
     schema_version = data.get("schema_version")
     if type(schema_version) is not int or schema_version != 1:
-        raise TranslationExtensionValidationError(f"{prefix}schema_version must be 1")
+        raise HttpExtensionValidationError(f"{prefix}schema_version must be 1")
 
-    extension_id = _required_text(data, "id", prefix)
-    _validate_identifier(extension_id, f"{prefix}id")
+    http_extension_id = _required_text(data, "id", prefix)
+    _validate_identifier(http_extension_id, f"{prefix}id")
     name = _required_text(data, "name", prefix)
     description = data.get("description")
     if description is not None and not isinstance(description, str):
-        raise TranslationExtensionValidationError(f"{prefix}description must be a string")
+        raise HttpExtensionValidationError(f"{prefix}description must be a string")
     url = _required_text(data, "url", prefix)
     _validate_url(url, prefix)
 
     headers = _string_map(data.get("headers", {}), f"{prefix}headers")
     for header_name in headers:
         if header_name.strip().lower() in _DANGEROUS_HEADERS:
-            raise TranslationExtensionValidationError(f"{prefix}header is transport-managed")
+            raise HttpExtensionValidationError(f"{prefix}header is transport-managed")
 
     request_data = _required_mapping(data, "request", prefix)
     request_unknown = set(request_data) - {"query", "body"}
     if request_unknown:
-        raise TranslationExtensionValidationError(
+        raise HttpExtensionValidationError(
             f"{prefix}unsupported request field: {sorted(request_unknown)[0]}"
         )
     query = _string_map(request_data.get("query", {}), f"{prefix}request.query")
     body_data = _required_mapping(request_data, "body", prefix)
     body_unknown = set(body_data) - {"type", "value"}
     if body_unknown:
-        raise TranslationExtensionValidationError(
+        raise HttpExtensionValidationError(
             f"{prefix}unsupported request.body field: {sorted(body_unknown)[0]}"
         )
     body_type = body_data.get("type")
     if not isinstance(body_type, str) or body_type not in {"json", "form", "none"}:
-        raise TranslationExtensionValidationError(
-            f"{prefix}request.body.type must be json, form, or none"
-        )
+        raise HttpExtensionValidationError(f"{prefix}request.body.type must be json, form, or none")
     body_value = body_data.get("value")
     if body_type in {"json", "form"} and "value" not in body_data:
-        raise TranslationExtensionValidationError(
+        raise HttpExtensionValidationError(
             f"{prefix}request.body.value is required for {body_type}"
         )
     if body_type == "json":
@@ -176,38 +174,38 @@ def parse_translation_extension(
     response_data = _required_mapping(data, "response", prefix)
     response_unknown = set(response_data) - {"type", "pointer"}
     if response_unknown:
-        raise TranslationExtensionValidationError(
+        raise HttpExtensionValidationError(
             f"{prefix}unsupported response field: {sorted(response_unknown)[0]}"
         )
     response_type = response_data.get("type")
     if not isinstance(response_type, str) or response_type not in {"json", "text"}:
-        raise TranslationExtensionValidationError(f"{prefix}response.type must be json or text")
+        raise HttpExtensionValidationError(f"{prefix}response.type must be json or text")
     pointer = response_data.get("pointer")
     if response_type == "json":
         if not isinstance(pointer, str):
-            raise TranslationExtensionValidationError(
+            raise HttpExtensionValidationError(
                 f"{prefix}response.pointer is required for json responses"
             )
         _validate_json_pointer(pointer, f"{prefix}response.pointer")
     elif pointer is not None:
-        raise TranslationExtensionValidationError(
+        raise HttpExtensionValidationError(
             f"{prefix}response.pointer is not used for text responses"
         )
 
     secrets = _parse_secrets(data.get("secrets", []), prefix)
     language_map = _parse_language_map(data.get("language_map"), prefix)
-    extension = TranslationExtension(
+    extension = HttpExtension(
         schema_version=1,
-        id=extension_id,
+        id=http_extension_id,
         name=name,
         description=description,
         url=url,
         headers=headers,
-        request=TranslationExtensionRequest(
+        request=HttpExtensionRequest(
             query=query,
-            body=TranslationExtensionBody(type=body_type, value=body_value),
+            body=HttpExtensionBody(type=body_type, value=body_value),
         ),
-        response=TranslationExtensionResponse(type=response_type, pointer=pointer),
+        response=HttpExtensionResponse(type=response_type, pointer=pointer),
         secrets=secrets,
         language_map=language_map,
     )
@@ -216,7 +214,7 @@ def parse_translation_extension(
 
 
 def render_translation_request(
-    extension: TranslationExtension,
+    extension: HttpExtension,
     request: TranslationBackendRequest,
     *,
     secrets: Mapping[str, str],
@@ -236,9 +234,7 @@ def render_translation_request(
     for secret in extension.secrets:
         value = secrets.get(secret.id)
         if value is None or not value.strip():
-            raise TranslationExtensionConfigurationError(
-                f"missing required credential: {secret.label}"
-            )
+            raise HttpExtensionConfigurationError(f"missing required credential: {secret.label}")
         secret_values[secret.id] = value
 
     def replace(value: str) -> str:
@@ -256,7 +252,7 @@ def render_translation_request(
     return extension.url, rendered_headers, rendered_query, rendered_body
 
 
-def extract_translation_text(extension: TranslationExtension, response_text: str) -> str:
+def extract_translation_text(extension: HttpExtension, response_text: str) -> str:
     if extension.response.type == "text":
         translated = response_text.strip()
     else:
@@ -267,13 +263,13 @@ def extract_translation_text(extension: TranslationExtension, response_text: str
         except (TypeError, ValueError):
             invalid_json = True
         if invalid_json:
-            raise TranslationExtensionResponseError("invalid response JSON")
+            raise HttpExtensionResponseError("invalid response JSON")
         translated_value = _resolve_json_pointer(payload, extension.response.pointer or "")
         if not isinstance(translated_value, str):
-            raise TranslationExtensionResponseError("response pointer did not select a string")
+            raise HttpExtensionResponseError("response pointer did not select a string")
         translated = translated_value.strip()
     if not translated:
-        raise TranslationExtensionResponseError("empty translation response")
+        raise HttpExtensionResponseError("empty translation response")
     return translated
 
 
@@ -290,7 +286,7 @@ def _resolve_json_pointer(value: object, pointer: str) -> object:
         token = raw_token.replace("~1", "/").replace("~0", "~")
         if isinstance(current, dict):
             if token not in current:
-                raise TranslationExtensionResponseError("response pointer path is missing")
+                raise HttpExtensionResponseError("response pointer path is missing")
             current = current[token]
             continue
         if isinstance(current, list):
@@ -300,61 +296,59 @@ def _resolve_json_pointer(value: object, pointer: str) -> object:
                 or any(character < "0" or character > "9" for character in token)
                 or (len(token) > 1 and token[0] == "0")
             ):
-                raise TranslationExtensionResponseError("response pointer array index is invalid")
+                raise HttpExtensionResponseError("response pointer array index is invalid")
             index = int(token)
             if index >= len(current):
-                raise TranslationExtensionResponseError("response pointer path is missing")
+                raise HttpExtensionResponseError("response pointer path is missing")
             current = current[index]
             continue
-        raise TranslationExtensionResponseError("response pointer path is missing")
+        raise HttpExtensionResponseError("response pointer path is missing")
     return current
 
 
-def _parse_secrets(value: object, prefix: str) -> tuple[TranslationExtensionSecret, ...]:
+def _parse_secrets(value: object, prefix: str) -> tuple[HttpExtensionSecret, ...]:
     if not isinstance(value, list):
-        raise TranslationExtensionValidationError(f"{prefix}secrets must be an array")
-    result: list[TranslationExtensionSecret] = []
+        raise HttpExtensionValidationError(f"{prefix}secrets must be an array")
+    result: list[HttpExtensionSecret] = []
     seen: set[str] = set()
     for index, item in enumerate(value):
         data = _require_mapping(item, f"{prefix}secrets[{index}] must be an object")
         if set(data) != {"id", "label"}:
-            raise TranslationExtensionValidationError(
+            raise HttpExtensionValidationError(
                 f"{prefix}secrets[{index}] must contain only id and label"
             )
         secret_id = data.get("id")
         label = data.get("label")
         if not isinstance(secret_id, str) or not secret_id:
-            raise TranslationExtensionValidationError(
-                f"{prefix}secrets[{index}].id must be a string"
-            )
+            raise HttpExtensionValidationError(f"{prefix}secrets[{index}].id must be a string")
         _validate_identifier(secret_id, f"{prefix}secrets[{index}].id")
         if secret_id in seen:
-            raise TranslationExtensionValidationError(f"{prefix}duplicate secret id")
+            raise HttpExtensionValidationError(f"{prefix}duplicate secret id")
         if not isinstance(label, str) or not label.strip():
-            raise TranslationExtensionValidationError(
+            raise HttpExtensionValidationError(
                 f"{prefix}secrets[{index}].label must be a non-empty string"
             )
         seen.add(secret_id)
-        result.append(TranslationExtensionSecret(id=secret_id, label=label))
+        result.append(HttpExtensionSecret(id=secret_id, label=label))
     return tuple(result)
 
 
-def _parse_language_map(value: object, prefix: str) -> TranslationExtensionLanguageMap:
+def _parse_language_map(value: object, prefix: str) -> HttpExtensionLanguageMap:
     if value is None:
-        return TranslationExtensionLanguageMap(source={}, target={})
+        return HttpExtensionLanguageMap(source={}, target={})
     data = _require_mapping(value, f"{prefix}language_map must be an object")
     unknown = set(data) - {"source", "target"}
     if unknown:
-        raise TranslationExtensionValidationError(
+        raise HttpExtensionValidationError(
             f"{prefix}unsupported language_map field: {sorted(unknown)[0]}"
         )
-    return TranslationExtensionLanguageMap(
+    return HttpExtensionLanguageMap(
         source=_string_map(data.get("source", {}), f"{prefix}language_map.source"),
         target=_string_map(data.get("target", {}), f"{prefix}language_map.target"),
     )
 
 
-def _validate_placeholders(extension: TranslationExtension, prefix: str) -> None:
+def _validate_placeholders(extension: HttpExtension, prefix: str) -> None:
     declared = extension.secret_ids
     referenced: set[str] = set()
 
@@ -370,7 +364,7 @@ def _validate_placeholders(extension: TranslationExtension, prefix: str) -> None
                 and index not in match_ends
                 for index in range(len(value) - 1)
             ):
-                raise TranslationExtensionValidationError(f"{prefix}invalid placeholder syntax")
+                raise HttpExtensionValidationError(f"{prefix}invalid placeholder syntax")
             for match in _PLACEHOLDER_PATTERN.finditer(value):
                 token = match.group(1)
                 if token in {"text", "source_language", "target_language"}:
@@ -378,16 +372,14 @@ def _validate_placeholders(extension: TranslationExtension, prefix: str) -> None
                 if token.startswith("secret:"):
                     secret_id = token.removeprefix("secret:")
                     if not _IDENTIFIER_PATTERN.fullmatch(secret_id):
-                        raise TranslationExtensionValidationError(
-                            f"{prefix}invalid secret placeholder"
-                        )
+                        raise HttpExtensionValidationError(f"{prefix}invalid secret placeholder")
                     if secret_id not in declared:
-                        raise TranslationExtensionValidationError(
+                        raise HttpExtensionValidationError(
                             f"{prefix}secret placeholder is not declared"
                         )
                     referenced.add(secret_id)
                     continue
-                raise TranslationExtensionValidationError(f"{prefix}unsupported placeholder")
+                raise HttpExtensionValidationError(f"{prefix}unsupported placeholder")
         elif isinstance(value, list):
             for item in value:
                 visit(item)
@@ -400,7 +392,7 @@ def _validate_placeholders(extension: TranslationExtension, prefix: str) -> None
     visit(extension.request.body.value)
     unused = declared - referenced
     if unused:
-        raise TranslationExtensionValidationError(
+        raise HttpExtensionValidationError(
             f"{prefix}declared secret is unused: {sorted(unused)[0]}"
         )
 
@@ -410,29 +402,29 @@ def _validate_url(value: str, prefix: str) -> None:
         parsed = urlsplit(value)
         hostname = parsed.hostname
     except ValueError as exc:
-        raise TranslationExtensionValidationError(f"{prefix}url is invalid") from exc
+        raise HttpExtensionValidationError(f"{prefix}url is invalid") from exc
     if parsed.scheme not in {"http", "https"} or not parsed.netloc or not hostname:
-        raise TranslationExtensionValidationError(f"{prefix}url must be an absolute HTTP(S) URL")
+        raise HttpExtensionValidationError(f"{prefix}url must be an absolute HTTP(S) URL")
     if parsed.username is not None or parsed.password is not None:
-        raise TranslationExtensionValidationError(f"{prefix}url must not contain credentials")
+        raise HttpExtensionValidationError(f"{prefix}url must not contain credentials")
     if "{{" in parsed.scheme or "}}" in parsed.scheme or "{{" in parsed.netloc:
-        raise TranslationExtensionValidationError(f"{prefix}url host cannot contain placeholders")
+        raise HttpExtensionValidationError(f"{prefix}url host cannot contain placeholders")
     if "{{" in value or "}}" in value:
-        raise TranslationExtensionValidationError(f"{prefix}url cannot contain placeholders")
+        raise HttpExtensionValidationError(f"{prefix}url cannot contain placeholders")
 
 
 def _validate_identifier(value: str, field: str) -> None:
     if _IDENTIFIER_PATTERN.fullmatch(value) is None:
-        raise TranslationExtensionValidationError(f"{field} has an invalid identifier")
+        raise HttpExtensionValidationError(f"{field} has an invalid identifier")
 
 
 def _validate_json_pointer(value: str, field: str) -> None:
     if value and not value.startswith("/"):
-        raise TranslationExtensionValidationError(f"{field} must start with / or be empty")
+        raise HttpExtensionValidationError(f"{field} must start with / or be empty")
     for token in value.split("/")[1:]:
         for index, character in enumerate(token):
             if character == "~" and (index + 1 >= len(token) or token[index + 1] not in {"0", "1"}):
-                raise TranslationExtensionValidationError(f"{field} contains invalid escape")
+                raise HttpExtensionValidationError(f"{field} contains invalid escape")
 
 
 def _validate_json_value(value: object, field: str) -> None:
@@ -440,7 +432,7 @@ def _validate_json_value(value: object, field: str) -> None:
         return
     if isinstance(value, float):
         if not math.isfinite(value):
-            raise TranslationExtensionValidationError(f"{field} contains a non-finite number")
+            raise HttpExtensionValidationError(f"{field} contains a non-finite number")
         return
     if isinstance(value, list):
         for index, item in enumerate(value):
@@ -449,10 +441,10 @@ def _validate_json_value(value: object, field: str) -> None:
     if isinstance(value, dict):
         for key, item in value.items():
             if not isinstance(key, str):
-                raise TranslationExtensionValidationError(f"{field} keys must be strings")
+                raise HttpExtensionValidationError(f"{field} keys must be strings")
             _validate_json_value(item, f"{field}.{key}")
         return
-    raise TranslationExtensionValidationError(f"{field} contains an unsupported JSON value")
+    raise HttpExtensionValidationError(f"{field} contains an unsupported JSON value")
 
 
 def _render_value(value: JSONValue | None, replace: Any) -> JSONValue | None:
@@ -468,19 +460,19 @@ def _render_value(value: JSONValue | None, replace: Any) -> JSONValue | None:
 def _required_text(data: Mapping[str, object], key: str, prefix: str) -> str:
     value = data.get(key)
     if not isinstance(value, str) or not value.strip():
-        raise TranslationExtensionValidationError(f"{prefix}{key} must be a non-empty string")
+        raise HttpExtensionValidationError(f"{prefix}{key} must be a non-empty string")
     return value
 
 
 def _required_mapping(data: Mapping[str, object], key: str, prefix: str) -> dict[str, object]:
     if key not in data:
-        raise TranslationExtensionValidationError(f"{prefix}{key} is required")
+        raise HttpExtensionValidationError(f"{prefix}{key} is required")
     return _require_mapping(data[key], f"{prefix}{key} must be an object")
 
 
 def _require_mapping(value: object, message: str) -> dict[str, object]:
     if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        raise TranslationExtensionValidationError(message)
+        raise HttpExtensionValidationError(message)
     return dict(value)
 
 
@@ -489,25 +481,25 @@ def _string_map(value: object, field: str) -> dict[str, str]:
     result: dict[str, str] = {}
     for key, item in data.items():
         if not key or not isinstance(item, str):
-            raise TranslationExtensionValidationError(f"{field} must be a string-to-string map")
+            raise HttpExtensionValidationError(f"{field} must be a string-to-string map")
         result[key] = item
     return result
 
 
 __all__ = [
     "JSONValue",
-    "TranslationExtension",
-    "TranslationExtensionBody",
-    "TranslationExtensionConfigurationError",
-    "TranslationExtensionError",
-    "TranslationExtensionLanguageMap",
-    "TranslationExtensionRequest",
-    "TranslationExtensionResponse",
-    "TranslationExtensionResponseError",
-    "TranslationExtensionSecret",
-    "TranslationExtensionValidationError",
+    "HttpExtension",
+    "HttpExtensionBody",
+    "HttpExtensionConfigurationError",
+    "HttpExtensionError",
+    "HttpExtensionLanguageMap",
+    "HttpExtensionRequest",
+    "HttpExtensionResponse",
+    "HttpExtensionResponseError",
+    "HttpExtensionSecret",
+    "HttpExtensionValidationError",
     "extract_translation_text",
-    "parse_translation_extension",
+    "parse_http_extension",
     "render_translation_request",
     "resolve_json_pointer",
 ]

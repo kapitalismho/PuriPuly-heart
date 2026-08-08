@@ -40,7 +40,7 @@ def _custom_settings() -> AppSettings:
             model=TranslationModel.GEMMA4,
             connection=TranslationConnection.OPENROUTER,
         ),
-        extension_id="libretranslate",
+        http_extension_id="libretranslate",
         previous_llm_model=TranslationModel.QWEN_35_PLUS,
     )
     return settings
@@ -54,12 +54,12 @@ def test_custom_http_settings_roundtrip_preserves_inactive_llm_state() -> None:
 
     assert persisted["translation"]["model"] == TranslationModel.CUSTOM_HTTP.value
     assert persisted["translation"]["connection"] == TranslationConnection.CUSTOM_HTTP.value
-    assert persisted["translation"]["extension_id"] == "libretranslate"
+    assert persisted["translation"]["http_extension_id"] == "libretranslate"
     assert persisted["translation"]["previous_llm_model"] == TranslationModel.QWEN_35_PLUS.value
     assert "credential-value" not in repr(persisted)
     assert loaded.translation.model is TranslationModel.CUSTOM_HTTP
     assert loaded.translation.connection is TranslationConnection.CUSTOM_HTTP
-    assert loaded.translation.extension_id == "libretranslate"
+    assert loaded.translation.http_extension_id == "libretranslate"
     assert loaded.translation.previous_llm_model is TranslationModel.QWEN_35_PLUS
     assert loaded.translation.fallback == settings.translation.fallback
     assert loaded.provider.llm is LLMProviderName.QWEN
@@ -102,7 +102,7 @@ def test_switching_custom_http_and_llm_preserves_model_connection_and_fallback()
 
     settings.translation.model = TranslationModel.CUSTOM_HTTP
     settings.translation.connection = TranslationConnection.CUSTOM_HTTP
-    settings.translation.extension_id = "libretranslate"
+    settings.translation.http_extension_id = "libretranslate"
     settings.translation.previous_llm_model = TranslationModel.QWEN_35_PLUS
     materialize_translation_settings(settings)
 
@@ -137,13 +137,13 @@ def test_vnext_custom_http_migration_is_idempotent_and_projects_legacy_provider(
     projected = migration.to_legacy_dict(migration.from_dict(canonical))
 
     assert reloaded == canonical
-    assert canonical["intent"]["translation"]["extension_id"] == "libretranslate"
+    assert canonical["intent"]["translation"]["http_extension_id"] == "libretranslate"
     assert canonical["intent"]["translation"]["previous_llm_model"] == (
         TranslationModel.QWEN_35_PLUS.value
     )
     assert projected["translation"]["model"] == TranslationModel.CUSTOM_HTTP.value
     assert projected["translation"]["connection"] == TranslationConnection.CUSTOM_HTTP.value
-    assert projected["translation"]["extension_id"] == "libretranslate"
+    assert projected["translation"]["http_extension_id"] == "libretranslate"
     assert projected["translation"]["previous_llm_model"] == TranslationModel.QWEN_35_PLUS.value
     assert projected["provider"]["llm"] == LLMProviderName.QWEN.value
 

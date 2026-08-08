@@ -431,18 +431,18 @@ class TranslatorApp:
     def _build_layout(self):
         self.view_dashboard = DashboardView()
         self.view_settings = SettingsView()
-        set_translation_extension_registry = getattr(
+        set_http_extension_registry = getattr(
             self.view_settings,
-            "set_translation_extension_registry",
+            "set_http_extension_registry",
             None,
         )
-        translation_extension_registry = getattr(
+        http_extension_registry = getattr(
             self.application,
-            "translation_extension_registry",
+            "http_extension_registry",
             None,
         )
-        if callable(set_translation_extension_registry):
-            set_translation_extension_registry(translation_extension_registry)
+        if callable(set_http_extension_registry):
+            set_http_extension_registry(http_extension_registry)
         self.view_logs = LogsView()
         self.view_about = AboutView()
         self.view_settings.set_overlay_runtime_state(self.overlay_state)
@@ -1421,13 +1421,13 @@ class TranslatorApp:
 
     def _on_providers_changed(self) -> None:
         view_settings = getattr(self, "view_settings", None)
-        consume_translation_extension_runtime_reload = getattr(
+        consume_http_extension_runtime_reload = getattr(
             view_settings,
-            "consume_translation_extension_runtime_reload",
+            "consume_http_extension_runtime_reload",
             None,
         )
-        if callable(consume_translation_extension_runtime_reload) and (
-            consume_translation_extension_runtime_reload()
+        if callable(consume_http_extension_runtime_reload) and (
+            consume_http_extension_runtime_reload()
         ):
 
             async def _runtime_only_task():

@@ -14,11 +14,11 @@ from puripuly_heart.config.settings import (
     TranslationSettings,
 )
 from puripuly_heart.core.clock import SystemClock
+from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
     PrebuiltLocalASRProviderRuntimeFactory,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
-from puripuly_heart.core.translation_extensions import TranslationExtensionRegistry
 
 
 class RecordingRelease:
@@ -83,11 +83,11 @@ async def test_custom_http_pipeline_skips_managed_rebuild_and_owns_backend_close
     settings.translation = TranslationSettings(
         model=TranslationModel.CUSTOM_HTTP,
         connection=TranslationConnection.CUSTOM_HTTP,
-        extension_id="demo",
+        http_extension_id="demo",
     )
     release = RecordingRelease()
     backend = RecordingBackend()
-    registry = TranslationExtensionRegistry(tmp_path)
+    registry = HttpExtensionRegistry(tmp_path)
     registry.reload()
     created: list[object] = []
 
@@ -124,7 +124,7 @@ async def test_custom_http_pipeline_skips_managed_rebuild_and_owns_backend_close
         vrc_mic_audio_gate=None,
         receiver_active=False,
         stt_failure_sink=lambda _message: None,
-        translation_extensions=registry,
+        http_extensions=registry,
     )
 
     assert created == [backend]

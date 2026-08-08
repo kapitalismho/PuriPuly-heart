@@ -306,7 +306,7 @@ class TranslationSettings:
         default_factory=lambda: _default_translation_connection_history()
     )
     fallback: TranslationFallbackSettings = field(default_factory=TranslationFallbackSettings)
-    extension_id: str | None = None
+    http_extension_id: str | None = None
     previous_llm_model: TranslationModel | None = None
 
     def validate(self) -> None:
@@ -326,12 +326,12 @@ class TranslationSettings:
                 raise ValueError("invalid translation connection_history connection")
             if connection not in _supported_translation_connections(model):
                 raise ValueError("translation connection_history connection is not supported")
-        if self.extension_id is not None and (
-            not isinstance(self.extension_id, str)
-            or not self.extension_id.strip()
-            or len(self.extension_id.strip()) > 64
+        if self.http_extension_id is not None and (
+            not isinstance(self.http_extension_id, str)
+            or not self.http_extension_id.strip()
+            or len(self.http_extension_id.strip()) > 64
         ):
-            raise ValueError("invalid translation extension_id")
+            raise ValueError("invalid HTTP http_extension_id")
         if self.previous_llm_model is not None and not isinstance(
             self.previous_llm_model,
             TranslationModel,
@@ -485,15 +485,17 @@ def _normalize_translation_settings(
     connection: TranslationConnection | None,
     fallback: object = None,
     history: object = None,
-    extension_id: object = None,
+    http_extension_id: object = None,
     previous_llm_model: object = None,
 ) -> TranslationSettings:
     normalized_model = model or TranslationModel.GEMMA4_26B_31B
     normalized_history = _parse_translation_connection_history(history)
     if connection not in _supported_translation_connections(normalized_model):
         connection = _default_translation_connection(normalized_model)
-    normalized_extension_id = (
-        extension_id.strip() if isinstance(extension_id, str) and extension_id.strip() else None
+    normalized_http_extension_id = (
+        http_extension_id.strip()
+        if isinstance(http_extension_id, str) and http_extension_id.strip()
+        else None
     )
     normalized_previous_llm_model = _parse_translation_model(previous_llm_model)
     if normalized_previous_llm_model == TranslationModel.CUSTOM_HTTP:
@@ -506,7 +508,7 @@ def _normalize_translation_settings(
         connection=connection,
         connection_history=normalized_history,
         fallback=_parse_translation_fallback(fallback),
-        extension_id=normalized_extension_id,
+        http_extension_id=normalized_http_extension_id,
         previous_llm_model=normalized_previous_llm_model,
     )
 
@@ -556,8 +558,8 @@ def _translation_settings_to_dict(settings: TranslationSettings) -> dict[str, An
             "connection": settings.fallback.connection.value,
         },
     }
-    if settings.model == TranslationModel.CUSTOM_HTTP or settings.extension_id is not None:
-        data["extension_id"] = settings.extension_id
+    if settings.model == TranslationModel.CUSTOM_HTTP or settings.http_extension_id is not None:
+        data["http_extension_id"] = settings.http_extension_id
     if settings.previous_llm_model is not None:
         data["previous_llm_model"] = settings.previous_llm_model.value
     return data
@@ -2434,7 +2436,7 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         connection=_parse_translation_connection(settings.translation.connection),
         fallback=settings.translation.fallback,
         history=settings.translation.connection_history,
-        extension_id=settings.translation.extension_id,
+        http_extension_id=settings.translation.http_extension_id,
         previous_llm_model=settings.translation.previous_llm_model,
     )
     model = settings.translation.model
@@ -2609,7 +2611,7 @@ def _apply_materialized_translation_to_data(
         model=_parse_translation_model(translation.model),
         connection=_parse_translation_connection(translation.connection),
         history=translation.connection_history,
-        extension_id=translation.extension_id,
+        http_extension_id=translation.http_extension_id,
         previous_llm_model=translation.previous_llm_model,
     )
 
@@ -3647,7 +3649,7 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
             connection=_parse_translation_connection(translation_data.get("connection")),
             fallback=translation_data.get("fallback"),
             history=translation_history,
-            extension_id=translation_data.get("extension_id"),
+            http_extension_id=translation_data.get("http_extension_id"),
             previous_llm_model=translation_data.get("previous_llm_model"),
         )
     else:
@@ -4354,7 +4356,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
             connection=_parse_translation_connection(translation_data.get("connection")),
             fallback=translation_data.get("fallback"),
             history=translation_history,
-            extension_id=translation_data.get("extension_id"),
+            http_extension_id=translation_data.get("http_extension_id"),
             previous_llm_model=translation_data.get("previous_llm_model"),
         )
     else:

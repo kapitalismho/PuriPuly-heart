@@ -9,18 +9,18 @@ from dataclasses import dataclass, field
 
 import httpx
 
+from puripuly_heart.core.http_extensions.keys import http_extension_secret_key
+from puripuly_heart.core.http_extensions.schema import (
+    HttpExtension,
+    HttpExtensionConfigurationError,
+    HttpExtensionResponseError,
+    extract_translation_text,
+    render_translation_request,
+)
 from puripuly_heart.core.translation_backend import (
     TranslationBackend,
     TranslationBackendRequest,
     TranslationSecretResolver,
-)
-from puripuly_heart.core.translation_extensions.keys import translation_extension_secret_key
-from puripuly_heart.core.translation_extensions.schema import (
-    TranslationExtension,
-    TranslationExtensionConfigurationError,
-    TranslationExtensionResponseError,
-    extract_translation_text,
-    render_translation_request,
 )
 from puripuly_heart.domain.models import Translation
 
@@ -96,7 +96,7 @@ def _is_tls_connect_error(error: BaseException) -> bool:
 
 @dataclass(slots=True)
 class HttpExtensionTranslationBackend(TranslationBackend):
-    extension: TranslationExtension
+    extension: HttpExtension
     secret_store: TranslationSecretResolver
     timeout: float = 10.0
     concurrency_limit: int = 5
@@ -112,7 +112,7 @@ class HttpExtensionTranslationBackend(TranslationBackend):
 
     async def translate(self, request: TranslationBackendRequest) -> Translation:
         if self._closed:
-            raise TranslationExtensionConfigurationError("translation backend is closed")
+            raise HttpExtensionConfigurationError("translation backend is closed")
         secret_values = self._secret_values()
         url, headers, query, body = render_translation_request(
             self.extension,
@@ -121,7 +121,7 @@ class HttpExtensionTranslationBackend(TranslationBackend):
         )
         async with self._semaphore:
             if self._closed:
-                raise TranslationExtensionConfigurationError("translation backend is closed")
+                raise HttpExtensionConfigurationError("translation backend is closed")
             client = await self._get_client()
             request_kwargs: dict[str, object] = {
                 "headers": headers,
@@ -160,7 +160,7 @@ class HttpExtensionTranslationBackend(TranslationBackend):
                 )
             try:
                 translated = extract_translation_text(self.extension, response.text)
-            except TranslationExtensionResponseError:
+            except HttpExtensionResponseError:
                 raise
             except UnicodeError:
                 translated = None
@@ -195,11 +195,9 @@ class HttpExtensionTranslationBackend(TranslationBackend):
     def _secret_values(self) -> dict[str, str]:
         values: dict[str, str] = {}
         for secret in self.extension.secrets:
-            value = self.secret_store.get(
-                translation_extension_secret_key(self.extension.id, secret.id)
-            )
+            value = self.secret_store.get(http_extension_secret_key(self.extension.id, secret.id))
             if value is None or not value.strip():
-                raise TranslationExtensionConfigurationError(
+                raise HttpExtensionConfigurationError(
                     f"missing required credential: {secret.label}"
                 )
             values[secret.id] = value

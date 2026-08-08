@@ -2936,8 +2936,7 @@ async def test_on_providers_changed_runtime_only_reload_does_not_consume_provide
     consumed = {"draft": False, "reload": True}
     app.view_settings = SimpleNamespace(
         has_provider_changes=True,
-        consume_translation_extension_runtime_reload=lambda: consumed.__setitem__("reload", False)
-        or True,
+        consume_http_extension_runtime_reload=lambda: consumed.__setitem__("reload", False) or True,
         consume_provider_apply_settings=lambda: consumed.__setitem__("draft", True),
     )
     seen: list[object] = []

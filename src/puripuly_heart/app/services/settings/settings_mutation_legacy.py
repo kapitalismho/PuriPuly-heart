@@ -28,7 +28,7 @@ ORDER21_TRANSLATION_PROVIDER_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "translation.connection",
     "translation.connection_history",
     "translation.fallback",
-    "translation.extension_id",
+    "translation.http_extension_id",
     "translation.previous_llm_model",
     "provider.llm",
     "gemini.llm_model",

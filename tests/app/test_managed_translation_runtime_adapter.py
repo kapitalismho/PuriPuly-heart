@@ -110,7 +110,7 @@ def test_state_labels_custom_http_without_reusing_inactive_llm_metadata() -> Non
     settings.translation = TranslationSettings(
         model=TranslationModel.CUSTOM_HTTP,
         connection=TranslationConnection.CUSTOM_HTTP,
-        extension_id="demo",
+        http_extension_id="demo",
     )
     adapter = _adapter(
         settings,
@@ -132,7 +132,7 @@ async def test_custom_http_prepare_skips_managed_release_service() -> None:
     settings.translation = TranslationSettings(
         model=TranslationModel.CUSTOM_HTTP,
         connection=TranslationConnection.CUSTOM_HTTP,
-        extension_id="demo",
+        http_extension_id="demo",
     )
 
     async def unexpected_prepare() -> object:

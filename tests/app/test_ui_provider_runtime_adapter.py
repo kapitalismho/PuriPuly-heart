@@ -37,19 +37,19 @@ async def test_active_custom_http_secret_change_rebuilds_runtime_backend() -> No
     settings.translation = TranslationSettings(
         model=TranslationModel.CUSTOM_HTTP,
         connection=TranslationConnection.CUSTOM_HTTP,
-        extension_id="demo",
+        http_extension_id="demo",
     )
     change_secret = AsyncMock(return_value=True)
     apply = AsyncMock(return_value=True)
     adapter = _adapter(settings, change_secret=change_secret, apply=apply)
 
     assert await adapter.persist_provider_secret_change(
-        "translation_extension.demo.api_key",
+        "http_extension.demo.api_key",
         "new-secret",
     )
 
     change_secret.assert_awaited_once_with(
-        "translation_extension.demo.api_key",
+        "http_extension.demo.api_key",
         "new-secret",
     )
     apply.assert_awaited_once_with(
@@ -65,14 +65,14 @@ async def test_inactive_custom_http_secret_change_does_not_rebuild_active_runtim
     settings.translation = TranslationSettings(
         model=TranslationModel.CUSTOM_HTTP,
         connection=TranslationConnection.CUSTOM_HTTP,
-        extension_id="demo",
+        http_extension_id="demo",
     )
     change_secret = AsyncMock(return_value=True)
     apply = AsyncMock(return_value=True)
     adapter = _adapter(settings, change_secret=change_secret, apply=apply)
 
     assert await adapter.persist_provider_secret_change(
-        "translation_extension.other.api_key",
+        "http_extension.other.api_key",
         "new-secret",
     )
 

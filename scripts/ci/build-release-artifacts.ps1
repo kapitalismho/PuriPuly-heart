@@ -408,7 +408,7 @@ $packagedNotoCjkProvenanceDir = Join-Path $distDir "third_party\noto-sans-cjk"
 $packagedNotoCjkLicensePath = Join-Path $packagedNotoCjkProvenanceDir "OFL.txt"
 $packagedNotoCjkReadmePath = Join-Path $packagedNotoCjkProvenanceDir "README.md"
 $packagedNotoCjkSha256SumsPath = Join-Path $packagedNotoCjkProvenanceDir "SHA256SUMS.txt"
-$packagedTranslationExamplesDir = Join-Path $distDir "examples\translation_extensions"
+$packagedTranslationExamplesDir = Join-Path $distDir "examples\http_extensions"
 $packagedMyMemoryExamplePath = Join-Path $packagedTranslationExamplesDir "mymemory.json"
 $pinnedOpenVrVendorDllSha256FromFile = Get-PinnedSha256FromFile -Path $openVrVendorSha256Path
 if ($pinnedOpenVrVendorDllSha256FromFile -ne $PinnedOpenVrVendorDllSha256) {

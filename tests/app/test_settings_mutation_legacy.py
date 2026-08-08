@@ -27,7 +27,7 @@ def test_order21_translation_provider_patch_records_initial_covered_surface_list
         "translation.connection",
         "translation.connection_history",
         "translation.fallback",
-        "translation.extension_id",
+        "translation.http_extension_id",
         "translation.previous_llm_model",
         "provider.llm",
         "gemini.llm_model",
@@ -54,13 +54,13 @@ def test_order21_patch_carries_custom_http_identity_fields() -> None:
     next_settings.translation = TranslationSettings(
         model=TranslationModel.CUSTOM_HTTP,
         connection=TranslationConnection.CUSTOM_HTTP,
-        extension_id="demo",
+        http_extension_id="demo",
         previous_llm_model=TranslationModel.GEMMA4_26B_31B,
     )
 
     patch = build_translation_provider_settings_path_patch(previous, next_settings)
 
-    assert patch["translation.extension_id"] == "demo"
+    assert patch["translation.http_extension_id"] == "demo"
     assert patch["translation.previous_llm_model"] == TranslationModel.GEMMA4_26B_31B
 
 

@@ -141,7 +141,7 @@ class UiApplicationBoundary:
         state: UiApplicationStatePort,
         runtime_shutdown: ApplicationRuntimeShutdownPort,
         runtime_logging: ApplicationRuntimeLoggingPort,
-        translation_extension_registry: object | None = None,
+        http_extension_registry: object | None = None,
     ) -> None:
         self._startup = startup
         self._input_runtime = input_runtime
@@ -154,7 +154,7 @@ class UiApplicationBoundary:
         self._engagement = engagement
         self._diagnostics = diagnostics
         self._runtime_logging = runtime_logging
-        self.translation_extension_registry = translation_extension_registry
+        self.http_extension_registry = http_extension_registry
         self._runtime_shutdown = runtime_shutdown
         self._state_owner = state
         self._github_star_prompt_runtime = GithubStarPromptRuntime(

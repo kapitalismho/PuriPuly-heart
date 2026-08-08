@@ -67,8 +67,8 @@ def compose_settings_api_surface(
         slots.peer_expected_language,
         slots.api_keys,
     ]
-    if slots.translation_extension is not None:
-        rows.insert(2, slots.translation_extension)
+    if slots.http_extension is not None:
+        rows.insert(2, slots.http_extension)
 
     return SettingsApiSurfaceRegions(
         rows=tuple(rows),

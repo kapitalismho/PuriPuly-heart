@@ -5499,7 +5499,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
         t("settings.translation_connection"),
         t("settings.fallback"),
     ]
-    assert api_controls[2] is view._translation_extension_card
+    assert api_controls[2] is view._http_extension_card
     assert _row_card_titles(api_controls[3]) == [t("settings.gpu_device.title")]
     assert view._gpu_device_card.visible is False
     assert _row_card_titles(api_controls[4]) == [t("settings.local_llm.connection")]

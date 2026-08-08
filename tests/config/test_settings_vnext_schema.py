@@ -147,7 +147,7 @@ def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
         "intent.translation.connection",
         "intent.translation.connection_history",
         "intent.translation.cerebras.llm_model",
-        "intent.translation.extension_id",
+        "intent.translation.http_extension_id",
         "intent.translation.fallback.connection",
         "intent.translation.fallback.enabled",
         "intent.translation.fallback.model",

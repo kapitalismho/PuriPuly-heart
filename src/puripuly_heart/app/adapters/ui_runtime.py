@@ -44,12 +44,12 @@ from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
 from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
+from puripuly_heart.core.http_extensions import (
+    http_extension_secret_key_prefix,
+)
 from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryResult,
     TranslationSuccessTelemetryService,
-)
-from puripuly_heart.core.translation_extensions import (
-    translation_extension_secret_key_prefix,
 )
 
 
@@ -320,14 +320,14 @@ class UiProviderRuntimeAdapter:
     async def persist_provider_secret_change(self, key: str, value: str) -> bool:
         succeeded = await self.provider_settings.change_secret(key, value)
         current = self.settings.current
-        extension_id = None if current is None else current.translation.extension_id
+        http_extension_id = None if current is None else current.translation.http_extension_id
         if (
             succeeded
-            and key.startswith("translation_extension.")
+            and key.startswith("http_extension.")
             and current is not None
             and current.translation.model == "custom_http"
-            and extension_id is not None
-            and key.startswith(translation_extension_secret_key_prefix(extension_id))
+            and http_extension_id is not None
+            and key.startswith(http_extension_secret_key_prefix(http_extension_id))
         ):
             await self.apply_providers(
                 force_rebuild_llm=True,

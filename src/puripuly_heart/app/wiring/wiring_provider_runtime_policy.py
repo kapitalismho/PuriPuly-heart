@@ -12,13 +12,13 @@ from puripuly_heart.config.settings import (
     TranslationConnection,
     TranslationModel,
 )
-from puripuly_heart.core.translation_extensions import TranslationExtensionRegistry
+from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 
 
 def build_llm_provider_signature(
     settings: AppSettings,
     *,
-    translation_extensions: TranslationExtensionRegistry | None = None,
+    http_extensions: HttpExtensionRegistry | None = None,
 ) -> tuple[object, ...]:
     primary_uses_openrouter = settings.provider.llm == LLMProviderName.OPENROUTER
     fallback_uses_openrouter = bool(
@@ -44,11 +44,9 @@ def build_llm_provider_signature(
     )
     extension_signature: tuple[object, ...] | None = None
     if settings.translation.model == TranslationModel.CUSTOM_HTTP:
-        selected_id = settings.translation.extension_id
+        selected_id = settings.translation.http_extension_id
         selected = (
-            translation_extensions.snapshot.get(selected_id)
-            if translation_extensions is not None
-            else None
+            http_extensions.snapshot.get(selected_id) if http_extensions is not None else None
         )
         extension_signature = (
             selected_id,
@@ -57,7 +55,7 @@ def build_llm_provider_signature(
     return (
         settings.translation.model,
         settings.translation.connection,
-        settings.translation.extension_id,
+        settings.translation.http_extension_id,
         extension_signature,
         settings.provider.llm,
         settings.llm.concurrency_limit,

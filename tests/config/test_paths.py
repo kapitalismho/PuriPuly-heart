@@ -34,8 +34,8 @@ def test_default_paths_use_user_config_dir(monkeypatch, tmp_path):
         paths.default_vad_model_path() == tmp_path / paths.APP_DIR_NAME / paths.VAD_MODEL_FILENAME
     )
     assert (
-        paths.default_translation_extensions_dir()
-        == tmp_path / paths.APP_DIR_NAME / paths.TRANSLATION_EXTENSIONS_DIRNAME
+        paths.default_http_extensions_dir()
+        == tmp_path / paths.APP_DIR_NAME / paths.HTTP_EXTENSIONS_DIRNAME
     )
 
 
@@ -53,8 +53,8 @@ def test_user_config_dir_windows_prefers_local_appdata(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
     monkeypatch.setenv("APPDATA", str(tmp_path / "roaming"))
 
-    assert paths.default_translation_extensions_dir() == (
-        tmp_path / "local" / paths.APP_DIR_NAME / paths.TRANSLATION_EXTENSIONS_DIRNAME
+    assert paths.default_http_extensions_dir() == (
+        tmp_path / "local" / paths.APP_DIR_NAME / paths.HTTP_EXTENSIONS_DIRNAME
     )
 
 

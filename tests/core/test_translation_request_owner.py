@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.http_extensions import parse_http_extension
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
@@ -27,7 +28,6 @@ from puripuly_heart.core.orchestrator.translation_request import (
 )
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
-from puripuly_heart.core.translation_extensions import parse_translation_extension
 from puripuly_heart.domain.models import ChannelId, Translation
 from puripuly_heart.providers.translation.http_extension_backend import (
     HttpExtensionTranslationBackend,
@@ -278,7 +278,7 @@ async def test_direct_request_rejects_stale_provider_completion() -> None:
 @pytest.mark.asyncio
 async def test_http_backend_rejects_completion_after_runtime_replacement() -> None:
     client = BlockingHttpClient()
-    extension = parse_translation_extension(
+    extension = parse_http_extension(
         {
             "schema_version": 1,
             "id": "demo",
