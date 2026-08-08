@@ -5,8 +5,10 @@ Phase 1; immediate implementation order Section 34 steps 4-5). The Phase 0 revie
 approved (`reviews/phase_0_pre_execution.md`); Phase 0 deliverables are committed. The
 Phase 1 inventory has **not** been built yet.
 
-Revision history: rev 1 initial bundle; rev 2 resolves review findings P1-RANGE-001,
-P1-B0-001, P1-B0-002, P1-B0-003, P1-GROUP-001, P1-SAMPLING-001, P1-PROV-001, P1-COUNT-001.
+Revision history: rev 1 initial bundle (candidate `2f5a03db`); rev 2 resolves review
+findings P1-RANGE-001, P1-B0-001, P1-B0-002, P1-B0-003, P1-GROUP-001, P1-SAMPLING-001,
+P1-PROV-001, P1-COUNT-001 (candidate `00ff8635`); rev 3 resolves P1-RANGE-002,
+P1-GROUP-002, P1-PROV-002 (this revision).
 
 ## 1. Artifacts under review
 
@@ -17,7 +19,7 @@ P1-B0-001, P1-B0-002, P1-B0-003, P1-GROUP-001, P1-SAMPLING-001, P1-PROV-001, P1-
 | Plan self-hash | `8c6bed2e564b9ec80e26ee6b73701985c863b7beb68e51590be7a5faf173aad4` |
 | Restart commit (base) | `fef0a6b312df34680d9db0fd858e28ae054ace89` |
 | Work branch | `experiment-v2-speaker-change-turn-boundaries-ls` |
-| Review base..candidate | `fef0a6b3..2f5a03db` (candidate head `2f5a03db083eb1228a3f74d982c59f9e05deb017`; working tree clean at bundle time) |
+| Review base..candidate | `fef0a6b3..00ff8635` (rev-2 candidate `00ff8635`; rev-1 candidate was `2f5a03db`; working tree clean at bundle time) |
 | Phase 0 evidence this phase depends on | `reviews/phase_0_pre_execution.md` (approved), `reviews/phase_0_review_bundle.md`, `turn_episode/schemas.py`, `turn_episode/contracts.py`, `proposal_contract.json`, `fusion_contract.json` |
 | Historical hash ledger | `reviews/historical_artifact_ledger.json` |
 
@@ -131,9 +133,13 @@ For each hard reference target (Section 6 taxonomy), using only the raw B0 bound
   (words.xml set / TextGrid); script and module code hashes (inventory script,
   `vad_baseline.py`, `events.py`, `config.py`); Silero model hash above; split-graph hash
   (Section 6); runtime settings (chunk size, hangover, pre-roll, max segment).
-- Per-session evidence: deterministic trace content hash (over the boundary trace and
-  classification result, excluding wall-clock metadata); runtime metadata (start/end UTC,
-  machine) stored in a separate non-hashed field.
+- Per-session evidence: deterministic trace content hash over a **canonical projection of the
+  boundary trace and classification result that excludes `emitted_monotonic_ns` and all
+  wall-clock/runtime metadata** (the raw `SpeakerBoundaryEvent.to_dict()` serializes
+  `emitted_monotonic_ns` from `time.perf_counter_ns`, which is nondeterministic; finding
+  P1-PROV-002). The projection retains those fields in a separate non-hashed section.
+  Canonical projection fields: audio_epoch, boundary_source_sample,
+  observed_source_sample_at_emit, confidence, source, debug (sorted).
 - Completeness: the inventory is accepted only when all 12 expected sessions
   (4 AMI + 8 AliMeeting) have per-session evidence; partial runs are stored per session and
   cannot masquerade as a complete inventory. The `coverage_inventory.json` records the
@@ -170,9 +176,13 @@ Complete group graph (finding P1-GROUP-001); all rules frozen before the invento
   - meeting series and related submeetings (AMI meeting id prefix series such as ES/IS; any
     two meetings sharing a series prefix are kept together conservatively);
   - recurring participant connected components: AMI via `global_name` actor IDs from the
-    words.xml speaker elements when discoverable (`corpus/ami.py` reads them); participants
+    **`corpusResources/meetings.xml`** speaker elements (`nxt_agent` -> `global_name`,
+    parsed by `corpus/ami.py`); the pilot manifests carry the same mapping as
+    `condition.partition_meta.agents` (meeting-local letter -> global participant id) and
+    are the authoritative local source for the four materialized meetings; participants
     without a discoverable global id are treated as meeting-local and never linked across
-    meetings;
+    meetings. The `words.xml` files contain word elements only and are not an identity
+    source (finding P1-GROUP-002);
   - all channel views and derivatives of one recording (AliMeeting `far_ch0` and
     `Eval_Ali_far` audio are one recording);
   - original and transformed synthetic audio (gain, codec, noise, prosody derivatives of one
@@ -278,11 +288,14 @@ Deterministic per-session hash-stratified sampling, frozen before Phase 2:
 
 | id | severity | finding | disposition |
 | --- | --- | --- | --- |
-| P1-RANGE-001 | blocker | bundle recorded stale head; candidate is 2f5a03db | resolved in Section 1 (exact base..candidate) |
+| P1-RANGE-001 | blocker | bundle recorded stale head; candidate is 2f5a03db | resolved in Section 1 (rev-1 range fef0a6b3..2f5a03db) |
+| P1-RANGE-002 | blocker | rev-2 bundle still named the rev-1 candidate | resolved in Section 1 (rev-2/3 range fef0a6b3..00ff8635) |
 | P1-B0-001 | blocker | legacy B0 runner rejects phase2-v1 manifests | resolved in Section 4.1 (dedicated inventory script, raw `replay_wav_epoch` path) |
 | P1-B0-002 | important | "not neural inference" false; Silero is ONNX | resolved in Section 4.1 (baseline engine wording; model hash bound) |
 | P1-B0-003 | important | classification inputs unspecified; coalescer non-normative; terminal boundaries deferred | resolved in Sections 4.1-4.2 (raw traces only; frozen classification rule) |
 | P1-GROUP-001 | important | incomplete keep-together rules; identity namespaces | resolved in Section 6 (complete group graph; AMI global_name; AliMeeting session-local) |
+| P1-GROUP-002 | important | AMI global_name source misattributed to words.xml | resolved in Section 6 (meetings.xml speaker elements; partition_meta.agents in manifests) |
 | P1-SAMPLING-001 | important | target-enriched selection not fully frozen | resolved in Section 7 (deterministic hash-stratified per-session rule) |
 | P1-PROV-001 | important | provenance/complete-set requirements unspecified | resolved in Section 4.3 (bound hashes, per-session evidence, completeness gate) |
+| P1-PROV-002 | important | trace hash nondeterministic via emitted_monotonic_ns | resolved in Section 4.3 (canonical projection excluding monotonic ns and runtime metadata) |
 | P1-COUNT-001 | note | annotation coverage could falsely satisfy gates | resolved in Sections 3 and 8 (separate counts; scorable-only gates) |
