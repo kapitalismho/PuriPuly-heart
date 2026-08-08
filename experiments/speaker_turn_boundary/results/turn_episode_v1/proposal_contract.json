@@ -1,0 +1,30 @@
+{
+  "content_sha256": "e9a61320ccfbe16d9b46742ac71a2c25ad598210826bd9aba712cdeb3c8f697d",
+  "invariants": [
+    "observed_source_sample_at_emit >= boundary_source_sample",
+    "audio_epoch and source_session_id mandatory",
+    "confidence interpreted only under confidence_semantics_id",
+    "events deterministic for identical audio/model/frontend/profile",
+    "event cannot read samples beyond its observation frontier",
+    "proposal generation and actionization use separate schema versions"
+  ],
+  "plan_blob": "24340f488f1bb46c666a5fc15eef2fc87ef1f826",
+  "proposal_generation_schema": "turn_episode_v1.proposal_generation",
+  "proposal_kinds": [
+    "new_track_onset",
+    "dominant_replacement",
+    "overlap_onset",
+    "track_instability",
+    "speaker_change_unknown"
+  ],
+  "schema_version": "turn_episode_v1",
+  "signal_extractor_declaration_fields": [
+    "signal_extractor_id",
+    "sign",
+    "causal_horizon_ms",
+    "valid_window_rule",
+    "missing_observation_rule"
+  ],
+  "signal_extractor_schema_version": "turn_episode_v1.signal_extractor",
+  "signal_extractors": []
+}

@@ -1,0 +1,78 @@
+{
+  "action_kinds": [
+    "retain_vad",
+    "accelerate_or_replace_vad",
+    "add_hard_boundary",
+    "emit_soft_marker",
+    "suppress_detector_duplicate",
+    "suppress_vad_duplicate",
+    "structural_max_duration",
+    "unscored_action"
+  ],
+  "actionization_schema": "turn_episode_v1.actionization",
+  "availability_deadlines_ms": [
+    250,
+    500,
+    1000,
+    1500,
+    2000
+  ],
+  "cluster_grid": {
+    "cluster_boundary_radius_ms": [
+      250,
+      500
+    ],
+    "cluster_debounce_ms": [
+      0,
+      100,
+      250
+    ],
+    "refractory_ms": [
+      0,
+      250,
+      500
+    ]
+  },
+  "cluster_kind_priority": [
+    "overlap_onset",
+    "dominant_replacement",
+    "new_track_onset",
+    "track_instability"
+  ],
+  "content_sha256": "3c20e381c62026dc36038416b857e9f94e56abddcf0156bf07f77a64a4a020a9",
+  "hard_boundary_action_kinds": [
+    "retain_vad",
+    "accelerate_or_replace_vad",
+    "add_hard_boundary"
+  ],
+  "harmful_active_split_guard_ms": {
+    "primary": 200,
+    "sensitivity_views": [
+      100,
+      300
+    ]
+  },
+  "localization_tolerance_ms": {
+    "primary": 500,
+    "view": 250
+  },
+  "plan_blob": "24340f488f1bb46c666a5fc15eef2fc87ef1f826",
+  "schema_version": "turn_episode_v1",
+  "turn_owner_threshold_ms": {
+    "primary": 100,
+    "sensitivity_views": [
+      50,
+      200
+    ]
+  },
+  "vad_association": {
+    "detector_vad_radius_ms": [
+      250,
+      500
+    ],
+    "same_silence_interval_association": [
+      false,
+      true
+    ]
+  }
+}
