@@ -307,6 +307,111 @@ def restore_b0(snapshot: dict[str, Any], wav_path: str) -> Any:
     return replay
 
 
+def _deep_copy_value(value: Any) -> Any:
+    if isinstance(value, np.ndarray):
+        return value.copy()
+    if isinstance(value, list):
+        return [_deep_copy_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _deep_copy_value(v) for k, v in value.items()}
+    if hasattr(value, "_buffer") and hasattr(value, "_write_pos"):
+        from puripuly_heart.core.audio.ring_buffer import RingBufferF32
+
+        copy = RingBufferF32(capacity_samples=int(value.capacity_samples))
+        copy._buffer = np.asarray(value._buffer).copy()
+        copy._write_pos = int(value._write_pos)
+        return copy
+    return value
+
+
+def _slots_of(obj: Any) -> list[str]:
+    names: list[str] = []
+    for cls in type(obj).__mro__:
+        names.extend(getattr(cls, "__slots__", ()) or ())
+    return names
+
+
+def capture_state(replay: Any) -> dict[str, Any]:
+    gating = replay._gating
+    gating_state = {
+        name: _deep_copy_value(getattr(gating, name))
+        for name in _slots_of(gating)
+        if name != "engine"
+    }
+    engine_state = {name: np.asarray(value).copy() for name, value in gating.engine._state.items()}
+    replay_state = {
+        name: _deep_copy_value(getattr(replay, name))
+        for name in _slots_of(replay)
+        if name != "_gating"
+    }
+    return {
+        "gating": gating_state,
+        "engine_state": engine_state,
+        "replay": replay_state,
+    }
+
+
+def restore_state(replay: Any, state: dict[str, Any]) -> None:
+    gating = replay._gating
+    for name, value in state["gating"].items():
+        setattr(gating, name, _deep_copy_value(value))
+    gating.engine._state = {
+        name: np.asarray(value).copy() for name, value in state["engine_state"].items()
+    }
+    for name, value in state["replay"].items():
+        setattr(replay, name, _deep_copy_value(value))
+
+
+def snapshot_round_trip(
+    wav_path: str,
+    bounds: WindowBounds,
+    session_end: int,
+) -> dict[str, Any]:
+    """Capture -> restore -> resume round trip (bundle Section 8.5).
+
+    The state is captured from the source-prefix (full-session) replay at the scored
+    start; a fresh replay is restored from that capture and resumed with the scored
+    audio. The round trip passes iff the resumed rows exactly reproduce the
+    source-prefix replay's rows from the scored start onward (boundaries and
+    progress, canonical coordinates).
+    """
+    samples = _load_wav(Path(wav_path))
+    effective_end = min(session_end, int(samples.size))
+    samples = samples[:effective_end]
+    source = _replay_region(samples, 0, effective_end)
+    cursor = 0
+    while cursor + CHUNK_SAMPLES <= bounds.scored_start:
+        source.process_chunk(samples[cursor : cursor + CHUNK_SAMPLES])
+        cursor += CHUNK_SAMPLES
+    capture = capture_state(source)
+    captured_rows = (len(source.boundaries), len(source.progress))
+
+    restored = _make_replay(_b0_engine_factory)
+    restored.start_epoch(0)
+    restore_state(restored, capture)
+    cursor = bounds.scored_start
+    while cursor + CHUNK_SAMPLES <= min(bounds.tail_end, effective_end):
+        chunk = samples[cursor : cursor + CHUNK_SAMPLES]
+        source.process_chunk(chunk)
+        restored.process_chunk(chunk)
+        cursor += CHUNK_SAMPLES
+
+    source_new = _boundary_rows(source)[captured_rows[0] :]
+    restored_new = _boundary_rows(restored)[captured_rows[0] :]
+    source_progress_new = _progress_rows(source)[captured_rows[1] :]
+    restored_progress_new = _progress_rows(restored)[captured_rows[1] :]
+    passed = source_new == restored_new and source_progress_new == restored_progress_new
+    return {
+        "episode_class": "b0/peer",
+        "passed": passed,
+        "captured_at_scored_start": True,
+        "source_rows_after_capture": len(source_new),
+        "restored_rows_after_capture": len(restored_new),
+        "source_progress_after_capture": len(source_progress_new),
+        "restored_progress_after_capture": len(restored_progress_new),
+    }
+
+
 @dataclass(slots=True)
 class ParityClass:
     class_id: str
@@ -357,6 +462,7 @@ def main() -> None:
         canonical_json,
         load_session_data,
         sha256_bytes,
+        verify_manifest,
     )
     from .build_episodes import (
         WindowBounds as WB,
@@ -364,7 +470,9 @@ def main() -> None:
 
     corpus_root = args.corpus_root or external.corpus_root()
     manifests_dir = _Path(__file__).resolve().parent.parent / "data" / "manifests"
-    dev = _json.loads((out / "episode_manifest_dev.json").read_text(encoding="utf-8"))
+    dev_path = out / "episode_manifest_dev.json"
+    verify_manifest(dev_path)
+    dev = _json.loads(dev_path.read_text(encoding="utf-8"))
     details_rows: dict[str, dict[str, Any]] = {}
     for line in (
         (out / "coverage_inventory_details.jsonl").read_text(encoding="utf-8").strip().splitlines()
@@ -416,16 +524,8 @@ def main() -> None:
             tail_end=int(bounds["tail_end"]),
             unaligned_source_end=bool(bounds["unaligned_source_end"]),
         )
-        snapshot = snapshot_b0(str(session.wav_abs_path), wb, session.duration_samples)
-        restored = restore_b0(snapshot, str(session.wav_abs_path))
-        restored_rows = _boundary_rows(restored)
-        snapshot_evidence.append(
-            {
-                "episode_id": episode["episode_id"],
-                "snapshot": snapshot,
-                "restored_boundary_count": len(restored_rows),
-            }
-        )
+        snapshot = snapshot_round_trip(str(session.wav_abs_path), wb, session.duration_samples)
+        snapshot_evidence.append({"episode_id": episode["episode_id"], **snapshot})
         if parity_skipped:
             continue
         result = parity_b0(str(session.wav_abs_path), wb, session.duration_samples)
@@ -439,11 +539,15 @@ def main() -> None:
         class_results["b0/peer"]["passed"].append(result["passed"])
 
     passed_list = class_results["b0/peer"]["passed"]
+    failed_count = sum(1 for p in passed_list if not p)
+    passed_count = len(passed_list) - failed_count
     if passed_list and all(passed_list):
         class_results["b0/peer"]["disposition"] = "reset_allowed"
     elif passed_list:
         class_results["b0/peer"]["disposition"] = "source_prefix_required"
     class_results["b0/peer"]["episode_count"] = len(passed_list)
+    class_results["b0/peer"]["passed_count"] = passed_count
+    class_results["b0/peer"]["failed_count"] = failed_count
 
     convergence_diagnostic: list[dict[str, Any]] = []
     if passed_list and not all(passed_list):
@@ -500,24 +604,46 @@ def main() -> None:
         },
         "finding": (
             "B0/peer FAILS the state-equivalence gate: the Silero VAD v5 RNN hidden "
-            "state carries long context (warm-up convergence diagnostic shows exact "
-            "parity only from ~60 s warm-up; 5 s warm-up yields different scored-region "
-            "boundaries in 186/186 episodes). Per PRD Section 5.4 and invariant 26, "
-            "reset-plus-warm-up scored evaluation is forbidden for B0/peer; scored "
-            "episodes must use deterministic source-prefix state (full-session replay "
-            "with the episode scored region sliced from the source-prefix trace). "
-            "The failed parity cases remain diagnostic evidence and are not hidden by "
-            "increasing warm-up."
+            "state carries long context. Parity fails in "
+            + str(failed_count)
+            + "/"
+            + str(len(passed_list))
+            + " episodes ("
+            + str(passed_count)
+            + " pass trivially, their scored regions contain no B0 boundary). "
+            "A warm-up convergence diagnostic on a failing episode shows exact parity "
+            "only from ~60 s warm-up (5/15/30 s warm-up differ). Per PRD Section 5.4 "
+            "and invariant 26, reset-plus-warm-up scored evaluation is forbidden for "
+            "B0/peer; scored episodes must use deterministic source-prefix state "
+            "(full-session replay with the episode scored region sliced from the "
+            "source-prefix trace). The failed parity cases remain diagnostic evidence "
+            "and are not hidden by increasing warm-up."
         ),
         "disposition_table": class_results,
         "convergence_diagnostic": convergence_diagnostic,
         "snapshot_fallback": {
-            "mechanism": "deterministic source-prefix state snapshot binding model hash, warm-up slice, chunk config; restore replays warm-up deterministically",
+            "mechanism": "capture/restore of the full B0 engine state (gating fields, "
+            "pre-roll ring, pending start, RNN hidden state) at the scored start; "
+            "restored replay resumes and must reproduce the source-prefix trace "
+            "exactly (boundaries + progress rows, canonical coordinates)",
             "round_trip_episodes": len(snapshot_evidence),
-            "round_trip_passed": all(e["restored_boundary_count"] >= 0 for e in snapshot_evidence),
+            "round_trip_passed": all(e["passed"] for e in snapshot_evidence),
+            "round_trip_failed": [e["episode_id"] for e in snapshot_evidence if not e["passed"]],
         },
         "snapshot_evidence": snapshot_evidence,
         "parity_skipped": parity_skipped,
+        "structural_taxonomy_status": "max_duration_and_terminal_deferred_phase3_8",
+        "generated_from": {
+            "state_equivalence": sha256_bytes(_Path(__file__).resolve().read_bytes()),
+            "build_episodes": sha256_bytes(
+                (_Path(__file__).resolve().parent / "build_episodes.py").read_bytes()
+            ),
+            "schemas": sha256_bytes((_Path(__file__).resolve().parent / "schemas.py").read_bytes()),
+            "contracts": sha256_bytes(
+                (_Path(__file__).resolve().parent / "contracts.py").read_bytes()
+            ),
+            "episode_manifest_dev": dev.get("content_sha256"),
+        },
         "pending_state_notes": (
             "per-episode pending-start inspection recorded in episode_manifest_dev.json "
             "flags.readiness; 1 episode diagnostic_only pending_state_unresolved"

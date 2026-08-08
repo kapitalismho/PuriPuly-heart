@@ -246,6 +246,7 @@ class RefSpec:
     acceptable_interval: tuple[int, int]
     evidence_onset: int
     primary_case: bool
+    gap: bool = False
 
 
 def build_reference_specs(
@@ -280,7 +281,15 @@ def build_reference_specs(
             if start > target:
                 start = target
             specs.append(
-                RefSpec(f"gt{gt_index}", "hard_boundary", target, (start, target), target, True)
+                RefSpec(
+                    f"gt{gt_index}",
+                    "hard_boundary",
+                    target,
+                    (start, target),
+                    target,
+                    True,
+                    gap=True,
+                )
             )
         elif change.kind == "interruption_onset":
             interval = (max(0, target - LOCALIZATION_TOLERANCE_MS * SAMPLES_PER_MS), target)
@@ -368,20 +377,53 @@ def references_for_episode(
         onset_ok = scored_start <= spec.evidence_onset < processed_scored_end
         if not in_region or not onset_ok:
             continue
+        start, end = spec.acceptable_interval
+        clipped = (max(start, scored_start), min(end, processed_scored_end))
+        if clipped[1] <= clipped[0]:
+            continue
+        gap_marker = ":gap" if spec.gap else ""
         out.append(
             ReferenceAction(
-                reference_id=f"{session_id}:{episode_id}:{spec.suffix}",
+                reference_id=f"{session_id}:{episode_id}:{spec.suffix}{gap_marker}",
                 audio_epoch=0,
                 source_session_id=session_id,
                 action_kind=spec.action_kind,
                 target_sample=spec.target_sample,
-                acceptable_interval=spec.acceptable_interval,
+                acceptable_interval=clipped,
                 evidence_onset_sample=spec.evidence_onset,
                 scorable=scorable,
                 primary_case=spec.primary_case,
                 episode_pool_tag=pool_tag,
             )
         )
+    out.append(
+        ReferenceAction(
+            reference_id=f"{session_id}:{episode_id}:structural:start",
+            audio_epoch=0,
+            source_session_id=session_id,
+            action_kind="structural",
+            target_sample=scored_start,
+            acceptable_interval=(scored_start, scored_start),
+            evidence_onset_sample=scored_start,
+            scorable=scorable,
+            primary_case=False,
+            episode_pool_tag=pool_tag,
+        )
+    )
+    out.append(
+        ReferenceAction(
+            reference_id=f"{session_id}:{episode_id}:structural:end",
+            audio_epoch=0,
+            source_session_id=session_id,
+            action_kind="structural",
+            target_sample=processed_scored_end,
+            acceptable_interval=(processed_scored_end, processed_scored_end),
+            evidence_onset_sample=processed_scored_end,
+            scorable=scorable,
+            primary_case=False,
+            episode_pool_tag=pool_tag,
+        )
+    )
     return out
 
 
@@ -691,6 +733,7 @@ class EpisodeRecord:
     wav_sha256: str | None
     annotation_sha256: str | None
     flags: dict[str, Any]
+    slice_sha256: str | None = None
 
     def payload(self) -> dict[str, Any]:
         return {
@@ -710,6 +753,7 @@ class EpisodeRecord:
             "wav_sha256": self.wav_sha256,
             "annotation_sha256": self.annotation_sha256,
             "flags": self.flags,
+            "slice_sha256": self.slice_sha256,
         }
 
     def content_hash(self) -> str:
@@ -767,17 +811,16 @@ def finalize_episodes(
         if reason is not None:
             status = "diagnostic_only"
         tag: str | None = None
-        if status == "scorable":
-            refs = references_for_episode(
-                session.specs,
-                session.session_id,
-                "PLACEHOLDER",
-                bounds.scored_start,
-                processed_scored_end,
-                "hard_only",
-                True,
-            )
-            tag = tag_episode(refs)
+        refs_placeholder = references_for_episode(
+            session.specs,
+            session.session_id,
+            "PLACEHOLDER",
+            bounds.scored_start,
+            processed_scored_end,
+            "hard_only",
+            True,
+        )
+        tag = tag_episode(refs_placeholder)
         anchor_suffix = ".".join(sorted(a[0] for a in draft.anchors))
         episode_id = f"{session.pool}:{session.session_id}:{bounds.scored_start}:{bounds.scored_end}:{anchor_suffix}"
         refs = references_for_episode(
@@ -786,11 +829,17 @@ def finalize_episodes(
             episode_id,
             bounds.scored_start,
             processed_scored_end,
-            tag or "negative_only",
+            tag,
             status == "scorable",
         )
-        if status == "scorable" and tag is None:
-            tag = tag_episode(refs)
+        slice_sha: str | None = None
+        if session.wav_abs_path is not None and session.wav_abs_path.is_file():
+            import wave as wave_module
+
+            with wave_module.open(str(session.wav_abs_path), "rb") as handle:
+                handle.setpos(bounds.scored_start)
+                frames = handle.readframes(processed_scored_end - bounds.scored_start)
+            slice_sha = sha256_bytes(frames)
         flags: dict[str, Any] = {
             "warmup_truncated": (bounds.scored_start - bounds.warm_start) / SAMPLES_PER_MS
             < WARMUP_MS,
@@ -817,6 +866,7 @@ def finalize_episodes(
                 wav_sha256=session.wav_sha256,
                 annotation_sha256=session.annotation_sha256,
                 flags=flags,
+                slice_sha256=slice_sha,
             )
         )
     return records
@@ -933,8 +983,12 @@ def natural_window_episodes(
         episode_id = f"{pool}:{session_id}:{start_sample}:{end_sample}:"
         last_full = floor_to_chunk(session.duration_samples)
         processed_end = min(end_sample, last_full)
-        refs = references_for_episode(
+        refs_placeholder = references_for_episode(
             session.specs, session_id, episode_id, start_sample, processed_end, "hard_only", True
+        )
+        tag = tag_episode(refs_placeholder)
+        refs = references_for_episode(
+            session.specs, session_id, episode_id, start_sample, processed_end, tag, True
         )
         records.append(
             EpisodeRecord(
@@ -946,7 +1000,7 @@ def natural_window_episodes(
                 session_id=session_id,
                 audio_epoch=0,
                 bounds=WindowBounds(start_sample, start_sample, end_sample, end_sample),
-                tag=tag_episode(refs) if refs else "negative_only",
+                tag=tag,
                 anchors=[],
                 coverage_loss=[],
                 references=refs,

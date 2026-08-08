@@ -1,6 +1,6 @@
 {
   "class": "b0/peer",
-  "content_sha256": "77bc4c799d8f073b2df3efcecf99dc5011fbb2b116393e289c32a9efd696d152",
+  "content_sha256": "b6a6bfdc49ce512e741543a09e93c1ce3265767a0e74f350ba3c7c2494d68f33",
   "convergence_diagnostic": [
     {
       "episode_id": "diagnostic_dev:alimeeting_R8001_M8004:12688384:12849152:p273",
@@ -983,6 +983,7 @@
           "reason": "scored_region_trace_mismatch"
         }
       ],
+      "failed_count": 74,
       "passed": [
         false,
         false,
@@ -1170,2439 +1171,1891 @@
         true,
         true,
         false
-      ]
+      ],
+      "passed_count": 112
     }
   },
-  "finding": "B0/peer FAILS the state-equivalence gate: the Silero VAD v5 RNN hidden state carries long context (warm-up convergence diagnostic shows exact parity only from ~60 s warm-up; 5 s warm-up yields different scored-region boundaries in 186/186 episodes). Per PRD Section 5.4 and invariant 26, reset-plus-warm-up scored evaluation is forbidden for B0/peer; scored episodes must use deterministic source-prefix state (full-session replay with the episode scored region sliced from the source-prefix trace). The failed parity cases remain diagnostic evidence and are not hidden by increasing warm-up.",
+  "finding": "B0/peer FAILS the state-equivalence gate: the Silero VAD v5 RNN hidden state carries long context. Parity fails in 74/186 episodes (112 pass trivially, their scored regions contain no B0 boundary). A warm-up convergence diagnostic on a failing episode shows exact parity only from ~60 s warm-up (5/15/30 s warm-up differ). Per PRD Section 5.4 and invariant 26, reset-plus-warm-up scored evaluation is forbidden for B0/peer; scored episodes must use deterministic source-prefix state (full-session replay with the episode scored region sliced from the source-prefix trace). The failed parity cases remain diagnostic evidence and are not hidden by increasing warm-up.",
+  "generated_from": {
+    "build_episodes": "1e3ea74e35e403a71d5af6d284b61126ac06d16dfa31172dc039b0462d524a8b",
+    "contracts": "b207d3f8b9720df5dd228aa8bd8b479c54622abb905a9ca04f580820a6fc3c03",
+    "episode_manifest_dev": "9d8e0db9efb5c7fdbaf21b5af630f216165f5dd30047b4422658a0a1803dd613",
+    "schemas": "a9fa4571b1bab3cf88d6739a3732c1cc62f753a46d51d59c2db7526468eb8868",
+    "state_equivalence": "5a3f4bac831f011e2e52a9b80e1d2b03640c15ece53557869fc5f05fd5d0f4b3"
+  },
   "parity_skipped": false,
   "pending_state_notes": "per-episode pending-start inspection recorded in episode_manifest_dev.json flags.readiness; 1 episode diagnostic_only pending_state_unresolved",
   "report_id": "state_equivalence_report",
   "schema_version": "turn_episode_v1",
   "snapshot_evidence": [
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8001_M8004:12688384:12849152:p273",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 12688384,
-        "warm_start": 12608000,
-        "warmup_samples": 80384,
-        "warmup_sha256": "59cd456cc150dd4c708a0a11586dbd16e1f0671263c23764561fa07bfbdb2535"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8001_M8004:17043456:17203712:n18",
-      "restored_boundary_count": 3,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 17043456,
-        "warm_start": 16963072,
-        "warmup_samples": 80384,
-        "warmup_sha256": "cbccc17ea1d08500027fad4fd6cff128d60003aa987a701fb89c4caa4e0f4103"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8001_M8004:743424:903680:p4",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 743424,
-        "warm_start": 663040,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8e8e864da9df3ed47f898d923bc96a1dc2923dafe7c595b65aeaf15cc601673d"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8007_M8010:18356224:18516480:p752",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 18356224,
-        "warm_start": 18275840,
-        "warmup_samples": 80384,
-        "warmup_sha256": "00e130b4066d6c996128d389d5fbc19201badadb952f155b3627b2bbb63d7314"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8007_M8010:19678208:19845632:p793.p794",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 19678208,
-        "warm_start": 19597824,
-        "warmup_samples": 80384,
-        "warmup_sha256": "aeb1d55dfd596901cbffa6c542d0cc3de0492bd36d5f2fe886fc7964a3487749"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 421,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 421,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8007_M8010:24306688:24467456:p976",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 24306688,
-        "warm_start": 24226304,
-        "warmup_samples": 80384,
-        "warmup_sha256": "7922fea519ec13b0d924aed22466796d75ed99b34e70a1fadd757d79df5e5461"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8007_M8010:27130880:27291648:n11",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 27130880,
-        "warm_start": 27050496,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5c6c4258dd76fbb2815f4c73e25565c8655c3bf215a07c148e121521ea9b07db"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8007_M8010:4111360:4272128:p172",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 4111360,
-        "warm_start": 4030976,
-        "warmup_samples": 80384,
-        "warmup_sha256": "7fc905930351659a4cf5d9e311f57e6c250c59aeb3c81c12ed3dfaf1ded66022"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:14833664:14994432:p224",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 14833664,
-        "warm_start": 14753280,
-        "warmup_samples": 80384,
-        "warmup_sha256": "39b8d84eef2021038d648206f3651c018029ba75f4449042d28b28f33822a2ca"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:17444352:17605120:p285",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 17444352,
-        "warm_start": 17363968,
-        "warmup_samples": 80384,
-        "warmup_sha256": "c48b5f08da442da54da4028ff771dfa5f1a2a60bc9a08838f288d98e7e2013d8"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:18397184:18717184:p309.p312",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 18397184,
-        "warm_start": 18316800,
-        "warmup_samples": 80384,
-        "warmup_sha256": "70e38d351837ce951ea6aeb55a302ba608cb6d7d6796488bbb2157ac962f925e"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 722,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 722,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:20435968:20596736:p361",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 20435968,
-        "warm_start": 20355584,
-        "warmup_samples": 80384,
-        "warmup_sha256": "f07ab6a2ebbba3e493c79868bbb85b3fbaf7a26675ac6d243b7fe49fda9787da"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:22068224:22228480:p406",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 22068224,
-        "warm_start": 21987840,
-        "warmup_samples": 80384,
-        "warmup_sha256": "85fcc9eb3b267f5c6053d294b37caaa7a8a050357eeb110b43d335ff9d985a0e"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:23559168:23719424:p435",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 23559168,
-        "warm_start": 23478784,
-        "warmup_samples": 80384,
-        "warmup_sha256": "2cae7c89b648b00ae3fc7fbfc20754ac04c885236efb8ce277a5dfc0ba3c1b40"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:24132608:24292864:p448",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 24132608,
-        "warm_start": 24052224,
-        "warmup_samples": 80384,
-        "warmup_sha256": "e878f54148dd11bc77227a16218acbff46361222ab27dd962e5b4e721451dc09"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:24687616:24847872:p463",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 24687616,
-        "warm_start": 24607232,
-        "warmup_samples": 80384,
-        "warmup_sha256": "d3ef6a28080a698a1c6dafe798a54267c786c9e470be0e94cd7b2f54387126cb"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:25297408:25457664:n28",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 25297408,
-        "warm_start": 25217024,
-        "warmup_samples": 80384,
-        "warmup_sha256": "31895a5e6d931206de861c5cdf02bf242e8330f96fbdb2d00ee01ae1bb9d5fdb"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:30706176:30866432:n37",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 30706176,
-        "warm_start": 30625792,
-        "warmup_samples": 80384,
-        "warmup_sha256": "9aa254812e843b48073d328522884bad5045f8f4a09a53afe9e9ff631427a8ee"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:5728768:5889024:p69",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 5728768,
-        "warm_start": 5648384,
-        "warmup_samples": 80384,
-        "warmup_sha256": "20fc3762677ab40ad288e23fac060f9f4b783600e6f7b0c596536e53b55db101"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:6423552:6584320:p80",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 6423552,
-        "warm_start": 6343168,
-        "warmup_samples": 80384,
-        "warmup_sha256": "a9266e4793b606cc096af146df3d562290c14f1551c69abb70b35971f0fc8d80"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8008_M8013:8479232:8639488:p113",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 8479232,
-        "warm_start": 8398848,
-        "warmup_samples": 80384,
-        "warmup_sha256": "a52feae9b0ec70f6cb07c208b6f2bb2ead8783b6a440c6916d5b9ea224743bfb"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:103424:264192:n1",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 103424,
-        "warm_start": 23040,
-        "warmup_samples": 80384,
-        "warmup_sha256": "92a132912fca5b9a86f087f8632342cec4be39286665dc2b9f4f86ccff0e8a99"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:10772480:10932736:n98",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 10772480,
-        "warm_start": 10692096,
-        "warmup_samples": 80384,
-        "warmup_sha256": "c2f35eb78d6843db31ebe76386260bf47b14a964efef1d8b867379144e850a1c"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:11961344:12122112:p96",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 11961344,
-        "warm_start": 11880960,
-        "warmup_samples": 80384,
-        "warmup_sha256": "14ef79f8d01a128c8bf613246bcc8085e7f985328015d097803c9f1f200867f4"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:12396032:12556800:n114",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 12396032,
-        "warm_start": 12315648,
-        "warmup_samples": 80384,
-        "warmup_sha256": "001b6e25804c0bc388f87eb319d963ef8d69fd92c05d1f19908016e5fb127e62"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:13980672:14141440:n127",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 13980672,
-        "warm_start": 13900288,
-        "warmup_samples": 80384,
-        "warmup_sha256": "eaa858754519068e5ff4e88d4e4f6ff306f2b2fd8e2f037d3e3eca8876fcc2d6"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:16221184:16438272:n154.n155",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 16221184,
-        "warm_start": 16140800,
-        "warmup_samples": 80384,
-        "warmup_sha256": "ff76a88fcf009c2576234d4c28f6758de524974e8820908bdbe5fc06d34ff04d"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 518,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 518,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:17025024:17185792:n162",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 17025024,
-        "warm_start": 16944640,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8b245e2fcc86ccc46e353bc574a9f142f35b5ca5c4e788375e4c183daa99583a"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:21228032:21388288:p161",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 21228032,
-        "warm_start": 21147648,
-        "warmup_samples": 80384,
-        "warmup_sha256": "804d99d52fa92cbb6e02a0cb65a6f7b38faddeab11240490071d5bb7ac96f16b"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:24465408:24626176:p177",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 24465408,
-        "warm_start": 24385024,
-        "warmup_samples": 80384,
-        "warmup_sha256": "4af0d7d44ffc03fe80eb7605cb063355cdce15839fc4dca3da94298b957465ac"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:25323008:25483264:p179",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 25323008,
-        "warm_start": 25242624,
-        "warmup_samples": 80384,
-        "warmup_sha256": "02a2c1ad8633cd93a93549b50bd886603864f986beea973b0b4792828aa124ce"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:30250496:30410752:p222",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 30250496,
-        "warm_start": 30170112,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5f0cd232792f785efd25fc6ac7d84a1b638b3e9d3ec10425df095def1b124dca"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:414720:602624:n4.n5",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 414720,
-        "warm_start": 334336,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8980b1b51d5c6fbed8939d9cdbb60049b5dfb90c3e851d91107c1e8f1d9af7d1"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 367,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 367,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:4965376:5125632:n53",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 4965376,
-        "warm_start": 4884992,
-        "warmup_samples": 80384,
-        "warmup_sha256": "c4ed4ccec849d379c576a9dc67f5ca2ae973fb8b97238a23a859a5179dec104e"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:8848896:9009152:p63",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 8848896,
-        "warm_start": 8768512,
-        "warmup_samples": 80384,
-        "warmup_sha256": "3fbe0a7e7dc0af9e3dd155d12b34b3a43a845185f8347ce927014c742cdea90f"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 5,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 5
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:alimeeting_R8009_M8019:9579520:9864704:n87.p74",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 9579520,
-        "warm_start": 9499136,
-        "warmup_samples": 80384,
-        "warmup_sha256": "2016916394d9f063c08c627f68d3be95504df07e101880021a909f467a4194d4"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 651,
+      "restored_rows_after_capture": 6,
+      "source_progress_after_capture": 651,
+      "source_rows_after_capture": 6
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:16642560:16803328:p159",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 16642560,
-        "warm_start": 16562176,
-        "warmup_samples": 80384,
-        "warmup_sha256": "a3559e4503a9349615dbafcbe00d2a6e57a52a79402367073a98a2d34fd3240b"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:19112960:19273216:p198",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 19112960,
-        "warm_start": 19032576,
-        "warmup_samples": 80384,
-        "warmup_sha256": "67ffd59e1b0bc9de7d93829bdfba71a69c85d306ff330f79dada123b4014882e"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:24626176:24786432:p270",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 24626176,
-        "warm_start": 24545792,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5313da2ebb4b6729cae1e4d7d68b0438a70ccd3c76cbd1f7acd23e21eb40d3e4"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:29702144:29862912:n31",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 29702144,
-        "warm_start": 29621760,
-        "warmup_samples": 80384,
-        "warmup_sha256": "4c1fc1b56b494cf8e46c3ca358804947cfa5a15bf948e28c934be46138df0229"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:31200256:31360512:p355",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 31200256,
-        "warm_start": 31119872,
-        "warmup_samples": 80384,
-        "warmup_sha256": "de65b3b4f0b66eb145cf845b836a59a71b70275ad0836f1c6599d90c0f0577da"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:3219456:3379712:p15",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 3219456,
-        "warm_start": 3139072,
-        "warmup_samples": 80384,
-        "warmup_sha256": "286744636a16d30d515c2fc9414381d03e55ccae13c959027a7f014f3c037cc8"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:38321664:38481920:p432",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 38321664,
-        "warm_start": 38241280,
-        "warmup_samples": 80384,
-        "warmup_sha256": "bbd5257eb88e0863e33ed8baa878633958b1b749dfd116a7ab990ac352e5771d"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:39536640:39742464:p447.p448",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 39536640,
-        "warm_start": 39456256,
-        "warmup_samples": 80384,
-        "warmup_sha256": "e0ed8650cf645272299a89f468fd6e5f1d171c428b3f42110bb0c98b1f3a2fc4"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 496,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 496,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:43462144:43622400:n44",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 43462144,
-        "warm_start": 43381760,
-        "warmup_samples": 80384,
-        "warmup_sha256": "af41b8e072d026e4a5ab0d9b79d192143df9b4978a291dd6ab1ff191c72150b2"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:51351040:51511296:p556",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 51351040,
-        "warm_start": 51270656,
-        "warmup_samples": 80384,
-        "warmup_sha256": "ee458ab0edf6c134af589365440c87e0076e8134ff9f1d23d6fa951fcc645f92"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:828416:989184:p3",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 828416,
-        "warm_start": 748032,
-        "warmup_samples": 80384,
-        "warmup_sha256": "bceadfc19069b6a014f1537a435f5c9d8d487f754265da5517ae7de5e1b9b6b3"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_EN2001d:8493056:8653312:p81",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 8493056,
-        "warm_start": 8412672,
-        "warmup_samples": 80384,
-        "warmup_sha256": "7ac636928198f5af5e88fb648821dfe0b889e30be21d8f38ee0a83057e51a3f9"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2003a:131584:291840:p0",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 131584,
-        "warm_start": 51200,
-        "warmup_samples": 80384,
-        "warmup_sha256": "a29ac105851ba33e1c8895a86f47c14d72af93e92379817ffd2b90da22ea8d50"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 5,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 5
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2003a:16025600:16185856:n28",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 16025600,
-        "warm_start": 15945216,
-        "warmup_samples": 80384,
-        "warmup_sha256": "ef23d013ed7a70a8e153e361619147bbf9d3dfef84edd466a403e62962237578"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2003a:16652288:16812544:p71",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 16652288,
-        "warm_start": 16571904,
-        "warmup_samples": 80384,
-        "warmup_sha256": "27a3b88eba9997979423fef83ff6f5ac7b8d2206b8605f183827ee99dc8f1671"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2003a:17403392:17564160:n32",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 17403392,
-        "warm_start": 17323008,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8cc37db931929462a9a69f5e259e272baf8b0cb88ec06e281fb548188a87f4ef"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 5,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 5
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2003a:4309504:4470272:p26",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 4309504,
-        "warm_start": 4229120,
-        "warmup_samples": 80384,
-        "warmup_sha256": "262217da29eba2c1fd84e0f113f23b0697b78e06af2c9ac70700210a435b22de"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:10422784:10583040:p146",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 10422784,
-        "warm_start": 10342400,
-        "warmup_samples": 80384,
-        "warmup_sha256": "c873d7de2fb0e3c12e3866697b6bda68b42a1cfe8aa6310e65a838616f25ce24"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:13216768:13377024:p225",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 13216768,
-        "warm_start": 13136384,
-        "warmup_samples": 80384,
-        "warmup_sha256": "144a06973348d533af515a6f519c2f80a016eb1ca75a58f6f90c77f9b6df45a1"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:18774016:18971136:p382.p384",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 18774016,
-        "warm_start": 18693632,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8952c4130b294c2dac83a33c79b32b57dd09e34b06dbd0022ccf6d4ccc9c1b7b"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 479,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 479,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:19358208:19518464:p407",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 19358208,
-        "warm_start": 19277824,
-        "warmup_samples": 80384,
-        "warmup_sha256": "061a76de9bc20e2de0da61bb79f163397245a4914e3c8b1d0dfb8caeb07b55b8"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:20136448:20297216:n24",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 20136448,
-        "warm_start": 20056064,
-        "warmup_samples": 80384,
-        "warmup_sha256": "889f48a7bb82903c593c7385a332b2074f255fc2b87ab449f5bb7ba4c3260e71"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:20605440:20765696:n26",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 20605440,
-        "warm_start": 20525056,
-        "warmup_samples": 80384,
-        "warmup_sha256": "0d89e65c1a2715b547626c941fbec7bb0ac9790fadebf5675f6924c22fdf5258"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:26750976:26911232:p553",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 26750976,
-        "warm_start": 26670592,
-        "warmup_samples": 80384,
-        "warmup_sha256": "f07d10aef661e654a82c978d996b94141d60549e9ad74409f92c7a22647ec33b"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:2701824:2862080:p19",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 2701824,
-        "warm_start": 2621440,
-        "warmup_samples": 80384,
-        "warmup_sha256": "452a9000294df06d2723a24b55d49ef916ecca7fafb330a4d1bc01a002f3728b"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:29830144:29990400:p627",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 29830144,
-        "warm_start": 29749760,
-        "warmup_samples": 80384,
-        "warmup_sha256": "0d72a087ea503cbb3e4e14e5eef12c5717214d0ab25fe0f17982b8b435af2d39"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:3213312:3373568:p30",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 3213312,
-        "warm_start": 3132928,
-        "warmup_samples": 80384,
-        "warmup_sha256": "2d41aaffd476d4804e9d60a3da18c13d2eb488a724fe876dfc151986b9a31826"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_ES2015d:9300992:9491456:n17.p140",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 9300992,
-        "warm_start": 9220608,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5ad3be45c459336fedff46fad0ea4f2ffdf1d44d54d58116702d09068ab40de0"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 466,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 466,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_IS1009a:10131456:10291712:p125",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 10131456,
-        "warm_start": 10051072,
-        "warmup_samples": 80384,
-        "warmup_sha256": "d0282e98b6610fad71adc657ed35b5f9278d5023c4310c3a3bbd1b22b0befc3e"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_IS1009a:10563072:10723840:p134",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 10563072,
-        "warm_start": 10482688,
-        "warmup_samples": 80384,
-        "warmup_sha256": "fdb58a1fd09ae3e09b982163588d82441a7bd8094486dc7ce8a57a18e1a767c8"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_IS1009a:2928640:3209216:p19.p20.p21",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 2928640,
-        "warm_start": 2848256,
-        "warmup_samples": 80384,
-        "warmup_sha256": "c2b384b6750e9786852577427b1b0b95b2c7a0668514e0b2387c3d1e19fcced3"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 642,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 642,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_IS1009a:4297216:4457984:n8",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 4297216,
-        "warm_start": 4216832,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8c347dd960609b88d2e2921e2b1b4c769509a57cda16809b21c3432f54255c53"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_IS1009a:5296128:5456384:p47",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 5296128,
-        "warm_start": 5215744,
-        "warmup_samples": 80384,
-        "warmup_sha256": "9118b84832a33baaad541fc13a2afb1fbabcb7e343c6055abbb7e71f4127ac97"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_IS1009a:5945344:6105600:n10",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 5945344,
-        "warm_start": 5864960,
-        "warmup_samples": 80384,
-        "warmup_sha256": "bdaec0e16a7e569ab10cd9944ee7485d9722bc16b1956dba6b83e91407fa339b"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_IS1009a:7964160:8124416:p82",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 7964160,
-        "warm_start": 7883776,
-        "warmup_samples": 80384,
-        "warmup_sha256": "6518b4ac4a4cced3a1bcd29b51cb1b1f4e87d60ea6d2775a13c87e01191169f0"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3006a:12765184:12925440:p212",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 12765184,
-        "warm_start": 12684800,
-        "warmup_samples": 80384,
-        "warmup_sha256": "f2c98942fcee3fe544dc6ff92120c1dac0cb0679fdc166b8bb4c6c5cb4feb4de"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3006a:1353728:1546240:p11.p12",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 1353728,
-        "warm_start": 1273344,
-        "warmup_samples": 80384,
-        "warmup_sha256": "d6549e50a53177a29ab27c0295e8c8f183a4522e64e89126729b37055fc7cca7"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 470,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 470,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3006a:14877696:15037952:p243",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 14877696,
-        "warm_start": 14797312,
-        "warmup_samples": 80384,
-        "warmup_sha256": "762f14f7d90eee54c824ffc3e39f8cd87054edc3298a6b8341046d4ce4bfef21"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3006a:1699840:1860608:p21",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 1699840,
-        "warm_start": 1619456,
-        "warmup_samples": 80384,
-        "warmup_sha256": "1872eab4ff6269dc6180aee8410b25055a80c8cea9ddb3873cae7fd987b75bfd"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3006a:19128832:19289600:p349",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 19128832,
-        "warm_start": 19048448,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5ff1969578f5571f024368aee723cf411bc878e25a6ba781dc529ecd0b8f5e8c"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3006a:3935744:4096512:p42",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 3935744,
-        "warm_start": 3855360,
-        "warmup_samples": 80384,
-        "warmup_sha256": "9606306e09fdfd68df60ce918adfadf59f0b0f03243075a12832ca2aaa7d6239"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3006a:5170688:5330944:p75",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 5170688,
-        "warm_start": 5090304,
-        "warmup_samples": 80384,
-        "warmup_sha256": "6aba1e8af17bd8acdfbf74723a891800c3918907010137c3d0e20d87867182ac"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3006a:6156800:6317056:p94",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 6156800,
-        "warm_start": 6076416,
-        "warmup_samples": 80384,
-        "warmup_sha256": "1474f21441cae3cddd87de71cd49162873945c215e2b4e3c2a558dff447dd55c"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3009b:10144768:10305536:p88",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 10144768,
-        "warm_start": 10064384,
-        "warmup_samples": 80384,
-        "warmup_sha256": "a1dc9e9ab4e203a157fe774f9b1b8b82c793ccca87ad3d02d0dc730073e6bb9c"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3009b:11284480:11445248:p116",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 11284480,
-        "warm_start": 11204096,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8250c9794cb9a87b170474e6b6e7c6814282691f9103335b4f0e2e9d67316218"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3009b:13621248:13781504:p154",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 13621248,
-        "warm_start": 13540864,
-        "warmup_samples": 80384,
-        "warmup_sha256": "00878ecb9df18d745147c94dbd1b96b91f405c5bcff94aeb2af60ace69d85223"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3009b:20175872:20336640:n48",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 20175872,
-        "warm_start": 20095488,
-        "warmup_samples": 80384,
-        "warmup_sha256": "1cebbd8702460665a5b82a5b364d8a42f9ca52afc0e6f8f70860207685617384"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3009b:26849792:27010560:p368",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 26849792,
-        "warm_start": 26769408,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8fb6a1a33d01cc59eebcd024db6c5132d9e9ad0250376c1024e6acdec6e77597"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3009b:2841088:3060736:n6.n7",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 2841088,
-        "warm_start": 2760704,
-        "warmup_samples": 80384,
-        "warmup_sha256": "ce292387a69cc2f0c3bf2b884412d7e8223e6828233c8b8411f9b5f02cb87602"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 523,
+      "restored_rows_after_capture": 5,
+      "source_progress_after_capture": 523,
+      "source_rows_after_capture": 5
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3009b:33533440:33693696:p530",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 33533440,
-        "warm_start": 33453056,
-        "warmup_samples": 80384,
-        "warmup_sha256": "830696b8b17635a5a76c427c8f9fcbc53388dd6da75db526ca551e197c567e36"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3009b:37823488:37984256:p622",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 37823488,
-        "warm_start": 37743104,
-        "warmup_samples": 80384,
-        "warmup_sha256": "0ee5f55efd8c2940ada44cc0af856616be32c9936996bad01b3486b06eae80e4"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "diagnostic_dev:ami_TS3009b:6904832:7065600:n22",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 6904832,
-        "warm_start": 6824448,
-        "warmup_samples": 80384,
-        "warmup_sha256": "ba63d983b6535e4e5042388b540bbb1a72fcdb926d91afefd2353488434cbd08"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:13256192:13416448:p200",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 13256192,
-        "warm_start": 13175808,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5373dd69b85e1fe9bd1d7227a7e79955a0f3e5360507bd70cdee98fd5a16c880"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:20404736:20614656:n40.p354",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 20404736,
-        "warm_start": 20324352,
-        "warmup_samples": 80384,
-        "warmup_sha256": "e9b12bba15b46032e721d8fa084ea689a4c815ef4bc1ef025b637c1edf808ecc"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 504,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 504,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:22000640:22160896:p399",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 22000640,
-        "warm_start": 21920256,
-        "warmup_samples": 80384,
-        "warmup_sha256": "02f29fcfe4dce7853833d7171becba0b700d90610b877848bdddb30791d08c42"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:23495168:23655424:n46",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 23495168,
-        "warm_start": 23414784,
-        "warmup_samples": 80384,
-        "warmup_sha256": "1e1c2bf2d62b7b85e1a7216dbb6c2e3a91896f81250ddaaef1537a61e68c3185"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:24949760:25110528:p447",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 24949760,
-        "warm_start": 24869376,
-        "warmup_samples": 80384,
-        "warmup_sha256": "d036f372b3112f685d35df954319e04559de1213dabd02ffb5d1f0bb33c31369"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:2731520:2892288:p26",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 2731520,
-        "warm_start": 2651136,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5ae74e5640862899837a572783abf2ac5be2865be64fc019d16b62e31df84bcc"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:30734336:30894592:p556",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 30734336,
-        "warm_start": 30653952,
-        "warmup_samples": 80384,
-        "warmup_sha256": "278bab83e3709d84441a31499fcf800382815a2e626fd11d6db2af18026ab435"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:32401408:32562176:n74",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 32401408,
-        "warm_start": 32321024,
-        "warmup_samples": 80384,
-        "warmup_sha256": "1085102a780e8d2bc3c292c5c9afc3a9b3c5b145d81d9541e3c43531f1e041f7"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:433664:593920:p1",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 433664,
-        "warm_start": 353280,
-        "warmup_samples": 80384,
-        "warmup_sha256": "aa216214c8b6d703038b53a2bda52d8f5ccdb75148d0f7a2b397c699da72f07a"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:6982144:7142912:p103",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 6982144,
-        "warm_start": 6901760,
-        "warmup_samples": 80384,
-        "warmup_sha256": "f8c73eac0d896d234f74f91e307bc4b8cd79fbc74628c680a78bb27d9997d9ea"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8003_M8001:9462272:9622528:n13",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 9462272,
-        "warm_start": 9381888,
-        "warmup_samples": 80384,
-        "warmup_sha256": "9eee5139cdde54d4365fd3e5037842aeebcd70903c3a5becfc9ce7d85120dd96"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8007_M8011:14154752:14315520:p291",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 14154752,
-        "warm_start": 14074368,
-        "warmup_samples": 80384,
-        "warmup_sha256": "9ad2903c4368cf6d4054a075af747b80ffbd1271240b944dc3c6e7a0a9349c30"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8007_M8011:18439680:18600448:n12",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 18439680,
-        "warm_start": 18359296,
-        "warmup_samples": 80384,
-        "warmup_sha256": "2e00455d1b71401afff403f85f8fed9ff1de36a08db7ae2265a7735a1f6f1d17"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8007_M8011:23438848:23599616:n14",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 23438848,
-        "warm_start": 23358464,
-        "warmup_samples": 80384,
-        "warmup_sha256": "cd4f7ac0216170bbb03b0725fc583d98b67a5d38eda2b7893e31ad51edfb28b2"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8007_M8011:26566656:26727424:p631",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 26566656,
-        "warm_start": 26486272,
-        "warmup_samples": 80384,
-        "warmup_sha256": "c196e3e719cfa15de22e24e3df8895df553e8175b20a074d017ddaf0ec4db77a"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8007_M8011:7961088:8121344:p154",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 7961088,
-        "warm_start": 7880704,
-        "warmup_samples": 80384,
-        "warmup_sha256": "4be16d9267fae579325f6bb4c1c87342433df59af29e8cfae59ed6a549e0c0a5"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:11780608:11941376:n38",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 11780608,
-        "warm_start": 11700224,
-        "warmup_samples": 80384,
-        "warmup_sha256": "a23da8d9672d3e12e4368aacb200b253d1b5b7259a56943aca57e43dd5cfb35b"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:14337024:14497280:n47",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 14337024,
-        "warm_start": 14256640,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8685e67f17dc77165b8650e7c39d9b8c016185f4a536702545c0f6f6f63e37eb"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:15233024:15393280:p216",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 15233024,
-        "warm_start": 15152640,
-        "warmup_samples": 80384,
-        "warmup_sha256": "470de157792bba9995eaa0369eabd8f1d6f7a9e866890ce9bb631e61298fddc0"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:17975296:18135552:p251",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 17975296,
-        "warm_start": 17894912,
-        "warmup_samples": 80384,
-        "warmup_sha256": "2d2bfd55d60390e44573fb36593f96c112a51812bd0e400f1ea5df78af5b270f"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:20302848:20463104:p284",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 20302848,
-        "warm_start": 20222464,
-        "warmup_samples": 80384,
-        "warmup_sha256": "df574141b9e9d37d6a4597c500c366bfa9f31043f381f6481d8e5bb8a1d8b700"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:20704768:20865536:p290",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 20704768,
-        "warm_start": 20624384,
-        "warmup_samples": 80384,
-        "warmup_sha256": "2f6642bed3945d9f2965f5c39ad880a82f147deb804388b4fc431a90cd01c958"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:22119424:22280192:p307",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 22119424,
-        "warm_start": 22039040,
-        "warmup_samples": 80384,
-        "warmup_sha256": "3fc9f2e46aa33f5caf381cc48b454aea403bcc38c234dc3ee13e07e9917ce2b3"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:23958528:24119296:n79",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 23958528,
-        "warm_start": 23878144,
-        "warmup_samples": 80384,
-        "warmup_sha256": "4cfe71a55c2e627f13fdf1e50c6f66c09af6291dcbe8a11f26b901ae95451891"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:3481600:3641856:p47",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 3481600,
-        "warm_start": 3401216,
-        "warmup_samples": 80384,
-        "warmup_sha256": "b64b749a6c554c68287eeacdfa886fa85f9a62833e2012be50c31c6cd9563ba5"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:3832320:3992576:p54",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 3832320,
-        "warm_start": 3751936,
-        "warmup_samples": 80384,
-        "warmup_sha256": "6e4159193623000a025a308653bbc171e41c3bf0150f10ac8fb19a3f5b1a07f4"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:4128768:4289536:n11",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 4128768,
-        "warm_start": 4048384,
-        "warmup_samples": 80384,
-        "warmup_sha256": "dc70d3ac0d0de31dc9df6c67d703e69d42e3c2fd4d3390817b7b133ff9f8680a"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:6093824:6254080:p75",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 6093824,
-        "warm_start": 6013440,
-        "warmup_samples": 80384,
-        "warmup_sha256": "7b37455d71abb0ffa5b4380cd3bc477aac33a005259504dee56a95ccc4f1d195"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8018:6960640:7120896:p86",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 6960640,
-        "warm_start": 6880256,
-        "warmup_samples": 80384,
-        "warmup_sha256": "3667cf2a8854933ce130febda7e139486b062fea8227d57d541f011015ebb8a0"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:12683776:12844544:p110",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 12683776,
-        "warm_start": 12603392,
-        "warmup_samples": 80384,
-        "warmup_sha256": "0a0bfdbab88ad10272b57aaf22cf0fb86abc23d156289a322c7af5dceff56723"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:14275584:14450176:p138",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 14275584,
-        "warm_start": 14195200,
-        "warmup_samples": 80384,
-        "warmup_sha256": "3d892d5d9960d6b3e71512b1abd2be56f90184d736fce06cefcc2a260297174c"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 341,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 341,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:15414784:15575552:n112",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 15414784,
-        "warm_start": 15334400,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5ec30212e734be590da9f9dd1937f68e7fff2f24a7e08adb72928b8c1a9205fa"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:16754688:16915456:n118",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 16754688,
-        "warm_start": 16674304,
-        "warmup_samples": 80384,
-        "warmup_sha256": "9f141d9b863486d62d4b8e9d6ea48f900b8d5166bdd3a24b35792489eb7f9b0c"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:18437632:18699776:p191.p193",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 18437632,
-        "warm_start": 18357248,
-        "warmup_samples": 80384,
-        "warmup_sha256": "4bccdebd8d387398bc133ffe8dff89a9825b3e66fb92404354d4b8fc79eb96e5"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 606,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 606,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:19549696:19710464:p203",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 19549696,
-        "warm_start": 19469312,
-        "warmup_samples": 80384,
-        "warmup_sha256": "b798527eccf0f317da43d1958b0c6c51c72f1f05a1f0c31395e1c78c177323e9"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:20548096:20708352:n136",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 20548096,
-        "warm_start": 20467712,
-        "warmup_samples": 80384,
-        "warmup_sha256": "e938b7b8cd9d78b096bb3e3dae126794564b863822a795c5a9cdef57ad30d58a"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:2089472:2250240:n19",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 2089472,
-        "warm_start": 2009088,
-        "warmup_samples": 80384,
-        "warmup_sha256": "a83ba2b8f0439d2a4c7d87074b46024278bdaf345be2d7ffab9fc1b761f2c167"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:21403136:21563392:n142",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 21403136,
-        "warm_start": 21322752,
-        "warmup_samples": 80384,
-        "warmup_sha256": "03dec5d028e82d7e266d6fb03391b3abfb4945581daf7ef12302cff09dc17694"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:22804480:22964736:n149",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 22804480,
-        "warm_start": 22724096,
-        "warmup_samples": 80384,
-        "warmup_sha256": "dd7e0f5905f0c5550651ac8277028c56642bc6edc24d583d269e59c6516d56b6"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:26312704:26472960:p267",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 26312704,
-        "warm_start": 26232320,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8465fed2b25ba82a131ddfa0a8ab286d9c04cc4e408c06f43981e567a9efc850"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:27161088:27321344:p273",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 27161088,
-        "warm_start": 27080704,
-        "warmup_samples": 80384,
-        "warmup_sha256": "2ac1649f93329ed08e65e653fc57546483f191f2684591cee354e5609975050a"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:3918336:4078592:n31",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 3918336,
-        "warm_start": 3837952,
-        "warmup_samples": 80384,
-        "warmup_sha256": "154f8e8fc70ffb38e53ca196a7ffae3edefdfa075a24319d4c09aa36d65cca05"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 5,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 5
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:6626816:6858752:n59.n60",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 6626816,
-        "warm_start": 6546432,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5a00ea18da57f6c04b24fb404476df79d8092093e80e18de8a99224850d77a51"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 453,
+      "restored_rows_after_capture": 5,
+      "source_progress_after_capture": 453,
+      "source_rows_after_capture": 5
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:alimeeting_R8009_M8020:8088576:8249344:n72",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 8088576,
-        "warm_start": 8008192,
-        "warmup_samples": 80384,
-        "warmup_sha256": "4e0a89d386d8ba3aa21c144455c395a9938e9ec9639f8e5ba7fcc0bb8b87a997"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_EN2002c:1454080:1614848:n4",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 1454080,
-        "warm_start": 1373696,
-        "warmup_samples": 80384,
-        "warmup_sha256": "d34cb4b211187f746129dad18d845b96271d4dd6d456cb72d5b51c51556b7970"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_EN2002c:29224448:29384704:p360",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 29224448,
-        "warm_start": 29144064,
-        "warmup_samples": 80384,
-        "warmup_sha256": "0dd49c2d147733bcbbe38f09d61107d29a2d4b04a0bddaba89c1a30416bb93a7"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_EN2002c:37445632:37606400:p464",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 37445632,
-        "warm_start": 37365248,
-        "warmup_samples": 80384,
-        "warmup_sha256": "b5a35be9f08b0576c0fe093df548cd9e0172f563db8452cf13156729b5ee4e2c"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_EN2002c:599040:759296:n1",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 599040,
-        "warm_start": 518656,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8593f86f5ef91c9164c8a6d7fec52087a25c67382fccb448ed712d1db7f8d057"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_ES2004a:13716992:13931008:p166",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 13716992,
-        "warm_start": 13636608,
-        "warmup_samples": 80384,
-        "warmup_sha256": "679dd099bcccaf7e8557decc8736ca2eab0893a014a2c08323c625d96d3a4987"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 418,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 418,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_ES2004a:14528000:14688768:n33",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 14528000,
-        "warm_start": 14447616,
-        "warmup_samples": 80384,
-        "warmup_sha256": "eb3684e5d12dfb7fa27b70ba53f3f809a6b121bf052c1152cbe545ca2bc43166"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_ES2004a:1787904:1948160:n5",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 1787904,
-        "warm_start": 1707520,
-        "warmup_samples": 80384,
-        "warmup_sha256": "9f59d5794dd0738802b4d7235681c5cdc70a3f824392374b06b206b69bc2fc5c"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_IS1008a:1508352:1668608:p10",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 1508352,
-        "warm_start": 1427968,
-        "warmup_samples": 80384,
-        "warmup_sha256": "376b310b72e5160a76f8165cd5fb2ab58c71299a44515f373cda0096854e2321"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_IS1008a:4603904:4764160:p45",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 4603904,
-        "warm_start": 4523520,
-        "warmup_samples": 80384,
-        "warmup_sha256": "e91f7b7034f78385db164d48bedb989180d55ca9e3c842543ca98d50bd521a2f"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_IS1008a:706048:866304:p0",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 706048,
-        "warm_start": 625664,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8b308058b3453670422d0ba7878088374114a7d397d4f9ebb1f4b07ba19ef42f"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_IS1008a:7932928:8120832:n16",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 7932928,
-        "warm_start": 7852544,
-        "warmup_samples": 80384,
-        "warmup_sha256": "06287c95647cf88c6c04f4f54e76c2a01976cf49a1d3ef68c48eed8868bac4cb"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 367,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 367,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3005b:16468992:16629760:p102",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 16468992,
-        "warm_start": 16388608,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5fc5434e0bd88c7019e0a86fb21e9ffc9a2ec2afb364cfe92e5f056e77008772"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3005b:17876992:18037248:n43",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 17876992,
-        "warm_start": 17796608,
-        "warmup_samples": 80384,
-        "warmup_sha256": "bd2e1240a58c3a5f368b4bcb72cc26f2177119381bbf267593eff92a48794619"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 5,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 5
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3005b:21968896:22129664:p218",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 21968896,
-        "warm_start": 21888512,
-        "warmup_samples": 80384,
-        "warmup_sha256": "188634ff04cdaf961b596fd70ab2bbb110d20f5cdb97ffae67707c57c3d839b4"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 5,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 5
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3005b:26631680:26791936:p337",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 26631680,
-        "warm_start": 26551296,
-        "warmup_samples": 80384,
-        "warmup_sha256": "4b1de14ce2486078836efe0039c0f227c29556d53b5f4ccf73e40e120c92cd79"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3005b:27245056:27405312:p359",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 27245056,
-        "warm_start": 27164672,
-        "warmup_samples": 80384,
-        "warmup_sha256": "960532e7386554f59722d266125c00d79ed047f77ebda34bb89b89ba4a902fa6"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3005b:2898944:3059200:n2",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 2898944,
-        "warm_start": 2818560,
-        "warmup_samples": 80384,
-        "warmup_sha256": "3992d8c160d3e0e13a30d9b50fc9125229ea99baad0b6e4c1a34b834ab2440f5"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3005b:31655424:31816192:n57",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 31655424,
-        "warm_start": 31575040,
-        "warmup_samples": 80384,
-        "warmup_sha256": "40e582f4cd6b2cae524cd2c25398df039f67f0ed34e61dd7b2f28a7c2f8e32dc"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3005b:33033216:33246208:p508",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 33033216,
-        "warm_start": 32952832,
-        "warmup_samples": 80384,
-        "warmup_sha256": "cc01fc5716944e5244538b0c5ea64035bc30516dc5db7ae85c930a06233d0544"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 416,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 416,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3005b:4931584:5091840:n7",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 4931584,
-        "warm_start": 4851200,
-        "warmup_samples": 80384,
-        "warmup_sha256": "757ef9ec3b8899ad4268e874b494391233d73fb1efb784c45496e7cc3735d0e8"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:10255360:10415616:n44",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 10255360,
-        "warm_start": 10174976,
-        "warmup_samples": 80384,
-        "warmup_sha256": "0eebcf0feb0188aa831f3cccbe838cb0f40ec99afa3b7c2cf73629ab10ea3070"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:12641280:12855296:p121.p122",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 12641280,
-        "warm_start": 12560896,
-        "warmup_samples": 80384,
-        "warmup_sha256": "9d8debbad53d7e2d14cf3687e67da85e40564e178f4c273541a5907bd42e387a"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 418,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 418,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:15229440:15390208:p179",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 15229440,
-        "warm_start": 15149056,
-        "warmup_samples": 80384,
-        "warmup_sha256": "749ff12f37b2ff19c38b50a511d5db2124037fa24de0cd5407545c272ff236a7"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:17163776:17324032:p192",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 17163776,
-        "warm_start": 17083392,
-        "warmup_samples": 80384,
-        "warmup_sha256": "20e561362aa67ba0a2b9876c72df3d8f75dd01f100a1f177c970fbad3d835b67"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:17724416:17900544:n69",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 17724416,
-        "warm_start": 17644032,
-        "warmup_samples": 80384,
-        "warmup_sha256": "d93569e2c827fed04ac1e092d2258e329f6bffd94a3013ffd92c00b33b1aab8a"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 344,
+      "restored_rows_after_capture": 0,
+      "source_progress_after_capture": 344,
+      "source_rows_after_capture": 0
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:201728:361984:p2",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 201728,
-        "warm_start": 121344,
-        "warmup_samples": 80384,
-        "warmup_sha256": "429866abbaaf4d5fca29c74599712b33b054b9a7a152ac1185e1ecca1058b356"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:20422656:20582912:n75",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 20422656,
-        "warm_start": 20342272,
-        "warmup_samples": 80384,
-        "warmup_sha256": "9e4ace4b0d8c725b8b53b00fa579590a2d4c34daaa4f950494da047491ff0349"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 5,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 5
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:21181440:21341696:p245",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 21181440,
-        "warm_start": 21101056,
-        "warmup_samples": 80384,
-        "warmup_sha256": "79d21669878641719f5ef29fa71538bb5c5cefef1937e79a464e59b288456879"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:22167040:22327296:n79",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 22167040,
-        "warm_start": 22086656,
-        "warmup_samples": 80384,
-        "warmup_sha256": "cd048dac3333eec0c1191699a0ac149e87dbebea9136abc5cc9e6ca4e3ed0a68"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:22803456:23123456:n81.n83",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 22803456,
-        "warm_start": 22723072,
-        "warmup_samples": 80384,
-        "warmup_sha256": "61f96a5600c04e4a8a2507f525561969aa2dcc2d6e5cd541c09e72fb85bce96d"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 756,
+      "restored_rows_after_capture": 5,
+      "source_progress_after_capture": 756,
+      "source_rows_after_capture": 5
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:2358784:2519552:p18",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 2358784,
-        "warm_start": 2278400,
-        "warmup_samples": 80384,
-        "warmup_sha256": "1541ceb50e2561503c500b61da1b1edfc0956a439d540b8706192de25f120865"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:24553984:24714240:p299",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 24553984,
-        "warm_start": 24473600,
-        "warmup_samples": 80384,
-        "warmup_sha256": "d061826099731679f91def4611061d529fd7312f3d621d360503a9ebff85822f"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:3402240:3562496:n8",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 3402240,
-        "warm_start": 3321856,
-        "warmup_samples": 80384,
-        "warmup_sha256": "8057441a9595de905aefa5bf987d7e17ba7c938a5c2579d3a63093319e309a83"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:4775424:4935680:n14",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 4775424,
-        "warm_start": 4695040,
-        "warmup_samples": 80384,
-        "warmup_sha256": "bed5b2f6e5f0eff726a64a5f4ca7fa4aeff89670ed643dbc24071c14f8531c99"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:6375424:6535680:n18",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 6375424,
-        "warm_start": 6295040,
-        "warmup_samples": 80384,
-        "warmup_sha256": "885d918f28e586025fc395ce14cf75b1fd519a7920cc26b222e8ac0135b24976"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:6738944:7021056:n22.p33",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 6738944,
-        "warm_start": 6658560,
-        "warmup_samples": 80384,
-        "warmup_sha256": "d894807259aaf2f4b5dd3202ead109209e7ebee1d1cd70fef4573299ffc70eec"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 645,
+      "restored_rows_after_capture": 6,
+      "source_progress_after_capture": 645,
+      "source_rows_after_capture": 6
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:8313856:8474112:p49",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 8313856,
-        "warm_start": 8233472,
-        "warmup_samples": 80384,
-        "warmup_sha256": "460691d4a37944d5064fc0da2fb947bda44367dbbef29857b9f58cde5591ddda"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3007a:9147392:9308160:p65",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 9147392,
-        "warm_start": 9067008,
-        "warmup_samples": 80384,
-        "warmup_sha256": "efa1f345f7841915e97a6e8e036207392a6ba5b40ce75115eb0ba96178832f05"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:10662400:10822656:p214",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 10662400,
-        "warm_start": 10582016,
-        "warmup_samples": 80384,
-        "warmup_sha256": "ea02bf6bcad4f0ea37db2a22f684669034a80116af765ba41f09fad7fcabb390"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:12524032:12684288:p258",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 12524032,
-        "warm_start": 12443648,
-        "warmup_samples": 80384,
-        "warmup_sha256": "5b9cafa370e634924705d0fd17e2a58bfaa001fbef3c1ed059dc7b30bf656ba1"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:14123520:14284288:n16",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 14123520,
-        "warm_start": 14043136,
-        "warmup_samples": 80384,
-        "warmup_sha256": "80b6c5bb779a13b645c7ed9e000e6a150df2c0dc2a2bbae4fb81e792f0e35022"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:14973952:15134720:p302",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 14973952,
-        "warm_start": 14893568,
-        "warmup_samples": 80384,
-        "warmup_sha256": "9d5e8bb683045594c4310ef5168b39801cac6ef928b9981f2ee5382949e598c0"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:15705600:15866368:n20",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 15705600,
-        "warm_start": 15625216,
-        "warmup_samples": 80384,
-        "warmup_sha256": "420a7b7f0310a7c7b145c94dfd155310234af997abf4fd9ce6c0632bf2e67b71"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:16380416:16541184:n22",
-      "restored_boundary_count": 2,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 16380416,
-        "warm_start": 16300032,
-        "warmup_samples": 80384,
-        "warmup_sha256": "74115069d09b6c7fc4774e7f061db6388d8edaeb93d4bee265f51bee30b7c32a"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:19768320:19929088:p393",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 19768320,
-        "warm_start": 19687936,
-        "warmup_samples": 80384,
-        "warmup_sha256": "b291e58d3a7f6097dce1b2b17178c62bcb10af849dc65b247b677cb8c14e1e18"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:20439040:20615680:p401.p402",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 20439040,
-        "warm_start": 20358656,
-        "warmup_samples": 80384,
-        "warmup_sha256": "d03cb82813acc4bb5dcba6b8d4935722cbecd0114716a696e7df1213ec397c6a"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 439,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 439,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:22059520:22220288:p433",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 22059520,
-        "warm_start": 21979136,
-        "warmup_samples": 80384,
-        "warmup_sha256": "7a4a347b6906075898f7a0213bfab97292d7372f11f1123346a7e6dcd4066be5"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 2,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 2
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:2245120:2405888:n3",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 2245120,
-        "warm_start": 2164736,
-        "warmup_samples": 80384,
-        "warmup_sha256": "a93676933e6dc94a6b2d5e682ab9c19746e7e9992ae5210fcc4f9132d70c186b"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:23388160:23548416:n32",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 23388160,
-        "warm_start": 23307776,
-        "warmup_samples": 80384,
-        "warmup_sha256": "1feb8fd394f2060f31da5fb5d9a061114110b49d1925d028dba61659e911204c"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:24631808:24792064:p459",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 24631808,
-        "warm_start": 24551424,
-        "warmup_samples": 80384,
-        "warmup_sha256": "c2d177c2f4efec258c931e0365b201c8901bf8bae0494b47dcf5d4194a183a6e"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 4,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 4
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:27008512:27169280:n50",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 27008512,
-        "warm_start": 26928128,
-        "warmup_samples": 80384,
-        "warmup_sha256": "b769e8b57682269011cc823e8e2fb900de343688caf996cc55bd2e5ffc520627"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:3060224:3220480:n5",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 3060224,
-        "warm_start": 2979840,
-        "warmup_samples": 80384,
-        "warmup_sha256": "94c9db45b0f753ddd6e2b99b9d7ab1d2f0c37a12f805b1e7c5f0f89178041d02"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 407,
+      "restored_rows_after_capture": 1,
+      "source_progress_after_capture": 407,
+      "source_rows_after_capture": 1
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:31572480:31821312:p572.p575",
-      "restored_boundary_count": 1,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 31572480,
-        "warm_start": 31492096,
-        "warmup_samples": 80384,
-        "warmup_sha256": "bdf6a9229f4e394f49099bbd6d68a75dbda60b4a9b7e2addeaf2c5fc6582f256"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 580,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 580,
+      "source_rows_after_capture": 3
     },
     {
+      "captured_at_scored_start": true,
+      "episode_class": "b0/peer",
       "episode_id": "frontier_dev:ami_TS3012c:6387200:6547968:p117",
-      "restored_boundary_count": 0,
-      "snapshot": {
-        "chunk_samples": 512,
-        "class": "b0/peer",
-        "model_sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
-        "scored_start": 6387200,
-        "warm_start": 6306816,
-        "warmup_samples": 80384,
-        "warmup_sha256": "d944e96529c3e5ef16a11b8b3c7c5b59e5f67e9efa6078e78dd4868c917a39d3"
-      }
+      "passed": true,
+      "restored_progress_after_capture": 408,
+      "restored_rows_after_capture": 3,
+      "source_progress_after_capture": 408,
+      "source_rows_after_capture": 3
     }
   ],
   "snapshot_fallback": {
-    "mechanism": "deterministic source-prefix state snapshot binding model hash, warm-up slice, chunk config; restore replays warm-up deterministically",
+    "mechanism": "capture/restore of the full B0 engine state (gating fields, pre-roll ring, pending start, RNN hidden state) at the scored start; restored replay resumes and must reproduce the source-prefix trace exactly (boundaries + progress rows, canonical coordinates)",
     "round_trip_episodes": 186,
+    "round_trip_failed": [],
     "round_trip_passed": true
   },
+  "structural_taxonomy_status": "max_duration_and_terminal_deferred_phase3_8",
   "tolerances": {
     "b0": "exact (tolerance 0) on scored-region boundary trace and aligned (observed, safe-frontier) progress rows",
     "eres2netv2": "aligned-window cosine >= 0.99 (declared; executed Phase 4)",
