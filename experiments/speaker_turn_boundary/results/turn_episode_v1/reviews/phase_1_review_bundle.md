@@ -19,7 +19,7 @@ P1-GROUP-002, P1-PROV-002 (this revision).
 | Plan self-hash | `8c6bed2e564b9ec80e26ee6b73701985c863b7beb68e51590be7a5faf173aad4` |
 | Restart commit (base) | `fef0a6b312df34680d9db0fd858e28ae054ace89` |
 | Work branch | `experiment-v2-speaker-change-turn-boundaries-ls` |
-| Review base..candidate | `fef0a6b3..00ff8635` (rev-2 candidate `00ff8635`; rev-1 candidate was `2f5a03db`; working tree clean at bundle time) |
+| Review base..candidate | `fef0a6b3..e3d88151` (rev-3 candidate `e3d88151`; rev-1 candidate `2f5a03db`, rev-2 candidate `00ff8635`; working tree clean at bundle time) |
 | Phase 0 evidence this phase depends on | `reviews/phase_0_pre_execution.md` (approved), `reviews/phase_0_review_bundle.md`, `turn_episode/schemas.py`, `turn_episode/contracts.py`, `proposal_contract.json`, `fusion_contract.json` |
 | Historical hash ledger | `reviews/historical_artifact_ledger.json` |
 
@@ -63,7 +63,7 @@ Corpus root resolution (`corpus/external.py`): `STB_PHASE2_CORPORA_ROOT` env var
 
 | Corpus | Local state | Notes |
 | --- | --- | --- |
-| AMI | 171 meetings with per-participant `words.xml` annotations (687 files); **audio materialized for 4 meetings only**: ES2003a, ES2004a, IS1008a, IS1009a (Mix-Headset 16 kHz mono wav) | words.xml word-level v1.6.2 per-participant; participant `global_name` actor IDs discoverable in the words.xml speaker elements (used by `corpus/ami.py`) |
+| AMI | 171 meetings with per-participant `words.xml` annotations (687 files); **audio materialized for 4 meetings only**: ES2003a, ES2004a, IS1008a, IS1009a (Mix-Headset 16 kHz mono wav) | words.xml is word-level v1.6.2 per-participant and supplies word timing only (no identity); participant `global_name` actor IDs come from `corpusResources/meetings.xml` speaker elements and from the pilot manifests' `condition.partition_meta.agents` mapping |
 | AliMeeting Eval | 8 sessions with TextGrid interval tiers per speaker + far-field audio; 8 sessions already materialized as `far_ch0` mono 16 kHz wav | R8001_M8004, R8003_M8001, R8007_M8010, R8007_M8011, R8008_M8013, R8009_M8018, R8009_M8019, R8009_M8020; speakers are `N_SPKxxxx` tier names (session-local) |
 | LibriSpeech synthetic | dev-clean (202 cases), test-clean (202), test-other (202) episode manifests exist; generated wavs under `data/generated/` | synthetic source blocks per Section 5.5 |
 
@@ -289,7 +289,7 @@ Deterministic per-session hash-stratified sampling, frozen before Phase 2:
 | id | severity | finding | disposition |
 | --- | --- | --- | --- |
 | P1-RANGE-001 | blocker | bundle recorded stale head; candidate is 2f5a03db | resolved in Section 1 (rev-1 range fef0a6b3..2f5a03db) |
-| P1-RANGE-002 | blocker | rev-2 bundle still named the rev-1 candidate | resolved in Section 1 (rev-2/3 range fef0a6b3..00ff8635) |
+| P1-RANGE-002 | blocker | rev-2 bundle still named the rev-1 candidate | resolved in Section 1 (rev-3 range fef0a6b3..e3d88151) |
 | P1-B0-001 | blocker | legacy B0 runner rejects phase2-v1 manifests | resolved in Section 4.1 (dedicated inventory script, raw `replay_wav_epoch` path) |
 | P1-B0-002 | important | "not neural inference" false; Silero is ONNX | resolved in Section 4.1 (baseline engine wording; model hash bound) |
 | P1-B0-003 | important | classification inputs unspecified; coalescer non-normative; terminal boundaries deferred | resolved in Sections 4.1-4.2 (raw traces only; frozen classification rule) |
