@@ -41,6 +41,7 @@ class SettingsGeneralIntents:
     current_loopback_capture_option: Callable[[], str]
     apply_loopback_capture_option: Callable[[str], None]
     loopback_capture_summary: Callable[[], str]
+    osc_effective_ports: Callable[[], tuple[int | None, int | None]] | None = None
 
 
 @dataclass(frozen=True, slots=True)

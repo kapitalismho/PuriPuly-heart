@@ -3,37 +3,18 @@ from __future__ import annotations
 from typing import cast
 
 import pytest
-
-from puripuly_heart.app import wiring_managed_account as managed_account_module
-from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
-from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
-from puripuly_heart.app.services.canonical_settings_persistence import (
-    compose_settings_owner,
-)
 from puripuly_heart.app.services.managed_auth import ManagedAuthOwner
 from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
-from puripuly_heart.app.services.openrouter_pkce_flow import (
-    OpenRouterPkceApplicationOwner,
-    OpenRouterPkceFlowOwner,
-)
 from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeOwner
 from puripuly_heart.app.services.provider_settings import ProviderSettingsOwner
 from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
-from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
 from puripuly_heart.app.wiring_managed_account import (
     ManagedOpenRouterReleaseRuntime,
     ManagedTranslationRuntimeAccess,
     compose_managed_account,
 )
-from puripuly_heart.config.settings import (
-    AppSettings,
-    LLMProviderName,
-    OpenRouterCredentialSource,
-    TranslationConnection,
-)
-from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
 from puripuly_heart.core.managed_openrouter_broker_client import (
     HttpManagedOpenRouterBrokerClient,
 )
@@ -42,6 +23,25 @@ from puripuly_heart.core.managed_openrouter_release import (
     UnavailableManagedOpenRouterReleaseClient,
 )
 from puripuly_heart.core.openrouter_credentials import OPENROUTER_BYOK_API_KEY_SECRET
+
+from puripuly_heart.app import wiring_managed_account as managed_account_module
+from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
+from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    compose_settings_owner,
+)
+from puripuly_heart.app.services.openrouter_pkce_flow import (
+    OpenRouterPkceApplicationOwner,
+    OpenRouterPkceFlowOwner,
+)
+from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
+from puripuly_heart.config.settings import (
+    AppSettings,
+    LLMProviderName,
+    OpenRouterCredentialSource,
+    TranslationConnection,
+)
+from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigurationOwner,
@@ -195,6 +195,7 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
         rebuild_llm=lambda: pytest.fail("runtime rebuild must not run"),
     )
     results = SettingsTransactionResultOwner()
+    runtime_state_changes: list[str] = []
     components = compose_managed_account(
         config_path=owner.path,
         settings=owner,
@@ -216,6 +217,7 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
         log_error=lambda _message: None,
         basic_warning_sink=lambda _message: None,
         detailed_warning_sink=lambda _message, _exception: None,
+        runtime_state_changed=lambda: runtime_state_changes.append("changed"),
     )
 
     assert isinstance(components.auth, ManagedAuthOwner)
@@ -229,6 +231,8 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
     translation_state = components.translation.state_provider()
     assert translation_state.managed_selected is True
     assert translation_state.runtime_available is False
+    components.translation.disable_for_managed_exhaustion(reopen_founder_letter=False)
+    assert runtime_state_changes == ["changed"]
 
     callback_events: list[str] = []
     components.auth.callback_received_hook = lambda: callback_events.append("callback")

@@ -59,6 +59,7 @@ from puripuly_heart.ui.components.settings import (
     CustomVocabularyTagEditor,
     LanguageHintEditor,
     OptionItem,
+    OscConnectionModal,
     PromptEditor,
     SettingsModal,
     SettingsUnitCard,
@@ -382,6 +383,7 @@ class SettingsView(ft.Column):
         self.on_current_loopback_capture_option: Callable[[], str] | None = None
         self.on_apply_loopback_capture_option: Callable[[str], None] | None = None
         self.on_loopback_capture_summary: Callable[[], str] | None = None
+        self.on_osc_effective_ports: Callable[[], tuple[int | None, int | None]] | None = None
         self.show_snackbar: Callable[[str, str], None] | None = None
         self.runtime_log_basic: Callable[..., None] | None = None
         self.runtime_log_detailed: Callable[..., None] | None = None
@@ -477,6 +479,7 @@ class SettingsView(ft.Column):
         self.on_current_loopback_capture_option = general.current_loopback_capture_option
         self.on_apply_loopback_capture_option = general.apply_loopback_capture_option
         self.on_loopback_capture_summary = general.loopback_capture_summary
+        self.on_osc_effective_ports = general.osc_effective_ports
         self.on_prompt_apply_settings = prompt.prompt_apply_settings
         self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
@@ -600,6 +603,7 @@ class SettingsView(ft.Column):
             self._llm_text,
             self._ui_text,
             self._chatbox_source_text,
+            self._osc_connection_text,
             self._clipboard_auto_translate_text,
             self._microphone_test_text,
             self._vrc_mic_text,
@@ -645,6 +649,15 @@ class SettingsView(ft.Column):
         self._set_unit_card_value_text(
             self._loopback_audio_text,
             loopback_summary or default_label,
+        )
+
+    def _sync_osc_connection_card(self, settings: AppSettings) -> None:
+        mode = settings.osc.connection_mode
+        if mode not in {"automatic", "manual", "off"}:
+            mode = "automatic"
+        self._set_unit_card_value_text(
+            self._osc_connection_text,
+            t(f"settings.osc.mode.{mode}"),
         )
 
     def refresh_loopback_capture_target(self, settings: AppSettings) -> None:
@@ -1308,6 +1321,41 @@ class SettingsView(ft.Column):
             value=self._chatbox_source_text,
         )
 
+        self._osc_connection_text = self._build_clickable_text(
+            t("settings.osc.mode.automatic"),
+            self._on_osc_connection_click,
+        )
+        self._osc_connection_label = ft.Text(
+            t("settings.osc.connection"),
+            size=20,
+            color=COLOR_SECONDARY,
+        )
+        self._osc_connection_chevron = ft.Icon(
+            ft.Icons.CHEVRON_RIGHT,
+            size=24,
+            color=COLOR_SECONDARY,
+        )
+        self._osc_connection_row = ft.Row(
+            controls=[
+                self._osc_connection_label,
+                self._osc_connection_text,
+                self._osc_connection_chevron,
+            ],
+            spacing=8,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            expand=True,
+        )
+        self._osc_connection_title = ft.Text(
+            t("settings.vrchat_osc"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._vrchat_osc_card = self._wrap_unit_card(
+            title=self._osc_connection_title,
+            value=self._osc_connection_row,
+        )
+
         self._clipboard_auto_translate_text = self._build_clickable_text(
             t("settings.clipboard_auto_translate.off"),
             self._on_clipboard_auto_translate_click,
@@ -1494,7 +1542,7 @@ class SettingsView(ft.Column):
                 vrchat_mic_intercept=vrc_mic_card,
                 telemetry_consent=self._telemetry_consent_card,
             ),
-            placeholder_factory=self._wrap_empty_unit_card,
+            placeholder_factory=lambda: self._vrchat_osc_card,
         )
 
         # === Peer STT card ===
@@ -3116,6 +3164,7 @@ class SettingsView(ft.Column):
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if settings.osc.vrc_mic_intercept else "settings.vrc_mic.off"
         )
+        self._sync_osc_connection_card(settings)
         self._chatbox_source_text.content.value = t(
             "settings.chatbox_source.on"
             if settings.osc.chatbox_include_source
@@ -4906,6 +4955,42 @@ class SettingsView(ft.Column):
             self._chatbox_source_text.update()
         self._emit_settings_changed()
 
+    def _on_osc_connection_click(self, e) -> None:
+        _ = e
+        if not self._settings or not is_control_mounted(self):
+            return
+        self._osc_connection_modal = OscConnectionModal(
+            self.page,
+            self._on_osc_connection_selected,
+            effective_ports_provider=self.on_osc_effective_ports,
+        )
+        self._osc_connection_modal.open(
+            self._settings.osc.connection_mode,
+            int(self._settings.osc.send_port or self._settings.osc.port),
+            int(self._settings.osc.receive_port),
+        )
+
+    def _on_osc_connection_selected(self, mode: str, send_port: int, receive_port: int) -> None:
+        if not self._settings:
+            return
+        if mode not in {"automatic", "manual", "off"}:
+            return
+        candidate = copy.deepcopy(self._settings)
+        candidate.osc.connection_mode = mode
+        candidate.osc.send_port = int(send_port)
+        candidate.osc.receive_port = int(receive_port)
+        try:
+            candidate.osc.validate()
+        except (TypeError, ValueError):
+            return
+        self._settings.osc.connection_mode = mode
+        self._settings.osc.send_port = int(send_port)
+        self._settings.osc.receive_port = int(receive_port)
+        self._sync_osc_connection_card(self._settings)
+        if is_control_mounted(self):
+            self._osc_connection_text.update()
+        self._emit_settings_changed()
+
     def _on_clipboard_auto_translate_click(self, e) -> None:
         """Toggle clipboard auto-translate immediately from the unit card."""
         if not self._settings:
@@ -5158,6 +5243,8 @@ class SettingsView(ft.Column):
         self._persona_title.value = t("settings.section.persona")
         self._custom_vocab_title.value = t("settings.section.custom_vocabulary")
         self._vrc_mic_title.value = t("settings.vrc_mic_intercept")
+        self._osc_connection_title.value = t("settings.vrchat_osc")
+        self._osc_connection_label.value = t("settings.osc.connection")
         self._chatbox_source_title.value = t("settings.chatbox_include_source")
         self._clipboard_auto_translate_title.value = t("settings.clipboard_auto_translate")
         self._telemetry_consent_title.value = t("settings.telemetry.title")
@@ -5246,6 +5333,7 @@ class SettingsView(ft.Column):
                 if display_settings.osc.vrc_mic_intercept
                 else "settings.vrc_mic.off"
             )
+            self._sync_osc_connection_card(display_settings)
             self._chatbox_source_text.content.value = t(
                 "settings.chatbox_source.on"
                 if display_settings.osc.chatbox_include_source

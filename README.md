@@ -168,6 +168,8 @@ So I built one that can.
 
 7. Enable OSC in VRChat: Action menu → Settings → OSC → Enable.
 
+For bidirectional control setup and the stable parameter ABI, see [VRChat OSC controls](docs/vrchat-osc.md).
+
 ### If audio capture does not work
 If audio capture does not work, open **Settings > General** and follow these steps.
 

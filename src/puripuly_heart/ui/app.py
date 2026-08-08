@@ -275,6 +275,7 @@ class TranslatorApp:
                 ),
                 apply_loopback_capture_option=self._on_apply_loopback_capture_option,
                 loopback_capture_summary=(lambda: self.application.loopback_capture_summary()),
+                osc_effective_ports=self._effective_osc_ports,
             ),
             prompt=SettingsPromptIntents(
                 prompt_apply_settings=self._on_prompt_apply_settings,
@@ -305,6 +306,18 @@ class TranslatorApp:
     @property
     def application(self) -> UiApplicationPort:
         return self._ui_application
+
+    def _effective_osc_ports(self) -> tuple[int | None, int | None]:
+        try:
+            value = self.application.effective_osc_ports()
+        except Exception:
+            return (None, None)
+        if not isinstance(value, tuple) or len(value) != 2:
+            return (None, None)
+        return (
+            value[0] if isinstance(value[0], int) and value[0] > 0 else None,
+            value[1] if isinstance(value[1], int) and value[1] > 0 else None,
+        )
 
     def _run_page_task(self, coroutine, *args):
         if getattr(self, "_shutting_down", False):

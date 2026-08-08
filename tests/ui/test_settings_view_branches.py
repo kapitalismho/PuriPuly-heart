@@ -5294,11 +5294,10 @@ def test_audio_change_updates_desktop_loopback_controls(monkeypatch: pytest.Monk
     assert changed[-1].desktop_audio.vad_pre_roll_ms == 420
 
 
-def test_general_tab_keeps_fixed_three_slot_rows_with_empty_retired_context_shell(
+def test_general_tab_keeps_fixed_three_slot_rows_with_vrchat_osc_card(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
-    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 
     view, _ = _make_settings_view(monkeypatch)
     general_controls = _subtab_controls(view, "general")
@@ -5308,6 +5307,7 @@ def test_general_tab_keeps_fixed_three_slot_rows_with_empty_retired_context_shel
     assert _row_card_titles(general_controls[0]) == [
         t("settings.section.ui"),
         t("settings.chatbox_include_source"),
+        t("settings.vrchat_osc"),
     ]
     assert _row_card_titles(general_controls[1]) == [
         t("settings.audio_host_api"),
@@ -5325,18 +5325,17 @@ def test_general_tab_keeps_fixed_three_slot_rows_with_empty_retired_context_shel
         t("settings.telemetry.title"),
     ]
 
-    empty_card = general_controls[0].content.controls[2]
-    empty_content = _wrapped_card_column(empty_card)
-
-    assert isinstance(empty_card, SharedCardWrapper)
-    assert not isinstance(empty_card, SettingsUnitCard)
-    assert empty_card.height == SettingsUnitCard.DEFAULT_HEIGHT
-    assert empty_card.expand is True
-    assert empty_card.ignore_interactions is True
-    assert empty_card.on_click is None
-    assert empty_card.on_hover is None
-    assert isinstance(empty_content, ft.Container)
-    assert empty_content.content is None
+    osc_card = general_controls[0].content.controls[2]
+    assert osc_card is view._vrchat_osc_card
+    assert isinstance(osc_card, SettingsUnitCard)
+    assert osc_card.height == SettingsUnitCard.DEFAULT_HEIGHT
+    assert osc_card.expand is True
+    osc_column = _wrapped_card_column(osc_card)
+    osc_row = osc_column.controls[1].content
+    assert isinstance(osc_row, ft.Row)
+    assert osc_row.controls[0].value == t("settings.osc.connection")
+    assert osc_row.controls[1] is view._osc_connection_text
+    assert osc_row.controls[2].icon == ft.Icons.CHEVRON_RIGHT
 
 
 def test_api_translation_connection_row_keeps_empty_fast_translation_slot(
@@ -5369,7 +5368,7 @@ def test_api_translation_connection_row_keeps_empty_fast_translation_slot(
 
 
 @pytest.mark.parametrize("locale", ["en", "ko", "ja", "ru", "zh-CN"])
-def test_retired_policy_empty_slots_are_locale_independent(
+def test_general_osc_card_is_locale_independent(
     monkeypatch: pytest.MonkeyPatch,
     locale: str,
 ) -> None:
@@ -5385,12 +5384,12 @@ def test_retired_policy_empty_slots_are_locale_independent(
         assert _row_card_titles(general_row) == [
             t("settings.section.ui"),
             t("settings.chatbox_include_source"),
+            t("settings.vrchat_osc"),
         ]
         assert _row_card_titles(api_row) == [
             t("settings.translation_connection"),
             t("settings.fallback"),
         ]
-        assert _control_labels(_row_cards(general_row)[2]) == []
         assert _control_labels(_row_cards(api_row)[0]) == []
     finally:
         i18n_module.set_locale(old_locale)
@@ -5675,6 +5674,7 @@ def test_general_tab_labels_and_section_headings_render_from_i18n(
         assert view._peer_hangover_field.label == t("settings.vad.peer_hangover_ms")
         assert view._peer_pre_roll_field.label == t("settings.vad.peer_pre_roll_ms")
         assert view._vrc_mic_title.value == t("settings.vrc_mic_intercept")
+        assert view._osc_connection_title.value == t("settings.vrchat_osc")
         assert view._chatbox_source_title.value == t("settings.chatbox_include_source")
         assert view._clipboard_auto_translate_title.value == t("settings.clipboard_auto_translate")
     finally:
@@ -6990,6 +6990,7 @@ def test_general_cards_use_settings_unit_card_defaults(
         _general_tab_card(view, t("settings.chatbox_include_source")),
         _general_tab_card(view, t("settings.clipboard_auto_translate")),
         _general_tab_card(view, t("settings.vrc_mic_intercept")),
+        _general_tab_card(view, t("settings.vrchat_osc")),
         _general_tab_card(view, t("settings.audio_host_api")),
         _general_tab_card(view, t("settings.section.microphone_audio")),
         _general_tab_card(view, t("settings.section.loopback_audio")),

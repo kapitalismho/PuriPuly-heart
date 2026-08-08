@@ -199,6 +199,11 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
         intent["translation"] = translation
         prepared["intent"] = intent
     if isinstance(intent, dict):
+        osc = intent.get("osc") if isinstance(intent.get("osc"), Mapping) else None
+        if isinstance(osc, dict) and "connection_mode" not in osc:
+            osc["connection_mode"] = "manual"
+            osc.setdefault("send_port", osc.get("port", 9000))
+            osc.setdefault("receive_port", 9001)
         if migrate_peer_source_auto:
             _migrate_peer_source_auto_mode(intent)
         if migrate_local_qwen:
@@ -688,8 +693,11 @@ def from_legacy_app_settings(
                     ),
                 ),
                 osc=OscIntent(
+                    connection_mode=str(data["osc"].get("connection_mode", "automatic")),
                     host=data["osc"]["host"],
                     port=int(data["osc"]["port"]),
+                    send_port=int(data["osc"].get("send_port", data["osc"]["port"])),
+                    receive_port=int(data["osc"].get("receive_port", 9001)),
                     chatbox_address=data["osc"]["chatbox_address"],
                     chatbox_send=bool(data["osc"]["chatbox_send"]),
                     chatbox_clear=bool(data["osc"]["chatbox_clear"]),
@@ -1017,6 +1025,13 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
         "vrc_mic_intercept": intent.osc.vrc_mic_intercept,
         "chatbox_include_source": intent.osc.chatbox_include_source,
     }
+    data["osc"].update(
+        {
+            "connection_mode": intent.osc.connection_mode,
+            "send_port": intent.osc.send_port,
+            "receive_port": intent.osc.receive_port,
+        }
+    )
     data["secrets"] = {
         "backend": intent.secrets.backend,
         "encrypted_file_path": intent.secrets.encrypted_file_path,

@@ -19,6 +19,7 @@ dependencies = [
   "janus>=2.0",
   "cryptography==46.0.7",
   "python-osc==1.10.2",
+  "zeroconf>=0.148.0,<1.0.0",
   "PyAudioWPatch; platform_system == 'Windows'",
   "proc-tap==1.1.1; platform_system == 'Windows' and platform_python_implementation == 'CPython' and python_version == '3.12' and platform_machine == 'AMD64'",
   "psutil>=5.9; platform_system == 'Windows' and platform_python_implementation == 'CPython' and python_version == '3.12' and platform_machine == 'AMD64'",

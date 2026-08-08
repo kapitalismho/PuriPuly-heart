@@ -30,6 +30,7 @@ UI_APPLICATION_NON_INTENT_MEMBERS = {
     "dashboard_managed_auth_action",
     "dashboard_managed_auth_prompt_kind",
     "emit_application_shutdown_diagnostic",
+    "effective_osc_ports",
     "get_event_language_codes",
     "is_current_github_star_prompt_generation",
     "list_loopback_capture_options",

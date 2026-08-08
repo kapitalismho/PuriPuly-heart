@@ -57,6 +57,7 @@ G15_GENERAL_INTENT_FIELDS = (
     "current_loopback_capture_option",
     "apply_loopback_capture_option",
     "loopback_capture_summary",
+    "osc_effective_ports",
 )
 G15_PROMPT_INTENT_FIELDS = ("prompt_apply_settings",)
 G15_OVERLAY_INTENT_FIELDS = (

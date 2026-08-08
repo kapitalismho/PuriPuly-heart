@@ -141,6 +141,7 @@ class UiApplicationBoundary:
         state: UiApplicationStatePort,
         runtime_shutdown: ApplicationRuntimeShutdownPort,
         runtime_logging: ApplicationRuntimeLoggingPort,
+        osc_state_publisher: Callable[[], object] | None = None,
     ) -> None:
         self._startup = startup
         self._input_runtime = input_runtime
@@ -155,6 +156,7 @@ class UiApplicationBoundary:
         self._runtime_logging = runtime_logging
         self._runtime_shutdown = runtime_shutdown
         self._state_owner = state
+        self._osc_state_publisher = osc_state_publisher
         self._github_star_prompt_runtime = GithubStarPromptRuntime(
             diagnostics_sink=self._github_star_prompt_runtime_diagnostics_sink,
         )
@@ -192,6 +194,9 @@ class UiApplicationBoundary:
 
     def state(self) -> UiApplicationState:
         return self._state_owner.snapshot()
+
+    def effective_osc_ports(self) -> tuple[int | None, int | None]:
+        return self._runtime_shutdown.effective_osc_ports()
 
     def compatibility_settings(self) -> Any | None:
         return self._state_owner.compatibility_settings()
@@ -242,6 +247,14 @@ class UiApplicationBoundary:
     def _admit_application_intent(self, intent_name: str) -> None:
         self.application_lifecycle().admit_intent(intent_name)
 
+    async def _publish_osc_state(self) -> None:
+        callback = self._osc_state_publisher
+        if callback is None:
+            return
+        result = callback()
+        if inspect.isawaitable(result):
+            await result
+
     def emit_application_shutdown_diagnostic(
         self,
         diagnostic: ApplicationShutdownDiagnostic,
@@ -261,16 +274,24 @@ class UiApplicationBoundary:
         self._input_runtime.set_manual_input_activity(has_text)
 
     async def set_translation_enabled(self, enabled: bool) -> object:
-        return await self._input_runtime.set_translation_enabled(enabled)
+        result = await self._input_runtime.set_translation_enabled(enabled)
+        await self._publish_osc_state()
+        return result
 
     async def set_stt_enabled(self, enabled: bool) -> object:
-        return await self._input_runtime.set_stt_enabled(enabled)
+        result = await self._input_runtime.set_stt_enabled(enabled)
+        await self._publish_osc_state()
+        return result
 
     async def set_peer_translation_enabled(self, enabled: bool) -> object:
-        return await self._peer_capture.set_peer_translation_enabled(enabled)
+        result = await self._peer_capture.set_peer_translation_enabled(enabled)
+        await self._publish_osc_state()
+        return result
 
     async def set_overlay_enabled(self, enabled: bool) -> object:
-        return await self._overlay.set_overlay_enabled(enabled)
+        result = await self._overlay.set_overlay_enabled(enabled)
+        await self._publish_osc_state()
+        return result
 
     async def retry_peer_process_capture(self) -> bool:
         return bool(await self._peer_capture.retry_peer_process_capture())
@@ -320,7 +341,9 @@ class UiApplicationBoundary:
         return self._settings.merge_settings_tab_apply_with_current_languages(settings)
 
     async def apply_settings(self, settings: Any) -> object:
-        return await self._settings.apply_settings(settings)
+        result = await self._settings.apply_settings(settings)
+        await self._publish_osc_state()
+        return result
 
     async def apply_providers(
         self,
@@ -330,14 +353,20 @@ class UiApplicationBoundary:
     ) -> object:
         if force_rebuild_llm:
             if settings is None:
-                return await self._provider.apply_providers(force_rebuild_llm=True)
-            return await self._provider.apply_providers(
-                settings,
-                force_rebuild_llm=True,
-            )
+                result = await self._provider.apply_providers(force_rebuild_llm=True)
+            else:
+                result = await self._provider.apply_providers(
+                    settings,
+                    force_rebuild_llm=True,
+                )
+            await self._publish_osc_state()
+            return result
         if settings is None:
-            return await self._provider.apply_providers()
-        return await self._provider.apply_providers(settings)
+            result = await self._provider.apply_providers()
+        else:
+            result = await self._provider.apply_providers(settings)
+        await self._publish_osc_state()
+        return result
 
     async def install_selected_gpu_model_if_needed(self) -> None:
         await self._provider.install_selected_gpu_model_if_needed()

@@ -727,6 +727,9 @@ class LLMSettings:
 class OSCSettings:
     host: str = "127.0.0.1"
     port: int = 9000
+    send_port: int | None = None
+    receive_port: int = 9001
+    connection_mode: str = "automatic"
     chatbox_address: str = "/chatbox/input"
     chatbox_send: bool = True
     chatbox_clear: bool = False
@@ -734,11 +737,30 @@ class OSCSettings:
     vrc_mic_intercept: bool = False
     chatbox_include_source: bool = False
 
+    def __post_init__(self) -> None:
+        if self.send_port is None:
+            object.__setattr__(self, "send_port", self.port)
+        else:
+            object.__setattr__(self, "port", self.send_port)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        object.__setattr__(self, name, value)
+        if name == "port":
+            object.__setattr__(self, "send_port", value)
+        elif name == "send_port" and value is not None:
+            object.__setattr__(self, "port", value)
+
     def validate(self) -> None:
         if not self.host:
             raise ValueError("host must be non-empty")
+        if self.connection_mode not in {"automatic", "manual", "off"}:
+            raise ValueError("connection_mode must be automatic, manual, or off")
         if not (0 < self.port <= 65535):
             raise ValueError("port must be in 1..65535")
+        if self.send_port != self.port:
+            raise ValueError("send_port must match port compatibility value")
+        if not (0 < self.receive_port <= 65535):
+            raise ValueError("receive_port must be in 1..65535")
         if not self.chatbox_address or not self.chatbox_address.startswith("/"):
             raise ValueError("chatbox_address must start with '/'")
         if self.chatbox_max_chars <= 0:
@@ -1773,6 +1795,13 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
         },
         "system_prompt": settings.system_prompt,
     }
+    data["osc"].update(
+        {
+            "connection_mode": settings.osc.connection_mode,
+            "send_port": settings.osc.send_port,
+            "receive_port": settings.osc.receive_port,
+        }
+    )
     return _enum_to_value(data)  # type: ignore[return-value]
 
 
@@ -3909,6 +3938,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     merged_overlay_calibration_data.update(overlay_calibration_data)
     stt_data = data.get("stt") or {}
     ui_data = data.get("ui") or {}
+    osc_data = data.get("osc") if isinstance(data.get("osc"), dict) else {}
     managed_identity_data = (
         data.get("managed_identity") if isinstance(data.get("managed_identity"), dict) else {}
     )
@@ -4183,7 +4213,14 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
         llm=LLMSettings(concurrency_limit=int(data.get("llm", {}).get("concurrency_limit", 5))),
         osc=OSCSettings(
             host=str(data.get("osc", {}).get("host", "127.0.0.1")),
-            port=int(data.get("osc", {}).get("port", 9000)),
+            port=int(data.get("osc", {}).get("port", data.get("osc", {}).get("send_port", 9000))),
+            send_port=(
+                int(data["osc"]["send_port"])
+                if isinstance(data.get("osc"), dict) and "send_port" in data["osc"]
+                else None
+            ),
+            receive_port=int(data.get("osc", {}).get("receive_port", 9001)),
+            connection_mode=str(osc_data.get("connection_mode", "manual")),
             chatbox_address=str(data.get("osc", {}).get("chatbox_address", "/chatbox/input")),
             chatbox_send=bool(data.get("osc", {}).get("chatbox_send", True)),
             chatbox_clear=bool(data.get("osc", {}).get("chatbox_clear", False)),

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
-from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.app.services.settings_mutation_legacy import (
     ORDER21_TRANSLATION_PROVIDER_SETTINGS_PATHS,
     ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS,
@@ -11,6 +9,8 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
     SettingsPathMutationValidator,
     SettingsPathPatch,
 )
+
+from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.core import messages
 
 
@@ -94,6 +94,9 @@ def test_order23_overlay_osc_output_patch_records_initial_covered_surface_list()
         "overlay.desktop_flet.visual.background_alpha",
         "osc.host",
         "osc.port",
+        "osc.connection_mode",
+        "osc.send_port",
+        "osc.receive_port",
         "osc.chatbox_address",
         "osc.chatbox_send",
         "osc.chatbox_clear",

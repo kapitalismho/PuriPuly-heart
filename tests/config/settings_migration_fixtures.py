@@ -119,8 +119,11 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "osc.chatbox_include_source": "intent.osc.chatbox_include_source",
     "osc.chatbox_max_chars": "intent.osc.chatbox_max_chars",
     "osc.chatbox_send": "intent.osc.chatbox_send",
+    "osc.connection_mode": "intent.osc.connection_mode",
     "osc.host": "intent.osc.host",
     "osc.port": "intent.osc.port",
+    "osc.receive_port": "intent.osc.receive_port",
+    "osc.send_port": "intent.osc.send_port",
     "osc.vrc_mic_intercept": "intent.osc.vrc_mic_intercept",
     "overlay.calibration.background_alpha": "intent.overlay.calibration.background_alpha",
     "overlay.calibration.distance": "intent.overlay.calibration.distance",
@@ -391,6 +394,8 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.llm.concurrency_limit = 7
     settings.osc.host = "192.0.2.25"
     settings.osc.port = 9012
+    settings.osc.connection_mode = "manual"
+    settings.osc.receive_port = 9013
     settings.osc.chatbox_address = "/fixture/chatbox"
     settings.osc.chatbox_send = False
     settings.osc.chatbox_clear = True

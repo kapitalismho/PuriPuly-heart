@@ -82,6 +82,8 @@ from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
+from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.app.services.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
@@ -113,7 +115,6 @@ from puripuly_heart.app.services.settings_runtime_effects import (
 )
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
-from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.app.wiring import (
     LocalASRProviderRuntimeFactory,
     ManagedSTTProviderFactory,
@@ -186,6 +187,7 @@ from puripuly_heart.config.settings import (
     QwenLLMModel,
     STTProviderName,
     build_managed_openrouter_byok_target_settings,
+    materialize_translation_settings,
     with_telemetry_consent,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -203,6 +205,7 @@ from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )
+from puripuly_heart.core.peer_capture import PeerCaptureSessionSnapshot
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
@@ -370,7 +373,7 @@ def compose_application_runtime(
     audio_diagnostics: AudioDiagnosticsApplicationOwner | None = None
     self_application: SelfCaptureApplicationOwner | None = None
     microphone: MicrophoneTestRuntime | None = None
-    vrc_mic_sync: VrcMicSyncOwner | None = None
+    vrc_mic_sync: OscControlIntegrationOwner | None = None
     manual_typing: ManualTypingOwner | None = None
     clipboard: ClipboardAutoTranslationOwner | None = None
     settings_projection: SettingsProjectionOwner | None = None
@@ -791,8 +794,17 @@ def compose_application_runtime(
             return not stt_available
         return stt_requires_secret(value.provider.stt) and not stt_available
 
+    def publish_osc_state_from_runtime() -> None:
+        if vrc_mic_sync is not None:
+            vrc_mic_sync.publish_delta()
+
     def on_self_capture_state(_snapshot: SelfCaptureSessionSnapshot) -> None:
         require_local_asr().adapters.notice.sync()
+        publish_osc_state_from_runtime()
+
+    def on_peer_capture_state(snapshot: PeerCaptureSessionSnapshot) -> None:
+        require_peer().owner.on_runtime_state_changed(snapshot)
+        publish_osc_state_from_runtime()
 
     def require_self_application() -> SelfCaptureApplicationOwner:
         nonlocal self_application
@@ -846,9 +858,40 @@ def compose_application_runtime(
     async def stop_self_capture() -> None:
         await require_self_application().set_enabled(False)
 
-    def require_vrc_mic_sync() -> VrcMicSyncOwner:
+    def require_vrc_mic_sync() -> OscControlIntegrationOwner:
         nonlocal vrc_mic_sync
         if vrc_mic_sync is None:
+
+            def osc_state() -> object:
+                value = current_settings()
+                if value is None:
+                    return state_from_settings(AppSettings())
+                self_capture = pipeline.self_capture
+                peer_owner = require_peer().owner
+                return state_from_settings(
+                    value,
+                    self_capture=bool(
+                        self_capture is not None and self_capture.snapshot.desired_active
+                    ),
+                    peer_capture=bool(peer_owner.snapshot().effective_enabled),
+                    translation=bool(
+                        managed_account is not None
+                        and managed_account.translation.state_provider().translation_enabled
+                    ),
+                    captions=bool(value.ui.overlay_enabled),
+                )
+
+            def language_state() -> tuple[str, str, str, str]:
+                value = current_settings()
+                if value is None:
+                    return ("ko", "en", "en", "ko")
+                return (
+                    value.languages.source_language,
+                    value.languages.target_language,
+                    value.languages.peer_source_language,
+                    value.languages.peer_target_language,
+                )
+
             vrc_mic_sync = compose_vrc_mic_sync(
                 state_provider=lambda: pipeline.vrc_mic_state,
                 gate_provider=lambda: pipeline.vrc_mic_audio_gate,
@@ -857,6 +900,15 @@ def compose_application_runtime(
                     level=level,
                 ),
                 error_sink=log_error,
+                settings_provider=current_settings,
+                apply_settings=lambda next_settings: require_settings_application().apply(
+                    next_settings
+                ),
+                application_provider=lambda: application,
+                sender_provider=lambda: pipeline.sender,
+                osc_state_provider=osc_state,
+                language_state_provider=language_state,
+                translation_model_normalizer=materialize_translation_settings,
             )
         return vrc_mic_sync
 
@@ -1404,7 +1456,7 @@ def compose_application_runtime(
         ),
         self_state_sink=on_self_capture_state,
         self_diagnostic_sink=(require_audio_diagnostics().capture_adapter().self_capture),
-        peer_state_sink=lambda snapshot: (require_peer().owner.on_runtime_state_changed(snapshot)),
+        peer_state_sink=on_peer_capture_state,
         peer_diagnostic_sink=require_peer().owner.on_runtime_diagnostic,
         local_asr_diagnostic_sink=(require_local_asr_diagnostics().transition_diagnostic),
     )
@@ -1517,6 +1569,7 @@ def compose_application_runtime(
         pending_sink=presentation.set_dashboard_managed_auth_pending,
         usage_view_sink=apply_managed_usage_view,
         dashboard_sink=presentation.set_dashboard_translation_enabled,
+        runtime_state_changed=lambda: require_vrc_mic_sync().publish_delta(),
         message_sink=lambda key, values: show_short_message(
             key,
             **dict(values),
@@ -1788,6 +1841,7 @@ def compose_application_runtime(
         ),
         runtime_shutdown=runtime_shutdown,
         runtime_logging=runtime_logging,
+        osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
     )
 
     async def initialize_local_asr_evidence(value: object) -> None:

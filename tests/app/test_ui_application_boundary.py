@@ -22,8 +22,15 @@ from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FREEZE_INGRESS
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
-def UiApplicationBoundary(backend: object) -> ProductionUiApplicationBoundary:
-    return compose_test_ui_application_boundary(backend)
+def UiApplicationBoundary(
+    backend: object,
+    *,
+    osc_state_publisher=None,
+) -> ProductionUiApplicationBoundary:
+    return compose_test_ui_application_boundary(
+        backend,
+        osc_state_publisher=osc_state_publisher,
+    )
 
 
 class RecordingBackend:
@@ -329,6 +336,24 @@ async def test_provider_apply_preserves_no_argument_and_forced_rebuild_contracts
 
 
 @pytest.mark.asyncio
+async def test_settings_and_provider_applies_publish_updated_osc_state() -> None:
+    backend = RecordingBackend()
+    published: list[str] = []
+    boundary = UiApplicationBoundary(
+        backend,
+        osc_state_publisher=lambda: published.append("published"),
+    )
+
+    await boundary.apply_settings(object())
+    await boundary.apply_providers()
+    await boundary.apply_providers(force_rebuild_llm=True)
+    await boundary.apply_providers(object())
+    await boundary.apply_providers(object(), force_rebuild_llm=True)
+
+    assert published == ["published"] * 5
+
+
+@pytest.mark.asyncio
 async def test_lifecycle_callbacks_diagnostics_and_logging_stay_behind_boundary() -> None:
     backend = RecordingBackend()
     boundary = UiApplicationBoundary(backend)
@@ -417,6 +442,29 @@ async def test_self_peer_overlay_and_retry_intents_preserve_channel_results() ->
         ("peer", True),
         ("overlay", True),
         ("peer-retry",),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_desktop_runtime_intents_publish_updated_osc_state() -> None:
+    backend = RecordingBackend()
+    published: list[str] = []
+    boundary = UiApplicationBoundary(
+        backend,
+        osc_state_publisher=lambda: published.append("published"),
+    )
+
+    assert await boundary.set_translation_enabled(True) is True
+    assert await boundary.set_stt_enabled(False) is False
+    assert await boundary.set_peer_translation_enabled(True) is True
+    assert await boundary.set_overlay_enabled(False) is False
+
+    assert published == ["published", "published", "published", "published"]
+    assert backend.events == [
+        ("translation", True),
+        ("self", False),
+        ("peer", True),
+        ("overlay", False),
     ]
 
 

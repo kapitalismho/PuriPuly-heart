@@ -379,6 +379,9 @@ def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None
     raw = to_dict(AppSettings())
     raw["settings_version"] = 17
     raw["osc"]["host"] = "192.0.2.20"
+    raw["osc"].pop("connection_mode", None)
+    raw["osc"].pop("send_port", None)
+    raw["osc"].pop("receive_port", None)
     raw["osc"]["port"] = 9011
     raw["osc"]["chatbox_max_chars"] = 96
     raw["osc"]["vrc_mic_intercept"] = True
@@ -387,6 +390,13 @@ def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None
     expected_osc = dict(raw["osc"])
     expected_osc.pop("cooldown_s")
     expected_osc.pop("ttl_s")
+    expected_osc.update(
+        {
+            "connection_mode": "manual",
+            "send_port": 9011,
+            "receive_port": 9001,
+        }
+    )
     path.write_text(json.dumps(raw), encoding="utf-8")
 
     loaded = load_settings(path)
