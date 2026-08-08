@@ -22,7 +22,7 @@ from puripuly_heart.core.http_extensions import (
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.translation_backend import TranslationBackendRequest
-from puripuly_heart.providers.translation.http_extension_backend import (
+from puripuly_heart.providers.extensions.http_extension_backend import (
     HttpExtensionTranslationBackend,
     HttpExtensionTranslationError,
 )

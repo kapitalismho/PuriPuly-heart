@@ -29,7 +29,7 @@ from puripuly_heart.core.orchestrator.translation_request import (
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.domain.models import ChannelId, Translation
-from puripuly_heart.providers.translation.http_extension_backend import (
+from puripuly_heart.providers.extensions.http_extension_backend import (
     HttpExtensionTranslationBackend,
 )
 
