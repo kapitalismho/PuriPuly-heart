@@ -347,6 +347,21 @@ def test_shared_windows_build_script_overrides_local_stt_appdata_for_smoke_and_c
     assert "Local STT provisioning completed successfully." in script
 
 
+def test_shared_windows_build_script_checks_packaged_translation_extension_example() -> None:
+    script = (ROOT / "scripts/ci/build-release-artifacts.ps1").read_text(encoding="utf-8")
+
+    assert (
+        '$packagedTranslationExamplesDir = Join-Path $distDir "examples\\translation_extensions"'
+        in script
+    )
+    assert (
+        "$packagedLibreTranslateExamplePath = Join-Path $packagedTranslationExamplesDir "
+        '"libretranslate.json"'
+    ) in script
+    assert "Packaged LibreTranslate example not found" in script
+    assert "-PathType Leaf" in script
+
+
 def test_build_spec_bundles_vendored_openvr_runtime_dll() -> None:
     spec = (ROOT / "build.spec").read_text(encoding="utf-8")
 
@@ -356,6 +371,26 @@ def test_build_spec_bundles_vendored_openvr_runtime_dll() -> None:
     )
     assert "runtime_binaries += collect_vendored_openvr_runtime_binaries()" in spec
     assert "SteamVR\\bin\\win64\\openvr_api.dll" not in spec
+
+
+def test_build_spec_bundles_translation_extension_examples() -> None:
+    spec = (ROOT / "build.spec").read_text(encoding="utf-8")
+
+    assert (
+        'TRANSLATION_EXTENSION_EXAMPLES_SOURCE_DIR = Path("examples/translation_extensions").resolve()'
+        in spec
+    )
+    assert (
+        'TRANSLATION_EXTENSION_EXAMPLES_PACKAGED_DIR = Path("examples/translation_extensions")'
+        in spec
+    )
+    assert (
+        "(\n"
+        "        str(TRANSLATION_EXTENSION_EXAMPLES_SOURCE_DIR),\n"
+        "        TRANSLATION_EXTENSION_EXAMPLES_PACKAGED_DIR.as_posix(),\n"
+        "    ),"
+    ) in spec
+    assert (ROOT / "examples/translation_extensions/libretranslate.json").is_file()
 
 
 def test_vendored_openvr_bundle_files_exist_and_sha256_line_is_exact() -> None:

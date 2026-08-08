@@ -70,9 +70,17 @@ FLET_WINDOWS_RUNTIME_SHA256 = "2cf0865b31bd0e394a24a6c2d270e084cf9dad9c711e0b5d0
 NOTO_CJK_SOURCE_FONT_PATH = src_path / "puripuly_heart" / "data" / "fonts" / "NotoSansCJK-Medium.ttc"
 NOTO_CJK_PROVENANCE_DIR = Path("third_party/noto-sans-cjk").resolve()
 NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR = Path("third_party/noto-sans-cjk")
+TRANSLATION_EXTENSION_EXAMPLES_SOURCE_DIR = Path("examples/translation_extensions").resolve()
+TRANSLATION_EXTENSION_EXAMPLES_PACKAGED_DIR = Path("examples/translation_extensions")
 
 if not NOTO_CJK_SOURCE_FONT_PATH.is_file():
     raise SystemExit(f"Noto Sans CJK Medium TTC not found: {NOTO_CJK_SOURCE_FONT_PATH}")
+
+if not TRANSLATION_EXTENSION_EXAMPLES_SOURCE_DIR.is_dir():
+    raise SystemExit(
+        "Translation extension examples directory not found: "
+        f"{TRANSLATION_EXTENSION_EXAMPLES_SOURCE_DIR}"
+    )
 
 if not FLET_WINDOWS_RUNTIME_ARCHIVE_PATH.is_file():
     raise SystemExit(
@@ -155,6 +163,10 @@ datas = [
     (str(src_path / "puripuly_heart" / "data"), "puripuly_heart/data"),
     # Prompt templates
     ("prompts", "prompts"),
+    (
+        str(TRANSLATION_EXTENSION_EXAMPLES_SOURCE_DIR),
+        TRANSLATION_EXTENSION_EXAMPLES_PACKAGED_DIR.as_posix(),
+    ),
     # Native VR Subtitle Overlay distribution provenance.
     # The TTC itself is included by the packaged puripuly_heart/data tree above.
     (str(NOTO_CJK_PROVENANCE_DIR / "OFL.txt"), NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR.as_posix()),
