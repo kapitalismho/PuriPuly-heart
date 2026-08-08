@@ -1181,9 +1181,9 @@ class RecordingWindowZOrderPort:
         on_reassert: Any | None = None,
         result: desktop_window_zorder.WindowZOrderResult | None = None,
         error: Exception | None = None,
-        reveal_result: desktop_window_zorder.WindowRevealResult | None = None,
+        reveal_result: desktop_window_zorder.WindowVisibilityConfirmation | None = None,
         reveal_error: Exception | None = None,
-        placement_result: desktop_window_zorder.WindowPlacementResult | None = None,
+        placement_result: desktop_window_zorder.WindowBoundsConfirmation | None = None,
         placement_error: Exception | None = None,
         on_placement: Any | None = None,
     ) -> None:
@@ -1195,17 +1195,18 @@ class RecordingWindowZOrderPort:
             topmost_style_present=True,
         )
         self.error = error
-        self.reveal_result = reveal_result or desktop_window_zorder.WindowRevealResult(
-            applied=True,
-            reason="applied",
+        self.reveal_result = reveal_result or desktop_window_zorder.WindowVisibilityConfirmation(
+            confirmed=True,
+            reason="confirmed",
             hwnd=4242,
             title_confirmed=True,
             visible_confirmed=True,
+            bounds_confirmed=True,
         )
         self.reveal_error = reveal_error
-        self.placement_result = placement_result or desktop_window_zorder.WindowPlacementResult(
-            applied=True,
-            reason="applied",
+        self.placement_result = placement_result or desktop_window_zorder.WindowBoundsConfirmation(
+            confirmed=True,
+            reason="confirmed",
             hwnd=4242,
             title_confirmed=True,
             bounds_confirmed=True,
@@ -1221,7 +1222,7 @@ class RecordingWindowZOrderPort:
     def bind_process(self, pid: int) -> None:
         self.bound_pids.append(pid)
 
-    async def place_window_before_show(
+    async def confirm_window_bounds(
         self,
         expected_title: str,
         *,
@@ -1229,7 +1230,7 @@ class RecordingWindowZOrderPort:
         y: int,
         width: int,
         height: int,
-    ) -> desktop_window_zorder.WindowPlacementResult:
+    ) -> desktop_window_zorder.WindowBoundsConfirmation:
         self.placement_calls.append((expected_title, x, y, width, height))
         if self.on_placement is not None:
             self.on_placement()
@@ -1237,7 +1238,16 @@ class RecordingWindowZOrderPort:
             raise self.placement_error
         return self.placement_result
 
-    async def reveal_window(self, expected_title: str) -> desktop_window_zorder.WindowRevealResult:
+    async def confirm_window_visible(
+        self,
+        expected_title: str,
+        *,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> desktop_window_zorder.WindowVisibilityConfirmation:
+        _ = (x, y, width, height)
         self.reveal_titles.append(expected_title)
         if self.reveal_error is not None:
             raise self.reveal_error
@@ -1304,6 +1314,7 @@ class FakeFletWindow:
         self.close_calls = 0
         self.destroy_calls = 0
         self.start_resizing_calls = 0
+        self.ready_wait_calls = 0
         self.protected_writes: list[str] = []
         self._record_writes = True
 
@@ -1319,6 +1330,10 @@ class FakeFletWindow:
     async def destroy(self) -> None:
         self.destroy_calls += 1
         self._app.closed.set()
+
+    async def wait_until_ready_to_show(self) -> None:
+        self.ready_wait_calls += 1
+        return None
 
     def start_resizing(self, *_args: object, **_kwargs: object) -> None:
         self.start_resizing_calls += 1
@@ -2306,7 +2321,7 @@ def test_desktop_overlay_requires_process_provider_for_custom_runner_and_zorder(
 
 
 @pytest.mark.asyncio
-async def test_desktop_overlay_places_hidden_window_before_reveal() -> None:
+async def test_desktop_overlay_confirms_hidden_bounds_before_flet_reveal() -> None:
     import flet as real_flet
 
     assert real_flet.Window.__dataclass_fields__["visible"].default is True
@@ -2345,6 +2360,7 @@ async def test_desktop_overlay_places_hidden_window_before_reveal() -> None:
             await task
 
         assert port.bound_pids == [4321]
+        assert app.page.window.ready_wait_calls == 1
         assert app.page.visibility_updates[:2] == [False, True]
         assert placement_visibility == [[False]]
         assert port.placement_calls == [
@@ -2363,8 +2379,8 @@ async def test_desktop_overlay_places_hidden_window_before_reveal() -> None:
                 "en", "desktop_overlay.window.title", default="PuriPuly Overlay"
             )
         ], (
-            "the renderer must ask the platform window port to reveal the overlay; "
-            "assigning the already-default Flet Window.visible produces no client patch"
+            "the renderer must ask the platform window port to confirm visibility after "
+            "Flet applies the visible patch"
         )
         assert app.page.title == port.reveal_titles[0]
     finally:
@@ -2553,6 +2569,169 @@ async def test_desktop_overlay_reveals_first_window_update_after_chrome_bounds_a
         }
     finally:
         await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_start_waits_for_visible_confirmation_before_ready() -> None:
+    class BlockingVisibilityPort(RecordingWindowZOrderPort):
+        def __init__(self) -> None:
+            super().__init__()
+            self.confirmation_started = asyncio.Event()
+            self.release_confirmation = asyncio.Event()
+
+        async def confirm_window_visible(
+            self,
+            expected_title: str,
+            *,
+            x: int,
+            y: int,
+            width: int,
+            height: int,
+        ) -> desktop_window_zorder.WindowVisibilityConfirmation:
+            _ = (x, y, width, height)
+            self.reveal_titles.append(expected_title)
+            self.confirmation_started.set()
+            await self.release_confirmation.wait()
+            return self.reveal_result
+
+    app = FakeFletApp()
+    port = BlockingVisibilityPort()
+    sink = RecordingLifecycleSink()
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=sink.emit,
+        locale="en",
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+    window.prime_startup_runtime_controls(
+        (
+            {
+                "command": "apply_window_bounds",
+                "x": 320,
+                "y": 720,
+                "width": 1344,
+                "height": 320,
+            },
+        )
+    )
+
+    start_task = asyncio.create_task(
+        window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+    )
+    await port.confirmation_started.wait()
+
+    assert start_task.done() is False
+    assert window.startup_generation == 0
+    assert app.page.window.visible is True
+    assert callable(app.page.window.on_event)
+    app.page.window.on_event(FakeWindowEvent(ft.WindowEventType.MOVED))
+    await asyncio.sleep(0)
+    assert sink.events == []
+
+    port.release_confirmation.set()
+    await start_task
+
+    assert window.startup_generation == 1
+    await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_unconfirmed_bounds_never_becomes_visible_or_ready() -> None:
+    app = FakeFletApp()
+    port = RecordingWindowZOrderPort(
+        placement_result=desktop_window_zorder.WindowBoundsConfirmation(
+            confirmed=False,
+            reason="bounds_not_retained",
+        )
+    )
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+    window.prime_startup_runtime_controls(
+        (
+            {
+                "command": "apply_window_bounds",
+                "x": 320,
+                "y": 720,
+                "width": 1344,
+                "height": 320,
+            },
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="Flet page configuration failed") as excinfo:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+
+    assert "canonical bounds were not confirmed" in str(excinfo.value.__cause__)
+    assert window.startup_generation == 0
+    assert app.page.window.visible is False
+    assert port.reveal_titles == []
+    await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_unconfirmed_visibility_never_becomes_ready() -> None:
+    app = FakeFletApp()
+    port = RecordingWindowZOrderPort(
+        reveal_result=desktop_window_zorder.WindowVisibilityConfirmation(
+            confirmed=False,
+            reason="visibility_not_retained",
+        )
+    )
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+        window_z_order_port=port,
+        window_process_info_provider=lambda: (4321, None),
+    )
+    window.prime_startup_runtime_controls(
+        (
+            {
+                "command": "apply_window_bounds",
+                "x": 320,
+                "y": 720,
+                "width": 1344,
+                "height": 320,
+            },
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="Flet page configuration failed") as excinfo:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+
+    assert "visibility was not confirmed" in str(excinfo.value.__cause__)
+    assert window.startup_phase == "bounds_confirmed"
+    assert window.startup_generation == 0
+    await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_native_ready_failure_reports_page_configured_phase() -> None:
+    app = FakeFletApp()
+
+    async def fail_native_ready() -> None:
+        raise RuntimeError("native readiness failed")
+
+    app.page.window.wait_until_ready_to_show = fail_native_ready
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=RecordingLifecycleSink().emit,
+        locale="en",
+    )
+
+    with pytest.raises(RuntimeError, match="Flet page configuration failed") as excinfo:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+
+    assert "native readiness failed" in str(excinfo.value.__cause__)
+    assert window.startup_phase == "page_configured"
+    assert app.page.window.visible is False
+    await window.close()
 
 
 @pytest.mark.asyncio
@@ -3469,7 +3648,7 @@ async def test_desktop_overlay_shipping_surface_has_no_overlay_local_controls() 
 
     try:
         await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
-        assert app.page.run_task_calls == 1
+        assert app.page.run_task_calls == 0
         for task in list(app.page.tasks):
             await task
         assert sink.events == []
@@ -3699,6 +3878,7 @@ async def test_desktop_overlay_window_bounds_events_debounce_zero_samples_and_pr
                     "event": "window_bounds_changed",
                     "source": "user",
                     "persist": True,
+                    "generation": 1,
                     "x": 100,
                     "y": 200,
                     "width": 900,
@@ -3747,6 +3927,7 @@ async def test_desktop_overlay_window_bounds_events_debounce_zero_samples_and_pr
             "event": "window_bounds_changed",
             "source": "user",
             "persist": True,
+            "generation": 1,
             "x": 360,
             "y": 700,
             "width": 1280,
@@ -3787,9 +3968,7 @@ async def test_desktop_overlay_shutdown_cancels_queued_bounds_callback_without_e
 
 
 @pytest.mark.asyncio
-async def test_desktop_overlay_bounds_programmatic_echo_suppression_is_bounded_and_tolerant() -> (
-    None
-):
+async def test_desktop_overlay_bounds_programmatic_echo_gate_is_generation_based() -> None:
     app = FakeFletApp()
     sink = RecordingLifecycleSink()
     window = desktop_overlay.FletDesktopRendererWindow(
@@ -3816,23 +3995,20 @@ async def test_desktop_overlay_bounds_programmatic_echo_suppression_is_bounded_a
         await asyncio.sleep(0.03)
         assert sink.events == []
 
-        app.page.window.left = 320.4
-        app.page.window.top = 719.6
-        app.page.window.width = 1279.8
-        app.page.window.height = 330.2
-        app.page.window.on_event(FakeWindowEvent(ft.WindowEventType.MOVED))
-        await asyncio.sleep(0.03)
-        assert sink.events == []
-
-        app.page.window.left = 321
-        app.page.window.top = 720
-        app.page.window.width = 1280
-        app.page.window.height = 330
-        app.page.window.on_event(FakeWindowEvent(ft.WindowEventType.RESIZE))
-        await asyncio.sleep(0.03)
-        assert sink.events == []
-
+        await window.dispatch_runtime_control(
+            {
+                "command": "apply_window_bounds",
+                "x": 500,
+                "y": 600,
+                "width": 1280,
+                "height": 330,
+            }
+        )
         await asyncio.sleep(0.30)
+        app.page.window.on_event(FakeWindowEvent(ft.WindowEventType.RESIZED))
+        await asyncio.sleep(0.03)
+        assert sink.events == []
+
         app.page.window.left = 360
         app.page.window.top = 700
         app.page.window.width = 1280
@@ -3847,6 +4023,7 @@ async def test_desktop_overlay_bounds_programmatic_echo_suppression_is_bounded_a
                     "event": "window_bounds_changed",
                     "source": "user",
                     "persist": True,
+                    "generation": 1,
                     "x": 360,
                     "y": 700,
                     "width": 1280,
@@ -3856,6 +4033,36 @@ async def test_desktop_overlay_bounds_programmatic_echo_suppression_is_bounded_a
         ]
     finally:
         await window.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_retired_generation_cannot_emit_bounds() -> None:
+    app = FakeFletApp()
+    sink = RecordingLifecycleSink()
+    window = desktop_overlay.FletDesktopRendererWindow(
+        app_runner=app.run,
+        event_sink=sink.emit,
+        locale="en",
+        bounds_debounce_s=0.0,
+    )
+
+    await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
+    assert window.startup_generation == 1
+    await window.close()
+
+    app.closed.clear()
+    await window.start(OverlayPresentationSnapshot(revision=2, blocks=[]))
+    assert window.startup_generation == 2
+    app.page.window.left = 100
+    app.page.window.top = 200
+    app.page.window.width = 900
+    app.page.window.height = 240
+
+    await window._schedule_bounds_sample(1)
+    await asyncio.sleep(0)
+
+    assert sink.events == []
+    await window.close()
 
 
 @pytest.mark.asyncio
@@ -4102,6 +4309,17 @@ async def test_desktop_overlay_snapshot_batching_matches_sequential_width_refere
         initial_snapshot=OverlayPresentationSnapshot(revision=1, blocks=[]),
         heartbeat_interval_ms=20,
         desktop_runtime_controls_enabled=True,
+    )
+    bridge.set_initial_desktop_runtime_controls(
+        [
+            {
+                "command": "apply_window_bounds",
+                "x": 320,
+                "y": 720,
+                "width": 1344,
+                "height": 320,
+            }
+        ]
     )
     await bridge.start()
     app = FakeFletApp()
@@ -4654,10 +4872,16 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
         run_task = asyncio.create_task(renderer.run())
         ready_event = await _next_bridge_event(bridge, expected_type="overlay_ready")
 
-        assert ready_event == {"type": "overlay_ready"}
+        assert ready_event == {
+            "type": "overlay_ready",
+            "overlay_instance_id": "desktop-overlay-test",
+        }
         assert window.started.is_set()
         assert window.snapshots[0].revision == 7
-        assert sink.events[-1] == {"type": "overlay_ready"}
+        assert sink.events[-1] == {
+            "type": "overlay_ready",
+            "overlay_instance_id": "desktop-overlay-test",
+        }
         assert token not in json.dumps(sink.events)
 
         await bridge.broadcast_shutdown()
@@ -4706,9 +4930,91 @@ async def test_desktop_overlay_malformed_initial_snapshot_is_startup_error_with_
 
     expected = {"type": "startup_error", "failure_reason": "renderer_init_failed"}
     assert bridge_event == expected
-    assert sink.events[-1] == expected
+    assert expected in sink.events
+    assert sink.events[-1] == {
+        "type": "shutdown_complete",
+        "overlay_instance_id": "desktop-overlay-test",
+    }
     assert token not in json.dumps(sink.events)
     assert token not in json.dumps(bridge_event)
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_rejects_unframed_initial_runtime_controls() -> None:
+    token = "unframed-initial-token"
+    received: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+
+    async def handler(connection: Any) -> None:
+        auth = json.loads(await connection.recv())
+        assert auth == {"type": "auth", "session_token": token}
+        await connection.send(
+            json.dumps(
+                {
+                    "type": "snapshot",
+                    "payload": OverlayPresentationSnapshot(revision=1).to_dict(),
+                }
+            )
+        )
+        await received.put(json.loads(await asyncio.wait_for(connection.recv(), timeout=1.0)))
+
+    server = await websockets.serve(handler, "127.0.0.1", 0, ping_interval=None)
+    host, port = server.sockets[0].getsockname()[:2]
+    window = FakeRendererWindow()
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(bridge_url=f"ws://{host}:{port}", session_token=token),
+        window=window,
+        lifecycle_sink=RecordingLifecycleSink(),
+        parent_monitor=FakeParentMonitor(),
+    )
+
+    try:
+        assert await renderer.run() == 1
+        bridge_event = await asyncio.wait_for(received.get(), timeout=1.0)
+    finally:
+        await renderer.shutdown()
+        server.close()
+        await server.wait_closed()
+
+    assert bridge_event == {
+        "type": "startup_error",
+        "failure_reason": "runtime_control_invalid",
+    }
+    assert window.snapshots == []
+
+
+@pytest.mark.asyncio
+async def test_desktop_overlay_rejects_flet_startup_without_canonical_bounds() -> None:
+    token = "missing-bounds-token"
+    bridge = OverlayBridge(
+        session_token=token,
+        initial_snapshot=OverlayPresentationSnapshot(revision=1),
+        desktop_runtime_controls_enabled=True,
+    )
+    await bridge.start()
+    app = FakeFletApp()
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(bridge_url=bridge.url, session_token=token),
+        window=desktop_overlay.FletDesktopRendererWindow(
+            app_runner=app.run,
+            event_sink=RecordingLifecycleSink().emit,
+            locale="en",
+        ),
+        lifecycle_sink=RecordingLifecycleSink(),
+        parent_monitor=FakeParentMonitor(),
+    )
+
+    try:
+        assert await renderer.run() == 1
+        bridge_event = await _next_bridge_event(bridge, expected_type="startup_error")
+    finally:
+        await renderer.shutdown()
+        await bridge.stop()
+
+    assert bridge_event == {
+        "type": "startup_error",
+        "failure_reason": "window_configuration_failed",
+    }
+    assert app.page.visibility_updates == []
 
 
 @pytest.mark.asyncio
@@ -4741,7 +5047,11 @@ async def test_desktop_overlay_window_start_failure_reports_window_configuration
 
     expected = {"type": "startup_error", "failure_reason": "window_configuration_failed"}
     assert bridge_event == expected
-    assert sink.events[-1] == expected
+    assert expected in sink.events
+    assert sink.events[-1] == {
+        "type": "shutdown_complete",
+        "overlay_instance_id": "desktop-overlay-test",
+    }
     assert token not in json.dumps(sink.events)
     assert token not in json.dumps(bridge_event)
     assert any(

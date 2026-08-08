@@ -57,6 +57,7 @@ PeerApplicationOverlayStart = Callable[[], Awaitable[None]]
 PeerApplicationEffectiveSink = Callable[[bool, bool], None]
 PeerApplicationLogSink = Callable[[str], object]
 PeerApplicationSupersededSink = Callable[[], None]
+PeerApplicationLifecycleTraceSink = Callable[[str, dict[str, object]], None]
 
 
 @dataclass(slots=True)
@@ -79,6 +80,10 @@ class PeerApplicationOwner:
     log_basic: PeerApplicationLogSink = field(repr=False)
     log_detailed: PeerApplicationLogSink = field(repr=False)
     log_failure: PeerApplicationLogSink = field(repr=False)
+    lifecycle_trace_sink: PeerApplicationLifecycleTraceSink | None = field(
+        default=None,
+        repr=False,
+    )
     _runtime: PeerCaptureSessionOwner | None = field(init=False, default=None, repr=False)
     _rebuild: ProviderRuntimeRebuildService = field(
         init=False,
@@ -101,6 +106,7 @@ class PeerApplicationOwner:
     _activation_starting: bool = field(init=False, default=False, repr=False)
     _model_loading: bool = field(init=False, default=False, repr=False)
     _process_warning_reason: str | None = field(init=False, default=None, repr=False)
+    _effective_trace_generation: int | None = field(init=False, default=None, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
     _runtime_lock: asyncio.Lock = field(
         init=False,
@@ -240,6 +246,17 @@ class PeerApplicationOwner:
         enabled = self.effective_enabled(current)
         if enabled:
             self._activation_starting = False
+            if self._effective_trace_generation != self._activation_generation:
+                self._effective_trace_generation = self._activation_generation
+                sink = self.lifecycle_trace_sink
+                if sink is not None:
+                    sink(
+                        "peer_capture_effective",
+                        {
+                            "activation_generation": self._activation_generation,
+                            "accepted": True,
+                        },
+                    )
         self.effective_sink(enabled, enabled)
 
     def record_settings(

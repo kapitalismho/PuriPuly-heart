@@ -12,6 +12,7 @@ _SUBMODULES = frozenset(
 _EXPORT_SOURCES = {
     "OVERLAY_FAILURE_REASONS": "overlay_application",
     "OVERLAY_SHUTDOWN_GRACE_S": "overlay_application",
+    "OVERLAY_STEAMVR_FALLBACK_POLICY": "overlay_application",
     "OVERLAY_STARTUP_TIMEOUT_MS": "overlay_application",
     "OverlayApplicationOwner": "overlay_application",
     "OverlayApplicationSnapshot": "overlay_application",
@@ -92,6 +93,7 @@ __all__ = [
     "overlay_generation_start",
     "overlay_session_transition",
     "OVERLAY_SHUTDOWN_GRACE_S",
+    "OVERLAY_STEAMVR_FALLBACK_POLICY",
     "OVERLAY_STARTUP_TIMEOUT_MS",
     "OverlayApplicationOwner",
     "OverlayApplicationSnapshot",

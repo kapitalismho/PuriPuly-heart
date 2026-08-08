@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import sys
 
 import pytest
 
+from puripuly_heart.core.overlay import process as process_module
+from puripuly_heart.core.overlay.process import OverlayProcessManager
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
@@ -432,6 +435,126 @@ async def test_overlay_runtime_marks_shutdown_before_broadcast_grace_exit_and_st
         "presenter.detach_bridge",
         "manager.stop",
     ]
+
+
+@pytest.mark.asyncio
+async def test_overlay_runtime_preserves_process_event_reader_until_manager_stop() -> None:
+    events: list[str] = []
+    shutdown_sent = asyncio.Event()
+    shutdown_acknowledged = asyncio.Event()
+
+    class ShutdownPresenter(FakePresenter):
+        async def broadcast_shutdown(self) -> None:
+            await super().broadcast_shutdown()
+            shutdown_sent.set()
+
+    class AckDependentManager(FakeManager):
+        async def stop(self) -> None:
+            self.stop_calls += 1
+            self.events.append("manager.stop.waiting_for_ack")
+            await asyncio.wait_for(shutdown_acknowledged.wait(), timeout=0.1)
+            self.events.append("manager.stop.acknowledged")
+
+    async def read_process_events() -> None:
+        await shutdown_sent.wait()
+        events.append("process-reader.shutdown_complete")
+        shutdown_acknowledged.set()
+
+    presenter = ShutdownPresenter(events)
+    manager = AckDependentManager(events)
+    handle = OverlayRuntimeHandle(shutdown_grace_s=0)
+    handle.attach_presenter(presenter)
+    handle.attach_process_manager(manager)
+    reader_task = handle.create_child_task(
+        read_process_events(),
+        task_name="process-read-stdout",
+    )
+
+    await handle.close(preserve_presenter_state=True)
+
+    assert reader_task.done()
+    assert not reader_task.cancelled()
+    assert events == [
+        "manager.mark_shutdown_requested",
+        "presenter.broadcast_shutdown",
+        "presenter.detach_bridge",
+        "manager.stop.waiting_for_ack",
+        "process-reader.shutdown_complete",
+        "manager.stop.acknowledged",
+    ]
+    assert handle.child_task_names == ()
+
+
+@pytest.mark.asyncio
+async def test_overlay_runtime_receives_real_subprocess_shutdown_ack_before_reader_cleanup() -> (
+    None
+):
+    overlay_instance_id = "overlay-runtime-shutdown-test"
+    child = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-u",
+        "-c",
+        (
+            "import json,sys,time;"
+            "sys.stdin.readline();"
+            "time.sleep(0.05);"
+            "print(json.dumps({'type':'shutdown_complete',"
+            "'overlay_instance_id':sys.argv[1]}),flush=True)"
+        ),
+        overlay_instance_id,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    handle = OverlayRuntimeHandle(shutdown_grace_s=0)
+    managed = process_module._AsyncioOverlayProcess(
+        process=child,
+        task_factory=handle.create_child_task,
+    )
+
+    async def request_shutdown() -> None:
+        assert child.stdin is not None
+        child.stdin.write(b"\n")
+        await child.stdin.drain()
+        child.stdin.close()
+
+    class SubprocessShutdownPresenter(FakePresenter):
+        async def broadcast_shutdown(self) -> None:
+            await super().broadcast_shutdown()
+            await request_shutdown()
+
+    presenter = SubprocessShutdownPresenter([])
+    manager = OverlayProcessManager(
+        overlay_instance_id=overlay_instance_id,
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.5,
+        selected_target="desktop",
+        geometry_authority="flet",
+    )
+    manager.state = "connected"
+    manager._process = managed
+    manager._attach_process_diagnostics(managed)
+    handle.attach_presenter(presenter)
+    handle.attach_process_manager(manager)
+
+    try:
+        await asyncio.wait_for(
+            handle.close(preserve_presenter_state=True),
+            timeout=1.0,
+        )
+    finally:
+        if child.returncode is None:
+            child.kill()
+            await child.wait()
+
+    assert child.returncode == 0
+    assert manager.diagnostics is not None
+    manager_events = [event["event"] for event in manager.diagnostics.process_events]
+    assert "graceful_shutdown_acknowledged" in manager_events
+    assert "graceful_shutdown_timeout" not in manager_events
+    assert "terminate_requested" not in manager_events
+    assert handle.process_manager is None
+    assert handle.child_task_names == ()
 
 
 @pytest.mark.asyncio

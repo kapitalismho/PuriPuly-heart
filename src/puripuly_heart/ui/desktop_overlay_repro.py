@@ -147,7 +147,20 @@ class LocalAuthenticatedRawIngress:
                 await websocket.send(json.dumps({"type": "auth_error"}))
                 return
             self._socket = websocket
-            await websocket.send(_serialized_snapshot_envelope(self.initial_snapshot))
+            await websocket.send(
+                _serialized_snapshot_envelope(
+                    self.initial_snapshot,
+                    startup_runtime_controls=(
+                        {
+                            "command": "apply_window_bounds",
+                            "x": 0,
+                            "y": 0,
+                            "width": 1344,
+                            "height": 336,
+                        },
+                    ),
+                )
+            )
             self._connected.set()
             await websocket.wait_closed()
         finally:
@@ -185,8 +198,17 @@ class LocalAuthenticatedRawIngress:
             await self._server.wait_closed()
 
 
-def _serialized_snapshot_envelope(snapshot: OverlayPresentationSnapshot) -> str:
-    return json.dumps({"type": "snapshot", "payload": snapshot.to_dict()})
+def _serialized_snapshot_envelope(
+    snapshot: OverlayPresentationSnapshot,
+    *,
+    startup_runtime_controls: Sequence[Mapping[str, object]] | None = None,
+) -> str:
+    envelope: dict[str, object] = {"type": "snapshot", "payload": snapshot.to_dict()}
+    if startup_runtime_controls is not None:
+        envelope["startup_runtime_controls"] = [
+            dict(payload) for payload in startup_runtime_controls
+        ]
+    return json.dumps(envelope)
 
 
 @dataclass(slots=True)

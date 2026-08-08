@@ -585,9 +585,7 @@ async def test_overlay_bridge_desktop_initial_control_replay_after_snapshot_and_
     try:
         async with connect(bridge.url) as ws:
             await ws.send(json.dumps({"type": "auth", "session_token": "expected-token"}))
-            messages = [
-                json.loads(await asyncio.wait_for(ws.recv(), timeout=0.5)) for _ in range(4)
-            ]
+            messages = [json.loads(await asyncio.wait_for(ws.recv(), timeout=0.5))]
     finally:
         await bridge.stop()
 
@@ -599,18 +597,11 @@ async def test_overlay_bridge_desktop_initial_control_replay_after_snapshot_and_
                 "calibration": OverlayPresentationCalibration().to_dict(),
                 "blocks": [],
             },
-        },
-        {
-            "type": "runtime_control",
-            "payload": {"logging_mode": "detailed"},
-        },
-        {
-            "type": "runtime_control",
-            "payload": initial_controls[0],
-        },
-        {
-            "type": "runtime_control",
-            "payload": initial_controls[1],
+            "startup_runtime_controls": [
+                {"logging_mode": "detailed"},
+                initial_controls[0],
+                initial_controls[1],
+            ],
         },
     ]
 

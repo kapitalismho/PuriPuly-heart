@@ -71,6 +71,7 @@ class OverlayGenerationStartRequest:
     target: str
     clock: Clock
     startup_timeout_ms: int
+    fallback_reason: str | None = None
 
     @property
     def desktop(self) -> bool:
@@ -248,6 +249,10 @@ class OverlayGenerationStartOwner:
                 logging_mode=effects.logging_mode(),
                 diagnostics=diagnostics,
                 task_factory=runtime.create_child_task,
+                selected_target=request.target,
+                fallback_reason=request.fallback_reason,
+                geometry_authority="flet" if request.desktop else "native",
+                graceful_shutdown_request=(bridge.broadcast_shutdown if request.desktop else None),
                 retry_ownership_changed=(
                     None
                     if request.desktop

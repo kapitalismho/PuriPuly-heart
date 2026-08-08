@@ -68,3 +68,32 @@ def test_overlay_failure_jsonl_redacts_token_assignment_variants(tmp_path) -> No
     assert "jsonl-id-secret" not in raw_dump
     assert "jsonl-auth-secret" not in raw_dump
     assert "[redacted]" in raw_dump
+
+
+def test_overlay_process_trace_is_monotonic_sanitized_and_included_in_failure_dump(
+    tmp_path,
+) -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-trace-test",
+        diagnostics_dir=tmp_path,
+    )
+
+    event = recorder.record_process(
+        "overlay_trace",
+        trace_event="bounds_confirmed",
+        generation=3,
+        monotonic_ms=12.5,
+        canonical_bounds={"x": 10, "y": 20, "width": 800, "height": 240},
+        subtitle_content="private subtitle text",
+    )
+
+    assert event["monotonic_ms"] >= 0
+    assert event["source_monotonic_ms"] == 12.5
+    assert event["generation"] == 3
+    assert event["canonical_bounds"] == {"x": 10, "y": 20, "width": 800, "height": 240}
+    assert "subtitle_content" not in event
+    assert "private subtitle text" not in json.dumps(event)
+
+    raw_dump = recorder.dump_failure(failure_reason="startup_timeout").read_text(encoding="utf-8")
+    assert '"trace_event": "bounds_confirmed"' in raw_dump
+    assert "private subtitle text" not in raw_dump

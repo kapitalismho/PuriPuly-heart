@@ -71,6 +71,7 @@ class Harness:
     ingress_frozen: bool = False
     events: list[object] = field(default_factory=list)
     effective: list[tuple[bool, bool]] = field(default_factory=list)
+    lifecycle_traces: list[tuple[str, dict[str, object]]] = field(default_factory=list)
     readiness_entered: asyncio.Event | None = None
     readiness_release: asyncio.Event | None = None
 
@@ -127,6 +128,9 @@ class Harness:
             log_basic=lambda message: self.events.append(("basic", message)),
             log_detailed=lambda message: self.events.append(("detail", message)),
             log_failure=lambda message: self.events.append(("failure", message)),
+            lifecycle_trace_sink=lambda event, fields: self.lifecycle_traces.append(
+                (event, fields)
+            ),
         )
 
 
@@ -373,6 +377,7 @@ async def test_peer_activation_starting_survives_overlay_connect_until_capture_e
     owner.sync_effective_flags()
 
     assert owner.snapshot().effective_enabled is False
+    assert harness.lifecycle_traces == []
     assert owner.snapshot().activation_starting is True
     assert _peer_surface_state(owner, overlay_state="connected") == "starting"
 
@@ -382,6 +387,11 @@ async def test_peer_activation_starting_survives_overlay_connect_until_capture_e
     assert owner.snapshot().effective_enabled is True
     assert owner.snapshot().activation_starting is False
     assert _peer_surface_state(owner, overlay_state="connected") == "on"
+    assert harness.lifecycle_traces == [
+        ("peer_capture_effective", {"activation_generation": 1, "accepted": True})
+    ]
+    owner.sync_effective_flags()
+    assert len(harness.lifecycle_traces) == 1
 
 
 @pytest.mark.asyncio
