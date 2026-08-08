@@ -4,6 +4,10 @@ Status: review bundle for the mandatory Phase 0 pre-execution review (PRD Sectio
 immediate implementation order Section 34 steps 1-2). No experiment schemas have been
 implemented for the new run, and no new model execution has started.
 
+Revision history: rev 1 initial bundle; rev 2 resolves review findings P0-INV-001, P0-B0-001,
+P0-COALESCE-001, P0-SCORE-001, P0-SCHEMA-001, P0-CAUSAL-001 and records authority note
+AUTH-001.
+
 ## 1. Artifacts under review
 
 | Item | Value |
@@ -18,9 +22,10 @@ implemented for the new run, and no new model execution has started.
 
 Authority-order note: authority item 2 (`.agents/specs/prd/speaker_change_turn_boundary_experiment_handoff_en(1).md`)
 is **absent from the repository** (verified by `git ls-files .agents` and filesystem search).
-GitHub issue #51 is external product/history context. The normative plan therefore stands on
-itself; if the absent handoff document is later recovered, its content must be re-audited
-against this bundle before it can add authority.
+GitHub issue #51 is external product/history context. The plan-only authority basis is
+therefore **provisional**: if the absent handoff document is recovered, it must be re-audited
+against this bundle before it can add any conflicting normative requirement (finding
+AUTH-001). Until then the normative plan stands on itself.
 
 ## 2. Restart inventory
 
@@ -49,8 +54,8 @@ Scope:
 - Freeze the `turn_episode_v1` reference/action/fusion schema and the detector
   progress/safe-frontier schema as *design contracts* (this bundle), then implement them as
   code with scientific contract tests after review approval.
-- Freeze the B0 logical-finalize replay description (Section 5 below) and the B1 equivalence
-  contract it implies.
+- Freeze the B0 logical-finalize replay description (Section 5 below), the B1 equivalence
+  contract it implies, and the exact boundary of what the current replay trace can prove.
 - Produce the approved Phase 0 pre-execution review artifact.
 
 Non-goals (Phase 0):
@@ -90,51 +95,73 @@ Asymmetric error costs, as fixed by the plan (Section 1):
 
 ## 5. B0/B1 semantics and the logical-finalize replay description
 
-### 5.1 Current production-shaped path (B0)
+### 5.1 Production-shaped path (what the product does today)
 
-B0 reproduces the current peer VAD configuration with causal event timing and **no speaker
-signal** (Section 7.1). It is already implemented and verified in the historical run as:
+The current peer path is (PRD Section 3):
 
 ```text
-mono 16 kHz PCM
-  -> Silero VAD via peer gating profile (create_peer_vad_gating:
-     speech threshold PEER_VAD_SPEECH_THRESHOLD, start debounce/commit chunks,
-     max segment 7000 ms, hangover 500 ms, 500 ms pre-roll ring buffer)
-  -> SpeechStart / SpeechEnd translated to SpeakerBoundaryEvent at 512-sample (32 ms)
-     chunk granularity; a boundary between two utterances is placed at the start sample
-     of the chunk in which the successor SpeechStart fires, observed at the end of that
-     chunk (boundary_source_sample = chunk_start, observed_source_sample_at_emit = chunk_end)
-  -> SpeechEnd requests backend finalization (peer logical turn -> translation turn)
+mono capture
+  -> VAD SpeechStart / SpeechChunk / SpeechEnd
+  -> STT backend audio stream
+  -> SpeechEnd requests backend finalization
+  -> peer logical turn
+  -> translation turn
 ```
 
-Historical B0 evidence: `results/result_b0_phase0_*.json`,
-`results/sweep_{ls_eend,eres}_summary_b0_phase0.json`; B0 VAD replay code is
-`vad_baseline.py` + `run_b0_replay.py`; the peer gating profile is read from
-`puripuly_heart/core/vad/gating.py` (behavioral baseline, not modified).
+Production `SpeechEnd` finalizes audio that has already been transmitted; it does not provide
+a source-sample retrospective split primitive. Production finalization, terminal flush, and
+maximum-duration (7000 ms peer segment) boundaries are production STT-controller behavior
+(read as behavioral baseline; not modified during this experiment). The peer VAD gating
+profile (`src/puripuly_heart/core/vad/gating.py`): `PEER_VAD_SPEECH_THRESHOLD`, start
+debounce/commit chunks, `PEER_MAX_SEGMENT_MS = 7000`, and the replay uses 500 ms hangover and
+500 ms pre-roll ring buffer.
 
-Key B0 characteristics relevant to the new run:
+### 5.2 The canonical B0 replay trace (what the experiment replays)
 
-- B0 has no source-sample retrospective split primitive: `SpeechEnd` finalizes audio already
-  transmitted (PRD Section 3).
-- B0 boundary positions are chunk-quantized to 512-sample (32 ms) grid, which aligns with the
-  plan's 32 ms gap binning (Section 16.2).
-- B0 VAD maximum-duration behavior (`structural_max_duration` at 7000 ms) is part of B0
-  segmentation and must survive B1 identically (Section 7.2; Section 6.6 structural actions).
+B0 (Section 7.1) reproduces the current peer VAD configuration with causal event timing and
+**no speaker signal**. The committed historical B0 replay is implemented by
+`vad_baseline.py` + `run_b0_replay.py`:
 
-### 5.2 B1 structural-engine equivalence control
+- Input: mono 16 kHz PCM16, processed in 512-sample (32 ms) chunks.
+- VAD: `create_peer_vad_gating` with speech threshold, start debounce/commit chunks, 7000 ms
+  max segment, 500 ms hangover, 500 ms pre-roll ring buffer.
+- Emitted events: `SpeakerBoundaryEvent` for a boundary between two utterances, placed at
+  the **start sample of the chunk in which the successor `SpeechStart` fires**, observed at
+  the **end of that chunk** (`observed_source_sample_at_emit = chunk_end`). Per-epoch
+  `DetectorProgress` snapshots are recorded at chunk granularity.
+- Important trace boundary (finding P0-B0-001): the canonical B0 replay trace **does not
+  emit or retain `SpeechEnd` events**; `SpeechEnd` is consumed by the replay only to
+  populate previous-utterance metadata (`speech_end_sample`, trailing silence, reason). A
+  terminal `SpeechEnd` or a max-duration structural boundary with no successor utterance is
+  therefore **not present** in the trace. B0's trace-visible segmentation consists of
+  successor-`SpeechStart` boundaries only.
 
-B1 (Section 7.2) routes the exact B0 VAD event stream through the new logical-action,
-evidence, and scoring infrastructure but receives no neural proposals. In the absence of
-neural proposals, B1 hard segmentation must be action-for-action and source-sample-for-
-sample identical to B0, including ordinary VAD boundaries and the 7000 ms maximum-duration
-behavior. New bookkeeping, silence-interval attribution, or action schemas may not create,
-delete, move, or accelerate a B0 boundary. Any B0/B1 difference is an implementation-contract
-failure (Section 31.2), not a product gain.
+Consequences for B1:
 
-Phase 0 freezes this contract; the B1 equivalence test itself is executed at Phase 5
-(invariant 21 of Section 28).
+- The B1 equivalence contract (Section 7.2) is defined over the **trace-visible B0
+  segmentation**: with no neural proposals, B1 must be action-for-action and
+  source-sample-for-source-sample identical to B0 for every boundary the B0 trace emits.
+- `SpeechEnd`-driven finalization semantics (terminal flush, max-duration structural
+  boundaries, `structural_max_duration` actions, Section 6.6) are **deferred to the Phase 3
+  provider-neutral oracle and Phase 8 provider replay**, where the `logical_finalize`
+  lifecycle is validated with oracle traces. Phase 0 records this deferral explicitly; it is
+  not silently claimed as proven by the B0 replay.
 
-### 5.3 Desired hard action
+### 5.3 Historical coalescing is non-normative for B0/B1
+
+`run_b0_replay.py` additionally runs the historical `coalesce_vad_and_detector` helper with a
+500 ms window (`VAD_COALESCE_WINDOW_SAMPLES = 8000`, `config.py`). This helper is
+**historical/non-normative for the new run** (finding P0-COALESCE-001):
+
+- its `absorbed` duplicate-tracking set is not keyed by epoch (cross-epoch index aliasing);
+- it orders detector events by boundary position rather than observation frontier;
+- it does not implement the Section 11.4 association rules or the safe-frontier contract.
+
+Its historical outputs remain evidence only. The new run implements epoch-keyed,
+observation-ordered causal VAD fusion at Phase 5 (Section 11 of the plan). B0/B1 for the new
+run consume only the raw VAD boundary trace plus `DetectorProgress` snapshots.
+
+### 5.4 Desired hard action
 
 ```text
 logical_finalize(boundary_source_sample)
@@ -146,7 +173,7 @@ synthetic silence reset, LS-EEND state continues inside the episode, ERes policy
 changes only per its frozen proposal policy, translation context survives, stale epoch
 actions rejected.
 
-### 5.4 Provider policy vs provider-neutral logical action
+### 5.5 Provider policy vs provider-neutral logical action
 
 Two layers (Section 3): (1) provider-neutral logical action at a canonical source sample;
 (2) provider policy realizing the action without loss/duplication, tested later with oracle
@@ -211,7 +238,7 @@ invariant 35):
 - Frontier resets with the epoch. A heuristic watermark is not sufficient (Qwen safe drain
   relies on the guarantee, Section 24.2).
 
-### 6.3 Reference action (Section 6 taxonomy, Section 12)
+### 6.3 Reference action and reference outcome (Sections 6, 12)
 
 ```text
 ReferenceAction {
@@ -239,7 +266,22 @@ Notes:
 - Pool tags (Section 5.1) gate the primary clean/gap headline: only `hard_only` contributes
   (invariants 10, 11).
 
-### 6.4 Final action and benefit/harm axes (Sections 11.2, 12.3)
+Benefit attribution lives **per reference** (Section 12.3; finding P0-SCHEMA-001), because
+`hard_miss`/`soft_miss`/`late_target_action` have no final action carrying them:
+
+```text
+ReferenceOutcome {
+    reference_id: str
+    matched_action_id: str | None
+    benefit_attribution: "retained_b0_success" | "recovered_b0_hard_miss" |
+                         "accelerated_b0_success" | "correct_soft_marker" |
+                         "late_target_action" | "hard_miss" | "soft_miss" | "none"
+    availability_delay_ms: int | None
+    localization_error_ms: int | None
+}
+```
+
+### 6.4 Final action and harm axis (Sections 11.2, 12.3)
 
 ```text
 FinalAction {
@@ -250,17 +292,20 @@ FinalAction {
                  "emit_soft_marker" | "suppress_detector_duplicate" |
                  "suppress_vad_duplicate" | "structural_max_duration" | "unscored_action"
     boundary_source_sample: int | None
+    observed_source_sample_at_emit: int | None
+    emitted_monotonic_ns: int | None
     availability_source_sample: int
     cluster_id: str | None
-    benefit_attribution: "retained_b0_success" | "recovered_b0_hard_miss" |
-                         "accelerated_b0_success" | "correct_soft_marker" |
-                         "late_target_action" | "hard_miss" | "soft_miss" | "none"
+    matched_reference_id: str | None
     harm_or_structure_flags: [...]
 }
 ```
 
 - Only `retain_vad`, `accelerate_or_replace_vad`, `add_hard_boundary` create final hard
   logical boundaries (Section 11.2).
+- Observation/emission provenance (`observed_source_sample_at_emit`,
+  `emitted_monotonic_ns`) is retained on the action so location accuracy and causal
+  availability are never collapsed into one timestamp (Section 4.9; finding P0-SCHEMA-001).
 - Harm flags (Section 12.3) are an independent axis stored on the action; a matched action is
   not presumed harmless (invariant 17). Flags: `harmful_active_split`, `lexical_split`,
   `same_speaker_pause_split`, `duplicate_hard_boundary`, `structural_split`,
@@ -268,7 +313,42 @@ FinalAction {
 - Hard and soft outputs from one cluster cannot both create product actions (Section 9.2/10);
   a final action belongs to at most one cluster (invariant 4).
 
-### 6.5 Frozen tables frozen now
+### 6.5 LogicalBoundaryCluster and actionization contract (Sections 9.3, 10)
+
+```text
+LogicalBoundaryCluster {
+    cluster_id: str
+    audio_epoch: int
+    source_session_id: str
+    member_proposal_ids: [...]
+    output_kind: "overlap_onset" | "dominant_replacement" | "new_track_onset" |
+                 "track_instability" | "speaker_change_unknown"
+    compatible_representative_subset: [...]
+    representative_proposal_id: str
+    representative_reason: "first" | "max_confidence" | "fallback_first"
+    confidence_semantics_id: str
+    suppression_reason: "refractory" | "none"
+    open_frontier_sample: int
+    close_frontier_sample: int
+    availability_source_sample: int
+    boundary_spread_samples: int
+    confidence_distribution: [...]
+    refractory_owner_cluster_id: str | None
+    tail_closed: bool
+}
+```
+
+Actionization mapping (Section 10; finding P0-CAUSAL-001):
+
+- LS `dominant_replacement` may request a hard action.
+- LS `overlap_onset` requests a soft marker.
+- LS `track_instability` is diagnostic-only and can never directly create a hard action.
+- ERes `speaker_change_unknown` requests a hard candidate (ERes does not expose overlap
+  state; reference overlap analysis later measures that limitation's cost).
+- Cluster output kind and representative boundary always come from semantically compatible
+  proposals; hard and soft outputs from one cluster cannot both create product actions.
+
+### 6.6 Frozen tables frozen now
 
 - Cluster output-kind semantic priority (Section 9.2.6):
   `overlap_onset > dominant_replacement > new_track_onset > track_instability`;
@@ -283,31 +363,84 @@ FinalAction {
 - Turn-owner threshold 100 ms with mandatory 50/200 ms sensitivity views (Section 13.2;
   invariant 16).
 - Harmful-active-split guard 200 ms with 100/300 ms sensitivity views (Section 14.1).
+- VAD-fusion association parameters (Section 11.3): `detector_vad_radius_ms V in {250, 500}`,
+  `same_silence_interval_association in {false, true}`.
 
-## 7. Assumptions relevant to Phase 0 (causal, split, state, statistical)
+## 7. Scoring, causal, split, state, and statistical assumptions
 
-- Causal: proposals/actions never use future audio or reference labels (Sections 8, 10, 11);
+### 7.1 Causal assumptions
+
+- Proposals/actions never use future audio or reference labels (Sections 8, 10, 11);
   `boundary_source_sample <= observed_source_sample_at_emit` for every event and control
   action (invariant 23). Controls may use only product-observable causal information
   (Section 7.3).
-- Split/held-out: `diagnostic_dev` and `frontier_dev` are group-disjoint at the strongest
-  available grouping (Section 16.4); confirmatory held-out paths are not opened until the
-  Phase 6 freeze and Phase 7 pre-access approval (Sections 17, 22). Phase 0 opens nothing.
+
+### 7.2 Scoring contract (Section 28 invariants relevant to Phase 0)
+
+The following rules are frozen as the Phase 0 scoring contract so later phases cannot deviate
+(finding P0-SCORE-001):
+
+- **Gap-VAD validity (invariant 9):** a pre-existing VAD boundary inside the gap acceptable
+  interval is valid product separation and may never be rejected merely because it is more
+  than 500 ms from B onset. Its availability is reported as pre-existing, not anticipatory.
+- **No anticipatory detector credit (invariant 8):** a detector/speaker-model proposal whose
+  observation frontier is before the detector-evidence onset (B onset for hard targets)
+  receives no gap speaker-change evidence credit.
+- **Overlap exclusion (invariants 10, 11):** `overlap_present` episodes and overlap soft
+  references cannot enter the primary clean/gap contamination headline or raise hard-boundary
+  headline recall. The overlap counterfactual (`overlap_hard_action_contamination_contribution`,
+  Section 13.5) is reported separately and cannot support the clean/gap claim.
+- **Warm-up exclusion (invariant 12):** warm-up actions and references never enter scored
+  counts.
+- **Unscored exclusion (invariant 13):** unscored intervals never enter benefit or harm
+  numerators.
+- **Contamination algorithm (invariants 14, 15):** source samples are never double-counted;
+  turn ownership requires 100 ms continuous singleton speech from the owning speaker before
+  ownership (50/200 ms sensitivity views reported); a premature boundary that leaves the
+  successor turn still owned by A and later containing B charges qualifying B speech as
+  contamination (no false reduction credit); once a different qualifying singleton speaker
+  appears, all subsequent qualifying singleton speech until the next hard boundary is
+  contamination, including a later return of the original speaker.
+- **Harm rules (invariants 17-20):** harm flags are independent of benefit matching
+  (a matched boundary can still be an active or lexical split); `harmful_active_split`
+  requires the same singleton speaker on both guarded sides (200 ms guard, 100/300 ms views);
+  missing word timing produces `not_observable`, never an inferred negative; same-speaker
+  pause splits are non-severe but remain counted as `same_speaker_extra_turn_count`.
+- **Timing metrics (Section 15):** interval localization error, signed point error,
+  causal availability delay, event lookback, cluster debounce delay, VAD association delay,
+  wall-clock model service time, end-to-end scheduling completion delay, real-time factor,
+  final backlog, peak RSS, model load time, cache-hit/miss execution time. No negative
+  detector availability delay; pre-existing gap VAD actions are a separate valid category.
+- **Rate labeling (Section 13.6, 16.4):** target-enriched pools report raw ms, ratios, and
+  rates per sampled exposure only, and are never converted into natural five-minute/session
+  rates. Five-minute/session/source-hour rates are emitted only from
+  `natural_exposure_validation` (source-time-uniform windows sampled before
+  transition-label inspection) or complete unbiased source coverage (invariant 30).
+
+### 7.3 Split/held-out and statistical assumptions
+
+- `diagnostic_dev` and `frontier_dev` are group-disjoint at the strongest available grouping
+  (Section 16.4; invariant 27).
+- Bootstrap resamples source-session blocks, never transitions (Section 21; invariant 28).
+- Cross-split source, speaker, recording, and transformation overlap fails closed via
+  group-graph hashes (Section 17; invariant 29).
+- Confirmatory held-out paths cannot be opened until a valid frozen self-hash exists and the
+  Phase 7 pre-access review is approved (Sections 17, 22; invariants 31, 32). Phase 0 opens
+  nothing.
 - State: reset-plus-warm-up scored evaluation is forbidden until the Section 5.4
   state-equivalence contract passes for the family/profile class; otherwise source-prefix
-  state (invariant 26). Phase 0 does not evaluate any family.
-- Statistical: source session (or synthetic source-connected block) is the primary
-  uncertainty unit; bootstrap resamples blocks (Section 21; invariant 28). Target-enriched
-  exposure is never rescaled to natural rates (invariant 30).
-- Historical artifacts are evidence/cached model output only (Section 0, 16.1); none is
+  state (invariant 26). Phase 0 implements the prohibition gate only; the parity run itself
+  executes at Phase 2/4.
+- Historical artifacts are evidence/cached model output only (Sections 0, 16.1); none is
   treated as normative corrected results.
 
 ## 8. Falsification and stop conditions for Phase 0
 
 - A B0/B1 difference in the Phase 5 equivalence test invalidates the run as a policy result
-  (Section 31.2) — Phase 0 freezes the contract so that test is defined now.
+  (Section 31.2) — Phase 0 freezes the contract so that test is defined now, over the
+  trace-visible B0 segmentation (Section 5.2).
 - Phase 0 fails if the schemas cannot express the Section 8/4.10/6/11/12 contracts above, or
-  if any frozen table (Section 6.5) is ambiguous.
+  if any frozen table (Section 6.6) is ambiguous.
 - The Phase 0 exit gate (PRD): no held-out access and no new model execution before (a) the
   action/scoring contract passes its invariant tests and (b) the Phase 0 review verdict is
   `approved`.
@@ -333,15 +466,73 @@ FinalAction {
 9. Whether the planned falsification tests can actually invalidate the intended claims
    (Sections 19, 28, 31).
 
-## 11. Proposed post-approval implementation (informational)
+## 11. Phase 0 scientific contract/gate inventory (post-approval implementation)
+
+### 11.1 Implementation units
 
 - `experiments/speaker_turn_boundary/turn_episode/` package: schema dataclasses with
   construction-time validation (`schemas.py`) and pure invariant/contract functions plus the
   frozen tables (`contracts.py`).
-- `tests/test_turn_episode_contracts.py`: scientific contract tests for Section 28 invariants
-  implementable without data, clustering, fusion, or model execution (currently identified:
-  1, 4, 5, 7, 8, 13, 17, 24, 25, 26, 34, 35 and the frozen-table consistency tests).
+- `tests/test_turn_episode_contracts.py`: scientific contract tests, plus a gate-only test
+  module where noted.
 - `results/turn_episode_v1/proposal_contract.json` and `fusion_contract.json`: frozen schema
   version, field definitions, and profile/extractor registries (extractor registry completed
   at Phase 4 per Section 18.3).
 - `results/turn_episode_v1/reviews/phase_0_pre_execution.md`: the review artifact.
+
+### 11.2 Invariant disposition (Section 28)
+
+Phase 0 implements **synthetic contract tests** (in-memory references, actions, proposals,
+clusters, metadata, hashes, block records; no audio, no model):
+
+- **4** no final action in two clusters; **5** no duplicated hard boundary at one source
+  sample; **7** gap interval matching accepts any boundary inside the annotated silence;
+  **8** no gap credit before B onset; **13** unscored intervals never enter numerators;
+  **17** benefit/harm orthogonality (a matched boundary can carry active/lexical split flags);
+  **24** cluster output kind/representative compatibility; **25** `max_confidence` restricted
+  to comparable confidence semantics; **34** stale epoch actions rejected.
+- **2** no cluster member after cluster close (pure policy function on ordered proposals);
+  **6** matching ordered one-to-one (pure matching engine over synthetic references/actions);
+  **9** pre-existing VAD gap boundary stays valid; **10**/**11** overlap soft references and
+  `overlap_present` episodes excluded from the clean/gap headline (pure pool-tag/mask
+  functions); **12** warm-up actions excluded from scored counts; **14** contamination
+  samples never double-counted; **15** premature-split no-false-credit rule; **16** turn
+  ownership 100 ms threshold with reproducible 50/200 ms views; **18** harmful active split
+  requires same singleton speaker on both guarded sides; **19** missing word timing is
+  `not_observable`, not absence of harm; **20** pause splits counted as same-speaker extra
+  turns; **27** diagnostic/frontier group-disjointness (hash/group-graph function);
+  **28** bootstrap resamples blocks (block-record function, not full bootstrap); **29**
+  cross-split overlap fails closed; **30** natural-rate labels gate (only
+  natural_exposure_validation source); **31** held-out open requires valid frozen self-hash;
+  **32** incomplete held-out sessions cannot produce a decision (completeness-check
+  function).
+
+Phase 0 implements **gate-only checks** (the prohibition/contract gate is tested; the
+empirical evidence is produced by later phases):
+
+- **1** schema-level `observed >= boundary` gate plus full frontier-read audit deferred to
+  replay harness (Phase 4/5); **26** reset-plus-warm-up prohibition gate only, state parity
+  run executes at Phase 2/4; **35** monotonicity/coverage check as a pure trace validator;
+  conservative safe-frontier *guarantee* evidence is produced by the Phase 5 fusion replay.
+
+Later-phase execution tests (recorded, not Phase 0): **3** refractory determinism (Phase 5);
+**21** B0/B1 equivalence (Phase 5); **22** frequency-matched controls (Phase 5); **23**
+control causal availability (Phase 5); **33** provider-neutral sample conservation (Phase 3);
+**36** Qwen safe drain (Phase 3/8); **37** Deepgram reconnect deduplication (Phase 8).
+
+## 12. Proposed post-approval implementation (informational)
+
+Covered by Section 11.1; the complete contract/gate inventory in Section 11.2 replaces the
+earlier abbreviated invariant list.
+
+## 13. Recorded review findings and dispositions
+
+| id | severity | finding | disposition |
+| --- | --- | --- | --- |
+| P0-INV-001 | blocker | Phase-0 invariant list incomplete; invariant 26 only partially Phase-0-testable | resolved in Section 11.2 (complete disposition per invariant) |
+| P0-B0-001 | blocker | B0 trace does not emit/retain SpeechEnd; max-duration/terminal semantics not trace-visible | resolved in Section 5.2 (trace boundary stated; deferral to Phase 3/8 recorded) |
+| P0-COALESCE-001 | important | historical 500 ms coalescer non-epoch-safe, boundary-ordered; omitted from bundle | resolved in Section 5.3 (recorded as non-normative historical evidence) |
+| P0-SCORE-001 | important | scoring contract incomplete (gap-VAD validity, overlap masks, warm-up, contamination, harm, timing, natural exposure) | resolved in Section 7.2 |
+| P0-SCHEMA-001 | important | benefit attribution must be per-reference; FinalAction lacks observation/emission provenance and match link | resolved in Sections 6.3-6.4 |
+| P0-CAUSAL-001 | important | no cluster schema, no explicit actionization mapping | resolved in Section 6.5 |
+| AUTH-001 | note | authority #2 absent; plan-only authority provisional | recorded in Section 1; re-audit required if handoff recovered |
