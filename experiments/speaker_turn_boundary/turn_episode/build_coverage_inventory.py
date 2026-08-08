@@ -738,6 +738,9 @@ def main() -> None:
 
     materialization: dict[str, dict[str, Any]] | None = None
     reserved_materialized: dict[str, Any] = {}
+    frozen_additions = [(m, "development") for m in AMI_DEVELOPMENT_ADDITIONS] + [
+        (m, "reserved") for m in AMI_RESERVED_ADDITIONS
+    ]
     if args.ami_materialization_manifest is not None:
         raw_manifest = json.loads(args.ami_materialization_manifest.read_text(encoding="utf-8"))
         payload = {k: v for k, v in raw_manifest.items() if k != "content_sha256"}
@@ -747,15 +750,15 @@ def main() -> None:
         if expected_hash != raw_manifest.get("content_sha256"):
             raise InventoryError("ami materialization manifest content_sha256 mismatch")
         selected = raw_manifest.get("selected_meetings") or []
-        selected_map = {item["meeting_id"]: item["group"] for item in selected}
-        if selected_map != {m: "development" for m in AMI_DEVELOPMENT_ADDITIONS} | {
-            m: "reserved" for m in AMI_RESERVED_ADDITIONS
-        }:
+        ordered_selected = [(item["meeting_id"], item["group"]) for item in selected]
+        if ordered_selected != frozen_additions:
             raise InventoryError("ami materialization manifest selection mismatch")
-        materialization = raw_manifest.get("meetings")
-        for meeting_id, entry in (materialization or {}).items():
-            expected_group = selected_map.get(meeting_id)
-            if expected_group is None or entry.get("group") != expected_group:
+        materialization = raw_manifest.get("meetings") or {}
+        if set(materialization.keys()) != {m for m, _ in frozen_additions}:
+            raise InventoryError("ami materialization manifest meetings key set mismatch")
+        for meeting_id, entry in materialization.items():
+            expected_group = dict(frozen_additions)[meeting_id]
+            if entry.get("group") != expected_group:
                 raise InventoryError(f"ami manifest group mismatch for {meeting_id}")
             destination = Path(str(entry["destination"]))
             if not destination.is_file():
@@ -767,7 +770,7 @@ def main() -> None:
                 raise InventoryError(f"ami manifest size mismatch for {meeting_id}")
         reserved_materialized = {
             meeting_id: entry
-            for meeting_id, entry in (materialization or {}).items()
+            for meeting_id, entry in materialization.items()
             if entry.get("group") == "reserved"
         }
 
@@ -807,11 +810,7 @@ def main() -> None:
         f"alimeeting_{sid}" for sid in ALIMEETING_SESSIONS
     }
     if materialization:
-        expected_sessions |= {
-            f"ami_{meeting_id}"
-            for meeting_id, entry in materialization.items()
-            if entry.get("group") == "development"
-        }
+        expected_sessions |= {f"ami_{m}" for m in AMI_DEVELOPMENT_ADDITIONS}
     actual_sessions = {s.session_id for s in all_sessions if s.wav_path is not None}
     missing = expected_sessions - actual_sessions
     if missing:
