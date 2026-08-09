@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from puripuly_heart.app.ports.oscquery import (
@@ -14,7 +16,7 @@ class FakeService:
         self.started = 0
         self.stopped = 0
         self.advertisements: list[OscQueryAdvertisement] = []
-        self.info = OscQueryServiceInfo(
+        self.info: OscQueryServiceInfo | None = OscQueryServiceInfo(
             service_id="vrchat",
             host="127.0.0.1",
             osc_send_port=9010,
@@ -27,7 +29,7 @@ class FakeService:
     async def stop(self) -> None:
         self.stopped += 1
 
-    async def discover_vrchat(self) -> OscQueryServiceInfo:
+    async def discover_vrchat(self) -> OscQueryServiceInfo | None:
         return self.info
 
     async def advertise_receiver(self, advertisement: OscQueryAdvertisement) -> None:
@@ -145,5 +147,53 @@ async def test_oscquery_start_applies_discovery_events_during_initialization() -
     await runtime.stop()
 
 
+@pytest.mark.asyncio
+async def test_oscquery_monitor_detects_disappearance_and_rediscovery_without_callback() -> None:
+    service = FakeService()
+    events: list[tuple[str, object]] = []
+    runtime = OscQueryRuntime(
+        service=service,
+        receiver_start=lambda: _noop(),
+        receiver_stop=lambda: _noop(),
+        receiver_effective_port=lambda: 49152,
+        sender_destination_changed=lambda host, port: events.append((host, port)),
+        snapshot_publisher=lambda reason: events.append(("snapshot", reason)),
+        discovery_poll_interval_seconds=0.01,
+    )
+    await runtime.start("automatic", manual_send_port=9000)
+    await asyncio.sleep(0.03)
+
+    assert events.count(("snapshot", "discovery")) == 0
+
+    service.info = None
+    await _wait_until(lambda: runtime.service_info is None)
+
+    assert runtime.effective_send_port == 9000
+    assert runtime.avatar_tree is None
+
+    service.info = OscQueryServiceInfo(
+        service_id="vrchat-restarted",
+        host="127.0.0.1",
+        osc_send_port=9999,
+        is_vrchat=True,
+    )
+    await _wait_until(lambda: runtime.effective_send_port == 9999)
+
+    assert ("127.0.0.1", 9999) in events
+    assert events.count(("snapshot", "discovery")) == 1
+    await runtime.stop()
+    assert runtime._monitor_task is None
+
+
 async def _noop() -> None:
     return None
+
+
+async def _wait_until(predicate, timeout: float = 1.0) -> None:
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        if predicate():
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("condition did not become true")

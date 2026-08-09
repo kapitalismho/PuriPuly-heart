@@ -246,6 +246,7 @@ LAYER_RULES = (
             "puripuly_heart.app.ports",
             "puripuly_heart.core.osc.control_schema",
             "puripuly_heart.core.osc.control_codec",
+            "puripuly_heart.core.osc.oscquery_contract",
         ),
         forbidden_layers=frozenset(
             {

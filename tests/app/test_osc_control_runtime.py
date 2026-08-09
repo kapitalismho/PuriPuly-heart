@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import pytest
@@ -85,10 +86,12 @@ class BlockingDashboardApplication:
     def __init__(self) -> None:
         self.started = asyncio.Event()
         self.gate = asyncio.Event()
+        self.completed = False
 
     async def set_stt_enabled(self, _enabled: bool) -> None:
         self.started.set()
         await self.gate.wait()
+        self.completed = True
 
 
 @dataclass
@@ -146,6 +149,7 @@ def _integration(
     *,
     application: object | None = None,
     osc_state: OscCanonicalState | None = None,
+    state_provider: Callable[[], OscCanonicalState] | None = None,
 ) -> OscControlIntegrationOwner:
     return OscControlIntegrationOwner(
         receiver_owner=receiver_owner,
@@ -153,7 +157,7 @@ def _integration(
         apply_settings=lambda _settings: None,
         application_provider=lambda: application,
         sender_provider=lambda: sender,
-        state_provider=lambda: osc_state or OscCanonicalState(),
+        state_provider=state_provider or (lambda: osc_state or OscCanonicalState()),
         language_state_provider=lambda: ("ko", "en", "en", "ko"),
         translation_model_normalizer=materialize_translation_settings,
         query_service=service,
@@ -417,7 +421,7 @@ async def test_rejected_dashboard_command_republishes_actual_full_canonical_stat
 
 
 @pytest.mark.asyncio
-async def test_off_transition_rejects_an_admitted_dashboard_command() -> None:
+async def test_off_transition_drains_an_admitted_dashboard_command() -> None:
     settings = AppSettings()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
@@ -428,7 +432,7 @@ async def test_off_transition_rejects_an_admitted_dashboard_command() -> None:
         sender,
         FakeService(None),
         application=application,
-        osc_state=OscCanonicalState(self_capture=False),
+        state_provider=lambda: OscCanonicalState(self_capture=application.completed),
     )
 
     await integration.configure_connection(
@@ -444,15 +448,25 @@ async def test_off_transition_rejects_an_admitted_dashboard_command() -> None:
     )
     await application.started.wait()
 
-    await integration.configure_connection(
-        mode="off",
-        send_port=9020,
-        receive_port=9021,
+    off_task = asyncio.create_task(
+        integration.configure_connection(
+            mode="off",
+            send_port=9020,
+            receive_port=9021,
+        )
     )
+    await asyncio.sleep(0)
+    assert off_task.done() is False
     application.gate.set()
 
-    result = await asyncio.wait_for(dispatch_task, timeout=1)
-    assert result.applied is False
-    assert result.error == "router_disabled"
-    assert len(sender.messages) == 15
+    result, _ = await asyncio.wait_for(
+        asyncio.gather(dispatch_task, off_task),
+        timeout=1,
+    )
+    assert result.applied is True
+    assert result.error is None
+    assert application.completed is True
+    assert integration.connection_mode == "off"
+    assert len(sender.messages) == 16
+    assert sender.messages[-1] == ("/avatar/parameters/PuriPuly_Talk", True)
     await integration.close()

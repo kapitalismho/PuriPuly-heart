@@ -6,7 +6,7 @@ import json
 import pytest
 import zeroconf
 
-from puripuly_heart.app.ports.oscquery import OscQueryAdvertisement
+from puripuly_heart.app.ports.oscquery import OscQueryAdvertisement, OscQueryServiceInfo
 from puripuly_heart.core.osc.oscquery import (
     OSC_SERVICE_TYPE,
     ZeroconfOscQueryService,
@@ -32,9 +32,14 @@ async def test_zeroconf_service_advertises_and_serves_the_puripuly_tree() -> Non
         assert response.split(b"\r\n", 1)[0] == b"HTTP/1.1 200 OK"
         payload = json.loads(response.split(b"\r\n\r\n", 1)[1])
         parameters = payload["CONTENTS"]["avatar"]["CONTENTS"]["parameters"]["CONTENTS"]
-        assert len(parameters) == 15
+        assert len(parameters) == 16
         assert parameters["PuriPuly_Talk"]["TYPE"] == "T"
         assert parameters["PuriPuly_SelfASR"]["TYPE"] == "i"
+        assert parameters["MuteSelf"] == {
+            "FULL_PATH": "/avatar/parameters/MuteSelf",
+            "ACCESS": 2,
+            "TYPE": "T",
+        }
 
         avatar_response = await _request(service.advertisement.query_port, "/avatar")
         avatar_payload = json.loads(avatar_response.split(b"\r\n\r\n", 1)[1])
@@ -62,6 +67,14 @@ async def test_zeroconf_service_advertises_and_serves_the_puripuly_tree() -> Non
         )
         assert value_response.split(b"\r\n", 1)[0] == b"HTTP/1.1 200 OK"
         assert json.loads(value_response.split(b"\r\n\r\n", 1)[1]) == {"VALUE": [False]}
+
+        mute_self_response = await _request(
+            service.advertisement.query_port,
+            "/avatar/parameters/MuteSelf",
+        )
+        mute_self_payload = json.loads(mute_self_response.split(b"\r\n\r\n", 1)[1])
+        assert mute_self_payload["ACCESS"] == 2
+        assert mute_self_payload["TYPE"] == "T"
 
         avatar_change_response = await _request(
             service.advertisement.query_port,
@@ -154,6 +167,71 @@ async def test_zeroconf_start_cleans_up_partial_browser_creation(
     assert service._loop is None
     assert FakeZeroconf.instances[0].closed is True
     assert FakeBrowser.instances[0].cancelled is True
+
+
+@pytest.mark.asyncio
+async def test_discovery_resolves_the_osc_destination_from_host_info() -> None:
+    requests: list[str] = []
+
+    async def handle_client(
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ) -> None:
+        request = await reader.readline()
+        requests.append(request.decode("ascii").split()[1])
+        payload = json.dumps(
+            {
+                "NAME": "VRChat-Client",
+                "OSC_IP": "127.0.0.1",
+                "OSC_PORT": 9123,
+            }
+        ).encode("utf-8")
+        writer.write(
+            b"HTTP/1.1 200 OK\r\n"
+            b"Content-Type: application/json\r\n"
+            + f"Content-Length: {len(payload)}\r\nConnection: close\r\n\r\n".encode("ascii")
+            + payload
+        )
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(handle_client, "127.0.0.1", 0)
+    query_port = int(server.sockets[0].getsockname()[1])
+    service = ZeroconfOscQueryService()
+    service._services["VRChat-Client"] = OscQueryServiceInfo(
+        service_id="VRChat-Client",
+        host="127.0.0.1",
+        query_port=query_port,
+        is_vrchat=True,
+    )
+    try:
+        discovered = await service.discover_vrchat()
+    finally:
+        server.close()
+        await server.wait_closed()
+
+    assert discovered is not None
+    assert discovered.osc_send_port == 9123
+    assert requests == ["/?HOST_INFO"]
+
+
+@pytest.mark.asyncio
+async def test_discovery_rejects_a_stale_oscquery_service() -> None:
+    server = await asyncio.start_server(lambda _reader, _writer: None, "127.0.0.1", 0)
+    query_port = int(server.sockets[0].getsockname()[1])
+    server.close()
+    await server.wait_closed()
+    service = ZeroconfOscQueryService()
+    service._services["VRChat-Client"] = OscQueryServiceInfo(
+        service_id="VRChat-Client",
+        host="127.0.0.1",
+        query_port=query_port,
+        osc_send_port=9000,
+        is_vrchat=True,
+    )
+
+    assert await service.discover_vrchat() is None
 
 
 async def _request(port: int | None, target: str) -> bytes:

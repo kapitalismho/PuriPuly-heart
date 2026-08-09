@@ -179,7 +179,7 @@ class OscControlIntegrationOwner:
 
         key = (host, mode, int(send_port), int(receive_port))
         if self._configured_connection == key and mode == "off":
-            self.router.set_ingress_enabled(False)
+            await self.router.suspend_ingress()
             if self._publisher is not None:
                 self._publisher.close()
             return
@@ -188,12 +188,12 @@ class OscControlIntegrationOwner:
             self._publish_delta()
             return
 
+        await self.router.suspend_ingress()
         self._send_port = int(send_port)
         self._receive_port = int(receive_port)
         self._host = host
         self._mode = mode
         self._configured_connection = (host, mode, self._send_port, self._receive_port)
-        self.router.set_ingress_enabled(False)
         await self.query_runtime.stop()
         receiver_port = 0 if mode == "automatic" else self._receive_port
         await self._receiver_owner.configure_control(

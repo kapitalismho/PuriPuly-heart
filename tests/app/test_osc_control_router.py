@@ -185,6 +185,38 @@ async def test_router_suppresses_values_echoed_from_its_publisher() -> None:
 
 
 @pytest.mark.asyncio
+async def test_echo_suppression_does_not_drop_a_newer_boolean_reversal() -> None:
+    class BlockingBooleanApplication(FakeApplication):
+        async def set_self_capture(self, enabled: bool) -> object:
+            self.started.set()
+            await self.gate.wait()
+            self.calls.append(("self_capture", enabled))
+            return None
+
+    application = BlockingBooleanApplication()
+    router = OscControlRouter(
+        application,
+        echo_suppression_provider=lambda message: message.name == "PuriPuly_Talk"
+        and message.value is False,
+    )
+    first = asyncio.create_task(router.dispatch_packet("/avatar/parameters/PuriPuly_Talk", True))
+    await application.started.wait()
+    second = asyncio.create_task(router.dispatch_packet("/avatar/parameters/PuriPuly_Talk", False))
+    await asyncio.sleep(0)
+    application.gate.set()
+
+    first_result, second_result = await asyncio.gather(first, second)
+
+    assert first_result.applied is True
+    assert second_result.applied is True
+    assert application.calls == [
+        ("self_capture", True),
+        ("self_capture", False),
+    ]
+    await router.close()
+
+
+@pytest.mark.asyncio
 async def test_router_republishes_canonical_state_after_invalid_id() -> None:
     application = FakeApplication()
     delta_republish_calls = 0
@@ -228,7 +260,7 @@ async def test_router_resolves_inflight_coalesced_command_when_closed() -> None:
 
 
 @pytest.mark.asyncio
-async def test_router_generation_rejects_admitted_command_after_ingress_is_disabled() -> None:
+async def test_router_drains_started_command_after_ingress_is_disabled() -> None:
     application = FakeApplication()
     router = OscControlRouter(application)
     dispatch_task = asyncio.create_task(
@@ -240,8 +272,9 @@ async def test_router_generation_rejects_admitted_command_after_ingress_is_disab
     application.gate.set()
 
     result = await asyncio.wait_for(dispatch_task, timeout=1)
-    assert result.applied is False
-    assert result.error == "router_disabled"
+    assert result.applied is True
+    assert result.error is None
+    assert ("self_asr", "local_parakeet_v3") in application.calls
     await router.close()
 
 
@@ -259,10 +292,11 @@ async def test_router_rechecks_generation_after_waiting_for_serial_lock() -> Non
 
     first_result, second_result = await asyncio.gather(first, second)
 
-    assert first_result.applied is False
-    assert first_result.error == "router_disabled"
+    assert first_result.applied is True
+    assert first_result.error is None
     assert second_result.applied is False
     assert second_result.error == "router_disabled"
+    assert ("self_asr", "local_parakeet_v3") in application.calls
     assert ("self_capture", True) not in application.calls
     await router.close()
 

@@ -9,14 +9,17 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
-from puripuly_heart.app.ports.oscquery import (
+from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.osc.control_schema import (
+    OSC_MUTE_SELF_ADDRESS,
+    OSC_PARAMETER_DEFINITIONS,
+)
+from puripuly_heart.core.osc.oscquery_contract import (
     OscQueryAdvertisement,
     OscQueryServiceInfo,
     OscQueryServicePort,
     OscQueryServicesChanged,
 )
-from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
-from puripuly_heart.core.osc.control_schema import OSC_PARAMETER_DEFINITIONS
 
 OSCJSON_SERVICE_TYPE = "_oscjson._tcp.local."
 OSC_SERVICE_TYPE = "_osc._udp.local."
@@ -133,11 +136,13 @@ class ZeroconfOscQueryService(OscQueryServicePort):
                 for service in self._services.values()
                 if "vrchat" in service.service_id.casefold()
             ]
-        return (
-            sorted(candidates, key=lambda service: service.service_id.casefold())[0]
-            if candidates
-            else None
-        )
+        if not candidates:
+            return None
+        for candidate in sorted(candidates, key=lambda service: service.service_id.casefold()):
+            resolved = await self._resolve_host_info(candidate)
+            if resolved is not None:
+                return resolved
+        return None
 
     async def advertise_receiver(self, advertisement: OscQueryAdvertisement) -> None:
         if self._zeroconf is None:
@@ -220,6 +225,34 @@ class ZeroconfOscQueryService(OscQueryServicePort):
         except Exception:
             return {}
         return payload if isinstance(payload, Mapping) else {}
+
+    async def _resolve_host_info(
+        self,
+        service: OscQueryServiceInfo,
+    ) -> OscQueryServiceInfo | None:
+        if service.query_port is None:
+            return service
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=1.5) as client:
+                response = await client.get(
+                    f"http://{service.host}:{service.query_port}/?HOST_INFO"
+                )
+                response.raise_for_status()
+                payload = response.json()
+        except Exception:
+            return None
+        if not isinstance(payload, Mapping):
+            return None
+        host = payload.get("OSC_IP")
+        resolved_host = host.strip() if isinstance(host, str) and host.strip() else service.host
+        resolved_port = _mapping_port(payload, "OSC_PORT") or service.osc_send_port
+        return replace(
+            service,
+            host=resolved_host,
+            osc_send_port=resolved_port,
+        )
 
     def _service_state_changed(
         self,
@@ -410,6 +443,11 @@ class ZeroconfOscQueryService(OscQueryServicePort):
                 "TYPE": "T" if definition.value_type == "bool" else "i",
                 "VALUE": [False] if definition.value_type == "bool" else [0],
             }
+        parameters["MuteSelf"] = {
+            "FULL_PATH": OSC_MUTE_SELF_ADDRESS,
+            "ACCESS": 2,
+            "TYPE": "T",
+        }
         return {
             "FULL_PATH": "/",
             "ACCESS": 0,
@@ -498,6 +536,17 @@ def _property_int(properties: Mapping[str, str], *keys: str) -> int | None:
             parsed = int(value)
             if 1 <= parsed <= 65535:
                 return parsed
+    return None
+
+
+def _mapping_port(values: Mapping[str, object], key: str) -> int | None:
+    value = values.get(key)
+    if isinstance(value, bool):
+        return None
+    with contextlib.suppress(TypeError, ValueError):
+        parsed = int(value)
+        if 1 <= parsed <= 65535:
+            return parsed
     return None
 
 

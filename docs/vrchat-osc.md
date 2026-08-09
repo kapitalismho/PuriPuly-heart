@@ -1,18 +1,10 @@
 # VRChat OSC controls
 
-PuriPuly can exchange its dashboard state with VRChat through OSC. Open **Settings > General > VRChat OSC > Connection** and choose one of these modes:
+PuriPuly exchanges its dashboard state with VRChat through OSC. Enable it at **Settings > General > VRChat OSC**; VRChat must have OSC enabled at **Action Menu > Settings > OSC > Enable**. Connection modes: Automatic (OSCQuery discovery, dynamic ports), Manual (send `9000`, receive `9001`), Off (stops control traffic, preserves saved ports).
 
-| Mode | Behavior |
-| --- | --- |
-| Automatic | Discovers VRChat through OSCQuery, uses a dynamically assigned receive port, advertises PuriPuly's parameter tree, and follows VRChat's discovered OSC send port. |
-| Manual | Sends to port `9000` and listens on port `9001` by default. Both ports can be changed. |
-| Off | Stops PuriPuly OSC control traffic while preserving the saved port values. |
+## Expression Parameters
 
-VRChat must have OSC enabled at **Action Menu > Settings > OSC > Enable**. Automatic mode uses the local mDNS services `_oscjson._tcp` and `_osc._udp`; manual mode does not require OSCQuery discovery.
-
-## Avatar and Action Menu setup example
-
-In the avatar's Expression Parameters, add the fixed names below with the shown OSC types. Add all seven Boolean parameters as `Bool` parameters and all eight selection parameters as `Int` parameters; keep the names and types unchanged when updating an avatar.
+Add the fixed names below to the avatar's Expression Parameters with the shown types; keep names and types unchanged when updating an avatar.
 
 | Parameter group | Parameters | Expression type |
 | --- | --- | --- |
@@ -20,17 +12,7 @@ In the avatar's Expression Parameters, add the fixed names below with the shown 
 | Language selection | `PuriPuly_SelfSrcLang`, `PuriPuly_SelfDstLang`, `PuriPuly_PeerSrcLang`, `PuriPuly_PeerDstLang` | Int |
 | Engine and fallback selection | `PuriPuly_SelfASR`, `PuriPuly_PeerASR`, `PuriPuly_Translator`, `PuriPuly_Fallback` | Int |
 
-In the Action Menu, use Toggle controls for the Boolean parameters. Keep the integer `PuriPuly_*` parameters out of the menu controls: Button and Sub-Menu controls reset their associated parameter to zero when they deactivate, so a direct menu binding would turn a nonzero selection into ID `0`.
-
-Use persistent proxy parameters for integer selections:
-
-1. Add one `Bool` proxy Expression Parameter per selectable ID, such as `PuriPuly_Menu_SelfSrcLang_16`. These proxy names are avatar-local menu state, not part of the PuriPuly OSC ABI.
-2. Add a Toggle for each proxy in a **PuriPuly** submenu. Use one submenu per selection family and keep the toggles mutually exclusive.
-3. In the avatar's FX or another local playable layer, create one state for each proxy. On entry to a state, use an **Avatar Parameter Driver** to set the matching `PuriPuly_*` Int parameter to its fixed ID and clear the other proxies in that family. Enable **Local Only** for the driver. The driver sets ID `0` explicitly when the ID `0` proxy is selected.
-4. Initialize one proxy in each family as enabled. The proxy remains enabled until another selection clears it, while the driver keeps the canonical `PuriPuly_*` Int parameter at the selected value for OSC publication.
-5. Add reverse states for each canonical `PuriPuly_*` Int target and ID, with a condition such as `PuriPuly_SelfSrcLang == 16`. Their **Avatar Parameter Driver** sets the matching proxy Bool to `true` and clears the other proxies in that family. Enable **Local Only**. These reverse drivers run when a desktop or OSC change publishes a canonical Int value, so the Action Menu indicator follows the actual selected ID.
-
-This proxy-and-driver arrangement avoids transient menu resets and keeps an absolute Int selection stable after the Action Menu closes. Puppet controls are not suitable for these parameters because VRChat Puppet controls drive Float values. Initialize Boolean values to `false` and the proxy-driven integer values to the IDs for the desired initial state from the tables below.
+In the Action Menu, use Toggle controls for the Booleans. Menu Button/Sub-Menu controls reset their parameter to zero when deactivated, so keep the Int parameters out of the menu and drive them through Bool proxy toggles with Avatar Parameter Drivers.
 
 ## Parameter ABI
 
@@ -48,7 +30,7 @@ All parameters use the address `/avatar/parameters/<name>`. Boolean values are O
 | `PuriPuly_MuteSync` | VRChat mute synchronization |
 | `PuriPuly_ChatboxSource` | Include source text in Chatbox output |
 
-Boolean commands are absolute and idempotent. Sending the same value twice does not create a second state transition.
+Boolean commands are absolute and idempotent; sending the same value twice causes no second transition.
 
 ### Language IDs
 
@@ -116,11 +98,3 @@ These IDs are used by `PuriPuly_Translator`.
 | 8 | `cerebras_gemma4_31b` |
 
 These IDs are used by `PuriPuly_Fallback`.
-
-## Synchronization behavior
-
-PuriPuly sends the complete state when OSC starts, when VRChat is discovered, and after `/avatar/change`. Ordinary changes send only changed values. Sent values are remembered so an echoed value from VRChat does not cause a publication loop. Incoming integer changes are serialized and coalesced per parameter so rapid slider or menu updates do not apply stale expensive settings repeatedly.
-
-The receiver shares one UDP socket for PuriPuly controls, `/avatar/parameters/MuteSelf`, and `/avatar/change`. Existing Chatbox output remains on the configured send destination.
-
-If automatic discovery is unavailable, PuriPuly keeps its receiver available and falls back to the saved manual send destination until VRChat is discovered.

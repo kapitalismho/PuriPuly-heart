@@ -6,7 +6,8 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal
 
-from puripuly_heart.app.ports.oscquery import (
+from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.osc.oscquery_contract import (
     OscQueryAdvertisement,
     OscQueryServiceInfo,
     OscQueryServicePort,
@@ -31,6 +32,7 @@ class OscQueryRuntime:
     snapshot_publisher: OscSnapshotPublisher | None = None
     avatar_inspector: OscAvatarInspector | None = None
     receiver_host: str = "127.0.0.1"
+    discovery_poll_interval_seconds: float = 2.0
     mode: OscConnectionMode = "off"
     service_info: OscQueryServiceInfo | None = field(init=False, default=None)
     advertised_port: int | None = field(init=False, default=None)
@@ -42,6 +44,12 @@ class OscQueryRuntime:
     _refresh_requested: bool = field(init=False, default=False)
     _manual_send_port: int = field(init=False, default=9000)
     _lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
+    _monitor_scope: LifecycleScope = field(
+        init=False,
+        default_factory=lambda: LifecycleScope("OscQueryRuntimeMonitor"),
+        repr=False,
+    )
+    _monitor_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
 
     @property
     def started(self) -> bool:
@@ -93,6 +101,7 @@ class OscQueryRuntime:
                     await self._refresh_locked(publish_snapshot=False)
                 if self.snapshot_publisher is not None:
                     await _maybe_await(self.snapshot_publisher("start"))
+                self._start_discovery_monitor()
             except BaseException:
                 await self._stop_locked()
                 raise
@@ -101,23 +110,36 @@ class OscQueryRuntime:
         async with self._lock:
             await self._refresh_locked(publish_snapshot=publish_snapshot)
 
-    async def _refresh_locked(self, *, publish_snapshot: bool) -> None:
+    async def _refresh_locked(
+        self,
+        *,
+        publish_snapshot: bool,
+        force_requery: bool = False,
+    ) -> None:
         if not self._started or self.mode != "automatic":
             return
-        self.service_info = await self.service.discover_vrchat()
+        service_info = await self.service.discover_vrchat()
+        changed = service_info != self.service_info
+        if not changed and not force_requery:
+            return
+        self.service_info = service_info
         await self._apply_service_info(
             self.service_info,
             manual_send_port=self._manual_send_port,
         )
-        if self.service_info is not None:
-            self.avatar_tree = await self.service.query_avatar(self.service_info)
-            if self.avatar_inspector is not None:
-                await _maybe_await(self.avatar_inspector(self.avatar_tree))
-        if publish_snapshot and self.snapshot_publisher is not None:
+        if (
+            publish_snapshot
+            and self.service_info is not None
+            and self.snapshot_publisher is not None
+        ):
             await _maybe_await(self.snapshot_publisher("discovery"))
 
     async def on_avatar_change(self) -> None:
-        await self.refresh(publish_snapshot=False)
+        async with self._lock:
+            await self._refresh_locked(
+                publish_snapshot=False,
+                force_requery=True,
+            )
         if self.snapshot_publisher is not None:
             await _maybe_await(self.snapshot_publisher("avatar_change"))
 
@@ -126,6 +148,9 @@ class OscQueryRuntime:
             await self._stop_locked()
 
     async def _stop_locked(self) -> None:
+        await self._monitor_scope.close()
+        self._monitor_scope = LifecycleScope("OscQueryRuntimeMonitor")
+        self._monitor_task = None
         if self.advertised_port is not None:
             with contextlib.suppress(Exception):
                 await self.service.unadvertise_receiver()
@@ -167,10 +192,27 @@ class OscQueryRuntime:
         self.effective_send_port = destination_port
         if self.sender_destination_changed is not None:
             await _maybe_await(self.sender_destination_changed(destination_host, destination_port))
-        if service is not None:
-            self.avatar_tree = await self.service.query_avatar(service)
-            if self.avatar_inspector is not None:
-                await _maybe_await(self.avatar_inspector(self.avatar_tree))
+        self.avatar_tree = await self.service.query_avatar(service) if service is not None else None
+        if self.avatar_inspector is not None:
+            await _maybe_await(self.avatar_inspector(self.avatar_tree or {}))
+
+    def _start_discovery_monitor(self) -> None:
+        if self._monitor_task is not None and not self._monitor_task.done():
+            return
+        self._monitor_task = start_lifecycle_task(
+            self._monitor_scope,
+            self._monitor_discovery(),
+            name="discovery",
+        )
+
+    async def _monitor_discovery(self) -> None:
+        interval = max(0.1, float(self.discovery_poll_interval_seconds))
+        while self._started and self.mode == "automatic":
+            await asyncio.sleep(interval)
+            try:
+                await self.refresh()
+            except Exception:
+                continue
 
 
 async def _maybe_await(value: object) -> object:

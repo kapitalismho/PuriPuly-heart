@@ -83,22 +83,36 @@ class OscControlRouter:
         self._closed = False
         self._ingress_enabled = True
         self._generation = 0
+        self._unsettled_by_parameter: dict[str, int] = {}
+        self._active_invocation_tasks: set[asyncio.Task[Any]] = set()
 
     def set_ingress_enabled(self, enabled: bool) -> None:
         self._generation += 1
         self._ingress_enabled = bool(enabled)
+
+    async def suspend_ingress(self) -> None:
+        self.set_ingress_enabled(False)
+        await self._wait_for_active_invocations()
 
     async def dispatch(self, message: OscControlMessage) -> OscDispatchResult:
         if self._closed:
             return OscDispatchResult(False, message.name, error="router_closed")
         if not self._ingress_enabled:
             return OscDispatchResult(False, message.name, error="router_disabled")
-        if self._echo_suppression_provider is not None and self._echo_suppression_provider(message):
+        if (
+            not self._has_unsettled_command(message.name)
+            and self._echo_suppression_provider is not None
+            and self._echo_suppression_provider(message)
+        ):
             return OscDispatchResult(False, message.name, error="echo_suppressed")
         generation = self._generation
-        if message.name in _COALESCED_CONTROLS:
-            return await self._enqueue_coalesced(message, generation)
-        return await self._apply_serialized(message, generation=generation)
+        self._mark_unsettled(message.name)
+        try:
+            if message.name in _COALESCED_CONTROLS:
+                return await self._enqueue_coalesced(message, generation)
+            return await self._apply_serialized(message, generation=generation)
+        finally:
+            self._mark_settled(message.name)
 
     async def dispatch_packet(self, address: str, *args: Any) -> OscDispatchResult:
         message = decode_control_message(address, *args)
@@ -128,8 +142,9 @@ class OscControlRouter:
 
     async def close(self) -> None:
         self._closed = True
-        self._ingress_enabled = False
-        self._generation += 1
+        self.set_ingress_enabled(False)
+        self._cancel_active_invocations()
+        await self._wait_for_active_invocations()
         async with self._pending_lock:
             pending = tuple(self._pending.values())
             self._pending.clear()
@@ -214,13 +229,18 @@ class OscControlRouter:
             async with self._serial_lock:
                 if not self._is_generation_current(generation):
                     return OscDispatchResult(False, message.name, error=self._generation_error())
-                result = await self._invoke(message)
+                invocation_task = asyncio.current_task()
+                if invocation_task is not None:
+                    self._active_invocation_tasks.add(invocation_task)
+                try:
+                    result = await self._invoke(message)
+                finally:
+                    if invocation_task is not None:
+                        self._active_invocation_tasks.discard(invocation_task)
         except Exception as exc:
             self._republish_canonical_state()
             self._report_error(f"{message.name}: {type(exc).__name__}")
             return OscDispatchResult(False, message.name, error=type(exc).__name__)
-        if not self._is_generation_current(generation):
-            return OscDispatchResult(False, message.name, error=self._generation_error())
         if _application_result_rejected(result):
             self._republish_canonical_state()
             self._report_error(f"{message.name}: application_rejected")
@@ -303,6 +323,35 @@ class OscControlRouter:
 
     def _generation_error(self) -> str:
         return "router_closed" if self._closed else "router_disabled"
+
+    def _has_unsettled_command(self, parameter: str) -> bool:
+        return self._unsettled_by_parameter.get(parameter, 0) > 0
+
+    def _mark_unsettled(self, parameter: str) -> None:
+        self._unsettled_by_parameter[parameter] = self._unsettled_by_parameter.get(parameter, 0) + 1
+
+    def _mark_settled(self, parameter: str) -> None:
+        remaining = self._unsettled_by_parameter.get(parameter, 0) - 1
+        if remaining > 0:
+            self._unsettled_by_parameter[parameter] = remaining
+            return
+        self._unsettled_by_parameter.pop(parameter, None)
+
+    def _cancel_active_invocations(self) -> None:
+        current = asyncio.current_task()
+        for task in tuple(self._active_invocation_tasks):
+            if task is not current and not task.done():
+                task.cancel()
+
+    async def _wait_for_active_invocations(self) -> None:
+        current = asyncio.current_task()
+        tasks = tuple(
+            task
+            for task in self._active_invocation_tasks
+            if task is not current and not task.done()
+        )
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def _application_result_rejected(result: object) -> bool:
