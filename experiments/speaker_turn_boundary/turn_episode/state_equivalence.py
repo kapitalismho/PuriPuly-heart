@@ -138,6 +138,27 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def _capture_hash_payload(capture: dict[str, Any]) -> dict[str, Any]:
+    uuid_labels: dict[str, str] = {}
+
+    def normalize(value: Any, field_name: str | None = None) -> Any:
+        if field_name == "emitted_monotonic_ns":
+            return 0
+        if isinstance(value, str):
+            try:
+                uuid_value = str(UUID(value))
+            except (ValueError, AttributeError):
+                return value
+            return uuid_labels.setdefault(uuid_value, f"uuid-{len(uuid_labels)}")
+        if isinstance(value, dict):
+            return {key: normalize(value[key], key) for key in sorted(value)}
+        if isinstance(value, list):
+            return [normalize(item) for item in value]
+        return value
+
+    return normalize(_jsonable(capture))
+
+
 def _progress_rows(replay: Any) -> list[dict[str, int]]:
     rows: list[dict[str, int]] = []
     for progress in replay.progress:
@@ -475,7 +496,9 @@ def snapshot_round_trip(
     source = _replay_region(samples, 0, capture_end)
     capture = capture_state(source)
     captured_rows = (len(source.boundaries), len(source.progress))
-    capture_sha256 = sha256_bytes(json.dumps(_jsonable(capture), sort_keys=True).encode("utf-8"))
+    capture_sha256 = sha256_bytes(
+        json.dumps(_capture_hash_payload(capture), sort_keys=True).encode("utf-8")
+    )
     capture_ring = _ring_payload(capture["gating"].get("_ring"))
     capture_pending_id = _pending_start_id(source)
     capture_pending_content = _pending_content(source)
@@ -490,6 +513,9 @@ def snapshot_round_trip(
         _pending_start_id(restored) == capture_pending_id
         and _pending_content(restored) == capture_pending_content
     )
+    ring_before_resume = _ring_payload_summary(restored._gating._ring)
+    pending_start_before_resume = _pending_start_id(restored)
+    pending_content_before_resume = _pending_content(restored)
     cursor = bounds.scored_start
     while cursor + CHUNK_SAMPLES <= min(bounds.tail_end, effective_end):
         chunk = samples[cursor : cursor + CHUNK_SAMPLES]
@@ -521,21 +547,22 @@ def snapshot_round_trip(
         "episode_class": "b0/peer",
         "passed": passed,
         "captured_at_scored_start": True,
+        "capture_hash_contract": "runtime_identity_normalized_v1",
         "capture_sha256": capture_sha256,
         "source_rows_after_capture": len(source_new),
         "restored_rows_after_capture": len(restored_new),
         "source_progress_after_capture": len(source_progress_new),
         "restored_progress_after_capture": len(restored_progress_new),
         "ring_payload_captured": _ring_payload_summary(capture["gating"].get("_ring")),
-        "ring_payload_before_resume": _ring_payload_summary(restored._gating._ring),
+        "ring_payload_before_resume": ring_before_resume,
         "ring_fidelity": ring_fidelity,
         "ring_payload_restored": _ring_payload_summary(restored._gating._ring),
         "ring_payload_source": _ring_payload_summary(source._gating._ring),
         "ring_parity": ring_parity,
         "pending_start_captured": capture_pending_id,
         "pending_content_captured": capture_pending_content,
-        "pending_start_before_resume": _pending_start_id(restored),
-        "pending_content_before_resume": _pending_content(restored),
+        "pending_start_before_resume": pending_start_before_resume,
+        "pending_content_before_resume": pending_content_before_resume,
         "pending_fidelity": pending_fidelity,
         "pending_start_restored": _pending_start_id(restored),
         "pending_start_source": _pending_start_id(source),
@@ -791,6 +818,7 @@ def main() -> None:
             "round_trip_episodes": len(snapshot_evidence),
             "round_trip_passed": all(e["passed"] for e in snapshot_evidence),
             "round_trip_failed": [e["episode_id"] for e in snapshot_evidence if not e["passed"]],
+            "capture_hash_contract": "runtime_identity_normalized_v1",
         },
         "snapshot_evidence": snapshot_evidence,
         "parity_skipped": parity_skipped,

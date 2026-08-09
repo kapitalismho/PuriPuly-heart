@@ -132,3 +132,26 @@ All five candidate artifacts pass their canonical self-hash and `generated_from`
 checks against the formatted live code. The full experiment test suite collects and
 passes 280 tests. Round 4 exit-gate re-review is pending; these results are candidate
 evidence until that review accepts the exact commit.
+
+Round 4 independently reviewed exact candidate `933561c3` and returned
+`repair_required`. The reviewer found that the three fields labeled
+`*_before_resume` were serialized after resumed audio had mutated the restored state,
+and that `capture_sha256` included runtime UUID values and monotonic emission times.
+The working-tree repair records the pre-resume ring and pending fields immediately
+after restore and binds the capture through the declared
+`runtime_identity_normalized_v1` hash projection, preserving UUID equality
+relationships while excluding runtime identity and timing values.
+
+The regenerated `state_equivalence_report.json` is 435,052 bytes with content SHA-256
+`c5e4836f69686587bad0b24a2293e0f80b336ba5105651889006aee4a7db3c2c` and live
+`state_equivalence.py` provenance SHA-256
+`44af3271f4e076a872e6ed0a18e315c1374d347123daa1ded3833156fb5f0ca8`.
+All 186 round trips pass; all 186 capture hashes are present under the declared hash
+contract; captured/pre-resume ring, pending-ID, and pending-content mismatches are all
+zero; ring and pending fidelity/parity failures are all zero. An independent rerun of
+the first real episode reproduces its persisted `capture_sha256`. The state-equivalence
+disposition remains `source_prefix_required` with 112 parity passes and 74 failures.
+All five Phase 2 artifacts pass their artifact-specific canonical self-hash verifier,
+all live-code provenance entries match, and all 878 manifest episode hashes verify.
+Black, Ruff, and all 281 collected experiment tests pass. Round 4 repair re-review
+remains pending until the coherent repair is committed.
