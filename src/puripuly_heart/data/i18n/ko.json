@@ -214,6 +214,7 @@
   "settings.overlay.calibration": "보정",
   "settings.overlay.calibration.anchor": "기준점",
   "settings.overlay.calibration.anchor.head_locked": "머리 고정",
+  "settings.overlay.calibration.anchor.spatial_locked": "공간 고정",
   "settings.overlay.calibration.offset_x": "가로 오프셋",
   "settings.overlay.calibration.offset_y": "세로 오프셋",
   "settings.overlay.calibration.distance": "거리",
