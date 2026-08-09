@@ -209,6 +209,8 @@
   "settings.overlay.calibration": "校准",
   "settings.overlay.calibration.anchor": "锚点",
   "settings.overlay.calibration.anchor.head_locked": "头部锁定",
+  "settings.overlay.calibration.anchor.spatial_locked": "空间锁定",
+  "settings.overlay.calibration.anchor.spatial_locked.description": "出现新对话时会移动到当前视野前方，然后固定在该位置。",
   "settings.overlay.calibration.offset_x": "水平偏移",
   "settings.overlay.calibration.offset_y": "垂直偏移",
   "settings.overlay.calibration.distance": "距离",

@@ -209,6 +209,8 @@
   "settings.overlay.calibration": "Calibration",
   "settings.overlay.calibration.anchor": "Anchor",
   "settings.overlay.calibration.anchor.head_locked": "Head-Locked",
+  "settings.overlay.calibration.anchor.spatial_locked": "Spatially Locked",
+  "settings.overlay.calibration.anchor.spatial_locked.description": "Moves in front of your current view when new dialogue appears, then stays fixed there.",
   "settings.overlay.calibration.offset_x": "Offset X",
   "settings.overlay.calibration.offset_y": "Offset Y",
   "settings.overlay.calibration.distance": "Distance",

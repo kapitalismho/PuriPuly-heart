@@ -4550,7 +4550,14 @@ class SettingsView(ft.Column):
         if not is_control_mounted(self) or not self._settings:
             return
         options = [
-            OptionItem(value=anchor, label=t(f"settings.overlay.calibration.anchor.{anchor}"))
+            OptionItem(
+                value=anchor,
+                label=t(f"settings.overlay.calibration.anchor.{anchor}"),
+                description=t(
+                    f"settings.overlay.calibration.anchor.{anchor}.description",
+                    default="",
+                ),
+            )
             for anchor in OVERLAY_CALIBRATION_ANCHORS
         ]
         modal = SettingsModal(
@@ -4558,7 +4565,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.calibration.anchor"),
             options,
             self._on_overlay_anchor_selected,
-            show_description=False,
+            show_description=True,
         )
         modal.open(self._overlay_calibration.anchor)
 

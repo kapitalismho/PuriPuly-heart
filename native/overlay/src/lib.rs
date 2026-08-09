@@ -17,7 +17,7 @@ pub use manifest::{
     QUIET_TAIL_PROFILE_ENV,
 };
 pub use openvr::{
-    submit_texture, FakeOpenVr, OpenVrError, OpenVrOutputAdapter, OpenVrOverlay,
+    submit_texture, FakeOpenVr, OpenVrError, OpenVrOutputAdapter, OpenVrOverlay, OverlayAnchorMode,
     OverlayFrameSubmitter, OverlayPlacementPolicy,
 };
 pub use presentation::{

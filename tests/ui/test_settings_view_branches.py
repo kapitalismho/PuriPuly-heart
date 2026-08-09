@@ -4464,8 +4464,15 @@ def test_overlay_anchor_click_opens_modal_with_current_selection(
     view._on_overlay_anchor_click(None)
 
     assert captured["title"] == t("settings.overlay.calibration.anchor")
-    assert captured["show_description"] is False
-    assert [option.value for option in captured["options"]] == ["head_locked"]
+    assert captured["show_description"] is True
+    assert [option.value for option in captured["options"]] == [
+        "head_locked",
+        "spatial_locked",
+    ]
+    assert captured["options"][1].label == t("settings.overlay.calibration.anchor.spatial_locked")
+    assert captured["options"][1].description == t(
+        "settings.overlay.calibration.anchor.spatial_locked.description"
+    )
     assert captured["current"] == "head_locked"
 
 

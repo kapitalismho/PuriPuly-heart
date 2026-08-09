@@ -209,6 +209,8 @@
   "settings.overlay.calibration": "キャリブレーション",
   "settings.overlay.calibration.anchor": "基準点",
   "settings.overlay.calibration.anchor.head_locked": "頭部固定",
+  "settings.overlay.calibration.anchor.spatial_locked": "空間固定",
+  "settings.overlay.calibration.anchor.spatial_locked.description": "新しいセリフが表示されると現在の視界の前へ移動し、その位置に固定されます。",
   "settings.overlay.calibration.offset_x": "横オフセット",
   "settings.overlay.calibration.offset_y": "縦オフセット",
   "settings.overlay.calibration.distance": "距離",

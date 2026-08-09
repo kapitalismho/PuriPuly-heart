@@ -26,9 +26,27 @@ const FN_TABLE_INTERFACE_PREFIX: &str = "FnTable:";
 const DEFAULT_OVERLAY_WIDTH_METERS: f32 = 1.0667;
 const DEFAULT_OVERLAY_DISTANCE_METERS: f32 = 1.1;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OverlayAnchorMode {
+    HeadLocked,
+    SpatialLocked,
+}
+
+impl OverlayAnchorMode {
+    pub fn from_anchor(anchor: &str) -> Result<Self, OpenVrError> {
+        match anchor {
+            "head_locked" => Ok(Self::HeadLocked),
+            "spatial_locked" => Ok(Self::SpatialLocked),
+            _ => Err(OpenVrError::Calibration(format!(
+                "unsupported overlay calibration anchor: {anchor}"
+            ))),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct OverlayPlacementPolicy {
-    anchor: &'static str,
+    anchor: OverlayAnchorMode,
     width_meters: f32,
     offset_x_meters: f32,
     offset_y_meters: f32,
@@ -38,7 +56,7 @@ pub struct OverlayPlacementPolicy {
 impl Default for OverlayPlacementPolicy {
     fn default() -> Self {
         Self {
-            anchor: "head_locked",
+            anchor: OverlayAnchorMode::HeadLocked,
             width_meters: DEFAULT_OVERLAY_WIDTH_METERS,
             offset_x_meters: 0.0,
             offset_y_meters: 0.0,
@@ -49,17 +67,21 @@ impl Default for OverlayPlacementPolicy {
 
 impl OverlayPlacementPolicy {
     pub fn is_head_locked(&self) -> bool {
-        self.anchor == "head_locked"
+        self.anchor == OverlayAnchorMode::HeadLocked
     }
 
-    pub fn from_calibration(calibration: &OverlayCalibration) -> Self {
-        Self {
-            anchor: "head_locked",
+    pub fn is_spatial_locked(&self) -> bool {
+        self.anchor == OverlayAnchorMode::SpatialLocked
+    }
+
+    pub fn from_calibration(calibration: &OverlayCalibration) -> Result<Self, OpenVrError> {
+        Ok(Self {
+            anchor: OverlayAnchorMode::from_anchor(&calibration.anchor)?,
             width_meters: DEFAULT_OVERLAY_WIDTH_METERS * calibration.text_scale.max(0.1),
             offset_x_meters: calibration.offset_x,
             offset_y_meters: calibration.offset_y,
             distance_meters: calibration.distance.max(0.1),
-        }
+        })
     }
 
     #[cfg(windows)]
@@ -114,6 +136,8 @@ pub enum OpenVrError {
     AdapterSelection(String),
     #[error("openvr texture submission failed: {0}")]
     Submit(String),
+    #[error("openvr calibration failed: {0}")]
+    Calibration(String),
 }
 
 #[cfg_attr(not(any(windows, test)), allow(dead_code))]
@@ -555,7 +579,7 @@ impl WindowsOpenVrOverlay {
     }
 
     fn apply_calibration(&mut self, calibration: &OverlayCalibration) -> Result<(), OpenVrError> {
-        self.placement_policy = OverlayPlacementPolicy::from_calibration(calibration);
+        self.placement_policy = OverlayPlacementPolicy::from_calibration(calibration)?;
         self.placement_policy
             .apply(self.overlay_api(), self.overlay_handle)
     }
@@ -994,7 +1018,7 @@ mod tests {
     use super::{
         fn_table_interface_version, requested_adapter_identity, run_startup_preflight,
         split_output_device_luid, validate_resolved_adapter, FakeOpenVr, OpenVrBackgroundInitError,
-        OpenVrPreflightApi, OpenVrStartupPreflightError, OverlayFrameSubmitter,
+        OpenVrPreflightApi, OpenVrStartupPreflightError, OverlayAnchorMode, OverlayFrameSubmitter,
         OverlayPlacementPolicy,
     };
     use crate::state::OverlayCalibration;
@@ -1074,9 +1098,44 @@ mod tests {
         let policy = OverlayPlacementPolicy::from_calibration(&OverlayCalibration {
             text_scale: 1.2,
             ..OverlayCalibration::default()
-        });
+        })
+        .unwrap();
 
         assert!((policy.width_meters - 1.28004).abs() < 0.001);
+    }
+
+    #[test]
+    fn placement_policy_parses_supported_anchor_modes() {
+        let head_locked =
+            OverlayPlacementPolicy::from_calibration(&OverlayCalibration::default()).unwrap();
+        let spatial_locked = OverlayPlacementPolicy::from_calibration(&OverlayCalibration {
+            anchor: "spatial_locked".to_string(),
+            ..OverlayCalibration::default()
+        })
+        .unwrap();
+
+        assert!(head_locked.is_head_locked());
+        assert!(spatial_locked.is_spatial_locked());
+        assert_eq!(
+            OverlayAnchorMode::from_anchor("spatial_locked").unwrap(),
+            OverlayAnchorMode::SpatialLocked
+        );
+    }
+
+    #[test]
+    fn placement_policy_rejects_unknown_anchor_mode() {
+        let error = OverlayPlacementPolicy::from_calibration(&OverlayCalibration {
+            anchor: "unsupported".to_string(),
+            ..OverlayCalibration::default()
+        })
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            super::OpenVrError::Calibration(
+                "unsupported overlay calibration anchor: unsupported".to_string()
+            )
+        );
     }
 
     #[test]

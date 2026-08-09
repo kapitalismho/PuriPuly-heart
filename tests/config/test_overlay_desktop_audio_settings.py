@@ -132,7 +132,7 @@ def test_overlay_calibration_round_trips_with_defaults() -> None:
         {
             "overlay": {
                 "calibration": {
-                    "anchor": "head_locked",
+                    "anchor": "spatial_locked",
                     "offset_x": 0.15,
                     "offset_y": -0.2,
                     "distance": 1.2,
@@ -143,13 +143,14 @@ def test_overlay_calibration_round_trips_with_defaults() -> None:
         }
     )
 
-    assert settings.overlay.calibration.anchor == "head_locked"
+    assert settings.overlay.calibration.anchor == "spatial_locked"
     assert settings.overlay.calibration.distance == 1.2
 
     data = to_dict(settings)
 
     assert data["overlay"]["calibration"]["offset_x"] == 0.15
     assert data["overlay"]["calibration"]["background_alpha"] == 0.4
+    assert from_dict(data).overlay.calibration.anchor == "spatial_locked"
 
 
 def test_from_dict_accepts_legacy_overlay_display_and_calibration_shape() -> None:
