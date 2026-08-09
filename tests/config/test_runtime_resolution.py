@@ -411,7 +411,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "managed",
             "managed",
             "openrouter",
-            "deepseek/deepseek-v4-flash",
+            "deepseek/deepseek-v4-flash-0731",
             "managed",
             "openrouter:managed",
             None,
@@ -422,7 +422,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "managed_china",
             "managed",
             "openrouter",
-            "deepseek/deepseek-v4-flash",
+            "deepseek/deepseek-v4-flash-0731",
             "managed",
             "openrouter:managed_qq",
             None,
@@ -433,7 +433,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "openrouter",
             "byok",
             "openrouter",
-            "deepseek/deepseek-v4-flash",
+            "deepseek/deepseek-v4-flash-0731",
             "secret_store",
             "openrouter:byok",
             None,
@@ -623,8 +623,8 @@ def test_translation_model_connection_matrix_resolves_llm_config(
             "secret_store",
             "openrouter:byok",
             "openrouter",
-            "deepseek/deepseek-v4-flash",
-            "default",
+            "deepseek/deepseek-v4-flash-0731",
+            "deepseek_v4_flash_latency",
         ),
         (
             "openrouter_gemma4_26b_a4b",
@@ -738,7 +738,7 @@ def test_openrouter_china_fallback_resolves_deepseek_only_fallback_routing() -> 
 
     assert config.fallback is not None
     assert config.fallback.target.provider == "openrouter"
-    assert config.fallback.target.model == "deepseek/deepseek-v4-flash"
+    assert config.fallback.target.model == "deepseek/deepseek-v4-flash-0731"
     assert config.fallback.target.credential == resolved.ResolvedCredentialRequirement(
         source=resolved.CREDENTIAL_SOURCE_MANAGED,
         required=True,
@@ -797,7 +797,7 @@ def test_openrouter_deepseek_only_primary_keeps_fallback_and_emergency_schedule(
     )
 
     assert config.provider == "openrouter"
-    assert config.model == "deepseek/deepseek-v4-flash"
+    assert config.model == "deepseek/deepseek-v4-flash-0731"
     assert config.provider_routing == "deepseek_only"
     assert config.fallback is not None
     assert config.fallback.target.provider_routing == "deepseek_only"
@@ -856,7 +856,7 @@ def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_and_suppresses
     resolved = _resolved_module()
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         provider_llm="openrouter",
-        model="deepseek/deepseek-v4-flash",
+        model="deepseek/deepseek-v4-flash-0731",
         selected_source="byok",
         fallback_selection_alias="qwen35_flash",
         routing_mode="parasail_first",
@@ -881,7 +881,7 @@ def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_and_suppresses
     assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH
     assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER
     assert config.provider == "openrouter"
-    assert config.model == "deepseek/deepseek-v4-flash"
+    assert config.model == "deepseek/deepseek-v4-flash-0731"
     assert config.credential == resolved.ResolvedCredentialRequirement(
         source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
         required=True,
@@ -891,6 +891,19 @@ def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_and_suppresses
     assert config.provider_routing == "deepseek_only"
     assert config.service_endpoint == "https://broker.fixture.test/v1"
     assert config.fallback is None
+
+
+def test_openrouter_runtime_intent_normalizes_legacy_deepseek_model() -> None:
+    runtime_resolution = _runtime_resolution_module()
+
+    intent = runtime_resolution.normalize_openrouter_runtime_intent(
+        provider_llm="openrouter",
+        model="deepseek/deepseek-v4-flash",
+        selected_source="byok",
+    )
+
+    assert intent.model == "deepseek/deepseek-v4-flash-0731"
+    assert intent.selection_alias == "deepseek_v4_flash_byok"
 
 
 def test_legacy_current_openrouter_aliases_normalize_to_canonical_intent_and_resolve() -> None:
@@ -1313,10 +1326,10 @@ def test_missing_translation_openrouter_compatibility_values_derive_exact_runtim
 
     assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH
     assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER
-    assert openrouter_intent.model == "deepseek/deepseek-v4-flash"
+    assert openrouter_intent.model == "deepseek/deepseek-v4-flash-0731"
     assert openrouter_intent.selected_source == "byok"
     assert config.provider == "openrouter"
-    assert config.model == "deepseek/deepseek-v4-flash"
+    assert config.model == "deepseek/deepseek-v4-flash-0731"
     assert config.credential == resolved.ResolvedCredentialRequirement(
         source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
         required=True,

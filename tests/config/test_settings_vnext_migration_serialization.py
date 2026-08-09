@@ -474,7 +474,7 @@ def test_china_first_run_defaults_project_to_vnext_intent() -> None:
     assert serialized["intent"]["ui"]["locale"] == "zh-CN"
     assert serialized["intent"]["translation"]["model"] == "deepseek_v4_flash"
     assert serialized["intent"]["translation"]["connection"] == "managed_china"
-    assert serialized["intent"]["translation"]["openrouter_model"] == ("deepseek/deepseek-v4-flash")
+    assert serialized["intent"]["translation"]["openrouter_model"] == ("deepseek/deepseek-v4-flash-0731")
     assert serialized["intent"]["translation"]["openrouter_selected_source"] == "managed"
     assert serialized["intent"]["translation"]["openrouter_selection_alias"] == (
         "deepseek_v4_flash_managed"

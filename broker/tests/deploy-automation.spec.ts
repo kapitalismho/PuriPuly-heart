@@ -434,6 +434,7 @@ describe('broker direct deploy automation', () => {
     expect(smokeSpec).toContain('ph-or-user-v');
     expect(smokeSpec).toContain('MANAGED_TRIAL_ALLOWED_MODELS');
     expect(smokeSpec).toContain('qwen/qwen3.5-flash-02-23');
+    expect(smokeSpec).toContain('deepseek/deepseek-v4-flash-0731');
     expect(smokeSpec).toContain('deepseek/deepseek-v4-flash');
     expect(smokeSpec).toContain('google/gemini-2.5-flash-lite');
     expect(smokeSpec).toContain('MANAGED_TRIAL_ALLOWED_MODELS');
@@ -479,6 +480,7 @@ describe('broker direct deploy automation', () => {
     expect(readme).not.toContain('six-month expiry');
     expect(readme).toContain('optional `openrouter_user_id`');
     expect(readme).toContain('qwen/qwen3.5-flash-02-23');
+    expect(readme).toContain('deepseek/deepseek-v4-flash-0731');
     expect(readme).toContain('deepseek/deepseek-v4-flash');
     expect(readme).toContain('google/gemini-2.5-flash-lite');
     expect(checklist).toContain('OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION');

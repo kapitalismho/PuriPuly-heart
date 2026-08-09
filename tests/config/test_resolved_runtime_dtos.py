@@ -107,7 +107,7 @@ def _llm_config(resolved: ModuleType, *, provider_options: dict[str, object] | N
         fallback=resolved.ResolvedLLMFallbackPlan(
             target=resolved.ResolvedLLMTarget(
                 provider="openrouter",
-                model="deepseek/deepseek-v4-flash",
+                model="deepseek/deepseek-v4-flash-0731",
                 credential=_credential(resolved, required=False),
                 provider_routing="deepseek_only",
             )
@@ -202,7 +202,7 @@ def test_resolved_llm_config_carries_explicit_fallback_branch_target() -> None:
         fallback=resolved.ResolvedLLMFallbackPlan(
             target=resolved.ResolvedLLMTarget(
                 provider="openrouter",
-                model="deepseek/deepseek-v4-flash",
+                model="deepseek/deepseek-v4-flash-0731",
                 credential=_credential(resolved),
                 provider_routing="deepseek_only",
             )

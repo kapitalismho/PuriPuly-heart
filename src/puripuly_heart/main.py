@@ -281,7 +281,7 @@ def _load_settings_or_default(
             translation,
             model="deepseek_v4_flash",
             connection="managed_china",
-            openrouter_model="deepseek/deepseek-v4-flash",
+            openrouter_model="deepseek/deepseek-v4-flash-0731",
             openrouter_selection_alias="deepseek_v4_flash_managed",
             openrouter_provider_routing="deepseek_only",
         )

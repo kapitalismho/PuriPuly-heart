@@ -2586,7 +2586,7 @@ def test_from_dict_disables_legacy_gemini25_flash_lite_fallback() -> None:
 
 
 def test_openrouter_deepseek_v4_flash_aliases_use_stable_slug() -> None:
-    expected = "deepseek/deepseek-v4-flash"
+    expected = "deepseek/deepseek-v4-flash-0731"
     deepseek_model = getattr(OpenRouterLLMModel, "DEEPSEEK_V4_FLASH", None)
     deepseek_managed = getattr(OpenRouterSelectionAlias, "DEEPSEEK_V4_FLASH_MANAGED", None)
     deepseek_byok = getattr(OpenRouterSelectionAlias, "DEEPSEEK_V4_FLASH_BYOK", None)
@@ -2618,6 +2618,23 @@ def test_openrouter_deepseek_v4_flash_aliases_use_stable_slug() -> None:
     )
     assert resolve_openrouter_fallback_model(deepseek_fallback.value) == expected
     assert resolve_openrouter_fallback_model(deepseek_china_fallback.value) == expected
+
+
+def test_from_dict_normalizes_legacy_openrouter_deepseek_model() -> None:
+    data = to_dict(AppSettings())
+    data["provider"]["llm"] = LLMProviderName.OPENROUTER.value
+    data["translation"]["model"] = TranslationModel.DEEPSEEK_V4_FLASH.value
+    data["translation"]["connection"] = TranslationConnection.OPENROUTER.value
+    data["openrouter"]["llm_model"] = "deepseek/deepseek-v4-flash"
+    data["openrouter"]["selected_source"] = OpenRouterCredentialSource.BYOK.value
+    data["openrouter"]["selection_alias"] = (
+        OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value
+    )
+
+    loaded = from_dict(data)
+
+    assert loaded.openrouter.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
+    assert loaded.openrouter.llm_model.value == "deepseek/deepseek-v4-flash-0731"
 
 
 def test_openrouter_settings_roundtrip_persists_deepseek_china_translation_fallback(

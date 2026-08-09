@@ -6,6 +6,13 @@ from uuid import uuid4
 
 import pytest
 
+from puripuly_heart.config.runtime_resolution import (
+    OpenRouterRuntimeIntent,
+    RuntimeResolutionInput,
+    TranslationFallbackRuntimeIntent,
+    TranslationRuntimeIntent,
+    resolve_llm_config,
+)
 from puripuly_heart.config.settings import OpenRouterProviderRouting, OpenRouterRoutingMode
 from puripuly_heart.providers.llm.openrouter import (
     HttpxOpenRouterClient,
@@ -322,22 +329,29 @@ async def test_httpx_openrouter_client_google_gemini_latency_denies_data_collect
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "provider_routing",
+    ("provider_routing", "expected_only"),
     [
-        OpenRouterProviderRouting.DEEPSEEK_ONLY,
-        OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY,
+        (
+            OpenRouterProviderRouting.DEEPSEEK_ONLY,
+            ["baidu/fp8", "deepseek/fp8", "siliconflow/fp8"],
+        ),
+        (
+            OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY,
+            ["coreweave/fp8", "baidu/fp8", "deepseek/fp8", "cloudflare/fp8"],
+        ),
     ],
 )
-async def test_httpx_openrouter_client_deepseek_routing_uses_latency_pool(
+async def test_httpx_openrouter_client_deepseek_routing_uses_selected_latency_pool(
     monkeypatch,
     provider_routing: OpenRouterProviderRouting,
+    expected_only: list[str],
 ) -> None:
     fake_client = FakeAsyncClient()
     monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
 
     client = HttpxOpenRouterClient(
         api_key="test-key",
-        model="deepseek/deepseek-v4-flash",
+        model="deepseek/deepseek-v4-flash-0731",
         base_url="https://example",
         routing_mode=OpenRouterRoutingMode.LATENCY,
         provider_routing=provider_routing,
@@ -351,14 +365,14 @@ async def test_httpx_openrouter_client_deepseek_routing_uses_latency_pool(
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["baidu", "deepseek", "cloudflare"],
+        "only": expected_only,
         "sort": {"by": "latency"},
         "allow_fallbacks": True,
     }
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_deepseek_default_uses_cloudflare_first_routing(
+async def test_httpx_openrouter_client_deepseek_default_uses_selected_general_pool(
     monkeypatch,
 ) -> None:
     fake_client = FakeAsyncClient()
@@ -366,7 +380,7 @@ async def test_httpx_openrouter_client_deepseek_default_uses_cloudflare_first_ro
 
     client = HttpxOpenRouterClient(
         api_key="test-key",
-        model="deepseek/deepseek-v4-flash",
+        model="deepseek/deepseek-v4-flash-0731",
         base_url="https://example",
     )
     await client.translate(
@@ -378,7 +392,87 @@ async def test_httpx_openrouter_client_deepseek_default_uses_cloudflare_first_ro
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["baidu", "deepseek", "cloudflare"],
+        "only": [
+            "coreweave/fp8",
+            "baidu/fp8",
+            "deepseek/fp8",
+            "cloudflare/fp8",
+        ],
+        "sort": {"by": "latency"},
+        "allow_fallbacks": True,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("primary", "primary_route", "fallback_connection", "expected_route", "expected_only"),
+    [
+        (
+            TranslationRuntimeIntent(model="gemma4", connection="openrouter"),
+            "gemma4_26b_latency",
+            "openrouter",
+            "deepseek_v4_flash_latency",
+            ["coreweave/fp8", "baidu/fp8", "deepseek/fp8", "cloudflare/fp8"],
+        ),
+        (
+            TranslationRuntimeIntent(model="deepseek_v4_flash", connection="managed_china"),
+            "deepseek_only",
+            "openrouter",
+            "deepseek_v4_flash_latency",
+            ["coreweave/fp8", "baidu/fp8", "deepseek/fp8", "cloudflare/fp8"],
+        ),
+        (
+            TranslationRuntimeIntent(model="gemma4", connection="openrouter"),
+            "gemma4_26b_latency",
+            "managed_china",
+            "deepseek_only",
+            ["baidu/fp8", "deepseek/fp8", "siliconflow/fp8"],
+        ),
+    ],
+)
+async def test_resolved_deepseek_fallback_uses_its_own_selected_pool(
+    monkeypatch,
+    primary: TranslationRuntimeIntent,
+    primary_route: str,
+    fallback_connection: str,
+    expected_route: str,
+    expected_only: list[str],
+) -> None:
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
+    resolved = resolve_llm_config(
+        RuntimeResolutionInput(
+            translation=primary,
+            translation_fallback=TranslationFallbackRuntimeIntent(
+                enabled=True,
+                model="deepseek_v4_flash",
+                connection=fallback_connection,
+            ),
+            openrouter=OpenRouterRuntimeIntent(
+                selected_source="byok",
+                provider_routing=primary_route,
+            ),
+        )
+    )
+
+    assert resolved.fallback is not None
+    fallback = resolved.fallback.target
+    assert fallback.provider_routing == expected_route
+    client = HttpxOpenRouterClient(
+        api_key="test-key",
+        model=fallback.model,
+        base_url="https://example",
+        provider_routing=OpenRouterProviderRouting(fallback.provider_routing),
+    )
+    await client.translate(
+        text="hello",
+        system_prompt="SYSTEM",
+        source_language="ko-KR",
+        target_language="zh-CN",
+    )
+
+    assert fake_client.last_request["json"]["provider"] == {
+        "only": expected_only,
         "sort": {"by": "latency"},
         "allow_fallbacks": True,
     }

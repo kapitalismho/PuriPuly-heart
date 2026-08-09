@@ -15,6 +15,7 @@ from puripuly_heart.config.audio_host_api import (
     WINDOWS_WASAPI_COMPATIBILITY_HOST_API,
 )
 from puripuly_heart.config.llm_profiles import (
+    LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_DEEPSEEK_V4_FLASH_CHINA,
     OPENROUTER_FALLBACK_SELECTION_ALIAS_GEMMA4_26B_31B,
@@ -1897,6 +1898,8 @@ def _parse_cerebras_llm_model(value: object) -> CerebrasLLMModel:
 def _parse_openrouter_llm_model(value: object) -> OpenRouterLLMModel:
     if isinstance(value, str):
         normalized = value.strip()
+        if normalized == LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
+            normalized = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
         try:
             return OpenRouterLLMModel(normalized)
         except ValueError:

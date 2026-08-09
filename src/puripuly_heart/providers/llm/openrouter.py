@@ -8,6 +8,7 @@ from uuid import UUID
 
 import httpx
 
+from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
 from puripuly_heart.config.settings import OpenRouterProviderRouting, OpenRouterRoutingMode
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.openrouter_credentials import normalize_managed_openrouter_user_identifier
@@ -158,12 +159,20 @@ def _build_provider_preferences(
             "only": ["cerebras/fp16"],
             "allow_fallbacks": False,
         }
-    if provider_routing in (
-        OpenRouterProviderRouting.DEEPSEEK_ONLY,
-        OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY,
-    ):
+    if provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY:
         return {
-            "only": ["baidu", "deepseek", "cloudflare"],
+            "only": ["baidu/fp8", "deepseek/fp8", "siliconflow/fp8"],
+            "sort": {"by": "latency"},
+            "allow_fallbacks": True,
+        }
+    if provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY:
+        return {
+            "only": [
+                "coreweave/fp8",
+                "baidu/fp8",
+                "deepseek/fp8",
+                "cloudflare/fp8",
+            ],
             "sort": {"by": "latency"},
             "allow_fallbacks": True,
         }
@@ -180,9 +189,14 @@ def _build_provider_preferences(
             "only": ["wafer", "cloudflare", "deepinfra"],
             "allow_fallbacks": True,
         }
-    if model == "deepseek/deepseek-v4-flash":
+    if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
         return {
-            "only": ["baidu", "deepseek", "cloudflare"],
+            "only": [
+                "coreweave/fp8",
+                "baidu/fp8",
+                "deepseek/fp8",
+                "cloudflare/fp8",
+            ],
             "sort": {"by": "latency"},
             "allow_fallbacks": True,
         }

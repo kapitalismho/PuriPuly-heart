@@ -6,6 +6,7 @@ from types import MappingProxyType
 from typing import Final, Literal, TypeAlias, cast
 
 from puripuly_heart.config.llm_profiles import (
+    LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     OPENROUTER_CREDENTIAL_SOURCE_NONE,
@@ -401,6 +402,11 @@ def _explicit_openrouter_source(value: object) -> OpenRouterSource | None:
 
 
 def _normalize_openrouter_model(value: object) -> str:
+    if (
+        isinstance(value, str)
+        and value.strip() == LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+    ):
+        value = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
     return _normalize_allowed(
         value,
         allowed=_OPENROUTER_MODELS,
@@ -1222,6 +1228,7 @@ def _resolve_translation_target(
     *,
     openrouter: OpenRouterRuntimeIntent,
     direct: DirectProviderRuntimeIntent,
+    is_fallback: bool = False,
 ) -> ResolvedLLMTarget:
     if translation.model == TRANSLATION_MODEL_GEMMA4_26B_31B:
         return _resolved_openrouter_target(
@@ -1277,7 +1284,9 @@ def _resolve_translation_target(
             "deepseek_only"
             if translation.connection == TRANSLATION_CONNECTION_MANAGED_CHINA
             else (
-                openrouter.provider_routing
+                "deepseek_v4_flash_latency"
+                if is_fallback
+                else openrouter.provider_routing
                 if translation.connection == TRANSLATION_CONNECTION_OPENROUTER
                 else "default"
             )
@@ -1462,6 +1471,7 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
             fallback_translation,
             openrouter=openrouter,
             direct=direct,
+            is_fallback=True,
         )
         fallback_plan = _fallback_plan_for_target(fallback_target)
         attempts.append(

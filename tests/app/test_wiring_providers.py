@@ -941,7 +941,7 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
     assert provider.inner.runtime_logging is runtime_logging
     assert provider.inner.attempts[1].log_summary == (
-        "provider=openrouter, model=deepseek/deepseek-v4-flash, mode=latency, "
+        "provider=openrouter, model=deepseek/deepseek-v4-flash-0731, mode=latency, "
         "route=deepseek_only, delay=1300ms"
     )
 

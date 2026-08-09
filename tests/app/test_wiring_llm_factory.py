@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 import pytest
-
-from puripuly_heart.app import wiring_llm_factory
-from puripuly_heart.app.wiring import create_llm_provider_from_resolved_config
 from puripuly_heart.app.wiring_managed_auth_factory import (
     ManagedIdentityStateAdapter,
     build_openrouter_release_runtime_config,
 )
+from puripuly_heart.core.managed_openrouter_release import (
+    ManagedOpenRouterReleaseBehavior,
+    ManagedOpenRouterReleaseResult,
+    ManagedOpenRouterReleaseService,
+    UnavailableManagedOpenRouterReleaseClient,
+)
+from puripuly_heart.core.openrouter_credentials import (
+    OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+)
+
+from puripuly_heart.app import wiring_llm_factory
+from puripuly_heart.app.wiring import create_llm_provider_from_resolved_config
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_MANAGED,
     ResolvedCredentialRequirement,
@@ -23,16 +33,6 @@ from puripuly_heart.config.settings import (
     TranslationModel,
 )
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterReleaseBehavior,
-    ManagedOpenRouterReleaseResult,
-    ManagedOpenRouterReleaseService,
-    UnavailableManagedOpenRouterReleaseClient,
-)
-from puripuly_heart.core.openrouter_credentials import (
-    OPENROUTER_MANAGED_API_KEY_SECRET,
-    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
-)
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 
@@ -75,7 +75,7 @@ def _managed_china_resolved_config() -> ResolvedLLMConfig:
     return ResolvedLLMConfig(
         primary=ResolvedLLMTarget(
             provider="openrouter",
-            model="deepseek/deepseek-v4-flash",
+            model="deepseek/deepseek-v4-flash-0731",
             credential=ResolvedCredentialRequirement(
                 source=CREDENTIAL_SOURCE_MANAGED,
                 required=True,
