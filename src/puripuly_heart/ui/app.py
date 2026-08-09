@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import inspect
+import json
 import logging
 import tempfile
 import webbrowser
@@ -22,6 +23,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
     application_shutdown_callback,
 )
+from puripuly_heart.config.settings import TranslationModel
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
@@ -431,6 +433,18 @@ class TranslatorApp:
     def _build_layout(self):
         self.view_dashboard = DashboardView()
         self.view_settings = SettingsView()
+        set_http_extension_registry = getattr(
+            self.view_settings,
+            "set_http_extension_registry",
+            None,
+        )
+        http_extension_registry = getattr(
+            self.application,
+            "http_extension_registry",
+            None,
+        )
+        if callable(set_http_extension_registry):
+            set_http_extension_registry(http_extension_registry)
         self.view_logs = LogsView()
         self.view_about = AboutView()
         self.view_settings.set_overlay_runtime_state(self.overlay_state)
@@ -481,6 +495,7 @@ class TranslatorApp:
             on_telemetry_consent=self._preview_telemetry_consent,
             on_stt_loading_button_cycle=self._cycle_debug_preview_stt_loading_button,
             on_foundation_primitives=self._preview_foundation_primitives,
+            on_http_extension_form=self._preview_http_extension_form,
         )
 
     def _mark_launch_high_priority_feedback_shown(
@@ -845,6 +860,51 @@ class TranslatorApp:
         )
         self._foundation_preview_dialog = dialog
         self.page.show_dialog(dialog)
+
+    def _preview_http_extension_form(self) -> None:
+        registry_service = getattr(self.application, "http_extension_registry", None)
+        if registry_service is None:
+            return
+        directory = registry_service.directory
+        directory.mkdir(parents=True, exist_ok=True)
+        demo_path = directory / "debug_demo.json"
+        if not demo_path.exists():
+            demo_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "id": "debug_demo",
+                        "name": "Debug Demo Translator",
+                        "description": "Debug preview: HTTP extension credential form",
+                        "url": "https://example.com/translate",
+                        "request": {
+                            "body": {
+                                "type": "json",
+                                "value": {
+                                    "q": "{{text}}",
+                                    "api_key": "{{secret:api_key}}",
+                                },
+                            }
+                        },
+                        "response": {"type": "text"},
+                        "secrets": [{"id": "api_key", "label": "API Key"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+        registry_service.reload()
+        view = self.view_settings
+        set_registry = getattr(view, "set_http_extension_registry", None)
+        if callable(set_registry):
+            set_registry(registry_service)
+        select_llm = getattr(view, "_on_llm_selected", None)
+        if callable(select_llm):
+            select_llm(TranslationModel.CUSTOM_HTTP.value)
+        select_extension = getattr(view, "_on_http_extension_selected", None)
+        if callable(select_extension):
+            select_extension("debug_demo")
+        if self._current_tab != 1:
+            self._open_settings_tab()
 
     def _show_peer_translation_eula(self, on_accept) -> None:
         dialog = PeerTranslationEulaDialog(
@@ -1408,8 +1468,26 @@ class TranslatorApp:
         self.view_logs.set_runtime_logging_mode(resolved_mode)
 
     def _on_providers_changed(self) -> None:
-        pending_settings = None
         view_settings = getattr(self, "view_settings", None)
+        consume_http_extension_runtime_reload = getattr(
+            view_settings,
+            "consume_http_extension_runtime_reload",
+            None,
+        )
+        if callable(consume_http_extension_runtime_reload) and (
+            consume_http_extension_runtime_reload()
+        ):
+
+            async def _runtime_only_task():
+                await self.application.apply_providers(
+                    persist_settings=False,
+                    refresh_ui=False,
+                )
+
+            self._queue_settings_mutation_task(_runtime_only_task)
+            return
+
+        pending_settings = None
         consume_provider_apply_settings = getattr(
             view_settings,
             "consume_provider_apply_settings",

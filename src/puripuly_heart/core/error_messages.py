@@ -18,6 +18,7 @@ from puripuly_heart.core.diagnostic_validation import (
 )
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
+    DIAGNOSTIC_CATEGORIES,
     DIAGNOSTIC_CATEGORY_AUTH,
     DIAGNOSTIC_CATEGORY_INVALID_RESPONSE,
     DIAGNOSTIC_CATEGORY_LIFECYCLE,
@@ -251,7 +252,7 @@ def _failure_report(
     operation: str,
     extra_fields: Mapping[str, DiagnosticFieldValue],
 ) -> UserErrorReport:
-    provider_label = _safe_label(provider, "unknown")
+    provider_label = _diagnostic_provider(exc, provider)
     operation_label = _safe_label(operation, "unknown")
     status_code = _status_code(exc)
     category = _classify_failure(exc, status_code=status_code)
@@ -302,6 +303,11 @@ def _classify_failure(
     if status_code is not None and 400 <= status_code < 500:
         return DIAGNOSTIC_CATEGORY_INVALID_RESPONSE
 
+    for item in _exception_chain(exc):
+        explicit_category = getattr(item, "diagnostic_category", None)
+        if explicit_category in DIAGNOSTIC_CATEGORIES:
+            return explicit_category
+
     if _is_timeout_exception(exc) or "timeout" in text or "timed out" in text:
         return DIAGNOSTIC_CATEGORY_TIMEOUT
     if isinstance(exc, ConnectionError | OSError) or any(
@@ -331,6 +337,14 @@ def _classify_failure(
     if any(marker in text for marker in ("not configured", "closed", "cancelled")):
         return DIAGNOSTIC_CATEGORY_LIFECYCLE
     return DIAGNOSTIC_CATEGORY_UNKNOWN
+
+
+def _diagnostic_provider(exc: BaseException | None, fallback: str) -> str:
+    for item in _exception_chain(exc):
+        provider = getattr(item, "diagnostic_provider", None)
+        if isinstance(provider, str) and provider.strip():
+            return _safe_label(provider, "unknown")
+    return _safe_label(fallback, "unknown")
 
 
 def _status_code(exc: BaseException | None) -> int | None:

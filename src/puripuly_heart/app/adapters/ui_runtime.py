@@ -44,6 +44,9 @@ from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
 from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
+from puripuly_heart.core.http_extensions import (
+    http_extension_secret_key_prefix,
+)
 from puripuly_heart.core.telemetry import (
     TranslationSuccessTelemetryResult,
     TranslationSuccessTelemetryService,
@@ -264,10 +267,20 @@ class UiProviderRuntimeAdapter:
         settings: object | None = None,
         *,
         force_rebuild_llm: bool = False,
+        persist_settings: bool = True,
+        refresh_ui: bool = True,
     ) -> object:
+        if persist_settings:
+            return await self.provider_application.apply(
+                settings,
+                force_rebuild_llm=force_rebuild_llm,
+                refresh_ui=refresh_ui,
+            )
         return await self.provider_application.apply(
             settings,
             force_rebuild_llm=force_rebuild_llm,
+            persist_settings=persist_settings,
+            refresh_ui=refresh_ui,
         )
 
     async def install_selected_gpu_model_if_needed(self) -> None:
@@ -308,7 +321,22 @@ class UiProviderRuntimeAdapter:
         self.provider_settings.persist_verification(provider, key, success)
 
     async def persist_provider_secret_change(self, key: str, value: str) -> bool:
-        return await self.provider_settings.change_secret(key, value)
+        succeeded = await self.provider_settings.change_secret(key, value)
+        current = self.settings.current
+        http_extension_id = None if current is None else current.translation.http_extension_id
+        if (
+            succeeded
+            and key.startswith("http_extension.")
+            and current is not None
+            and current.translation.model == "custom_http"
+            and http_extension_id is not None
+            and key.startswith(http_extension_secret_key_prefix(http_extension_id))
+        ):
+            await self.apply_providers(
+                force_rebuild_llm=True,
+                persist_settings=False,
+            )
+        return succeeded
 
     def clear_provider_verification(self, provider: str) -> None:
         self.provider_settings.persist_verification(provider, "", False)

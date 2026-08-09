@@ -4,12 +4,12 @@ import copy
 from types import SimpleNamespace
 
 import pytest
-
 from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeApplyPlan
 from puripuly_heart.app.services.provider_settings import ProviderApplicationOwner
 from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
+
 from puripuly_heart.config.settings import (
     AppSettings,
     LLMProviderName,
@@ -292,3 +292,37 @@ async def test_provider_application_owner_force_rebuild_owns_direct_apply_sequen
         assert (
             None if results.current.diagnostics is None else results.current.diagnostics.code
         ) == expected_code
+
+
+@pytest.mark.asyncio
+async def test_provider_application_owner_runtime_only_apply_does_not_persist() -> None:
+    events: list[object] = []
+    owner = _owner(
+        settings=FakeSettingsOwner(AppSettings(), events),
+        runtime=FakeRuntimeOwner(events),
+        service=RecordingMutationService([]),
+        results=SettingsTransactionResultOwner(),
+        events=events,
+    )
+
+    result = await owner.apply(persist_settings=False)
+
+    assert result is True
+    assert events == ["preserve", "capture", "plan", "runtime", "sync_ui"]
+
+
+@pytest.mark.asyncio
+async def test_provider_application_owner_runtime_only_apply_can_preserve_ui_draft() -> None:
+    events: list[object] = []
+    owner = _owner(
+        settings=FakeSettingsOwner(AppSettings(), events),
+        runtime=FakeRuntimeOwner(events),
+        service=RecordingMutationService([]),
+        results=SettingsTransactionResultOwner(),
+        events=events,
+    )
+
+    result = await owner.apply(persist_settings=False, refresh_ui=False)
+
+    assert result is True
+    assert events == ["preserve", "capture", "plan", "runtime"]

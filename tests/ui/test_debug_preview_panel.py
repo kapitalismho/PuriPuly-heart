@@ -15,7 +15,6 @@ from puripuly_heart.ui.components.debug_preview_panel import (  # noqa: E402
 )
 import puripuly_heart.ui.components.debug_preview_panel as panel_module  # noqa: E402
 
-
 DEBUG_PREVIEW_I18N_KEYS = {
     "debug_preview.button",
     "debug_preview.tooltip",
@@ -39,6 +38,7 @@ DEBUG_PREVIEW_I18N_KEYS = {
     "debug_preview.audio_fault_clear",
     "debug_preview.gpu_state_cycle",
     "debug_preview.foundation_primitives",
+    "debug_preview.http_extension_form",
     "foundation.preview.title",
     "foundation.preview.body",
     "foundation.preview.ready",
@@ -73,6 +73,7 @@ ACTION_KEYS = [
     "gpu_state_cycle",
     "stt_loading_button_cycle",
     "foundation_primitives",
+    "http_extension_form",
 ]
 
 
@@ -100,6 +101,7 @@ def _callbacks(seen: list[str]):
         "on_gpu_state_cycle": lambda: seen.append("gpu_state_cycle"),
         "on_foundation_primitives": lambda: seen.append("foundation_primitives"),
         "on_stt_loading_button_cycle": lambda: seen.append("stt_loading_button_cycle"),
+        "on_http_extension_form": lambda: seen.append("http_extension_form"),
     }
 
 
@@ -240,6 +242,7 @@ def test_debug_preview_panel_uses_flet_086_text_button_content_api(
         "Cycle GPU state",
         "Cycle STT loading button",
         "Foundation primitives",
+        "HTTP extension form",
     ]
 
 

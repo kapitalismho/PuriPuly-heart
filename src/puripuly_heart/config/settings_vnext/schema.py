@@ -16,7 +16,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 32
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 33
 
 DEFAULT_OPENROUTER_BROKER_BASE_URL: Final = "https://puripuly-heart-broker.kapitalismho.workers.dev"
 DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: Final = "openrouter_gemma4_26b_31b"
@@ -362,6 +362,8 @@ def _default_translation_fallback_intent() -> TranslationFallbackIntent:
 class TranslationIntent:
     model: str = "gemma4_26b_31b"
     connection: str = "managed"
+    http_extension_id: str | None = None
+    previous_llm_model: str | None = None
     connection_history: dict[str, str] = field(
         default_factory=_default_translation_connection_history
     )

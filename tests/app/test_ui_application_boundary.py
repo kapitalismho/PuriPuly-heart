@@ -320,11 +320,25 @@ async def test_provider_apply_preserves_no_argument_and_forced_rebuild_contracts
     await boundary.apply_providers(force_rebuild_llm=True)
     pending = object()
     await boundary.apply_providers(pending)
+    await boundary.apply_providers(
+        force_rebuild_llm=True,
+        persist_settings=False,
+        refresh_ui=False,
+    )
 
     assert backend.events == [
         ("providers", (), {}),
         ("providers", (), {"force_rebuild_llm": True}),
         ("providers", (pending,), {}),
+        (
+            "providers",
+            (None,),
+            {
+                "force_rebuild_llm": True,
+                "persist_settings": False,
+                "refresh_ui": False,
+            },
+        ),
     ]
 
 

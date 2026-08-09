@@ -47,6 +47,7 @@ TRANSLATION_MODEL_QWEN_35_PLUS: Final = "qwen35_plus"
 TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: Final = "openrouter_qwen35_flash"
 TRANSLATION_MODEL_LOCAL_LLM: Final = "local_llm"
 TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS: Final = "gemma4_31b_cerebras"
+TRANSLATION_MODEL_CUSTOM_HTTP: Final = "custom_http"
 
 _FIRST_HEDGE_DELAY_MS: Final = 1300
 _EMERGENCY_HEDGE_DELAY_MS: Final = 4500
@@ -64,6 +65,7 @@ TranslationModelName: TypeAlias = Literal[
     "openrouter_qwen35_flash",
     "local_llm",
     "gemma4_31b_cerebras",
+    "custom_http",
 ]
 TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_GEMMA4_26B_31B,
@@ -77,6 +79,7 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
     TRANSLATION_MODEL_LOCAL_LLM,
     TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS,
+    TRANSLATION_MODEL_CUSTOM_HTTP,
 )
 
 TRANSLATION_CONNECTION_MANAGED: Final = "managed"
@@ -84,6 +87,7 @@ TRANSLATION_CONNECTION_MANAGED_CHINA: Final = "managed_china"
 TRANSLATION_CONNECTION_OPENROUTER: Final = "openrouter"
 TRANSLATION_CONNECTION_OFFICIAL_BYOK: Final = "official_byok"
 TRANSLATION_CONNECTION_OLLAMA: Final = "ollama"
+TRANSLATION_CONNECTION_CUSTOM_HTTP: Final = "custom_http"
 
 TranslationConnectionName: TypeAlias = Literal[
     "managed",
@@ -91,6 +95,7 @@ TranslationConnectionName: TypeAlias = Literal[
     "openrouter",
     "official_byok",
     "ollama",
+    "custom_http",
 ]
 TRANSLATION_CONNECTIONS: Final[tuple[TranslationConnectionName, ...]] = (
     TRANSLATION_CONNECTION_MANAGED,
@@ -98,6 +103,7 @@ TRANSLATION_CONNECTIONS: Final[tuple[TranslationConnectionName, ...]] = (
     TRANSLATION_CONNECTION_OPENROUTER,
     TRANSLATION_CONNECTION_OFFICIAL_BYOK,
     TRANSLATION_CONNECTION_OLLAMA,
+    TRANSLATION_CONNECTION_CUSTOM_HTTP,
 )
 TRANSLATION_CONNECTIONS_BY_MODEL: Final[
     Mapping[TranslationModelName, tuple[TranslationConnectionName, ...]]
@@ -137,6 +143,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
         ),
         TRANSLATION_MODEL_LOCAL_LLM: (TRANSLATION_CONNECTION_OLLAMA,),
         TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS: (TRANSLATION_CONNECTION_OFFICIAL_BYOK,),
+        TRANSLATION_MODEL_CUSTOM_HTTP: (TRANSLATION_CONNECTION_CUSTOM_HTTP,),
     }
 )
 TRANSLATION_CONNECTION_PRIORITY: Final[tuple[TranslationConnectionName, ...]] = (
@@ -168,6 +175,7 @@ PROVIDER_GEMINI: Final = "gemini"
 PROVIDER_QWEN: Final = "qwen"
 PROVIDER_LOCAL_LLM: Final = "local_llm"
 PROVIDER_CEREBRAS: Final = "cerebras"
+PROVIDER_CUSTOM_HTTP: Final = "custom_http"
 LLM_PROVIDERS: Final[tuple[str, ...]] = (
     PROVIDER_GEMINI,
     PROVIDER_OPENROUTER,
@@ -537,6 +545,8 @@ class TranslationFallbackRuntimeIntent:
         object.__setattr__(self, "model", model)
         object.__setattr__(self, "connection", connection)
         _require_allowed(model, TRANSLATION_MODELS, field_name="fallback model")
+        if model == TRANSLATION_MODEL_CUSTOM_HTTP:
+            raise ValueError("custom HTTP translation cannot be used as fallback")
         if connection not in TRANSLATION_CONNECTIONS_BY_MODEL[model]:
             raise ValueError("translation fallback connection is not supported for model")
 
@@ -1223,6 +1233,13 @@ def _resolve_translation_target(
     openrouter: OpenRouterRuntimeIntent,
     direct: DirectProviderRuntimeIntent,
 ) -> ResolvedLLMTarget:
+    if translation.model == TRANSLATION_MODEL_CUSTOM_HTTP:
+        return _resolved_direct_provider_target(
+            provider=PROVIDER_CUSTOM_HTTP,
+            model=TRANSLATION_MODEL_CUSTOM_HTTP,
+            credential=_no_credential(),
+        )
+
     if translation.model == TRANSLATION_MODEL_GEMMA4_26B_31B:
         return _resolved_openrouter_target(
             model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
@@ -1452,7 +1469,10 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
         ResolvedLLMAttemptPlan(target=primary),
     ]
 
-    if runtime_input.translation_fallback.enabled:
+    if (
+        runtime_input.translation_fallback.enabled
+        and translation.model != TRANSLATION_MODEL_CUSTOM_HTTP
+    ):
         fallback_translation = TranslationRuntimeIntent(
             model=runtime_input.translation_fallback.model,
             connection=runtime_input.translation_fallback.connection,
@@ -1523,6 +1543,7 @@ __all__ = [
     "OpenRouterSource",
     "PROVIDER_DEEPSEEK",
     "PROVIDER_CEREBRAS",
+    "PROVIDER_CUSTOM_HTTP",
     "PROVIDER_GEMINI",
     "PROVIDER_LOCAL_LLM",
     "PROVIDER_OPENROUTER",
@@ -1564,6 +1585,7 @@ __all__ = [
     "TRANSLATION_CONNECTION_MANAGED_CHINA",
     "TRANSLATION_CONNECTION_OFFICIAL_BYOK",
     "TRANSLATION_CONNECTION_OLLAMA",
+    "TRANSLATION_CONNECTION_CUSTOM_HTTP",
     "TRANSLATION_CONNECTION_OPENROUTER",
     "TRANSLATION_CONNECTIONS",
     "TRANSLATION_CONNECTIONS_BY_MODEL",
@@ -1575,6 +1597,7 @@ __all__ = [
     "TRANSLATION_MODEL_GEMMA4_26B_31B",
     "TRANSLATION_MODEL_GEMMA4_31B",
     "TRANSLATION_MODEL_GEMMA4_31B_CEREBRAS",
+    "TRANSLATION_MODEL_CUSTOM_HTTP",
     "TRANSLATION_MODEL_LOCAL_LLM",
     "TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH",
     "TRANSLATION_MODEL_QWEN_35_PLUS",

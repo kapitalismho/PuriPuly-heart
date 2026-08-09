@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
-from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.app.services.settings_mutation_legacy import (
     ORDER21_TRANSLATION_PROVIDER_SETTINGS_PATHS,
     ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS,
@@ -10,6 +8,15 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
     ORDER24_UI_PROMPT_CLIPBOARD_STATE_SETTINGS_PATHS,
     SettingsPathMutationValidator,
     SettingsPathPatch,
+    build_translation_provider_settings_path_patch,
+)
+
+from puripuly_heart.app.services import settings_mutation
+from puripuly_heart.config.settings import (
+    AppSettings,
+    TranslationConnection,
+    TranslationModel,
+    TranslationSettings,
 )
 from puripuly_heart.core import messages
 
@@ -20,6 +27,8 @@ def test_order21_translation_provider_patch_records_initial_covered_surface_list
         "translation.connection",
         "translation.connection_history",
         "translation.fallback",
+        "translation.http_extension_id",
+        "translation.previous_llm_model",
         "provider.llm",
         "gemini.llm_model",
         "openrouter.llm_model",
@@ -37,6 +46,22 @@ def test_order21_translation_provider_patch_records_initial_covered_surface_list
         "local_llm.extra_body",
         "llm.concurrency_limit",
     }
+
+
+def test_order21_patch_carries_custom_http_identity_fields() -> None:
+    previous = AppSettings()
+    next_settings = AppSettings()
+    next_settings.translation = TranslationSettings(
+        model=TranslationModel.CUSTOM_HTTP,
+        connection=TranslationConnection.CUSTOM_HTTP,
+        http_extension_id="demo",
+        previous_llm_model=TranslationModel.GEMMA4_26B_31B,
+    )
+
+    patch = build_translation_provider_settings_path_patch(previous, next_settings)
+
+    assert patch["translation.http_extension_id"] == "demo"
+    assert patch["translation.previous_llm_model"] == TranslationModel.GEMMA4_26B_31B
 
 
 def test_order22_stt_language_audio_patch_records_initial_covered_surface_list() -> None:

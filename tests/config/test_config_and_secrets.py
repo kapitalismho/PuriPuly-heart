@@ -469,6 +469,7 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("QWEN_35_PLUS", "qwen35_plus"),
         ("LOCAL_LLM", "local_llm"),
         ("GEMMA4_31B_CEREBRAS", "gemma4_31b_cerebras"),
+        ("CUSTOM_HTTP", "custom_http"),
     )
 
 

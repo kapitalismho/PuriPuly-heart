@@ -58,16 +58,20 @@ def compose_settings_api_surface(
     gpu_device_row = ft.Container(content=gpu_device_controls)
     gpu_device_row.visible = False
 
+    rows: list[ft.Control] = [
+        provider_row,
+        translation_connection_row,
+        gpu_device_row,
+        slots.local_llm_connection,
+        slots.managed_key,
+        slots.peer_expected_language,
+        slots.api_keys,
+    ]
+    if slots.http_extension is not None:
+        rows.insert(2, slots.http_extension)
+
     return SettingsApiSurfaceRegions(
-        rows=(
-            provider_row,
-            translation_connection_row,
-            gpu_device_row,
-            slots.local_llm_connection,
-            slots.managed_key,
-            slots.peer_expected_language,
-            slots.api_keys,
-        ),
+        rows=tuple(rows),
         provider_row=provider_row,
         provider_controls=provider_controls,
         translation_connection_row=translation_connection_row,

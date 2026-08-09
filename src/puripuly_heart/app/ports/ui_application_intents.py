@@ -74,6 +74,8 @@ class UiProviderRuntimePort(Protocol):
         settings: object | None = None,
         *,
         force_rebuild_llm: bool = False,
+        persist_settings: bool = True,
+        refresh_ui: bool = True,
     ) -> object: ...
 
     async def install_selected_gpu_model_if_needed(self) -> None: ...
