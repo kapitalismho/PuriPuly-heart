@@ -94,7 +94,7 @@
   "settings.translation_model.gemma4_31b_cerebras.description": "非常非常快 非常贵",
   "settings.translation_model.section.recommended": "推荐",
   "settings.translation_model.section.others": "其他",
-  "settings.http_extension.title": "Custom HTTP API",
+  "settings.http_extension.title": "HTTP API 选择",
   "settings.http_extension.credential_save_failed": "无法保存扩展凭据。",
   "settings.http_extension.open_folder_failed": "无法打开扩展目录。",
   "settings.http_extension.reload_errors": "无法加载 {count} 个扩展文件。",
