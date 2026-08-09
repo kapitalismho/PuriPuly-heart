@@ -449,7 +449,7 @@
   "provider.local_llm": "Local LLMs",
   "provider.gemma4_31b_cerebras": "Gemma 4 31B (Cerebras)",
   "provider.gemma4_31b_cerebras.description": "",
-  "provider.local_cpu_auto": "Auto Select (CPU)",
+  "provider.local_cpu_auto": "Auto Select\n(CPU Inference)",
   "provider.local_cpu_auto.description": "Uses the optimal model for your selected language",
   "provider.local_cpu_auto.unavailable": "Available after all three CPU ASR models are installed",
   "provider.local_parakeet_v3": "Parakeet TDT 0.6B v3",

@@ -449,7 +449,7 @@
   "provider.local_llm": "Local LLMs",
   "provider.gemma4_31b_cerebras": "Gemma 4 31B (Cerebras)",
   "provider.gemma4_31b_cerebras.description": "",
-  "provider.local_cpu_auto": "自动选择（使用 CPU）",
+  "provider.local_cpu_auto": "自动选择（CPU 推理）",
   "provider.local_cpu_auto.description": "根据设置的语言使用最优模型",
   "provider.local_cpu_auto.unavailable": "安装全部三个 CPU ASR 模型后可用",
   "provider.local_parakeet_v3": "Parakeet TDT 0.6B v3",
