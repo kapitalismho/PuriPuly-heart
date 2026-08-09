@@ -18,7 +18,7 @@ pub use manifest::{
 };
 pub use openvr::{
     submit_texture, FakeOpenVr, OpenVrError, OpenVrOutputAdapter, OpenVrOverlay, OverlayAnchorMode,
-    OverlayFrameSubmitter, OverlayPlacementPolicy,
+    OverlayFrameSubmitter, OverlayPlacementPolicy, SpatialReanchorOutcome,
 };
 pub use presentation::{
     AdapterIdentity, AdapterMatch, CompositorAttribution, PendingPresentationDiagnostics,

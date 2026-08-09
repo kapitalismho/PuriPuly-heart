@@ -90,42 +90,180 @@ impl OverlayPlacementPolicy {
         overlay_api: &openvr_sys::VR_IVROverlay_FnTable,
         overlay_handle: openvr_sys::VROverlayHandle_t,
     ) -> Result<(), OpenVrError> {
-        let set_overlay_width_in_meters = overlay_api
+        let mut api = OpenVrPlacementApi {
+            overlay_api,
+            overlay_handle,
+        };
+        self.apply_with_api(&mut api)
+    }
+
+    fn apply_with_api(&self, api: &mut impl OverlayPlacementApi) -> Result<(), OpenVrError> {
+        api.set_width(self.width_meters)?;
+
+        if self.is_spatial_locked() {
+            return Ok(());
+        }
+
+        api.set_hmd_relative_transform(self.hmd_relative_transform())
+    }
+
+    fn hmd_relative_transform(&self) -> [[f32; 4]; 3] {
+        [
+            [1.0, 0.0, 0.0, self.offset_x_meters],
+            [0.0, 1.0, 0.0, self.offset_y_meters],
+            [0.0, 0.0, 1.0, -self.distance_meters],
+        ]
+    }
+}
+
+trait OverlayPlacementApi {
+    fn set_width(&mut self, width_meters: f32) -> Result<(), OpenVrError>;
+    fn set_hmd_relative_transform(&mut self, transform: [[f32; 4]; 3]) -> Result<(), OpenVrError>;
+}
+
+#[cfg(windows)]
+struct OpenVrPlacementApi<'a> {
+    overlay_api: &'a openvr_sys::VR_IVROverlay_FnTable,
+    overlay_handle: openvr_sys::VROverlayHandle_t,
+}
+
+#[cfg(windows)]
+impl OverlayPlacementApi for OpenVrPlacementApi<'_> {
+    fn set_width(&mut self, width_meters: f32) -> Result<(), OpenVrError> {
+        let set_width = self
+            .overlay_api
             .SetOverlayWidthInMeters
             .ok_or_else(missing_overlay_method("SetOverlayWidthInMeters"))?;
-        let error = unsafe { set_overlay_width_in_meters(overlay_handle, self.width_meters) };
-        map_overlay_init_error(overlay_api, "SetOverlayWidthInMeters", error)?;
+        let error = unsafe { set_width(self.overlay_handle, width_meters) };
+        map_overlay_init_error(self.overlay_api, "SetOverlayWidthInMeters", error)
+    }
 
-        let set_overlay_transform = overlay_api
+    fn set_hmd_relative_transform(&mut self, transform: [[f32; 4]; 3]) -> Result<(), OpenVrError> {
+        let set_transform = self
+            .overlay_api
             .SetOverlayTransformTrackedDeviceRelative
             .ok_or_else(missing_overlay_method(
                 "SetOverlayTransformTrackedDeviceRelative",
             ))?;
-        let mut transform = self.hmd_relative_transform();
+        let mut transform = openvr_sys::HmdMatrix34_t { m: transform };
         let error = unsafe {
-            set_overlay_transform(
-                overlay_handle,
+            set_transform(
+                self.overlay_handle,
                 openvr_sys::k_unTrackedDeviceIndex_Hmd,
                 &mut transform,
             )
         };
         map_overlay_init_error(
-            overlay_api,
+            self.overlay_api,
             "SetOverlayTransformTrackedDeviceRelative",
             error,
         )
     }
+}
 
-    #[cfg(windows)]
-    fn hmd_relative_transform(&self) -> openvr_sys::HmdMatrix34_t {
-        openvr_sys::HmdMatrix34_t {
-            m: [
-                [1.0, 0.0, 0.0, self.offset_x_meters],
-                [0.0, 1.0, 0.0, self.offset_y_meters],
-                [0.0, 0.0, 1.0, -self.distance_meters],
-            ],
-        }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpatialReanchorOutcome {
+    Applied,
+    PoseUnavailable,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SpatialTrackingOrigin {
+    Seated,
+    Standing,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct SpatialHmdPose {
+    matrix: [[f32; 4]; 3],
+    connected: bool,
+    valid: bool,
+}
+
+trait SpatialReanchorApi {
+    fn active_tracking_origin(&mut self) -> Result<Option<SpatialTrackingOrigin>, OpenVrError>;
+    fn hmd_pose(
+        &mut self,
+        origin: SpatialTrackingOrigin,
+    ) -> Result<Option<SpatialHmdPose>, OpenVrError>;
+    fn set_absolute_transform(
+        &mut self,
+        origin: SpatialTrackingOrigin,
+        transform: [[f32; 4]; 3],
+    ) -> Result<(), OpenVrError>;
+}
+
+fn reanchor_spatial_locked_with_api(
+    policy: &OverlayPlacementPolicy,
+    api: &mut impl SpatialReanchorApi,
+) -> Result<SpatialReanchorOutcome, OpenVrError> {
+    let Some(origin) = api.active_tracking_origin()? else {
+        return Ok(SpatialReanchorOutcome::PoseUnavailable);
+    };
+    let Some(pose) = api.hmd_pose(origin)? else {
+        return Ok(SpatialReanchorOutcome::PoseUnavailable);
+    };
+    if !pose.connected || !pose.valid {
+        return Ok(SpatialReanchorOutcome::PoseUnavailable);
     }
+    let Some(transform) = spatial_locked_transform(policy, pose.matrix) else {
+        return Ok(SpatialReanchorOutcome::PoseUnavailable);
+    };
+    api.set_absolute_transform(origin, transform)?;
+    Ok(SpatialReanchorOutcome::Applied)
+}
+
+fn spatial_locked_transform(
+    policy: &OverlayPlacementPolicy,
+    hmd: [[f32; 4]; 3],
+) -> Option<[[f32; 4]; 3]> {
+    if !hmd.iter().flatten().all(|value| value.is_finite()) {
+        return None;
+    }
+    let position = [hmd[0][3], hmd[1][3], hmd[2][3]];
+    let forward = normalize3([-hmd[0][2], -hmd[1][2], -hmd[2][2]])?;
+    let right = normalize3(cross3(forward, [0.0, 1.0, 0.0]))?;
+    let up = normalize3(cross3(right, forward))?;
+    let anchored = add3(
+        add3(
+            add3(position, scale3(right, policy.offset_x_meters)),
+            scale3(up, policy.offset_y_meters),
+        ),
+        scale3(forward, policy.distance_meters),
+    );
+    Some([
+        [right[0], up[0], -forward[0], anchored[0]],
+        [right[1], up[1], -forward[1], anchored[1]],
+        [right[2], up[2], -forward[2], anchored[2]],
+    ])
+}
+
+fn add3(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
+    [left[0] + right[0], left[1] + right[1], left[2] + right[2]]
+}
+
+fn scale3(vector: [f32; 3], scale: f32) -> [f32; 3] {
+    [vector[0] * scale, vector[1] * scale, vector[2] * scale]
+}
+
+fn cross3(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
+    [
+        left[1] * right[2] - left[2] * right[1],
+        left[2] * right[0] - left[0] * right[2],
+        left[0] * right[1] - left[1] * right[0],
+    ]
+}
+
+fn normalize3(vector: [f32; 3]) -> Option<[f32; 3]> {
+    let length_squared = vector
+        .iter()
+        .map(|component| component * component)
+        .sum::<f32>();
+    if !length_squared.is_finite() || length_squared <= 1.0e-8 {
+        return None;
+    }
+    let inverse_length = length_squared.sqrt().recip();
+    Some(scale3(vector, inverse_length))
 }
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -225,6 +363,10 @@ pub trait OverlayFrameSubmitter {
         Ok(())
     }
 
+    fn reanchor_spatial_locked(&mut self) -> Result<SpatialReanchorOutcome, OpenVrError> {
+        Ok(SpatialReanchorOutcome::PoseUnavailable)
+    }
+
     fn set_overlay_visible(&mut self, _visible: bool) -> Result<(), OpenVrError> {
         Ok(())
     }
@@ -289,6 +431,8 @@ pub fn submit_texture<T: OverlayTextureSubmitter>(
 #[derive(Debug, Default)]
 pub struct FakeOpenVr {
     last_call: RefCell<Option<String>>,
+    call_sequence: RefCell<Vec<&'static str>>,
+    spatial_reanchor_count: Cell<usize>,
     visible: Cell<bool>,
     last_visibility_api_call_log: RefCell<Option<String>>,
 }
@@ -297,12 +441,21 @@ impl FakeOpenVr {
     pub fn last_call(&self) -> Option<String> {
         self.last_call.borrow().clone()
     }
+
+    pub fn call_sequence(&self) -> Vec<&'static str> {
+        self.call_sequence.borrow().clone()
+    }
+
+    pub fn spatial_reanchor_count(&self) -> usize {
+        self.spatial_reanchor_count.get()
+    }
 }
 
 impl OverlayTextureSubmitter for FakeOpenVr {
     fn set_overlay_texture(&self, _texture_handle: *mut c_void) -> Result<(), OpenVrError> {
         self.last_call
             .replace(Some("SetOverlayTexture".to_string()));
+        self.call_sequence.borrow_mut().push("SetOverlayTexture");
         Ok(())
     }
 }
@@ -334,6 +487,10 @@ impl OverlayFrameSubmitter for OpenVrOverlay {
 
     fn apply_calibration(&mut self, calibration: &OverlayCalibration) -> Result<(), OpenVrError> {
         self.backend.apply_calibration(calibration)
+    }
+
+    fn reanchor_spatial_locked(&mut self) -> Result<SpatialReanchorOutcome, OpenVrError> {
+        self.backend.reanchor_spatial_locked()
     }
 
     fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
@@ -440,6 +597,15 @@ impl OpenVrBackend {
             Self::Windows(openvr) => openvr.apply_calibration(calibration),
             #[cfg(not(windows))]
             Self::Test(_) => Ok(()),
+        }
+    }
+
+    fn reanchor_spatial_locked(&mut self) -> Result<SpatialReanchorOutcome, OpenVrError> {
+        match self {
+            #[cfg(windows)]
+            Self::Windows(openvr) => openvr.reanchor_spatial_locked(),
+            #[cfg(not(windows))]
+            Self::Test(openvr) => openvr.reanchor_spatial_locked(),
         }
     }
 
@@ -584,6 +750,11 @@ impl WindowsOpenVrOverlay {
             .apply(self.overlay_api(), self.overlay_handle)
     }
 
+    fn reanchor_spatial_locked(&mut self) -> Result<SpatialReanchorOutcome, OpenVrError> {
+        let policy = self.placement_policy.clone();
+        reanchor_spatial_locked_with_api(&policy, self)
+    }
+
     fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
         let cached_visible_before = self.visible;
         if self.visible == visible {
@@ -660,6 +831,79 @@ impl WindowsOpenVrOverlay {
             total_render_gpu_ms: timing.m_flTotalRenderGpuMs,
             post_submit_gpu_ms: timing.m_flPostSubmitGpuMs,
         })
+    }
+}
+
+#[cfg(windows)]
+impl SpatialReanchorApi for WindowsOpenVrOverlay {
+    fn active_tracking_origin(&mut self) -> Result<Option<SpatialTrackingOrigin>, OpenVrError> {
+        let Some(compositor_api) = self.compositor_api else {
+            return Ok(None);
+        };
+        let Some(get_tracking_space) = (unsafe { (*compositor_api).GetTrackingSpace }) else {
+            return Ok(None);
+        };
+        let origin = unsafe { get_tracking_space() };
+        if origin == openvr_sys::ETrackingUniverseOrigin_TrackingUniverseSeated {
+            return Ok(Some(SpatialTrackingOrigin::Seated));
+        }
+        if origin == openvr_sys::ETrackingUniverseOrigin_TrackingUniverseStanding {
+            return Ok(Some(SpatialTrackingOrigin::Standing));
+        }
+        Ok(None)
+    }
+
+    fn hmd_pose(
+        &mut self,
+        origin: SpatialTrackingOrigin,
+    ) -> Result<Option<SpatialHmdPose>, OpenVrError> {
+        let get_pose = self
+            .system_api()
+            .GetDeviceToAbsoluteTrackingPose
+            .ok_or_else(|| {
+                OpenVrError::Init(
+                    "missing OpenVR system method: GetDeviceToAbsoluteTrackingPose".to_string(),
+                )
+            })?;
+        let mut pose = openvr_sys::TrackedDevicePose_t::default();
+        unsafe {
+            get_pose(openvr_tracking_origin(origin), 0.0, &mut pose, 1);
+        }
+        Ok(Some(SpatialHmdPose {
+            matrix: pose.mDeviceToAbsoluteTracking.m,
+            connected: pose.bDeviceIsConnected,
+            valid: pose.bPoseIsValid,
+        }))
+    }
+
+    fn set_absolute_transform(
+        &mut self,
+        origin: SpatialTrackingOrigin,
+        transform: [[f32; 4]; 3],
+    ) -> Result<(), OpenVrError> {
+        let set_transform = self
+            .overlay_api()
+            .SetOverlayTransformAbsolute
+            .ok_or_else(missing_overlay_method("SetOverlayTransformAbsolute"))?;
+        let mut transform = openvr_sys::HmdMatrix34_t { m: transform };
+        let error = unsafe {
+            set_transform(
+                self.overlay_handle,
+                openvr_tracking_origin(origin),
+                &mut transform,
+            )
+        };
+        map_overlay_submit_error(self.overlay_api(), "SetOverlayTransformAbsolute", error)
+    }
+}
+
+#[cfg(windows)]
+fn openvr_tracking_origin(origin: SpatialTrackingOrigin) -> openvr_sys::ETrackingUniverseOrigin {
+    match origin {
+        SpatialTrackingOrigin::Seated => openvr_sys::ETrackingUniverseOrigin_TrackingUniverseSeated,
+        SpatialTrackingOrigin::Standing => {
+            openvr_sys::ETrackingUniverseOrigin_TrackingUniverseStanding
+        }
     }
 }
 
@@ -768,6 +1012,15 @@ impl OverlayTextureSubmitter for WindowsOpenVrOverlay {
 impl OverlayFrameSubmitter for FakeOpenVr {
     fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError> {
         submit_texture(self, frame)
+    }
+
+    fn reanchor_spatial_locked(&mut self) -> Result<SpatialReanchorOutcome, OpenVrError> {
+        self.spatial_reanchor_count
+            .set(self.spatial_reanchor_count.get() + 1);
+        self.call_sequence
+            .borrow_mut()
+            .push("ReanchorSpatialLocked");
+        Ok(SpatialReanchorOutcome::PoseUnavailable)
     }
 
     fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
@@ -1016,10 +1269,12 @@ mod tests {
     use std::cell::Cell;
 
     use super::{
-        fn_table_interface_version, requested_adapter_identity, run_startup_preflight,
-        split_output_device_luid, validate_resolved_adapter, FakeOpenVr, OpenVrBackgroundInitError,
+        fn_table_interface_version, reanchor_spatial_locked_with_api, requested_adapter_identity,
+        run_startup_preflight, spatial_locked_transform, split_output_device_luid,
+        validate_resolved_adapter, FakeOpenVr, OpenVrBackgroundInitError, OpenVrError,
         OpenVrPreflightApi, OpenVrStartupPreflightError, OverlayAnchorMode, OverlayFrameSubmitter,
-        OverlayPlacementPolicy,
+        OverlayPlacementApi, OverlayPlacementPolicy, SpatialHmdPose, SpatialReanchorApi,
+        SpatialReanchorOutcome, SpatialTrackingOrigin, DEFAULT_OVERLAY_WIDTH_METERS,
     };
     use crate::state::OverlayCalibration;
 
@@ -1034,6 +1289,64 @@ mod tests {
         background_init: FakeBackgroundInitResult,
         hmd_present: bool,
         shutdown_calls: Cell<usize>,
+    }
+
+    #[derive(Default)]
+    struct FakeSpatialReanchorApi {
+        origin: Option<SpatialTrackingOrigin>,
+        pose: Option<SpatialHmdPose>,
+        calls: Vec<&'static str>,
+        pose_origin: Option<SpatialTrackingOrigin>,
+        absolute_origin: Option<SpatialTrackingOrigin>,
+        absolute_transform: Option<[[f32; 4]; 3]>,
+    }
+
+    #[derive(Default)]
+    struct FakePlacementApi {
+        widths: Vec<f32>,
+        relative_transforms: Vec<[[f32; 4]; 3]>,
+    }
+
+    impl OverlayPlacementApi for FakePlacementApi {
+        fn set_width(&mut self, width_meters: f32) -> Result<(), OpenVrError> {
+            self.widths.push(width_meters);
+            Ok(())
+        }
+
+        fn set_hmd_relative_transform(
+            &mut self,
+            transform: [[f32; 4]; 3],
+        ) -> Result<(), OpenVrError> {
+            self.relative_transforms.push(transform);
+            Ok(())
+        }
+    }
+
+    impl SpatialReanchorApi for FakeSpatialReanchorApi {
+        fn active_tracking_origin(&mut self) -> Result<Option<SpatialTrackingOrigin>, OpenVrError> {
+            self.calls.push("GetTrackingSpace");
+            Ok(self.origin)
+        }
+
+        fn hmd_pose(
+            &mut self,
+            origin: SpatialTrackingOrigin,
+        ) -> Result<Option<SpatialHmdPose>, OpenVrError> {
+            self.calls.push("GetDeviceToAbsoluteTrackingPose");
+            self.pose_origin = Some(origin);
+            Ok(self.pose)
+        }
+
+        fn set_absolute_transform(
+            &mut self,
+            origin: SpatialTrackingOrigin,
+            transform: [[f32; 4]; 3],
+        ) -> Result<(), OpenVrError> {
+            self.calls.push("SetOverlayTransformAbsolute");
+            self.absolute_origin = Some(origin);
+            self.absolute_transform = Some(transform);
+            Ok(())
+        }
     }
 
     impl FakePreflightApi {
@@ -1136,6 +1449,218 @@ mod tests {
                 "unsupported overlay calibration anchor: unsupported".to_string()
             )
         );
+    }
+
+    #[test]
+    fn spatial_reanchor_uses_active_origin_for_pose_and_absolute_transform() {
+        let policy = OverlayPlacementPolicy::from_calibration(&OverlayCalibration {
+            anchor: "spatial_locked".to_string(),
+            offset_x: 0.25,
+            offset_y: -0.5,
+            distance: 1.5,
+            ..OverlayCalibration::default()
+        })
+        .unwrap();
+        let mut api = FakeSpatialReanchorApi {
+            origin: Some(SpatialTrackingOrigin::Seated),
+            pose: Some(SpatialHmdPose {
+                matrix: [
+                    [1.0, 0.0, 0.0, 4.0],
+                    [0.0, 1.0, 0.0, 5.0],
+                    [0.0, 0.0, 1.0, 6.0],
+                ],
+                connected: true,
+                valid: true,
+            }),
+            ..FakeSpatialReanchorApi::default()
+        };
+
+        let outcome = reanchor_spatial_locked_with_api(&policy, &mut api).unwrap();
+
+        assert_eq!(outcome, SpatialReanchorOutcome::Applied);
+        assert_eq!(api.pose_origin, Some(SpatialTrackingOrigin::Seated));
+        assert_eq!(api.absolute_origin, Some(SpatialTrackingOrigin::Seated));
+        assert_eq!(
+            api.calls,
+            vec![
+                "GetTrackingSpace",
+                "GetDeviceToAbsoluteTrackingPose",
+                "SetOverlayTransformAbsolute"
+            ]
+        );
+        assert_eq!(
+            api.absolute_transform,
+            Some([
+                [1.0, 0.0, 0.0, 4.25],
+                [0.0, 1.0, 0.0, 4.5],
+                [0.0, 0.0, 1.0, 4.5],
+            ])
+        );
+    }
+
+    #[test]
+    fn calibration_placement_calls_split_by_anchor_mode() {
+        let spatial = OverlayPlacementPolicy::from_calibration(&OverlayCalibration {
+            anchor: "spatial_locked".to_string(),
+            text_scale: 1.5,
+            offset_x: 0.25,
+            offset_y: -0.5,
+            distance: 1.5,
+            ..OverlayCalibration::default()
+        })
+        .unwrap();
+        let mut spatial_api = FakePlacementApi::default();
+
+        spatial.apply_with_api(&mut spatial_api).unwrap();
+
+        assert_eq!(spatial_api.widths, vec![DEFAULT_OVERLAY_WIDTH_METERS * 1.5]);
+        assert!(spatial_api.relative_transforms.is_empty());
+
+        let head = OverlayPlacementPolicy::from_calibration(&OverlayCalibration {
+            anchor: "head_locked".to_string(),
+            text_scale: 1.5,
+            offset_x: 0.25,
+            offset_y: -0.5,
+            distance: 1.5,
+            ..OverlayCalibration::default()
+        })
+        .unwrap();
+        let mut head_api = FakePlacementApi::default();
+
+        head.apply_with_api(&mut head_api).unwrap();
+
+        assert_eq!(head_api.widths, vec![DEFAULT_OVERLAY_WIDTH_METERS * 1.5]);
+        assert_eq!(
+            head_api.relative_transforms,
+            vec![[
+                [1.0, 0.0, 0.0, 0.25],
+                [0.0, 1.0, 0.0, -0.5],
+                [0.0, 0.0, 1.0, -1.5],
+            ]]
+        );
+    }
+
+    #[test]
+    fn spatial_reanchor_skips_transform_for_missing_origin_or_invalid_pose() {
+        let policy = OverlayPlacementPolicy::from_calibration(&OverlayCalibration {
+            anchor: "spatial_locked".to_string(),
+            ..OverlayCalibration::default()
+        })
+        .unwrap();
+        let mut missing_origin = FakeSpatialReanchorApi::default();
+
+        assert_eq!(
+            reanchor_spatial_locked_with_api(&policy, &mut missing_origin).unwrap(),
+            SpatialReanchorOutcome::PoseUnavailable
+        );
+        assert_eq!(missing_origin.calls, vec!["GetTrackingSpace"]);
+
+        let mut invalid_pose = FakeSpatialReanchorApi {
+            origin: Some(SpatialTrackingOrigin::Standing),
+            pose: Some(SpatialHmdPose {
+                matrix: [
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                ],
+                connected: true,
+                valid: false,
+            }),
+            ..FakeSpatialReanchorApi::default()
+        };
+
+        assert_eq!(
+            reanchor_spatial_locked_with_api(&policy, &mut invalid_pose).unwrap(),
+            SpatialReanchorOutcome::PoseUnavailable
+        );
+        assert_eq!(
+            invalid_pose.calls,
+            vec!["GetTrackingSpace", "GetDeviceToAbsoluteTrackingPose"]
+        );
+        assert!(invalid_pose.absolute_transform.is_none());
+    }
+
+    #[test]
+    fn spatial_transform_removes_roll_and_preserves_pitch() {
+        let policy = OverlayPlacementPolicy::from_calibration(&OverlayCalibration {
+            anchor: "spatial_locked".to_string(),
+            offset_x: 0.0,
+            offset_y: 0.0,
+            distance: 1.0,
+            ..OverlayCalibration::default()
+        })
+        .unwrap();
+        let rolled = spatial_locked_transform(
+            &policy,
+            [
+                [0.0, -1.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            rolled,
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, -1.0],
+            ]
+        );
+
+        let pitched = spatial_locked_transform(
+            &policy,
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.8660254, -0.5, 0.0],
+                [0.0, 0.5, 0.8660254, 0.0],
+            ],
+        )
+        .unwrap();
+
+        assert!((pitched[1][3] - 0.5).abs() < 0.0001);
+        assert!((pitched[2][3] + 0.8660254).abs() < 0.0001);
+        assert!((pitched[1][2] + 0.5).abs() < 0.0001);
+        assert!((pitched[2][2] - 0.8660254).abs() < 0.0001);
+    }
+
+    #[test]
+    fn spatial_transform_rejects_non_finite_and_vertical_forward_pose() {
+        let policy = OverlayPlacementPolicy::from_calibration(&OverlayCalibration {
+            anchor: "spatial_locked".to_string(),
+            ..OverlayCalibration::default()
+        })
+        .unwrap();
+        let mut non_finite = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ];
+        non_finite[0][3] = f32::NAN;
+
+        assert!(spatial_locked_transform(&policy, non_finite).is_none());
+        assert!(spatial_locked_transform(
+            &policy,
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, -1.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+            ]
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn fake_openvr_records_explicit_spatial_reanchor_attempts() {
+        let mut openvr = FakeOpenVr::default();
+
+        assert_eq!(
+            openvr.reanchor_spatial_locked().unwrap(),
+            SpatialReanchorOutcome::PoseUnavailable
+        );
+        assert_eq!(openvr.spatial_reanchor_count(), 1);
+        assert_eq!(openvr.call_sequence(), vec!["ReanchorSpatialLocked"]);
     }
 
     #[test]
