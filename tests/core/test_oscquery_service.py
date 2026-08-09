@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 
 import pytest
 import zeroconf
@@ -170,7 +171,9 @@ async def test_zeroconf_start_cleans_up_partial_browser_creation(
 
 
 @pytest.mark.asyncio
-async def test_discovery_resolves_the_osc_destination_from_host_info() -> None:
+async def test_discovery_resolves_the_osc_destination_from_host_info(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     requests: list[str] = []
 
     async def handle_client(
@@ -205,15 +208,27 @@ async def test_discovery_resolves_the_osc_destination_from_host_info() -> None:
         query_port=query_port,
         is_vrchat=True,
     )
+    caplog.set_level(logging.DEBUG, logger="httpx")
+    caplog.set_level(logging.DEBUG, logger="httpcore")
+    caplog.clear()
     try:
         discovered = await service.discover_vrchat()
+        assert discovered is not None
+        avatar = await service.query_avatar(discovered)
     finally:
         server.close()
         await server.wait_closed()
 
     assert discovered is not None
     assert discovered.osc_send_port == 9123
-    assert requests == ["/?HOST_INFO"]
+    assert avatar["NAME"] == "VRChat-Client"
+    assert requests == ["/?HOST_INFO", "/avatar"]
+    logging.getLogger("httpx").info("unrelated HTTP request remains visible")
+    assert [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "httpx" or record.name.startswith("httpcore.")
+    ] == ["unrelated HTTP request remains visible"]
 
 
 @pytest.mark.asyncio

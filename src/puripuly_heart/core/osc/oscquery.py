@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
+from puripuly_heart.core.http_client_logging import suppress_http_client_logs
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.osc.control_schema import (
     OSC_MUTE_SELF_ADDRESS,
@@ -218,10 +219,13 @@ class ZeroconfOscQueryService(OscQueryServicePort):
         try:
             import httpx
 
-            async with httpx.AsyncClient(timeout=1.5) as client:
-                response = await client.get(f"http://{service.host}:{service.query_port}/avatar")
-                response.raise_for_status()
-                payload = response.json()
+            with suppress_http_client_logs():
+                async with httpx.AsyncClient(timeout=1.5) as client:
+                    response = await client.get(
+                        f"http://{service.host}:{service.query_port}/avatar"
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
         except Exception:
             return {}
         return payload if isinstance(payload, Mapping) else {}
@@ -235,12 +239,13 @@ class ZeroconfOscQueryService(OscQueryServicePort):
         try:
             import httpx
 
-            async with httpx.AsyncClient(timeout=1.5) as client:
-                response = await client.get(
-                    f"http://{service.host}:{service.query_port}/?HOST_INFO"
-                )
-                response.raise_for_status()
-                payload = response.json()
+            with suppress_http_client_logs():
+                async with httpx.AsyncClient(timeout=1.5) as client:
+                    response = await client.get(
+                        f"http://{service.host}:{service.query_port}/?HOST_INFO"
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
         except Exception:
             return None
         if not isinstance(payload, Mapping):
