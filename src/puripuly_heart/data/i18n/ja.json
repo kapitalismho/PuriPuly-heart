@@ -80,7 +80,7 @@
   "settings.translation_connection.official_byok.description": "自分のAPIキーでプロバイダー公式APIを使用します",
   "settings.translation_connection.ollama": "OpenAI互換API",
   "settings.translation_connection.ollama.description": "Ollama、LM Studio、vLLM、llama.cpp server などの OpenAI 形式の /v1 エンドポイントに接続します。",
-  "settings.translation_connection.custom_http": "カスタムHTTP API",
+  "settings.translation_connection.custom_http": "Custom HTTP API",
   "settings.translation_connection.custom_http.description": "ファイルで管理する翻訳拡張機能を使います",
   "settings.translation_connection.only_supported": "このモデルはこの接続方式のみ対応しています",
   "settings.translation_model.gemma4.description": "",
@@ -94,7 +94,7 @@
   "settings.translation_model.gemma4_31b_cerebras.description": "とてもとても速いです とても高いです",
   "settings.translation_model.section.recommended": "おすすめ",
   "settings.translation_model.section.others": "その他",
-  "settings.http_extension.title": "カスタムHTTP API",
+  "settings.http_extension.title": "Custom HTTP API",
   "settings.http_extension.credential_save_failed": "拡張機能の認証情報を保存できませんでした。",
   "settings.http_extension.open_folder_failed": "拡張機能フォルダーを開けませんでした。",
   "settings.http_extension.reload_errors": "{count}個の拡張ファイルを読み込めませんでした。",
@@ -409,7 +409,7 @@
   "provider.gemini31_flash_lite.description": "速くて（そこそこ）賢いです",
   "provider.openrouter": "OpenRouter",
   "provider.openrouter.description": "OpenRouter APIルートです",
-  "provider.custom_http": "カスタムHTTP API",
+  "provider.custom_http": "Custom HTTP API",
   "provider.deepseek": "DeepSeek",
   "provider.cerebras": "Cerebras",
   "provider.deepseek_v4_flash": "DeepSeek V4 Flash",
@@ -613,5 +613,6 @@
   "settings.http_extension.path": "JSONパス",
   "settings.http_extension.open": "開く",
   "settings.http_extension.refresh": "JSON再読み込み",
-  "debug_preview.http_extension_form": "HTTP拡張フォーム"
+  "debug_preview.http_extension_form": "HTTP拡張フォーム",
+  "settings.http_extension.api_key": "Custom HTTP API Key"
 }

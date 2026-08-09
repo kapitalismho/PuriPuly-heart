@@ -2396,7 +2396,7 @@ class SettingsView(ft.Column):
         if extension is not None:
             for secret in extension.secrets:
                 field = ft.TextField(
-                    label=f"{t('settings.http_extension.title')} · {secret.label}",
+                    label=t("settings.http_extension.api_key"),
                     password=True,
                     can_reveal_password=False,
                     border_radius=12,

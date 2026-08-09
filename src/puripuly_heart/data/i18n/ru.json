@@ -80,7 +80,7 @@
   "settings.translation_connection.official_byok.description": "Использовать официальный API провайдера с собственным ключом",
   "settings.translation_connection.ollama": "OpenAI-совместимый API",
   "settings.translation_connection.ollama.description": "Подключиться к OpenAI-совместимому /v1 эндпоинту: Ollama, LM Studio, vLLM или llama.cpp server.",
-  "settings.translation_connection.custom_http": "Пользовательский HTTP API",
+  "settings.translation_connection.custom_http": "Custom HTTP API",
   "settings.translation_connection.custom_http.description": "Использовать переводческое расширение из файла",
   "settings.translation_connection.only_supported": "Эта модель поддерживает только это подключение",
   "settings.translation_model.gemma4.description": "",
@@ -94,7 +94,7 @@
   "settings.translation_model.gemma4_31b_cerebras.description": "Очень быстро. Дорого.",
   "settings.translation_model.section.recommended": "Рекомендуемые",
   "settings.translation_model.section.others": "Другие",
-  "settings.http_extension.title": "Пользовательский HTTP API",
+  "settings.http_extension.title": "Custom HTTP API",
   "settings.http_extension.credential_save_failed": "Не удалось сохранить учетные данные расширения.",
   "settings.http_extension.open_folder_failed": "Не удалось открыть каталог расширений.",
   "settings.http_extension.reload_errors": "Не удалось загрузить файлов расширений: {count}.",
@@ -409,7 +409,7 @@
   "provider.gemini31_flash_lite.description": "Быстрый и (вроде) умный",
   "provider.openrouter": "OpenRouter",
   "provider.openrouter.description": "Доступ к API OpenRouter",
-  "provider.custom_http": "Пользовательский HTTP API",
+  "provider.custom_http": "Custom HTTP API",
   "provider.deepseek": "DeepSeek",
   "provider.cerebras": "Cerebras",
   "provider.deepseek_v4_flash": "DeepSeek V4 Flash",
@@ -613,5 +613,6 @@
   "settings.http_extension.path": "Путь к JSON",
   "settings.http_extension.open": "Открыть",
   "settings.http_extension.refresh": "Обновить JSON",
-  "debug_preview.http_extension_form": "Форма HTTP-расширения"
+  "debug_preview.http_extension_form": "Форма HTTP-расширения",
+  "settings.http_extension.api_key": "Custom HTTP API Key"
 }

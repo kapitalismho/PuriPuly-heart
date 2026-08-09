@@ -613,5 +613,6 @@
   "settings.http_extension.path": "JSON Path",
   "settings.http_extension.open": "Open",
   "settings.http_extension.refresh": "JSON Refresh",
-  "debug_preview.http_extension_form": "HTTP extension form"
+  "debug_preview.http_extension_form": "HTTP extension form",
+  "settings.http_extension.api_key": "Custom HTTP API Key"
 }

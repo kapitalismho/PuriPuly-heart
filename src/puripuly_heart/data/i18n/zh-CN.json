@@ -80,7 +80,7 @@
   "settings.translation_connection.official_byok.description": "使用你的 API 密钥连接服务商官方 API",
   "settings.translation_connection.ollama": "OpenAI 兼容 API",
   "settings.translation_connection.ollama.description": "连接到 Ollama、LM Studio、vLLM、llama.cpp server 等提供 OpenAI 风格 /v1 端点的服务器。",
-  "settings.translation_connection.custom_http": "自定义 HTTP API",
+  "settings.translation_connection.custom_http": "Custom HTTP API",
   "settings.translation_connection.custom_http.description": "使用文件管理的翻译扩展",
   "settings.translation_connection.only_supported": "此模型仅支持这种连接方式",
   "settings.translation_model.gemma4.description": "",
@@ -94,7 +94,7 @@
   "settings.translation_model.gemma4_31b_cerebras.description": "非常非常快 非常贵",
   "settings.translation_model.section.recommended": "推荐",
   "settings.translation_model.section.others": "其他",
-  "settings.http_extension.title": "自定义 HTTP API",
+  "settings.http_extension.title": "Custom HTTP API",
   "settings.http_extension.credential_save_failed": "无法保存扩展凭据。",
   "settings.http_extension.open_folder_failed": "无法打开扩展目录。",
   "settings.http_extension.reload_errors": "无法加载 {count} 个扩展文件。",
@@ -409,7 +409,7 @@
   "provider.gemini31_flash_lite.description": "速度快，也（还算）聪明",
   "provider.openrouter": "OpenRouter",
   "provider.openrouter.description": "通过 OpenRouter API 访问",
-  "provider.custom_http": "自定义 HTTP API",
+  "provider.custom_http": "Custom HTTP API",
   "provider.deepseek": "DeepSeek",
   "provider.cerebras": "Cerebras",
   "provider.deepseek_v4_flash": "DeepSeek V4 Flash",
@@ -613,5 +613,6 @@
   "settings.http_extension.path": "JSON 路径",
   "settings.http_extension.open": "打开",
   "settings.http_extension.refresh": "JSON 刷新",
-  "debug_preview.http_extension_form": "HTTP 扩展表单"
+  "debug_preview.http_extension_form": "HTTP 扩展表单",
+  "settings.http_extension.api_key": "Custom HTTP API Key"
 }
