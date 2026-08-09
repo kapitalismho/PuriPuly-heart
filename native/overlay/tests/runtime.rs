@@ -383,6 +383,7 @@ async fn run_overlay_binary_with_scripted_bridge(
 #[derive(Default)]
 struct RecordingSubmitter {
     calls: usize,
+    calibration_anchors: Vec<String>,
     fail: bool,
     operations: Vec<&'static str>,
     visibility_changes: Vec<bool>,
@@ -395,6 +396,7 @@ impl RecordingSubmitter {
     fn failing() -> Self {
         Self {
             calls: 0,
+            calibration_anchors: Vec::new(),
             fail: true,
             operations: Vec::new(),
             visibility_changes: Vec::new(),
@@ -406,6 +408,14 @@ impl RecordingSubmitter {
 }
 
 impl OverlayFrameSubmitter for RecordingSubmitter {
+    fn apply_calibration(
+        &mut self,
+        calibration: &OverlayPresentationCalibration,
+    ) -> Result<(), OpenVrError> {
+        self.calibration_anchors.push(calibration.anchor.clone());
+        Ok(())
+    }
+
     fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError> {
         self.calls += 1;
         let operation = if frame.layout().visible_blocks.is_empty() {
@@ -1824,6 +1834,10 @@ async fn runtime_submits_same_peer_refresh_target_when_session_scope_nonce_chang
 
     assert_eq!(submitter.calls, 3);
     assert_eq!(
+        submitter.calibration_anchors,
+        vec!["head_locked", "head_locked", "head_locked"]
+    );
+    assert_eq!(
         submitter.operations,
         vec!["submit:empty", "submit:text", "show", "submit:text"]
     );
@@ -1900,6 +1914,10 @@ async fn runtime_self_refresh_keeps_logical_identity_and_fresh_render_cadence() 
 
     assert_eq!(submitter.calls, 3);
     assert_eq!(
+        submitter.calibration_anchors,
+        vec!["head_locked", "head_locked", "head_locked"]
+    );
+    assert_eq!(
         submitter.operations,
         vec!["submit:empty", "submit:text", "show", "submit:text"]
     );
@@ -1948,6 +1966,10 @@ async fn native_owner_retries_unchanged_caption_with_new_generation() {
         .collect::<Vec<_>>();
     assert_eq!(submissions, vec![(1, Some(1)), (1, Some(2))]);
     assert_eq!(submitter.calls, 2);
+    assert_eq!(
+        submitter.calibration_anchors,
+        vec!["head_locked", "head_locked"]
+    );
 
     runtime
         .handle_event(OverlayBridgeEvent::Shutdown)
