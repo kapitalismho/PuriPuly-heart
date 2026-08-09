@@ -19,7 +19,7 @@ use crate::manifest::{
 use crate::openvr::OpenVrError;
 use crate::openvr::{
     format_openvr_visibility_api_call_log, perform_startup_preflight, FrameTimingSample,
-    OpenVrOverlay, OpenVrStartupPreflightError, OverlayFrameSubmitter,
+    OpenVrOverlay, OpenVrStartupPreflightError, OverlayFrameSubmitter, SpatialReanchorOutcome,
 };
 use crate::presentation::{
     PresentationBackend, PresentationCause, PresentationCauseChannel, PresentationCauseKind,
@@ -150,6 +150,8 @@ pub struct PresentationRuntime {
     last_presentation_correlation: Option<PresentationCorrelation>,
     last_presentation_backend: Option<PresentationBackend>,
     pending_presentation_causes: PresentationCauses,
+    spatial_lock: SpatialLockState,
+    pending_spatial_diagnostics: Vec<SpatialDiagnostic>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -221,6 +223,172 @@ struct FrameStageDurations {
     receive_to_submit_us: Option<u128>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SpatialReanchorReason {
+    InitialVisible,
+    NewTurn,
+    ModeEntered,
+    PlacementCalibrationChanged,
+}
+
+impl SpatialReanchorReason {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::InitialVisible => "initial_visible",
+            Self::NewTurn => "new_turn",
+            Self::ModeEntered => "mode_entered",
+            Self::PlacementCalibrationChanged => "placement_calibration_changed",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingSpatialReanchor {
+    reason: SpatialReanchorReason,
+    requested_revision: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SpatialDiagnostic {
+    Info(String),
+    Warning(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct SpatialLockState {
+    active: bool,
+    seen_turn_ids: HashSet<String>,
+    pending_reanchor: Option<PendingSpatialReanchor>,
+}
+
+impl SpatialLockState {
+    fn from_initial_snapshot(
+        snapshot: &OverlayPresentationSnapshot,
+    ) -> (Self, Vec<SpatialDiagnostic>) {
+        if snapshot.calibration.anchor != "spatial_locked" {
+            return (Self::default(), Vec::new());
+        }
+        let seen_turn_ids = drawable_turn_ids(snapshot);
+        let mut state = Self {
+            active: true,
+            seen_turn_ids,
+            pending_reanchor: None,
+        };
+        let mut diagnostics = vec![SpatialDiagnostic::Info(format!(
+            "spatial_lock_mode_entered revision={}",
+            snapshot.revision
+        ))];
+        if !state.seen_turn_ids.is_empty() {
+            state.request_reanchor(
+                SpatialReanchorReason::InitialVisible,
+                snapshot.revision,
+                &mut diagnostics,
+            );
+        }
+        (state, diagnostics)
+    }
+
+    fn apply_snapshot_transition(
+        &mut self,
+        previous_calibration: &crate::state::OverlayPresentationCalibration,
+        snapshot: &OverlayPresentationSnapshot,
+    ) -> Vec<SpatialDiagnostic> {
+        let mut diagnostics = Vec::new();
+        let current_spatial = snapshot.calibration.anchor == "spatial_locked";
+        match (self.active, current_spatial) {
+            (false, false) => {}
+            (false, true) => {
+                self.active = true;
+                self.seen_turn_ids = drawable_turn_ids(snapshot);
+                diagnostics.push(SpatialDiagnostic::Info(format!(
+                    "spatial_lock_mode_entered revision={}",
+                    snapshot.revision
+                )));
+                if !self.seen_turn_ids.is_empty() {
+                    self.request_reanchor(
+                        SpatialReanchorReason::ModeEntered,
+                        snapshot.revision,
+                        &mut diagnostics,
+                    );
+                }
+            }
+            (true, false) => {
+                self.active = false;
+                self.seen_turn_ids.clear();
+                self.pending_reanchor = None;
+                diagnostics.push(SpatialDiagnostic::Info(format!(
+                    "spatial_lock_mode_exited revision={}",
+                    snapshot.revision
+                )));
+            }
+            (true, true) => {
+                let visible_ids = drawable_turn_ids(snapshot);
+                let first_drawable = self.seen_turn_ids.is_empty() && !visible_ids.is_empty();
+                let has_new_turn = visible_ids
+                    .iter()
+                    .any(|block_id| !self.seen_turn_ids.contains(block_id));
+                self.seen_turn_ids.extend(visible_ids);
+                let placement_changed = previous_calibration.offset_x
+                    != snapshot.calibration.offset_x
+                    || previous_calibration.offset_y != snapshot.calibration.offset_y
+                    || previous_calibration.distance != snapshot.calibration.distance;
+                let reason = if placement_changed {
+                    Some(SpatialReanchorReason::PlacementCalibrationChanged)
+                } else if first_drawable {
+                    Some(SpatialReanchorReason::InitialVisible)
+                } else if has_new_turn {
+                    Some(SpatialReanchorReason::NewTurn)
+                } else {
+                    None
+                };
+                if let Some(reason) = reason {
+                    self.request_reanchor(reason, snapshot.revision, &mut diagnostics);
+                }
+            }
+        }
+        diagnostics
+    }
+
+    fn request_reanchor(
+        &mut self,
+        reason: SpatialReanchorReason,
+        revision: u64,
+        diagnostics: &mut Vec<SpatialDiagnostic>,
+    ) {
+        if self.pending_reanchor.is_some() {
+            return;
+        }
+        self.pending_reanchor = Some(PendingSpatialReanchor {
+            reason,
+            requested_revision: revision,
+        });
+        diagnostics.push(SpatialDiagnostic::Info(format!(
+            "spatial_reanchor_requested reason={} revision={revision}",
+            reason.as_str()
+        )));
+    }
+
+    fn pending(&self) -> Option<PendingSpatialReanchor> {
+        self.pending_reanchor
+    }
+
+    fn take_pending(&mut self) -> Option<PendingSpatialReanchor> {
+        self.pending_reanchor.take()
+    }
+}
+
+fn drawable_turn_ids(snapshot: &OverlayPresentationSnapshot) -> HashSet<String> {
+    snapshot
+        .blocks
+        .iter()
+        .filter(|block| {
+            !block.primary_text.trim().is_empty()
+                || (block.secondary_enabled && !block.secondary_text.trim().is_empty())
+        })
+        .map(|block| block.id.clone())
+        .collect()
+}
+
 pub type OverlayRuntime = PresentationRuntime;
 
 impl PresentationRuntime {
@@ -231,6 +399,8 @@ impl PresentationRuntime {
     pub fn new(snapshot: OverlayPresentationSnapshot) -> Self {
         let seeded_peer_ids = peer_overlay_first_emit_block_ids_from_snapshot(&snapshot);
         let seen_peer_overlay_ids = seeded_peer_ids.iter().cloned().collect::<HashSet<_>>();
+        let (spatial_lock, pending_spatial_diagnostics) =
+            SpatialLockState::from_initial_snapshot(&snapshot);
         let mut runtime = Self {
             ready: false,
             first_texture_submitted: false,
@@ -263,6 +433,8 @@ impl PresentationRuntime {
                 });
                 causes
             },
+            spatial_lock,
+            pending_spatial_diagnostics,
         };
         if runtime.state.seed_snapshot(&snapshot) {
             runtime.redraw_requested = true;
@@ -312,7 +484,12 @@ impl PresentationRuntime {
             }
         }
 
+        let previous_calibration = self.state.calibration().clone();
         let visual_changed = self.state.apply_snapshot(&snapshot);
+        self.pending_spatial_diagnostics.extend(
+            self.spatial_lock
+                .apply_snapshot_transition(&previous_calibration, self.state.snapshot()),
+        );
         let logical_caption_identity = logical_caption_identity(self.state());
         if logical_caption_identity != self.last_logical_caption_identity {
             self.pending_logical_revision_acceptance = true;
@@ -849,12 +1026,20 @@ impl PresentationRuntime {
         );
         if readiness_outcome != ReadinessOutcome::Ready {
             self.retain_failed_presentation_causes(presentation_correlation);
-            self.emit_pending_presentation_diagnostics(logger).await?;
             if readiness_outcome == ReadinessOutcome::Cancelled && pending_message.is_some() {
+                if let Some(pending) = self.spatial_lock.pending() {
+                    self.pending_spatial_diagnostics
+                        .push(SpatialDiagnostic::Info(format!(
+                            "spatial_reanchor_deferred_by_preemption reason={} revision={}",
+                            pending.reason.as_str(),
+                            pending.requested_revision
+                        )));
+                }
                 return Ok(FrameCycleOutcome::Preempted(
                     pending_message.expect("cancelled readiness has pending message"),
                 ));
             }
+            self.emit_pending_presentation_diagnostics(logger).await?;
             let failure = match readiness_outcome {
                 ReadinessOutcome::TimedOut => RuntimeFailure::ReadinessTimedOut,
                 ReadinessOutcome::Cancelled => RuntimeFailure::ReadinessCancelled,
@@ -862,6 +1047,32 @@ impl PresentationRuntime {
                 ReadinessOutcome::Ready => unreachable!(),
             };
             return Err(failure);
+        }
+        if has_drawable_text {
+            if let Some(pending) = self.spatial_lock.take_pending() {
+                let reanchor_result = openvr.reanchor_spatial_locked();
+                match reanchor_result {
+                    Ok(SpatialReanchorOutcome::Applied) => {
+                        self.pending_spatial_diagnostics
+                            .push(SpatialDiagnostic::Info(format!(
+                                "spatial_reanchor_applied reason={} revision={scene_generation}",
+                                pending.reason.as_str()
+                            )));
+                    }
+                    Ok(SpatialReanchorOutcome::PoseUnavailable) => {
+                        self.pending_spatial_diagnostics
+                            .push(SpatialDiagnostic::Warning(format!(
+                                "spatial_reanchor_pose_unavailable reason={} revision={scene_generation}",
+                                pending.reason.as_str()
+                            )));
+                    }
+                    Err(error) => {
+                        self.retain_failed_presentation_causes(presentation_correlation);
+                        self.emit_pending_presentation_diagnostics(logger).await?;
+                        return Err(RuntimeFailure::OpenVr(error.to_string()));
+                    }
+                }
+            }
         }
         self.presentation_diagnostics
             .record_submission_attempt(presentation_correlation, presentation_backend);
@@ -874,6 +1085,7 @@ impl PresentationRuntime {
             duration_us(submission_started.elapsed()),
         );
         if let Err(error) = submission_result {
+            self.emit_pending_spatial_diagnostics(logger).await;
             self.retain_failed_presentation_causes(presentation_correlation);
             self.emit_pending_presentation_diagnostics(logger).await?;
             return Err(RuntimeFailure::OpenVr(error.to_string()));
@@ -916,6 +1128,7 @@ impl PresentationRuntime {
                 desired_runtime_visible == self.overlay_visible,
             );
         }
+        self.emit_pending_spatial_diagnostics(logger).await;
         self.last_presentation_correlation = Some(presentation_correlation);
         self.last_presentation_backend = Some(presentation_backend);
         if detailed_logging {
@@ -1147,6 +1360,20 @@ impl PresentationRuntime {
         self.caption_blocks()
             .iter()
             .any(CaptionBlock::has_drawable_text)
+    }
+
+    async fn emit_pending_spatial_diagnostics(&mut self, logger: &OverlayLogger) {
+        let diagnostics = std::mem::take(&mut self.pending_spatial_diagnostics);
+        for diagnostic in diagnostics {
+            match diagnostic {
+                SpatialDiagnostic::Info(message) => {
+                    let _ = logger.info(message).await;
+                }
+                SpatialDiagnostic::Warning(message) => {
+                    let _ = logger.warn(message).await;
+                }
+            }
+        }
     }
 
     async fn emit_pending_peer_overlay_first_emit_hooks(
@@ -3163,15 +3390,17 @@ mod tests {
         format_two_row_window_closed_log, milliseconds_to_microseconds,
         peer_overlay_first_emit_block_ids_from_snapshot,
         peer_overlay_first_render_block_ids_from_caption_blocks, prepare_openvr_runtime,
-        DiagnosticRow, FrameStageDurations, FreshRetryChannel, NativeFreshSchedule,
-        NativePresentationOwner, OverlayRuntime, RenderedDiagnosticRow, RuntimeFailure,
-        SnapshotApplyOutcome, StartupError, TwoRowWindowState, NATIVE_FRESH_AUDIT_CAPACITY,
-        NATIVE_FRESH_RETRY_MAX_COMPLETED,
+        DiagnosticRow, FrameCycleOutcome, FrameStageDurations, FreshRetryChannel,
+        NativeFreshSchedule, NativePresentationOwner, OverlayRuntime, RenderedDiagnosticRow,
+        RuntimeFailure, SnapshotApplyOutcome, StartupError, TwoRowWindowState,
+        NATIVE_FRESH_AUDIT_CAPACITY, NATIVE_FRESH_RETRY_MAX_COMPLETED,
     };
+    use crate::bridge::{BridgeClient, BridgeIncoming};
     use crate::logging::{OverlayLogger, OverlayLoggingMode};
+    use crate::manifest::{OverlayManifest, EXPECTED_CONTRACT_VERSION};
     use crate::openvr::{
         FakeOpenVr, FrameTimingSample, OpenVrError, OpenVrStartupPreflightError,
-        OverlayFrameSubmitter,
+        OverlayFrameSubmitter, SpatialReanchorOutcome,
     };
     use crate::presentation::{
         PresentationBackend, PresentationCause, PresentationCauseChannel, PresentationCauseKind,
@@ -3180,18 +3409,22 @@ mod tests {
     use crate::renderer::{
         CaptionBlock, CaptionBlockVariant, CaptionChannel, CaptionLayoutPolicy,
         CaptionPresentation, CaptionRenderer, FontLanguageBucket, FontSource, RenderDiagnostics,
-        StyleBucketSourceCount,
+        RenderedFrame, StyleBucketSourceCount,
     };
     use crate::state::{
         OverlayPresentationBlock, OverlayPresentationBlockVariant, OverlayPresentationCalibration,
         OverlayPresentationSnapshot,
     };
+    use futures_util::{SinkExt, StreamExt};
+    use serde_json::json;
     use std::cell::Cell;
     use std::collections::HashSet;
     use std::io;
     use std::pin::Pin;
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::{accept_async, tungstenite::Message};
 
     #[test]
     fn native_fresh_audit_capacity_covers_simultaneous_production_journey() {
@@ -3746,6 +3979,231 @@ mod tests {
             origin_wall_clock_ms: None,
             session_scope: None,
         }
+    }
+
+    struct SpatialSubmitProbe {
+        outcome: SpatialReanchorOutcome,
+        operations: Vec<&'static str>,
+    }
+
+    impl OverlayFrameSubmitter for SpatialSubmitProbe {
+        fn reanchor_spatial_locked(&mut self) -> Result<SpatialReanchorOutcome, OpenVrError> {
+            self.operations.push("reanchor");
+            Ok(self.outcome)
+        }
+
+        fn submit_frame(&mut self, _frame: &RenderedFrame) -> Result<(), OpenVrError> {
+            self.operations.push("submit");
+            Ok(())
+        }
+
+        fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+            self.operations.push(if visible { "show" } else { "hide" });
+            Ok(())
+        }
+    }
+
+    async fn controlled_test_bridge(
+        followup: Option<(Arc<tokio::sync::Notify>, OverlayPresentationSnapshot)>,
+    ) -> (BridgeClient, tokio::task::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = accept_async(stream).await.unwrap();
+            let _auth = ws.next().await.unwrap().unwrap();
+            ws.send(Message::Text(
+                json!({
+                    "type": "snapshot",
+                    "payload": OverlayPresentationSnapshot::default()
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+            if let Some((readiness_started, snapshot)) = followup {
+                readiness_started.notified().await;
+                ws.send(Message::Text(
+                    json!({"type": "snapshot", "payload": snapshot})
+                        .to_string()
+                        .into(),
+                ))
+                .await
+                .unwrap();
+            }
+            while ws.next().await.is_some() {}
+        });
+        let manifest = OverlayManifest {
+            contract_version: EXPECTED_CONTRACT_VERSION,
+            app_version: env!("CARGO_PKG_VERSION").to_string(),
+            overlay_instance_id: "spatial-runtime-unit".to_string(),
+            bridge_url: format!("ws://{address}"),
+            session_token: "unit-token".to_string(),
+            parent_pid: 1,
+            startup_deadline_ms: 3000,
+            log_dir: std::env::temp_dir().display().to_string(),
+            log_level: "INFO".to_string(),
+            locale: "en".to_string(),
+            logging_mode: OverlayLoggingMode::Detailed,
+        };
+        let (bridge, _) = BridgeClient::connect(&manifest).await.unwrap();
+        (bridge, server)
+    }
+
+    #[tokio::test]
+    async fn spatial_diagnostic_write_failure_cannot_block_pose_unavailable_texture_submit() {
+        let (mut bridge, server) = controlled_test_bridge(None).await;
+        let renderer = CaptionRenderer::new_for_test().unwrap();
+        let logger = controlled_logger(
+            OverlayLoggingMode::Detailed,
+            ControlledSink::new(ControlledSinkMode::Error),
+        );
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
+            revision: 1,
+            calibration: OverlayPresentationCalibration {
+                anchor: "spatial_locked".to_string(),
+                ..OverlayPresentationCalibration::default()
+            },
+            blocks: vec![block("self:A", "self", "A", "", true)],
+            native_fresh_render_generations: None,
+        });
+        runtime.first_texture_submitted = true;
+        runtime.overlay_visible = true;
+        let mut submitter = SpatialSubmitProbe {
+            outcome: SpatialReanchorOutcome::PoseUnavailable,
+            operations: Vec::new(),
+        };
+
+        let result = runtime
+            .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+            .await;
+
+        assert!(matches!(result, Err(RuntimeFailure::Bridge(_))));
+        assert_eq!(submitter.operations, vec!["reanchor", "submit"]);
+        drop(bridge);
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn pending_spatial_diagnostic_cannot_block_first_visible_pose_unavailable_reveal() {
+        let (mut bridge, server) = controlled_test_bridge(None).await;
+        let renderer = CaptionRenderer::new_for_test().unwrap();
+        let logger = controlled_logger(
+            OverlayLoggingMode::Basic,
+            ControlledSink::new(ControlledSinkMode::Pending),
+        );
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
+            revision: 1,
+            calibration: OverlayPresentationCalibration {
+                anchor: "spatial_locked".to_string(),
+                ..OverlayPresentationCalibration::default()
+            },
+            blocks: vec![block("self:A", "self", "A", "", true)],
+            native_fresh_render_generations: None,
+        });
+        runtime.first_texture_submitted = true;
+        let mut submitter = SpatialSubmitProbe {
+            outcome: SpatialReanchorOutcome::PoseUnavailable,
+            operations: Vec::new(),
+        };
+
+        let result = tokio::time::timeout(
+            Duration::from_millis(50),
+            runtime.submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(submitter.operations, vec!["reanchor", "submit", "show"]);
+        assert!(runtime.overlay_visible);
+        drop(bridge);
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn spatial_diagnostic_write_failure_cannot_drop_preempted_latest_frame() {
+        let readiness_started = Arc::new(tokio::sync::Notify::new());
+        let latest_snapshot = OverlayPresentationSnapshot {
+            revision: 3,
+            calibration: OverlayPresentationCalibration {
+                anchor: "spatial_locked".to_string(),
+                ..OverlayPresentationCalibration::default()
+            },
+            blocks: vec![
+                block("self:B", "self", "B", "", true),
+                block("self:C", "self", "C", "", true),
+            ],
+            native_fresh_render_generations: None,
+        };
+        let (mut bridge, server) =
+            controlled_test_bridge(Some((readiness_started.clone(), latest_snapshot))).await;
+        let renderer = CaptionRenderer::new_for_test().unwrap();
+        renderer.set_test_readiness_pending_yields_on_call(1, usize::MAX);
+        renderer.set_test_readiness_started_notify_on_call(1, readiness_started);
+        let failing_logger = controlled_logger(
+            OverlayLoggingMode::Detailed,
+            ControlledSink::new(ControlledSinkMode::Error),
+        );
+        let healthy_logger = controlled_logger(
+            OverlayLoggingMode::Detailed,
+            ControlledSink::new(ControlledSinkMode::Success),
+        );
+        let calibration = OverlayPresentationCalibration {
+            anchor: "spatial_locked".to_string(),
+            ..OverlayPresentationCalibration::default()
+        };
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
+            revision: 1,
+            calibration: calibration.clone(),
+            blocks: vec![block("self:A", "self", "A", "", true)],
+            native_fresh_render_generations: None,
+        });
+        runtime.first_texture_submitted = true;
+        runtime.overlay_visible = true;
+        runtime.redraw_requested = false;
+        runtime.spatial_lock.take_pending();
+        runtime.pending_spatial_diagnostics.clear();
+        runtime.apply_snapshot(OverlayPresentationSnapshot {
+            revision: 2,
+            calibration,
+            blocks: vec![
+                block("self:A", "self", "A", "", true),
+                block("self:B", "self", "B", "", true),
+            ],
+            native_fresh_render_generations: None,
+        });
+        let mut submitter = SpatialSubmitProbe {
+            outcome: SpatialReanchorOutcome::Applied,
+            operations: Vec::new(),
+        };
+
+        let preempted = runtime
+            .submit_frame_if_needed_with_timing(
+                &renderer,
+                &mut submitter,
+                &mut bridge,
+                &failing_logger,
+                None,
+                None,
+                true,
+            )
+            .await
+            .unwrap();
+
+        let FrameCycleOutcome::Preempted(Ok(BridgeIncoming::Snapshot(snapshot))) = preempted else {
+            panic!("expected latest snapshot preemption");
+        };
+        assert!(submitter.operations.is_empty());
+        runtime.apply_snapshot(snapshot);
+        runtime
+            .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &healthy_logger)
+            .await
+            .unwrap();
+        assert_eq!(submitter.operations, vec!["reanchor", "submit"]);
+        assert_eq!(runtime.state().snapshot().revision, 3);
+        drop(bridge);
+        server.await.unwrap();
     }
 
     #[test]

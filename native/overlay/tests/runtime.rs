@@ -19,9 +19,9 @@ use puripuly_heart_overlay::{
     OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
     OverlayRuntime, PresentationBackend, PresentationCause, PresentationCauseChannel,
     PresentationCauseKind, PresentationOutcome, PresentationStage, PresentationStrategy,
-    QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure, StartupError,
-    EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE, NATIVE_FRESH_RETRY_DEADLINE,
-    NATIVE_FRESH_RETRY_MAX_COMPLETED,
+    QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure, SpatialReanchorOutcome,
+    StartupError, EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE,
+    NATIVE_FRESH_RETRY_DEADLINE, NATIVE_FRESH_RETRY_MAX_COMPLETED,
 };
 
 #[test]
@@ -226,6 +226,26 @@ fn block(
     }
 }
 
+fn spatial_calibration() -> OverlayPresentationCalibration {
+    OverlayPresentationCalibration {
+        anchor: "spatial_locked".to_string(),
+        ..OverlayPresentationCalibration::default()
+    }
+}
+
+fn presentation_snapshot(
+    revision: u64,
+    calibration: OverlayPresentationCalibration,
+    blocks: Vec<OverlayPresentationBlock>,
+) -> OverlayPresentationSnapshot {
+    OverlayPresentationSnapshot {
+        revision,
+        calibration,
+        blocks,
+        native_fresh_render_generations: None,
+    }
+}
+
 fn slot_block(
     id: &str,
     occupant_key: &str,
@@ -383,6 +403,8 @@ async fn run_overlay_binary_with_scripted_bridge(
 #[derive(Default)]
 struct RecordingSubmitter {
     calls: usize,
+    spatial_reanchor_calls: usize,
+    spatial_reanchor_outcome: Option<SpatialReanchorOutcome>,
     calibration_anchors: Vec<String>,
     fail: bool,
     operations: Vec<&'static str>,
@@ -395,14 +417,8 @@ struct RecordingSubmitter {
 impl RecordingSubmitter {
     fn failing() -> Self {
         Self {
-            calls: 0,
-            calibration_anchors: Vec::new(),
             fail: true,
-            operations: Vec::new(),
-            visibility_changes: Vec::new(),
-            last_visible: None,
-            fail_show: false,
-            fail_hide: false,
+            ..Self::default()
         }
     }
 }
@@ -430,6 +446,14 @@ impl OverlayFrameSubmitter for RecordingSubmitter {
         assert_eq!(frame.width(), 4096);
         assert_eq!(frame.height(), 1056);
         Ok(())
+    }
+
+    fn reanchor_spatial_locked(&mut self) -> Result<SpatialReanchorOutcome, OpenVrError> {
+        self.spatial_reanchor_calls += 1;
+        self.operations.push("reanchor");
+        Ok(self
+            .spatial_reanchor_outcome
+            .unwrap_or(SpatialReanchorOutcome::Applied))
     }
 
     fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
@@ -630,6 +654,446 @@ async fn test_logger(name: &str) -> OverlayLogger {
     OverlayLogger::open(unique_log_dir(name), OverlayLoggingMode::Detailed)
         .await
         .unwrap()
+}
+
+#[tokio::test]
+async fn spatial_locked_reanchors_only_for_unseen_drawable_turn_ids() {
+    let (mut bridge, server) = connect_test_bridge().await;
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    let logger = test_logger("spatial-semantic-turns").await;
+    let mut runtime = OverlayRuntime::new(presentation_snapshot(
+        1,
+        spatial_calibration(),
+        vec![block("self:A", "self", "A", "", true)],
+    ));
+    let mut submitter = RecordingSubmitter::default();
+
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 1);
+
+    let mut same_a = block("self:A", "self", "A streaming", "translated", true);
+    same_a.block_variant = OverlayPresentationBlockVariant::ActiveSelf;
+    runtime.apply_snapshot(presentation_snapshot(
+        2,
+        spatial_calibration(),
+        vec![same_a],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+
+    let mut refreshed_a = block("self:A", "self", "A final", "translated final", true);
+    refreshed_a.session_scope = Some("refresh-nonce".to_string());
+    refreshed_a.update_id = Some("refresh-update".to_string());
+    runtime.apply_snapshot(presentation_snapshot(
+        3,
+        spatial_calibration(),
+        vec![refreshed_a.clone()],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert!(runtime.request_native_presentation_retry());
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 1);
+
+    runtime.apply_snapshot(presentation_snapshot(4, spatial_calibration(), vec![]));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    runtime.apply_snapshot(presentation_snapshot(
+        5,
+        spatial_calibration(),
+        vec![refreshed_a.clone()],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 1);
+
+    runtime.apply_snapshot(presentation_snapshot(
+        6,
+        spatial_calibration(),
+        vec![refreshed_a, block("peer:B", "peer", "B", "", true)],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 2);
+
+    runtime.apply_snapshot(presentation_snapshot(
+        7,
+        spatial_calibration(),
+        vec![block("peer:B", "peer", "B", "", true)],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 2);
+
+    runtime.apply_snapshot(presentation_snapshot(
+        8,
+        spatial_calibration(),
+        vec![
+            block("peer:B", "peer", "B", "", true),
+            block("self:C", "self", "C", "", true),
+        ],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 3);
+
+    runtime.apply_snapshot(presentation_snapshot(
+        9,
+        spatial_calibration(),
+        vec![
+            block("self:D", "self", "D", "", true),
+            block("peer:E", "peer", "E", "", true),
+        ],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 4);
+
+    assert!(matches!(
+        runtime.apply_snapshot(presentation_snapshot(
+            8,
+            spatial_calibration(),
+            vec![block("self:F", "self", "F", "", true)],
+        )),
+        SnapshotApplyOutcome::Ignored { .. }
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 4);
+    for (index, operation) in submitter.operations.iter().enumerate() {
+        if *operation == "reanchor" {
+            assert_eq!(submitter.operations.get(index + 1), Some(&"submit:text"));
+        }
+    }
+
+    drop(bridge);
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn spatial_mode_and_placement_calibration_transitions_request_once() {
+    let (mut bridge, server) = connect_test_bridge().await;
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    let logger = test_logger("spatial-mode-calibration").await;
+    let visible_a = vec![block("self:A", "self", "A", "", true)];
+    let mut runtime = OverlayRuntime::new(presentation_snapshot(
+        1,
+        OverlayPresentationCalibration::default(),
+        visible_a.clone(),
+    ));
+    let mut submitter = RecordingSubmitter::default();
+
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 0);
+
+    runtime.apply_snapshot(presentation_snapshot(
+        2,
+        spatial_calibration(),
+        visible_a.clone(),
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 1);
+
+    let mut presentation_only = spatial_calibration();
+    presentation_only.background_alpha = 0.2;
+    presentation_only.text_scale = 1.25;
+    runtime.apply_snapshot(presentation_snapshot(
+        3,
+        presentation_only.clone(),
+        vec![block("self:A", "self", "A updated", "", true)],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 1);
+
+    presentation_only.offset_x = 0.25;
+    runtime.apply_snapshot(presentation_snapshot(
+        4,
+        presentation_only,
+        visible_a.clone(),
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 2);
+
+    let mut offset_y_changed = spatial_calibration();
+    offset_y_changed.offset_x = 0.25;
+    offset_y_changed.offset_y = -0.5;
+    runtime.apply_snapshot(presentation_snapshot(
+        5,
+        offset_y_changed.clone(),
+        visible_a.clone(),
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 3);
+
+    offset_y_changed.distance = 1.75;
+    runtime.apply_snapshot(presentation_snapshot(
+        6,
+        offset_y_changed,
+        visible_a.clone(),
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 4);
+
+    runtime.apply_snapshot(presentation_snapshot(
+        7,
+        OverlayPresentationCalibration::default(),
+        visible_a.clone(),
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 4);
+    assert_eq!(submitter.calibration_anchors.last().unwrap(), "head_locked");
+
+    runtime.apply_snapshot(presentation_snapshot(8, spatial_calibration(), vec![]));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 4);
+    runtime.apply_snapshot(presentation_snapshot(9, spatial_calibration(), visible_a));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 5);
+
+    drop(bridge);
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn unavailable_spatial_pose_is_consumed_without_blocking_texture_submit() {
+    let (mut bridge, server) = connect_test_bridge().await;
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    let logger = test_logger("spatial-pose-unavailable").await;
+    let mut runtime = OverlayRuntime::new(presentation_snapshot(
+        1,
+        spatial_calibration(),
+        vec![block("self:A", "self", "A", "", true)],
+    ));
+    let mut submitter = RecordingSubmitter {
+        spatial_reanchor_outcome: Some(SpatialReanchorOutcome::PoseUnavailable),
+        ..RecordingSubmitter::default()
+    };
+
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.operations[0..2], ["reanchor", "submit:text"]);
+    assert_eq!(submitter.calls, 1);
+    assert_eq!(submitter.spatial_reanchor_calls, 1);
+
+    assert!(runtime.request_native_presentation_retry());
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    runtime.apply_snapshot(presentation_snapshot(
+        2,
+        spatial_calibration(),
+        vec![block("self:A", "self", "A refresh", "", true)],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.calls, 3);
+    assert_eq!(submitter.spatial_reanchor_calls, 1);
+
+    submitter.spatial_reanchor_outcome = Some(SpatialReanchorOutcome::Applied);
+    runtime.apply_snapshot(presentation_snapshot(
+        3,
+        spatial_calibration(),
+        vec![
+            block("self:A", "self", "A refresh", "", true),
+            block("peer:B", "peer", "B", "", true),
+        ],
+    ));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.calls, 4);
+    assert_eq!(submitter.spatial_reanchor_calls, 2);
+
+    drop(bridge);
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn pending_spatial_reanchor_skips_empty_frame_and_applies_on_drawable_reappearance() {
+    let (mut bridge, server) = connect_test_bridge().await;
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    let logger = test_logger("spatial-empty-before-ready").await;
+    let visible_a = vec![block("self:A", "self", "A", "", true)];
+    let mut runtime = OverlayRuntime::new(presentation_snapshot(
+        1,
+        spatial_calibration(),
+        visible_a.clone(),
+    ));
+    let mut submitter = RecordingSubmitter::default();
+
+    runtime.apply_snapshot(presentation_snapshot(2, spatial_calibration(), vec![]));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 0);
+    assert_eq!(submitter.operations, vec!["submit:empty"]);
+
+    runtime.apply_snapshot(presentation_snapshot(3, spatial_calibration(), visible_a));
+    runtime
+        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+    assert_eq!(submitter.spatial_reanchor_calls, 1);
+    assert_eq!(
+        submitter.operations,
+        vec!["submit:empty", "reanchor", "submit:text", "show"]
+    );
+
+    drop(bridge);
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn spatial_reanchor_is_deferred_until_latest_gpu_ready_frame_after_preemption() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let readiness_started = Arc::new(tokio::sync::Notify::new());
+    let server_readiness_started = readiness_started.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":presentation_snapshot(
+                1,
+                spatial_calibration(),
+                vec![block("self:A","self","A","",true)]
+            )})
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        loop {
+            let message = ws.next().await.unwrap().unwrap();
+            if message.to_text().unwrap().contains("overlay_ready") {
+                break;
+            }
+        }
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":presentation_snapshot(
+                2,
+                spatial_calibration(),
+                vec![
+                    block("self:A","self","A","",true),
+                    block("peer:B","peer","B","",true)
+                ]
+            )})
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        server_readiness_started.notified().await;
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":presentation_snapshot(
+                3,
+                spatial_calibration(),
+                vec![
+                    block("peer:B","peer","B","",true),
+                    block("self:C","self","C","",true)
+                ]
+            )})
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    renderer.set_test_readiness_pending_yields_on_call(2, usize::MAX);
+    renderer.set_test_readiness_started_notify_on_call(2, readiness_started);
+    let logger = test_logger("spatial-preemption").await;
+    let mut runtime = OverlayRuntime::new(snapshot);
+    let mut submitter = RecordingSubmitter::default();
+
+    runtime
+        .submit_initial_frame_message_aware(&renderer, &mut submitter, &mut bridge, &logger)
+        .await
+        .unwrap();
+
+    tokio::time::timeout(
+        Duration::from_secs(3),
+        runtime.run_event_loop(&mut bridge, &renderer, &mut submitter, &logger),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(submitter.spatial_reanchor_calls, 2);
+    assert_eq!(submitter.calls, 2);
+    assert_eq!(
+        submitter.operations,
+        vec!["reanchor", "submit:text", "show", "reanchor", "submit:text"]
+    );
+    assert_eq!(runtime.state().snapshot().revision, 3);
+    server.await.unwrap();
 }
 
 #[tokio::test]
@@ -1931,6 +2395,70 @@ async fn runtime_self_refresh_keeps_logical_identity_and_fresh_render_cadence() 
     assert_eq!(submissions, vec![(1, Some(1)), (2, Some(2)), (2, Some(3))]);
     drop(bridge);
     let _ = server.await.unwrap();
+}
+
+#[tokio::test]
+async fn spatial_peer_and_self_refresh_keep_fresh_submit_cadence_without_reanchoring() {
+    for (channel, id, scope_prefix) in [
+        ("peer", "peer:refresh", "peer_presentation_refresh"),
+        ("self", "self:refresh", "self_presentation_refresh"),
+    ] {
+        let renderer = CaptionRenderer::new_for_test().unwrap();
+        let logger = test_logger(&format!("spatial-{channel}-refresh")).await;
+        let (mut bridge, server) = connect_test_bridge().await;
+        let mut runtime =
+            OverlayRuntime::new(presentation_snapshot(0, spatial_calibration(), vec![]));
+        let mut submitter = RecordingSubmitter::default();
+        runtime
+            .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+            .await
+            .unwrap();
+
+        for revision in 1..=2 {
+            let mut refreshed = block(id, channel, "stable caption", "stable source", true);
+            refreshed.session_scope = Some(format!("{scope_prefix}={revision}"));
+            runtime.apply_snapshot(presentation_snapshot(
+                revision,
+                spatial_calibration(),
+                vec![refreshed],
+            ));
+            runtime
+                .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+                .await
+                .unwrap();
+        }
+
+        assert!(runtime.request_native_presentation_retry());
+        runtime
+            .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+            .await
+            .unwrap();
+
+        assert_eq!(submitter.calls, 4);
+        assert_eq!(submitter.spatial_reanchor_calls, 1);
+        assert_eq!(
+            submitter.calibration_anchors,
+            vec![
+                "spatial_locked",
+                "spatial_locked",
+                "spatial_locked",
+                "spatial_locked"
+            ]
+        );
+        assert_eq!(
+            runtime
+                .presentation_diagnostics()
+                .records()
+                .iter()
+                .filter(|record| record.stage == PresentationStage::SubmissionReturned)
+                .map(|record| record.render_generation)
+                .collect::<Vec<_>>(),
+            vec![Some(1), Some(2), Some(3), Some(4)]
+        );
+
+        drop(bridge);
+        let _ = server.await.unwrap();
+    }
 }
 
 #[tokio::test]
