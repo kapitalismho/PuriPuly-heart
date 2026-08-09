@@ -1,36 +1,51 @@
 # VRChat OSC controls
 
-PuriPuly exchanges its dashboard state with VRChat through OSC. Enable it at **Settings > General > VRChat OSC**; VRChat must have OSC enabled at **Action Menu > Settings > OSC > Enable**. Connection modes: Automatic (OSCQuery discovery, dynamic ports), Manual (send `9000`, receive `9001`), Off (stops control traffic, preserves saved ports).
+- Purpose: exchange PuriPuly dashboard state with VRChat through OSC
+- PuriPuly setting: **Settings > General > VRChat OSC**
+- VRChat setting: **Action Menu > Settings > OSC > Enable**
+- Automatic: OSCQuery discovery and dynamic receive port
+- Manual: send `9000`, receive `9001` by default
+- Off: stop control traffic and preserve manual ports
 
 ## Expression Parameters
 
-Add the fixed names below to the avatar's Expression Parameters with the shown types; keep names and types unchanged when updating an avatar.
+- Add every required parameter to the avatar's Expression Parameters.
+- Match names, capitalization, and types exactly.
 
-| Parameter group | Parameters | Expression type |
-| --- | --- | --- |
-| Dashboard and behavior | `PuriPuly_Talk`, `PuriPuly_Listen`, `PuriPuly_Trans`, `PuriPuly_Captions`, `PuriPuly_PeerAuto`, `PuriPuly_MuteSync`, `PuriPuly_ChatboxSource` | Bool |
-| Language selection | `PuriPuly_SelfSrcLang`, `PuriPuly_SelfDstLang`, `PuriPuly_PeerSrcLang`, `PuriPuly_PeerDstLang` | Int |
-| Engine and fallback selection | `PuriPuly_SelfASR`, `PuriPuly_PeerASR`, `PuriPuly_Translator`, `PuriPuly_Fallback` | Int |
+| Parameter | Meaning | Type | Default | Saved | Synced |
+| --- | --- | --- | ---: | --- | --- |
+| `PuriPuly_Talk` | Self capture | Bool | False | Off | Off |
+| `PuriPuly_Listen` | Peer capture | Bool | False | Off | Off |
+| `PuriPuly_Trans` | Translation | Bool | False | Off | Off |
+| `PuriPuly_Captions` | Captions | Bool | False | Off | Off |
+| `PuriPuly_PeerAuto` | Peer source auto-detection | Bool | False | Off | Off |
+| `PuriPuly_MuteSync` | VRChat mute synchronization | Bool | False | Off | Off |
+| `PuriPuly_ChatboxSource` | Include source text in Chatbox output | Bool | False | Off | Off |
+| `PuriPuly_SelfSrcLang` | Self source language | Int | 17 (`ko`) | Off | Off |
+| `PuriPuly_SelfDstLang` | Self target language | Int | 7 (`en`) | Off | Off |
+| `PuriPuly_PeerSrcLang` | Peer source language | Int | 7 (`en`) | Off | Off |
+| `PuriPuly_PeerDstLang` | Peer target language | Int | 17 (`ko`) | Off | Off |
+| `PuriPuly_SelfASR` | Self ASR provider | Int | 0 (`local_cpu_auto`) | Off | Off |
+| `PuriPuly_PeerASR` | Peer ASR provider | Int | 0 (`local_cpu_auto`) | Off | Off |
+| `PuriPuly_Translator` | Translation model | Int | 0 (`gemma4_26b_31b`) | Off | Off |
+| `PuriPuly_Fallback` | Translation fallback | Int | 0 (`none`) | Off | Off |
 
-In the Action Menu, use Toggle controls for the Booleans. Menu Button/Sub-Menu controls reset their parameter to zero when deactivated, so keep the Int parameters out of the menu and drive them through Bool proxy toggles with Avatar Parameter Drivers.
+- Default: PuriPuly fresh runtime value
+- Saved: Off; PuriPuly owns persistence and republishes its current state
+- Synced: Off; local application controls do not require avatar network sync
+- Remote visual effects: drive separate synced visual parameters
+- `MuteSelf`: VRChat-provided; do not add as a custom Expression Parameter
+- Bool menu controls: use Toggle
+- Int menu controls: use Bool proxies with Avatar Parameter Drivers
+- Avoid Button/Sub-Menu for Int values; they reset to zero when deactivated
 
 ## Parameter ABI
 
-All parameters use the address `/avatar/parameters/<name>`. Boolean values are OSC booleans. Integer values are fixed IDs; IDs are append-only and must not be reused.
-
-### Boolean controls
-
-| Parameter | Meaning |
-| --- | --- |
-| `PuriPuly_Talk` | Self capture |
-| `PuriPuly_Listen` | Peer capture |
-| `PuriPuly_Trans` | Translation |
-| `PuriPuly_Captions` | Captions |
-| `PuriPuly_PeerAuto` | Peer source auto-detection |
-| `PuriPuly_MuteSync` | VRChat mute synchronization |
-| `PuriPuly_ChatboxSource` | Include source text in Chatbox output |
-
-Boolean commands are absolute and idempotent; sending the same value twice causes no second transition.
+- Address: `/avatar/parameters/<name>`
+- Bool payload: OSC boolean
+- Int payload: fixed ABI ID
+- Int ID policy: append-only; never reuse an ID
+- Bool commands: absolute and idempotent
 
 ### Language IDs
 
@@ -49,7 +64,7 @@ Boolean commands are absolute and idempotent; sending the same value twice cause
 | 10 | `fi` | 22 | `no` | 34 | `zh-TW` |
 | 11 | `fr` | 23 | `pl` | | |
 
-Language IDs are used by `PuriPuly_SelfSrcLang`, `PuriPuly_SelfDstLang`, `PuriPuly_PeerSrcLang`, and `PuriPuly_PeerDstLang`.
+- Used by: `PuriPuly_SelfSrcLang`, `PuriPuly_SelfDstLang`, `PuriPuly_PeerSrcLang`, `PuriPuly_PeerDstLang`
 
 ### ASR IDs
 
@@ -64,7 +79,7 @@ Language IDs are used by `PuriPuly_SelfSrcLang`, `PuriPuly_SelfDstLang`, `PuriPu
 | 6 | `qwen_asr` |
 | 7 | `soniox` |
 
-These IDs are used by `PuriPuly_SelfASR` and `PuriPuly_PeerASR`.
+- Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
 
 ### Translation model IDs
 
@@ -79,9 +94,11 @@ These IDs are used by `PuriPuly_SelfASR` and `PuriPuly_PeerASR`.
 | 6 | `gemini31_flash_lite` |
 | 7 | `qwen35_plus` |
 | 8 | `local_llm` |
-| 9 | `gemma4_31b_cerebras` |
+| 9 | `custom_http` |
 
-These IDs are used by `PuriPuly_Translator`.
+- Used by: `PuriPuly_Translator`
+- Gemma 4 31B on a Cerebras connection is published as ID `1`; select the connection in PuriPuly.
+- ID `9` selects the currently configured custom HTTP API and does not select an individual extension.
 
 ### Fallback IDs
 
@@ -97,4 +114,4 @@ These IDs are used by `PuriPuly_Translator`.
 | 7 | `managed_gemma4_31b` |
 | 8 | `cerebras_gemma4_31b` |
 
-These IDs are used by `PuriPuly_Fallback`.
+- Used by: `PuriPuly_Fallback`
