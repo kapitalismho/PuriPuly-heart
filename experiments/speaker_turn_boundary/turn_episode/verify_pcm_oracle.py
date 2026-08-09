@@ -86,6 +86,33 @@ def _ownership_valid(spans: list[dict[str, Any]]) -> bool:
     return all(str(span["turn_id"]) == f"turn-{index:04d}" for index, span in enumerate(ordered))
 
 
+def _boundary_turn_ids(spans: list[dict[str, Any]], boundary_sample: int) -> dict[str, str | None]:
+    old_turn_id: str | None = None
+    new_turn_id: str | None = None
+    for span in spans:
+        start = int(span["start"])
+        end = int(span["end"])
+        if start < boundary_sample <= end:
+            old_turn_id = str(span["turn_id"])
+        if start <= boundary_sample < end:
+            new_turn_id = str(span["turn_id"])
+    return {"old_turn_id": old_turn_id, "new_turn_id": new_turn_id}
+
+
+def _boundary_turn_ownership(spans: list[dict[str, Any]], boundary_sample: int) -> dict[str, Any]:
+    ids = _boundary_turn_ids(spans, boundary_sample)
+    old_span: list[int] | None = None
+    new_span: list[int] | None = None
+    for span in spans:
+        start = int(span["start"])
+        end = int(span["end"])
+        if str(span["turn_id"]) == ids["old_turn_id"]:
+            old_span = [start, end]
+        if str(span["turn_id"]) == ids["new_turn_id"]:
+            new_span = [start, end]
+    return {**ids, "old_turn_span": old_span, "new_turn_span": new_span}
+
+
 def _contamination(
     spans: list[dict[str, Any]], singleton: list[list[Any]], threshold_ms: int
 ) -> dict[str, int]:
@@ -104,9 +131,12 @@ def _contamination(
         qualifying.sort(key=lambda item: (item[0], item[1], item[2]))
         if qualifying:
             owner = qualifying[0][2]
-            contaminated += sum(
-                end - start for start, end, speaker in qualifying if speaker != owner
-            )
+            contamination_started = False
+            for start, end, speaker in qualifying:
+                if speaker != owner:
+                    contamination_started = True
+                if contamination_started:
+                    contaminated += end - start
     return {"contaminated_samples": contaminated, "denominator_samples": denominator}
 
 
@@ -123,6 +153,35 @@ def _progress_valid(row: dict[str, Any], field: str, digest_field: str) -> bool:
             return False
         previous_observed = observed
         previous_safe = safe
+    return True
+
+
+def _exact_progress_valid(row: dict[str, Any], *, baseline: bool) -> bool:
+    field = "baseline_progress_rows" if baseline else "progress_rows"
+    progress = row[field]
+    actions = [] if baseline else row["oracle_actions"]
+    safe_by_observed: dict[int, int] = {}
+    for observed_raw, safe_raw in progress:
+        observed = int(observed_raw)
+        safe = int(safe_raw)
+        safe_by_observed[observed] = safe
+        pending = [
+            int(action["boundary_source_sample"])
+            for action in actions
+            if action["apply_frontier"] is None or int(action["apply_frontier"]) >= observed
+        ]
+        expected = max(0, min(observed, min(pending) - 1)) if pending else observed
+        if safe != expected:
+            return False
+    for action in actions:
+        apply_frontier = action["apply_frontier"]
+        if apply_frontier is None:
+            continue
+        boundary = int(action["boundary_source_sample"])
+        safe = safe_by_observed.get(int(apply_frontier))
+        zero_sentinel = int(row["epoch_origin_source_sample"]) == 0 and boundary == 0
+        if safe is None or (boundary <= safe and not zero_sentinel):
+            return False
     return True
 
 
@@ -176,6 +235,7 @@ def _hydrate_row(
     expanded["baseline_progress_sha256"] = baseline["baseline_progress_sha256"]
     expanded["baseline_turn_spans"] = baseline["baseline_turn_spans"]
     expanded["baseline_drain_records"] = baseline["baseline_drain_records"]
+    expanded["baseline_finalization_records"] = baseline["baseline_finalization_records"]
     expanded["baseline_state_digest"] = baseline["baseline_state_digest"]
     expanded["progress_rows"] = progress["progress_rows"]
     expanded["progress_sha256"] = progress["progress_sha256"]
@@ -394,78 +454,182 @@ def _row_mismatches(row: dict[str, Any]) -> list[str]:
                 mismatches.append(f"contamination_{system}_{threshold}")
     if not _progress_valid(row, "progress_rows", "progress_sha256"):
         mismatches.append("progress")
+    elif not _exact_progress_valid(row, baseline=False):
+        mismatches.append("progress_exact_safe_frontier")
     if not _progress_valid(row, "baseline_progress_rows", "baseline_progress_sha256"):
         mismatches.append("baseline_progress")
+    elif not _exact_progress_valid(row, baseline=True):
+        mismatches.append("baseline_progress_exact_safe_frontier")
     if row["final_ring_span"] != [end, end]:
         mismatches.append("terminal_ring")
     if row["terminal_release_record"]["released_through"] != end:
         mismatches.append("terminal_release")
+    prior_target: int | None = None
+    finalizations_by_id = {
+        str(record["finalization_id"]): record for record in row["candidate_finalization_records"]
+    }
+    realized_boundaries = {int(span["start"]) for span in row["realized_turn_spans"][1:]}
+    progress_by_observed = {int(observed): int(safe) for observed, safe in row["progress_rows"]}
     for drain in row["candidate_drain_records"]:
+        target = int(drain["target_sample"])
+        if prior_target is not None and target < prior_target:
+            mismatches.append("drain_fifo_target_order")
+        prior_target = target
         if drain["outcome"] not in ("safe_complete", "safe_drain_timeout_fallback"):
             mismatches.append("drain_outcome")
+        if (
+            drain["outcome"] == "safe_complete"
+            and progress_by_observed.get(int(drain["resolution_observed_frontier"]), -1) < target
+        ):
+            mismatches.append("drain_safe_coverage")
         if drain["outcome"] == "safe_drain_timeout_fallback" and int(
             drain["resolution_clock_ms"]
         ) < int(drain["deadline_clock_ms"]):
             mismatches.append("early_fallback")
+        finalization_record_id = drain.get("finalization_record_id")
+        if finalization_record_id is None:
+            mismatches.append("drain_missing_finalization")
+        else:
+            finalization = finalizations_by_id.get(str(finalization_record_id))
+            if finalization is None:
+                mismatches.append("drain_finalization_reference")
+            else:
+                if int(finalization["finalization_source_sample"]) != target:
+                    mismatches.append("drain_finalization_boundary")
+                creates_hard_boundary = finalization["event_reason"] == "max_duration"
+                if finalization.get("creates_hard_boundary") != creates_hard_boundary:
+                    mismatches.append("drain_finalization_taxonomy")
+                if creates_hard_boundary and target not in realized_boundaries:
+                    mismatches.append("max_duration_boundary_missing")
+                if creates_hard_boundary and not finalization["hard_boundary_action_ids"]:
+                    mismatches.append("max_duration_action_reference")
+        if int(drain["released_frontier_after_resolution"]) < int(
+            drain["released_frontier_before_resolution"]
+        ):
+            mismatches.append("drain_release_regression")
+    lifecycle_speech_end_ids = {
+        str(event["event_id"])
+        for event in row["lifecycle_events"]
+        if event["event_kind"] == "speech_end"
+    }
+    finalized_event_ids = {
+        str(record["event_id"]) for record in row["candidate_finalization_records"]
+    }
+    if lifecycle_speech_end_ids != finalized_event_ids:
+        mismatches.append("lifecycle_finalization_completeness")
+    for action in row["oracle_actions"]:
+        ownership = action.get("ownership")
+        if not isinstance(ownership, dict):
+            mismatches.append("oracle_ownership_missing")
+            continue
+        boundary = int(action["boundary_source_sample"])
+        ideal = _boundary_turn_ownership(row["ideal_turn_spans"], boundary)
+        realized_boundary = action["realized_boundary_source_sample"]
+        realized = (
+            _boundary_turn_ownership(row["realized_turn_spans"], int(realized_boundary))
+            if realized_boundary is not None
+            else {
+                "old_turn_id": None,
+                "new_turn_id": None,
+                "old_turn_span": None,
+                "new_turn_span": None,
+            }
+        )
+        recorded_ideal = {
+            "old_turn_id": ownership.get("ideal_old_turn_id"),
+            "new_turn_id": ownership.get("ideal_new_turn_id"),
+        }
+        recorded_realized = {
+            "old_turn_id": ownership.get("realized_old_turn_id"),
+            "new_turn_id": ownership.get("realized_new_turn_id"),
+        }
+        recorded_ideal_spans = {
+            "old_turn_span": ownership.get("ideal_old_turn_span"),
+            "new_turn_span": ownership.get("ideal_new_turn_span"),
+        }
+        recorded_realized_spans = {
+            "old_turn_span": ownership.get("realized_old_turn_span"),
+            "new_turn_span": ownership.get("realized_new_turn_span"),
+        }
+        if recorded_ideal != {
+            "old_turn_id": ideal["old_turn_id"],
+            "new_turn_id": ideal["new_turn_id"],
+        }:
+            mismatches.append("oracle_ideal_ownership")
+        if recorded_realized != {
+            "old_turn_id": realized["old_turn_id"],
+            "new_turn_id": realized["new_turn_id"],
+        }:
+            mismatches.append("oracle_realized_ownership")
+        if recorded_ideal_spans != {
+            "old_turn_span": ideal["old_turn_span"],
+            "new_turn_span": ideal["new_turn_span"],
+        }:
+            mismatches.append("oracle_ideal_ownership_spans")
+        if recorded_realized_spans != {
+            "old_turn_span": realized["old_turn_span"],
+            "new_turn_span": realized["new_turn_span"],
+        }:
+            mismatches.append("oracle_realized_ownership_spans")
+        old_side_matches = (
+            ideal["old_turn_span"] is None and realized["old_turn_span"] is None
+        ) or (
+            ideal["old_turn_span"] is not None
+            and realized["old_turn_span"] is not None
+            and ideal["old_turn_span"][1] == boundary
+            and realized["old_turn_span"][1] == boundary
+        )
+        new_side_matches = (
+            ideal["new_turn_span"] is None and realized["new_turn_span"] is None
+        ) or (
+            ideal["new_turn_span"] is not None
+            and realized["new_turn_span"] is not None
+            and ideal["new_turn_span"][0] == boundary
+            and realized["new_turn_span"][0] == boundary
+        )
+        boundary_assignment_matches = (
+            realized_boundary == boundary and old_side_matches and new_side_matches
+        )
+        if ownership.get("boundary_assignment_matches_ideal") != boundary_assignment_matches:
+            mismatches.append("oracle_boundary_assignment_match_flag")
+        expected_match = (
+            action["recoverability"] != "fully_recoverable" or boundary_assignment_matches
+        )
+        if ownership.get("fully_recoverable_matches_ideal") != expected_match:
+            mismatches.append("oracle_ownership_match_flag")
+        if action["recoverability"] == "fully_recoverable" and not expected_match:
+            mismatches.append("oracle_fully_recoverable_ownership")
     return mismatches
 
 
-def _mutation_fixtures(
-    sample_row: dict[str, Any], sample_grid: dict[str, Any]
-) -> list[dict[str, Any]]:
+MUTATION_IDS = (
+    "missing_row",
+    "duplicated_span",
+    "altered_ownership",
+    "altered_contamination_numerator",
+    "altered_quantile",
+)
+
+
+def _mutation_fixtures(main_path: Path) -> list[dict[str, Any]]:
     fixtures: list[dict[str, Any]] = []
-    fixtures.append(
-        {
-            "fixture_id": "missing_row",
-            "rejected": EXPECTED_DETAIL_ROWS - 1 != EXPECTED_DETAIL_ROWS,
-        }
-    )
-    duplicated = json.loads(canonical_json(sample_row))
-    duplicated["realized_turn_spans"].append(dict(duplicated["realized_turn_spans"][0]))
-    fixtures.append(
-        {
-            "fixture_id": "duplicated_span",
-            "rejected": not all(
-                _cover(
-                    duplicated["realized_turn_spans"],
-                    duplicated["scored_start"],
-                    duplicated["processed_scored_end"],
-                ).values()
-            ),
-        }
-    )
-    ownership = json.loads(canonical_json(sample_row))
-    ownership["realized_turn_spans"][0]["turn_id"] = "altered"
-    fixtures.append(
-        {
-            "fixture_id": "altered_ownership",
-            "rejected": not _ownership_valid(ownership["realized_turn_spans"]),
-        }
-    )
-    contamination = json.loads(canonical_json(sample_row))
-    contamination["metrics"]["candidate"]["100"]["contaminated_samples"] += 1
-    actual = _contamination(
-        contamination["realized_turn_spans"], contamination["singleton_intervals"], 100
-    )
-    fixtures.append(
-        {
-            "fixture_id": "altered_contamination_numerator",
-            "rejected": actual != contamination["metrics"]["candidate"]["100"],
-        }
-    )
-    quantile = json.loads(canonical_json(sample_grid))
-    persisted = quantile["unrecoverable_samples"]["p95"]
-    quantile["unrecoverable_samples"]["p95"] = -1 if persisted != -1 else -2
-    fixtures.append(
-        {
-            "fixture_id": "altered_quantile",
-            "rejected": quantile["unrecoverable_samples"]["p95"] != persisted,
-        }
-    )
+    for mutation_id in MUTATION_IDS:
+        result = verify_artifact(main_path, mutation=mutation_id, run_mutations=False)
+        fixtures.append(
+            {
+                "fixture_id": mutation_id,
+                "rejected": not result["passed"],
+                "rejection_mismatches": result["mismatches"],
+            }
+        )
     return fixtures
 
 
-def verify_artifact(main_path: Path) -> dict[str, Any]:
+def verify_artifact(
+    main_path: Path, *, mutation: str | None = None, run_mutations: bool = True
+) -> dict[str, Any]:
+    if mutation is not None and mutation not in MUTATION_IDS:
+        raise ValueError(f"unknown Phase 3 verifier mutation: {mutation}")
     main = json.loads(main_path.read_text(encoding="utf-8"))
     mismatches: list[str] = []
     content_payload = {key: value for key, value in main.items() if key != "content_sha256"}
@@ -497,6 +661,7 @@ def verify_artifact(main_path: Path) -> dict[str, Any]:
     total_actions = 0
     total_clamps = 0
     sample_row: dict[str, Any] | None = None
+    mutation_applied = False
     shard_results: list[dict[str, Any]] = []
     for shard in main["shards"]:
         shard_path = main_path.parent / str(shard["path"])
@@ -528,6 +693,22 @@ def verify_artifact(main_path: Path) -> dict[str, Any]:
                 )
                 if row is None:
                     continue
+                if mutation == "missing_row" and not mutation_applied:
+                    mutation_applied = True
+                    continue
+                if mutation == "duplicated_span" and not mutation_applied:
+                    row = json.loads(canonical_json(row))
+                    row["realized_turn_spans"].append(dict(row["realized_turn_spans"][0]))
+                    mutation_applied = True
+                elif mutation == "altered_ownership" and not mutation_applied:
+                    if row["oracle_actions"]:
+                        row = json.loads(canonical_json(row))
+                        row["oracle_actions"][0]["ownership"]["realized_old_turn_id"] = "altered"
+                        mutation_applied = True
+                elif mutation == "altered_contamination_numerator" and not mutation_applied:
+                    row = json.loads(canonical_json(row))
+                    row["metrics"]["candidate"]["100"]["contaminated_samples"] += 1
+                    mutation_applied = True
                 if sample_row is None:
                     sample_row = row
                 row_errors = _row_mismatches(row)
@@ -660,6 +841,9 @@ def verify_artifact(main_path: Path) -> dict[str, Any]:
         for holdback in HOLDBACKS_MS
     ]
     recomputed_grid_sha = _hash(recomputed_grid)
+    if mutation == "altered_quantile":
+        main["grid_rows"][0]["unrecoverable_samples"]["p95"] = -1
+        mutation_applied = True
     if recomputed_grid_sha != main["grid_aggregate_sha256"]:
         mismatches.append("grid_aggregate_sha256")
     if recomputed_grid != main["grid_rows"]:
@@ -684,13 +868,17 @@ def verify_artifact(main_path: Path) -> dict[str, Any]:
         mismatches.append("completeness")
     if len(identities) != EXPECTED_DETAIL_ROWS:
         mismatches.append("identity_count")
+    if mutation is not None and not mutation_applied:
+        mismatches.append(f"mutation_not_applied:{mutation}")
     if sample_row is None:
         mismatches.append("no_detail_rows")
         mutation_fixtures: list[dict[str, Any]] = []
-    else:
-        mutation_fixtures = _mutation_fixtures(sample_row, recomputed_grid[0])
+    elif run_mutations:
+        mutation_fixtures = _mutation_fixtures(main_path)
         if not all(fixture["rejected"] for fixture in mutation_fixtures):
             mismatches.append("mutation_fixtures")
+    else:
+        mutation_fixtures = []
     pcm_path = Path(__file__).resolve().parent / "pcm_oracle.py"
     live_verifier_hash = sha256_file(Path(__file__).resolve())
     live_pcm_hash = sha256_file(pcm_path)
@@ -718,6 +906,7 @@ def verify_artifact(main_path: Path) -> dict[str, Any]:
         "completeness": completeness,
         "recomputed_grid_aggregate_sha256": recomputed_grid_sha,
         "mutation_fixtures": mutation_fixtures,
+        "injected_mutation": mutation,
         "mismatches": mismatches,
         "passed": not mismatches,
     }

@@ -17,6 +17,7 @@ from experiments.speaker_turn_boundary.turn_episode.pcm_oracle import (
     canonical_sha256,
     clamp_identity,
     compact_detail_row,
+    contamination_samples,
     population_identity,
     run_pcm_fixtures,
     simulate_case,
@@ -26,9 +27,9 @@ from experiments.speaker_turn_boundary.turn_episode.pcm_oracle import (
 from experiments.speaker_turn_boundary.turn_episode.verify_pcm_oracle import (
     IndependentAccumulator,
     _hydrate_row,
-    _mutation_fixtures,
     _register_definitions,
     _row_mismatches,
+    verify_artifact,
 )
 
 
@@ -111,6 +112,43 @@ def test_drain_fifo_and_regression_contract() -> None:
         regressed.arm_drain("b", 1200, 0)
 
 
+def test_reset_terminally_resolves_held_pcm_before_new_epoch() -> None:
+    assembler = CanonicalPCMAssembler(0, 1000, 1512, 512)
+    assembler.append_chunk(1000, 1512)
+    assembler.update_progress(1512, 1100)
+    assembler.arm_drain(
+        "held",
+        1400,
+        0,
+        event_id="held",
+        event_reason="silence",
+        normalized_utterance_id="u0",
+        finalize_turn=True,
+    )
+    reset = assembler.reset_epoch(
+        audio_epoch=1,
+        epoch_origin_source_sample=2000,
+        processed_end_source_sample=2512,
+        holdback_samples=512,
+        clock_ms=0,
+    )
+    assert reset["prior_epoch"]["terminal_record"]["released_through"] == 1512
+    assert reset["prior_epoch"]["drain_records"][0]["outcome"] == ("safe_drain_timeout_fallback")
+    assert assembler.audio_epoch == 1
+    assert assembler.observed_frontier == 2000
+    assert assembler.released_frontier == 2000
+
+
+def test_contamination_latches_after_different_speaker_returns_to_owner() -> None:
+    spans = turn_spans(0, 6000, [])
+    result = contamination_samples(
+        spans,
+        [[0, 2000, "A"], [2000, 4000, "B"], [4000, 6000, "A"]],
+        100,
+    )
+    assert result == {"contaminated_samples": 4000, "denominator_samples": 6000}
+
+
 def test_turn_span_cover_rejects_duplication() -> None:
     spans = turn_spans(1000, 2000, [1250, 1500, 1500, 1750])
     assert all(span_cover_flags(spans, 1000, 2000).values())
@@ -185,20 +223,54 @@ def _synthetic_case() -> dict[str, object]:
     }
 
 
-def test_independent_row_recomputation_and_mutations() -> None:
+def test_independent_row_recomputation_and_action_ownership() -> None:
     row = simulate_case(_synthetic_case(), 250, 0, 500)
     assert _row_mismatches(row) == []
     accumulator = IndependentAccumulator(250, 0, 500)
     accumulator.add(row)
-    mutations = _mutation_fixtures(row, accumulator.finish())
-    assert {fixture["fixture_id"] for fixture in mutations} == {
-        "missing_row",
-        "duplicated_span",
-        "altered_ownership",
-        "altered_contamination_numerator",
-        "altered_quantile",
-    }
-    assert all(fixture["rejected"] for fixture in mutations)
+    assert accumulator.finish()["action_instances"] == 1
+    assert row["oracle_actions"][0]["ownership"]["fully_recoverable_matches_ideal"]
+
+
+def test_speech_end_finalization_preserves_successor_b0_hard_boundary() -> None:
+    case = _synthetic_case()
+    case["lifecycle_events"] = [
+        {
+            "event_id": "speech-end",
+            "audio_epoch": 0,
+            "source_session_id": "session",
+            "normalized_utterance_id": "u0",
+            "event_kind": "speech_end",
+            "reason": "silence",
+            "event_source_sample": 7000,
+            "observed_source_sample_at_emit": 7168,
+            "trailing_silence_ms": 32,
+            "chunk_index": 13,
+            "chunk_samples": 512,
+        }
+    ]
+    case["b0_actions"] = [
+        {
+            "action_id": "b0",
+            "audio_epoch": 0,
+            "boundary_source_sample": 8000,
+            "availability_source_sample": 8192,
+            "owner": "b0",
+            "normalization_source_sample": 7000,
+            "normalization_reason": "silence",
+        }
+    ]
+    row = simulate_case(case, 250, 0, 500)
+    assert _row_mismatches(row) == []
+    assert [record["event_id"] for record in row["candidate_finalization_records"]] == [
+        "speech-end"
+    ]
+    b0 = row["b0_actions"][0]
+    assert b0["boundary_source_sample"] == 8000
+    assert b0["logical_boundary_source_sample"] == 8000
+    assert not row["candidate_finalization_records"][0]["creates_hard_boundary"]
+    assert row["candidate_finalization_records"][0]["finalization_source_sample"] == 7000
+    assert [span["start"] for span in row["realized_turn_spans"]] == [4096, 8000]
 
 
 def test_compact_detail_round_trip_preserves_independent_evidence() -> None:
@@ -213,3 +285,15 @@ def test_compact_detail_round_trip_preserves_independent_evidence() -> None:
     assert hydrated["progress_rows"] == original["progress_rows"]
     assert hydrated["baseline_turn_spans"] == original["baseline_turn_spans"]
     assert hydrated["singleton_intervals"] == original["singleton_intervals"]
+
+
+def test_public_artifact_verifier_rejects_altered_ownership() -> None:
+    main_path = (
+        Path(__file__).resolve().parent.parent
+        / "results"
+        / "turn_episode_v1"
+        / "oracle_provider_neutral.json"
+    )
+    result = verify_artifact(main_path, mutation="altered_ownership", run_mutations=False)
+    assert not result["passed"]
+    assert any("oracle_realized_ownership" in mismatch for mismatch in result["mismatches"])

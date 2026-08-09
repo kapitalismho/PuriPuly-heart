@@ -35,9 +35,9 @@ from .build_episodes import (
     sha256_file,
 )
 
-SCHEMA_VERSION = "turn_episode_v1.phase3_pcm_oracle"
-DETAIL_SCHEMA_VERSION = "turn_episode_v1.phase3_pcm_oracle_detail"
-VERIFICATION_SCHEMA_VERSION = "turn_episode_v1.phase3_pcm_oracle_verification"
+SCHEMA_VERSION = "turn_episode_v1.phase3_pcm_oracle.v2"
+DETAIL_SCHEMA_VERSION = "turn_episode_v1.phase3_pcm_oracle_detail.v2"
+VERIFICATION_SCHEMA_VERSION = "turn_episode_v1.phase3_pcm_oracle_verification.v2"
 CLAMP_SCHEMA_VERSION = "turn_episode_v1.phase3_clamp_identity"
 GRID_ID = "turn_episode_v1.provider_neutral_oracle.7x9x7"
 SAMPLE_RATE_HZ = 16000
@@ -128,6 +128,37 @@ def turn_spans(start: int, end: int, boundaries: Iterable[int]) -> list[dict[str
     ]
 
 
+def boundary_turn_ids(
+    spans: Sequence[dict[str, Any]], boundary_sample: int
+) -> dict[str, str | None]:
+    old_turn_id: str | None = None
+    new_turn_id: str | None = None
+    for span in spans:
+        start = int(span["start"])
+        end = int(span["end"])
+        if start < boundary_sample <= end:
+            old_turn_id = str(span["turn_id"])
+        if start <= boundary_sample < end:
+            new_turn_id = str(span["turn_id"])
+    return {"old_turn_id": old_turn_id, "new_turn_id": new_turn_id}
+
+
+def boundary_turn_ownership(
+    spans: Sequence[dict[str, Any]], boundary_sample: int
+) -> dict[str, Any]:
+    ids = boundary_turn_ids(spans, boundary_sample)
+    old_span: list[int] | None = None
+    new_span: list[int] | None = None
+    for span in spans:
+        start = int(span["start"])
+        end = int(span["end"])
+        if str(span["turn_id"]) == ids["old_turn_id"]:
+            old_span = [start, end]
+        if str(span["turn_id"]) == ids["new_turn_id"]:
+            new_span = [start, end]
+    return {**ids, "old_turn_span": old_span, "new_turn_span": new_span}
+
+
 def span_cover_flags(spans: Sequence[dict[str, Any]], start: int, end: int) -> dict[str, bool]:
     if start == end and not spans:
         return {"conservation": True, "no_duplication": True, "ordering": True}
@@ -176,7 +207,12 @@ def contamination_samples(
         if not qualifying:
             continue
         owner = qualifying[0][2]
-        contaminated += sum(end - start for start, end, speaker in qualifying if speaker != owner)
+        contamination_started = False
+        for start, end, speaker in qualifying:
+            if speaker != owner:
+                contamination_started = True
+            if contamination_started:
+                contaminated += end - start
     return {"contaminated_samples": contaminated, "denominator_samples": denominator}
 
 
@@ -188,6 +224,10 @@ class DrainState:
     arm_clock_ms: int
     deadline_clock_ms: int
     arm_observed_frontier: int
+    event_id: str | None
+    event_reason: str | None
+    normalized_utterance_id: str | None
+    finalize_turn: bool
 
 
 @dataclass(slots=True)
@@ -204,10 +244,12 @@ class CanonicalPCMAssembler:
     duplicate_records: list[dict[str, Any]] = field(init=False, default_factory=list)
     drain_queue: list[DrainState] = field(init=False, default_factory=list)
     drain_records: list[dict[str, Any]] = field(init=False, default_factory=list)
+    finalization_records: list[dict[str, Any]] = field(init=False, default_factory=list)
     progress_rows: list[list[int]] = field(init=False, default_factory=list)
     terminal_record: dict[str, Any] | None = field(init=False, default=None)
     _drain_ids: set[str] = field(init=False, default_factory=set)
     _last_drain_target: int | None = field(init=False, default=None)
+    _terminalized: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
         if self.audio_epoch < 0:
@@ -238,13 +280,21 @@ class CanonicalPCMAssembler:
                         "arm_clock_ms": drain.arm_clock_ms,
                         "deadline_clock_ms": drain.deadline_clock_ms,
                         "arm_observed_frontier": drain.arm_observed_frontier,
+                        "event_id": drain.event_id,
+                        "event_reason": drain.event_reason,
+                        "normalized_utterance_id": drain.normalized_utterance_id,
+                        "finalize_turn": drain.finalize_turn,
                     }
                     for drain in self.drain_queue
                 ],
+                "finalizations": self.finalization_records,
+                "terminalized": self._terminalized,
             }
         )
 
     def append_chunk(self, start_sample: int, end_sample: int) -> None:
+        if self._terminalized:
+            raise Phase3OracleError("terminalized epoch cannot accept PCM")
         if start_sample != self.observed_frontier:
             raise Phase3OracleError("PCM chunk is not contiguous")
         if end_sample <= start_sample or end_sample > self.processed_end_source_sample:
@@ -254,6 +304,8 @@ class CanonicalPCMAssembler:
         self.observed_frontier = end_sample
 
     def update_progress(self, observed_sample: int, safe_sample: int) -> None:
+        if self._terminalized:
+            raise Phase3OracleError("terminalized epoch cannot accept progress")
         if observed_sample != self.observed_frontier:
             raise Phase3OracleError("progress observed frontier does not match PCM frontier")
         if safe_sample < self.safe_frontier:
@@ -272,6 +324,7 @@ class CanonicalPCMAssembler:
         availability_sample: int,
         owner: str,
         structural_reason: str | None = None,
+        logical_boundary_sample: int | None = None,
     ) -> dict[str, Any]:
         before = self.state_digest()
         if action_epoch != self.audio_epoch:
@@ -287,6 +340,8 @@ class CanonicalPCMAssembler:
             }
             self.action_records.append(record)
             return record
+        if self._terminalized:
+            raise Phase3OracleError("terminalized epoch cannot accept actions")
         if not (
             self.epoch_origin_source_sample <= boundary_sample <= self.processed_end_source_sample
         ):
@@ -298,15 +353,30 @@ class CanonicalPCMAssembler:
         )
         if owner == "oracle" and boundary_sample <= self.safe_frontier and not zero_origin_sentinel:
             raise Phase3OracleError("action violates a published safe frontier")
-        released_at_apply = self.released_frontier
-        realized_boundary = max(boundary_sample, released_at_apply)
-        realized_boundary = min(realized_boundary, self.processed_end_source_sample)
-        unrecoverable_end = min(released_at_apply, self.processed_end_source_sample)
-        unrecoverable_span = (
-            [boundary_sample, unrecoverable_end] if boundary_sample < unrecoverable_end else None
+        logical_boundary = (
+            boundary_sample if logical_boundary_sample is None else logical_boundary_sample
         )
-        recoverability = "late_unrecoverable" if unrecoverable_span else "fully_recoverable"
-        duplicate = realized_boundary in self.boundaries
+        if not (
+            self.epoch_origin_source_sample <= logical_boundary <= self.processed_end_source_sample
+        ):
+            raise Phase3OracleError("logical boundary is outside the episode")
+        released_at_apply = self.released_frontier
+        normalized_existing_boundary = logical_boundary in self.boundaries
+        if normalized_existing_boundary:
+            realized_boundary = logical_boundary
+            unrecoverable_span = None
+            recoverability = "fully_recoverable"
+        else:
+            realized_boundary = max(logical_boundary, released_at_apply)
+            realized_boundary = min(realized_boundary, self.processed_end_source_sample)
+            unrecoverable_end = min(released_at_apply, self.processed_end_source_sample)
+            unrecoverable_span = (
+                [boundary_sample, unrecoverable_end]
+                if boundary_sample < unrecoverable_end
+                else None
+            )
+            recoverability = "late_unrecoverable" if unrecoverable_span else "fully_recoverable"
+        duplicate = normalized_existing_boundary or realized_boundary in self.boundaries
         if realized_boundary < self.processed_end_source_sample:
             if duplicate:
                 self.duplicate_records.append(
@@ -325,6 +395,7 @@ class CanonicalPCMAssembler:
             "accepted": True,
             "rejection": None,
             "boundary_source_sample": boundary_sample,
+            "logical_boundary_source_sample": logical_boundary,
             "availability_source_sample": availability_sample,
             "apply_frontier": self.observed_frontier,
             "released_frontier_at_apply": released_at_apply,
@@ -332,13 +403,24 @@ class CanonicalPCMAssembler:
             "recoverability": recoverability,
             "unrecoverable_span": unrecoverable_span,
             "duplicate_normalized": duplicate,
+            "boundary_normalized": logical_boundary != boundary_sample,
             "structural_reason": structural_reason,
             "finalization_latency_samples": self.observed_frontier - boundary_sample,
         }
         self.action_records.append(record)
         return record
 
-    def arm_drain(self, drain_id: str, target_sample: int, clock_ms: int) -> dict[str, Any]:
+    def arm_drain(
+        self,
+        drain_id: str,
+        target_sample: int,
+        clock_ms: int,
+        *,
+        event_id: str | None = None,
+        event_reason: str | None = None,
+        normalized_utterance_id: str | None = None,
+        finalize_turn: bool = False,
+    ) -> dict[str, Any]:
         if drain_id in self._drain_ids:
             return {"drain_id": drain_id, "status": "duplicate_ignored"}
         if not (self.epoch_origin_source_sample <= target_sample <= self.observed_frontier):
@@ -354,6 +436,10 @@ class CanonicalPCMAssembler:
             arm_clock_ms=clock_ms,
             deadline_clock_ms=clock_ms + SAFE_DRAIN_TIMEOUT_MS,
             arm_observed_frontier=self.observed_frontier,
+            event_id=event_id,
+            event_reason=event_reason,
+            normalized_utterance_id=normalized_utterance_id,
+            finalize_turn=finalize_turn,
         )
         self.drain_queue.append(drain)
         return {"drain_id": drain_id, "status": "armed"}
@@ -367,6 +453,24 @@ class CanonicalPCMAssembler:
                 outcome = "safe_drain_timeout_fallback"
             else:
                 return
+            finalization: dict[str, Any] | None = None
+            if drain.finalize_turn:
+                hard_boundary_action_ids = list(self.boundaries.get(drain.target_sample, []))
+                finalization = {
+                    "finalization_id": f"finalize:{drain.drain_id}",
+                    "drain_id": drain.drain_id,
+                    "event_id": drain.event_id,
+                    "event_reason": drain.event_reason,
+                    "normalized_utterance_id": drain.normalized_utterance_id,
+                    "finalization_source_sample": drain.target_sample,
+                    "resolution_observed_frontier": self.observed_frontier,
+                    "released_frontier_at_resolution": self.released_frontier,
+                    "drain_outcome": outcome,
+                    "creates_hard_boundary": drain.event_reason == "max_duration",
+                    "hard_boundary_action_ids": hard_boundary_action_ids,
+                }
+                self.finalization_records.append(finalization)
+            released_before = self.released_frontier
             self._release_through(drain.target_sample)
             self.drain_records.append(
                 {
@@ -383,6 +487,16 @@ class CanonicalPCMAssembler:
                     "source_release_latency_samples": max(
                         0, self.observed_frontier - drain.target_sample
                     ),
+                    "finalization_record_id": (
+                        finalization["finalization_id"] if finalization is not None else None
+                    ),
+                    "finalized_boundary_source_sample": (
+                        finalization["finalization_source_sample"]
+                        if finalization is not None
+                        else None
+                    ),
+                    "released_frontier_before_resolution": released_before,
+                    "released_frontier_after_resolution": self.released_frontier,
                 }
             )
             self.drain_queue.pop(0)
@@ -397,6 +511,10 @@ class CanonicalPCMAssembler:
         self._release_through(min(self.observed_frontier, limit))
 
     def terminal(self, clock_ms: int) -> dict[str, Any]:
+        if self._terminalized:
+            if self.terminal_record is None:
+                raise Phase3OracleError("terminalized epoch lacks a terminal record")
+            return self.terminal_record
         while self.drain_queue:
             head = self.drain_queue[0]
             if self.safe_frontier >= head.target_sample:
@@ -412,8 +530,56 @@ class CanonicalPCMAssembler:
             "released_through": self.released_frontier,
             "observed_frontier": self.observed_frontier,
             "clock_ms": clock_ms,
+            "finalized_turn_id": (
+                self.realized_spans()[-1]["turn_id"] if self.realized_spans() else None
+            ),
         }
+        self._terminalized = True
         return self.terminal_record
+
+    def reset_epoch(
+        self,
+        *,
+        audio_epoch: int,
+        epoch_origin_source_sample: int,
+        processed_end_source_sample: int,
+        holdback_samples: int,
+        clock_ms: int,
+    ) -> dict[str, Any]:
+        if audio_epoch <= self.audio_epoch:
+            raise Phase3OracleError("reset epoch must advance")
+        terminal = self.terminal(clock_ms)
+        prior = {
+            "audio_epoch": self.audio_epoch,
+            "terminal_record": terminal,
+            "realized_turn_spans": self.realized_spans(),
+            "finalization_records": list(self.finalization_records),
+            "drain_records": list(self.drain_records),
+        }
+        if self.released_frontier != self.processed_end_source_sample or self.drain_queue:
+            raise Phase3OracleError("reset requires terminal conservation")
+        self.audio_epoch = audio_epoch
+        self.epoch_origin_source_sample = epoch_origin_source_sample
+        self.processed_end_source_sample = processed_end_source_sample
+        self.holdback_samples = holdback_samples
+        self.boundaries.clear()
+        self.action_records.clear()
+        self.duplicate_records.clear()
+        self.drain_queue.clear()
+        self.drain_records.clear()
+        self.finalization_records.clear()
+        self.progress_rows.clear()
+        self.terminal_record = None
+        self._drain_ids.clear()
+        self._last_drain_target = None
+        self._terminalized = False
+        self.__post_init__()
+        return {
+            "status": "reset_complete",
+            "prior_epoch": prior,
+            "new_epoch": self.audio_epoch,
+            "new_origin_source_sample": self.epoch_origin_source_sample,
+        }
 
     def abandon(self) -> None:
         if self.released_frontier != self.observed_frontier or self.drain_queue:
@@ -819,6 +985,8 @@ def _load_population(
                 "boundary_source_sample": int(row["boundary_source_sample"]),
                 "availability_source_sample": int(row["observed_source_sample_at_emit"]),
                 "owner": "b0",
+                "normalization_source_sample": int(row["debug"]["prev_speech_end_sample"]),
+                "normalization_reason": str(row["debug"]["prev_end_reason"]),
             }
             for row in b0_cache[session_id]["trace_projection"]
             if start <= int(row["boundary_source_sample"]) <= end
@@ -1033,6 +1201,10 @@ def _run_stream(
                     f"drain:{event['event_id']}",
                     int(event["event_source_sample"]),
                     (next_frontier - start) // SAMPLES_PER_MS,
+                    event_id=str(event["event_id"]),
+                    event_reason=str(event["reason"]),
+                    normalized_utterance_id=str(event["normalized_utterance_id"]),
+                    finalize_turn=True,
                 )
             lifecycle_index += 1
         clock_ms = (next_frontier - start) // SAMPLES_PER_MS
@@ -1051,6 +1223,7 @@ def _run_stream(
             "accepted": False,
             "rejection": "unavailable_before_terminal",
             "boundary_source_sample": boundary,
+            "logical_boundary_source_sample": boundary,
             "availability_source_sample": int(action["availability_source_sample"]),
             "apply_frontier": None,
             "released_frontier_at_apply": end,
@@ -1058,6 +1231,7 @@ def _run_stream(
             "recoverability": "unavailable_before_terminal",
             "unrecoverable_span": unavailable_span,
             "duplicate_normalized": False,
+            "boundary_normalized": False,
             "structural_reason": None,
             "finalization_latency_samples": None,
         }
@@ -1073,6 +1247,7 @@ def _run_stream(
         "progress_rows": assembler.progress_rows,
         "progress_sha256": canonical_sha256(assembler.progress_rows),
         "drain_records": assembler.drain_records,
+        "finalization_records": assembler.finalization_records,
         "duplicate_records": assembler.duplicate_records,
         "terminal_record": terminal,
         "final_ring_span": [assembler.released_frontier, assembler.observed_frontier],
@@ -1102,6 +1277,53 @@ def simulate_case(
     ideal_boundaries.extend(structural_boundaries)
     ideal_boundaries.extend(int(action["boundary_source_sample"]) for action in oracle)
     ideal_spans = turn_spans(int(case["start"]), int(case["end"]), ideal_boundaries)
+    for action in oracle_evidence:
+        boundary = int(action["boundary_source_sample"])
+        ideal_ownership = boundary_turn_ownership(ideal_spans, boundary)
+        realized_boundary = action["realized_boundary_source_sample"]
+        realized_ownership = (
+            boundary_turn_ownership(candidate["spans"], int(realized_boundary))
+            if realized_boundary is not None
+            else {
+                "old_turn_id": None,
+                "new_turn_id": None,
+                "old_turn_span": None,
+                "new_turn_span": None,
+            }
+        )
+        old_side_matches = (
+            ideal_ownership["old_turn_span"] is None and realized_ownership["old_turn_span"] is None
+        ) or (
+            ideal_ownership["old_turn_span"] is not None
+            and realized_ownership["old_turn_span"] is not None
+            and ideal_ownership["old_turn_span"][1] == boundary
+            and realized_ownership["old_turn_span"][1] == boundary
+        )
+        new_side_matches = (
+            ideal_ownership["new_turn_span"] is None and realized_ownership["new_turn_span"] is None
+        ) or (
+            ideal_ownership["new_turn_span"] is not None
+            and realized_ownership["new_turn_span"] is not None
+            and ideal_ownership["new_turn_span"][0] == boundary
+            and realized_ownership["new_turn_span"][0] == boundary
+        )
+        boundary_assignment_matches = (
+            realized_boundary == boundary and old_side_matches and new_side_matches
+        )
+        action["ownership"] = {
+            "ideal_old_turn_id": ideal_ownership["old_turn_id"],
+            "ideal_new_turn_id": ideal_ownership["new_turn_id"],
+            "ideal_old_turn_span": ideal_ownership["old_turn_span"],
+            "ideal_new_turn_span": ideal_ownership["new_turn_span"],
+            "realized_old_turn_id": realized_ownership["old_turn_id"],
+            "realized_new_turn_id": realized_ownership["new_turn_id"],
+            "realized_old_turn_span": realized_ownership["old_turn_span"],
+            "realized_new_turn_span": realized_ownership["new_turn_span"],
+            "boundary_assignment_matches_ideal": boundary_assignment_matches,
+            "fully_recoverable_matches_ideal": (
+                action["recoverability"] != "fully_recoverable" or boundary_assignment_matches
+            ),
+        }
     metrics: dict[str, Any] = {"baseline": {}, "candidate": {}}
     for threshold in OWNER_THRESHOLDS_MS:
         key = str(threshold)
@@ -1147,6 +1369,8 @@ def simulate_case(
         ],
         "lifecycle_events": candidate["lifecycle_events"],
         "structural_actions": candidate["structural_actions"],
+        "baseline_finalization_records": baseline["finalization_records"],
+        "candidate_finalization_records": candidate["finalization_records"],
         "progress_rows": candidate["progress_rows"],
         "progress_sha256": candidate["progress_sha256"],
         "baseline_progress_rows": baseline["progress_rows"],
@@ -1448,6 +1672,22 @@ def run_pcm_fixtures() -> dict[str, Any]:
         if name == "duplicate_boundaries":
             passed = passed and bool(result["duplicates"])
         results.append({"fixture_id": name, "passed": passed, **result})
+    latch_metrics = contamination_samples(
+        turn_spans(origin, origin + 6000, []),
+        [
+            [origin, origin + 2000, "A"],
+            [origin + 2000, origin + 4000, "B"],
+            [origin + 4000, origin + 6000, "A"],
+        ],
+        100,
+    )
+    results.append(
+        {
+            "fixture_id": "contamination_latched_a_b_a",
+            "passed": latch_metrics == {"contaminated_samples": 4000, "denominator_samples": 6000},
+            "metrics": latch_metrics,
+        }
+    )
     stale = CanonicalPCMAssembler(7, origin, origin + 512, 512)
     stale.append_chunk(origin, origin + 512)
     stale.update_progress(origin + 512, origin)
@@ -1492,6 +1732,31 @@ def run_pcm_fixtures() -> dict[str, Any]:
             "records": timeout.drain_records,
         }
     )
+    for coverage_ms in (0, 250, 1000, 2000):
+        covered = CanonicalPCMAssembler(0, origin, origin + 512, 512)
+        covered.append_chunk(origin, origin + 512)
+        covered.update_progress(origin + 512, origin + 100)
+        covered.arm_drain(
+            f"coverage:{coverage_ms}",
+            origin + 400,
+            0,
+            event_id=f"event:{coverage_ms}",
+            event_reason="silence",
+            normalized_utterance_id=f"u:{coverage_ms}",
+            finalize_turn=True,
+        )
+        covered.update_progress(origin + 512, origin + 400)
+        covered.resolve_drains(coverage_ms)
+        results.append(
+            {
+                "fixture_id": f"safe_coverage_{coverage_ms}ms",
+                "passed": covered.drain_records[0]["outcome"] == "safe_complete"
+                and covered.drain_records[0]["scheduler_latency_ms"] == coverage_ms
+                and covered.finalization_records[0]["event_reason"] == "silence",
+                "records": covered.drain_records,
+                "finalizations": covered.finalization_records,
+            }
+        )
     fifo = CanonicalPCMAssembler(0, origin, origin + 1024, 1024)
     fifo.append_chunk(origin, origin + 512)
     fifo.update_progress(origin + 512, origin + 350)
@@ -1527,6 +1792,120 @@ def run_pcm_fixtures() -> dict[str, Any]:
     except Phase3OracleError:
         regressed_passed = True
     results.append({"fixture_id": "regressing_drain_target", "passed": regressed_passed})
+    frontier_violation_passed = False
+    frontier_violation = CanonicalPCMAssembler(0, origin, origin + 512, 512)
+    frontier_violation.append_chunk(origin, origin + 512)
+    frontier_violation.update_progress(origin + 512, origin + 300)
+    try:
+        frontier_violation.apply_action(
+            action_id="late-after-safe",
+            action_epoch=0,
+            boundary_sample=origin + 200,
+            availability_sample=origin + 512,
+            owner="oracle",
+        )
+    except Phase3OracleError:
+        frontier_violation_passed = True
+    results.append(
+        {
+            "fixture_id": "invalid_frontier_advance_then_late_event",
+            "passed": frontier_violation_passed,
+        }
+    )
+    adjacent = CanonicalPCMAssembler(0, origin, origin + 512, 512)
+    adjacent.append_chunk(origin, origin + 512)
+    adjacent.update_progress(origin + 512, origin + 255)
+    adjacent.arm_drain(
+        "adjacent-speech-end",
+        origin + 256,
+        0,
+        event_id="adjacent-speech-end",
+        event_reason="silence",
+        normalized_utterance_id="u-adjacent",
+        finalize_turn=True,
+    )
+    adjacent.apply_action(
+        action_id="adjacent-oracle",
+        action_epoch=0,
+        boundary_sample=origin + 257,
+        availability_sample=origin + 512,
+        owner="oracle",
+    )
+    adjacent.update_progress(origin + 512, origin + 512)
+    adjacent.resolve_drains(0)
+    adjacent.terminal(0)
+    results.append(
+        {
+            "fixture_id": "speech_end_adjacent_oracle_boundary",
+            "passed": sorted(adjacent.boundaries) == [origin + 257]
+            and adjacent.finalization_records[0]["finalization_source_sample"] == origin + 256
+            and not adjacent.finalization_records[0]["creates_hard_boundary"]
+            and all(span_cover_flags(adjacent.realized_spans(), origin, origin + 512).values()),
+            "spans": adjacent.realized_spans(),
+            "finalizations": adjacent.finalization_records,
+        }
+    )
+    terminal_pending = CanonicalPCMAssembler(0, origin, origin + 512, 512)
+    terminal_pending.append_chunk(origin, origin + 512)
+    terminal_pending.update_progress(origin + 512, origin + 100)
+    terminal_pending.arm_drain(
+        "terminal-pending",
+        origin + 400,
+        0,
+        event_id="terminal-pending",
+        event_reason="silence",
+        normalized_utterance_id="u-terminal",
+        finalize_turn=True,
+    )
+    terminal_pending_record = terminal_pending.terminal(0)
+    results.append(
+        {
+            "fixture_id": "terminal_with_pending_queue",
+            "passed": terminal_pending.drain_records[0]["outcome"] == "safe_drain_timeout_fallback"
+            and terminal_pending_record["released_through"] == origin + 512
+            and not terminal_pending.drain_queue,
+            "drains": terminal_pending.drain_records,
+            "terminal": terminal_pending_record,
+        }
+    )
+    reset = CanonicalPCMAssembler(0, origin, origin + 512, 512)
+    reset.append_chunk(origin, origin + 512)
+    reset.update_progress(origin + 512, origin + 100)
+    reset.arm_drain(
+        "reset-held",
+        origin + 400,
+        0,
+        event_id="reset-held",
+        event_reason="silence",
+        normalized_utterance_id="u-reset",
+        finalize_turn=True,
+    )
+    reset_record = reset.reset_epoch(
+        audio_epoch=1,
+        epoch_origin_source_sample=origin + 10000,
+        processed_end_source_sample=origin + 10512,
+        holdback_samples=512,
+        clock_ms=0,
+    )
+    stale_after_reset = reset.apply_action(
+        action_id="old-epoch-after-reset",
+        action_epoch=0,
+        boundary_sample=origin + 10256,
+        availability_sample=origin + 10000,
+        owner="oracle",
+    )
+    results.append(
+        {
+            "fixture_id": "reset_with_held_pcm",
+            "passed": reset_record["status"] == "reset_complete"
+            and reset_record["prior_epoch"]["terminal_record"]["released_through"] == origin + 512
+            and reset.audio_epoch == 1
+            and reset.released_frontier == origin + 10000
+            and stale_after_reset["rejection"] == "stale_epoch",
+            "reset": reset_record,
+            "stale_record": stale_after_reset,
+        }
+    )
     abandonment_passed = False
     abandonment = CanonicalPCMAssembler(0, origin, origin + 512, 512)
     abandonment.append_chunk(origin, origin + 512)
@@ -1670,16 +2049,6 @@ def _run_lifecycle_replays(
         "terminal_event_count": terminal_count,
         "lifecycle_coordinate_digest": lifecycle_digest,
         "projection_coordinate_digest": projection_digest,
-        "b1_seed": {
-            "b0_boundary_digest": projection_digest,
-            "b1_boundary_digest": projection_digest,
-            "b0_lifecycle_digest": lifecycle_digest,
-            "b1_lifecycle_digest": lifecycle_digest,
-            "ordinary_boundary_coordinates_identical": True,
-            "lifecycle_coordinates_reasons_identical": True,
-            "logical_segmentation_identical_after_duplicate_normalization": True,
-            "passed": True,
-        },
         "passed": all(summary["projection_parity"] for summary in summaries)
         and max_duration_count > 0
         and silence_count > 0
@@ -1688,6 +2057,102 @@ def _run_lifecycle_replays(
     if not lifecycle["passed"]:
         raise Phase3OracleError("structural lifecycle coverage did not pass")
     return full, lifecycle
+
+
+def run_b1_seed(prepared: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    evidence: list[dict[str, Any]] = []
+    mismatches: list[dict[str, Any]] = []
+    for case in prepared:
+        b0_replay = _run_stream(case, 2000, [])
+        b1_replay = _run_stream(case, 2000, [])
+        lifecycle_coordinates = [
+            [
+                str(event["event_id"]),
+                str(event["event_kind"]),
+                str(event["reason"]),
+                int(event["event_source_sample"]),
+            ]
+            for event in case["lifecycle_events"]
+        ]
+        applied_coordinates = [
+            [
+                str(event["event_id"]),
+                str(event["event_kind"]),
+                str(event["reason"]),
+                int(event["event_source_sample"]),
+            ]
+            for event in b1_replay["lifecycle_events"]
+        ]
+        expected_b0_boundaries = [
+            int(action["boundary_source_sample"]) for action in case["b0_actions"]
+        ]
+        actual_b1_boundaries = [
+            int(b1_replay["action_results"][str(action["action_id"])]["boundary_source_sample"])
+            for action in case["b0_actions"]
+        ]
+        structural_boundaries = {
+            int(event["event_source_sample"])
+            for event in case["lifecycle_events"]
+            if event["event_kind"] == "speech_end" and event["reason"] == "max_duration"
+        }
+        normalized_boundaries = set(structural_boundaries)
+        normalized_boundaries.update(
+            int(action["boundary_source_sample"]) for action in case["b0_actions"]
+        )
+        expected_spans = turn_spans(int(case["start"]), int(case["end"]), normalized_boundaries)
+        checks = {
+            "ordinary_boundary_coordinates_identical": (
+                expected_b0_boundaries == actual_b1_boundaries
+            ),
+            "lifecycle_coordinates_reasons_identical": (
+                lifecycle_coordinates == applied_coordinates
+            ),
+            "b0_b1_logical_segmentation_identical": (b0_replay["spans"] == b1_replay["spans"]),
+            "logical_segmentation_matches_direct_normalization": (
+                b1_replay["spans"] == expected_spans
+            ),
+        }
+        row = {
+            "session_id": str(case["episode"]["session_id"]),
+            "episode_id": str(case["episode"]["episode_id"]),
+            "b0_boundary_coordinates": expected_b0_boundaries,
+            "b1_boundary_coordinates": actual_b1_boundaries,
+            "lifecycle_coordinate_digest": canonical_sha256(lifecycle_coordinates),
+            "b1_lifecycle_coordinate_digest": canonical_sha256(applied_coordinates),
+            "b0_normalized_segmentation_digest": canonical_sha256(b0_replay["spans"]),
+            "b1_normalized_segmentation_digest": canonical_sha256(b1_replay["spans"]),
+            "direct_normalized_segmentation_digest": canonical_sha256(expected_spans),
+            "checks": checks,
+        }
+        evidence.append(row)
+        if not all(checks.values()):
+            mismatches.append(row)
+    result = {
+        "holdback_ms": 2000,
+        "episode_count": len(evidence),
+        "evidence_digest": canonical_sha256(evidence),
+        "mismatch_count": len(mismatches),
+        "mismatches": mismatches,
+        "ordinary_boundary_coordinates_identical": all(
+            row["checks"]["ordinary_boundary_coordinates_identical"] for row in evidence
+        ),
+        "lifecycle_coordinates_reasons_identical": all(
+            row["checks"]["lifecycle_coordinates_reasons_identical"] for row in evidence
+        ),
+        "logical_segmentation_identical_after_duplicate_normalization": all(
+            row["checks"]["b0_b1_logical_segmentation_identical"]
+            and row["checks"]["logical_segmentation_matches_direct_normalization"]
+            for row in evidence
+        ),
+    }
+    result["passed"] = (
+        result["episode_count"] == EXPECTED_EPISODE_COUNT
+        and result["mismatch_count"] == 0
+        and result["ordinary_boundary_coordinates_identical"]
+        and result["lifecycle_coordinates_reasons_identical"]
+        and result["logical_segmentation_identical_after_duplicate_normalization"]
+    )
+    return result
 
 
 def _shard_name(delay_ms: int) -> str:
@@ -1718,6 +2183,7 @@ def compact_detail_row(row: dict[str, Any], emitted: set[str]) -> dict[str, Any]
         "baseline_progress_sha256": row.pop("baseline_progress_sha256"),
         "baseline_turn_spans": row.pop("baseline_turn_spans"),
         "baseline_drain_records": row.pop("baseline_drain_records"),
+        "baseline_finalization_records": row.pop("baseline_finalization_records"),
         "baseline_state_digest": row.pop("baseline_state_digest"),
         "baseline_metrics": row["metrics"].pop("baseline"),
         "baseline_invariants": row["invariants"].pop("baseline"),
@@ -1754,16 +2220,22 @@ def run_oracle(results_dir: Path, corpus_root: Path) -> tuple[Path, Path]:
     frozen_inputs = _verify_frozen_inputs(results_dir)
     lifecycle_full, lifecycle_summary = _run_lifecycle_replays(results_dir, corpus_root)
     prepared, identities = _load_population(results_dir, corpus_root, lifecycle_full)
+    lifecycle_summary["b1_seed"] = run_b1_seed(prepared)
+    if not lifecycle_summary["b1_seed"]["passed"]:
+        raise Phase3OracleError("B1 no-detector lifecycle seed failed")
     fixtures = run_pcm_fixtures()
     if not fixtures["fixtures_passed"] or not fixtures["property_checks_passed"]:
         raise Phase3OracleError("PCM or lifecycle fixture matrix failed")
     details_dir = results_dir / "oracle_provider_neutral_details"
     details_dir.mkdir(parents=True, exist_ok=True)
     expected_names = {_shard_name(delay) for delay in DELAYS_MS}
+    expected_temp_names = {f".{name}.tmp" for name in expected_names}
     unexpected = sorted(
         path.name
         for path in details_dir.iterdir()
-        if path.is_file() and path.name not in expected_names
+        if path.is_file()
+        and path.name not in expected_names
+        and path.name not in expected_temp_names
     )
     if unexpected:
         raise Phase3OracleError(f"unexpected Phase 3 detail shard files: {unexpected}")
@@ -1779,12 +2251,13 @@ def run_oracle(results_dir: Path, corpus_root: Path) -> tuple[Path, Path]:
     total_clamps = 0
     for delay in DELAYS_MS:
         shard_path = details_dir / _shard_name(delay)
+        temp_shard_path = details_dir / f".{shard_path.name}.tmp"
         identity_hasher = hashlib.sha256()
         emitted_definitions: set[str] = set()
         row_count = 0
         action_count = 0
         clamp_count = 0
-        with shard_path.open("wb") as raw_handle:
+        with temp_shard_path.open("wb") as raw_handle:
             with gzip.GzipFile(
                 filename="", fileobj=raw_handle, mode="wb", compresslevel=9, mtime=0
             ) as gzip_handle:
@@ -1806,9 +2279,10 @@ def run_oracle(results_dir: Path, corpus_root: Path) -> tuple[Path, Path]:
                 f"detail shard completeness failure for delay {delay}: "
                 f"rows={row_count}, actions={action_count}"
             )
-        size = shard_path.stat().st_size
+        size = temp_shard_path.stat().st_size
         if size > SHARD_MAX_BYTES:
-            raise Phase3OracleError(f"compressed detail shard exceeds 20 MiB: {shard_path}")
+            raise Phase3OracleError(f"compressed detail shard exceeds 20 MiB: {temp_shard_path}")
+        temp_shard_path.replace(shard_path)
         shard_metadata.append(
             {
                 "delay_ms": delay,
