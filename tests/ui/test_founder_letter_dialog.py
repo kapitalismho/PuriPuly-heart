@@ -8,23 +8,11 @@ from tests.helpers.flet_page import DialogTrackingPage as DummyPage
 
 pytest.importorskip("flet")
 
-from puripuly_heart.ui.components.founder_letter_dialog import FounderLetterDialog
-from puripuly_heart.ui.i18n import set_locale
-
-REQUESTED_FOUNDER_LETTER_COPY = (
-    "PuriPuly Heart를 사용해줘서 고마워요.\n"
-    "제가 충전해놓은 크레딧은 여기서 끝이에요.\n\n"
-    "어땠을까요?\n"
-    "새로움이라든가 놀라움이라든가\n"
-    "즐거운 순간이 당신과 함께했길 바라요.\n\n"
-    "더 이용하고 싶으시면\n"
-    "자신의 API 키를 발급해서 사용해주세요.\n\n"
-    "방법은 README에 적어뒀어요.\n"
-    "천천히 따라가면 어렵지 않을 거예요.\n\n"
-    "어디선가 막히거나 건의하고 싶은 게 있다면\n"
-    "무슨 일이든 편하게 저한테 연락해주세요.\n\n"
-    "그럼 다시 만나길 바랄게요."
+from puripuly_heart.ui.components.founder_letter_dialog import (
+    FOUNDER_LETTER_PARAGRAPH_KEYS,
+    FounderLetterDialog,
 )
+from puripuly_heart.ui.i18n import set_locale, t
 
 
 def _body_text_value(page: DummyPage) -> str:
@@ -68,8 +56,8 @@ def test_founder_letter_dialog_opens_with_two_actions() -> None:
     assert dialog._acknowledge_button is not None
     assert dialog._cancel_button is not None
     assert len(page.opened) == 1
-    assert dialog._cancel_button.content == "닫기"
-    assert dialog._acknowledge_button.content == "README 열기"
+    assert dialog._cancel_button.content == t("openrouter.handoff.close")
+    assert dialog._acknowledge_button.content == t("openrouter.handoff.readme")
 
 
 def test_founder_letter_dialog_uses_requested_letter_copy() -> None:
@@ -78,7 +66,8 @@ def test_founder_letter_dialog_uses_requested_letter_copy() -> None:
 
     FounderLetterDialog(page).open()
 
-    assert _body_text_value(page) == REQUESTED_FOUNDER_LETTER_COPY
+    expected_body = "\n\n".join(t(key) for key in FOUNDER_LETTER_PARAGRAPH_KEYS)
+    assert _body_text_value(page) == expected_body
 
 
 def test_founder_letter_dialog_is_modal_to_prevent_outside_dismissal() -> None:

@@ -335,6 +335,8 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
 
     try:
         i18n_module.set_locale("ko")
+        expected_message = i18n_module.t("github_star.snackbar.message")
+        expected_action = i18n_module.t("github_star.snackbar.action")
         shown = await app.maybe_show_github_star_prompt_after_launch()
     finally:
         i18n_module.set_locale(previous_locale)
@@ -355,8 +357,8 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
     assert isinstance(snackbar.content, ft.Row)
     message = snackbar.content.controls[0]
     action = snackbar.content.controls[1]
-    assert message.value == "PuriPuly가 도움이 됐다면 GitHub에서 Star를 눌러주세요! 큰 힘이 되어요!"
-    assert action.content == "이동"
+    assert message.value == expected_message
+    assert action.content == expected_action
 
     in_click_callback = True
     click_callback_save_calls: list[dict[str, object]] = []
@@ -908,7 +910,7 @@ def test_debug_preview_panel_includes_github_star_snackbar_action() -> None:
     )
 
     action = panel._action_buttons["github_star_snackbar"]  # noqa: SLF001
-    assert action.content == "GitHub Star"
+    assert action.content == i18n_module.t("debug_preview.github_star_snackbar")
 
     action.on_click(None)
 
@@ -930,6 +932,8 @@ def test_debug_preview_github_star_snackbar_opens_without_mutating_prompt_state(
 
     try:
         i18n_module.set_locale("ko")
+        expected_message = i18n_module.t("github_star.snackbar.message")
+        expected_action = i18n_module.t("github_star.snackbar.action")
         app._preview_github_star_snackbar()  # noqa: SLF001
     finally:
         i18n_module.set_locale(previous_locale)
@@ -945,8 +949,8 @@ def test_debug_preview_github_star_snackbar_opens_without_mutating_prompt_state(
     assert isinstance(snackbar.content, ft.Row)
     message = snackbar.content.controls[0]
     action = snackbar.content.controls[1]
-    assert message.value == "PuriPuly가 도움이 됐다면 GitHub에서 Star를 눌러주세요! 큰 힘이 되어요!"
-    assert action.content == "이동"
+    assert message.value == expected_message
+    assert action.content == expected_action
 
     action.on_click(None)
 

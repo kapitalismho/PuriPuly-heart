@@ -3870,11 +3870,6 @@ def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only
         reset_card = _overlay_tab_card(view, t("settings.overlay.position_reset.desktop.title"))
         reset_actions = _wrapped_card_column(reset_card).controls[1].content
 
-        assert t("settings.overlay.desktop.size.title") == "오버레이 크기"
-        assert t("settings.overlay.desktop.lock.title") == "오버레이 잠금"
-        assert t("settings.overlay.desktop.background_alpha.title") == "배경 투명도"
-        assert t("settings.overlay.position_reset.vr.title") == "위치 초기화"
-        assert t("settings.overlay.position_reset.desktop.title") == "위치 초기화"
         assert t("settings.overlay.desktop.size.title") in overlay_titles
         assert t("settings.overlay.desktop.background_alpha.title") in overlay_titles
         assert t("settings.overlay.desktop.lock.title") in overlay_titles

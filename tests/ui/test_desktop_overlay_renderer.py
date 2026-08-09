@@ -1729,7 +1729,9 @@ def test_desktop_overlay_preview_no_caption_fixture_supports_manual_qa_states() 
 
     fixture = next(fixture for fixture in catalog.fixtures if "no_caption" in fixture.coverage_tags)
 
-    assert fixture.label == "No captions"
+    assert fixture.label == desktop_overlay.t_for_locale(
+        "en", "settings.overlay.desktop.preview.fixture.no_captions"
+    )
     edit_plan = desktop_overlay.build_desktop_caption_plan(
         fixture.snapshot,
         interaction_mode="edit",
@@ -1767,7 +1769,10 @@ def test_desktop_overlay_preview_uses_edit_mode_for_no_caption_empty_state() -> 
 
     window._render_page()  # noqa: SLF001 - verify preview rendering contract
 
-    assert "Lock" in _page_text_values(app.page)
+    assert (
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.empty_state.action.lock")
+        in _page_text_values(app.page)
+    )
     assert len(_text_buttons(app.page)) == 1
 
 
@@ -2041,9 +2046,12 @@ def test_desktop_overlay_preview_fixtures_use_real_overlay_window_surface_and_ed
     assert not _page_contains_control_type(app.page, ft.WindowDragArea)
 
     visible_text = _page_text_values(app.page)
-    assert "Sample captions" in visible_text
-    assert "Overlay size" in visible_text
-    assert "Preview background" in visible_text
+    assert desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.fixture") in visible_text
+    assert desktop_overlay.t_for_locale("en", "settings.overlay.desktop.size.title") in visible_text
+    assert (
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface")
+        in visible_text
+    )
     assert "Outline width" not in visible_text
     assert "Text scale" not in visible_text
 
@@ -2065,7 +2073,10 @@ async def test_desktop_overlay_preview_controls_apply_size_preset_without_outlin
 
     try:
         await window.start(catalog.fixtures[0].snapshot)
-        assert "Preview background" in _page_text_values(app.page)
+        assert (
+            desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface")
+            in _page_text_values(app.page)
+        )
         assert "Outline width" not in _page_text_values(app.page)
 
         large_control = _find_control_with_text(app.page, "Large")
@@ -2079,7 +2090,10 @@ async def test_desktop_overlay_preview_controls_apply_size_preset_without_outlin
         assert app.page.window.width == _DESKTOP_CAPTION_SIZE_PRESETS["large"].window_width
         assert app.page.window.height == _DESKTOP_CAPTION_SIZE_PRESETS["large"].window_height
         visible_text = _page_text_values(app.page)
-        assert "Preview background" in visible_text
+        assert (
+            desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface")
+            in visible_text
+        )
         assert sink.events == []
     finally:
         await window.close()
@@ -2221,16 +2235,36 @@ def test_desktop_overlay_preview_fixtures_run_local_app_without_renderer_or_pers
     assert len(app.targets) == 1
 
     visible_text = _page_text_values(app.page)
-    assert "Sample captions" in visible_text
-    assert "Overlay size" in visible_text
-    assert "Background transparency" in visible_text
-    assert "Preview background" in visible_text
+    assert desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.fixture") in visible_text
+    assert desktop_overlay.t_for_locale("en", "settings.overlay.desktop.size.title") in visible_text
+    assert (
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_alpha")
+        in visible_text
+    )
+    assert (
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface")
+        in visible_text
+    )
     assert "Outline width" not in visible_text
     assert "Text scale" not in visible_text
     assert {"65%", "50%", "40%", "20%"} <= visible_text
-    assert {"Small", "Medium", "Large", "Extra large"} <= visible_text
-    assert {"Bright", "Dark", "Busy desktop"} <= visible_text
-    assert "Korean long wrap" in visible_text
+    assert {
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.size.option.small"),
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.size.option.medium"),
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.size.option.large"),
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.size.option.xlarge"),
+    } <= visible_text
+    assert {
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface.bright"),
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface.dark"),
+        desktop_overlay.t_for_locale(
+            "en", "settings.overlay.desktop.preview.background_surface.busy"
+        ),
+    } <= visible_text
+    assert (
+        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.fixture.korean_long_wrap")
+        in visible_text
+    )
     assert any("긴 문장" in text for text in visible_text)
 
 
@@ -2563,7 +2597,11 @@ async def test_desktop_overlay_reveals_first_window_update_after_chrome_bounds_a
         ]
         assert app.page.render_snapshots[0] == {
             "ignore_mouse_events": False,
-            "texts": {"Lock"},
+            "texts": {
+                desktop_overlay.t_for_locale(
+                    "en", "settings.overlay.desktop.empty_state.action.lock"
+                )
+            },
             "has_drag_area": True,
             "card_count": 1,
         }
@@ -3118,9 +3156,12 @@ async def test_desktop_overlay_flet_window_starts_frameless_transparent_moving_e
         assert page.window.width == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].window_width
         assert page.window.height == _DESKTOP_CAPTION_SIZE_PRESETS["medium"].window_height
 
-        assert _page_text_values(page) == {"Lock"}
+        lock_label = desktop_overlay.t_for_locale(
+            "en", "settings.overlay.desktop.empty_state.action.lock"
+        )
+        assert _page_text_values(page) == {lock_label}
         _assert_no_overlay_local_renderer_text(page)
-        assert [button.content for button in _text_buttons(page)] == ["Lock"]
+        assert [button.content for button in _text_buttons(page)] == [lock_label]
         assert _page_contains_control_type(page, ft.WindowDragArea)
         cards = _caption_card_controls(page)
         assert len(cards) == 1
@@ -3181,11 +3222,14 @@ async def test_desktop_overlay_empty_moving_state_renders_text_only_lock_action(
     try:
         await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
 
-        assert "고정하기" in _page_text_values(app.page)
-        action = _find_text_button(app.page, "고정하기")
+        lock_label = desktop_overlay.t_for_locale(
+            "ko", "settings.overlay.desktop.empty_state.action.lock"
+        )
+        assert lock_label in _page_text_values(app.page)
+        action = _find_text_button(app.page, lock_label)
         assert action.width >= 44
         assert action.height >= 44
-        assert action.tooltip == "고정하기"
+        assert action.tooltip == lock_label
         assert action.style.bgcolor == ft.Colors.TRANSPARENT
         assert action.style.overlay_color == ft.Colors.TRANSPARENT
         assert action.style.elevation == 0
@@ -3197,7 +3241,7 @@ async def test_desktop_overlay_empty_moving_state_renders_text_only_lock_action(
         assert action_text_style.shadow is None
         action_padding = action.style.padding
         required_label_width = desktop_overlay._estimated_caption_line_width(
-            "고정하기",
+            lock_label,
             int(action_text_style.size),
         )
         assert action.width >= required_label_width + action_padding.left + action_padding.right
@@ -3242,11 +3286,14 @@ async def test_desktop_overlay_empty_lock_action_hides_when_captions_arrive() ->
 
     try:
         await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
-        assert "고정하기" in _page_text_values(app.page)
+        lock_label = desktop_overlay.t_for_locale(
+            "ko", "settings.overlay.desktop.empty_state.action.lock"
+        )
+        assert lock_label in _page_text_values(app.page)
 
         await window.dispatch_snapshot(captions)
 
-        assert "고정하기" not in _page_text_values(app.page)
+        assert lock_label not in _page_text_values(app.page)
         assert {"좋아요", "Sounds good"} <= _page_text_values(app.page)
         assert len(_text_buttons(app.page)) == 1
         assert _text_buttons(app.page)[0].visible is False
@@ -3492,7 +3539,10 @@ async def test_desktop_overlay_empty_lock_action_switches_to_pass_through() -> N
 
     try:
         await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
-        action = _find_text_button(app.page, "Lock")
+        action = _find_text_button(
+            app.page,
+            desktop_overlay.t_for_locale("en", "settings.overlay.desktop.empty_state.action.lock"),
+        )
 
         action.on_click(None)
         if app.page.tasks:
@@ -3524,12 +3574,15 @@ async def test_desktop_overlay_display_matrix_locked_no_captions_is_fully_transp
     try:
         await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
 
+        lock_label = desktop_overlay.t_for_locale(
+            "en", "settings.overlay.desktop.empty_state.action.lock"
+        )
         assert app.page.window.frameless is True
         assert app.page.window.shadow is False
         assert app.page.window.resizable is False
         assert app.page.window.always_on_top is True
         assert app.page.window.ignore_mouse_events is False
-        assert "Lock" in _page_text_values(app.page)
+        assert lock_label in _page_text_values(app.page)
         assert len(_text_buttons(app.page)) == 1
         assert _page_contains_control_type(app.page, ft.WindowDragArea)
         assert len(_caption_card_controls(app.page)) == 1
@@ -3555,7 +3608,7 @@ async def test_desktop_overlay_display_matrix_locked_no_captions_is_fully_transp
         assert app.page.window.title_bar_buttons_hidden is None
         assert app.page.window.resizable is False
         assert app.page.window.ignore_mouse_events is False
-        assert "Lock" in _page_text_values(app.page)
+        assert lock_label in _page_text_values(app.page)
         assert len(_text_buttons(app.page)) == 1
         assert _page_contains_control_type(app.page, ft.WindowDragArea)
         assert len(_caption_card_controls(app.page)) == 1
@@ -3654,7 +3707,9 @@ async def test_desktop_overlay_shipping_surface_has_no_overlay_local_controls() 
         assert sink.events == []
         _assert_no_overlay_local_renderer_text(app.page)
         buttons = _text_buttons(app.page)
-        assert [button.content for button in buttons] == ["Lock"]
+        assert [button.content for button in buttons] == [
+            desktop_overlay.t_for_locale("en", "settings.overlay.desktop.empty_state.action.lock")
+        ]
         assert not any(
             isinstance(item, ft.ElevatedButton)
             for control in app.page.controls
@@ -3817,7 +3872,10 @@ async def test_desktop_overlay_post_start_paths_update_retained_controls_in_plac
         assert (app.page.window.width, app.page.window.height) == (1152, 288)
 
         await window.dispatch_snapshot(OverlayPresentationSnapshot(revision=3, blocks=[]))
-        action = _find_text_button(app.page, "Lock")
+        action = _find_text_button(
+            app.page,
+            desktop_overlay.t_for_locale("en", "settings.overlay.desktop.empty_state.action.lock"),
+        )
         action.on_click(None)
         await asyncio.gather(*app.page.tasks)
 
@@ -5205,7 +5263,11 @@ async def test_desktop_overlay_initial_pass_through_control_does_not_lock_startu
         first_render = app.page.render_snapshots[0]
         assert first_render == {
             "ignore_mouse_events": False,
-            "texts": {"Lock"},
+            "texts": {
+                desktop_overlay.t_for_locale(
+                    "en", "settings.overlay.desktop.empty_state.action.lock"
+                )
+            },
             "has_drag_area": True,
             "card_count": 1,
         }
@@ -5275,7 +5337,11 @@ async def test_desktop_overlay_primed_initial_controls_are_not_replayed_after_st
         assert app.page.visibility_updates == [False, True]
         assert app.page.render_snapshots[0] == {
             "ignore_mouse_events": False,
-            "texts": {"Lock"},
+            "texts": {
+                desktop_overlay.t_for_locale(
+                    "en", "settings.overlay.desktop.empty_state.action.lock"
+                )
+            },
             "has_drag_area": True,
             "card_count": 1,
         }
