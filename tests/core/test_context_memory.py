@@ -11,6 +11,7 @@ import pytest
 
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime, ContextEntry
 from puripuly_heart.core.orchestrator.context import ContextResolver
+from puripuly_heart.core.translation_backend import LlmTranslationBackend
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import Transcript, Translation
 from tests.helpers.translation_owners import compose_translation_test_harness
@@ -865,7 +866,7 @@ class TestContextLogging:
         await harness.ensure_translation(transcript)
         await harness.ensure_translation(transcript)
 
-        assert len(harness.llm_runtime.provider.calls) == 1
+        assert len(harness.llm_runtime.provider.provider.calls) == 1
         assert harness.translation_turns.is_parent_closed(transcript.utterance_id)
         assert harness.self_runtime.translation_tasks == {}
 
@@ -889,7 +890,7 @@ class TestContextLogging:
             await release.wait()
             return Translation(utterance_id=kwargs["utterance_id"], text="translated")
 
-        harness.llm_runtime.provider.translate = blocking_translate
+        harness.llm_runtime.provider.provider.translate = blocking_translate
         parent_id = uuid4()
         harness.peer_runtime.utterance_start_times[parent_id] = 12.0
         harness.peer_runtime.speech_ended_ids.add(parent_id)
@@ -1069,7 +1070,9 @@ class TestContextLogging:
             integrated_context_enabled=True,
             peer_translation_enabled=True,
         )
-        harness.llm_runtime.attach_provider_reference(FakeLLMProvider(response_text="OK"))
+        harness.llm_runtime.attach_provider_reference(
+            LlmTranslationBackend(FakeLLMProvider(response_text="OK"))
+        )
         harness.replace_configuration(source_language="en")
         harness.replace_configuration(target_language="ko")
         transcript = Transcript(
@@ -1082,7 +1085,7 @@ class TestContextLogging:
         async def failing_translate(**kwargs):  # noqa: ANN003
             raise RuntimeError("boom")
 
-        harness.llm_runtime.provider.translate = failing_translate  # type: ignore[method-assign]
+        harness.llm_runtime.provider.provider.translate = failing_translate  # type: ignore[method-assign]
 
         await harness.ensure_translation(transcript)
         await asyncio.gather(

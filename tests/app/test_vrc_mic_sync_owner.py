@@ -85,6 +85,27 @@ async def test_owner_configures_starts_and_stops_receiver_with_gate() -> None:
 
 
 @pytest.mark.asyncio
+async def test_owner_keeps_legacy_mute_receiver_when_control_mode_is_off() -> None:
+    gate = RecordingGate()
+    owner, errors, _ = _owner(state=VrcMicState(), gate=gate)
+
+    await owner.configure_control(
+        active=False,
+        host="127.0.0.1",
+        port=9001,
+        force_restart=True,
+    )
+    await owner.configure(enabled=True)
+
+    assert isinstance(owner.receiver, RecordingReceiver)
+    assert owner.receiver.started is True
+    assert owner.control_active is False
+    assert errors == []
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_owner_skips_receiver_without_state_and_marks_gate_inactive() -> None:
     gate = RecordingGate()
     factory_calls = 0

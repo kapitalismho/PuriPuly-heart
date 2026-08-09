@@ -268,15 +268,17 @@ class TranslationModel(str, Enum):
     GEMINI_31_FLASH_LITE = "gemini31_flash_lite"
     QWEN_35_PLUS = "qwen35_plus"
     LOCAL_LLM = "local_llm"
-    GEMMA4_31B_CEREBRAS = "gemma4_31b_cerebras"
+    CUSTOM_HTTP = "custom_http"
 
 
 class TranslationConnection(str, Enum):
     MANAGED = "managed"
     MANAGED_CHINA = "managed_china"
     OPENROUTER = "openrouter"
+    CEREBRAS = "cerebras"
     OFFICIAL_BYOK = "official_byok"
     OLLAMA = "ollama"
+    CUSTOM_HTTP = "custom_http"
 
 
 @dataclass(slots=True)
@@ -291,6 +293,8 @@ class TranslationFallbackSettings:
             raise ValueError("invalid translation fallback model")
         if not isinstance(self.connection, TranslationConnection):
             raise ValueError("invalid translation fallback connection")
+        if self.model == TranslationModel.CUSTOM_HTTP:
+            raise ValueError("custom HTTP translation cannot be used as fallback")
         if self.connection not in _supported_translation_connections(self.model):
             raise ValueError("translation fallback connection is not supported for model")
 
@@ -303,6 +307,8 @@ class TranslationSettings:
         default_factory=lambda: _default_translation_connection_history()
     )
     fallback: TranslationFallbackSettings = field(default_factory=TranslationFallbackSettings)
+    http_extension_id: str | None = None
+    previous_llm_model: TranslationModel | None = None
 
     def validate(self) -> None:
         if not isinstance(self.model, TranslationModel):
@@ -321,6 +327,24 @@ class TranslationSettings:
                 raise ValueError("invalid translation connection_history connection")
             if connection not in _supported_translation_connections(model):
                 raise ValueError("translation connection_history connection is not supported")
+        if self.http_extension_id is not None and (
+            not isinstance(self.http_extension_id, str)
+            or not self.http_extension_id.strip()
+            or len(self.http_extension_id.strip()) > 64
+        ):
+            raise ValueError("invalid HTTP http_extension_id")
+        if self.previous_llm_model is not None and not isinstance(
+            self.previous_llm_model,
+            TranslationModel,
+        ):
+            raise ValueError("invalid previous LLM translation model")
+        if self.model == TranslationModel.CUSTOM_HTTP:
+            if self.connection != TranslationConnection.CUSTOM_HTTP:
+                raise ValueError("custom HTTP translation requires custom_http connection")
+            if self.previous_llm_model == TranslationModel.CUSTOM_HTTP:
+                raise ValueError("invalid previous LLM translation model")
+        elif self.previous_llm_model is not None:
+            raise ValueError("previous LLM translation model is only valid for custom HTTP")
         self.fallback.validate()
 
 
@@ -332,6 +356,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnec
     TranslationModel.GEMMA4_31B: (
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
+        TranslationConnection.CEREBRAS,
     ),
     TranslationModel.GEMMA4: (
         TranslationConnection.MANAGED,
@@ -354,7 +379,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[TranslationModel, tuple[TranslationConnec
     ),
     TranslationModel.QWEN_35_PLUS: (TranslationConnection.OFFICIAL_BYOK,),
     TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
-    TranslationModel.GEMMA4_31B_CEREBRAS: (TranslationConnection.OFFICIAL_BYOK,),
+    TranslationModel.CUSTOM_HTTP: (TranslationConnection.CUSTOM_HTTP,),
 }
 TRANSLATION_CONNECTION_PRIORITY: tuple[TranslationConnection, ...] = (
     TranslationConnection.MANAGED,
@@ -370,6 +395,8 @@ def supported_translation_connections(
 
 
 def default_translation_connection(model: TranslationModel) -> TranslationConnection:
+    if model == TranslationModel.CUSTOM_HTTP:
+        return TranslationConnection.CUSTOM_HTTP
     if model in (TranslationModel.GEMINI_3_FLASH, TranslationModel.GEMINI_31_FLASH_LITE):
         return TranslationConnection.OFFICIAL_BYOK
     supported_connections = supported_translation_connections(model)
@@ -398,6 +425,8 @@ def _parse_translation_model(value: object) -> TranslationModel | None:
         return value
     if isinstance(value, str):
         normalized = value.strip()
+        if normalized == "gemma4_31b_cerebras":
+            return TranslationModel.GEMMA4_31B
         try:
             return TranslationModel(normalized)
         except ValueError:
@@ -422,7 +451,11 @@ def _parse_translation_connection_history(value: object) -> dict[str, Translatio
         return {}
 
     history: dict[str, TranslationConnection] = {}
+    legacy_cerebras = False
     for raw_model, raw_connection in value.items():
+        if str(raw_model).strip() == "gemma4_31b_cerebras":
+            legacy_cerebras = True
+            continue
         model = _parse_translation_model(raw_model)
         connection = _parse_translation_connection(raw_connection)
         if model is None or connection is None:
@@ -430,7 +463,18 @@ def _parse_translation_connection_history(value: object) -> dict[str, Translatio
         if connection not in _supported_translation_connections(model):
             continue
         history[model.value] = connection
+    if TranslationModel.GEMMA4_31B.value not in history and legacy_cerebras:
+        history[TranslationModel.GEMMA4_31B.value] = TranslationConnection.CEREBRAS
     return history
+
+
+def _parse_translation_selection(
+    raw_model: object,
+    raw_connection: object,
+) -> tuple[TranslationModel | None, TranslationConnection | None]:
+    if isinstance(raw_model, str) and raw_model.strip() == "gemma4_31b_cerebras":
+        return TranslationModel.GEMMA4_31B, TranslationConnection.CEREBRAS
+    return _parse_translation_model(raw_model), _parse_translation_connection(raw_connection)
 
 
 def _parse_translation_fallback(value: object) -> TranslationFallbackSettings:
@@ -440,8 +484,8 @@ def _parse_translation_fallback(value: object) -> TranslationFallbackSettings:
         return fallback
     if not isinstance(value, dict):
         return TranslationFallbackSettings()
-    model = _parse_translation_model(value.get("model")) or TranslationModel.DEEPSEEK_V4_FLASH
-    connection = _parse_translation_connection(value.get("connection"))
+    model, connection = _parse_translation_selection(value.get("model"), value.get("connection"))
+    model = model or TranslationModel.DEEPSEEK_V4_FLASH
     if connection not in _supported_translation_connections(model):
         connection = _default_translation_connection(model)
     fallback = TranslationFallbackSettings(
@@ -459,17 +503,31 @@ def _normalize_translation_settings(
     connection: TranslationConnection | None,
     fallback: object = None,
     history: object = None,
+    http_extension_id: object = None,
+    previous_llm_model: object = None,
 ) -> TranslationSettings:
     normalized_model = model or TranslationModel.GEMMA4_26B_31B
     normalized_history = _parse_translation_connection_history(history)
     if connection not in _supported_translation_connections(normalized_model):
         connection = _default_translation_connection(normalized_model)
+    normalized_http_extension_id = (
+        http_extension_id.strip()
+        if isinstance(http_extension_id, str) and http_extension_id.strip()
+        else None
+    )
+    normalized_previous_llm_model = _parse_translation_model(previous_llm_model)
+    if normalized_previous_llm_model == TranslationModel.CUSTOM_HTTP:
+        normalized_previous_llm_model = None
+    if normalized_model != TranslationModel.CUSTOM_HTTP:
+        normalized_previous_llm_model = None
     normalized_history[normalized_model.value] = connection
     return TranslationSettings(
         model=normalized_model,
         connection=connection,
         connection_history=normalized_history,
         fallback=_parse_translation_fallback(fallback),
+        http_extension_id=normalized_http_extension_id,
+        previous_llm_model=normalized_previous_llm_model,
     )
 
 
@@ -506,7 +564,7 @@ def _history_connection_or_default(
 
 
 def _translation_settings_to_dict(settings: TranslationSettings) -> dict[str, Any]:
-    return {
+    data: dict[str, Any] = {
         "model": settings.model.value,
         "connection": settings.connection.value,
         "connection_history": {
@@ -518,6 +576,11 @@ def _translation_settings_to_dict(settings: TranslationSettings) -> dict[str, An
             "connection": settings.fallback.connection.value,
         },
     }
+    if settings.model == TranslationModel.CUSTOM_HTTP or settings.http_extension_id is not None:
+        data["http_extension_id"] = settings.http_extension_id
+    if settings.previous_llm_model is not None:
+        data["previous_llm_model"] = settings.previous_llm_model.value
+    return data
 
 
 def _default_translation_settings_dict() -> dict[str, Any]:
@@ -728,6 +791,9 @@ class LLMSettings:
 class OSCSettings:
     host: str = "127.0.0.1"
     port: int = 9000
+    send_port: int | None = None
+    receive_port: int = 9001
+    connection_mode: str = "automatic"
     chatbox_address: str = "/chatbox/input"
     chatbox_send: bool = True
     chatbox_clear: bool = False
@@ -735,11 +801,30 @@ class OSCSettings:
     vrc_mic_intercept: bool = False
     chatbox_include_source: bool = False
 
+    def __post_init__(self) -> None:
+        if self.send_port is None:
+            object.__setattr__(self, "send_port", self.port)
+        else:
+            object.__setattr__(self, "port", self.send_port)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        object.__setattr__(self, name, value)
+        if name == "port":
+            object.__setattr__(self, "send_port", value)
+        elif name == "send_port" and value is not None:
+            object.__setattr__(self, "port", value)
+
     def validate(self) -> None:
         if not self.host:
             raise ValueError("host must be non-empty")
+        if self.connection_mode not in {"automatic", "manual", "off"}:
+            raise ValueError("connection_mode must be automatic, manual, or off")
         if not (0 < self.port <= 65535):
             raise ValueError("port must be in 1..65535")
+        if self.send_port != self.port:
+            raise ValueError("send_port must match port compatibility value")
+        if not (0 < self.receive_port <= 65535):
+            raise ValueError("receive_port must be in 1..65535")
         if not self.chatbox_address or not self.chatbox_address.startswith("/"):
             raise ValueError("chatbox_address must start with '/'")
         if self.chatbox_max_chars <= 0:
@@ -1774,6 +1859,13 @@ def to_dict(settings: AppSettings) -> dict[str, Any]:
         },
         "system_prompt": settings.system_prompt,
     }
+    data["osc"].update(
+        {
+            "connection_mode": settings.osc.connection_mode,
+            "send_port": settings.osc.send_port,
+            "receive_port": settings.osc.receive_port,
+        }
+    )
     return _enum_to_value(data)  # type: ignore[return-value]
 
 
@@ -2323,8 +2415,8 @@ def _derive_translation_settings_from_runtime_values(
 
     if provider_llm == LLMProviderName.CEREBRAS:
         return _normalize_translation_settings(
-            model=TranslationModel.GEMMA4_31B_CEREBRAS,
-            connection=TranslationConnection.OFFICIAL_BYOK,
+            model=TranslationModel.GEMMA4_31B,
+            connection=TranslationConnection.CEREBRAS,
             history=normalized_history,
         )
 
@@ -2393,9 +2485,14 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         connection=_parse_translation_connection(settings.translation.connection),
         fallback=settings.translation.fallback,
         history=settings.translation.connection_history,
+        http_extension_id=settings.translation.http_extension_id,
+        previous_llm_model=settings.translation.previous_llm_model,
     )
     model = settings.translation.model
     connection = settings.translation.connection
+
+    if model == TranslationModel.CUSTOM_HTTP:
+        return settings
 
     if model == TranslationModel.GEMMA4_26B_31B:
         settings.provider.llm = LLMProviderName.OPENROUTER
@@ -2416,6 +2513,11 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         return settings
 
     if model == TranslationModel.GEMMA4_31B:
+        if connection == TranslationConnection.CEREBRAS:
+            settings.provider.llm = LLMProviderName.CEREBRAS
+            settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
+            settings.cerebras.llm_model = CerebrasLLMModel.GEMMA_4_31B
+            return settings
         settings.provider.llm = LLMProviderName.OPENROUTER
         settings.openrouter.llm_model = OpenRouterLLMModel.GEMMA_4_31B_IT
         settings.openrouter.provider_routing = OpenRouterProviderRouting.GEMMA4_31B_LATENCY
@@ -2515,12 +2617,6 @@ def materialize_translation_settings(settings: AppSettings) -> AppSettings:
         settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
         return settings
 
-    if model == TranslationModel.GEMMA4_31B_CEREBRAS:
-        settings.provider.llm = LLMProviderName.CEREBRAS
-        settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
-        settings.cerebras.llm_model = CerebrasLLMModel.GEMMA_4_31B
-        return settings
-
     settings.provider.llm = LLMProviderName.QWEN
     settings.openrouter.provider_routing = OpenRouterProviderRouting.DEFAULT
     settings.qwen.llm_model = QwenLLMModel.QWEN_35_PLUS
@@ -2563,9 +2659,30 @@ def _apply_materialized_translation_to_data(
         model=_parse_translation_model(translation.model),
         connection=_parse_translation_connection(translation.connection),
         history=translation.connection_history,
+        http_extension_id=translation.http_extension_id,
+        previous_llm_model=translation.previous_llm_model,
     )
 
+    if translation.model == TranslationModel.CUSTOM_HTTP:
+        return changed
+
     if translation.model in (TranslationModel.GEMMA4_26B_31B, TranslationModel.GEMMA4_31B):
+        if (
+            translation.model == TranslationModel.GEMMA4_31B
+            and translation.connection == TranslationConnection.CEREBRAS
+        ):
+            changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.CEREBRAS.value)
+            changed |= _set_mapping_value(
+                openrouter_data,
+                "provider_routing",
+                OpenRouterProviderRouting.DEFAULT.value,
+            )
+            changed |= _set_mapping_value(
+                cerebras_data,
+                "llm_model",
+                CerebrasLLMModel.GEMMA_4_31B.value,
+            )
+            return changed
         selected_source = (
             OpenRouterCredentialSource.MANAGED
             if translation.connection == TranslationConnection.MANAGED
@@ -2753,20 +2870,6 @@ def _apply_materialized_translation_to_data(
 
     if translation.model == TranslationModel.LOCAL_LLM:
         changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.LOCAL_LLM.value)
-        return changed
-
-    if translation.model == TranslationModel.GEMMA4_31B_CEREBRAS:
-        changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.CEREBRAS.value)
-        changed |= _set_mapping_value(
-            openrouter_data,
-            "provider_routing",
-            OpenRouterProviderRouting.DEFAULT.value,
-        )
-        changed |= _set_mapping_value(
-            cerebras_data,
-            "llm_model",
-            CerebrasLLMModel.GEMMA_4_31B.value,
-        )
         return changed
 
     changed |= _set_mapping_value(provider_data, "llm", LLMProviderName.QWEN.value)
@@ -3590,12 +3693,20 @@ def _migrate_settings_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     translation_history = _parse_translation_connection_history(
         translation_data.get("connection_history") if isinstance(translation_data, dict) else None
     )
+    if translation_data.get("previous_llm_model") == "gemma4_31b_cerebras":
+        translation_history[TranslationModel.GEMMA4_31B.value] = TranslationConnection.CEREBRAS
     if _translation_data_has_valid_model(translation_data):
+        translation_model, translation_connection = _parse_translation_selection(
+            translation_data.get("model"),
+            translation_data.get("connection"),
+        )
         normalized_translation_settings = _normalize_translation_settings(
-            model=_parse_translation_model(translation_data.get("model")),
-            connection=_parse_translation_connection(translation_data.get("connection")),
+            model=translation_model,
+            connection=translation_connection,
             fallback=translation_data.get("fallback"),
             history=translation_history,
+            http_extension_id=translation_data.get("http_extension_id"),
+            previous_llm_model=translation_data.get("previous_llm_model"),
         )
     else:
         normalized_translation_settings = _derive_translation_settings_from_runtime_values(
@@ -3912,6 +4023,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     merged_overlay_calibration_data.update(overlay_calibration_data)
     stt_data = data.get("stt") or {}
     ui_data = data.get("ui") or {}
+    osc_data = data.get("osc") if isinstance(data.get("osc"), dict) else {}
     managed_identity_data = (
         data.get("managed_identity") if isinstance(data.get("managed_identity"), dict) else {}
     )
@@ -4186,7 +4298,14 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
         llm=LLMSettings(concurrency_limit=int(data.get("llm", {}).get("concurrency_limit", 5))),
         osc=OSCSettings(
             host=str(data.get("osc", {}).get("host", "127.0.0.1")),
-            port=int(data.get("osc", {}).get("port", 9000)),
+            port=int(data.get("osc", {}).get("port", data.get("osc", {}).get("send_port", 9000))),
+            send_port=(
+                int(data["osc"]["send_port"])
+                if isinstance(data.get("osc"), dict) and "send_port" in data["osc"]
+                else None
+            ),
+            receive_port=int(data.get("osc", {}).get("receive_port", 9001)),
+            connection_mode=str(osc_data.get("connection_mode", "automatic")),
             chatbox_address=str(data.get("osc", {}).get("chatbox_address", "/chatbox/input")),
             chatbox_send=bool(data.get("osc", {}).get("chatbox_send", True)),
             chatbox_clear=bool(data.get("osc", {}).get("chatbox_clear", False)),
@@ -4295,12 +4414,20 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
     translation_history = _parse_translation_connection_history(
         translation_data.get("connection_history") if isinstance(translation_data, dict) else None
     )
+    if translation_data.get("previous_llm_model") == "gemma4_31b_cerebras":
+        translation_history[TranslationModel.GEMMA4_31B.value] = TranslationConnection.CEREBRAS
     if _translation_data_has_valid_model(translation_data):
+        translation_model, translation_connection = _parse_translation_selection(
+            translation_data.get("model"),
+            translation_data.get("connection"),
+        )
         settings.translation = _normalize_translation_settings(
-            model=_parse_translation_model(translation_data.get("model")),
-            connection=_parse_translation_connection(translation_data.get("connection")),
+            model=translation_model,
+            connection=translation_connection,
             fallback=translation_data.get("fallback"),
             history=translation_history,
+            http_extension_id=translation_data.get("http_extension_id"),
+            previous_llm_model=translation_data.get("previous_llm_model"),
         )
     else:
         settings.translation = _derive_translation_settings_from_runtime(

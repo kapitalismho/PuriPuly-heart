@@ -56,6 +56,8 @@ VNEXT_NATIVE_PERSISTED_LEAF_PATHS = frozenset(
         "intent.desktop_audio.capture_target.kind",
         "intent.desktop_audio.capture_target.device_name",
         "intent.desktop_audio.capture_target.process",
+        "intent.translation.http_extension_id",
+        "intent.translation.previous_llm_model",
     }
 ) | frozenset(
     f"state.provider_verification.{provider}.{field}"
@@ -119,8 +121,11 @@ CURRENT_USER_INTENT_DESTINATIONS = {
     "osc.chatbox_include_source": "intent.osc.chatbox_include_source",
     "osc.chatbox_max_chars": "intent.osc.chatbox_max_chars",
     "osc.chatbox_send": "intent.osc.chatbox_send",
+    "osc.connection_mode": "intent.osc.connection_mode",
     "osc.host": "intent.osc.host",
     "osc.port": "intent.osc.port",
+    "osc.receive_port": "intent.osc.receive_port",
+    "osc.send_port": "intent.osc.send_port",
     "osc.vrc_mic_intercept": "intent.osc.vrc_mic_intercept",
     "overlay.calibration.background_alpha": "intent.overlay.calibration.background_alpha",
     "overlay.calibration.distance": "intent.overlay.calibration.distance",
@@ -391,6 +396,8 @@ def maximal_v24_settings_fixture() -> dict[str, Any]:
     settings.llm.concurrency_limit = 7
     settings.osc.host = "192.0.2.25"
     settings.osc.port = 9012
+    settings.osc.connection_mode = "manual"
+    settings.osc.receive_port = 9013
     settings.osc.chatbox_address = "/fixture/chatbox"
     settings.osc.chatbox_send = False
     settings.osc.chatbox_clear = True
@@ -555,11 +562,11 @@ def _current_migration_classification() -> dict[str, FieldClassification]:
         notes="Schema metadata, not a user/state setting field; v24 fixture must remain version 24.",
     )
     table["overlay.calibration.anchor"] = FieldClassification(
-        category="singleton_supported_value",
+        category="supported_enum_value",
         destination="intent.overlay.calibration.anchor",
-        status="singleton_supported_value",
+        status="default_supported_value",
         fixture=MAXIMAL_V24_FIXTURE_NAME,
-        notes="Current overlay calibration supports only 'head_locked'; non-default values fail validation.",
+        notes="Current overlay calibration supports 'head_locked' and 'spatial_locked'; other values fail validation.",
     )
     for path, destination in ADR_RESOLVED_CURRENT_DESTINATIONS.items():
         if path in table:

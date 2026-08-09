@@ -26,6 +26,18 @@ class VrcMicSyncOwner:
     error_sink: Callable[[str], None]
     host: str
     port: int
+    control_packet_handler: Callable[[str, tuple[object, ...]], object] | None = field(
+        default=None,
+        repr=False,
+    )
+    avatar_change_handler: Callable[[tuple[object, ...]], object] | None = field(
+        default=None,
+        repr=False,
+    )
+    packet_handler: Callable[[str, tuple[object, ...]], object] | None = field(
+        default=None,
+        repr=False,
+    )
     _runtime: VrcMicReceiverRuntime | None = field(
         init=False,
         default=None,
@@ -46,6 +58,7 @@ class VrcMicSyncOwner:
         default=None,
         repr=False,
     )
+    _control_active: bool = field(init=False, default=False, repr=False)
     _accepting_ingress: bool = field(init=False, default=True, repr=False)
 
     @property
@@ -77,6 +90,17 @@ class VrcMicSyncOwner:
         self._last_enabled = enabled
 
     @property
+    def control_active(self) -> bool:
+        return self._control_active
+
+    @property
+    def effective_port(self) -> int:
+        runtime = self._runtime
+        if runtime is None:
+            return self.port
+        return int(getattr(runtime, "effective_port", self.port))
+
+    @property
     def lock(self) -> asyncio.Lock:
         if self._lock is None:
             self._lock = asyncio.Lock()
@@ -93,6 +117,7 @@ class VrcMicSyncOwner:
                 "_runtime",
                 "_receiver",
                 "_lock",
+                "_control_active",
                 "_accepting_ingress",
             ),
             "stop_ingress": "reject runtime creation and configuration",
@@ -117,8 +142,59 @@ class VrcMicSyncOwner:
                 receiver_factory=self.receiver_factory,
                 diagnostics_sink=self.diagnostics_sink,
                 state_changed=self.sync_runtime_receiver,
+                control_packet_handler=self.control_packet_handler,
+                avatar_change_handler=self.avatar_change_handler,
+                packet_handler=self.packet_handler,
             )
         return self._runtime
+
+    def set_packet_handlers(
+        self,
+        *,
+        control_packet_handler: Callable[[str, tuple[object, ...]], object] | None = None,
+        avatar_change_handler: Callable[[tuple[object, ...]], object] | None = None,
+        packet_handler: Callable[[str, tuple[object, ...]], object] | None = None,
+    ) -> None:
+        if self._runtime is not None or self._receiver is not None:
+            raise RuntimeError("receiver packet handlers cannot change while running")
+        self.control_packet_handler = control_packet_handler
+        self.avatar_change_handler = avatar_change_handler
+        self.packet_handler = packet_handler
+
+    async def configure_control(
+        self,
+        *,
+        active: bool,
+        host: str,
+        port: int,
+        force_restart: bool = False,
+    ) -> None:
+        async with self.lock:
+            if not self._accepting_ingress:
+                return
+            endpoint_changed = self.host != host or self.port != port
+            self.host = host
+            self.port = int(port)
+            self._control_active = bool(active)
+            if (endpoint_changed or force_restart) and self._receiver is not None:
+                await self._stop_locked()
+            runtime = self._runtime
+            configure_endpoint = getattr(runtime, "configure_endpoint", None)
+            if callable(configure_endpoint) and self._receiver is None:
+                configure_endpoint(self.host, self.port)
+            await self._reconcile_locked()
+
+    async def ensure_receiver(self) -> object | None:
+        async with self.lock:
+            if not self._accepting_ingress:
+                return None
+            if not (self._control_active or bool(self._last_enabled)):
+                return None
+            return await self._start_locked()
+
+    async def stop_receiver(self) -> None:
+        async with self.lock:
+            await self._stop_locked()
 
     def sync_runtime_receiver(self, runtime: object | None = None) -> None:
         owner = runtime or self._runtime
@@ -129,43 +205,11 @@ class VrcMicSyncOwner:
         async with self.lock:
             if not self._accepting_ingress:
                 return
-            self._last_enabled = enabled
+            self._last_enabled = bool(enabled)
             gate = self.gate_provider()
             if gate is not None:
-                gate.set_enabled(enabled)
-
-            if not enabled:
-                await self._stop_locked()
-                return
-
-            state = self.state_provider()
-            if self._receiver is not None or state is None:
-                if gate is not None:
-                    gate.set_receiver_active(self._receiver is not None)
-                return
-
-            runtime = self.get_runtime()
-            if runtime is None:
-                if gate is not None:
-                    gate.set_receiver_active(False)
-                return
-            try:
-                receiver = await runtime.start()
-            except OSError as exc:
-                if gate is not None:
-                    gate.set_receiver_active(False)
-                self.error_sink(
-                    f"VRChat mic sync receiver unavailable on {self.host}:{self.port}: {exc}"
-                )
-                return
-
-            if not self._accepting_ingress:
-                await self._close_locked()
-                return
-            self._receiver = receiver
-            if gate is not None:
-                gate.set_receiver_active(True)
-                gate.reset()
+                gate.set_enabled(self._last_enabled)
+            await self._reconcile_locked()
 
     async def stop(self) -> None:
         async with self.lock:
@@ -187,6 +231,47 @@ class VrcMicSyncOwner:
         if gate is not None:
             gate.set_receiver_active(False)
 
+    async def _start_locked(self) -> object | None:
+        if self._receiver is not None:
+            return self._receiver
+        state = self.state_provider()
+        if state is None:
+            self._set_receiver_active(False)
+            return None
+        runtime = self.get_runtime()
+        if runtime is None:
+            self._set_receiver_active(False)
+            return None
+        try:
+            receiver = await runtime.start()
+        except OSError as exc:
+            self._set_receiver_active(False)
+            self.error_sink(
+                f"VRChat mic sync receiver unavailable on {self.host}:{self.port}: {exc}"
+            )
+            return None
+        if not self._accepting_ingress:
+            await self._close_locked()
+            return None
+        self._receiver = receiver
+        self._set_receiver_active(True)
+        gate = self.gate_provider()
+        if gate is not None:
+            gate.reset()
+        return receiver
+
+    async def _reconcile_locked(self) -> None:
+        should_run = self._control_active or bool(self._last_enabled)
+        if should_run:
+            await self._start_locked()
+            return
+        await self._stop_locked()
+
+    def _set_receiver_active(self, active: bool) -> None:
+        gate = self.gate_provider()
+        if gate is not None:
+            gate.set_receiver_active(active)
+
     async def close(self) -> None:
         self.stop_ingress()
         async with self.lock:
@@ -194,6 +279,7 @@ class VrcMicSyncOwner:
 
     async def _close_locked(self) -> None:
         self._last_enabled = False
+        self._control_active = False
         gate = self.gate_provider()
         if gate is not None:
             gate.set_enabled(False)

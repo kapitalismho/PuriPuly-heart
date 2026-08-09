@@ -347,9 +347,9 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         TranslationModel.DEEPSEEK_V4_FLASH.value,
         TranslationModel.GEMMA4_31B.value,
         TranslationModel.GEMMA4.value,
-        TranslationModel.GEMMA4_31B_CEREBRAS.value,
-        TranslationModel.LOCAL_LLM.value,
         TranslationModel.DEEPSEEK_V4_PRO.value,
+        TranslationModel.LOCAL_LLM.value,
+        TranslationModel.CUSTOM_HTTP.value,
         TranslationModel.GEMINI_3_FLASH.value,
         TranslationModel.GEMINI_31_FLASH_LITE.value,
         TranslationModel.QWEN_35_PLUS.value,
@@ -357,6 +357,76 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     assert TranslationModel.QWEN_35_PLUS.value in values
     assert TranslationModel.LOCAL_LLM.value in values
     assert all("qwen35_flash" not in value for value in values)
+    assert len(values) == len(set(values))
+
+    sections: list[str] = []
+    for option in options:
+        if option.section and option.section not in sections:
+            sections.append(option.section)
+    assert sections == [
+        t("settings.translation_model.section.recommended"),
+        t("settings.translation_model.section.gemma"),
+        t("settings.translation_model.section.deepseek"),
+        t("settings.translation_model.section.user_settings"),
+        t("settings.translation_model.section.others"),
+    ]
+
+
+def test_gemma31_connection_modal_lists_managed_openrouter_and_cerebras(monkeypatch) -> None:
+    settings = AppSettings()
+    settings.translation = TranslationSettings(
+        model=TranslationModel.GEMMA4_31B,
+        connection=TranslationConnection.OPENROUTER,
+        connection_history={
+            TranslationModel.GEMMA4_31B.value: TranslationConnection.OPENROUTER,
+        },
+    )
+    view = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    attach_dummy_page(monkeypatch, view)
+    captured: dict[str, object] = {}
+
+    class DummyModal:
+        def __init__(self, _page, _title, options, _on_select, **_kwargs):
+            captured["options"] = options
+            captured["show_description"] = _kwargs.get("show_description")
+
+        def open(self, current: str) -> None:
+            captured["current"] = current
+
+    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
+
+    view._on_translation_connection_click(None)
+
+    assert [option.value for option in captured["options"]] == [
+        TranslationConnection.MANAGED.value,
+        TranslationConnection.OPENROUTER.value,
+        TranslationConnection.CEREBRAS.value,
+    ]
+    assert captured["current"] == TranslationConnection.OPENROUTER.value
+    assert captured["show_description"] is True
+    assert captured["options"][0].description == ""
+    assert captured["options"][1].description == ""
+    assert captured["options"][2].description == t(
+        "settings.translation_connection.cerebras.description"
+    )
+
+
+def test_gemma31_cerebras_connection_materializes_provider_and_key_visibility(monkeypatch) -> None:
+    settings = AppSettings()
+    view = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    view._on_llm_selected(TranslationModel.GEMMA4_31B.value)
+    view._on_translation_connection_selected(TranslationConnection.CEREBRAS.value)
+    pending = view.build_provider_apply_settings()
+
+    assert pending is not None
+    assert pending.translation.model == TranslationModel.GEMMA4_31B
+    assert pending.translation.connection == TranslationConnection.CEREBRAS
+    assert pending.provider.llm == LLMProviderName.CEREBRAS
+    assert view._cerebras_key.visible is True
+    assert view._openrouter_key.visible is False
 
 
 def test_settings_view_updates_gemini_model_without_provider_switch(monkeypatch) -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import copy
+import inspect
 import json
 import logging
 import math
@@ -16,6 +17,9 @@ import flet as ft
 from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
 from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
+from puripuly_heart.app.services.http_extension_registry import (
+    HttpExtensionRegistryService,
+)
 from puripuly_heart.app.wiring import create_secret_store
 from puripuly_heart.config.llm_profiles import (
     profile_for_alias,
@@ -51,6 +55,7 @@ from puripuly_heart.config.settings import (
     supported_translation_connections,
     with_telemetry_consent,
 )
+from puripuly_heart.core.http_extensions import http_extension_secret_key
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.ui.components.managed_trial_usage_bar import ManagedTrialUsageBar
 from puripuly_heart.ui.components.settings import (
@@ -59,6 +64,7 @@ from puripuly_heart.ui.components.settings import (
     CustomVocabularyTagEditor,
     LanguageHintEditor,
     OptionItem,
+    OscConnectionModal,
     PromptEditor,
     SettingsModal,
     SettingsUnitCard,
@@ -93,6 +99,7 @@ from puripuly_heart.ui.settings.contract import (
     SettingsSurfaceIntents,
 )
 from puripuly_heart.ui.settings.renderer import (
+    SETTINGS_ROW_SPACING,
     compose_settings_api_surface,
     compose_settings_general_surface,
     compose_settings_overlay_surface,
@@ -152,7 +159,7 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
-    TranslationModel.GEMMA4_31B: "provider.gemma4_31b_openrouter",
+    TranslationModel.GEMMA4_31B: "provider.gemma4_31b",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.DEEPSEEK_V4_PRO: "provider.deepseek_v4_pro",
@@ -160,39 +167,52 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.GEMINI_31_FLASH_LITE: "provider.gemini31_flash_lite",
     TranslationModel.QWEN_35_PLUS: "provider.qwen35_plus",
     TranslationModel.LOCAL_LLM: "provider.local_llms",
-    TranslationModel.GEMMA4_31B_CEREBRAS: "provider.gemma4_31b_cerebras",
+    TranslationModel.CUSTOM_HTTP: "provider.custom_http",
 }
 _TRANSLATION_CONNECTION_LABEL_KEYS = {
     TranslationConnection.MANAGED: "settings.translation_connection.managed",
     TranslationConnection.MANAGED_CHINA: "settings.translation_connection.managed_china",
     TranslationConnection.OPENROUTER: "settings.translation_connection.openrouter",
+    TranslationConnection.CEREBRAS: "settings.translation_connection.cerebras",
     TranslationConnection.OFFICIAL_BYOK: "settings.translation_connection.official_byok",
     TranslationConnection.OLLAMA: "settings.translation_connection.ollama",
+    TranslationConnection.CUSTOM_HTTP: "settings.translation_connection.custom_http",
 }
 _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
-    TranslationConnection.MANAGED: "settings.translation_connection.managed.description",
-    TranslationConnection.MANAGED_CHINA: "settings.translation_connection.managed_china.description",
-    TranslationConnection.OPENROUTER: "settings.translation_connection.openrouter.description",
-    TranslationConnection.OFFICIAL_BYOK: "settings.translation_connection.official_byok.description",
-    TranslationConnection.OLLAMA: "settings.translation_connection.ollama.description",
+    TranslationConnection.CEREBRAS: "settings.translation_connection.cerebras.description",
 }
 _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
-_TRANSLATION_MODEL_RECOMMENDED_SECTION_KEY = "settings.translation_model.section.recommended"
-_TRANSLATION_MODEL_OTHERS_SECTION_KEY = "settings.translation_model.section.others"
-_RECOMMENDED_TRANSLATION_MODELS = (
+_TRANSLATION_MODELS = (
     TranslationModel.GEMMA4_26B_31B,
-    TranslationModel.DEEPSEEK_V4_FLASH,
-)
-_OTHER_TRANSLATION_MODELS = (
     TranslationModel.GEMMA4_31B,
     TranslationModel.GEMMA4,
-    TranslationModel.GEMMA4_31B_CEREBRAS,
-    TranslationModel.LOCAL_LLM,
+    TranslationModel.DEEPSEEK_V4_FLASH,
     TranslationModel.DEEPSEEK_V4_PRO,
+    TranslationModel.LOCAL_LLM,
+    TranslationModel.CUSTOM_HTTP,
     TranslationModel.GEMINI_3_FLASH,
     TranslationModel.GEMINI_31_FLASH_LITE,
     TranslationModel.QWEN_35_PLUS,
 )
+_TRANSLATION_MODEL_SECTION_ORDER = (
+    "settings.translation_model.section.recommended",
+    "settings.translation_model.section.gemma",
+    "settings.translation_model.section.deepseek",
+    "settings.translation_model.section.user_settings",
+    "settings.translation_model.section.others",
+)
+_TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
+    TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended",
+    TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended",
+    TranslationModel.GEMMA4_31B: "settings.translation_model.section.gemma",
+    TranslationModel.GEMMA4: "settings.translation_model.section.gemma",
+    TranslationModel.DEEPSEEK_V4_PRO: "settings.translation_model.section.deepseek",
+    TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
+    TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
+    TranslationModel.GEMINI_3_FLASH: "settings.translation_model.section.others",
+    TranslationModel.GEMINI_31_FLASH_LITE: "settings.translation_model.section.others",
+    TranslationModel.QWEN_35_PLUS: "settings.translation_model.section.others",
+}
 _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str], ...] = (
     (
         "none",
@@ -248,8 +268,8 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSettings, str
         "cerebras_gemma4_31b",
         TranslationFallbackSettings(
             enabled=True,
-            model=TranslationModel.GEMMA4_31B_CEREBRAS,
-            connection=TranslationConnection.OFFICIAL_BYOK,
+            model=TranslationModel.GEMMA4_31B,
+            connection=TranslationConnection.CEREBRAS,
         ),
         "settings.fallback.cerebras_gemma4_31b",
     ),
@@ -269,6 +289,25 @@ _TRANSLATION_FALLBACK_DESCRIPTION_KEY_BY_VALUE = {
 
 def _make_text_button(label: str, **kwargs) -> ft.TextButton:
     return ft.TextButton(content=label, **kwargs)
+
+
+def _settings_secondary_text_button_style() -> ft.ButtonStyle:
+    return ft.ButtonStyle(
+        color={
+            ft.ControlState.HOVERED: COLOR_PRIMARY,
+            ft.ControlState.DEFAULT: COLOR_SECONDARY,
+        },
+        icon_color={
+            ft.ControlState.HOVERED: COLOR_PRIMARY,
+            ft.ControlState.DEFAULT: COLOR_SECONDARY,
+        },
+        text_style=ft.TextStyle(
+            size=20,
+            font_family=font_for_language(get_locale()),
+        ),
+        overlay_color=ft.Colors.TRANSPARENT,
+        animation_duration=0,
+    )
 
 
 def _set_text_button_label(button: ft.TextButton, label: str) -> None:
@@ -350,7 +389,10 @@ def _derive_openrouter_selection_alias(
 class SettingsView(ft.Column):
     """Settings view with Bento grid layout."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        http_extension_registry: HttpExtensionRegistryService | None = None,
+    ):
         super().__init__(expand=True, spacing=16)
 
         # Callbacks (assigned by App)
@@ -382,9 +424,21 @@ class SettingsView(ft.Column):
         self.on_current_loopback_capture_option: Callable[[], str] | None = None
         self.on_apply_loopback_capture_option: Callable[[str], None] | None = None
         self.on_loopback_capture_summary: Callable[[], str] | None = None
+        self.on_osc_effective_ports: Callable[[], tuple[int | None, int | None]] | None = None
         self.show_snackbar: Callable[[str, str], None] | None = None
         self.runtime_log_basic: Callable[..., None] | None = None
         self.runtime_log_detailed: Callable[..., None] | None = None
+
+        self._http_extensions = (
+            http_extension_registry
+            if http_extension_registry is not None
+            else HttpExtensionRegistryService.from_default_directory()
+        )
+        self._http_extension_secret_fields: dict[str, ft.TextField] = {}
+        self._http_extension_secret_dirty: set[str] = set()
+        self._http_extension_selected_id: str | None = None
+        self._http_extension_snapshot = self._http_extensions.snapshot
+        self._http_extension_runtime_reload_pending = False
 
         # State
         self._settings: AppSettings | None = None
@@ -428,6 +482,19 @@ class SettingsView(ft.Column):
 
     def translation_connection_control(self) -> ft.Control:
         return self._translation_connection_card
+
+    def http_extension_control(self) -> ft.Control:
+        return ft.Container(content=self._http_extension_row)
+
+    def set_http_extension_registry(
+        self,
+        registry: HttpExtensionRegistryService | None,
+    ) -> None:
+        if registry is None:
+            return
+        self._http_extensions = registry
+        self._http_extension_snapshot = registry.snapshot
+        self._sync_http_extension_card(force_credentials=True)
 
     def translation_fallback_control(self) -> ft.Control:
         return self._openrouter_fallback_card
@@ -477,6 +544,7 @@ class SettingsView(ft.Column):
         self.on_current_loopback_capture_option = general.current_loopback_capture_option
         self.on_apply_loopback_capture_option = general.apply_loopback_capture_option
         self.on_loopback_capture_summary = general.loopback_capture_summary
+        self.on_osc_effective_ports = general.osc_effective_ports
         self.on_prompt_apply_settings = prompt.prompt_apply_settings
         self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
@@ -600,6 +668,7 @@ class SettingsView(ft.Column):
             self._llm_text,
             self._ui_text,
             self._chatbox_source_text,
+            self._osc_connection_text,
             self._clipboard_auto_translate_text,
             self._microphone_test_text,
             self._vrc_mic_text,
@@ -620,6 +689,8 @@ class SettingsView(ft.Column):
             self._translation_connection_text,
             self._openrouter_fallback_text,
             self._telemetry_consent_text,
+            self._http_extension_text,
+            self._http_extension_path_text,
         )
 
     def _sync_clickable_text_control_fonts(self, font_family: str | None) -> None:
@@ -645,6 +716,15 @@ class SettingsView(ft.Column):
         self._set_unit_card_value_text(
             self._loopback_audio_text,
             loopback_summary or default_label,
+        )
+
+    def _sync_osc_connection_card(self, settings: AppSettings) -> None:
+        mode = settings.osc.connection_mode
+        if mode not in {"automatic", "manual", "off"}:
+            mode = "automatic"
+        self._set_unit_card_value_text(
+            self._osc_connection_text,
+            t(f"settings.osc.mode.{mode}"),
         )
 
     def refresh_loopback_capture_target(self, settings: AppSettings) -> None:
@@ -1308,6 +1388,21 @@ class SettingsView(ft.Column):
             value=self._chatbox_source_text,
         )
 
+        self._osc_connection_text = self._build_clickable_text(
+            t("settings.osc.mode.automatic"),
+            self._on_osc_connection_click,
+        )
+        self._osc_connection_title = ft.Text(
+            t("settings.osc.connection.title"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._vrchat_osc_card = self._wrap_unit_card(
+            title=self._osc_connection_title,
+            value=self._osc_connection_text,
+        )
+
         self._clipboard_auto_translate_text = self._build_clickable_text(
             t("settings.clipboard_auto_translate.off"),
             self._on_clipboard_auto_translate_click,
@@ -1494,7 +1589,7 @@ class SettingsView(ft.Column):
                 vrchat_mic_intercept=vrc_mic_card,
                 telemetry_consent=self._telemetry_consent_card,
             ),
-            placeholder_factory=self._wrap_empty_unit_card,
+            placeholder_factory=lambda: self._vrchat_osc_card,
         )
 
         # === Peer STT card ===
@@ -2043,6 +2138,78 @@ class SettingsView(ft.Column):
         )
         self._local_llm_connection_card.visible = False
 
+        self._http_extension_title = ft.Text(
+            t("settings.http_extension.title"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._http_extension_text = self._build_clickable_text(
+            t("settings.http_extension.none"),
+            self._on_http_extension_click,
+            no_wrap=True,
+            max_lines=1,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+        self._http_extension_selection_card = self._wrap_unit_card(
+            title=self._http_extension_title,
+            value=self._http_extension_text,
+        )
+
+        self._http_extension_path_title = ft.Text(
+            t("settings.http_extension.path"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._http_extension_path_text = self._build_clickable_text(
+            t("settings.http_extension.open"),
+            self._on_http_extension_open_folder,
+            no_wrap=True,
+            max_lines=1,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+        self._http_extension_path_card = self._wrap_unit_card(
+            title=self._http_extension_path_title,
+            value=self._http_extension_path_text,
+        )
+
+        self._http_extension_refresh_title = ft.Text(
+            t("settings.http_extension.refresh"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._http_extension_refresh_icon = ft.Container(
+            content=ft.Icon(
+                ft.Icons.REFRESH_ROUNDED,
+                size=44,
+                color=COLOR_ON_BACKGROUND,
+            ),
+            alignment=_CENTER_ALIGNMENT,
+            expand=True,
+            on_click=self._on_http_extension_reload,
+            on_hover=self._on_text_hover,
+        )
+        self._http_extension_refresh_card = self._wrap_unit_card(
+            title=self._http_extension_refresh_title,
+            value=self._http_extension_refresh_icon,
+        )
+
+        self._http_extension_credentials = ft.Column([], spacing=12, visible=False)
+        self._api_keys_column.controls.append(self._http_extension_credentials)
+
+        self._http_extension_row = ft.Row(
+            [
+                self._http_extension_selection_card,
+                self._http_extension_path_card,
+                self._http_extension_refresh_card,
+            ],
+            spacing=SETTINGS_ROW_SPACING,
+            expand=True,
+        )
+        self._http_extension_row.visible = False
+
         # === Row 8: Persona (2x2) - Licenses style ===
         self._prompt_editor = PromptEditor(
             on_change=self._on_prompt_change,
@@ -2061,22 +2228,7 @@ class SettingsView(ft.Column):
         self._reset_prompt_btn = _make_text_button(
             t("settings.reset_prompt"),
             icon=ft.Icons.REFRESH_ROUNDED,
-            style=ft.ButtonStyle(
-                color={
-                    ft.ControlState.HOVERED: COLOR_PRIMARY,
-                    ft.ControlState.DEFAULT: COLOR_SECONDARY,
-                },
-                icon_color={
-                    ft.ControlState.HOVERED: COLOR_PRIMARY,
-                    ft.ControlState.DEFAULT: COLOR_SECONDARY,
-                },
-                text_style=ft.TextStyle(
-                    size=20,
-                    font_family=font_for_language(get_locale()),
-                ),
-                overlay_color=ft.Colors.TRANSPARENT,
-                animation_duration=0,
-            ),
+            style=_settings_secondary_text_button_style(),
             on_click=self._on_reset_prompt,
         )
 
@@ -2261,6 +2413,207 @@ class SettingsView(ft.Column):
         return [
             ft.dropdown.Option(key=code, text=locale_label(code)) for code in available_locales()
         ]
+
+    def _http_extension_modal_options(self) -> list[OptionItem]:
+        options = [OptionItem(value="", label=t("settings.http_extension.none"))]
+        options.extend(
+            OptionItem(
+                value=loaded.definition.id,
+                label=loaded.definition.name,
+                description=loaded.definition.description or None,
+            )
+            for loaded in self._http_extension_snapshot.extensions
+        )
+        return options
+
+    def _sync_http_extension_credentials(self, extension) -> None:
+        self._http_extension_secret_fields = {}
+        self._http_extension_secret_dirty.clear()
+        controls: list[ft.Control] = []
+        if extension is not None:
+            for secret in extension.secrets:
+                field = ft.TextField(
+                    label=t("settings.http_extension.api_key"),
+                    password=True,
+                    can_reveal_password=False,
+                    border_radius=12,
+                    border_color=COLOR_DIVIDER,
+                    focused_border_color=COLOR_PRIMARY,
+                    expand=True,
+                    text_size=24,
+                    color=COLOR_NEUTRAL_DARK,
+                    label_style=ft.TextStyle(
+                        size=18,
+                        weight=ft.FontWeight.BOLD,
+                        color=COLOR_NEUTRAL_DARK,
+                    ),
+                    on_change=lambda _event, secret_id=secret.id: (
+                        self._http_extension_secret_dirty.add(secret_id)
+                    ),
+                    on_blur=lambda _event, secret_id=secret.id: (
+                        self._on_http_extension_secret_blur(secret_id)
+                    ),
+                )
+                reveal_button = ft.IconButton(
+                    icon=ft.Icons.VISIBILITY_OFF_ROUNDED,
+                    icon_color=COLOR_DIVIDER,
+                    icon_size=24,
+                )
+
+                def _on_toggle_secret_reveal(
+                    _event,
+                    field: ft.TextField = field,
+                    button: ft.IconButton = reveal_button,
+                ) -> None:
+                    field.password = not field.password
+                    button.icon = (
+                        ft.Icons.VISIBILITY_OFF_ROUNDED
+                        if field.password
+                        else ft.Icons.VISIBILITY_ROUNDED
+                    )
+                    update_control_if_mounted(field)
+                    update_control_if_mounted(button)
+
+                reveal_button.on_click = _on_toggle_secret_reveal
+                field.suffix = reveal_button
+                self._http_extension_secret_fields[secret.id] = field
+                controls.append(field)
+        self._http_extension_credentials.controls = controls
+        _update_control_if_mounted(self._http_extension_credentials)
+
+    def _sync_http_extension_card(
+        self,
+        settings: AppSettings | None = None,
+        *,
+        force_credentials: bool = False,
+    ) -> None:
+        if not hasattr(self, "_http_extension_row"):
+            return
+        if settings is None:
+            settings = self._build_settings_with_provider_draft()
+        if settings is None:
+            return
+        is_custom = settings.translation.model == TranslationModel.CUSTOM_HTTP
+        self._http_extension_row.visible = is_custom
+        self._http_extension_credentials.visible = is_custom
+        if not is_custom:
+            return
+        selected_id = settings.translation.http_extension_id
+        loaded = self._http_extension_snapshot.get(selected_id)
+        selected_changed = selected_id != self._http_extension_selected_id
+        self._set_unit_card_value_text(
+            self._http_extension_text,
+            loaded.definition.name if loaded else t("settings.http_extension.none"),
+        )
+        if selected_changed or force_credentials:
+            self._sync_http_extension_credentials(loaded.definition if loaded else None)
+            self._http_extension_selected_id = selected_id
+        _update_control_if_mounted(self._http_extension_row)
+        _update_control_if_mounted(self._http_extension_credentials)
+
+    def _on_http_extension_click(self, _event) -> None:
+        if not is_control_mounted(self):
+            return
+        settings = self._build_settings_with_provider_draft()
+        selected = settings.translation.http_extension_id if settings is not None else ""
+        SettingsModal(
+            self.page,
+            t("settings.http_extension.title"),
+            self._http_extension_modal_options(),
+            self._on_http_extension_selected,
+            show_description=True,
+        ).open(selected)
+
+    def _on_http_extension_selected(self, value: str) -> None:
+        if self._settings is None:
+            return
+        draft = self._ensure_provider_settings_draft()
+        draft.translation.http_extension_id = value or ""
+        self.has_provider_changes = True
+        self._sync_http_extension_card(draft, force_credentials=True)
+
+    def _on_http_extension_secret_blur(self, secret_id: str) -> None:
+        http_extension_id = self._http_extension_selected_id
+        field = self._http_extension_secret_fields.get(secret_id)
+        if not http_extension_id or field is None:
+            return
+        value = (field.value or "").strip()
+        if not value and secret_id not in self._http_extension_secret_dirty:
+            return
+        self._http_extension_secret_dirty.discard(secret_id)
+        result = self._on_secret_change(
+            http_extension_secret_key(http_extension_id, secret_id),
+            value,
+        )
+        if inspect.isawaitable(result):
+            self._schedule_page_task(self._finish_http_extension_secret_save, result)
+
+    async def _finish_http_extension_secret_save(self, result) -> None:
+        succeeded = await result
+        if succeeded is False and self.show_snackbar is not None:
+            self.show_snackbar(
+                t("settings.http_extension.credential_save_failed"),
+                ft.Colors.RED_400,
+            )
+
+    def _schedule_page_task(self, callback: Callable[..., object], *args: object) -> None:
+        page = getattr(self, "page", None)
+        if page is not None:
+            page.run_task(callback, *args)
+
+    def _on_http_extension_open_folder(self, _event) -> None:
+        try:
+            self._http_extensions.open_directory()
+        except Exception:
+            if self.show_snackbar is not None:
+                self.show_snackbar(
+                    t("settings.http_extension.open_folder_failed"),
+                    ft.Colors.RED_400,
+                )
+
+    def _on_http_extension_reload(self, _event) -> None:
+        settings = self._build_settings_with_provider_draft()
+        previous_snapshot = self._http_extension_snapshot
+        active_settings = self._settings
+        selected_id = (
+            active_settings.translation.http_extension_id
+            if active_settings is not None
+            and active_settings.translation.model == TranslationModel.CUSTOM_HTTP
+            else None
+        )
+        previous_selected = previous_snapshot.get(selected_id) if selected_id else None
+        self._http_extension_snapshot = self._http_extensions.reload()
+        current_selected = self._http_extension_snapshot.get(selected_id) if selected_id else None
+        self._sync_http_extension_card(settings, force_credentials=True)
+        if self._http_extension_snapshot.errors and self.show_snackbar is not None:
+            self.show_snackbar(
+                t(
+                    "settings.http_extension.reload_errors",
+                    count=len(self._http_extension_snapshot.errors),
+                ),
+                ft.Colors.ORANGE_700,
+            )
+        if (
+            active_settings is not None
+            and active_settings.translation.model == TranslationModel.CUSTOM_HTTP
+            and (
+                previous_selected is None
+                and current_selected is not None
+                or previous_selected is not None
+                and current_selected is None
+                or previous_selected is not None
+                and current_selected is not None
+                and previous_selected.fingerprint != current_selected.fingerprint
+            )
+            and self.on_providers_changed is not None
+        ):
+            self._http_extension_runtime_reload_pending = True
+            self.on_providers_changed()
+
+    def consume_http_extension_runtime_reload(self) -> bool:
+        pending = self._http_extension_runtime_reload_pending
+        self._http_extension_runtime_reload_pending = False
+        return pending
 
     def _get_llm_modal_value(self, settings: AppSettings) -> str:
         return settings.translation.model.value
@@ -2559,6 +2912,8 @@ class SettingsView(ft.Column):
 
     def _is_managed_translation_connection_selected(self, settings: AppSettings | None) -> bool:
         if settings is None:
+            return False
+        if settings.translation.model == TranslationModel.CUSTOM_HTTP:
             return False
         managed_connections = (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
         return bool(
@@ -3049,6 +3404,8 @@ class SettingsView(ft.Column):
         self._settings = settings
         self._provider_settings_draft = None
         self._config_path = config_path
+        self._http_extension_runtime_reload_pending = False
+        self._http_extension_secret_dirty.clear()
         self.has_provider_changes = False
         self.has_pending_prompt_changes = False
         self._desktop_overlay_pending_size_preset = None
@@ -3116,6 +3473,7 @@ class SettingsView(ft.Column):
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if settings.osc.vrc_mic_intercept else "settings.vrc_mic.off"
         )
+        self._sync_osc_connection_card(settings)
         self._chatbox_source_text.content.value = t(
             "settings.chatbox_source.on"
             if settings.osc.chatbox_include_source
@@ -3317,6 +3675,7 @@ class SettingsView(ft.Column):
 
         stt = settings.provider.stt
         llm = settings.provider.llm
+        is_custom_http = settings.translation.model == TranslationModel.CUSTOM_HTTP
         peer_stt = self._effective_peer_stt_provider(settings)
         fallback = settings.translation.fallback
         fallback_source = self._openrouter_fallback_source(settings)
@@ -3333,49 +3692,69 @@ class SettingsView(ft.Column):
                 except Exception:
                     pass
 
-        self._google_key.visible = llm == LLMProviderName.GEMINI
+        self._google_key.visible = not is_custom_http and llm == LLMProviderName.GEMINI
         self._sync_managed_key_card(settings)
+        if is_custom_http:
+            self._managed_key_card.visible = False
+            self._managed_trial_usage_bar.visible = False
+        if hasattr(self, "_http_extension_credentials"):
+            self._http_extension_credentials.visible = is_custom_http
+            _update_control_if_mounted(self._http_extension_credentials)
         openrouter_byok_selected = bool(
-            llm == LLMProviderName.OPENROUTER
+            not is_custom_http
+            and llm == LLMProviderName.OPENROUTER
             and settings.openrouter.selected_source == OpenRouterCredentialSource.BYOK
         )
         self._openrouter_key.visible = bool(
-            openrouter_byok_selected or fallback_source == OpenRouterCredentialSource.BYOK
+            not is_custom_http
+            and (openrouter_byok_selected or fallback_source == OpenRouterCredentialSource.BYOK)
         )
         self._openrouter_pkce_button_row.visible = openrouter_byok_selected
         self._deepseek_key.visible = bool(
-            llm == LLMProviderName.DEEPSEEK
-            or (
-                fallback.enabled
-                and fallback.model
-                in (TranslationModel.DEEPSEEK_V4_FLASH, TranslationModel.DEEPSEEK_V4_PRO)
-                and fallback.connection == TranslationConnection.OFFICIAL_BYOK
+            not is_custom_http
+            and (
+                llm == LLMProviderName.DEEPSEEK
+                or (
+                    fallback.enabled
+                    and fallback.model
+                    in (TranslationModel.DEEPSEEK_V4_FLASH, TranslationModel.DEEPSEEK_V4_PRO)
+                    and fallback.connection == TranslationConnection.OFFICIAL_BYOK
+                )
             )
         )
         self._cerebras_key.visible = bool(
-            llm == LLMProviderName.CEREBRAS
-            or (
-                fallback.enabled
-                and fallback.model == TranslationModel.GEMMA4_31B_CEREBRAS
-                and fallback.connection == TranslationConnection.OFFICIAL_BYOK
+            not is_custom_http
+            and (
+                llm == LLMProviderName.CEREBRAS
+                or (
+                    fallback.enabled
+                    and fallback.model == TranslationModel.GEMMA4_31B
+                    and fallback.connection == TranslationConnection.CEREBRAS
+                )
             )
         )
         self._sync_openrouter_pkce_button_state(settings)
-        self._translation_connection_row.visible = True
-        self._local_llm_connection_card.visible = llm == LLMProviderName.LOCAL_LLM
+        self._translation_connection_row.visible = not is_custom_http
+        self._local_llm_connection_card.visible = (
+            not is_custom_http and llm == LLMProviderName.LOCAL_LLM
+        )
         self._sync_openrouter_fallback_card(settings)
+        openrouter_fallback_card = getattr(self, "_openrouter_fallback_card", None)
+        if openrouter_fallback_card is not None:
+            openrouter_fallback_card.visible = not is_custom_http
+        self._sync_http_extension_card(settings)
 
         qwen_regions: set[QwenRegion] = set()
         if (
             stt == STTProviderName.QWEN_ASR
-            or llm == LLMProviderName.QWEN
+            or (not is_custom_http and llm == LLMProviderName.QWEN)
             or peer_stt == STTProviderName.QWEN_ASR
         ):
             qwen_regions.add(settings.qwen.region)
 
         self._qwen_region_btn.visible = (
             stt == STTProviderName.QWEN_ASR
-            or llm == LLMProviderName.QWEN
+            or (not is_custom_http and llm == LLMProviderName.QWEN)
             or peer_stt == STTProviderName.QWEN_ASR
         )
         self._alibaba_key_beijing.visible = QwenRegion.BEIJING in qwen_regions
@@ -3547,11 +3926,9 @@ class SettingsView(ft.Column):
                 description=t(f"settings.translation_model.{model.value}.description", default=""),
                 section=t(section_key),
             )
-            for section_key, models in (
-                (_TRANSLATION_MODEL_RECOMMENDED_SECTION_KEY, _RECOMMENDED_TRANSLATION_MODELS),
-                (_TRANSLATION_MODEL_OTHERS_SECTION_KEY, _OTHER_TRANSLATION_MODELS),
-            )
-            for model in models
+            for section_key in _TRANSLATION_MODEL_SECTION_ORDER
+            for model in _TRANSLATION_MODELS
+            if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) == section_key
         ]
         display_settings = self._build_settings_with_provider_draft()
         current = (
@@ -3620,6 +3997,10 @@ class SettingsView(ft.Column):
             current_settings.translation.connection_history
         )
         draft.translation.connection_history[model.value] = connection
+        if model == TranslationModel.CUSTOM_HTTP and old_model != TranslationModel.CUSTOM_HTTP:
+            draft.translation.previous_llm_model = old_model
+        elif model != TranslationModel.CUSTOM_HTTP:
+            draft.translation.previous_llm_model = None
         materialize_translation_settings(draft)
         new_provider = draft.provider.llm
 
@@ -3665,6 +4046,9 @@ class SettingsView(ft.Column):
             self._llm_text.update()
             self._translation_connection_row.update()
             self._local_llm_connection_card.update()
+            http_extension_row = getattr(self, "_http_extension_row", None)
+            if http_extension_row is not None:
+                http_extension_row.update()
 
     def _on_llm_selected(self, value: str) -> None:
         """Handle LLM provider selection from modal."""
@@ -3700,6 +4084,11 @@ class SettingsView(ft.Column):
             OptionItem(
                 value=connection.value,
                 label=self._translation_connection_display_label(connection),
+                description=(
+                    self._translation_connection_display_description(connection)
+                    if connection == TranslationConnection.CEREBRAS
+                    else ""
+                ),
             )
             for connection in connections
         ]
@@ -3713,7 +4102,7 @@ class SettingsView(ft.Column):
             t("settings.translation_connection"),
             options,
             self._on_translation_connection_selected,
-            show_description=False,
+            show_description=True,
         )
         modal.open(current)
 
@@ -4037,7 +4426,7 @@ class SettingsView(ft.Column):
                     two_column=True,
                 )
                 modal.open(current, loading_section=process_section)
-                self.page.run_task(self._load_process_capture_options, modal, current)
+                self._schedule_page_task(self._load_process_capture_options, modal, current)
             else:
                 options = list_options()
                 modal = SettingsModal(
@@ -4550,7 +4939,14 @@ class SettingsView(ft.Column):
         if not is_control_mounted(self) or not self._settings:
             return
         options = [
-            OptionItem(value=anchor, label=t(f"settings.overlay.calibration.anchor.{anchor}"))
+            OptionItem(
+                value=anchor,
+                label=t(f"settings.overlay.calibration.anchor.{anchor}"),
+                description=t(
+                    f"settings.overlay.calibration.anchor.{anchor}.description",
+                    default="",
+                ),
+            )
             for anchor in OVERLAY_CALIBRATION_ANCHORS
         ]
         modal = SettingsModal(
@@ -4558,7 +4954,7 @@ class SettingsView(ft.Column):
             t("settings.overlay.calibration.anchor"),
             options,
             self._on_overlay_anchor_selected,
-            show_description=False,
+            show_description=True,
         )
         modal.open(self._overlay_calibration.anchor)
 
@@ -4906,6 +5302,42 @@ class SettingsView(ft.Column):
             self._chatbox_source_text.update()
         self._emit_settings_changed()
 
+    def _on_osc_connection_click(self, e) -> None:
+        _ = e
+        if not self._settings or not is_control_mounted(self):
+            return
+        self._osc_connection_modal = OscConnectionModal(
+            self.page,
+            self._on_osc_connection_selected,
+            effective_ports_provider=self.on_osc_effective_ports,
+        )
+        self._osc_connection_modal.open(
+            self._settings.osc.connection_mode,
+            int(self._settings.osc.send_port or self._settings.osc.port),
+            int(self._settings.osc.receive_port),
+        )
+
+    def _on_osc_connection_selected(self, mode: str, send_port: int, receive_port: int) -> None:
+        if not self._settings:
+            return
+        if mode not in {"automatic", "manual", "off"}:
+            return
+        candidate = copy.deepcopy(self._settings)
+        candidate.osc.connection_mode = mode
+        candidate.osc.send_port = int(send_port)
+        candidate.osc.receive_port = int(receive_port)
+        try:
+            candidate.osc.validate()
+        except (TypeError, ValueError):
+            return
+        self._settings.osc.connection_mode = mode
+        self._settings.osc.send_port = int(send_port)
+        self._settings.osc.receive_port = int(receive_port)
+        self._sync_osc_connection_card(self._settings)
+        if is_control_mounted(self):
+            self._osc_connection_text.update()
+        self._emit_settings_changed()
+
     def _on_clipboard_auto_translate_click(self, e) -> None:
         """Toggle clipboard auto-translate immediately from the unit card."""
         if not self._settings:
@@ -5136,6 +5568,14 @@ class SettingsView(ft.Column):
         self._translation_connection_title.value = t("settings.translation_connection")
         self._openrouter_fallback_title.value = t("settings.fallback")
         self._local_llm_connection_title.value = t("settings.local_llm.connection")
+        self._http_extension_title.value = t("settings.http_extension.title")
+        self._http_extension_path_title.value = t("settings.http_extension.path")
+        self._http_extension_refresh_title.value = t("settings.http_extension.refresh")
+        self._set_unit_card_value_text(
+            self._http_extension_path_text,
+            t("settings.http_extension.open"),
+        )
+        self._sync_http_extension_card()
         self._local_llm_base_url.label = t("settings.local_llm.base_url")
         self._local_llm_model.label = t("settings.local_llm.model")
         self._local_llm_api_key.apply_locale()
@@ -5158,6 +5598,7 @@ class SettingsView(ft.Column):
         self._persona_title.value = t("settings.section.persona")
         self._custom_vocab_title.value = t("settings.section.custom_vocabulary")
         self._vrc_mic_title.value = t("settings.vrc_mic_intercept")
+        self._osc_connection_title.value = t("settings.osc.connection.title")
         self._chatbox_source_title.value = t("settings.chatbox_include_source")
         self._clipboard_auto_translate_title.value = t("settings.clipboard_auto_translate")
         self._telemetry_consent_title.value = t("settings.telemetry.title")
@@ -5235,6 +5676,7 @@ class SettingsView(ft.Column):
                 self._get_translation_connection_display_label(display_settings),
             )
             self._sync_openrouter_fallback_card(display_settings)
+            self._sync_http_extension_card(display_settings, force_credentials=True)
             self._sync_managed_key_card(display_settings)
             self._sync_managed_key_invite_progress_row(
                 self._managed_key_referral_id,
@@ -5246,6 +5688,7 @@ class SettingsView(ft.Column):
                 if display_settings.osc.vrc_mic_intercept
                 else "settings.vrc_mic.off"
             )
+            self._sync_osc_connection_card(display_settings)
             self._chatbox_source_text.content.value = t(
                 "settings.chatbox_source.on"
                 if display_settings.osc.chatbox_include_source

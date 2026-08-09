@@ -9,6 +9,11 @@ from puripuly_heart.app.ports.canonical_settings_persistence import (
 )
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort, RuntimeApplyRequest
 from puripuly_heart.app.ports.secret_store import SecretStorePort
+from puripuly_heart.app.ports.settings_repository import (
+    SettingsCommitRequest,
+    SettingsCommitResult,
+    SettingsSnapshot,
+)
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.secret_settings_transaction import (
     SecretSettingsTransaction,
@@ -76,6 +81,19 @@ class ProviderStrictSettingsSaveFailed(Exception):
     pass
 
 
+class _HttpExtensionSecretSettingsRepository:
+    async def load(self) -> SettingsSnapshot:
+        return SettingsSnapshot(values={}, revision=None)
+
+    async def save(self, request: SettingsCommitRequest) -> SettingsCommitResult:
+        return SettingsCommitResult(
+            succeeded=True,
+            snapshot=SettingsSnapshot(values=request.values, revision=None),
+            message=None,
+            diagnostics=None,
+        )
+
+
 @dataclass(slots=True)
 class ProviderApplicationOwner:
     settings: SettingsOwner
@@ -103,13 +121,15 @@ class ProviderApplicationOwner:
         pending: AppSettings | None = None,
         *,
         force_rebuild_llm: bool = False,
+        persist_settings: bool = True,
+        refresh_ui: bool = True,
     ) -> bool:
         next_settings = self.settings.current if pending is None else self.merge_settings(pending)
         if next_settings is None:
             return False
         await self.preserve_before_replace(next_settings)
         try:
-            if pending is not None and not force_rebuild_llm:
+            if persist_settings and pending is not None and not force_rebuild_llm:
                 if await self._apply_combined(next_settings):
                     return self._last_result_committed()
                 if await self._apply_translation(next_settings):
@@ -119,9 +139,11 @@ class ProviderApplicationOwner:
             return await self._apply_direct(
                 next_settings,
                 force_rebuild_llm=force_rebuild_llm,
+                persist_settings=persist_settings,
             )
         finally:
-            self.sync_ui()
+            if refresh_ui:
+                self.sync_ui()
 
     async def _apply_combined(self, next_settings: AppSettings) -> bool:
         base_settings = self.settings.current
@@ -491,10 +513,32 @@ class ProviderApplicationOwner:
         plan: ProviderRuntimeApplyPlan | None = None,
         route_order22: bool = True,
         strict_persistence_errors: bool = False,
+        persist_settings: bool = True,
     ) -> bool:
-        if route_order22 and not force_rebuild_llm and plan is None:
+        if persist_settings and route_order22 and not force_rebuild_llm and plan is None:
             if await self._apply_stt_language_audio(next_settings):
                 return self._last_result_committed()
+        if not persist_settings:
+            self.capture_runtime_signatures()
+            if plan is None:
+                plan = self.runtime.build_plan(
+                    next_settings,
+                    force_rebuild_llm=force_rebuild_llm,
+                )
+            runtime_result = await ProviderRuntimeApplyAdapter(
+                owner=self.runtime,
+                settings=next_settings,
+                plan=plan,
+            ).apply_runtime(
+                RuntimeApplyRequest(
+                    settings_values=self.settings.legacy_snapshot_values(next_settings),
+                    reason="provider_runtime_only",
+                    correlation_id=None,
+                )
+            )
+            if runtime_result.status != RUNTIME_APPLY_STATUS_APPLIED:
+                self._set_result(_runtime_apply_result_as_degraded_transaction(runtime_result))
+            return runtime_result.status == RUNTIME_APPLY_STATUS_APPLIED
         self.settings.begin(
             legacy_snapshot=self.settings.projection_snapshot or self.settings.current
         )
@@ -665,8 +709,36 @@ class ProviderSettingsOwner:
         )
 
     async def change_secret(self, secret_key: str, value: str) -> bool:
+        if secret_key.startswith("http_extension."):
+            return await self._change_http_extension_secret(secret_key, value)
         return await self.secret_change.change(
             lambda: self._secret_change_execution(secret_key, value)
+        )
+
+    async def _change_http_extension_secret(self, secret_key: str, value: str) -> bool:
+        return await self.secret_change.change(
+            lambda: self._http_extension_secret_change_execution(secret_key, value)
+        )
+
+    def _http_extension_secret_change_execution(
+        self,
+        secret_key: str,
+        value: str,
+    ) -> ProviderSecretChangeExecution:
+        current = self._current()
+        transaction = SecretSettingsTransaction(
+            secret_store=self.secret_store_factory(current),
+            settings_repository=_HttpExtensionSecretSettingsRepository(),
+        )
+        return ProviderSecretChangeExecution(
+            transaction=transaction,
+            request=ProviderSecretChangeRequest(
+                provider="http_extension",
+                secret_key=secret_key,
+                secret_value=value,
+                settings_values=self.settings.legacy_snapshot_values(current),
+            ),
+            result_handler=lambda result, _succeeded: self.results.set(result),
         )
 
     def _secret_change_execution(

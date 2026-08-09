@@ -16,9 +16,9 @@ from puripuly_heart.app.services.clipboard_auto_translation import (
     ClipboardAutoTranslationOwner,
 )
 from puripuly_heart.app.services.github_star_prompt import GithubStarPromptOwner
+from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
-from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
 from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import (
@@ -45,10 +45,21 @@ class ApplicationRuntimeShutdownAdapter:
     peer: Callable[[], PeerApplicationOwner | None]
     overlay: Callable[[], OverlayApplicationOwner | None]
     vrchat_presence: Callable[[], VrchatOscPresenceProbeOwner | None]
-    vrc_mic_sync: Callable[[], VrcMicSyncOwner | None]
+    vrc_mic_sync: Callable[[], OscControlIntegrationOwner | None]
     github_prompt: Callable[[], GithubStarPromptOwner | None]
     clipboard: Callable[[], ClipboardAutoTranslationOwner | None]
     microphone: Callable[[], MicrophoneTestRuntime | None]
+
+    def effective_osc_ports(self) -> tuple[int | None, int | None]:
+        owner = self.vrc_mic_sync()
+        if owner is None or owner.receiver is None:
+            return (None, None)
+        send_port = owner.effective_send_port
+        receive_port = owner.effective_receive_port
+        return (
+            send_port if isinstance(send_port, int) and send_port > 0 else None,
+            receive_port if isinstance(receive_port, int) and receive_port > 0 else None,
+        )
 
     def freeze_application_ingress(self) -> None:
         self.ingress.freeze()

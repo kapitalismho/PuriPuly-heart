@@ -16,7 +16,11 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 32
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 35
+OSC_DEFAULT_HOST: Final = "127.0.0.1"
+OSC_DEFAULT_SEND_PORT: Final = 9000
+OSC_DEFAULT_RECEIVE_PORT: Final = 9001
+OSC_CONNECTION_MODES: Final = ("automatic", "manual", "off")
 
 DEFAULT_OPENROUTER_BROKER_BASE_URL: Final = "https://puripuly-heart-broker.kapitalismho.workers.dev"
 DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: Final = "openrouter_gemma4_26b_31b"
@@ -80,7 +84,7 @@ _FALLBACK_ALIAS_FIELDS: Final = {
     "openrouter_gemma4_31b": (True, "gemma4_31b", "openrouter"),
     "managed_gemma4_26b_31b": (True, "gemma4_26b_31b", "managed"),
     "managed_gemma4_31b": (True, "gemma4_31b", "managed"),
-    "cerebras_gemma4_31b": (True, "gemma4_31b_cerebras", "official_byok"),
+    "cerebras_gemma4_31b": (True, "gemma4_31b", "cerebras"),
     "deepseek_v4_flash_china": (True, "deepseek_v4_flash", "managed_china"),
 }
 _FALLBACK_FIELDS_ALIAS: Final = {fields: alias for alias, fields in _FALLBACK_ALIAS_FIELDS.items()}
@@ -362,6 +366,8 @@ def _default_translation_fallback_intent() -> TranslationFallbackIntent:
 class TranslationIntent:
     model: str = "gemma4_26b_31b"
     connection: str = "managed"
+    http_extension_id: str | None = None
+    previous_llm_model: str | None = None
     connection_history: dict[str, str] = field(
         default_factory=_default_translation_connection_history
     )
@@ -654,14 +660,47 @@ class OverlayIntent:
 
 @dataclass(frozen=True, slots=True)
 class OscIntent:
-    host: str = "127.0.0.1"
-    port: int = 9000
+    connection_mode: Literal["automatic", "manual", "off"] = "automatic"
+    host: str = OSC_DEFAULT_HOST
+    port: int = OSC_DEFAULT_SEND_PORT
+    send_port: int = OSC_DEFAULT_SEND_PORT
+    receive_port: int = OSC_DEFAULT_RECEIVE_PORT
     chatbox_address: str = "/chatbox/input"
     chatbox_send: bool = True
     chatbox_clear: bool = False
     chatbox_max_chars: int = 144
     vrc_mic_intercept: bool = False
     chatbox_include_source: bool = False
+
+    def __post_init__(self) -> None:
+        mode = self.connection_mode if self.connection_mode in OSC_CONNECTION_MODES else "automatic"
+        if self.port != OSC_DEFAULT_SEND_PORT and self.send_port == OSC_DEFAULT_SEND_PORT:
+            send_port = self.port
+        elif self.port == OSC_DEFAULT_SEND_PORT:
+            send_port = self.send_port
+        elif self.port != self.send_port:
+            send_port = self.port
+        else:
+            send_port = self.send_port
+        try:
+            send_port = int(send_port)
+            receive_port = int(self.receive_port)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("OSC ports must be integers") from exc
+        if not (1 <= send_port <= 65535):
+            raise ValueError("OSC send_port must be in 1..65535")
+        if not (1 <= receive_port <= 65535):
+            raise ValueError("OSC receive_port must be in 1..65535")
+        if not isinstance(self.host, str) or not self.host.strip():
+            raise ValueError("OSC host must be non-empty")
+        if not isinstance(self.chatbox_address, str) or not self.chatbox_address.startswith("/"):
+            raise ValueError("OSC chatbox_address must start with '/'")
+        if self.chatbox_max_chars <= 0:
+            raise ValueError("OSC chatbox_max_chars must be > 0")
+        object.__setattr__(self, "connection_mode", mode)
+        object.__setattr__(self, "port", send_port)
+        object.__setattr__(self, "send_port", send_port)
+        object.__setattr__(self, "receive_port", receive_port)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1050,6 +1089,10 @@ __all__ = [
     "UiIntent",
     "UserIntentSettings",
     "VNEXT_SETTINGS_SCHEMA_VERSION",
+    "OSC_CONNECTION_MODES",
+    "OSC_DEFAULT_HOST",
+    "OSC_DEFAULT_RECEIVE_PORT",
+    "OSC_DEFAULT_SEND_PORT",
     "with_capture_target",
     "with_telemetry_consent",
     "with_translation_runtime_policy",

@@ -50,6 +50,7 @@ from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
 )
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
+from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackend
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
 
@@ -551,7 +552,12 @@ class TranslationOwnersTestHarness:
         await self._local_asr_runtime.release_channel("peer", mode="abort")
 
     async def replace_llm_provider(self, llm: object | None) -> object | None:
-        return await self._llm_runtime.replace_provider(llm, start=False)
+        backend = (
+            llm
+            if llm is None or isinstance(llm, TranslationBackend)
+            else LlmTranslationBackend(llm)
+        )
+        return await self._llm_runtime.replace_provider(backend, start=False)
 
     async def drain_self_stt_for_toggle_off(
         self,
@@ -657,7 +663,10 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
             peer_exception_handler=callbacks.peer_exception_handler,
         )
     )
-    llm_runtime = ProviderRuntimeHandle(name="llm", provider=llm)
+    backend = (
+        llm if llm is None or isinstance(llm, TranslationBackend) else LlmTranslationBackend(llm)
+    )
+    llm_runtime = ProviderRuntimeHandle(name="llm", provider=backend)
     translation_requests = TranslationRequestOwner(
         config_snapshot=config_owner.snapshot,
         self_runtime=self_runtime,

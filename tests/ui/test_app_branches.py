@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -10,12 +11,14 @@ import pytest
 
 pytest.importorskip("flet")
 import flet as ft
+from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 import puripuly_heart.ui.app as app_module
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
+from puripuly_heart.app.services.http_extension_registry import HttpExtensionRegistryService
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.composition.ui_application import compose_ui_application
 from puripuly_heart.config.settings import (
@@ -33,8 +36,8 @@ from puripuly_heart.config.settings import (
     build_managed_openrouter_byok_target_settings,
     with_telemetry_consent,
 )
+from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
@@ -854,6 +857,7 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_gpu_state_cycle",
         "on_foundation_primitives",
         "on_stt_loading_button_cycle",
+        "on_http_extension_form",
     }
     discord_callback = seen["callbacks"]["on_discord_auth"]
     assert getattr(discord_callback, "__self__", None) is app
@@ -943,6 +947,39 @@ def test_debug_preview_telemetry_consent_opens_without_side_effects(
     assert settings.telemetry.consent == "unknown"
     assert settings.telemetry_state.anonymous_id == "existing-id"
     assert settings.telemetry_state.sent_translation_success_dates_utc == ["2026-07-03"]
+
+
+def test_debug_preview_http_extension_form_writes_demo_extension_and_selects_it(
+    tmp_path: Path,
+) -> None:
+    registry = HttpExtensionRegistry(tmp_path)
+    registry.reload()
+    service = HttpExtensionRegistryService(registry)
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    app._ui_application = SimpleNamespace(http_extension_registry=lambda: service)
+    llm_values: list[str] = []
+    extension_values: list[str] = []
+    app.view_settings = SimpleNamespace(
+        set_http_extension_registry=lambda _service: None,
+        _on_llm_selected=lambda value: llm_values.append(value),
+        _on_http_extension_selected=lambda value: extension_values.append(value),
+    )
+    app._current_tab = 1
+
+    app._preview_http_extension_form()
+
+    demo_path = tmp_path / "debug_demo.json"
+    assert demo_path.exists()
+    demo = json.loads(demo_path.read_text(encoding="utf-8"))
+    assert demo["secrets"] == [{"id": "api_key", "label": "API Key"}]
+    assert llm_values == [TranslationModel.CUSTOM_HTTP.value]
+    assert extension_values == ["debug_demo"]
+    assert registry.snapshot.get("debug_demo") is not None
+
+    app._preview_http_extension_form()
+    assert llm_values == [TranslationModel.CUSTOM_HTTP.value] * 2
+    assert extension_values == ["debug_demo", "debug_demo"]
 
 
 def test_debug_preview_local_qwen_modal_opens_production_dialog_without_state_or_side_effects(
@@ -1674,23 +1711,6 @@ def test_debug_preview_surviving_managed_actions_are_snackbar_only() -> None:
         (app_module.t("managed_release.revoked_contact"), ft.Colors.ORANGE_700),
     ]
     assert app.view_dashboard.managed_trial_calls == []
-
-
-def test_managed_release_ko_snackbar_copy_matches_requested_wording() -> None:
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale("ko")
-
-        assert (
-            i18n_module.t("managed_release.brake")
-            == "신규 인증이 잠시 중지된 상태에요. BYOK 방식으로 이용해주세요."
-        )
-        assert (
-            i18n_module.t("managed_release.revoked_contact")
-            == "엑세스 키가 손상되었어요. 저에게 연락해서 새 키를 받아가세요."
-        )
-    finally:
-        i18n_module.set_locale(previous_locale)
 
 
 def test_debug_preview_founder_letter_opens_dialog_with_readme_action(
@@ -2928,6 +2948,41 @@ async def test_on_providers_changed_applies_consumed_provider_draft() -> None:
 
 
 @pytest.mark.asyncio
+async def test_on_providers_changed_runtime_only_reload_does_not_consume_provider_draft() -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    app._settings_mutation_queue = []
+    app._settings_mutation_worker_active = False
+    consumed = {"draft": False, "reload": True}
+    app.view_settings = SimpleNamespace(
+        has_provider_changes=True,
+        consume_http_extension_runtime_reload=lambda: consumed.__setitem__("reload", False) or True,
+        consume_provider_apply_settings=lambda: consumed.__setitem__("draft", True),
+    )
+    seen: list[tuple[bool, bool]] = []
+
+    async def fake_apply_providers(
+        settings=None,
+        *,
+        force_rebuild_llm: bool = False,
+        persist_settings: bool = True,
+        refresh_ui: bool = True,
+    ) -> None:
+        assert settings is None
+        assert force_rebuild_llm is False
+        seen.append((persist_settings, refresh_ui))
+
+    app.controller = SimpleNamespace(apply_providers=fake_apply_providers)
+
+    app._on_providers_changed()
+    assert len(app.page.tasks) == 1
+    await app.page.tasks[0]()
+
+    assert seen == [(False, False)]
+    assert consumed == {"draft": False, "reload": False}
+
+
+@pytest.mark.asyncio
 async def test_on_nav_change_refreshes_prompt_and_schedules_log_scroll() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
@@ -3376,78 +3431,6 @@ async def test_settings_apply_closes_microphone_test_modal_after_audio_cleanup()
     assert app.page.closed == [app.page.opened[0]]
 
 
-@pytest.mark.parametrize(
-    ("locale", "expected"),
-    [
-        ("en", "Microphone level"),
-        ("ko", "마이크 입력 레벨"),
-        ("ja", "マイク入力レベル"),
-        ("zh-CN", "麦克风输入电平"),
-    ],
-)
-def test_microphone_test_level_accessibility_label_is_localized(
-    locale: str,
-    expected: str,
-) -> None:
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        assert i18n_module.t("settings.microphone_test.level_label") == expected
-    finally:
-        i18n_module.set_locale(previous_locale)
-
-
-@pytest.mark.parametrize(
-    ("locale", "expected"),
-    [
-        ("en", "Couldn’t start microphone test"),
-        ("ko", "마이크 테스트를 시작하지 못했어요"),
-        ("ja", "マイクテストを開始できませんでした"),
-        ("zh-CN", "无法开始麦克风测试"),
-    ],
-)
-def test_microphone_test_start_failed_label_is_localized(
-    locale: str,
-    expected: str,
-) -> None:
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        assert i18n_module.t("settings.microphone_test.start_failed") == expected
-    finally:
-        i18n_module.set_locale(previous_locale)
-
-
-@pytest.mark.parametrize(
-    ("locale", "expected"),
-    [
-        (
-            "en",
-            "If audio isn’t being captured, change Host API to Auto or MME, then restart the app.",
-        ),
-        (
-            "ko",
-            "오디오 캡쳐가 되지 않으면 호스트 API를 자동선택 혹은 MME로 변경 후 앱을 재시작해주세요",
-        ),
-        (
-            "ja",
-            "音声がキャプチャされない場合は、ホストAPIを自動選択またはMMEに変更してからアプリを再起動してください",
-        ),
-        ("zh-CN", "如果无法捕获音频，请将主机 API 改为自动选择或 MME，然后重启应用"),
-    ],
-)
-def test_microphone_test_host_api_hint_is_localized(
-    locale: str,
-    expected: str,
-) -> None:
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        assert i18n_module.t("settings.microphone_test.host_api_hint") == expected
-    finally:
-        i18n_module.set_locale(previous_locale)
-
-
 @pytest.mark.asyncio
 async def test_start_microphone_test_waits_for_pending_settings_queue() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
@@ -3603,12 +3586,6 @@ async def test_on_request_openrouter_pkce_uses_draft_preserving_refresh_on_succe
     assert pkce_calls == [(target_settings, "settings")]
     assert refresh_calls == [(updated_settings, Path("settings.json"))]
     assert snackbar_calls == [(app_module.t("openrouter.pkce.connected"), app_module.COLOR_SUCCESS)]
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale("ko")
-        assert i18n_module.t("openrouter.pkce.connected") == "OpenRouter 인증이 완료되었어요."
-    finally:
-        i18n_module.set_locale(previous_locale)
 
 
 @pytest.mark.asyncio

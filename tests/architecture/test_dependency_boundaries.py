@@ -242,7 +242,12 @@ LAYER_RULES = (
     ),
     LayerRule(
         layer=SERVICE_PORTS,
-        prefixes=("puripuly_heart.app.ports",),
+        prefixes=(
+            "puripuly_heart.app.ports",
+            "puripuly_heart.core.osc.control_schema",
+            "puripuly_heart.core.osc.control_codec",
+            "puripuly_heart.core.osc.oscquery_contract",
+        ),
         forbidden_layers=frozenset(
             {
                 MIGRATION_SERIALIZATION,
@@ -252,7 +257,7 @@ LAYER_RULES = (
             }
         ),
         rule_id="service-ports-stay-abstract",
-        reason="service ports define protocols and DTOs only; they must not import concrete files, keyring/encrypted-file implementations, Flet, provider SDKs, adapters, or migration internals",
+        reason="service ports and stable external contracts define protocols, DTOs, and ABI codecs only; they must not import concrete files, keyring/encrypted-file implementations, Flet, provider SDKs, adapters, or migration internals",
     ),
     LayerRule(
         layer=ADAPTERS,

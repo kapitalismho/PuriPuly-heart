@@ -34,6 +34,33 @@ EXACT_DYNAMIC_I18N_KEYS = frozenset(
     }
 )
 
+# Overlay failure reasons are composed at runtime as f"settings.overlay.failure.{reason}",
+# so no individual key is referenced literally in source; every bundle must ship all of them.
+OVERLAY_FAILURE_I18N_KEYS = frozenset(
+    {
+        "settings.overlay.failure.bridge_auth_failed",
+        "settings.overlay.failure.contract_mismatch",
+        "settings.overlay.failure.hmd_not_found",
+        "settings.overlay.failure.manifest_invalid",
+        "settings.overlay.failure.missing_executable",
+        "settings.overlay.failure.openvr_dll_hash_mismatch",
+        "settings.overlay.failure.openvr_init_failed",
+        "settings.overlay.failure.packaged_openvr_dll_missing",
+        "settings.overlay.failure.renderer_init_failed",
+        "settings.overlay.failure.runtime_control_invalid",
+        "settings.overlay.failure.runtime_crashed",
+        "settings.overlay.failure.runtime_disconnected",
+        "settings.overlay.failure.spawn_failed",
+        "settings.overlay.failure.stale_overlay_build",
+        "settings.overlay.failure.startup_timeout",
+        "settings.overlay.failure.steamvr_not_installed",
+        "settings.overlay.failure.steamvr_not_running",
+        "settings.overlay.failure.unknown",
+        "settings.overlay.failure.vendored_openvr_dll_missing",
+        "settings.overlay.failure.window_configuration_failed",
+    }
+)
+
 # Desktop-overlay copy seeds product-standard keys before every key is referenced
 # in runtime code.
 # Keep this exact, temporary allowlist narrow so typo or stale seeded keys still fail.
@@ -91,3 +118,14 @@ def test_i18n_bundles_do_not_keep_unused_runtime_keys() -> None:
     unused_keys = _unused_i18n_keys(all_keys, runtime_source)
 
     assert unused_keys == []
+
+
+def test_dynamic_overlay_failure_keys_exist_in_every_bundle() -> None:
+    bundles = _load_bundles()
+
+    missing = {
+        locale: sorted(OVERLAY_FAILURE_I18N_KEYS - set(bundle))
+        for locale, bundle in bundles.items()
+    }
+
+    assert missing == {locale: [] for locale in bundles}

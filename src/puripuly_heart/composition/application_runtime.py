@@ -12,6 +12,7 @@ from typing import Literal, cast
 from puripuly_heart.app.adapters.application_runtime_shutdown import (
     ApplicationRuntimeShutdownAdapter,
 )
+from puripuly_heart.app.adapters.system_directory_opener import SystemDirectoryOpener
 from puripuly_heart.app.adapters.ui_runtime import (
     UiDiagnosticsRuntimeAdapter,
     UiEngagementRuntimeAdapter,
@@ -70,6 +71,9 @@ from puripuly_heart.app.services.gpu_runtime_interaction import (
     GpuRuntimeInteractionOwner,
     GpuRuntimeInteractionState,
 )
+from puripuly_heart.app.services.http_extension_registry import (
+    HttpExtensionRegistryService,
+)
 from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningDiagnostic,
@@ -82,6 +86,8 @@ from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
+from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.app.services.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
@@ -113,7 +119,6 @@ from puripuly_heart.app.services.settings_runtime_effects import (
 )
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
-from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.app.wiring import (
     LocalASRProviderRuntimeFactory,
     ManagedSTTProviderFactory,
@@ -177,7 +182,7 @@ from puripuly_heart.composition.application_startup import (
     compose_application_startup,
 )
 from puripuly_heart.composition.application_state import ApplicationUiStateAdapter
-from puripuly_heart.config.paths import user_config_dir
+from puripuly_heart.config.paths import default_http_extensions_dir, user_config_dir
 from puripuly_heart.config.settings import (
     OVERLAY_TARGET_STEAMVR,
     AppSettings,
@@ -185,12 +190,15 @@ from puripuly_heart.config.settings import (
     OpenRouterCredentialSource,
     QwenLLMModel,
     STTProviderName,
+    TranslationModel,
     build_managed_openrouter_byok_target_settings,
+    materialize_translation_settings,
     with_telemetry_consent,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.clipboard.watcher import create_clipboard_watcher
 from puripuly_heart.core.clock import SystemClock
+from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
 )
@@ -203,6 +211,7 @@ from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )
+from puripuly_heart.core.peer_capture import PeerCaptureSessionSnapshot
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
@@ -350,10 +359,12 @@ def compose_application_runtime(
     ) = None,
 ) -> UiApplicationPort:
     settings = compose_settings_owner(config_path)
+    http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
+    http_extensions.reload()
     clock = SystemClock()
     ingress = ApplicationIngressGate()
     pipeline = RuntimePipelineHandle()
-    signatures = ProviderRuntimeSignatures()
+    signatures = ProviderRuntimeSignatures(http_extensions=http_extensions)
     effects_state = SettingsRuntimeEffectsState()
     manual_fallback = ManualLocalASRFallbackOwner()
     event_bridge: UIEventBridgePort | None = None
@@ -370,7 +381,7 @@ def compose_application_runtime(
     audio_diagnostics: AudioDiagnosticsApplicationOwner | None = None
     self_application: SelfCaptureApplicationOwner | None = None
     microphone: MicrophoneTestRuntime | None = None
-    vrc_mic_sync: VrcMicSyncOwner | None = None
+    vrc_mic_sync: OscControlIntegrationOwner | None = None
     manual_typing: ManualTypingOwner | None = None
     clipboard: ClipboardAutoTranslationOwner | None = None
     settings_projection: SettingsProjectionOwner | None = None
@@ -791,8 +802,17 @@ def compose_application_runtime(
             return not stt_available
         return stt_requires_secret(value.provider.stt) and not stt_available
 
+    def publish_osc_state_from_runtime() -> None:
+        if vrc_mic_sync is not None:
+            vrc_mic_sync.publish_delta()
+
     def on_self_capture_state(_snapshot: SelfCaptureSessionSnapshot) -> None:
         require_local_asr().adapters.notice.sync()
+        publish_osc_state_from_runtime()
+
+    def on_peer_capture_state(snapshot: PeerCaptureSessionSnapshot) -> None:
+        require_peer().owner.on_runtime_state_changed(snapshot)
+        publish_osc_state_from_runtime()
 
     def require_self_application() -> SelfCaptureApplicationOwner:
         nonlocal self_application
@@ -846,9 +866,40 @@ def compose_application_runtime(
     async def stop_self_capture() -> None:
         await require_self_application().set_enabled(False)
 
-    def require_vrc_mic_sync() -> VrcMicSyncOwner:
+    def require_vrc_mic_sync() -> OscControlIntegrationOwner:
         nonlocal vrc_mic_sync
         if vrc_mic_sync is None:
+
+            def osc_state() -> object:
+                value = current_settings()
+                if value is None:
+                    return state_from_settings(AppSettings())
+                self_capture = pipeline.self_capture
+                peer_owner = require_peer().owner
+                return state_from_settings(
+                    value,
+                    self_capture=bool(
+                        self_capture is not None and self_capture.snapshot.desired_active
+                    ),
+                    peer_capture=bool(peer_owner.snapshot().effective_enabled),
+                    translation=bool(
+                        managed_account is not None
+                        and managed_account.translation.state_provider().translation_enabled
+                    ),
+                    captions=bool(value.ui.overlay_enabled),
+                )
+
+            def language_state() -> tuple[str, str, str, str]:
+                value = current_settings()
+                if value is None:
+                    return ("ko", "en", "en", "ko")
+                return (
+                    value.languages.source_language,
+                    value.languages.target_language,
+                    value.languages.peer_source_language,
+                    value.languages.peer_target_language,
+                )
+
             vrc_mic_sync = compose_vrc_mic_sync(
                 state_provider=lambda: pipeline.vrc_mic_state,
                 gate_provider=lambda: pipeline.vrc_mic_audio_gate,
@@ -857,6 +908,15 @@ def compose_application_runtime(
                     level=level,
                 ),
                 error_sink=log_error,
+                settings_provider=current_settings,
+                apply_settings=lambda next_settings: require_settings_application().apply(
+                    next_settings
+                ),
+                application_provider=lambda: application,
+                sender_provider=lambda: pipeline.sender,
+                osc_state_provider=osc_state,
+                language_state_provider=language_state,
+                translation_model_normalizer=materialize_translation_settings,
             )
         return vrc_mic_sync
 
@@ -1404,7 +1464,7 @@ def compose_application_runtime(
         ),
         self_state_sink=on_self_capture_state,
         self_diagnostic_sink=(require_audio_diagnostics().capture_adapter().self_capture),
-        peer_state_sink=lambda snapshot: (require_peer().owner.on_runtime_state_changed(snapshot)),
+        peer_state_sink=on_peer_capture_state,
         peer_diagnostic_sink=require_peer().owner.on_runtime_diagnostic,
         local_asr_diagnostic_sink=(require_local_asr_diagnostics().transition_diagnostic),
     )
@@ -1452,6 +1512,7 @@ def compose_application_runtime(
         translation_runtime_configuration_provider=(
             lambda: pipeline.translation_runtime_configuration
         ),
+        http_extensions=http_extensions,
         self_capture_provider=lambda: pipeline.self_capture,
         self_capture_owner=self_capture_owner,
         peer=lambda: require_peer().owner,
@@ -1517,6 +1578,7 @@ def compose_application_runtime(
         pending_sink=presentation.set_dashboard_managed_auth_pending,
         usage_view_sink=apply_managed_usage_view,
         dashboard_sink=presentation.set_dashboard_translation_enabled,
+        runtime_state_changed=lambda: require_vrc_mic_sync().publish_delta(),
         message_sink=lambda key, values: show_short_message(
             key,
             **dict(values),
@@ -1580,6 +1642,7 @@ def compose_application_runtime(
         configure_vrc_mic=lambda *, enabled: (require_vrc_mic_sync().configure(enabled=enabled)),
         stt_failure_sink=log_error,
         cleanup_failure_sink=lambda message, exc: log_error(f"{message}: {exc}"),
+        http_extensions=http_extensions,
     )
 
     runtime_components = RuntimeCompositionComponents(
@@ -1599,6 +1662,9 @@ def compose_application_runtime(
         return "alibaba_singapore"
 
     def llm_requires_secret(provider: LLMProviderName) -> bool:
+        value = current_settings()
+        if value is not None and value.translation.model == TranslationModel.CUSTOM_HTTP:
+            return False
         return provider in {
             LLMProviderName.GEMINI,
             LLMProviderName.OPENROUTER,
@@ -1611,6 +1677,7 @@ def compose_application_runtime(
         llm_runtime = pipeline.llm_runtime
         return bool(
             value is not None
+            and value.translation.model != TranslationModel.CUSTOM_HTTP
             and value.provider.llm == LLMProviderName.OPENROUTER
             and value.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
             and llm_runtime is not None
@@ -1788,6 +1855,11 @@ def compose_application_runtime(
         ),
         runtime_shutdown=runtime_shutdown,
         runtime_logging=runtime_logging,
+        osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
+        http_extension_registry=HttpExtensionRegistryService(
+            http_extensions,
+            SystemDirectoryOpener(),
+        ),
     )
 
     async def initialize_local_asr_evidence(value: object) -> None:

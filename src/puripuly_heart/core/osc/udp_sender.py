@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from pythonosc.osc_message_builder import OscMessageBuilder
 
+from puripuly_heart.core.osc.encoding import OscArg
 from puripuly_heart.core.osc.sender import OscSender
 
 
@@ -33,17 +34,25 @@ class VrchatOscUdpSender(OscSender):
     def close(self) -> None:
         self._sock.close()
 
+    def set_destination(self, host: str, port: int) -> None:
+        if not host:
+            raise ValueError("OSC destination host must be non-empty")
+        if not 1 <= int(port) <= 65535:
+            raise ValueError("OSC destination port must be in 1..65535")
+        self.host = host
+        self.port = int(port)
+
+    def send_message(self, address: str, *values: OscArg) -> None:
+        if not address or not address.startswith("/"):
+            raise ValueError("OSC address must start with '/'")
+        builder = self._OscMessageBuilder(address=address)
+        for value in values:
+            builder.add_arg(value)
+        self._sock.sendto(builder.build().dgram, (self.host, self.port))
+
     def send_chatbox(self, text: str) -> None:
-        builder = self._OscMessageBuilder(address=self.chatbox_address)
-        builder.add_arg(text)
-        builder.add_arg(self.chatbox_send)
-        builder.add_arg(self.chatbox_clear)
-        packet = builder.build().dgram
-        self._sock.sendto(packet, (self.host, self.port))
+        self.send_message(self.chatbox_address, text, self.chatbox_send, self.chatbox_clear)
 
     def send_typing(self, is_typing: bool) -> None:
         """Send typing indicator to VRChat chatbox."""
-        builder = self._OscMessageBuilder(address=self.typing_address)
-        builder.add_arg(is_typing)
-        packet = builder.build().dgram
-        self._sock.sendto(packet, (self.host, self.port))
+        self.send_message(self.typing_address, is_typing)

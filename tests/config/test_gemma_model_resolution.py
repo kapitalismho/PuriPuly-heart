@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from puripuly_heart.config import llm_profiles, runtime_resolution
 from puripuly_heart.config.settings_vnext import migration, serialization
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.settings_vnext.schema import (
+    VNEXT_SETTINGS_SCHEMA_VERSION,
+    AppSettingsVNext,
+)
 
 
 def _runtime_input(
@@ -159,7 +162,7 @@ def test_vnext_gemma_migration_is_idempotent_after_round_trip() -> None:
 
     assert once == twice
     assert once["intent"]["translation"]["model"] == "gemma4_26b_31b"
-    assert once["settings_version"] == 32
+    assert once["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
     assert once["intent"]["translation"]["fallback"] == {
         "enabled": True,
         "model": "gemma4_26b_31b",

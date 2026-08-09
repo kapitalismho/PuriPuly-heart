@@ -81,8 +81,8 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: Final = {
     },
     "cerebras_gemma4_31b": {
         "enabled": True,
-        "model": "gemma4_31b_cerebras",
-        "connection": "official_byok",
+        "model": "gemma4_31b",
+        "connection": "cerebras",
         "selection_alias": "cerebras_gemma4_31b",
     },
 }
@@ -95,6 +95,7 @@ _FALLBACK_FIELDS_ALIAS: Final = {
     (True, "gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
     (True, "gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
     (True, "gemma4_31b", "managed"): "managed_gemma4_31b",
+    (True, "gemma4_31b", "cerebras"): "cerebras_gemma4_31b",
     (True, "gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
 }

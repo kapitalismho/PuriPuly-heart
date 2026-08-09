@@ -52,12 +52,12 @@ def test_openrouter_unified_request_uses_models_only() -> None:
 
 def test_gemma_semantic_routes_produce_issue_provider_policies() -> None:
     assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY) == {
-        "only": ["cloudflare", "coreweave/bf16", "open-inference/bf16"],
+        "only": ["cloudflare", "coreweave/bf16", "friendli"],
         "sort": {"by": "latency", "partition": "none"},
         "allow_fallbacks": True,
     }
     assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_31B_LATENCY) == {
-        "only": ["coreweave/bf16", "open-inference/bf16"],
+        "only": ["coreweave/bf16", "friendli"],
         "sort": {"by": "latency"},
         "allow_fallbacks": True,
     }

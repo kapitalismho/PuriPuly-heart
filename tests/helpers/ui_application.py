@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
@@ -373,6 +374,7 @@ def compose_test_ui_application_boundary(
     *,
     runtime_shutdown: ApplicationRuntimeShutdownPort | None = None,
     runtime_logging: ApplicationRuntimeLoggingPort | None = None,
+    osc_state_publisher: Callable[[], object] | None = None,
 ) -> UiApplicationBoundary:
     logging_port = runtime_logging or ApplicationRuntimeLoggingStub(backend)
     state_runtime = cast(
@@ -397,4 +399,5 @@ def compose_test_ui_application_boundary(
         ),
         runtime_shutdown=runtime_shutdown or ApplicationRuntimeShutdownStub(backend),
         runtime_logging=logging_port,
+        osc_state_publisher=osc_state_publisher,
     )

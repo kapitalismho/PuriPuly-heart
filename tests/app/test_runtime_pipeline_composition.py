@@ -5,13 +5,13 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-
-from puripuly_heart.app import wiring_runtime_pipeline as runtime_pipeline_module
 from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineLauncher,
     RuntimePipelineResourceOwner,
     compose_runtime_pipeline,
 )
+
+from puripuly_heart.app import wiring_runtime_pipeline as runtime_pipeline_module
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import SystemClock
@@ -87,7 +87,11 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(runtime_pipeline_module, "create_llm_provider", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        runtime_pipeline_module,
+        "create_translation_backend",
+        lambda *_a, **_k: None,
+    )
     sender = RecordingSender()
     chatbox = RecordingChatbox()
     monkeypatch.setattr(runtime_pipeline_module, "VrchatOscUdpSender", lambda *_a, **_k: sender)
@@ -189,7 +193,7 @@ async def test_pipeline_composition_preserves_runtime_configuration_and_gate(
         osc_kwargs.update(kwargs)
         return RecordingChatbox()
 
-    monkeypatch.setattr(runtime_pipeline_module, "create_llm_provider", create_llm)
+    monkeypatch.setattr(runtime_pipeline_module, "create_translation_backend", create_llm)
     monkeypatch.setattr(
         runtime_pipeline_module,
         "VrchatOscUdpSender",
@@ -329,7 +333,11 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
     chatbox = RecordingChatbox()
     overlay = RecordingOverlay()
     monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(runtime_pipeline_module, "create_llm_provider", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        runtime_pipeline_module,
+        "create_translation_backend",
+        lambda *_a, **_k: None,
+    )
     monkeypatch.setattr(
         runtime_pipeline_module,
         "VrchatOscUdpSender",
@@ -660,7 +668,11 @@ async def test_pipeline_composition_closes_pending_llm_on_early_failure(
         raise RuntimeError("peer_owner construction failed")
 
     monkeypatch.setattr(runtime_pipeline_module, "create_secret_store", lambda *_a, **_k: object())
-    monkeypatch.setattr(runtime_pipeline_module, "create_llm_provider", lambda *_a, **_k: Llm())
+    monkeypatch.setattr(
+        runtime_pipeline_module,
+        "create_translation_backend",
+        lambda *_a, **_k: Llm(),
+    )
     monkeypatch.setattr(runtime_pipeline_module, "VrchatOscUdpSender", create_sender)
     monkeypatch.setattr(
         runtime_pipeline_module,

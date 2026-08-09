@@ -408,6 +408,8 @@ $packagedNotoCjkProvenanceDir = Join-Path $distDir "third_party\noto-sans-cjk"
 $packagedNotoCjkLicensePath = Join-Path $packagedNotoCjkProvenanceDir "OFL.txt"
 $packagedNotoCjkReadmePath = Join-Path $packagedNotoCjkProvenanceDir "README.md"
 $packagedNotoCjkSha256SumsPath = Join-Path $packagedNotoCjkProvenanceDir "SHA256SUMS.txt"
+$packagedTranslationExamplesDir = Join-Path $distDir "examples\http_extensions"
+$packagedMyMemoryExamplePath = Join-Path $packagedTranslationExamplesDir "mymemory.json"
 $pinnedOpenVrVendorDllSha256FromFile = Get-PinnedSha256FromFile -Path $openVrVendorSha256Path
 if ($pinnedOpenVrVendorDllSha256FromFile -ne $PinnedOpenVrVendorDllSha256) {
     throw "Vendored OpenVR runtime DLL pinned SHA256 literal drifted from $openVrVendorSha256Path"
@@ -532,6 +534,10 @@ if (-not (Test-Path $processCaptureSmokeHelperPath)) {
 $exePath = Join-Path $PWD "dist/PuriPulyHeart/PuriPulyHeart.exe"
 if (-not (Test-Path $exePath)) {
     throw "Packaged executable not found: $exePath"
+}
+$packagedMyMemoryExamplePath = [System.IO.Path]::GetFullPath($packagedMyMemoryExamplePath)
+if (-not (Test-Path -LiteralPath $packagedMyMemoryExamplePath -PathType Leaf)) {
+    throw "Packaged MyMemory example not found: $packagedMyMemoryExamplePath"
 }
 $productionPackagedSmokeHelperPath = Join-Path $distDir "PuriPulyHeartProcessCaptureSmoke.exe"
 if (Test-Path $productionPackagedSmokeHelperPath) {

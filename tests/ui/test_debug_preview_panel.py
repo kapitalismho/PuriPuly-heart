@@ -15,7 +15,6 @@ from puripuly_heart.ui.components.debug_preview_panel import (  # noqa: E402
 )
 import puripuly_heart.ui.components.debug_preview_panel as panel_module  # noqa: E402
 
-
 DEBUG_PREVIEW_I18N_KEYS = {
     "debug_preview.button",
     "debug_preview.tooltip",
@@ -39,6 +38,7 @@ DEBUG_PREVIEW_I18N_KEYS = {
     "debug_preview.audio_fault_clear",
     "debug_preview.gpu_state_cycle",
     "debug_preview.foundation_primitives",
+    "debug_preview.http_extension_form",
     "foundation.preview.title",
     "foundation.preview.body",
     "foundation.preview.ready",
@@ -73,6 +73,7 @@ ACTION_KEYS = [
     "gpu_state_cycle",
     "stt_loading_button_cycle",
     "foundation_primitives",
+    "http_extension_form",
 ]
 
 
@@ -100,6 +101,7 @@ def _callbacks(seen: list[str]):
         "on_gpu_state_cycle": lambda: seen.append("gpu_state_cycle"),
         "on_foundation_primitives": lambda: seen.append("foundation_primitives"),
         "on_stt_loading_button_cycle": lambda: seen.append("stt_loading_button_cycle"),
+        "on_http_extension_form": lambda: seen.append("http_extension_form"),
     }
 
 
@@ -113,8 +115,8 @@ def test_debug_preview_panel_starts_collapsed_with_dbg_button() -> None:
     panel = DebugPreviewPanel(**_callbacks(seen))
 
     assert panel.data == DEBUG_PREVIEW_PANEL_DATA_KEY
-    assert _button_label(panel._toggle_button) == "DBG"
-    assert panel._toggle_button.tooltip == "Debug UI preview"
+    assert _button_label(panel._toggle_button) == panel_module.t("debug_preview.button")
+    assert panel._toggle_button.tooltip == panel_module.t("debug_preview.tooltip")
     assert panel._popover.visible is False
     assert list(panel._action_buttons) == ACTION_KEYS
     assert seen == []
@@ -219,27 +221,8 @@ def test_debug_preview_panel_uses_flet_086_text_button_content_api(
     DebugPreviewPanel(**_callbacks([]))
 
     assert [button.content for button in created] == [
-        "DBG",
-        "Brake notice",
-        "Revoked notice",
-        "GitHub Star",
-        "Telemetry consent",
-        "Founder letter",
-        "PKCE failure",
-        "Discord auth",
-        "QQ auth",
-        "QQ recoverable error",
-        "QQ translation gated",
-        "Discord callback page",
-        "Peer translation EULA",
-        "Local Qwen warning",
-        "Invite 1/5",
-        "Cycle capture fault",
-        "Cycle STT fault",
-        "Clear audio faults",
-        "Cycle GPU state",
-        "Cycle STT loading button",
-        "Foundation primitives",
+        panel_module.t("debug_preview.button"),
+        *(panel_module.t(f"debug_preview.{action_key}") for action_key in ACTION_KEYS),
     ]
 
 

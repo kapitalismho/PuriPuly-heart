@@ -183,6 +183,9 @@ class VrcMicReceiverRuntime:
         cancel_timeout_s: float = 2.0,
         diagnostics_sink: ReceiverDiagnosticsSink | None = None,
         state_changed: ReceiverRuntimeStateChanged | None = None,
+        control_packet_handler: Callable[[str, tuple[Any, ...]], object] | None = None,
+        avatar_change_handler: Callable[[tuple[Any, ...]], object] | None = None,
+        packet_handler: Callable[[str, tuple[Any, ...]], object] | None = None,
     ) -> None:
         self._state = state
         self._host = host
@@ -192,6 +195,9 @@ class VrcMicReceiverRuntime:
         self._cancel_timeout_s = max(0.0, float(cancel_timeout_s))
         self._diagnostics_sink = diagnostics_sink
         self._state_changed = state_changed
+        self._control_packet_handler = control_packet_handler
+        self._avatar_change_handler = avatar_change_handler
+        self._packet_handler = packet_handler
         self._mute_task: asyncio.Task[None] | None = None
         self._mute_tasks: set[asyncio.Task[None]] = set()
         self._generation = 0
@@ -215,8 +221,24 @@ class VrcMicReceiverRuntime:
         return self._osc_runtime.receiver
 
     @property
+    def effective_port(self) -> int:
+        receiver = self.receiver
+        value = getattr(receiver, "effective_port", self._port)
+        return int(value)
+
+    @property
     def mute_task(self) -> asyncio.Task[None] | None:
         return self._mute_task
+
+    def configure_endpoint(self, host: str, port: int) -> None:
+        if self.receiver is not None:
+            raise RuntimeError("cannot change OSC receiver endpoint while running")
+        if not host:
+            raise ValueError("OSC receiver host must be non-empty")
+        if not 0 <= int(port) <= 65535:
+            raise ValueError("OSC receiver port must be in 0..65535")
+        self._host = host
+        self._port = int(port)
 
     @property
     def generation(self) -> int:
@@ -335,6 +357,9 @@ class VrcMicReceiverRuntime:
                 is_muted,
                 generation=_generation,
             ),
+            control_packet_handler=self._control_packet_handler,
+            avatar_change_handler=self._avatar_change_handler,
+            packet_handler=self._packet_handler,
         )
 
     def _build_receiver_for_osc_runtime(self) -> OscReceiverProtocol:

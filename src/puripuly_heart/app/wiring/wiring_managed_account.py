@@ -362,6 +362,7 @@ def compose_managed_account(
     log_error: Callable[[str], None],
     basic_warning_sink: Callable[[str], None],
     detailed_warning_sink: Callable[[str, BaseException | None], None],
+    runtime_state_changed: Callable[[], None] | None = None,
 ) -> ManagedAccountComponents:
     auth_owner: ManagedAuthOwner | None = None
 
@@ -470,7 +471,11 @@ def compose_managed_account(
         runtime_ensurer=runtime.ensure,
         usage_refresh_sink=usage_owner.schedule_usage_refresh,
         usage_refresh_now=lambda: usage_owner.refresh(auto_show_founder_letter=False),
-        runtime_sink=runtime.set_enabled,
+        runtime_sink=lambda enabled: _set_runtime_enabled(
+            runtime,
+            enabled,
+            runtime_state_changed,
+        ),
         dashboard_sink=dashboard_sink,
         clear_context=runtime.clear_context,
         warmup=translation_adapter.warmup,
@@ -509,6 +514,16 @@ def compose_managed_account(
         pkce_flow=pkce_flow,
         pkce=pkce,
     )
+
+
+def _set_runtime_enabled(
+    runtime: ManagedTranslationRuntimeAccess,
+    enabled: bool,
+    state_changed: Callable[[], None] | None,
+) -> None:
+    runtime.set_enabled(enabled)
+    if state_changed is not None:
+        state_changed()
 
 
 __all__ = [

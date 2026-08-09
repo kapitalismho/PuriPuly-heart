@@ -22,11 +22,11 @@ from puripuly_heart.app.services.clipboard_auto_translation import (
 )
 from puripuly_heart.app.services.github_star_prompt import GithubStarPromptOwner
 from puripuly_heart.app.services.gpu_runtime_interaction import GpuRuntimeInteractionOwner
+from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
-from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
 from puripuly_heart.app.wiring_provider_runtime import (
@@ -46,6 +46,7 @@ from puripuly_heart.config.settings import (
     OVERLAY_TARGET_DESKTOP,
     AppSettings,
     LLMProviderName,
+    TranslationModel,
 )
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.orchestrator.configuration import (
@@ -75,7 +76,7 @@ class SettingsRuntimeEffectsAdapter:
         clipboard: ClipboardAutoTranslationOwner,
         provisioning: LocalASRProvisioningPort,
         gpu: GpuRuntimeInteractionOwner,
-        vrc_mic_sync: VrcMicSyncOwner,
+        vrc_mic_sync: OscControlIntegrationOwner,
         projection: SettingsProjectionOwner,
         github_prompt: Callable[[], GithubStarPromptOwner],
         desktop_overlay: DesktopOverlayRuntimeEffectsPort[AppSettings],
@@ -367,7 +368,10 @@ class SettingsRuntimeEffectsAdapter:
                 local_asr_runtime is not None
                 and local_asr_runtime.snapshot.channel_for("peer").provider_id is not None
             ),
-            qwen_llm_desired=settings.provider.llm == LLMProviderName.QWEN,
+            qwen_llm_desired=(
+                settings.translation.model != TranslationModel.CUSTOM_HTTP
+                and settings.provider.llm == LLMProviderName.QWEN
+            ),
             llm_available=llm_runtime is not None and llm_runtime.provider is not None,
         )
 
@@ -425,6 +429,15 @@ class SettingsRuntimeEffectsAdapter:
 
         if transition.previous_overlay_enabled != settings.ui.overlay_enabled:
             await self._overlay.set_enabled(settings.ui.overlay_enabled)
+
+        configure_connection = getattr(self._vrc_mic_sync, "configure_connection", None)
+        if callable(configure_connection):
+            await configure_connection(
+                mode=settings.osc.connection_mode,
+                send_port=settings.osc.send_port or settings.osc.port,
+                receive_port=settings.osc.receive_port,
+                host=settings.osc.host,
+            )
 
         if self._vrc_mic_sync.last_enabled != settings.osc.vrc_mic_intercept:
             self._runtime_logging.emit_detailed(
@@ -497,6 +510,9 @@ class SettingsRuntimeEffectsAdapter:
                     raise
 
         self._overlay.publish_presentation()
+        publish_delta = getattr(self._vrc_mic_sync, "publish_delta", None)
+        if callable(publish_delta):
+            publish_delta()
 
     async def _clear_language_runtime_state(
         self,

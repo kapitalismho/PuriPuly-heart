@@ -90,7 +90,7 @@ def test_overlay_presentation_snapshot_round_trips_blocks_and_calibration() -> N
     snapshot = OverlayPresentationSnapshot(
         revision=7,
         calibration=OverlayPresentationCalibration(
-            anchor="head_locked",
+            anchor="spatial_locked",
             offset_x=0.15,
             offset_y=-0.2,
             distance=1.1,
@@ -124,7 +124,7 @@ def test_overlay_presentation_snapshot_round_trips_blocks_and_calibration() -> N
     restored = OverlayPresentationSnapshot.from_dict(snapshot.to_dict())
 
     assert restored.revision == 7
-    assert restored.calibration.anchor == "head_locked"
+    assert restored.calibration.anchor == "spatial_locked"
     assert restored.calibration.distance == 1.1
     assert restored.blocks == [
         OverlayPresentationBlock(

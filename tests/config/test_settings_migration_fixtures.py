@@ -176,6 +176,8 @@ def test_vnext_native_provider_verification_evidence_leaves_are_explicitly_exclu
             "intent.desktop_audio.capture_target.kind",
             "intent.desktop_audio.capture_target.device_name",
             "intent.desktop_audio.capture_target.process",
+            "intent.translation.http_extension_id",
+            "intent.translation.previous_llm_model",
         }
     )
     classified_vnext_destinations = {
@@ -221,7 +223,7 @@ def test_maximal_v24_fixture_covers_current_paths_with_safe_non_default_values()
     assert V24_MIGRATION_CLASSIFICATION["settings_version"].category == "schema_metadata"
     assert (
         V24_MIGRATION_CLASSIFICATION["overlay.calibration.anchor"].status
-        == "singleton_supported_value"
+        == "default_supported_value"
     )
 
 
@@ -239,12 +241,12 @@ def test_repairable_non_default_maximal_v24_values_normalize_to_canonical_values
     assert loaded_data["local_llm"]["backend"] == "ollama"
 
 
-def test_singleton_overlay_anchor_classification_matches_current_validation() -> None:
-    assert OVERLAY_CALIBRATION_ANCHORS == ("head_locked",)
+def test_overlay_anchor_classification_matches_current_validation() -> None:
+    assert OVERLAY_CALIBRATION_ANCHORS == ("head_locked", "spatial_locked")
     assert path_get(maximal_v24_settings_fixture(), "overlay.calibration.anchor") == "head_locked"
     assert (
         V24_MIGRATION_CLASSIFICATION["overlay.calibration.anchor"].notes
-        == "Current overlay calibration supports only 'head_locked'; non-default values fail validation."
+        == "Current overlay calibration supports 'head_locked' and 'spatial_locked'; other values fail validation."
     )
 
     with pytest.raises(ValueError, match="unsupported overlay calibration anchor"):

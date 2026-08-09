@@ -7,6 +7,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from puripuly_heart.app.services.provider_settings import (
+    ProviderSettingsOwner,
+    provider_verification_context,
+)
+from puripuly_heart.app.services.provider_verification_binding import (
+    ProviderVerificationBindingOwner,
+)
 
 from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as adapter_module,
@@ -20,13 +27,6 @@ from puripuly_heart.app.ports.canonical_settings_persistence import (
     ProviderVerificationBinding,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.provider_settings import (
-    ProviderSettingsOwner,
-    provider_verification_context,
-)
-from puripuly_heart.app.services.provider_verification_binding import (
-    ProviderVerificationBindingOwner,
-)
 from puripuly_heart.config.settings import AppSettings
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -348,6 +348,26 @@ async def test_provider_secret_change_invalidates_before_reverification_and_rela
     reloaded = load_vnext_settings(path)
     assert reloaded.settings is not None
     assert reloaded.settings.state.provider_verification.openrouter.status == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_http_extension_secret_change_uses_transaction_without_settings_write(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "settings.json"
+    store = MemorySecretStore()
+    provider_settings = _provider_settings_owner(path, store)
+    assert provider_settings.settings.current is not None
+    before = copy.deepcopy(provider_settings.settings.current)
+
+    assert await provider_settings.change_secret(
+        "http_extension.demo.api_key",
+        "extension-secret",
+    )
+
+    assert store.get("http_extension.demo.api_key") == "extension-secret"
+    assert provider_settings.settings.current == before
+    assert not path.exists()
 
 
 @pytest.mark.asyncio

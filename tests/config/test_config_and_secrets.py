@@ -379,6 +379,9 @@ def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None
     raw = to_dict(AppSettings())
     raw["settings_version"] = 17
     raw["osc"]["host"] = "192.0.2.20"
+    raw["osc"].pop("connection_mode", None)
+    raw["osc"].pop("send_port", None)
+    raw["osc"].pop("receive_port", None)
     raw["osc"]["port"] = 9011
     raw["osc"]["chatbox_max_chars"] = 96
     raw["osc"]["vrc_mic_intercept"] = True
@@ -387,6 +390,13 @@ def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None
     expected_osc = dict(raw["osc"])
     expected_osc.pop("cooldown_s")
     expected_osc.pop("ttl_s")
+    expected_osc.update(
+        {
+            "connection_mode": "automatic",
+            "send_port": 9011,
+            "receive_port": 9001,
+        }
+    )
     path.write_text(json.dumps(raw), encoding="utf-8")
 
     loaded = load_settings(path)
@@ -468,7 +478,7 @@ def test_translation_model_public_member_names_and_values_match_plan() -> None:
         ("GEMINI_31_FLASH_LITE", "gemini31_flash_lite"),
         ("QWEN_35_PLUS", "qwen35_plus"),
         ("LOCAL_LLM", "local_llm"),
-        ("GEMMA4_31B_CEREBRAS", "gemma4_31b_cerebras"),
+        ("CUSTOM_HTTP", "custom_http"),
     )
 
 
@@ -578,8 +588,10 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     assert supported_translation_connections(TranslationModel.LOCAL_LLM) == (
         TranslationConnection.OLLAMA,
     )
-    assert supported_translation_connections(TranslationModel.GEMMA4_31B_CEREBRAS) == (
-        TranslationConnection.OFFICIAL_BYOK,
+    assert supported_translation_connections(TranslationModel.GEMMA4_31B) == (
+        TranslationConnection.MANAGED,
+        TranslationConnection.OPENROUTER,
+        TranslationConnection.CEREBRAS,
     )
     assert default_translation_connection(TranslationModel.GEMMA4) == TranslationConnection.MANAGED
     assert (
@@ -590,8 +602,7 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
         default_translation_connection(TranslationModel.LOCAL_LLM) == TranslationConnection.OLLAMA
     )
     assert (
-        default_translation_connection(TranslationModel.GEMMA4_31B_CEREBRAS)
-        == TranslationConnection.OFFICIAL_BYOK
+        default_translation_connection(TranslationModel.GEMMA4_31B) == TranslationConnection.MANAGED
     )
 
 
@@ -1094,8 +1105,43 @@ def test_cerebras_settings_default_roundtrip_and_verification_state() -> None:
     persisted["api_key_verified"]["cerebras"] = True
     loaded_verified = from_dict(persisted)
     assert loaded_verified.provider.llm == LLMProviderName.CEREBRAS
-    assert loaded_verified.translation.model == TranslationModel.GEMMA4_31B_CEREBRAS
+    assert loaded_verified.translation.model == TranslationModel.GEMMA4_31B
+    assert loaded_verified.translation.connection == TranslationConnection.CEREBRAS
     assert loaded_verified.api_key_verified.cerebras is True
+
+
+def test_legacy_cerebras_translation_selection_migrates_to_gemma31_connection() -> None:
+    raw = to_dict(AppSettings())
+    raw["provider"]["llm"] = LLMProviderName.CEREBRAS.value
+    raw["translation"] = {
+        "model": "gemma4_31b_cerebras",
+        "connection": TranslationConnection.OFFICIAL_BYOK.value,
+        "connection_history": {
+            TranslationModel.GEMMA4_31B.value: TranslationConnection.OPENROUTER.value,
+            "gemma4_31b_cerebras": TranslationConnection.OFFICIAL_BYOK.value,
+        },
+        "fallback": {
+            "enabled": True,
+            "model": "gemma4_31b_cerebras",
+            "connection": TranslationConnection.OFFICIAL_BYOK.value,
+        },
+    }
+
+    loaded = from_dict(raw)
+    persisted = to_dict(loaded)
+
+    assert loaded.translation.model == TranslationModel.GEMMA4_31B
+    assert loaded.translation.connection == TranslationConnection.CEREBRAS
+    assert loaded.translation.connection_history[TranslationModel.GEMMA4_31B.value] == (
+        TranslationConnection.CEREBRAS
+    )
+    assert loaded.translation.fallback == TranslationFallbackSettings(
+        enabled=True,
+        model=TranslationModel.GEMMA4_31B,
+        connection=TranslationConnection.CEREBRAS,
+    )
+    assert loaded.provider.llm == LLMProviderName.CEREBRAS
+    assert "gemma4_31b_cerebras" not in json.dumps(persisted)
 
 
 def test_cerebras_api_key_is_not_serialized_in_settings() -> None:

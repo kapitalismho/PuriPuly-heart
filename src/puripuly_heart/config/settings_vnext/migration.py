@@ -93,6 +93,7 @@ _LOCAL_CPU_AUTO_PROVIDER = "local_cpu_auto"
 _LOCAL_QWEN_CPU_AUTO_MIGRATION_VERSION = 30
 _PEER_SOURCE_AUTO_MIGRATION_VERSION = 31
 _MULTI_MODEL_GEMMA_MIGRATION_VERSION = 32
+_CEREBRAS_CONNECTION_MIGRATION_VERSION = 35
 _EXPLICIT_LEGACY_GEMMA_FALLBACK_ALIASES = frozenset({"openrouter_gemma4_26b_a4b"})
 
 _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
@@ -141,8 +142,8 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
     ),
     "cerebras_gemma4_31b": TranslationFallbackIntent(
         enabled=True,
-        model="gemma4_31b_cerebras",
-        connection="official_byok",
+        model="gemma4_31b",
+        connection="cerebras",
         selection_alias="cerebras_gemma4_31b",
     ),
 }
@@ -155,6 +156,7 @@ _FALLBACK_FIELDS_ALIAS: dict[tuple[bool, str, str], str] = {
     (True, "gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
     (True, "gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
     (True, "gemma4_31b", "managed"): "managed_gemma4_31b",
+    (True, "gemma4_31b", "cerebras"): "cerebras_gemma4_31b",
     (True, "gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
 }
@@ -179,6 +181,9 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_local_qwen = _requires_local_qwen_cpu_auto_migration(data.get("settings_version"))
     migrate_peer_source_auto = _requires_peer_source_auto_migration(data.get("settings_version"))
     migrate_multi_model_gemma = _requires_multi_model_gemma_migration(data.get("settings_version"))
+    migrate_cerebras_connection = _requires_cerebras_connection_migration(
+        data.get("settings_version")
+    )
     prepared = dict(copy.deepcopy(data))
     prepared["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
     intent = prepared.get("intent") if isinstance(prepared.get("intent"), dict) else {}
@@ -186,6 +191,8 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(intent, dict) and isinstance(translation, dict):
         if migrate_multi_model_gemma:
             _migrate_multi_model_gemma_translation(translation)
+        if migrate_cerebras_connection:
+            _migrate_cerebras_connection_translation(translation)
         fallback = translation.get("fallback")
         if not isinstance(fallback, Mapping):
             translation["fallback"] = _fallback_intent_to_dict(
@@ -199,6 +206,11 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
         intent["translation"] = translation
         prepared["intent"] = intent
     if isinstance(intent, dict):
+        osc = intent.get("osc") if isinstance(intent.get("osc"), Mapping) else None
+        if isinstance(osc, dict) and "connection_mode" not in osc:
+            osc["connection_mode"] = "automatic"
+            osc.setdefault("send_port", osc.get("port", 9000))
+            osc.setdefault("receive_port", 9001)
         if migrate_peer_source_auto:
             _migrate_peer_source_auto_mode(intent)
         if migrate_local_qwen:
@@ -256,6 +268,16 @@ def _requires_multi_model_gemma_migration(settings_version: object) -> bool:
     return True
 
 
+def _requires_cerebras_connection_migration(settings_version: object) -> bool:
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < _CEREBRAS_CONNECTION_MIGRATION_VERSION
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < _CEREBRAS_CONNECTION_MIGRATION_VERSION
+    return True
+
+
 def _migrate_multi_model_gemma_translation(translation: dict[str, Any]) -> None:
     connection = translation.get("connection")
     if connection not in {"managed", "openrouter"}:
@@ -288,6 +310,37 @@ def _migrate_multi_model_gemma_translation(translation: dict[str, Any]) -> None:
         if fallback_connection == "managed"
         else "openrouter_gemma4_26b_31b"
     )
+
+
+def _migrate_cerebras_connection_translation(translation: dict[str, Any]) -> None:
+    active_legacy_cerebras = translation.get("model") == "gemma4_31b_cerebras"
+    previous_legacy_cerebras = translation.get("previous_llm_model") == "gemma4_31b_cerebras"
+    if active_legacy_cerebras:
+        translation["model"] = "gemma4_31b"
+        translation["connection"] = "cerebras"
+    if previous_legacy_cerebras:
+        translation["previous_llm_model"] = "gemma4_31b"
+
+    history = translation.get("connection_history")
+    if isinstance(history, dict):
+        legacy_history_present = "gemma4_31b_cerebras" in history
+        history.pop("gemma4_31b_cerebras", None)
+        if active_legacy_cerebras or previous_legacy_cerebras:
+            history["gemma4_31b"] = "cerebras"
+        elif "gemma4_31b" not in history and legacy_history_present:
+            history["gemma4_31b"] = "cerebras"
+
+    fallback = translation.get("fallback")
+    if not isinstance(fallback, dict):
+        return
+    fallback_alias = fallback.get("selection_alias")
+    if fallback_alias == "cerebras_gemma4_31b" or (
+        fallback_alias is None and fallback.get("model") == "gemma4_31b_cerebras"
+    ):
+        fallback["enabled"] = True
+        fallback["model"] = "gemma4_31b"
+        fallback["connection"] = "cerebras"
+        fallback["selection_alias"] = "cerebras_gemma4_31b"
 
 
 def _migrate_peer_source_auto_mode(intent: dict[str, Any]) -> None:
@@ -589,6 +642,8 @@ def from_legacy_app_settings(
                 translation=TranslationIntent(
                     model=data["translation"]["model"],
                     connection=data["translation"]["connection"],
+                    http_extension_id=data["translation"].get("http_extension_id"),
+                    previous_llm_model=data["translation"].get("previous_llm_model"),
                     connection_history=dict(data["translation"]["connection_history"]),
                     concurrency_limit=int(data["llm"]["concurrency_limit"]),
                     fallback=fallback,
@@ -688,8 +743,11 @@ def from_legacy_app_settings(
                     ),
                 ),
                 osc=OscIntent(
+                    connection_mode=str(data["osc"].get("connection_mode", "automatic")),
                     host=data["osc"]["host"],
                     port=int(data["osc"]["port"]),
+                    send_port=int(data["osc"].get("send_port", data["osc"]["port"])),
+                    receive_port=int(data["osc"].get("receive_port", 9001)),
                     chatbox_address=data["osc"]["chatbox_address"],
                     chatbox_send=bool(data["osc"]["chatbox_send"]),
                     chatbox_clear=bool(data["osc"]["chatbox_clear"]),
@@ -902,9 +960,15 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
     state = settings.state
     data = legacy_settings.to_dict(legacy_settings.AppSettings())
     data["settings_version"] = legacy_settings.SETTINGS_SCHEMA_VERSION
+    previous_model = intent.translation.previous_llm_model
+    previous_connection = (
+        intent.translation.connection_history.get(previous_model)
+        if previous_model is not None
+        else None
+    )
     data["provider"]["llm"] = _legacy_provider_llm_for_translation(
-        intent.translation.model,
-        intent.translation.connection,
+        previous_model or intent.translation.model,
+        previous_connection or intent.translation.connection,
     )
     data["provider"]["stt"] = intent.stt.provider
     data["provider"]["peer_stt"] = intent.peer_stt.provider
@@ -918,6 +982,13 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
             "connection": intent.translation.fallback.connection,
         },
     }
+    if (
+        intent.translation.model == "custom_http"
+        or intent.translation.http_extension_id is not None
+    ):
+        data["translation"]["http_extension_id"] = intent.translation.http_extension_id
+    if intent.translation.previous_llm_model is not None:
+        data["translation"]["previous_llm_model"] = intent.translation.previous_llm_model
     data["languages"] = {
         "source_language": intent.languages.source_language,
         "target_language": intent.languages.target_language,
@@ -1017,6 +1088,13 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
         "vrc_mic_intercept": intent.osc.vrc_mic_intercept,
         "chatbox_include_source": intent.osc.chatbox_include_source,
     }
+    data["osc"].update(
+        {
+            "connection_mode": intent.osc.connection_mode,
+            "send_port": intent.osc.send_port,
+            "receive_port": intent.osc.receive_port,
+        }
+    )
     data["secrets"] = {
         "backend": intent.secrets.backend,
         "encrypted_file_path": intent.secrets.encrypted_file_path,
@@ -1113,7 +1191,7 @@ def to_legacy_dict(settings: AppSettingsVNext) -> dict[str, Any]:
 def _legacy_provider_llm_for_translation(model: str, connection: str) -> str:
     if model == "local_llm":
         return "local_llm"
-    if model == "gemma4_31b_cerebras":
+    if model == "gemma4_31b_cerebras" or (model == "gemma4_31b" and connection == "cerebras"):
         return "cerebras"
     if model in {"gemini3_flash", "gemini31_flash_lite"}:
         if connection == "openrouter":
