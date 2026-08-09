@@ -11,7 +11,10 @@ from puripuly_heart.app.ports.osc_control import (
 from puripuly_heart.app.ports.oscquery import OscQueryServicePort
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
-from puripuly_heart.core.runtime.oscquery import OscQueryRuntime
+from puripuly_heart.core.runtime.oscquery import (
+    VRCHAT_OSC_DEFAULT_INPUT_PORT,
+    OscQueryRuntime,
+)
 
 from .control_application import SettingsBackedOscControlApplication
 from .control_router import OscControlRouter
@@ -107,7 +110,9 @@ class OscControlIntegrationOwner:
 
     @property
     def effective_send_port(self) -> int | None:
-        return self.query_runtime.effective_send_port or self._send_port
+        if self._mode == "automatic":
+            return self.query_runtime.effective_send_port or VRCHAT_OSC_DEFAULT_INPUT_PORT
+        return self._send_port
 
     @property
     def accepting_ingress(self) -> bool:
@@ -215,14 +220,11 @@ class OscControlIntegrationOwner:
             return
 
         try:
-            await self.query_runtime.start(
-                "automatic",
-                manual_send_port=self._send_port,
-            )
+            await self.query_runtime.start("automatic")
         except Exception as exc:
             self._report_error(f"OSCQuery automatic discovery unavailable: {type(exc).__name__}")
             await self._receiver_owner.ensure_receiver()
-            await self._set_sender_destination(host, self._send_port)
+            await self._set_sender_destination(host, VRCHAT_OSC_DEFAULT_INPUT_PORT)
             self._publish_start()
         self.router.set_ingress_enabled(True)
 

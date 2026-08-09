@@ -216,7 +216,7 @@ async def test_integration_shares_dynamic_receiver_and_transitions_modes() -> No
 
 
 @pytest.mark.asyncio
-async def test_automatic_refresh_keeps_configured_manual_fallback_port() -> None:
+async def test_automatic_refresh_uses_vrchat_default_instead_of_saved_manual_port() -> None:
     settings = AppSettings()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
@@ -228,11 +228,20 @@ async def test_automatic_refresh_keeps_configured_manual_fallback_port() -> None
         send_port=9123,
         receive_port=9124,
     )
-    assert sender.destinations[-1] == ("127.0.0.1", 9123)
+    assert sender.destinations[-1] == ("127.0.0.1", 9000)
+    assert integration.effective_send_port == 9000
 
     await integration.query_runtime.refresh()
 
+    assert sender.destinations[-1] == ("127.0.0.1", 9000)
+
+    await integration.configure_connection(
+        mode="manual",
+        send_port=9123,
+        receive_port=9124,
+    )
     assert sender.destinations[-1] == ("127.0.0.1", 9123)
+    assert integration.effective_send_port == 9123
     await integration.close()
 
 
@@ -260,7 +269,7 @@ async def test_automatic_discovery_recovers_after_vrchat_disappears_and_reappear
 
     service.info = None
     await integration.query_runtime.refresh()
-    assert sender.destinations[-1] == ("127.0.0.1", 9130)
+    assert sender.destinations[-1] == ("127.0.0.1", 9000)
 
     service.info = OscQueryServiceInfo(
         service_id="VRChat-restarted",

@@ -160,7 +160,7 @@ async def test_oscquery_monitor_detects_disappearance_and_rediscovery_without_ca
         snapshot_publisher=lambda reason: events.append(("snapshot", reason)),
         discovery_poll_interval_seconds=0.01,
     )
-    await runtime.start("automatic", manual_send_port=9000)
+    await runtime.start("automatic", manual_send_port=9123)
     await asyncio.sleep(0.03)
 
     assert events.count(("snapshot", "discovery")) == 0

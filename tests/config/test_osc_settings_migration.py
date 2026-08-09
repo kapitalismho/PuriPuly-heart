@@ -60,7 +60,7 @@ def test_vnext_migration_preserves_osc_mode_and_ports() -> None:
     assert legacy["osc"]["receive_port"] == 9201
 
 
-def test_pre_feature_vnext_osc_records_become_manual_and_round_trip_idempotently() -> None:
+def test_pre_feature_vnext_osc_records_become_automatic_and_round_trip_idempotently() -> None:
     settings = AppSettings()
     settings.osc.connection_mode = "manual"
     settings.osc.port = 9137
@@ -75,10 +75,10 @@ def test_pre_feature_vnext_osc_records_become_manual_and_round_trip_idempotently
     loaded = from_vnext_dict(persisted)
     round_tripped = serialization.to_dict(loaded)
 
-    assert loaded.intent.osc.connection_mode == "manual"
+    assert loaded.intent.osc.connection_mode == "automatic"
     assert loaded.intent.osc.send_port == 9137
     assert loaded.intent.osc.receive_port == 9001
-    assert round_tripped["intent"]["osc"]["connection_mode"] == "manual"
+    assert round_tripped["intent"]["osc"]["connection_mode"] == "automatic"
     assert round_tripped["intent"]["osc"]["send_port"] == 9137
     assert round_tripped["intent"]["osc"]["receive_port"] == 9001
 
@@ -97,7 +97,7 @@ def test_explicit_vnext_osc_mode_is_preserved_on_reload() -> None:
     assert loaded.intent.osc.receive_port == 9139
 
 
-def test_legacy_port_only_osc_settings_preserve_fixed_port_behavior() -> None:
+def test_legacy_port_only_osc_settings_become_automatic_and_preserve_ports() -> None:
     persisted = to_dict(AppSettings())
     persisted["osc"].pop("connection_mode", None)
     persisted["osc"].pop("send_port", None)
@@ -105,7 +105,7 @@ def test_legacy_port_only_osc_settings_preserve_fixed_port_behavior() -> None:
 
     loaded = from_dict(persisted)
 
-    assert loaded.osc.connection_mode == "manual"
+    assert loaded.osc.connection_mode == "automatic"
     assert loaded.osc.port == 9130
     assert loaded.osc.send_port == 9130
     assert loaded.osc.receive_port == 9001

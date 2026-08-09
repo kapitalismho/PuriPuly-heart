@@ -201,7 +201,7 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(intent, dict):
         osc = intent.get("osc") if isinstance(intent.get("osc"), Mapping) else None
         if isinstance(osc, dict) and "connection_mode" not in osc:
-            osc["connection_mode"] = "manual"
+            osc["connection_mode"] = "automatic"
             osc.setdefault("send_port", osc.get("port", 9000))
             osc.setdefault("receive_port", 9001)
         if migrate_peer_source_auto:

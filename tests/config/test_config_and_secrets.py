@@ -392,7 +392,7 @@ def test_load_settings_persists_v18_osc_rate_limit_key_removal(tmp_path) -> None
     expected_osc.pop("ttl_s")
     expected_osc.update(
         {
-            "connection_mode": "manual",
+            "connection_mode": "automatic",
             "send_port": 9011,
             "receive_port": 9001,
         }

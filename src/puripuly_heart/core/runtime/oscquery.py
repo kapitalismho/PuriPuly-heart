@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Final, Literal
 
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.osc.oscquery_contract import (
@@ -20,6 +20,7 @@ OscEffectivePort = Callable[[], int]
 OscDestinationChanged = Callable[[str, int], Awaitable[None] | None]
 OscSnapshotPublisher = Callable[[str], Awaitable[None] | None]
 OscAvatarInspector = Callable[[Mapping[str, object]], Awaitable[None] | None]
+VRCHAT_OSC_DEFAULT_INPUT_PORT: Final = 9000
 
 
 @dataclass(slots=True)
@@ -42,7 +43,7 @@ class OscQueryRuntime:
     _started: bool = field(init=False, default=False)
     _service_started: bool = field(init=False, default=False)
     _refresh_requested: bool = field(init=False, default=False)
-    _manual_send_port: int = field(init=False, default=9000)
+    _fallback_send_port: int = field(init=False, default=VRCHAT_OSC_DEFAULT_INPUT_PORT)
     _lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
     _monitor_scope: LifecycleScope = field(
         init=False,
@@ -66,7 +67,6 @@ class OscQueryRuntime:
             self.mode = mode
             if mode == "off":
                 return
-            self._manual_send_port = int(manual_send_port)
             if mode == "manual":
                 await self.receiver_start()
                 self.effective_receive_port = self.receiver_effective_port()
@@ -80,13 +80,17 @@ class OscQueryRuntime:
                     await _maybe_await(self.snapshot_publisher("start"))
                 return
 
+            self._fallback_send_port = VRCHAT_OSC_DEFAULT_INPUT_PORT
             try:
                 self._service_started = True
                 await self.service.start(self._services_changed)
                 await self.receiver_start()
                 self.effective_receive_port = self.receiver_effective_port()
                 self.service_info = await self.service.discover_vrchat()
-                await self._apply_service_info(self.service_info, manual_send_port=manual_send_port)
+                await self._apply_service_info(
+                    self.service_info,
+                    fallback_send_port=self._fallback_send_port,
+                )
                 await self.service.advertise_receiver(
                     OscQueryAdvertisement(
                         host=self.receiver_host,
@@ -125,7 +129,7 @@ class OscQueryRuntime:
         self.service_info = service_info
         await self._apply_service_info(
             self.service_info,
-            manual_send_port=self._manual_send_port,
+            fallback_send_port=self._fallback_send_port,
         )
         if (
             publish_snapshot
@@ -181,12 +185,12 @@ class OscQueryRuntime:
         self,
         service: OscQueryServiceInfo | None,
         *,
-        manual_send_port: int,
+        fallback_send_port: int,
     ) -> None:
         destination_port = (
             service.osc_send_port
             if service is not None and service.osc_send_port is not None
-            else manual_send_port
+            else fallback_send_port
         )
         destination_host = service.host if service is not None and service.host else "127.0.0.1"
         self.effective_send_port = destination_port
@@ -221,4 +225,4 @@ async def _maybe_await(value: object) -> object:
     return value
 
 
-__all__ = ["OscQueryRuntime"]
+__all__ = ["OscQueryRuntime", "VRCHAT_OSC_DEFAULT_INPUT_PORT"]

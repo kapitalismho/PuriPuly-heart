@@ -4220,7 +4220,7 @@ def from_dict(data: dict[str, Any]) -> AppSettings:
                 else None
             ),
             receive_port=int(data.get("osc", {}).get("receive_port", 9001)),
-            connection_mode=str(osc_data.get("connection_mode", "manual")),
+            connection_mode=str(osc_data.get("connection_mode", "automatic")),
             chatbox_address=str(data.get("osc", {}).get("chatbox_address", "/chatbox/input")),
             chatbox_send=bool(data.get("osc", {}).get("chatbox_send", True)),
             chatbox_clear=bool(data.get("osc", {}).get("chatbox_clear", False)),
