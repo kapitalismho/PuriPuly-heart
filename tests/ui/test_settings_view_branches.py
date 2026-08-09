@@ -359,18 +359,6 @@ def _card_title(card: ft.Control) -> str | None:
     return None
 
 
-def _card_value_text(card: ft.Control) -> str | None:
-    column = _wrapped_card_column(card)
-    controls = getattr(column, "controls", None)
-    if not controls or len(controls) < 2:
-        return None
-    value_slot = getattr(controls[1], "content", None)
-    value_text = getattr(value_slot, "content", None)
-    if isinstance(value_text, ft.Text):
-        return value_text.value
-    return None
-
-
 def _general_tab_card_titles(view: settings_view.SettingsView) -> list[str]:
     titles: list[str] = []
     for row in _subtab_controls(view, "general"):
@@ -386,14 +374,6 @@ def _api_tab_card_titles(view: settings_view.SettingsView) -> list[str]:
         titles.extend(
             title for card in _layout_cards(row) if (title := _card_title(card)) is not None
         )
-    return titles
-
-
-def _prompt_tab_card_titles(view: settings_view.SettingsView) -> list[str]:
-    titles: list[str] = []
-    for card in _prompt_tab_cards(view):
-        if (title := _card_title(card)) is not None:
-            titles.append(title)
     return titles
 
 
@@ -494,12 +474,6 @@ def _subtab_label(button: ft.Control) -> ft.Text:
     raise AssertionError(f"Expected subtab container label, got {type(button)!r}")
 
 
-def _subtab_text_value(button: ft.Control) -> str:
-    if isinstance(button, ft.TextButton):
-        return button.content
-    return _subtab_label(button).value
-
-
 def _subtab_text_color(button: ft.Control) -> str | None:
     if isinstance(button, ft.TextButton):
         return _button_style_value(button, "color")
@@ -573,20 +547,6 @@ def test_load_from_settings_peer_stt_card_has_no_peer_subsetting_controls(
     assert not hasattr(view, "_peer_qwen_region_text")
     assert not hasattr(view, "_peer_qwen_model_text")
     assert not hasattr(view, "_peer_soniox_model_text")
-
-
-def test_load_from_settings_shows_clipboard_auto_translate_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _store = _make_settings_view(monkeypatch)
-    settings = AppSettings()
-    settings.ui.clipboard_auto_translate_enabled = True
-
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._clipboard_auto_translate_text.content.value == t(
-        "settings.clipboard_auto_translate.on"
-    )
 
 
 def test_clipboard_auto_translate_selection_updates_settings_and_emits_change(
@@ -1398,19 +1358,6 @@ def test_set_managed_key_state_clamps_over_limit_invite_progress(
     assert view._managed_key_invite_progress_value.value == "5 / 5"
 
 
-def test_update_api_visibility_keeps_openrouter_cards_visible_for_inactive_fallback_copy(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.GEMINI
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._translation_connection_row.visible is True
-    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
-
-
 def test_update_api_visibility_treats_peer_local_qwen_as_local_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1714,23 +1661,6 @@ def test_local_llm_secret_failure_logs_do_not_include_secret(
 
     assert "server-secret" not in caplog.text
     assert "RuntimeError" in caplog.text
-
-
-def test_apply_locale_refreshes_local_llm_api_key_copy(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    i18n_module.set_locale("ko")
-    try:
-        view, _ = _make_settings_view(monkeypatch)
-
-        view.apply_locale()
-
-        assert view._local_llm_api_key._text_field.label == t("settings.local_llm.api_key")
-        assert view._local_llm_api_key_helper.value == ""
-        assert view._local_llm_api_key_helper.visible is False
-    finally:
-        i18n_module.set_locale(old_locale)
 
 
 def test_local_llm_fields_update_provider_draft(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2240,62 +2170,6 @@ def test_gpu_card_is_standard_one_by_one_and_contains_only_device_selection(
     assert view._gpu_device_row.content.controls[2].opacity == 1.0
 
 
-def test_gpu_device_modal_shows_graphics_card_name_and_vulkan_slot(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
-    settings.stt.gpu_device_id = "vk:1"
-    view, _ = _make_settings_view(monkeypatch)
-    page = attach_dummy_page(monkeypatch, view)
-    captured: dict[str, object] = {}
-
-    class CapturingModal:
-        def __init__(
-            self,
-            page_arg,
-            title,
-            options,
-            on_select,
-            *,
-            show_description=False,
-        ) -> None:
-            captured.update(
-                page=page_arg,
-                title=title,
-                options=options,
-                on_select=on_select,
-                show_description=show_description,
-            )
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", CapturingModal)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.set_gpu_devices(
-        devices=(
-            GpuDeviceOption("vk:0", "NVIDIA GeForce RTX 4070", "Vulkan0"),
-            GpuDeviceOption("vk:1", "AMD Radeon RX 7900 XTX", "Vulkan1"),
-        )
-    )
-
-    view._on_gpu_device_click(None)
-
-    options = captured["options"]
-    assert captured["page"] is page
-    assert captured["title"] == t("settings.gpu_device.title")
-    assert captured["show_description"] is True
-    assert captured["current"] == "vk:1"
-    assert [option.value for option in options] == ["auto", "vk:0", "vk:1"]
-    assert [option.label for option in options] == [
-        t("settings.gpu_device.auto"),
-        "NVIDIA GeForce RTX 4070",
-        "AMD Radeon RX 7900 XTX",
-    ]
-    assert [option.description for option in options] == ["", "Vulkan 0", "Vulkan 1"]
-
-
 def test_gpu_row_repaints_and_collapses_immediately_with_provider_selection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2341,33 +2215,6 @@ def test_selecting_gpu_for_self_or_peer_requests_discovery_once_per_new_selectio
     view._on_peer_stt_selected(STTProviderName.LOCAL_QWEN_GPU.value)
 
     assert requests == ["discover", "discover"]
-
-
-@pytest.mark.parametrize("locale", ("en", "ko", "zh-CN", "ja", "ru"))
-def test_gpu_card_localizes_device_options_in_each_supported_locale(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-) -> None:
-    previous_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        settings = AppSettings()
-        settings.provider.stt = STTProviderName.LOCAL_QWEN_GPU
-        settings.stt.gpu_device_id = "vk:saved"
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-
-        view.set_gpu_devices(
-            devices=(GpuDeviceOption("vk:0", "NVIDIA GeForce RTX 4070", "Vulkan0"),)
-        )
-
-        assert view._gpu_device_card.visible is True
-        assert view._gpu_device_text.content.value == t(
-            "settings.gpu_device.unavailable",
-            device="vk:saved",
-        )
-    finally:
-        i18n_module.set_locale(previous_locale)
 
 
 def test_settings_view_omits_legacy_overlay_peer_toggle_api(
@@ -2914,24 +2761,6 @@ def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_g
     assert pending.openrouter.selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
 
 
-def test_load_from_settings_shows_translation_connection_label(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=TranslationModel.GEMMA4,
-        connection=TranslationConnection.OPENROUTER,
-    )
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._translation_connection_row.visible is True
-    assert view._translation_connection_text.content.value == t(
-        "settings.translation_connection.openrouter"
-    )
-
-
 def test_on_translation_connection_selected_updates_settings_and_flags(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3106,27 +2935,6 @@ def test_on_openrouter_fallback_selected_defaults_invalid_value_to_deepseek(
     assert view._openrouter_fallback_text.content.value == t("settings.fallback.none")
 
 
-def test_openrouter_fallback_card_initializes_with_deepseek_default(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-
-    assert view._openrouter_fallback_text.content.value == t("settings.fallback.none")
-
-
-def test_fallback_card_stays_visible_when_non_openrouter_active(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.GEMINI
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._translation_connection_row.visible is True
-    assert t("settings.fallback") in _api_tab_card_titles(view)
-
-
 def test_update_api_visibility_keeps_openrouter_key_for_openrouter_deepseek_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3212,8 +3020,8 @@ def test_update_api_visibility_shows_cerebras_key_for_cerebras_fallback_only(
     settings = AppSettings()
     settings.provider.llm = LLMProviderName.GEMINI
     settings.translation.fallback = _enabled_fallback(
-        TranslationModel.GEMMA4_31B_CEREBRAS,
-        TranslationConnection.OFFICIAL_BYOK,
+        TranslationModel.GEMMA4_31B,
+        TranslationConnection.CEREBRAS,
     )
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -3429,276 +3237,6 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
     assert view.has_pending_prompt_changes is False
 
 
-def test_openrouter_fallback_modal_lists_curated_openrouter_fallbacks(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-
-    view = _make_settings_view(monkeypatch)[0]
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    attach_dummy_page(monkeypatch, view)
-
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(self, _page, _title, options, _on_select, *, show_description=False):
-            captured["options"] = options
-            captured["show_description"] = show_description
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_openrouter_fallback_click(None)
-
-    assert captured["show_description"] is True
-    options = captured["options"]
-
-    assert [option.value for option in options] == [
-        "none",
-        "deepseek_v4_flash_official",
-        "openrouter_deepseek_v4_flash",
-        "openrouter_gemma4_26b_31b",
-        "openrouter_gemma4_31b",
-        "openrouter_gemma4_26b_a4b",
-        "cerebras_gemma4_31b",
-    ]
-    assert [option.label for option in options] == [
-        t("settings.fallback.none"),
-        t("settings.fallback.deepseek_v4_flash_official"),
-        t("settings.fallback.openrouter_deepseek_v4_flash"),
-        t("settings.fallback.openrouter_gemma4_26b_31b"),
-        t("settings.fallback.openrouter_gemma4_31b"),
-        t("settings.fallback.openrouter_gemma4_26b_a4b"),
-        t("settings.fallback.cerebras_gemma4_31b"),
-    ]
-    assert [option.description for option in options] == [
-        "",
-        "",
-        "",
-        t("settings.fallback.openrouter_gemma4_26b_31b.description"),
-        t("settings.fallback.openrouter_gemma4_31b.description"),
-        "",
-        t("settings.fallback.cerebras_gemma4_31b.description"),
-    ]
-
-
-def test_llm_modal_lists_logical_translation_models_once(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-    )
-    settings.provider.llm = LLMProviderName.GEMINI
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    attach_dummy_page(monkeypatch, view)
-
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(
-            self,
-            _page,
-            title,
-            options,
-            _on_select,
-            *,
-            show_description=False,
-            two_column=False,
-        ):
-            captured["title"] = title
-            captured["options"] = options
-            captured["show_description"] = show_description
-            captured["two_column"] = two_column
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_llm_click(None)
-
-    options = captured["options"]
-    option_by_value = {option.value: option for option in options}
-    deepseek_managed = getattr(OpenRouterSelectionAlias, "DEEPSEEK_V4_FLASH_MANAGED", None)
-    deepseek_byok = getattr(OpenRouterSelectionAlias, "DEEPSEEK_V4_FLASH_BYOK", None)
-
-    assert deepseek_managed is not None
-    assert deepseek_byok is not None
-
-    assert captured["title"] == t("settings.section.translation")
-    assert captured["show_description"] is True
-    assert captured["two_column"] is True
-    assert [option.value for option in options] == [
-        TranslationModel.GEMMA4_26B_31B.value,
-        TranslationModel.DEEPSEEK_V4_FLASH.value,
-        TranslationModel.GEMMA4_31B.value,
-        TranslationModel.GEMMA4.value,
-        TranslationModel.GEMMA4_31B_CEREBRAS.value,
-        TranslationModel.LOCAL_LLM.value,
-        TranslationModel.DEEPSEEK_V4_PRO.value,
-        TranslationModel.GEMINI_3_FLASH.value,
-        TranslationModel.GEMINI_31_FLASH_LITE.value,
-        TranslationModel.QWEN_35_PLUS.value,
-        TranslationModel.CUSTOM_HTTP.value,
-    ]
-    assert [option.section for option in options] == [
-        t("settings.translation_model.section.recommended"),
-        t("settings.translation_model.section.recommended"),
-        t("settings.translation_model.section.others"),
-        t("settings.translation_model.section.others"),
-        t("settings.translation_model.section.others"),
-        t("settings.translation_model.section.others"),
-        t("settings.translation_model.section.others"),
-        t("settings.translation_model.section.others"),
-        t("settings.translation_model.section.others"),
-        t("settings.translation_model.section.others"),
-        t("settings.translation_model.section.others"),
-    ]
-    assert captured["current"] == TranslationModel.GEMINI_3_FLASH.value
-    assert OpenRouterSelectionAlias.GEMMA4_MANAGED.value not in option_by_value
-    assert OpenRouterSelectionAlias.GEMMA4_BYOK.value not in option_by_value
-    assert TranslationModel.QWEN_35_PLUS.value in option_by_value
-    assert TranslationModel.LOCAL_LLM.value in option_by_value
-    assert all("qwen35_flash" not in value for value in option_by_value)
-    assert deepseek_managed.value not in option_by_value
-    assert deepseek_byok.value not in option_by_value
-    assert QwenLLMModel.QWEN_35_FLASH.value not in option_by_value
-    assert option_by_value[TranslationModel.GEMMA4.value].label == t("provider.gemma4_26b_a4b_it")
-    assert option_by_value[TranslationModel.DEEPSEEK_V4_FLASH.value].label == t(
-        "provider.deepseek_v4_flash"
-    )
-    assert option_by_value[TranslationModel.DEEPSEEK_V4_PRO.value].label == t(
-        "provider.deepseek_v4_pro"
-    )
-    assert option_by_value[TranslationModel.GEMMA4_31B_CEREBRAS.value].label == t(
-        "provider.gemma4_31b_cerebras"
-    )
-    assert option_by_value[TranslationModel.LOCAL_LLM.value].label == t("provider.local_llms")
-
-
-def test_translation_connection_modal_lists_supported_connections(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.MANAGED,
-    )
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    attach_dummy_page(monkeypatch, view)
-
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(self, _page, _title, options, _on_select, *, show_description=False):
-            captured["options"] = options
-            captured["show_description"] = show_description
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_translation_connection_click(None)
-
-    assert captured["show_description"] is False
-    options = captured["options"]
-    assert [option.value for option in options] == [
-        TranslationConnection.MANAGED.value,
-        TranslationConnection.MANAGED_CHINA.value,
-        TranslationConnection.OPENROUTER.value,
-        TranslationConnection.OFFICIAL_BYOK.value,
-    ]
-    assert [option.label for option in options] == [
-        t("settings.translation_connection.managed"),
-        t("settings.translation_connection.managed_china"),
-        t("settings.translation_connection.openrouter"),
-        t("settings.translation_connection.official_byok"),
-    ]
-    assert [option.description for option in options] == ["", "", "", ""]
-    assert captured["current"] == TranslationConnection.MANAGED.value
-
-
-def test_translation_connection_modal_lists_gemini_connections_without_description(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.translation = TranslationSettings(
-        model=TranslationModel.GEMINI_3_FLASH,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-    )
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    attach_dummy_page(monkeypatch, view)
-
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(self, _page, _title, options, _on_select, *, show_description=False):
-            captured["options"] = options
-            captured["show_description"] = show_description
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_translation_connection_click(None)
-
-    options = captured["options"]
-    assert captured["show_description"] is False
-    assert captured["current"] == TranslationConnection.OFFICIAL_BYOK.value
-    assert [option.value for option in options] == [
-        TranslationConnection.OFFICIAL_BYOK.value,
-        TranslationConnection.OPENROUTER.value,
-    ]
-    assert [option.description for option in options] == ["", ""]
-
-
-def test_openrouter_fallback_modal_uses_label_only_generic_options(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-
-    view = _make_settings_view(monkeypatch)[0]
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    attach_dummy_page(monkeypatch, view)
-
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(self, _page, _title, options, _on_select, *, show_description=False):
-            captured["options"] = options
-            captured["show_description"] = show_description
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_openrouter_fallback_click(None)
-
-    options = {option.value: option for option in captured["options"]}
-    assert captured["show_description"] is True
-    assert options["none"].description == ""
-    assert options["openrouter_deepseek_v4_flash"].description == ""
-    assert options["cerebras_gemma4_31b"].description == t(
-        "settings.fallback.cerebras_gemma4_31b.description"
-    )
-    assert "qwen35_flash" not in options
-
-
 def test_hidden_legacy_deepseek_china_fallback_displays_safe_current_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3712,32 +3250,6 @@ def test_hidden_legacy_deepseek_china_fallback_displays_safe_current_value(
 
     assert view._translation_fallback_preset_value(settings.translation.fallback) == "none"
     assert view._get_openrouter_fallback_display_label(settings) == t("settings.fallback.none")
-
-
-def test_openrouter_fallback_off_does_not_show_active_helper_copy(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.OPENROUTER
-    settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
-
-
-def test_openrouter_fallback_off_shows_off_description_when_main_provider_is_inactive(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.llm = LLMProviderName.GEMINI
-    settings.openrouter.fallback_selection_alias = OpenRouterFallbackSelectionAlias.NONE
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
 
 
 def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4204,222 +3716,6 @@ def test_peer_auto_detection_languages_card_is_visible_only_for_peer_soniox(
     assert view._peer_auto_languages_editor._terms == ["ja"]
 
 
-def test_peer_provider_labels_are_backed_by_i18n(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = AppSettings()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._peer_stt_label.value == t("settings.peer_stt_provider")
-
-
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN"])
-def test_deepseek_provider_copy_is_backed_by_i18n(locale: str) -> None:
-    bundle = i18n_module._load_bundle(locale)
-
-    for key in (
-        "settings.deepseek_api_key",
-        "provider.deepseek",
-        "provider.deepseek_v4_flash",
-        "provider.deepseek_v4_flash.description",
-    ):
-        assert bundle.get(key) and bundle[key] != key
-
-
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN", "ja"])
-def test_deepseek_china_fallback_copy_is_backed_by_i18n(locale: str) -> None:
-    bundle = i18n_module._load_bundle(locale)
-
-    for key in (
-        "provider.deepseek_v4_flash_china_fallback",
-        "provider.deepseek_v4_flash_china_fallback.description",
-    ):
-        assert key in bundle
-        assert bundle[key] != key
-
-
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN"])
-def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) -> None:
-    bundle = i18n_module._load_bundle(locale)
-
-    for key in (
-        "settings.translation_connection",
-        "settings.translation_connection.managed",
-        "settings.translation_connection.managed.description",
-        "settings.translation_connection.managed_china",
-        "settings.translation_connection.managed_china.description",
-        "settings.translation_connection.openrouter",
-        "settings.translation_connection.openrouter.description",
-        "settings.translation_connection.official_byok",
-        "settings.translation_connection.official_byok.description",
-        "settings.translation_connection.only_supported",
-        "settings.translation_model.gemma4_26b_31b.description",
-        "settings.translation_model.deepseek_v4_flash.description",
-        "settings.translation_model.gemini3_flash.description",
-        "settings.translation_model.gemini31_flash_lite.description",
-        "settings.translation_model.qwen35_plus.description",
-        "settings.translation_model.local_llm.description",
-    ):
-        assert key in bundle
-        if key == "settings.translation_model.gemini31_flash_lite.description":
-            assert bundle[key] == ""
-            continue
-        assert bundle[key]
-        assert bundle[key] != key
-
-    assert (
-        bundle["settings.translation_connection.managed"]
-        == bundle["dashboard.trial.source.managed"]
-    )
-    if locale in {"ko", "zh-CN"}:
-        assert bundle["settings.translation_connection.managed"] != "Managed"
-
-    assert (
-        bundle["settings.translation_connection.managed_china"]
-        == {
-            "en": "Managed (China)",
-            "ko": "관리형 (중국)",
-            "zh-CN": "托管（中国）",
-        }[locale]
-    )
-
-    assert (
-        bundle["settings.translation_connection.official_byok"]
-        == {
-            "en": "Official API",
-            "ko": "공식 API",
-            "zh-CN": "官方 API",
-        }[locale]
-    )
-
-    expected_model_descriptions = {
-        "en": {
-            "settings.translation_model.gemma4_26b_31b.description": "Good for most situations",
-            "settings.translation_model.deepseek_v4_flash.description": "Try this if Gemma 4's speed is unstable",
-            "settings.translation_model.gemini3_flash.description": "Translation speed is slow",
-            "settings.translation_model.gemini31_flash_lite.description": "",
-            "settings.translation_model.qwen35_plus.description": "A strong alternative to DeepSeek",
-            "settings.translation_model.local_llm.description": "You can also use a local LLM",
-        },
-        "ko": {
-            "settings.translation_model.gemma4_26b_31b.description": "대부분의 상황에서 좋아요",
-            "settings.translation_model.deepseek_v4_flash.description": "Gemma 4의 속도가 불안정할 경우 사용해보세요",
-            "settings.translation_model.gemini3_flash.description": "번역 속도가 느려요",
-            "settings.translation_model.gemini31_flash_lite.description": "",
-            "settings.translation_model.qwen35_plus.description": "딥시크의 좋은 대안이에요",
-            "settings.translation_model.local_llm.description": "로컬 LLM도 사용할 수 있어요",
-        },
-        "zh-CN": {
-            "settings.translation_model.gemma4_26b_31b.description": "适合大多数情况",
-            "settings.translation_model.deepseek_v4_flash.description": "当 Gemma 4 速度不稳定时可以试试",
-            "settings.translation_model.gemini3_flash.description": "翻译速度较慢",
-            "settings.translation_model.gemini31_flash_lite.description": "",
-            "settings.translation_model.qwen35_plus.description": "DeepSeek 的不错替代选择",
-            "settings.translation_model.local_llm.description": "也可以使用本地 LLM",
-        },
-    }[locale]
-    for key, expected in expected_model_descriptions.items():
-        assert bundle[key] == expected
-
-
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN"])
-def test_peer_stt_local_qwen_explanatory_copy_renders_from_i18n(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    try:
-        settings = AppSettings()
-        settings.ui.locale = locale
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-        attach_dummy_page(monkeypatch, view)
-
-        captured: dict[str, object] = {}
-
-        class DummyModal:
-            def __init__(
-                self,
-                _page,
-                title,
-                options,
-                _on_select,
-                *,
-                show_description=False,
-                two_column=False,
-            ):
-                captured["title"] = title
-                captured["options"] = options
-                captured["show_description"] = show_description
-                captured["two_column"] = two_column
-
-            def open(self, current: str) -> None:
-                captured["current"] = current
-
-        monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-        i18n_module.set_locale(locale)
-        view.apply_locale()
-        view._on_peer_stt_click(None)
-
-        options = captured["options"]
-        local_qwen_option = next(
-            option for option in options if option.value == STTProviderName.LOCAL_QWEN.value
-        )
-
-        assert captured["title"] == t("settings.section.peer_stt")
-        assert captured["two_column"] is True
-        assert local_qwen_option.description == t("provider.local_qwen.description")
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
-def test_peer_local_qwen_load_preserves_display_and_modal_current(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.peer_stt = STTProviderName.LOCAL_QWEN
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert settings.provider.peer_stt == STTProviderName.LOCAL_QWEN
-    assert view._peer_stt_text.content.value == t("provider.local_qwen")
-
-    view._peer_stt_text.content.value = "stale"
-    view.apply_locale()
-
-    assert view._peer_stt_text.content.value == t("provider.local_qwen")
-
-    attach_dummy_page(monkeypatch, view)
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(
-            self,
-            _page,
-            title,
-            options,
-            _on_select,
-            *,
-            show_description=False,
-            two_column=False,
-        ):
-            captured["title"] = title
-            captured["options"] = options
-            captured["show_description"] = show_description
-            captured["two_column"] = two_column
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_peer_stt_click(None)
-
-    assert captured["title"] == t("settings.section.peer_stt")
-    assert captured["two_column"] is True
-    assert captured["current"] == STTProviderName.LOCAL_QWEN.value
-
-
 def test_overlay_display_toggles_update_persistent_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -4440,40 +3736,6 @@ def test_overlay_display_toggles_update_persistent_settings(
     assert all(incoming is not settings for incoming in settings_calls)
     assert settings_calls[-1].overlay.show_translation is False
     assert settings_calls[-1].overlay.show_peer_original is False
-
-
-def test_overlay_anchor_click_opens_modal_with_current_selection(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    attach_dummy_page(monkeypatch, view)
-
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(self, _page, title, options, _on_select, *, show_description=False):
-            captured["title"] = title
-            captured["options"] = options
-            captured["show_description"] = show_description
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_overlay_anchor_click(None)
-
-    assert captured["title"] == t("settings.overlay.calibration.anchor")
-    assert captured["show_description"] is True
-    assert [option.value for option in captured["options"]] == [
-        "head_locked",
-        "spatial_locked",
-    ]
-    assert captured["options"][1].label == t("settings.overlay.calibration.anchor.spatial_locked")
-    assert captured["options"][1].description == ""
-    assert captured["current"] == "head_locked"
 
 
 def test_overlay_single_action_cards_use_broad_value_slot_click_targets(
@@ -4526,40 +3788,6 @@ def test_overlay_single_action_cards_use_broad_value_slot_click_targets(
         assert control.expand is True
         assert control.content.value == expected
         assert control.content.color == settings_view.COLOR_ON_BACKGROUND
-
-
-def test_overlay_text_size_click_opens_modal_with_named_presets(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    attach_dummy_page(monkeypatch, view)
-
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(self, _page, title, options, _on_select, *, show_description=False):
-            captured["title"] = title
-            captured["options"] = options
-            captured["show_description"] = show_description
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_overlay_text_scale_click(None)
-
-    assert captured["title"] == t("settings.overlay.calibration.text_scale")
-    assert captured["show_description"] is False
-    assert [option.value for option in captured["options"]] == ["large", "normal", "small"]
-    assert [option.label for option in captured["options"]] == [
-        t("settings.overlay.calibration.text_scale.large"),
-        t("settings.overlay.calibration.text_scale.normal"),
-        t("settings.overlay.calibration.text_scale.small"),
-    ]
-    assert captured["current"] == "normal"
 
 
 def test_overlay_text_scale_modal_selection_updates_settings_immediately(
@@ -4690,27 +3918,6 @@ def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only
         i18n_module.set_locale(previous_locale)
 
 
-def test_overlay_tab_shows_only_vr_position_controls_for_vr_target(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.overlay.target = "steamvr"
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert _overlay_tab_card_titles(view) == [
-        t("settings.overlay.caption_location"),
-        t("settings.overlay.show_translation"),
-        t("settings.overlay.show_peer_original"),
-        t("settings.overlay.calibration.anchor"),
-        t("settings.overlay.calibration.distance"),
-        t("settings.overlay.calibration.offset_x"),
-        t("settings.overlay.calibration.offset_y"),
-        t("settings.overlay.calibration.text_scale"),
-        t("settings.overlay.position_reset.vr.title"),
-    ]
-
-
 def test_overlay_tab_switches_visible_cards_when_caption_location_changes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -4804,52 +4011,6 @@ def test_desktop_gui_background_transparency_card_clamps_to_zero_and_one(
 
     assert view._settings.overlay.desktop_flet.visual.background_alpha == pytest.approx(1.0)
     assert view._desktop_overlay_background_alpha_value_text.value == "0%"
-
-
-def test_desktop_gui_size_card_opens_six_label_only_options_large_to_tiny(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.overlay.desktop_flet.size_preset = "medium"
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    attach_dummy_page(monkeypatch, view)
-
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(self, _page, title, options, _on_select, *, show_description=False):
-            captured["title"] = title
-            captured["options"] = options
-            captured["show_description"] = show_description
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_desktop_overlay_size_click(None)
-
-    assert captured["title"] == t("settings.overlay.desktop.size.title")
-    assert captured["show_description"] is False
-    assert [option.value for option in captured["options"]] == [
-        "xlarge",
-        "large",
-        "medium",
-        "small",
-        "xsmall",
-        "tiny",
-    ]
-    assert [option.label for option in captured["options"]] == [
-        t("settings.overlay.desktop.size.option.xlarge"),
-        t("settings.overlay.desktop.size.option.large"),
-        t("settings.overlay.desktop.size.option.medium"),
-        t("settings.overlay.desktop.size.option.small"),
-        t("settings.overlay.desktop.size.option.xsmall"),
-        t("settings.overlay.desktop.size.option.tiny"),
-    ]
-    assert [option.description for option in captured["options"]] == ["", "", "", "", "", ""]
-    assert captured["current"] == "medium"
 
 
 def test_desktop_gui_size_selection_persists_and_emits_settings(
@@ -5375,63 +4536,6 @@ def test_api_translation_connection_row_keeps_empty_fast_translation_slot(
     assert empty_content.content is None
 
 
-@pytest.mark.parametrize("locale", ["en", "ko", "ja", "ru", "zh-CN"])
-def test_retired_policy_empty_slots_are_locale_independent(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        view, _ = _make_settings_view(monkeypatch)
-        general_row = _subtab_controls(view, "general")[0]
-        api_row = view._translation_connection_row
-
-        assert len(_row_cards(general_row)) == 3
-        assert len(_row_cards(api_row)) == 3
-        assert _row_card_titles(general_row) == [
-            t("settings.section.ui"),
-            t("settings.chatbox_include_source"),
-        ]
-        assert _row_card_titles(api_row) == [
-            t("settings.translation_connection"),
-            t("settings.fallback"),
-        ]
-        assert _control_labels(_row_cards(general_row)[2]) == []
-        assert _control_labels(_row_cards(api_row)[0]) == []
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
-@pytest.mark.parametrize(
-    ("locale", "expected_title", "expected_action"),
-    [
-        ("en", "Microphone test", "Test"),
-        ("ko", "마이크 테스트", "테스트"),
-        ("ja", "マイクテスト", "テスト"),
-        ("zh-CN", "麦克风测试", "测试"),
-    ],
-)
-def test_microphone_test_card_uses_localized_title_and_action(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-    expected_title: str,
-    expected_action: str,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        view, _ = _make_settings_view(monkeypatch)
-        card = _general_tab_card(view, t("settings.microphone_test"))
-
-        assert _card_title(card) == expected_title
-        assert _card_value_text(card) == expected_action
-        assert _tree_contains_control(card, view._microphone_test_text)
-        assert not any(isinstance(node, ft.Slider) for node in _iter_control_tree(card))
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
 def test_microphone_test_card_click_invokes_start_callback_without_modal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -5469,23 +4573,6 @@ def test_microphone_test_card_clicks_always_request_start_without_inline_state(
     view._on_microphone_test_click(None)
     assert calls == ["start", "start"]
     assert view._microphone_test_text.content.value == t("settings.microphone_test.action")
-
-
-def test_general_tab_excludes_prompt_and_overlay_controls(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-
-    general_labels: list[str] = []
-    for row in _subtab_controls(view, "general"):
-        general_labels.extend(_control_labels(row))
-
-    assert t("settings.section.persona") not in general_labels
-    assert t("settings.section.custom_vocabulary") not in general_labels
-    assert t("settings.section.overlay") not in general_labels
-    assert t("settings.overlay.enabled") not in general_labels
-    assert "settings.integrated_context" not in general_labels
-    assert t("settings.overlay.calibration") not in general_labels
 
 
 def test_api_tab_places_independent_managed_key_card_above_api_keys(
@@ -5537,45 +4624,6 @@ def test_api_tab_primary_value_typography_is_consistent_across_rows(
     } == {28}
 
 
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN"])
-def test_api_tab_single_value_cards_do_not_render_helper_copy(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    try:
-        settings = AppSettings()
-        settings.ui.locale = locale
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-
-        i18n_module.set_locale(locale)
-        view.apply_locale()
-
-        api_labels: list[str] = []
-        for row in _subtab_controls(view, "api"):
-            api_labels.extend(_control_labels(row))
-
-        assert view._stt_provider_label.value == t("settings.self_stt_provider")
-        assert view._translation_provider_label.value == t("settings.shared_translation_provider")
-        assert view._dashboard_language_redirect_text.value == t(
-            "settings.dashboard_language_redirect"
-        )
-        assert view._openrouter_fallback_helper_text.value in {
-            t("settings.fallback.inactive_helper"),
-            t("settings.fallback.active_helper"),
-            t("settings.fallback.none.description"),
-        }
-        assert t("settings.self_stt_provider") not in api_labels
-        assert t("settings.shared_translation_provider") not in api_labels
-        assert t("settings.peer_stt_provider") not in api_labels
-        assert t("settings.dashboard_language_redirect") not in api_labels
-        assert t("settings.fallback.inactive_helper") not in api_labels
-        assert t("settings.fallback.active_helper") not in api_labels
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
 def test_general_tab_host_api_card_exposes_host_api_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -5585,27 +4633,6 @@ def test_general_tab_host_api_card_exposes_host_api_only(
 
     assert t("settings.desktop_audio.output_device") not in host_api_labels
     assert _tree_contains_control(host_api_card, view._audio_host_api_text)
-
-
-def test_general_audio_host_api_card_displays_localized_compatibility_label(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    i18n_module.set_locale("ko")
-    try:
-        settings = AppSettings()
-        settings.audio.input_host_api = WINDOWS_WASAPI_COMPATIBILITY_HOST_API
-        view, _ = _make_settings_view(monkeypatch)
-
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-
-        assert view._audio_settings.host_api == WINDOWS_WASAPI_COMPATIBILITY_HOST_API
-        assert view._audio_host_api_text.content.value == t(
-            "settings.audio_host_api.option.windows_wasapi_compatibility"
-        )
-        assert view._audio_host_api_text.content.value != WINDOWS_WASAPI_COMPATIBILITY_HOST_API
-    finally:
-        i18n_module.set_locale(old_locale)
 
 
 def test_general_tab_microphone_audio_card_exposes_microphone_only(
@@ -5659,218 +4686,6 @@ def test_general_tab_peer_vad_card_contains_peer_fields_only(
     assert not _tree_contains_control(peer_vad_card, view._peer_hangover_field)
     assert not _tree_contains_control(peer_vad_card, view._peer_pre_roll_field)
     assert not _tree_contains_control(peer_vad_card, view._vad_slider)
-
-
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN"])
-def test_general_tab_labels_and_section_headings_render_from_i18n(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-) -> None:
-    settings = AppSettings()
-    settings.ui.locale = locale
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        view.apply_locale()
-
-        assert view._ui_title.value == t("settings.section.ui")
-        assert view._audio_host_api_title.value == t("settings.audio_host_api")
-        assert view._mic_audio_title.value == t("settings.section.microphone_audio")
-        assert view._loopback_audio_title.value == t("settings.section.loopback_audio")
-        assert view._microphone_test_title.value == t("settings.microphone_test")
-        assert view._microphone_test_text.content.value == t("settings.microphone_test.action")
-        assert view._self_vad_title.value == t("settings.section.self_vad_sensitivity")
-        assert view._peer_vad_title.value == t("settings.section.peer_vad_sensitivity")
-        assert view._peer_vad_field.label == t("settings.vad.peer")
-        assert view._peer_hangover_field.label == t("settings.vad.peer_hangover_ms")
-        assert view._peer_pre_roll_field.label == t("settings.vad.peer_pre_roll_ms")
-        assert view._vrc_mic_title.value == t("settings.vrc_mic_intercept")
-        assert view._chatbox_source_title.value == t("settings.chatbox_include_source")
-        assert view._clipboard_auto_translate_title.value == t("settings.clipboard_auto_translate")
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
-@pytest.mark.parametrize(
-    ("locale", "expected_title"),
-    [
-        ("ko", "Chatbox 출력 형식"),
-        ("en", "Chatbox Output Format"),
-        ("zh-CN", "Chatbox 输出格式"),
-    ],
-)
-def test_chatbox_source_card_title_uses_chatbox_output_format_wording(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-    expected_title: str,
-) -> None:
-    settings = AppSettings()
-    settings.ui.locale = locale
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        view.apply_locale()
-
-        assert view._chatbox_source_title.value == expected_title
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
-@pytest.mark.parametrize(
-    ("locale", "expected_on", "expected_off"),
-    [
-        ("ko", "켜기", "끄기"),
-        ("zh-CN", "开启", "关闭"),
-    ],
-)
-def test_vrc_mic_sync_card_uses_localized_on_off_labels(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-    expected_on: str,
-    expected_off: str,
-) -> None:
-    settings = AppSettings()
-    settings.ui.locale = locale
-    view, _ = _make_settings_view(monkeypatch)
-
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-
-        settings.osc.vrc_mic_intercept = True
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-        view.apply_locale()
-        assert view._vrc_mic_text.content.value == expected_on
-
-        settings.osc.vrc_mic_intercept = False
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-        view.apply_locale()
-        assert view._vrc_mic_text.content.value == expected_off
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN"])
-def test_overlay_failure_reason_keys_are_localized(locale: str) -> None:
-    bundle = i18n_module._load_bundle(locale)
-
-    assert bundle["settings.overlay.failure.missing_executable"]
-    assert bundle["settings.overlay.failure.runtime_crashed"]
-    assert bundle["settings.overlay.failure.stale_overlay_build"]
-    assert bundle["settings.overlay.failure.vendored_openvr_dll_missing"]
-    assert bundle["settings.overlay.failure.packaged_openvr_dll_missing"]
-    assert bundle["settings.overlay.failure.openvr_dll_hash_mismatch"]
-    assert bundle["settings.overlay.failure.steamvr_not_installed"]
-    assert bundle["settings.overlay.failure.steamvr_not_running"]
-    assert bundle["settings.overlay.failure.hmd_not_found"]
-    assert bundle["settings.overlay.show_translation"]
-    assert bundle["settings.overlay.show_peer_original"]
-    assert bundle["settings.overlay.position_reset"]
-    assert bundle["settings.peer_translation.status.warning"]
-    assert bundle["settings.peer_translation.warning.overlay_failed"]
-
-
-def test_overlay_tab_controls_are_localized(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(AppSettings(), config_path=Path("settings.json"))
-
-    assert view._overlay_target_title.value == t("settings.overlay.caption_location")
-    assert view._overlay_translation_title.value == t("settings.overlay.show_translation")
-    assert view._overlay_peer_original_title.value == t("settings.overlay.show_peer_original")
-    assert view._overlay_anchor_title.value == t("settings.overlay.calibration.anchor")
-    assert view._overlay_distance_title.value == t("settings.overlay.calibration.distance")
-    assert view._overlay_offset_x_title.value == t("settings.overlay.calibration.offset_x")
-    assert view._overlay_offset_y_title.value == t("settings.overlay.calibration.offset_y")
-    assert view._overlay_text_scale_title.value == t("settings.overlay.calibration.text_scale")
-    assert view._overlay_vr_reset_title.value == t("settings.overlay.position_reset.vr.title")
-    assert view._overlay_desktop_reset_title.value == t(
-        "settings.overlay.position_reset.desktop.title"
-    )
-    assert view._desktop_overlay_size_title.value == t("settings.overlay.desktop.size.title")
-    assert view._desktop_overlay_background_alpha_title.value == t(
-        "settings.overlay.desktop.background_alpha.title"
-    )
-    assert view._desktop_overlay_lock_title.value == t("settings.overlay.desktop.lock.title")
-    assert view._desktop_overlay_status_card.visible is False
-
-
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN"])
-def test_overlay_immediate_card_labels_render_from_i18n(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-) -> None:
-    settings = AppSettings()
-    settings.ui.locale = locale
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        view._overlay_translation_title.value = "stale"
-        view._overlay_peer_original_title.value = "stale"
-        view._overlay_target_title.value = "stale"
-        view._overlay_anchor_title.value = "stale"
-        view._overlay_distance_title.value = "stale"
-        view._overlay_offset_x_title.value = "stale"
-        view._overlay_offset_y_title.value = "stale"
-        view._overlay_text_scale_title.value = "stale"
-        view._overlay_vr_reset_title.value = "stale"
-        view._overlay_desktop_reset_title.value = "stale"
-        view._desktop_overlay_size_title.value = "stale"
-        view._desktop_overlay_background_alpha_title.value = "stale"
-        view._desktop_overlay_lock_title.value = "stale"
-        view._desktop_overlay_status_title.value = "stale"
-
-        view.apply_locale()
-
-        overlay_labels: list[str] = []
-        for card in _overlay_tab_cards(view):
-            overlay_labels.extend(_control_labels(card))
-
-        assert view._overlay_target_title.value == t("settings.overlay.caption_location")
-        assert view._overlay_translation_title.value == t("settings.overlay.show_translation")
-        assert view._overlay_peer_original_title.value == t("settings.overlay.show_peer_original")
-        assert view._overlay_target_title.value == t("settings.overlay.caption_location")
-        assert view._overlay_anchor_title.value == t("settings.overlay.calibration.anchor")
-        assert view._overlay_distance_title.value == t("settings.overlay.calibration.distance")
-        assert view._overlay_offset_x_title.value == t("settings.overlay.calibration.offset_x")
-        assert view._overlay_offset_y_title.value == t("settings.overlay.calibration.offset_y")
-        assert view._overlay_text_scale_title.value == t("settings.overlay.calibration.text_scale")
-        assert view._overlay_vr_reset_title.value == t("settings.overlay.position_reset.vr.title")
-        assert view._overlay_desktop_reset_title.value == t(
-            "settings.overlay.position_reset.desktop.title"
-        )
-        assert view._desktop_overlay_size_title.value == t("settings.overlay.desktop.size.title")
-        assert view._desktop_overlay_background_alpha_title.value == t(
-            "settings.overlay.desktop.background_alpha.title"
-        )
-        assert view._desktop_overlay_lock_title.value == t("settings.overlay.desktop.lock.title")
-        assert view._desktop_overlay_status_card.visible is False
-        assert t("settings.overlay.caption_location") in overlay_labels
-        assert t("settings.overlay.show_translation") in overlay_labels
-        assert t("settings.overlay.show_peer_original") in overlay_labels
-        assert t("settings.overlay.calibration.anchor") in overlay_labels
-        assert t("settings.overlay.calibration.distance") in overlay_labels
-        assert t("settings.overlay.calibration.offset_x") in overlay_labels
-        assert t("settings.overlay.calibration.offset_y") in overlay_labels
-        assert t("settings.overlay.calibration.text_scale") in overlay_labels
-        assert t("settings.overlay.position_reset.vr.title") in overlay_labels
-        assert t("settings.overlay.desktop.size.title") not in overlay_labels
-        assert t("settings.overlay.desktop.background_alpha.title") not in overlay_labels
-        assert t("settings.overlay.desktop.lock.title") not in overlay_labels
-        assert all(row.visible is True for row in view._overlay_vr_rows)
-        assert all(row.visible is False for row in view._overlay_desktop_rows)
-    finally:
-        i18n_module.set_locale(old_locale)
 
 
 def test_overlay_tab_uses_target_specific_unit_card_rows(
@@ -5927,135 +4742,6 @@ def test_overlay_tab_uses_target_specific_unit_card_rows(
     assert overlay_controls[3].visible is False
     assert overlay_controls[4].visible is False
     assert overlay_controls[5].visible is False
-
-
-def test_legacy_vr_overlay_shell_removed_from_settings_subtabs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-
-    prompt_titles = _prompt_tab_card_titles(view)
-    overlay_titles = _overlay_tab_card_titles(view)
-    prompt_labels: list[str] = []
-    overlay_labels: list[str] = []
-    for control in _subtab_controls(view, "prompt"):
-        prompt_labels.extend(_control_labels(control))
-    for control in _subtab_controls(view, "overlay"):
-        overlay_labels.extend(_control_labels(control))
-
-    assert prompt_titles == [
-        t("settings.section.custom_vocabulary"),
-        t("settings.section.persona"),
-    ]
-    assert overlay_titles == [
-        t("settings.overlay.caption_location"),
-        t("settings.overlay.show_translation"),
-        t("settings.overlay.show_peer_original"),
-        t("settings.overlay.calibration.anchor"),
-        t("settings.overlay.calibration.distance"),
-        t("settings.overlay.calibration.offset_x"),
-        t("settings.overlay.calibration.offset_y"),
-        t("settings.overlay.calibration.text_scale"),
-        t("settings.overlay.position_reset.vr.title"),
-    ]
-    assert t("settings.section.overlay") not in prompt_labels
-    assert t("settings.section.overlay") not in overlay_labels
-    assert t("settings.overlay.enabled") not in prompt_labels
-    assert t("settings.overlay.enabled") not in overlay_labels
-    assert t("settings.peer_translation") not in prompt_labels
-    assert t("settings.peer_translation") not in overlay_labels
-
-
-def test_migrated_overlay_copy_cleanup_keeps_prompt_and_overlay_sections_separate(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-
-    translation_card = _overlay_tab_card(view, t("settings.overlay.show_translation"))
-    anchor_card = _overlay_tab_card(view, t("settings.overlay.calibration.anchor"))
-    translation_labels = _control_labels(translation_card)
-    anchor_labels = _control_labels(anchor_card)
-
-    assert t("settings.integrated_context") not in translation_labels
-    assert t("settings.integrated_context") not in anchor_labels
-    assert t("settings.overlay.show_translation") in translation_labels
-    assert t("settings.overlay.calibration.anchor") in anchor_labels
-
-
-def test_legacy_overlay_cleanup_copy_renders_from_i18n(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    previous_locale = i18n_module.get_locale()
-
-    try:
-        for locale in ("en", "ko", "zh-CN"):
-            settings = AppSettings()
-            settings.ui.locale = locale
-
-            view, _ = _make_settings_view(monkeypatch)
-            view.load_from_settings(settings, config_path=Path("settings.json"))
-
-            i18n_module.set_locale(locale)
-            view._overlay_target_title.value = "stale"
-            view._overlay_translation_title.value = "stale"
-            view._overlay_peer_original_title.value = "stale"
-            view._overlay_anchor_title.value = "stale"
-            view._overlay_distance_title.value = "stale"
-            view._overlay_offset_x_title.value = "stale"
-            view._overlay_offset_y_title.value = "stale"
-            view._overlay_text_scale_title.value = "stale"
-            view._overlay_vr_reset_title.value = "stale"
-            view._overlay_desktop_reset_title.value = "stale"
-            view._desktop_overlay_size_title.value = "stale"
-            view._desktop_overlay_background_alpha_title.value = "stale"
-            view._desktop_overlay_lock_title.value = "stale"
-            view._desktop_overlay_status_title.value = "stale"
-
-            view.apply_locale()
-
-            translation_card = _overlay_tab_card(view, t("settings.overlay.show_translation"))
-            anchor_card = _overlay_tab_card(view, t("settings.overlay.calibration.anchor"))
-            translation_labels = _control_labels(translation_card)
-            anchor_labels = _control_labels(anchor_card)
-
-            assert view._overlay_target_title.value == t("settings.overlay.caption_location")
-            assert view._overlay_translation_title.value == t("settings.overlay.show_translation")
-            assert view._overlay_peer_original_title.value == t(
-                "settings.overlay.show_peer_original"
-            )
-            assert view._overlay_anchor_title.value == t("settings.overlay.calibration.anchor")
-            assert view._overlay_distance_title.value == t("settings.overlay.calibration.distance")
-            assert view._overlay_offset_x_title.value == t("settings.overlay.calibration.offset_x")
-            assert view._overlay_offset_y_title.value == t("settings.overlay.calibration.offset_y")
-            assert view._overlay_text_scale_title.value == t(
-                "settings.overlay.calibration.text_scale"
-            )
-            assert view._overlay_vr_reset_title.value == t(
-                "settings.overlay.position_reset.vr.title"
-            )
-            assert view._overlay_desktop_reset_title.value == t(
-                "settings.overlay.position_reset.desktop.title"
-            )
-            assert view._desktop_overlay_size_title.value == t(
-                "settings.overlay.desktop.size.title"
-            )
-            assert view._desktop_overlay_background_alpha_title.value == t(
-                "settings.overlay.desktop.background_alpha.title"
-            )
-            assert view._desktop_overlay_lock_title.value == t(
-                "settings.overlay.desktop.lock.title"
-            )
-            assert view._desktop_overlay_status_card.visible is False
-            assert t("settings.overlay.caption_location") in _control_labels(
-                _overlay_tab_card(view, t("settings.overlay.caption_location"))
-            )
-            assert t("settings.overlay.show_translation") in translation_labels
-            assert t("settings.overlay.calibration.anchor") in anchor_labels
-            assert t("settings.section.overlay") not in translation_labels
-            assert t("settings.overlay.enabled") not in translation_labels
-            assert t("settings.peer_translation") not in translation_labels
-    finally:
-        i18n_module.set_locale(previous_locale)
 
 
 def test_apply_locale_updates_general_clickable_value_fonts_to_zh_cn(
@@ -6362,60 +5048,6 @@ def test_translation_card_no_longer_contains_translation_connection_row(
     assert view._translation_connection_row not in translation_column.controls
 
 
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN"])
-def test_overlay_tab_labels_and_headings_render_from_i18n(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-) -> None:
-    settings = AppSettings()
-    settings.ui.locale = locale
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    old_locale = i18n_module.get_locale()
-    try:
-        i18n_module.set_locale(locale)
-        view.apply_locale()
-
-        overlay_labels: list[str] = []
-        for card in _overlay_tab_cards(view):
-            overlay_labels.extend(_control_labels(card))
-
-        assert view._overlay_translation_title.value == t("settings.overlay.show_translation")
-        assert view._overlay_peer_original_title.value == t("settings.overlay.show_peer_original")
-        assert view._overlay_anchor_title.value == t("settings.overlay.calibration.anchor")
-        assert view._overlay_distance_title.value == t("settings.overlay.calibration.distance")
-        assert view._overlay_offset_x_title.value == t("settings.overlay.calibration.offset_x")
-        assert view._overlay_offset_y_title.value == t("settings.overlay.calibration.offset_y")
-        assert view._overlay_text_scale_title.value == t("settings.overlay.calibration.text_scale")
-        assert view._overlay_vr_reset_title.value == t("settings.overlay.position_reset.vr.title")
-        assert view._overlay_desktop_reset_title.value == t(
-            "settings.overlay.position_reset.desktop.title"
-        )
-        assert view._desktop_overlay_size_title.value == t("settings.overlay.desktop.size.title")
-        assert view._desktop_overlay_background_alpha_title.value == t(
-            "settings.overlay.desktop.background_alpha.title"
-        )
-        assert view._desktop_overlay_lock_title.value == t("settings.overlay.desktop.lock.title")
-        assert view._desktop_overlay_status_card.visible is False
-        assert t("settings.overlay.caption_location") in overlay_labels
-        assert t("settings.overlay.show_translation") in overlay_labels
-        assert t("settings.overlay.show_peer_original") in overlay_labels
-        assert t("settings.overlay.calibration.anchor") in overlay_labels
-        assert t("settings.overlay.calibration.distance") in overlay_labels
-        assert t("settings.overlay.calibration.offset_x") in overlay_labels
-        assert t("settings.overlay.calibration.offset_y") in overlay_labels
-        assert t("settings.overlay.calibration.text_scale") in overlay_labels
-        assert t("settings.overlay.position_reset.vr.title") in overlay_labels
-        assert t("settings.overlay.desktop.size.title") not in overlay_labels
-        assert t("settings.overlay.desktop.background_alpha.title") not in overlay_labels
-        assert t("settings.overlay.desktop.lock.title") not in overlay_labels
-        assert all(row.visible is True for row in view._overlay_vr_rows)
-        assert all(row.visible is False for row in view._overlay_desktop_rows)
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
 @pytest.mark.asyncio
 async def test_prompt_verify_and_emit_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = AppSettings()
@@ -6577,45 +5209,6 @@ def test_on_text_hover_updates_container_once(monkeypatch: pytest.MonkeyPatch) -
     assert len(updates) == 1
 
 
-def test_apply_locale_and_refresh_prompt_if_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = AppSettings()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    view._prompt_editor.value = ""
-    view.apply_locale()
-    view.refresh_prompt_if_empty()
-
-    assert view._stt_title.value == t("settings.section.stt")
-    assert view._reset_prompt_btn.content == t("settings.reset_prompt")
-    assert bool(view._prompt_editor.value.strip())
-    assert view._translation_connection_title.value == t("settings.translation_connection")
-
-
-def test_apply_locale_refreshes_peer_labels_and_inherit_texts(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.ui.locale = "ko"
-    settings.provider.peer_stt = STTProviderName.QWEN_ASR
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    old_locale = i18n_module.get_locale()
-    expected_peer_stt_label = ""
-    try:
-        i18n_module.set_locale("ko")
-        view._peer_stt_label.value = "stale"
-
-        view.apply_locale()
-        expected_peer_stt_label = t("settings.peer_stt_provider")
-    finally:
-        i18n_module.set_locale(old_locale)
-
-    assert view._peer_stt_label.value == expected_peer_stt_label
-
-
 def test_apply_locale_refreshes_deepseek_api_key_field(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -6630,55 +5223,6 @@ def test_apply_locale_refreshes_deepseek_api_key_field(
     assert calls == ["deepseek"]
 
 
-@pytest.mark.parametrize(
-    ("locale", "expected_title", "expected_redirect"),
-    [
-        (
-            "en",
-            "Peer Speech Recognition",
-            "Change self and peer language pairs from the Dashboard language card.",
-        ),
-        (
-            "ko",
-            "상대 음성 인식",
-            "셀프와 상대 언어 조합은 대시보드 언어 카드에서 바꿔주세요.",
-        ),
-        (
-            "zh-CN",
-            "对方语音识别",
-            "请在仪表板的语言卡片中修改自己与对方的语言组合。",
-        ),
-    ],
-)
-def test_peer_language_migration_copy_renders_from_i18n(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-    expected_title: str,
-    expected_redirect: str,
-) -> None:
-    old_locale = i18n_module.get_locale()
-    try:
-        settings = AppSettings()
-        settings.ui.locale = locale
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-
-        i18n_module.set_locale(locale)
-        view.apply_locale()
-
-        assert view._peer_provider_title.value == expected_title
-        assert view._dashboard_language_redirect_text.value == expected_redirect
-
-        if locale != "en":
-            assert view._peer_provider_title.value != "Peer Speech Recognition"
-            assert (
-                view._dashboard_language_redirect_text.value
-                != "Change self and peer language pairs from the Dashboard language card."
-            )
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
 def test_settings_view_does_not_create_peer_deepgram_model_controls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -6686,21 +5230,6 @@ def test_settings_view_does_not_create_peer_deepgram_model_controls(
 
     assert not hasattr(view, "_peer_deepgram_model_label")
     assert not hasattr(view, "_peer_deepgram_model_text")
-
-
-def test_load_from_settings_updates_vrc_mic_toggle_label(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    view, _ = _make_settings_view(monkeypatch)
-
-    settings.osc.vrc_mic_intercept = True
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
-
-    settings.osc.vrc_mic_intercept = False
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    assert view._vrc_mic_text.content.value == t("settings.vrc_mic.off")
 
 
 def test_on_vrc_mic_click_toggles_without_page(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -6785,22 +5314,6 @@ def test_on_vrc_mic_selected_without_settings_returns_early(
     view._on_vrc_mic_selected("on")
 
     assert changed == []
-
-
-def test_apply_locale_refreshes_vrc_mic_title_and_value(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.osc.vrc_mic_intercept = True
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view._vrc_mic_title.value = "stale-title"
-    view._vrc_mic_text.content.value = "stale-value"
-
-    view.apply_locale()
-
-    assert view._vrc_mic_title.value == t("settings.vrc_mic_intercept")
-    assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
 
 
 def test_custom_vocabulary_loads_current_source_language_bucket_as_tags(
@@ -6900,73 +5413,6 @@ def test_prompt_tab_hides_prompt_provider_copy_and_old_language_helper_text(
         ) not in _control_labels(prompt_card)
         assert not hasattr(view, "_custom_vocab_helper_text")
         assert t("settings.custom_vocabulary.description") in _control_labels(custom_vocab_card)
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
-@pytest.mark.parametrize(
-    ("locale", "expected_description"),
-    [
-        (
-            "ko",
-            "현재는 Soniox와 Deepgram만 지원해요.",
-        ),
-        (
-            "en",
-            "Currently, only Soniox and Deepgram support this.",
-        ),
-        ("zh-CN", "目前仅支持 Soniox 和 Deepgram。"),
-    ],
-)
-def test_custom_vocabulary_inline_helper_copy_matches_provider_scope(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-    expected_description: str,
-) -> None:
-    settings = AppSettings()
-    settings.ui.locale = locale
-
-    old_locale = i18n_module.get_locale()
-    try:
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-
-        i18n_module.set_locale(locale)
-        view.apply_locale()
-
-        custom_vocab_card = _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
-        assert view._custom_vocab_description_text.value == expected_description
-        assert expected_description in _control_labels(custom_vocab_card)
-        assert not hasattr(view, "_custom_vocab_info_icon")
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
-@pytest.mark.parametrize(
-    ("locale", "expected_title"),
-    [
-        ("ko", "단어 인식 힌트"),
-        ("en", "Word Recognition Hints"),
-        ("zh-CN", "单词识别提示"),
-    ],
-)
-def test_custom_vocabulary_card_title_uses_generic_hint_wording(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
-    expected_title: str,
-) -> None:
-    settings = AppSettings()
-    settings.ui.locale = locale
-
-    old_locale = i18n_module.get_locale()
-    try:
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
-
-        i18n_module.set_locale(locale)
-        view.apply_locale()
-
-        assert view._custom_vocab_title.value == expected_title
     finally:
         i18n_module.set_locale(old_locale)
 
@@ -7391,33 +5837,6 @@ def test_on_qwen_region_selected_uses_detailed_runtime_log(
     assert detailed_messages == ["[Settings] Qwen region changed: beijing -> singapore"]
 
 
-def test_apply_locale_refreshes_custom_vocabulary_text(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettings()
-    settings.provider.stt = STTProviderName.DEEPGRAM
-    settings.languages.source_language = "en"
-    settings.stt.custom_terms = {"en": ["Puripuly"]}
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view._custom_vocab_title.value = "stale-title"
-    view._custom_vocab_description_text.value = "stale-description"
-    view._custom_vocab_tag_editor.set_placeholder("stale-placeholder")
-    view._custom_vocab_tag_editor.set_add_label("stale-add")
-    view._custom_vocab_tag_editor.set_empty_text("stale-empty")
-    view._custom_vocab_tag_editor.set_remove_label_template("stale-remove {term}")
-
-    view.apply_locale()
-
-    assert view._custom_vocab_title.value == t("settings.section.custom_vocabulary")
-    assert view._custom_vocab_description_text.value == t("settings.custom_vocabulary.description")
-    assert view._custom_vocab_tag_editor._input_field.hint_text == ""  # noqa: SLF001
-    assert view._custom_vocab_tag_editor._empty_text.visible is False  # noqa: SLF001
-    chip = view._custom_vocab_tag_editor._chips_wrap.controls[0]  # noqa: SLF001
-    assert chip.tooltip is None
-
-
 def test_settings_view_uses_generic_subtab_shell(monkeypatch: pytest.MonkeyPatch) -> None:
     from puripuly_heart.ui.components.subtab_shell import TextSubtabShell
 
@@ -7560,27 +5979,6 @@ def test_text_subtab_shell_keeps_floating_treatment_when_bar_is_top() -> None:
         subtab_shell_module.COLOR_PRIMARY_CONTAINER
     )
     assert _button_style_value(shell.button_by_key["general"], "bgcolor") == (ft.Colors.TRANSPARENT)
-
-
-def test_settings_subtab_labels_render_from_i18n(monkeypatch: pytest.MonkeyPatch) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    previous_locale = i18n_module.get_locale()
-
-    try:
-        i18n_module.set_locale("ko")
-        view.apply_locale()
-
-        assert [
-            _subtab_text_value(view._settings_subtab_shell.button_by_key[key])
-            for key in settings_view._SETTINGS_SUBTAB_ORDER
-        ] == [
-            t("settings.subtab.api"),
-            t("settings.subtab.general"),
-            t("settings.subtab.prompt"),
-            t("settings.subtab.overlay"),
-        ]
-    finally:
-        i18n_module.set_locale(previous_locale)
 
 
 def test_text_subtab_shell_rejects_duplicate_keys() -> None:
