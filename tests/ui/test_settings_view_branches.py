@@ -4298,7 +4298,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
             "settings.translation_model.gemini3_flash.description": "Translation speed is slow",
             "settings.translation_model.gemini31_flash_lite.description": "",
             "settings.translation_model.qwen35_plus.description": "A strong alternative to DeepSeek",
-            "settings.translation_model.local_llm.description": "You can use an OpenAI-compatible API",
+            "settings.translation_model.local_llm.description": "You can also use a local LLM",
         },
         "ko": {
             "settings.translation_model.gemma4_26b_31b.description": "대부분의 상황에서 좋아요",
@@ -4306,7 +4306,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
             "settings.translation_model.gemini3_flash.description": "번역 속도가 느려요",
             "settings.translation_model.gemini31_flash_lite.description": "",
             "settings.translation_model.qwen35_plus.description": "딥시크의 좋은 대안이에요",
-            "settings.translation_model.local_llm.description": "OpenAI 호환 API를 사용할 수 있어요",
+            "settings.translation_model.local_llm.description": "로컬 LLM도 사용할 수 있어요",
         },
         "zh-CN": {
             "settings.translation_model.gemma4_26b_31b.description": "适合大多数情况",
@@ -4314,7 +4314,7 @@ def test_translation_connection_and_model_copy_is_backed_by_i18n(locale: str) ->
             "settings.translation_model.gemini3_flash.description": "翻译速度较慢",
             "settings.translation_model.gemini31_flash_lite.description": "",
             "settings.translation_model.qwen35_plus.description": "DeepSeek 的不错替代选择",
-            "settings.translation_model.local_llm.description": "可以使用 OpenAI 兼容 API",
+            "settings.translation_model.local_llm.description": "也可以使用本地 LLM",
         },
     }[locale]
     for key, expected in expected_model_descriptions.items():
