@@ -210,7 +210,6 @@
   "settings.overlay.calibration.anchor": "Привязка",
   "settings.overlay.calibration.anchor.head_locked": "К голове",
   "settings.overlay.calibration.anchor.spatial_locked": "В пространстве",
-  "settings.overlay.calibration.anchor.spatial_locked.description": "При появлении новой реплики перемещается перед текущим взглядом и остается зафиксированным в этом месте.",
   "settings.overlay.calibration.offset_x": "Смещение X",
   "settings.overlay.calibration.offset_y": "Смещение Y",
   "settings.overlay.calibration.distance": "Расстояние",
