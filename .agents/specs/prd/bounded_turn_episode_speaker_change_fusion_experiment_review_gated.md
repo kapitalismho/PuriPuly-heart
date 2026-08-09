@@ -1731,7 +1731,7 @@ The Phase 9 reviewer must examine at minimum:
 - negative-outcome rules and external-validity caveat;
 - confirmation that no threshold, panel, fusion, or provider policy is being changed after held-out/provider results.
 
-The Phase 9 verifier/reviewer must be independent of the execution worker whose results
+The Phase 9 verifier/reviewer must be independent of the phase executor whose results
 are being checked. If the final review discovers a structural flaw that would require
 changing a frozen experiment contract, the affected claim is withdrawn or the experiment
 returns to the earliest affected phase; it is not repaired by post-hoc rescoring under a
@@ -1823,25 +1823,28 @@ Use explicit outcomes when appropriate:
 ## 32. Independent review, verification, and worker governance
 
 Every Phase 0-9 first receives the mandatory pre-execution review defined in Section 29.
-The phase execution worker is not dispatched until the review verdict is `approved`.
-Where tooling permits, the pre-execution reviewer must be a fresh worker/reviewer distinct
-from the worker that will implement or execute the phase. A reviewer must not inspect
+Phase execution does not start until the review verdict is `approved`.
+The pre-execution reviewer must be fresh and independent from the Goal executor that will
+implement or execute the phase. A reviewer must not inspect
 restricted confirmatory held-out content earlier than the phase contract permits.
+Each phase-exit evidence verification also uses a fresh reviewer independent from the
+Goal executor.
 
 If a reviewer finds a blocking or required change, the coordinator updates the affected
-contract/artifact, records the new hash, and requests re-review. The execution worker may
+contract/artifact, records the new hash, and requests re-review. The Goal executor may
 not treat `approved_with_required_changes` as permission to start. One review may not be
 reused to approve later phases whose inputs have changed.
 
-Each execution phase then uses a fresh paid DeepSeek OpenCode worker. The execution worker:
+The active Goal executor directly implements and executes each approved phase. OpenCode
+must not be launched or delegated to unless the user explicitly authorizes it later. The
+Goal executor:
 
 - receives the exact approved phase scope, review artifact/hash, and timeout requirements;
 - does not expand the experiment beyond the approved review scope;
 - does not retry or restart a failed full run without a new coordinator instruction;
-- reports `worker_done` or escalation;
-- is monitored with ten-minute event waits rather than one-minute polling.
+- reports completion or escalation at the phase boundary.
 
-Reviewer or worker reports are not scientific evidence by themselves. The coordinator independently verifies:
+Reviewer or executor reports are not scientific evidence by themselves. The coordinator independently verifies:
 
 - file and self hashes;
 - expected session/profile counts;
