@@ -23,6 +23,7 @@ const POSITIVE_ROUTING_PROBE_MODELS = MANAGED_ALLOWLIST_MODELS.filter(
 );
 const EMPTY_CONTENT_ALLOWED_POSITIVE_ROUTING_MODELS = new Set([
   'deepseek/deepseek-v4-flash-0731',
+  'deepseek/deepseek-v4-flash-0423',
   'deepseek/deepseek-v4-flash',
 ]);
 const BOOTSTRAP_PLACEHOLDER = '__BOOTSTRAP_REQUIRED__';
@@ -152,6 +153,13 @@ describe('broker deploy smoke helpers', () => {
     ).toThrow(/must differ from the managed allowlisted models/i);
     expect(() =>
       normalizeDisallowedModel(
+        'deepseek/deepseek-v4-flash-0423',
+        MANAGED_ALLOWLIST_MODELS,
+        true,
+      ),
+    ).toThrow(/must differ from the managed allowlisted models/i);
+    expect(() =>
+      normalizeDisallowedModel(
         'deepseek/deepseek-v4-flash',
         MANAGED_ALLOWLIST_MODELS,
         true,
@@ -163,6 +171,7 @@ describe('broker deploy smoke helpers', () => {
     expect(POSITIVE_ROUTING_PROBE_MODELS).toEqual([
       'qwen/qwen3.5-flash-02-23',
       'deepseek/deepseek-v4-flash-0731',
+      'deepseek/deepseek-v4-flash-0423',
       'deepseek/deepseek-v4-flash',
       'google/gemini-2.5-flash-lite',
     ]);
